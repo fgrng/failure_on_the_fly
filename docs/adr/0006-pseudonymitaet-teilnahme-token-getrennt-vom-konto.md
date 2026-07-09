@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Erhebungs-Teilnahmen sind pseudonym und strikt vom Trainingsbereich getrennt

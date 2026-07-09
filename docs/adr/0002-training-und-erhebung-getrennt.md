@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Training und Erhebung sind getrennte Konzepte auf gemeinsamem Sitzungs-Rückgrat

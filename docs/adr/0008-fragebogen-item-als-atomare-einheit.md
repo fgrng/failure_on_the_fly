@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Das Fragebogen-Item ist die atomare Einheit; „Fragebogen" ist kein Objekt

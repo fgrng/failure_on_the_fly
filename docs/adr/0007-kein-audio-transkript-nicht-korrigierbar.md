@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Audio wird nie gespeichert; das Transkript ist nicht korrigierbar
