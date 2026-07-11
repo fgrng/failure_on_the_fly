@@ -29,7 +29,7 @@ Die Sichtbarkeit ist bewusst gestaffelt:
 
 ## Consequences
 
-- Die Vignette braucht eine **Bearbeitungsbeschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Inhalt zu sehen ist. Das Bild ist für den Menschen, der Text speist das Reasoning.
+- Die Vignette braucht eine **Arbeitsheft-Beschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Inhalt zu sehen ist. Das Bild ist für den Menschen, der Text speist das Reasoning.
 - Der didaktisch reizvolle Gedanke, Trainingsteilnehmenden nachträglich zu zeigen, „wie die Simulation gedacht hat", ist verworfen.
 - Die Menge der zulässigen Anbieter und Modelle ist auf solche eingeschränkt, die Structured Output beherrschen. Ob ein Modell Structured Output und natives Reasoning zugleich zulässt, ist bei der Implementierung je Anbieter zu prüfen.
 - Weil die Denkspur nicht in den Kontext zurückfließt, bleibt der Kontext klein und die Denkspur ein reines Ausgabeprodukt.
