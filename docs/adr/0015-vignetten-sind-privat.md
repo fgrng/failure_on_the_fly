@@ -4,6 +4,8 @@ status: accepted
 
 # Vignetten sind privat; es gibt kein Veröffentlichen
 
+> **Nachgeführt durch ADR-0022 (Ko-Autorschaft):** Eine Vignette gehört inzwischen einem *Kreis* gleichrangiger Eigentümerinnen, nicht einer einzelnen Autor:in. Die Privatheit fällt dadurch nicht, sie verengt sich von „privat für die Autor:in" auf „privat für den Eigentümer-Kreis". Wo dieses ADR „ihre eigenen Vignetten" sagt, lies „die Vignetten ihres Eigentümer-Kreises".
+
 Eine Autor:in sieht und bearbeitet **ausschließlich ihre eigenen Vignetten**. Es gibt keinen Mechanismus, eine Vignette anderen Autor:innen derselben Instanz zugänglich zu machen — und deshalb auch keinen Status *veröffentlicht* im Versions-Lebenszyklus (siehe ADR-0003). Sichtbarkeit ist kein Attribut, sondern eine Konstante.
 
 Rollen sind damit **additiv**: Wer eine Erhebung oder ein Training zusammenstellen will, muss die enthaltenen Vignetten selbst in der Rolle der Autor:in geschrieben haben. Ausbilder:innen und Forschende greifen auf keine fremden Vignetten zu.

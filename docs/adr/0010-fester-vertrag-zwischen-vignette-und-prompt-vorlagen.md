@@ -25,12 +25,23 @@ Der Arbeitsheft-Inhalt bleibt aus dem Prompt heraus, weil er ein Bild sein kann;
 
 **Beide Akteure sind Vignettenfelder**, nicht Kernfelder: Dieselbe Schüler:in dürfte sonst in jeder Klassenstufe und jedem Fach dieselbe sein, und dasselbe gilt eine Rolle weiter für die Lehrperson. Namen und Geschlechter werden im Anlegen-Formular zufällig vorbelegt und sind überschreibbar — der Zufall ist eine Freundlichkeit der Oberfläche, keine Eigenschaft der Domäne. Sie werden mit der Vignette versioniert und beim Finalisieren eingefroren; ein Entwurf aus einer finalen Fassung erbt sie.
 
-Die **Rahmenhandlung ist ebenfalls eine Vorlage** und schöpft aus demselben Vertrag, jedoch nur aus dessen Nutzeransicht-Spalte.
+Die **Rahmenhandlung ist ebenfalls eine Vorlage**, schöpft aber nicht aus demselben Vertrag: Prompt-Vorlagen und Rahmenhandlung berühren sich nie (ADR-0004) und ziehen aus verschiedenen Spalten obiger Tabelle. Der Vertrag ist deshalb **zwei benannte Mengen, nicht eine**:
+
+- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte, als rohe Werte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht.
+- `VERTRAG_RAHMEN` — die Felder der Nutzeransicht-Spalte, plus abgeleitete grammatische Formen (siehe unten). Aus ihr schöpfen Einleitung und Debrief.
+
+Eine einzige Menge wäre falsch: Sie erlaubte die Fehlermuster-Beschreibung in der Einleitung, die sie nie sehen darf, und den Namen der erfahrenen Lehrperson im System-Prompt, wo er eine Störvariable wäre.
+
+## Die Nutzeransicht-Spalte ist keine reine Platzhalterliste
+
+Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituiert. Der **Lernauftrag** und der **Arbeitsheft-Inhalt** sind **Ansichtsbausteine**, die die View neben der Rahmenhandlung rendert — der Arbeitsheft-Inhalt kann ein Bild sein und lässt sich nicht in einen `string.Template`-Platzhalter füllen. Substituiert werden nur die kurzen, satzfähigen Werte: die Namen und Geschlechter der Akteure und der Unterrichtskontext.
+
+Weil die Rahmenhandlung Fließtext für Menschen ist, braucht sie Grammatik, die rohe Feldwerte nicht liefern. Der Code berechnet aus dem Geschlecht **abgeleitete grammatische Formen** und stellt sie als eigene Platzhalter in `VERTRAG_RAHMEN` bereit (Anrede, Pronomen, Possessiv). `VERTRAG_RAHMEN` hat damit mehr Einträge als die Nutzeransicht-Spalte Zeilen. Jede neue grammatische Form ist eine Code-Änderung — dieselbe Aussage wie unten über neue Leerstellen, nur über Ableitungen statt über Felder.
 
 ## Consequences
 
-- Eine Kern-Fassung lässt sich nur finalisieren, wenn ihre Vorlagen ausschließlich Platzhalter des Vertrags verwenden. Diese Prüfung ist statisch und ruft **kein** Modell auf — eine Invariante, die vom Wohlwollen eines externen Anbieters abhinge, wäre keine.
-- Der Vertrag steht an zwei Orten: im Code, der die Platzhalter bereitstellt, und in der Validierung, die sie prüft. Das ist dieselbe Liste, und sie muss eine bleiben.
+- Eine Kern-Fassung lässt sich nur finalisieren, wenn jede ihrer Vorlagen ausschließlich Platzhalter *ihrer* Menge verwendet — Prompt-Vorlagen aus `VERTRAG_PROMPT`, Rahmenhandlungs-Vorlagen aus `VERTRAG_RAHMEN`. Die Prüfung ist ein Teilmengen-Test (`get_identifiers()` ⊆ Menge) und ruft **kein** Modell auf — eine Invariante, die vom Wohlwollen eines externen Anbieters abhinge, wäre keine. Der Vertrag ist eine Obergrenze: Eine Vorlage darf jede Teilmenge verwenden; kein Platzhalter ist verpflichtend.
+- Jede der beiden Mengen steht an zwei Orten: im Code, der die Platzhalter bereitstellt, und in der Validierung, die sie prüft. Das sind zwei Listen an je zwei Orten, und jede muss eine bleiben.
 - Ein **freies Profilfeld** für die simulierte Schüler:in gibt es nicht. Es wäre die Hintertür, durch die Prompt-Engineering unkuratiert zurückkehrt, und es machte Auskunftsfreude und Ausweichverhalten zwischen Vignetten unvergleichbar. Sollten diese Dimensionen gebraucht werden, gehören sie als benannte Stufen in den Kern — eine additive Änderung.
 - **Namenskollisionen werden nirgends geprüft**, auch nicht beim Zusammenstellen einer Erhebung oder eines Trainings. Zwei gleichnamige simulierte Schüler:innen in einer Teilnahme sind ein Darstellungsproblem, kein Datenfehler.
 - Eine neue Leerstelle bedeutet ein neues Vignettenfeld, eine Migration und eine Code-Änderung. Ein vom Kern deklarierter Vertrag wurde verworfen: Er hätte das Vorspulen eines Vignettenentwurfs auf einen neueren Kern (ADR-0004) scheitern lassen können, womit der Entwurf auf einem alten Kern gefangen wäre.

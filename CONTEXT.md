@@ -127,7 +127,7 @@ _Avoid_: gelöscht, deaktiviert, zurückgezogen
 **Historie**:
 Das Objekt, das die sequenziell entstandenen Fassungen eines versionierten Artefakts zusammenfasst. Sie bleibt linear und trägt höchstens einen Entwurf. Entsteht automatisch und wird erst ab der zweiten Fassung sichtbar und benennbar.
 
-Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt eine Eigentümer:in und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** kennt beides nicht. Für den Simulationskern ist offen, ob seine Historie je benannt werden muss — er ist konzeptionell eine einzige Linie und gehört der Administration. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
+Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt eine oder mehrere gleichrangige Eigentümer:innen (Ko-Autorschaft) und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** kennt beides nicht. Die **Simulationskern-Historie** ist namenlos: Der Kern ist konzeptionell eine einzige Linie, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
 _Avoid_: Familie, Reihe, Strang, Lineage
 
 ## Anlässe für Sitzungen
@@ -188,7 +188,7 @@ Wer Sitzungen führt und diagnostiziert. In einer Erhebung pseudonym über ein T
 _Avoid_: Proband, Nutzer, Studierende
 
 **Autor:in**:
-Wer Vignetten anlegt und pflegt. Sieht und bearbeitet ausschließlich die eigenen. Wählt den Simulationskern nicht aus, kann einen Entwurf aber auf den aktuellsten Kern vorspulen.
+Wer Vignetten anlegt und pflegt. Sieht und bearbeitet ausschließlich die Vignetten, an denen sie Ko-Eigentümerin ist — die eigenen und die mit ihr geteilten. Wählt den Simulationskern nicht aus, kann einen Entwurf aber auf den aktuellsten Kern vorspulen.
 _Avoid_: Vignettenautor, Redakteur
 
 **Ausbilder:in**:

@@ -14,6 +14,8 @@ Zwei Rollen tragen Sichtbarkeitsregeln, die an einzelnen Objekten hängen statt 
 
 Der Eigentümer ist ein Fremdschlüssel auf dem Objekt. Bei der Vignette trägt ihn die **Vignettenhistorie**, nicht die einzelne Fassung — eine finale Fassung ist unveränderlich, ein Eigentümerwechsel an ihr wäre eine Mutation.
 
+> **Nachgeführt durch ADR-0022 (Ko-Autorschaft):** Aus dem einzelnen Fremdschlüssel ist ein Many-to-Many gleichrangiger Eigentümerinnen an der Vignettenhistorie geworden. `sichtbar_fuer` prüft dann Mengenzugehörigkeit statt Fremdschlüssel-Gleichheit; die Stelle und die Regel bleiben. Die guardian-Verwerfung unten gilt weiter — Eigentümerschaft ist uniform, kein Rechte-Gitter.
+
 Die Regel selbst lebt als benannte Methode am QuerySet:
 
 ```python

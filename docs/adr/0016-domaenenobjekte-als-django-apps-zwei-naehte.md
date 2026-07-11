@@ -38,7 +38,9 @@ Die eine Methode nimmt System-Prompt, User-Prompt und das Ausgabeschema und lief
 
 Der **Ablauf** (`sitzungen/ablauf.py`): die Frage „welche Vignette kommt als Nächstes, und was danach?", mit zwei Adaptern. Im Training freie Reihenfolge, beliebig oft, kein Fragebogen, kein Ende; in der Erhebung festgelegte oder randomisierte Reihenfolge, Andockpunkte (ADR-0008) und ein definiertes Ende. Der Adapter wird von der aufrufenden View hineingereicht, nicht von `sitzungen` nachgeschlagen — sonst kennte `sitzungen` seine Aufrufer doch.
 
-Sonst keine. Kein Repository-Interface, kein Service-Layer, kein framework-freier Domänenkern. Postgres wird nicht ausgetauscht, HTTP wird nicht ausgetauscht; Interfaces an Stellen, an denen nichts variiert, kosten Lesbarkeit ohne Gegenwert.
+Sonst keine. Kein Repository-Interface, kein Service-Layer, kein framework-freier Domänenkern. Die Datenbank wird nicht hinter einem Interface versteckt, HTTP wird nicht ausgetauscht; Interfaces an Stellen, an denen nichts variiert, kosten Lesbarkeit ohne Gegenwert.
+
+Das Projekt läuft **vorerst auf SQLite**, nicht auf Postgres. Der Wechsel ist billig, solange keine Forschungsdaten existieren, und beißt erst bei gleichzeitigen Teilnehmenden einer Erhebung. Die Schlussfolgerung dieses Abschnitts — kein Repository-Interface, weil die Datenbank nicht variiert — bleibt davon unberührt: Sie hängt daran, dass *eine* Datenbank fest verdrahtet ist, nicht daran, welche. Alle Constraints der Modelle sind so gewählt, dass sie unter SQLite laufen (siehe ADR-0021).
 
 ## Das simulationsseitige Interface kennt keine Datenbank
 
