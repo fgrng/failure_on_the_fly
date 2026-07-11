@@ -34,12 +34,15 @@ RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d 
 # Install Codex CLI (run as root before USER agent)
 RUN npm install -g @openai/codex
 
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
 USER ${AGENT_UID}:${AGENT_GID}
 
 WORKDIR /home/agent
+
+# Install Claude Code CLI as the agent user so it lands in the agent's
+# ~/.local/bin (installing as root would put it in /root, invisible to agent).
+# Add that dir to PATH so `claude` resolves for the merge-phase agent.
+ENV PATH="/home/agent/.local/bin:${PATH}"
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
 # and overrides the working directory to /home/agent/workspace at container start.
