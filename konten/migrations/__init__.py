@@ -1,0 +1,1 @@
+"""Datenbankmigrationen der Konten-App."""

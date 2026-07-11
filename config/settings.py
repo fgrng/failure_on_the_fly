@@ -43,7 +43,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_htmx',
+    'konten',
 ]
+
+AUTH_USER_MODEL: str = 'konten.Konto'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
