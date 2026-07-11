@@ -15,14 +15,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && apt-get update && apt-get install -y gh \
   && rm -rf /var/lib/apt/lists/*
 
-# Python toolchain for this project. This is a Python codebase); 
-# the Node base image only carries the Sandcastle/Codex harness. 
-# Debian bookworm ships Python 3.11.
-# Without python3-venv/python3-pip a clean container
-# cannot install requirements-dev.txt or run pytest.
-RUN apt-get update && apt-get install -y \
-  python3 python3-venv python3-pip \
-  && rm -rf /var/lib/apt/lists/*
+# Python toolchain for this project. This is a Python codebase;
+# the Node base image only carries the Sandcastle/Codex harness.
+# uv manages the project's dependencies and provisions its own managed
+# Python 3.14 (bookworm only ships 3.11), so `uv sync` / `uv run pytest`
+# work in a clean container. Installed into /usr/local/bin for all users.
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 # Build-args for UID/GID alignment: sandcastle docker build-image
 # defaults these to the host user's UID/GID so image-built files

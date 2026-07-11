@@ -61,13 +61,14 @@ const codexSandbox = () =>
     ],
   });
 
-// Hooks run inside the sandbox before the agent starts. npm install ensures
-// fresh dependencies; the second command copies the Codex auth material from the
-// read-only mount into CODEX_HOME so the Codex CLI is authenticated.
+// Hooks run inside the sandbox before the agent starts. uv sync ensures fresh
+// dependencies (and provisions the managed Python 3.14 toolchain); the second
+// command copies the Codex auth material from the read-only mount into
+// CODEX_HOME so the Codex CLI is authenticated.
 const hooks = {
   sandbox: {
     onSandboxReady: [
-      { command: "npm install" },
+      { command: "uv sync" },
       {
         command: [
           `mkdir -p "${sandboxCodexHome}"`,
@@ -80,10 +81,9 @@ const hooks = {
   },
 };
 
-// Copy node_modules from the host into the worktree before each sandbox starts.
-// Avoids a full npm install from scratch; the hook above handles platform-
-// specific binaries and any packages added since the last copy.
-const copyToWorktree = ["node_modules"];
+// Nothing to copy from the host into the worktree — the uv sync hook above
+// provisions the virtualenv and managed Python from scratch inside the sandbox.
+const copyToWorktree: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -100,7 +100,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     hooks,
     copyToWorktree,
     name: "Planner",
-    agent: sandcastle.codex("gpt-5.5", { effort: "high" }),
+    agent: sandcastle.codex("gpt-5.6-terra"),
     promptFile: "./.sandcastle/plan-prompt.md",
   });
 
@@ -159,7 +159,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
         const result = await sandbox.run({
           name: "Implementer #" + issue.id,
-          agent: sandcastle.codex("gpt-5.5", { effort: "medium" }),
+          agent: sandcastle.codex("gpt-5.6-terra", { effort: "medium" }),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
             TASK_ID: issue.id,
@@ -171,7 +171,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         if (result.commits.length > 0) {
           await sandbox.run({
             name: "Reviewer #" + issue.id,
-            agent: sandcastle.claudeCode("claude-opus-4-6"),
+            agent: sandcastle.codex("gpt-5.6-sol"),
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
               BRANCH: issue.branch,

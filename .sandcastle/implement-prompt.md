@@ -35,7 +35,7 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Before committing, run `npm run typecheck` and `npm run test` to ensure the tests pass.
+Before committing, run `uv run ruff check .` and `uv run pytest` to ensure linting and tests pass.
 
 # COMMIT
 

@@ -28,7 +28,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 3. **Check correctness**:
    - Does the implementation match the intent? Are edge cases handled?
    - Are new/changed behaviours covered by tests?
-   - Are there unsafe casts, `any` types, or unchecked assumptions?
+   - Are there unsafe casts, overly broad exception handling, or unchecked assumptions?
    - Does the change introduce injection vulnerabilities, credential leaks, or other security issues?
 
 4. **Maintain balance**: Avoid over-simplification that could:
@@ -47,7 +47,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 If you find improvements to make:
 
 1. Make the changes directly on this branch
-2. Run tests and type checking to ensure nothing is broken
+2. Run `uv run ruff check .` and `uv run pytest` to ensure nothing is broken
 3. Commit describing the refinements
 
 If the code is already clean and well-structured, do nothing.
