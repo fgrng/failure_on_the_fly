@@ -14,7 +14,7 @@ from simulation.models import KernHistorie, Simulationskern
 def test_vertragsfremder_prompt_platzhalter_wird_abgelehnt() -> None:
     """Prompt-Vorlagen dürfen nur die vereinbarten Vignettenfelder ansprechen."""
 
-    kern = Simulationskern(system_prompt_vorlage="$lehrperson_name")
+    kern: Simulationskern = Simulationskern(system_prompt_vorlage="$lehrperson_name")
 
     with pytest.raises(ValidationError):
         kern.full_clean(exclude=["historie"])
@@ -24,7 +24,7 @@ def test_vertragsfremder_prompt_platzhalter_wird_abgelehnt() -> None:
 def test_ungueltige_vorlagen_syntax_wird_abgelehnt() -> None:
     """Eine Vorlage muss ein gültiges string.Template sein."""
 
-    kern = Simulationskern(system_prompt_vorlage="$")
+    kern: Simulationskern = Simulationskern(system_prompt_vorlage="$")
 
     with pytest.raises(ValidationError):
         kern.full_clean(exclude=["historie"])
@@ -34,7 +34,7 @@ def test_ungueltige_vorlagen_syntax_wird_abgelehnt() -> None:
 def test_vertragstreue_teilmengen_und_leere_vorlagen_werden_akzeptiert() -> None:
     """Alle vier Vorlagen dürfen ihren Vertrag auch nur teilweise ausschöpfen."""
 
-    kern = Simulationskern(
+    kern: Simulationskern = Simulationskern(
         system_prompt_vorlage="$fehlermuster_beschreibung",
         rahmenhandlung_einleitung="$lehrperson_anrede $lehrperson_name",
     )

@@ -7,7 +7,7 @@ from django.db import models
 from django.db.models import Q
 
 
-VERTRAG_PROMPT = frozenset(
+VERTRAG_PROMPT: frozenset[str] = frozenset(
     {
         "fehlermuster_beschreibung",
         "lernauftrag",
@@ -19,7 +19,7 @@ VERTRAG_PROMPT = frozenset(
         "klassenstufe",
     }
 )
-VERTRAG_RAHMEN = frozenset(
+VERTRAG_RAHMEN: frozenset[str] = frozenset(
     {
         "schuelerin_name",
         "schuelerin_geschlecht",
@@ -105,15 +105,20 @@ class Simulationskern(models.Model):
         """Lehnt Vorlagen mit Platzhaltern außerhalb ihres Vertrags ab."""
 
         fehler: dict[str, str] = {}
-        for feld, vertrag in (
+        vorlagenfeld: str
+        erlaubte_platzhalter: frozenset[str]
+        for vorlagenfeld, erlaubte_platzhalter in (
             ("system_prompt_vorlage", VERTRAG_PROMPT),
             ("user_prompt_vorlage", VERTRAG_PROMPT),
             ("rahmenhandlung_einleitung", VERTRAG_RAHMEN),
             ("rahmenhandlung_debrief", VERTRAG_RAHMEN),
         ):
-            vorlage = Template(getattr(self, feld))
-            if not vorlage.is_valid() or not set(vorlage.get_identifiers()) <= vertrag:
-                fehler[feld] = "Enthält ungültige Platzhalter."
+            vorlage: Template = Template(getattr(self, vorlagenfeld))
+            if (
+                not vorlage.is_valid()
+                or not set(vorlage.get_identifiers()) <= erlaubte_platzhalter
+            ):
+                fehler[vorlagenfeld] = "Enthält ungültige Platzhalter."
         if fehler:
             raise ValidationError(fehler)
 
