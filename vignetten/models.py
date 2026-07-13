@@ -55,6 +55,12 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
         """Verhindert das Umgehen der Unveränderlichkeit per Massenupdate."""
         raise RuntimeError("Vignetten dürfen nicht per Massenupdate geändert werden.")
 
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Löscht gesammelt ausschließlich Entwürfe."""
+        if self.exclude(zustand=Vignette.Zustand.ENTWURF).exists():
+            raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
+        return super().delete()
+
     def einbindbar(self) -> models.QuerySet["Vignette"]:
         """Liefert die finalen Fassungen, die eingebunden werden dürfen."""
         return self.filter(zustand=Vignette.Zustand.FINAL)
@@ -145,6 +151,13 @@ class Vignette(models.Model):
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
         if not self._state.adding:
             gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
+            if (
+                self.zustand != gespeicherte_fassung.zustand
+                and not getattr(self, "_wechselt_zustand", False)
+            ):
+                raise ValidationError(
+                    "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+                )
             if gespeicherte_fassung.zustand != self.Zustand.ENTWURF and any(
                 getattr(self, modellfeld.attname)
                 != getattr(gespeicherte_fassung, modellfeld.attname)
@@ -153,6 +166,73 @@ class Vignette(models.Model):
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
+        if not type(self).objects.filter(
+            pk=self.pk,
+            zustand=self.Zustand.ENTWURF,
+        ).exists():
+            raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
+        return super().delete(*args, **kwargs)
+
+    def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
+        """Speichert einen ausschließlich intern ausgelösten Zustandsübergang."""
+        self._wechselt_zustand = True
+        try:
+            self.zustand = zustand
+            self.save(update_fields=update_fields)
+        finally:
+            del self._wechselt_zustand
+
+    @transaction.atomic
+    def bearbeiten(self) -> "Vignette":
+        """Erzeugt aus einer finalen Fassung einen Entwurf derselben Historie."""
+        quelle: Vignette = type(self).objects.select_for_update().get(pk=self.pk)
+        if quelle.zustand != self.Zustand.FINAL:
+            raise ValidationError("Nur finale Fassungen können bearbeitet werden.")
+        return type(self).objects.create(
+            historie=quelle.historie,
+            vorgaengerin=quelle,
+            gepinnter_kern=quelle.gepinnter_kern,
+            schuelerin_name=quelle.schuelerin_name,
+            schuelerin_geschlecht=quelle.schuelerin_geschlecht,
+            lehrperson_name=quelle.lehrperson_name,
+            lehrperson_geschlecht=quelle.lehrperson_geschlecht,
+        )
+
+    @transaction.atomic
+    def vorspulen(self) -> None:
+        """Pinnt einen Entwurf auf die aktuellste finale Kern-Fassung."""
+        if not type(self).objects.filter(
+            pk=self.pk,
+            zustand=self.Zustand.ENTWURF,
+        ).exists():
+            raise ValidationError("Nur Entwürfe können vorgespult werden.")
+        self.gepinnter_kern = Simulationskern.objects.filter(
+            zustand=Simulationskern.Zustand.FINAL
+        ).latest("finalisiert_am", "pk")
+        self.save(update_fields=["gepinnter_kern"])
+
+    @transaction.atomic
+    def archivieren(self) -> None:
+        """Archiviert eine finale Fassung."""
+        if not type(self).objects.filter(
+            pk=self.pk,
+            zustand=self.Zustand.FINAL,
+        ).exists():
+            raise ValidationError("Nur finale Fassungen können archiviert werden.")
+        self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
+
+    @transaction.atomic
+    def entarchivieren(self) -> None:
+        """Macht eine archivierte Fassung wieder final."""
+        if not type(self).objects.filter(
+            pk=self.pk,
+            zustand=self.Zustand.ARCHIVIERT,
+        ).exists():
+            raise ValidationError("Nur archivierte Fassungen können entarchiviert werden.")
+        self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
 
     @transaction.atomic
     def finalisieren(self) -> None:
@@ -183,9 +263,11 @@ class Vignette(models.Model):
         if self.gepinnter_kern.zustand != Simulationskern.Zustand.FINAL:
             raise ValidationError("Der gepinnte Simulationskern ist nicht final.")
 
-        self.zustand = self.Zustand.FINAL
         self.finalisiert_am = timezone.now()
-        self.save(update_fields=["zustand", "finalisiert_am"])
+        self._zustand_wechseln(
+            self.Zustand.FINAL,
+            ["zustand", "finalisiert_am"],
+        )
 
     class Meta:
         """Datenbankinvarianten der Vignettenfassung."""

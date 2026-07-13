@@ -151,10 +151,8 @@ class VignetteConstraintTests(TestCase):
             finalisiert_am=finalisiert_am,
             arbeitsheft_text="Bearbeitung",
         )
-        archivierte_schwester.zustand = Vignette.Zustand.FINAL
-
         with self.assertRaises(IntegrityError), transaction.atomic():
-            archivierte_schwester.save()
+            archivierte_schwester.entarchivieren()
 
     def test_finale_fassung_braucht_arbeitsheft_text_oder_bild(self) -> None:
         """Die Arbeitsheft-OR-Constraint schützt finale Fassungen."""
@@ -200,6 +198,18 @@ class VignetteQuerySetTests(TestCase):
         )
 
         self.assertEqual(list(Vignette.objects.einbindbar()), [finale])
+
+    def test_historie_archivieren_beruehrt_keine_fassung(self) -> None:
+        """Das Archiv-Flag der Historie ist unabhängig vom Fassungslifecycle."""
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        vignette: Vignette = Vignette.objects.create(historie=historie)
+
+        historie.archiviert = True
+        historie.save(update_fields=["archiviert"])
+
+        vignette.refresh_from_db()
+        self.assertTrue(historie.archiviert)
+        self.assertEqual(vignette.zustand, Vignette.Zustand.ENTWURF)
 
 
 class VignetteFinalisierenTests(TestCase):
@@ -293,8 +303,7 @@ class VignetteFinalisierenTests(TestCase):
             gepinnter_kern=kern2,
         )
         archivierte.finalisieren()
-        archivierte.zustand = Vignette.Zustand.ARCHIVIERT
-        archivierte.save(update_fields=["zustand"])
+        archivierte.archivieren()
 
         for vignette in (finale, archivierte):
             with self.subTest(zustand=vignette.zustand):
@@ -346,3 +355,137 @@ class VignetteFinalisierenTests(TestCase):
             vignette.finalisieren()
 
         self.assertIn("vorspulen", str(fehler.exception))
+
+
+class VignetteBearbeitenTests(TestCase):
+    """Das Bearbeiten erzeugt eine neue, unveränderte Entwurfsfassung."""
+
+    def test_bearbeiten_erbt_pin_und_akteure_ohne_finale_zu_mutieren(self) -> None:
+        """Eine finale Fassung bleibt beim Anlegen ihres Nachfolgeentwurfs erhalten."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        finale: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Herr Koch",
+            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern,
+        )
+        finale.finalisieren()
+        finale.schuelerin_name = "Nicht gespeicherter Name"
+
+        entwurf: Vignette = finale.bearbeiten()
+
+        self.assertEqual(entwurf.zustand, Vignette.Zustand.ENTWURF)
+        self.assertEqual(entwurf.historie, finale.historie)
+        self.assertEqual(entwurf.vorgaengerin, finale)
+        self.assertEqual(entwurf.gepinnter_kern, kern)
+        self.assertEqual(entwurf.schuelerin_name, "Mia")
+        self.assertEqual(entwurf.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)
+        self.assertEqual(entwurf.lehrperson_name, "Herr Koch")
+        self.assertEqual(entwurf.lehrperson_geschlecht, Vignette.Geschlecht.MAENNLICH)
+        finale.refresh_from_db()
+        self.assertEqual(finale.zustand, Vignette.Zustand.FINAL)
+
+    def test_vorspulen_aktualisiert_nur_den_pin_eines_entwurfs(self) -> None:
+        """Der Kern-Pin wechselt ausschließlich auf ausdrücklichen Aufruf im Entwurf."""
+        erster_kern: Simulationskern = Simulationskern.objects.anlegen()
+        erster_kern.finalisieren()
+        neuester_kern: Simulationskern = erster_kern.bearbeiten()
+        neuester_kern.finalisieren()
+        entwurf: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            gepinnter_kern=erster_kern,
+        )
+
+        entwurf.vorspulen()
+
+        entwurf.refresh_from_db()
+        self.assertEqual(entwurf.gepinnter_kern, neuester_kern)
+
+    def test_finale_fassung_kann_archiviert_und_entarchiviert_werden(self) -> None:
+        """Die beiden Archiv-Kanten ändern nur den Zustand der finalen Fassung."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Herr Koch",
+            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern,
+        )
+        vignette.finalisieren()
+
+        with self.assertRaisesMessage(ValidationError, "Entwürfe"):
+            vignette.vorspulen()
+
+        vignette.archivieren()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.ARCHIVIERT)
+        with self.assertRaisesMessage(ValidationError, "Entwürfe"):
+            vignette.vorspulen()
+        vignette.entarchivieren()
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+
+    def test_nur_entwuerfe_duerfen_physisch_geloescht_werden(self) -> None:
+        """Finale und archivierte Fassungen bleiben als Datenspur erhalten."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        finale: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Herr Koch",
+            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern,
+        )
+        finale.finalisieren()
+        entwurf: Vignette = finale.bearbeiten()
+
+        entwurf.delete()
+        with self.assertRaises(ValidationError):
+            finale.delete()
+        finale.archivieren()
+        with self.assertRaises(ValidationError):
+            finale.delete()
+        with self.assertRaises(ValidationError):
+            Vignette.objects.filter(pk=finale.pk).delete()
+
+    def test_zustandswechsel_sind_auf_lebenszyklus_methoden_beschraenkt(self) -> None:
+        """Direkte ORM-Saves dürfen keine Kante des Automaten umgehen."""
+        entwurf: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+        )
+        entwurf.zustand = Vignette.Zustand.ARCHIVIERT
+
+        with self.assertRaisesMessage(ValidationError, "Zustandswechsel"):
+            entwurf.save(update_fields=["zustand"])
