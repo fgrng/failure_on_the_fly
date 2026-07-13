@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from konten.models import Konto
-from simulation.models import KernHistorie, Simulationskern
+from simulation.models import Simulationskern
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -20,19 +20,10 @@ class VignetteAnlegenTests(TestCase):
     ) -> tuple[Vignette, Konto, Simulationskern]:
         # Baut den gemeinsamen Ausgangszustand der drei Tests auf.
         konto: Konto = get_user_model().objects.create_user(username="ada")
-        historie: KernHistorie = KernHistorie.objects.create()
-        finalisiert_am: datetime = timezone.now()
-        erster_kern: Simulationskern = Simulationskern.objects.create(
-            historie=historie,
-            zustand=Simulationskern.Zustand.FINAL,
-            finalisiert_am=finalisiert_am,
-        )
-        neuester_kern: Simulationskern = Simulationskern.objects.create(
-            historie=historie,
-            vorgaengerin=erster_kern,
-            zustand=Simulationskern.Zustand.FINAL,
-            finalisiert_am=finalisiert_am + timezone.timedelta(seconds=1),
-        )
+        erster_kern: Simulationskern = Simulationskern.objects.anlegen()
+        erster_kern.finalisieren()
+        neuester_kern: Simulationskern = erster_kern.bearbeiten()
+        neuester_kern.finalisieren()
         vignette: Vignette = Vignette.objects.anlegen(konto)
 
         return vignette, konto, neuester_kern
