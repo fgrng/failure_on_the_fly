@@ -22,7 +22,7 @@ class VignettenlisteTests(TestCase):
         grace: Konto = get_user_model().objects.create_user(username="grace")
         eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         eigene_historie.eigentuemerinnen.add(ada)
-        Vignette.objects.create(
+        Vignette.objects._erstellen(
             historie=eigene_historie,
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
@@ -31,7 +31,7 @@ class VignettenlisteTests(TestCase):
             thema="Addition",
             klassenstufe="4",
         )
-        neueste_fassung: Vignette = Vignette.objects.create(
+        neueste_fassung: Vignette = Vignette.objects._erstellen(
             historie=eigene_historie,
             fach="Mathematik",
             thema="Brüche",
@@ -41,12 +41,12 @@ class VignettenlisteTests(TestCase):
             name="Addition mit Übertrag"
         )
         benannte_historie.eigentuemerinnen.add(ada)
-        Vignette.objects.create(historie=benannte_historie)
+        Vignette.objects._erstellen(historie=benannte_historie)
         fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Versteckte Vignette"
         )
         fremde_historie.eigentuemerinnen.add(grace)
-        Vignette.objects.create(historie=fremde_historie)
+        Vignette.objects._erstellen(historie=fremde_historie)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(reverse("vignetten:liste"))
@@ -132,7 +132,7 @@ class VignetteDetailViewTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects.create(
+        vignette: Vignette = Vignette.objects._erstellen(
             historie=historie,
             lernauftrag="Addiere 27 und 15.",
             arbeitsheft_text="27 + 15 = 312",
@@ -154,7 +154,7 @@ class VignetteDetailViewTests(TestCase):
         grace: Konto = get_user_model().objects.create_user(username="grace")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(grace)
-        fremde_vignette: Vignette = Vignette.objects.create(historie=historie)
+        fremde_vignette: Vignette = Vignette.objects._erstellen(historie=historie)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -170,7 +170,7 @@ class VignettenLoginTests(TestCase):
     def test_anonyme_zugriffe_werden_zum_login_geleitet(self) -> None:
         """Liste, Anlegen und Detail sind ausschließlich eingeloggten Personen offen."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        vignette: Vignette = Vignette.objects.create(historie=historie)
+        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
 
         urls: tuple[str, ...] = (
             reverse("vignetten:liste"),
