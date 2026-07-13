@@ -1,6 +1,8 @@
 """Datenmodelle für Vignetten und ihre Historien."""
 
+from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -26,6 +28,11 @@ _PFLICHTFELD_NAMEN: tuple[str, ...] = (
 
 if TYPE_CHECKING:
     from konten.models import Konto
+
+
+def arbeitsheft_bild_pfad(_: "Vignette", dateiname: str) -> str:
+    """Vergibt jeder hochgeladenen Arbeitsheft-Datei einen neuen Pfad."""
+    return f"arbeitshefte/{uuid4().hex}{Path(dateiname).suffix.lower()}"
 
 
 class VignettenhistorieQuerySet(models.QuerySet["Vignettenhistorie"]):
@@ -115,7 +122,9 @@ class Vignette(models.Model):
         blank=True, help_text="Was die Teilnehmer:in sieht."
     )
     arbeitsheft_bild: models.ImageField = models.ImageField(
-        upload_to="arbeitshefte/", blank=True, help_text="Was die Teilnehmer:in sieht."
+        upload_to=arbeitsheft_bild_pfad,
+        blank=True,
+        help_text="Was die Teilnehmer:in sieht.",
     )
     schuelerin_name: models.CharField = models.CharField(max_length=255, blank=True)
     schuelerin_geschlecht: models.CharField = models.CharField(

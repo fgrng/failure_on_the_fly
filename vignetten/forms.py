@@ -29,6 +29,7 @@ class VignetteForm(ModelForm):
             "lernauftrag",
             "arbeitsheft_beschreibung",
             "arbeitsheft_text",
+            "arbeitsheft_bild",
             "schuelerin_name",
             "schuelerin_geschlecht",
             "lehrperson_name",
