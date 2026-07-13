@@ -44,6 +44,13 @@ WORKDIR /home/agent
 ENV PATH="/home/agent/.local/bin:${PATH}"
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
+# Pre-provision uv's managed CPython 3.14 into the image (matches pyproject's
+# requires-python >=3.14). The per-sandbox `uv sync` hook in main.mts otherwise
+# re-downloads and unpacks the interpreter on every container start. Baked here,
+# it lands in the agent's ~/.local/share/uv/python and is shared across all
+# sandboxes, so `uv sync` finds it ready and only needs to link the .venv.
+RUN uv python install 3.14
+
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
 # and overrides the working directory to /home/agent/workspace at container start.
 # Structure your Dockerfile so that /home/agent/workspace can serve as the project root.

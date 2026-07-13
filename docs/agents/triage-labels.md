@@ -14,6 +14,17 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 Edit the right-hand column to match whatever vocabulary you actually use.
 
+## Spec vs. Ticket
+
+Two labels separate specification from executable work:
+
+| Label    | Meaning                                                                                                   |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| `Spec`   | A specification / umbrella issue that describes a requirement. **Never carries `Sandcastle`** — AFK agents must not implement a spec directly; it is only the source for decomposed tickets. |
+| `Ticket` | An executable sub-task that implements part of a `Spec`. Carries `Sandcastle` once it is ready for work.  |
+
+A `Spec` and its `Ticket`s overlap heavily (same files, same models). If a spec kept the `Sandcastle` label, the planner would pick up both the spec and its tickets and produce duplicate, conflicting branches. Keep `Sandcastle` on tickets only.
+
 ## Agent state labels
 
 The `agent:*` labels track an issue's position in the AFK-agent workflow:
@@ -25,4 +36,4 @@ The `agent:*` labels track an issue's position in the AFK-agent workflow:
 | `agent:in-progress` | An implement run is currently active.                                                                                                                       |
 | `agent:review`      | PR is ready for the automated review workflow.                                                                                                              |
 | `agent:blocked`     | A run failed or was refused; needs human attention before retry.                                                                                            |
-| `agent:to-issues`   | PRD is ready to be decomposed into sub-issues.                                                                                                              |
+| `agent:to-issues`   | Spec is ready to be decomposed into sub-issues (tickets).                                                                                                              |

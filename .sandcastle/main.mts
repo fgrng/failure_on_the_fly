@@ -48,9 +48,6 @@ const MAX_ITERATIONS = 10;
 // Maximum number of issues to implement+review concurrently within one iteration.
 const MAX_PARALLEL = 4;
 
-// Base branch the reviewer diffs against and the merger merges into.
-const BASE_BRANCH = "main";
-
 // docker() sandbox config wiring the read-only host .codex mount and CODEX_HOME.
 // Called fresh per sandbox so each phase gets its own configured container.
 const codexSandbox = () =>
@@ -62,9 +59,11 @@ const codexSandbox = () =>
   });
 
 // Hooks run inside the sandbox before the agent starts. uv sync ensures fresh
-// dependencies (and provisions the managed Python 3.14 toolchain); the second
-// command copies the Codex auth material from the read-only mount into
-// CODEX_HOME so the Codex CLI is authenticated.
+// dependencies; the managed Python 3.14 toolchain is pre-provisioned in the
+// image (see .sandcastle/Dockerfile), so sync only links the .venv instead of
+// re-downloading the interpreter. The second command copies the Codex auth
+// material from the read-only mount into CODEX_HOME so the Codex CLI is
+// authenticated.
 const hooks = {
   sandbox: {
     onSandboxReady: [
@@ -175,7 +174,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
               BRANCH: issue.branch,
-              TARGET_BRANCH: BASE_BRANCH,
+              // TARGET_BRANCH is a built-in prompt arg (auto-injected as the
+              // host's active branch at run() time, i.e. main) and must not be
+              // passed explicitly — doing so throws PromptError.
             },
           });
         }

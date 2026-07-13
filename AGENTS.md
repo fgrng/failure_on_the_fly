@@ -6,7 +6,7 @@ When changing public-facing behavior, check README.md to see if the documentatio
 
 ## Issue Tracker
 
-Issues and PRDs live as GitHub issues in fgrng/failure_on_the_fly, managed via the gh CLI. See docs/agents/issue-tracker.md.
+Issues and Specs live as GitHub issues in fgrng/failure_on_the_fly, managed via the gh CLI. See docs/agents/issue-tracker.md.
 
 ## Triage Labels
 
