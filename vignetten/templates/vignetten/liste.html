@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Vignetten{% endblock %}
+
+{% block content %}
+    <h1>Meine Vignetten</h1>
+    <p><a href="{% url 'vignetten:anlegen' %}">Vignette anlegen</a></p>
+    <ul>
+        {% for eintrag in historien %}
+            <li><a href="{% url 'vignetten:detail' eintrag.fassung_pk %}">{{ eintrag.label }}</a></li>
+        {% empty %}
+            <li>Noch keine Vignetten vorhanden.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}
