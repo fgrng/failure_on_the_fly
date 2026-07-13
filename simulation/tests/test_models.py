@@ -4,11 +4,32 @@ from datetime import datetime
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
 from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
+
+
+@pytest.mark.django_db
+def test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an() -> None:
+    """Der Command befüllt eine frische Instanz über den Lebenszyklus."""
+
+    call_command("kern_initialisieren")
+
+    kern: Simulationskern = Simulationskern.objects.get()
+    assert kern.zustand == Simulationskern.Zustand.FINAL
+
+
+@pytest.mark.django_db
+def test_kern_initialisieren_ist_idempotent() -> None:
+    """Ein zweiter Lauf erzeugt keine weitere Kern-Linie."""
+
+    call_command("kern_initialisieren")
+    call_command("kern_initialisieren")
+
+    assert Simulationskern.objects.count() == 1
 
 
 def _direkt_einfuegen(**werte: object) -> Simulationskern:
