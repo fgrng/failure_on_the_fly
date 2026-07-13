@@ -21,10 +21,10 @@ class VignetteForm(ModelForm):
     """Die bearbeitbaren Inhaltsfelder einer Vignette."""
 
     class Meta:
-        """Konfiguriert die editierbaren Felder des Django-Formulars."""
+        """Schließt Lebenszyklus- und Kernfelder vom Anlegeformular aus."""
 
-        model = Vignette
-        fields = [
+        model: type[Vignette] = Vignette
+        fields: list[str] = [
             "fehlermuster_beschreibung",
             "lernauftrag",
             "arbeitsheft_beschreibung",

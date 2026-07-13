@@ -1,8 +1,8 @@
 """Views für den privaten Vignetten-Editor."""
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
@@ -21,7 +21,6 @@ def liste(request: HttpRequest) -> HttpResponse:
         neueste_fassung: Vignette = historie.vignette_set.latest("pk")
         historien.append(
             {
-                "historie": historie,
                 "label": historie.name or _fallback_label(neueste_fassung),
                 "fassung_pk": neueste_fassung.pk,
             }
@@ -33,7 +32,7 @@ def liste(request: HttpRequest) -> HttpResponse:
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine Vignette mit dem vom Manager gewählten Kern an."""
     if request.method == "POST":
-        form = VignetteForm(request.POST)
+        form: VignetteForm = VignetteForm(request.POST)
         if form.is_valid():
             vignette: Vignette = Vignette.objects.anlegen(request.user)
             for feldname, wert in form.cleaned_data.items():
@@ -49,6 +48,9 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
     vignette: Vignette = get_object_or_404(
-        Vignette.objects.filter(historie__eigentuemerinnen=request.user), pk=pk
+        Vignette.objects.filter(
+            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
+        ),
+        pk=pk,
     )
     return render(request, "vignetten/detail.html", {"vignette": vignette})

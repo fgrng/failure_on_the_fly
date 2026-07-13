@@ -1,8 +1,12 @@
 """HTTP-Tests für den Vignetten-Editor."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import Simulationskern
@@ -20,6 +24,15 @@ class VignettenlisteTests(TestCase):
         eigene_historie.eigentuemerinnen.add(ada)
         Vignette.objects.create(
             historie=eigene_historie,
+            zustand=Vignette.Zustand.ARCHIVIERT,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="1 + 1 = 3",
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="4",
+        )
+        neueste_fassung: Vignette = Vignette.objects.create(
+            historie=eigene_historie,
             fach="Mathematik",
             thema="Brüche",
             klassenstufe="5",
@@ -36,9 +49,14 @@ class VignettenlisteTests(TestCase):
         Vignette.objects.create(historie=fremde_historie)
         self.client.force_login(ada)
 
-        response = self.client.get(reverse("vignetten:liste"))
+        response: HttpResponse = self.client.get(reverse("vignetten:liste"))
 
         self.assertContains(response, "Mathematik: Brüche (Klasse 5)")
+        self.assertContains(
+            response,
+            reverse("vignetten:detail", args=[neueste_fassung.pk]),
+        )
+        self.assertNotContains(response, "Mathematik: Addition (Klasse 4)")
         self.assertContains(response, "Addition mit Übertrag")
         self.assertNotContains(response, "Versteckte Vignette")
         self.assertContains(response, reverse("vignetten:anlegen"))
@@ -50,11 +68,11 @@ class VignetteAnlegenViewTests(TestCase):
     def test_speichert_ueberschriebene_akteure_und_zeigt_gepinnten_kern(self) -> None:
         """Die Oberfläche legt einen Entwurf mit dem automatisch gepinnten Kern an."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
-        kern = Simulationskern.objects.anlegen()
+        kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         self.client.force_login(ada)
 
-        response = self.client.post(
+        response: HttpResponse = self.client.post(
             reverse("vignetten:anlegen"),
             {
                 "fehlermuster_beschreibung": "Zählt Stellenwerte einzeln.",
@@ -80,7 +98,9 @@ class VignetteAnlegenViewTests(TestCase):
         self.assertEqual(vignette.lehrperson_geschlecht, Vignette.Geschlecht.MAENNLICH)
         self.assertEqual(vignette.gepinnter_kern, kern)
         self.assertEqual(list(vignette.historie.eigentuemerinnen.all()), [ada])
-        detail_response = self.client.get(reverse("vignetten:detail", args=[vignette.pk]))
+        detail_response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
         self.assertContains(detail_response, f"Gepinnter Simulationskern: {kern.pk}")
 
     def test_formular_belegt_akteure_vor_und_bietet_keine_kernwahl(self) -> None:
@@ -88,12 +108,19 @@ class VignetteAnlegenViewTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         self.client.force_login(ada)
 
-        response = self.client.get(reverse("vignetten:anlegen"))
+        with patch(
+            "vignetten.forms.random.choice",
+            side_effect=[
+                ("Mia", Vignette.Geschlecht.WEIBLICH),
+                ("Koch", Vignette.Geschlecht.MAENNLICH),
+            ],
+        ):
+            response: HttpResponse = self.client.get(reverse("vignetten:anlegen"))
 
-        self.assertContains(response, 'name="schuelerin_name" value="')
-        self.assertContains(response, 'name="schuelerin_geschlecht"')
-        self.assertContains(response, 'name="lehrperson_name" value="')
-        self.assertContains(response, 'name="lehrperson_geschlecht"')
+        self.assertContains(response, 'name="schuelerin_name" value="Mia"')
+        self.assertContains(response, '<option value="weiblich" selected>')
+        self.assertContains(response, 'name="lehrperson_name" value="Koch"')
+        self.assertContains(response, '<option value="männlich" selected>')
         self.assertNotContains(response, 'name="gepinnter_kern"')
 
 
@@ -113,7 +140,9 @@ class VignetteDetailViewTests(TestCase):
         )
         self.client.force_login(ada)
 
-        response = self.client.get(reverse("vignetten:detail", args=[vignette.pk]))
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
 
         self.assertContains(response, "Addiere 27 und 15.")
         self.assertContains(response, "27 + 15 = 312")
@@ -128,7 +157,7 @@ class VignetteDetailViewTests(TestCase):
         fremde_vignette: Vignette = Vignette.objects.create(historie=historie)
         self.client.force_login(ada)
 
-        response = self.client.get(
+        response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[fremde_vignette.pk])
         )
 
@@ -143,11 +172,12 @@ class VignettenLoginTests(TestCase):
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         vignette: Vignette = Vignette.objects.create(historie=historie)
 
-        for url in (
+        urls: tuple[str, ...] = (
             reverse("vignetten:liste"),
             reverse("vignetten:anlegen"),
             reverse("vignetten:detail", args=[vignette.pk]),
-        ):
-            response = self.client.get(url)
+        )
+        for url in urls:
+            response: HttpResponse = self.client.get(url)
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response.url.startswith("/accounts/login/?next="))
