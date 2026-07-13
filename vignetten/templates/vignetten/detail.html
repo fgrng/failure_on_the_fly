@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Vignette{% endblock %}
+
+{% block content %}
+    <h1>Vignette</h1>
+    <p>Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk }}</p>
+    <h2>Aufgabenkontext</h2>
+    <dl>
+        <dt>Lernauftrag</dt><dd>{{ vignette.lernauftrag }}</dd>
+        <dt>Arbeitsheft-Inhalt</dt><dd>{{ vignette.arbeitsheft_text }}</dd>
+        <dt>Arbeitsheft-Beschreibung</dt><dd>{{ vignette.arbeitsheft_beschreibung }}</dd>
+    </dl>
+{% endblock %}
