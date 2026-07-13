@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_htmx',
     'konten',
+    'simulation',
 ]
 
 AUTH_USER_MODEL: str = 'konten.Konto'
