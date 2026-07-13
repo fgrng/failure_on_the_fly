@@ -4,6 +4,7 @@ from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
@@ -316,6 +317,18 @@ class VignetteFinalisierenTests(TestCase):
 
         with self.assertRaisesMessage(ValidationError, "Arbeitsheft"):
             vignette.finalisieren()
+
+    def test_finalisieren_nimmt_arbeitsheft_nur_mit_bild_an(self) -> None:
+        """Ein Bild allein erfüllt die Arbeitsheft-Alternative."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.arbeitsheft_text = ""
+        vignette.arbeitsheft_bild = SimpleUploadedFile(
+            "arbeitsheft.png", b"bild", content_type="image/png"
+        )
+
+        vignette.finalisieren()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
 
     def test_finalisieren_lehnt_nichtpositives_budget_ab(self) -> None:
         """Ein Gesprächsbudget muss mindestens einen Schritt oder eine Zeit tragen."""
