@@ -1,10 +1,10 @@
 """Integrationstests für das Nutzer-Modell."""
 
 import pytest
-from django.apps import apps
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group, Permission
-from django.db.models.signals import post_migrate
+from django.core.management import call_command
+from django.db.models import QuerySet
 
 from konten.models import Konto
 
@@ -12,7 +12,7 @@ from konten.models import Konto
 @pytest.mark.django_db
 def test_kontorollen_werden_nach_migration_angelegt() -> None:
     """Die vier Kontorollen existieren als berechtigungsfreie Django-Groups."""
-    rollen = Group.objects.order_by("name")
+    rollen: QuerySet[Group] = Group.objects.order_by("name")
 
     assert list(rollen.values_list("name", flat=True)) == [
         "Administrator:in",
@@ -24,18 +24,25 @@ def test_kontorollen_werden_nach_migration_angelegt() -> None:
 
 
 @pytest.mark.django_db
-def test_kontorollen_werden_beim_zweiten_post_migrate_lauf_nicht_dupliziert() -> None:
-    """Ein erneuter Migrationslauf lässt die vier Kontorollen unverändert."""
-    konten_config = apps.get_app_config("konten")
-    Group.objects.get(name="Autor:in").permissions.add(Permission.objects.first())
-
-    post_migrate.send(
-        sender=konten_config,
-        app_config=konten_config,
-        using="default",
-    )
+def test_erneute_migration_dupliziert_kontorollen_nicht() -> None:
+    """Ein erneuter Migrationslauf dupliziert die vier Kontorollen nicht."""
+    call_command("migrate", verbosity=0)
 
     assert Group.objects.count() == 4
+
+
+@pytest.mark.django_db
+def test_erneute_migration_entfernt_berechtigungen_der_kontorollen() -> None:
+    """Ein erneuter Migrationslauf entfernt vergebene Django-Permissions."""
+    berechtigung: Permission = Permission.objects.get(
+        codename="add_group",
+        content_type__app_label="auth",
+        content_type__model="group",
+    )
+    Group.objects.get(name="Autor:in").permissions.add(berechtigung)
+
+    call_command("migrate", verbosity=0)
+
     assert not Group.objects.filter(permissions__isnull=False).exists()
 
 

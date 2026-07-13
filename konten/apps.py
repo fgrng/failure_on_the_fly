@@ -4,15 +4,22 @@ from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
 
-KONTOROLLEN = ("Autor:in", "Ausbilder:in", "Forschende:r", "Administrator:in")
+KONTOROLLEN: tuple[str, ...] = (
+    "Autor:in",
+    "Ausbilder:in",
+    "Forschende:r",
+    "Administrator:in",
+)
 
 
 def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:
     """Stellt die vier additiven Kontorollen bereit."""
     from django.contrib.auth.models import Group
 
-    for name in KONTOROLLEN:
-        gruppe, _ = Group.objects.using(using).get_or_create(name=name)
+    rollenname: str
+    for rollenname in KONTOROLLEN:
+        gruppe: Group
+        gruppe, _ = Group.objects.using(using).get_or_create(name=rollenname)
         gruppe.permissions.clear()
 
 
