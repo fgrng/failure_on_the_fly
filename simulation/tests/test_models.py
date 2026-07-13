@@ -105,7 +105,7 @@ def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None
 
 @pytest.mark.django_db
 def test_modell_konfiguration_ist_nach_dem_anlegen_unveraenderlich() -> None:
-    """Eine angelegte Modell-Konfiguration bleibt append-only."""
+    """Eine angelegte Modell-Konfiguration bleibt unveränderlich."""
 
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="erstes-modell",

@@ -3,6 +3,8 @@
 from django.db import models
 from django.db.models import Q
 
+_UNVERAENDERLICH_FEHLERMELDUNG: str = "ModellKonfigurationen sind append-only."
+
 
 class KernHistorie(models.Model):
     """Die einzige, namenlose Historie der Simulationskern-Fassungen."""
@@ -91,13 +93,12 @@ class Simulationskern(models.Model):
 
 
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
-    """Schreibgeschützte QuerySets für Modell-Konfigurationen."""
+    """QuerySets für unveränderliche Modell-Konfigurationen."""
 
     def update(self, **kwargs: object) -> int:
-        """Verhindert Bulk-Mutationen an append-only Konfigurationen."""
+        """Verhindert Massenänderungen an Modell-Konfigurationen."""
 
-        msg = "ModellKonfigurationen sind append-only."
-        raise RuntimeError(msg)
+        raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
 
 
 class ModellKonfigurationManager(
@@ -124,7 +125,7 @@ class ModellKonfigurationManager(
 
 
 class ModellKonfiguration(models.Model):
-    """Append-only Konfiguration eines Sprachmodells."""
+    """Unveränderliche Konfiguration eines Sprachmodells."""
 
     sprachmodell: models.CharField = models.CharField(max_length=255)
     parameter: models.JSONField = models.JSONField(default=dict)
@@ -134,9 +135,8 @@ class ModellKonfiguration(models.Model):
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert jede Mutation einer bereits angelegten Konfiguration."""
 
-        if self._state.adding is False:
-            msg = "ModellKonfigurationen sind append-only."
-            raise RuntimeError(msg)
+        if not self._state.adding:
+            raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
         super().save(*args, **kwargs)
 
 
