@@ -88,3 +88,75 @@ class Simulationskern(models.Model):
                 name="simulation_finalisiert_am_passt_zu_zustand",
             ),
         ]
+
+
+class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
+    """Schreibgeschützte QuerySets für Modell-Konfigurationen."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Bulk-Mutationen an append-only Konfigurationen."""
+
+        msg = "ModellKonfigurationen sind append-only."
+        raise RuntimeError(msg)
+
+
+class ModellKonfigurationManager(
+    models.Manager.from_queryset(ModellKonfigurationQuerySet),
+):
+    """Zugang zur aktiven Modell-Konfiguration."""
+
+    def aktive(self) -> "ModellKonfiguration":
+        """Liefert die Konfiguration, auf die der aktive Zeiger verweist."""
+
+        return AktiveModellKonfiguration.objects.get(singleton=1).konfiguration
+
+    def aktivieren(
+        self,
+        konfiguration: "ModellKonfiguration",
+    ) -> "ModellKonfiguration":
+        """Setzt die einzige aktive Konfiguration."""
+
+        AktiveModellKonfiguration.objects.update_or_create(
+            singleton=1,
+            defaults={"konfiguration": konfiguration},
+        )
+        return konfiguration
+
+
+class ModellKonfiguration(models.Model):
+    """Append-only Konfiguration eines Sprachmodells."""
+
+    sprachmodell: models.CharField = models.CharField(max_length=255)
+    parameter: models.JSONField = models.JSONField(default=dict)
+
+    objects: ModellKonfigurationManager = ModellKonfigurationManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Verhindert jede Mutation einer bereits angelegten Konfiguration."""
+
+        if self._state.adding is False:
+            msg = "ModellKonfigurationen sind append-only."
+            raise RuntimeError(msg)
+        super().save(*args, **kwargs)
+
+
+class AktiveModellKonfiguration(models.Model):
+    """Der einzige, veränderliche Zeiger auf eine Modell-Konfiguration."""
+
+    konfiguration: models.ForeignKey = models.ForeignKey(
+        ModellKonfiguration,
+        on_delete=models.PROTECT,
+    )
+    singleton: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        default=1,
+        unique=True,
+        editable=False,
+    )
+
+    class Meta:
+        constraints: list[models.BaseConstraint] = [
+            models.CheckConstraint(
+                condition=Q(singleton=1),
+                name="simulation_aktive_modell_konfiguration_ist_singleton",
+            ),
+        ]
