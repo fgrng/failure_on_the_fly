@@ -32,10 +32,6 @@ Die Vision nennt CSV und JSON. Offen ist, welche Tabellen bzw. Objekte der Expor
 
 `docs/adr/0011` lässt begrenzte Wiederholungen eines gescheiterten Gesprächsschritts zu, ohne die Grenze zu nennen. Offen: Wie viele Versuche, bevor eine Sitzung aufgibt, und was sieht die Teilnehmer:in dann? Getrennt davon verlangt `docs/adr/0012` eine **harte Obergrenze** gegen ewig offene Sitzungen — sie hat nichts mit dem Gesprächsbudget zu tun und ist noch unbeziffert.
 
-## 6. Arbeitsheft-Inhalt und Bildablage
-
-Der Arbeitsheft-Inhalt ist die für den Menschen sichtbare Bearbeitung und kann ein Bild sein. Offen: Ist er Pflicht oder optional? Sind Text und Bild Alternativen oder beides zugleich? Wie und wo werden Bilder abgelegt, und was passiert mit ihnen, wenn eine finale Vignettenfassung Jahre später noch aus einer Datenspur heraus angezeigt werden soll?
-
-## 7. Zulässige Anbieter und Modelle
+## 6. Zulässige Anbieter und Modelle
 
 `docs/adr/0005` schreibt fest, dass die Denkspur immer aus dem Structured Output stammt. Damit sind nur Anbieter und Modelle zulässig, die das beherrschen. Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
