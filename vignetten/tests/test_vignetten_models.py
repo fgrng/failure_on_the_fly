@@ -10,7 +10,51 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import Simulationskern
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
+
+
+def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:
+    """Die Rahmenhandlung erhält rohe und abgeleitete Werte der Vignette."""
+    vignette: Vignette = Vignette(
+        schuelerin_name="Mia",
+        schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        lehrperson_name="Koch",
+        lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        fach="Mathematik",
+        thema="Brüche",
+        klassenstufe="5",
+    )
+
+    assert rahmen_platzhalter(vignette) == {
+        "schuelerin_name": "Mia",
+        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "lehrperson_name": "Koch",
+        "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "fach": "Mathematik",
+        "thema": "Brüche",
+        "klassenstufe": "5",
+        "schuelerin_pronomen": "sie",
+        "schuelerin_possessiv": "ihr",
+        "lehrperson_pronomen": "sie",
+        "lehrperson_possessiv": "ihr",
+        "lehrperson_anrede": "Frau",
+    }
+
+
+def test_rahmen_platzhalter_leitet_maennliche_formen_beider_akteure_ab() -> None:
+    """Die kanonischen männlichen Formen gelten für beide Akteure."""
+    vignette: Vignette = Vignette(
+        schuelerin_geschlecht=Vignette.Geschlecht.MAENNLICH,
+        lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+    )
+
+    platzhalter: dict[str, str] = rahmen_platzhalter(vignette)
+
+    assert platzhalter["schuelerin_pronomen"] == "er"
+    assert platzhalter["schuelerin_possessiv"] == "sein"
+    assert platzhalter["lehrperson_pronomen"] == "er"
+    assert platzhalter["lehrperson_possessiv"] == "sein"
+    assert platzhalter["lehrperson_anrede"] == "Herr"
 
 
 class VignetteAnlegenTests(TestCase):
