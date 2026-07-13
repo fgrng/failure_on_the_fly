@@ -109,10 +109,8 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
     ) -> "Simulationskern":
         """Legt die erste Kern-Fassung als Entwurf mit Historie an."""
 
-        historie: KernHistorie
-        angelegt: bool
-        historie, angelegt = KernHistorie.objects.get_or_create(pk=1)
-        if not angelegt:
+        historie, _ = KernHistorie.objects.get_or_create(pk=1)
+        if self.filter(historie=historie).exists():
             raise ValueError("Der Simulationskern wurde bereits angelegt.")
         return self._erstellen(
             historie=historie,

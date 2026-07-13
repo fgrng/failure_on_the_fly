@@ -152,6 +152,17 @@ def test_entwurf_kann_physisch_geloescht_werden() -> None:
 
 
 @pytest.mark.django_db
+def test_anlegen_ist_nach_loeschen_des_einzigen_entwurfs_wieder_moeglich() -> None:
+    """Ein verworfener erster Entwurf blockiert die Kern-Historie nicht."""
+
+    Simulationskern.objects.anlegen().delete()
+
+    neuer_entwurf: Simulationskern = Simulationskern.objects.anlegen()
+
+    assert neuer_entwurf.zustand == Simulationskern.Zustand.ENTWURF
+
+
+@pytest.mark.django_db
 def test_finale_fassung_kann_nicht_physisch_geloescht_werden() -> None:
     """Finale Kern-Fassungen bleiben für spätere Datenspuren erhalten."""
 
