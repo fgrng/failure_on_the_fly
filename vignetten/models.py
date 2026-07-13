@@ -2,10 +2,27 @@
 
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from simulation.models import Simulationskern
+
+
+_PFLICHTFELD_NAMEN: tuple[str, ...] = (
+    "fehlermuster_beschreibung",
+    "lernauftrag",
+    "arbeitsheft_beschreibung",
+    "schuelerin_name",
+    "schuelerin_geschlecht",
+    "lehrperson_name",
+    "lehrperson_geschlecht",
+    "fach",
+    "thema",
+    "klassenstufe",
+    "budget_typ",
+)
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -33,6 +50,10 @@ class Vignettenhistorie(models.Model):
 
 class VignetteQuerySet(models.QuerySet["Vignette"]):
     """Abfragen über Vignettenfassungen."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert das Umgehen der Unveränderlichkeit per Massenupdate."""
+        raise RuntimeError("Vignetten dürfen nicht per Massenupdate geändert werden.")
 
     def einbindbar(self) -> models.QuerySet["Vignette"]:
         """Liefert die finalen Fassungen, die eingebunden werden dürfen."""
@@ -119,6 +140,52 @@ class Vignette(models.Model):
     )
 
     objects: VignetteManager = VignetteManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
+        if not self._state.adding:
+            gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
+            if gespeicherte_fassung.zustand != self.Zustand.ENTWURF and any(
+                getattr(self, modellfeld.attname)
+                != getattr(gespeicherte_fassung, modellfeld.attname)
+                for modellfeld in self._meta.local_fields
+                if modellfeld.name != "zustand"
+            ):
+                raise ValidationError("Finale Fassungen sind unveränderlich.")
+        super().save(*args, **kwargs)
+
+    @transaction.atomic
+    def finalisieren(self) -> None:
+        """Prüft einen Entwurf und friert ihn als finale Fassung ein."""
+        if self.zustand != self.Zustand.ENTWURF:
+            raise ValidationError("Nur Entwürfe können finalisiert werden.")
+        fehlende_felder: list[str] = [
+            feldname
+            for feldname in _PFLICHTFELD_NAMEN
+            if not getattr(self, feldname)
+        ]
+        if fehlende_felder:
+            raise ValidationError(
+                f"Zum Finalisieren fehlen: {', '.join(fehlende_felder)}."
+            )
+        if not self.arbeitsheft_text and not self.arbeitsheft_bild:
+            raise ValidationError(
+                "Zum Finalisieren braucht das Arbeitsheft Text oder ein Bild."
+            )
+        if self.budget_wert is None or self.budget_wert <= 0:
+            raise ValidationError("Zum Finalisieren muss das Budget größer als 0 sein.")
+        if self.gepinnter_kern is None:
+            raise ValidationError("Zum Finalisieren fehlt ein gepinnter Simulationskern.")
+        if self.gepinnter_kern.zustand == Simulationskern.Zustand.ARCHIVIERT:
+            raise ValidationError(
+                "Der gepinnte Simulationskern wurde archiviert; bitte vorspulen()."
+            )
+        if self.gepinnter_kern.zustand != Simulationskern.Zustand.FINAL:
+            raise ValidationError("Der gepinnte Simulationskern ist nicht final.")
+
+        self.zustand = self.Zustand.FINAL
+        self.finalisiert_am = timezone.now()
+        self.save(update_fields=["zustand", "finalisiert_am"])
 
     class Meta:
         """Datenbankinvarianten der Vignettenfassung."""
