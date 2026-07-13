@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_htmx',
     'konten',
     'simulation',
+    'vignetten',
 ]
 
 AUTH_USER_MODEL: str = 'konten.Konto'
