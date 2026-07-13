@@ -1,0 +1,89 @@
+/* Design-Tokens – abgeleitet aus dem PHSG Corporate Design (Guidelines 2026).
+   Siehe docs/adr/0023-ui-design-tokens-phsg-cd.md und
+   docs/research/corporate-design-webapp.md.
+
+   Grundhaltung: CD-konform, aber als eigenständiges Tool-UI. Farben werden
+   nach ROLLE vergeben (semantische Tokens unten), nicht nach Farbname. Die
+   Primitiv-Tokens (--phsg-*) spiegeln die offizielle Palette 1:1 und dienen
+   nur als Quelle für die semantischen Tokens. Vorerst nur Light Mode. */
+
+:root {
+    /* ---- Primitive: Primärfarben (Logofarben, verbindlich) ---- */
+    --phsg-bright-green: #1fc070;
+    --phsg-deep-mint: #1c3e37;
+
+    /* ---- Primitive: Graustufen (für digitale Anwendungen) ---- */
+    --phsg-white: #ffffff;
+    --phsg-gray-050: #f5f7f6;
+    --phsg-gray-100: #ececec;
+    --phsg-gray-200: #d8dad9;
+    --phsg-gray-300: #c5c7c6;
+    --phsg-gray-400: #b2b4b3;
+    --phsg-gray-500: #9d9f9e;
+    --phsg-gray-600: #878988;
+    --phsg-gray-700: #6f7170;
+    --phsg-gray-800: #555756;
+    --phsg-gray-900: #383836;
+    --phsg-black: #000000;
+
+    /* ---- Primitive: Sekundärpalette (Light / Bright / Dark / Deep) ----
+       Vorerst ungenutzt; angelegt für spätere Kategorie-Kacheln u. Ä. */
+    --phsg-green-light: #d8ecd8;
+    --phsg-green-bright: #1fc070;
+    --phsg-green-dark: #009b56;
+    --phsg-green-deep: #2c512c;
+    --phsg-mint-light: #c7e6e2;
+    --phsg-mint-bright: #56ba9d;
+    --phsg-mint-dark: #00836a;
+    --phsg-mint-deep: #1c3e37;
+    --phsg-blue-light: #dcf1fc;
+    --phsg-blue-bright: #50bacd;
+    --phsg-blue-dark: #005d75;
+    --phsg-blue-deep: #1e2c39;
+    --phsg-red-light: #fbddde;
+    --phsg-red-bright: #ee7e7e;
+    --phsg-red-dark: #bf4850;
+    --phsg-red-deep: #651819;
+    --phsg-purple-light: #e5d3e7;
+    --phsg-purple-bright: #b982b6;
+    --phsg-purple-dark: #7b2d61;
+    --phsg-purple-deep: #422335;
+    --phsg-yellow-light: #fefbd3;
+    --phsg-yellow-bright: #c8d73b;
+    --phsg-yellow-dark: #967231;
+    --phsg-yellow-deep: #3d301a;
+
+    /* ---- Semantisch: Farben nach Rolle ---- */
+    --color-text: var(--phsg-gray-900);        /* primärer Lesetext */
+    --color-text-muted: var(--phsg-gray-700);  /* sekundär, ADR-0023 Option A */
+    --color-text-on-accent: var(--phsg-white); /* Text auf Farbflächen: weiss */
+
+    --color-accent: var(--phsg-green-dark);      /* Links, Buttons, aktive Nav */
+    --color-accent-hover: var(--phsg-green-deep);/* Hover/aktiv */
+    --color-focus: var(--phsg-bright-green);     /* Fokus-Ring, Highlights */
+
+    --color-surface: var(--phsg-white);
+    --color-surface-muted: var(--phsg-gray-050);
+    --color-border: var(--phsg-gray-200);
+
+    --color-footer-bg: var(--phsg-deep-mint);
+    --color-footer-text: var(--phsg-white);
+
+    /* ---- Typografie ---- */
+    --font-heading: "Platypi", Georgia, serif;
+    --font-body: "Albert Sans", system-ui, sans-serif;
+
+    /* ---- Spacing: 8×8-Raster (Achterraster) ---- */
+    --space-1: 8px;
+    --space-2: 16px;
+    --space-3: 24px;
+    --space-4: 32px;
+    --space-5: 40px;
+    --space-6: 48px;
+    --space-7: 56px;
+    --space-8: 64px;
+
+    /* ---- Layout ---- */
+    --content-max-width: 1152px; /* 144 × 8 */
+    --radius: 8px;
+}

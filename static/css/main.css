@@ -1,5 +1,138 @@
+/* Basis-Layout auf Grundlage der Design-Tokens (tokens.css).
+   Erwartet, dass fonts.css und tokens.css davor geladen werden. */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: system-ui, sans-serif;
     margin: 0;
-    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-surface);
+}
+
+/* ---- Typografie ---- */
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--color-text);
+}
+
+a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+a:hover {
+    color: var(--color-accent-hover);
+    text-decoration: underline;
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+/* ---- Grundgerüst: Header / Nav / Main / Footer ---- */
+.site-header {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.site-header__inner,
+.site-main,
+.site-footer__inner {
+    width: 100%;
+    max-width: var(--content-max-width);
+    margin-inline: auto;
+    padding-inline: var(--space-3);
+}
+
+.site-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: var(--space-8);
+}
+
+.site-brand {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 1.25rem;
+    color: var(--color-text);
+}
+.site-brand:hover {
+    text-decoration: none;
+}
+
+.site-nav {
+    display: flex;
+    gap: var(--space-3);
+}
+.site-nav a {
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.site-main {
+    flex: 1;
+    padding-block: var(--space-4);
+}
+
+.site-footer {
+    background: var(--color-footer-bg);
+    color: var(--color-footer-text);
+    margin-top: var(--space-6);
+}
+.site-footer a {
+    color: var(--color-footer-text);
+    text-decoration: underline;
+}
+.site-footer__inner {
+    padding-block: var(--space-4);
+}
+
+/* ---- Buttons ---- */
+.button {
+    display: inline-block;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.25;
+    cursor: pointer;
+}
+.button:hover {
+    background: var(--color-accent-hover);
+    color: var(--color-text-on-accent);
+    text-decoration: none;
+}
+.button--secondary {
+    background: transparent;
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+.button--secondary:hover {
+    background: var(--color-surface-muted);
+    color: var(--color-accent-hover);
 }
