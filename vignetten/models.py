@@ -153,16 +153,21 @@ class Vignette(models.Model):
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:
     """Liefert die Rohwerte und Grammatikformen für die Rahmenhandlung."""
-    formen: dict[str, tuple[str, str, str]] = {
-        Vignette.Geschlecht.WEIBLICH: ("sie", "ihr", "Frau"),
-        Vignette.Geschlecht.MAENNLICH: ("er", "sein", "Herr"),
+    pronomen_und_possessiv: dict[str, tuple[str, str]] = {
+        Vignette.Geschlecht.WEIBLICH: ("sie", "ihr"),
+        Vignette.Geschlecht.MAENNLICH: ("er", "sein"),
     }
-    schuelerin_pronomen, schuelerin_possessiv, _ = formen[
+    anreden: dict[str, str] = {
+        Vignette.Geschlecht.WEIBLICH: "Frau",
+        Vignette.Geschlecht.MAENNLICH: "Herr",
+    }
+    schuelerin_pronomen, schuelerin_possessiv = pronomen_und_possessiv[
         vignette.schuelerin_geschlecht
     ]
-    lehrperson_pronomen, lehrperson_possessiv, lehrperson_anrede = formen[
+    lehrperson_pronomen, lehrperson_possessiv = pronomen_und_possessiv[
         vignette.lehrperson_geschlecht
     ]
+    lehrperson_anrede: str = anreden[vignette.lehrperson_geschlecht]
     return {
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
