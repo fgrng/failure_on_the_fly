@@ -78,7 +78,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbaren_entwurf_laden(request, pk)
-    form = FinalisierenForm(request.POST)
+    form: FinalisierenForm = FinalisierenForm(request.POST)
     try:
         vignette.finalisieren()
     except ValidationError as error:

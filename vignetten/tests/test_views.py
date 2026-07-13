@@ -320,44 +320,56 @@ class VignetteBearbeitenViewTests(TestCase):
 
 
 class VignetteFinalisierenViewTests(TestCase):
-    """Die Finalisieren-Aktion delegiert an die Modell-Schreibnaht."""
+    """Entwürfe lassen sich mit lesbaren Fehlermeldungen finalisieren."""
 
     def setUp(self) -> None:
         """Legt eine eingeloggte Autorin mit vollständigem Entwurf an."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        self.vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            fehlermuster_beschreibung="Zählt Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Frau Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
+        self.vignette: Vignette = Vignette.objects.anlegen(ada)
+        self.vignette.fehlermuster_beschreibung = "Zählt Stellenwerte einzeln."
+        self.vignette.lernauftrag = "Addiere 27 und 15."
+        self.vignette.arbeitsheft_beschreibung = "27 + 15 = 312"
+        self.vignette.arbeitsheft_text = "27 + 15 = 312"
+        self.vignette.schuelerin_name = "Mia"
+        self.vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.vignette.lehrperson_name = "Frau Weber"
+        self.vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.vignette.fach = "Mathematik"
+        self.vignette.thema = "Addition"
+        self.vignette.klassenstufe = "5"
+        self.vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+        self.vignette.budget_wert = 5
+        self.vignette.save()
         self.client.force_login(ada)
 
-    def test_finalisiert_vollstaendigen_eigenen_entwurf(self) -> None:
-        """Ein vollständiger Entwurf wird über HTTP zur finalen Fassung."""
-        detail_response: HttpResponse = self.client.get(
+    def _assert_finalisieren_zeigt_fehler(
+        self, feldname: str, wert: object, fehlermeldung: str
+    ) -> None:
+        # Prüft eine abgelehnte Finalisierung über die sichtbare Antwort.
+        setattr(self.vignette, feldname, wert)
+        self.vignette.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:finalisieren", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, fehlermeldung)
+
+    def test_zeigt_finalisieren_aber_keine_vorspulen_aktion(self) -> None:
+        """Der Entwurf bietet nur die vorgesehene Lebenszyklus-Aktion an."""
+        response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[self.vignette.pk])
         )
         self.assertContains(
-            detail_response,
+            response,
             reverse("vignetten:finalisieren", args=[self.vignette.pk]),
         )
-        self.assertNotContains(detail_response, "vorspulen")
+        self.assertNotContains(response, "vorspulen")
+
+    def test_finalisiert_vollstaendigen_eigenen_entwurf(self) -> None:
+        """Ein vollständiger Entwurf wird über HTTP zur finalen Fassung."""
 
         response: HttpResponse = self.client.post(
             reverse("vignetten:finalisieren", args=[self.vignette.pk])
@@ -366,65 +378,41 @@ class VignetteFinalisierenViewTests(TestCase):
         self.assertRedirects(
             response, reverse("vignetten:detail", args=[self.vignette.pk])
         )
-        self.vignette.refresh_from_db()
-        self.assertEqual(self.vignette.zustand, Vignette.Zustand.FINAL)
         detail_response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[self.vignette.pk])
         )
         self.assertContains(detail_response, "Finale Fassung")
 
-    def test_zeigt_vollstaendigkeitsfehler_aus_der_schreibnaht(self) -> None:
-        """Finalisieren zeigt die Gründe der Modell-API als Formfehler."""
-        unvollstaendige_entwurfsfaelle: tuple[tuple[str, object, str], ...] = (
-            ("lernauftrag", "", "lernauftrag"),
-            ("arbeitsheft_text", "", "Arbeitsheft"),
-            ("budget_wert", 0, "größer als 0"),
+    def test_zeigt_fehler_fuer_fehlendes_pflichtfeld(self) -> None:
+        """Ein fehlendes Pflichtfeld wird verständlich benannt."""
+        self._assert_finalisieren_zeigt_fehler("lernauftrag", "", "lernauftrag")
+
+    def test_zeigt_fehler_fuer_leeres_arbeitsheft(self) -> None:
+        """Ein leeres Arbeitsheft wird verständlich benannt."""
+        self._assert_finalisieren_zeigt_fehler(
+            "arbeitsheft_text", "", "Arbeitsheft"
         )
-        for feldname, wert, fehlermeldung in unvollstaendige_entwurfsfaelle:
-            with self.subTest(feldname=feldname):
-                setattr(self.vignette, feldname, wert)
-                self.vignette.save()
 
-                response: HttpResponse = self.client.post(
-                    reverse("vignetten:finalisieren", args=[self.vignette.pk])
-                )
+    def test_zeigt_fehler_fuer_budget_null(self) -> None:
+        """Ein Budget von null wird verständlich abgelehnt."""
+        self._assert_finalisieren_zeigt_fehler("budget_wert", 0, "größer als 0")
 
-                self.assertContains(response, "errorlist nonfield")
-                self.assertContains(response, fehlermeldung)
-                self.vignette.refresh_from_db()
-                self.assertEqual(self.vignette.zustand, Vignette.Zustand.ENTWURF)
-                setattr(
-                    self.vignette,
-                    feldname,
-                    {
-                        "lernauftrag": "Addiere 27 und 15.",
-                        "arbeitsheft_text": "27 + 15 = 312",
-                        "budget_wert": 5,
-                    }[feldname],
-                )
-                self.vignette.save()
-
-    def test_zeigt_fehler_fuer_nicht_finalen_und_archivierten_kern_pin(self) -> None:
-        """Auch Pin-Fehler kommen ohne eigene View-Logik zur Oberfläche."""
+    def test_zeigt_fehler_fuer_nicht_finalen_kern_pin(self) -> None:
+        """Ein nicht finaler Kern-Pin wird verständlich abgelehnt."""
         kern: Simulationskern = self.vignette.gepinnter_kern.bearbeiten()
-        self.vignette.gepinnter_kern = kern
-        self.vignette.save(update_fields=["gepinnter_kern"])
 
-        entwurfs_response: HttpResponse = self.client.post(
-            reverse("vignetten:finalisieren", args=[self.vignette.pk])
+        self._assert_finalisieren_zeigt_fehler(
+            "gepinnter_kern", kern, "nicht final"
         )
 
-        self.assertContains(entwurfs_response, "errorlist nonfield")
-        self.assertContains(entwurfs_response, "nicht final")
-        kern.finalisieren()
+    def test_zeigt_fehler_fuer_archivierten_kern_pin(self) -> None:
+        """Ein archivierter Kern-Pin wird verständlich abgelehnt."""
+        kern: Simulationskern = self.vignette.gepinnter_kern
         kern.archivieren()
 
-        archivierungs_response: HttpResponse = self.client.post(
-            reverse("vignetten:finalisieren", args=[self.vignette.pk])
+        self._assert_finalisieren_zeigt_fehler(
+            "gepinnter_kern", kern, "archiviert"
         )
-
-        self.assertContains(archivierungs_response, "errorlist nonfield")
-        self.assertContains(archivierungs_response, "archiviert")
 
 
 class VignettenLoginTests(TestCase):

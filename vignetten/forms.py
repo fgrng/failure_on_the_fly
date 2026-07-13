@@ -2,8 +2,7 @@
 
 import random
 
-from django import forms
-from django.forms import ModelForm
+from django.forms import Form, ModelForm
 
 from .models import Vignette
 
@@ -44,7 +43,7 @@ class VignetteForm(ModelForm):
         ]
 
 
-class FinalisierenForm(forms.Form):
+class FinalisierenForm(Form):
     """Trägt die nicht feldgebundenen Fehler der Finalisieren-Aktion."""
 
 
