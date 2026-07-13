@@ -21,6 +21,8 @@ class VignetteForm(ModelForm):
     """Die bearbeitbaren Inhaltsfelder einer Vignette."""
 
     class Meta:
+        """Konfiguriert die editierbaren Felder des Django-Formulars."""
+
         model = Vignette
         fields = [
             "fehlermuster_beschreibung",
