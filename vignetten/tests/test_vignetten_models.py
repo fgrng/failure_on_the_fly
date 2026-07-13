@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
@@ -164,3 +165,134 @@ class VignetteQuerySetTests(TestCase):
         )
 
         self.assertEqual(list(Vignette.objects.einbindbar()), [finale])
+
+
+class VignetteFinalisierenTests(TestCase):
+    """Das Finalisieren prüft die Vignette an ihrer ORM-Naht."""
+
+    def _vollstaendigen_entwurf_anlegen(
+        self,
+        kern_zustand: Simulationskern.Zustand = Simulationskern.Zustand.FINAL,
+    ) -> Vignette:
+        historie: KernHistorie
+        historie, _ = KernHistorie.objects.get_or_create()
+        kern: Simulationskern = Simulationskern.objects.create(
+            historie=historie,
+            zustand=kern_zustand,
+            finalisiert_am=timezone.now()
+            if kern_zustand != Simulationskern.Zustand.ENTWURF
+            else None,
+        )
+        return Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Frau Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern,
+        )
+
+    def test_finalisieren_ueberfuehrt_vollstaendigen_entwurf_nach_final(self) -> None:
+        """Eine vollständige Fassung wird final und erhält einen Zeitpunkt."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+
+        vignette.finalisieren()
+
+        vignette.refresh_from_db()
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+        self.assertIsNotNone(vignette.finalisiert_am)
+
+    def test_finale_fassung_ist_unveraenderlich(self) -> None:
+        """Inhalte einer finalen Fassung lassen sich nicht mehr überschreiben."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.finalisieren()
+        vignette.lernauftrag = "Addiere 28 und 15."
+
+        with self.assertRaises(ValidationError):
+            vignette.save()
+
+    def test_finalisiert_am_wird_nie_zurueckgesetzt(self) -> None:
+        """Der Finalisierungszeitpunkt überlebt jede spätere Zustandsänderung."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.finalisieren()
+        vignette.finalisiert_am = None
+
+        with self.assertRaises(ValidationError):
+            vignette.save()
+
+    def test_finale_fassung_laesst_keine_massenmutation_zu(self) -> None:
+        """Auch der QuerySet-Zugang kann eine finale Fassung nicht verändern."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.finalisieren()
+
+        with self.assertRaises(RuntimeError):
+            Vignette.objects.filter(pk=vignette.pk).update(lernauftrag="Verändert")
+
+    def test_finalisieren_lehnt_nichtentwuerfe_ab(self) -> None:
+        """Finalisieren ist ausschließlich die Kante vom Entwurf nach final."""
+        finale: Vignette = self._vollstaendigen_entwurf_anlegen()
+        finale.finalisieren()
+        archivierte: Vignette = self._vollstaendigen_entwurf_anlegen()
+        archivierte.finalisieren()
+        archivierte.zustand = Vignette.Zustand.ARCHIVIERT
+        archivierte.save(update_fields=["zustand"])
+
+        for vignette in (finale, archivierte):
+            with self.subTest(zustand=vignette.zustand):
+                with self.assertRaisesMessage(ValidationError, "Entwürfe"):
+                    vignette.finalisieren()
+
+    def test_finalisieren_nennt_fehlendes_pflichtfeld(self) -> None:
+        """Unvollständige Entwürfe erklären, welches Feld ergänzt werden muss."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.lernauftrag = ""
+
+        with self.assertRaisesMessage(ValidationError, "lernauftrag"):
+            vignette.finalisieren()
+
+    def test_finalisieren_lehnt_leeres_arbeitsheft_ab(self) -> None:
+        """Das Arbeitsheft braucht sichtbar Text oder ein Bild."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.arbeitsheft_text = ""
+
+        with self.assertRaisesMessage(ValidationError, "Arbeitsheft"):
+            vignette.finalisieren()
+
+    def test_finalisieren_lehnt_nichtpositives_budget_ab(self) -> None:
+        """Ein Gesprächsbudget muss mindestens einen Schritt oder eine Zeit tragen."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.budget_wert = 0
+
+        with self.assertRaisesMessage(ValidationError, "größer als 0"):
+            vignette.finalisieren()
+
+    def test_finalisieren_lehnt_entwurfs_kern_pin_ab(self) -> None:
+        """Nur ein finaler Simulationskern kann dauerhaft gepinnt werden."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(
+            Simulationskern.Zustand.ENTWURF
+        )
+
+        with self.assertRaisesMessage(ValidationError, "nicht final"):
+            vignette.finalisieren()
+
+    def test_finalisieren_verweist_bei_archiviertem_kern_aufs_vorspulen(
+        self,
+    ) -> None:
+        """Ein überholter Pin erklärt Autor:innen die nächste Handlung."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(
+            Simulationskern.Zustand.ARCHIVIERT
+        )
+
+        with self.assertRaisesMessage(ValidationError, "archiviert") as fehler:
+            vignette.finalisieren()
+
+        self.assertIn("vorspulen", str(fehler.exception))
