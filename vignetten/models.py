@@ -51,6 +51,23 @@ class Vignettenhistorie(models.Model):
 class VignetteQuerySet(models.QuerySet["Vignette"]):
     """Abfragen über Vignettenfassungen."""
 
+    def bulk_create(
+        self,
+        objs: list["Vignette"],
+        **kwargs: object,
+    ) -> list["Vignette"]:
+        """Verhindert das Umgehen der Anlege-Naht per Masseneinfügen."""
+        raise RuntimeError("Vignetten werden über die Anlege-Naht erzeugt.")
+
+    def bulk_update(
+        self,
+        objs: list["Vignette"],
+        fields: list[str],
+        **kwargs: object,
+    ) -> int:
+        """Verhindert das Umgehen der Lebenszyklus-Methoden per Massenupdate."""
+        raise RuntimeError("Vignetten dürfen nicht per Massenupdate geändert werden.")
+
     def update(self, **kwargs: object) -> int:
         """Verhindert das Umgehen der Unveränderlichkeit per Massenupdate."""
         raise RuntimeError("Vignetten dürfen nicht per Massenupdate geändert werden.")
@@ -69,6 +86,17 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
 class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
     """Manager für neue Vignettenlinien."""
 
+    def create(self, **kwargs: object) -> "Vignette":
+        """Verhindert das Umgehen der Anlege-Naht."""
+        raise RuntimeError("Vignetten werden über die Anlege-Naht erzeugt.")
+
+    def _erstellen(self, **werte: object) -> "Vignette":
+        # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
+        vignette: Vignette = self.model(**werte)
+        vignette._wird_angelegt = True
+        vignette.save(using=self.db)
+        return vignette
+
     @transaction.atomic
     def anlegen(self, konto: "Konto") -> "Vignette":
         """Legt einen Entwurf mit Historie und aktuellem finalem Kern an."""
@@ -77,11 +105,13 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         ).latest("finalisiert_am", "pk")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(konto)
-        return self.create(historie=historie, gepinnter_kern=kern)
+        return self._erstellen(historie=historie, gepinnter_kern=kern)
 
 
 class Vignette(models.Model):
     """Eine versionierte Fassung einer konkreten Trainingssituation."""
+
+    _wird_angelegt: bool
 
     class Zustand(models.TextChoices):
         """Mögliche Zustände einer Vignettenfassung."""
@@ -149,7 +179,10 @@ class Vignette(models.Model):
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
-        if not self._state.adding:
+        if self._state.adding:
+            if not getattr(self, "_wird_angelegt", False):
+                raise RuntimeError("Vignetten werden über die Anlege-Naht erzeugt.")
+        else:
             gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
             if (
                 self.zustand != gespeicherte_fassung.zustand
@@ -178,6 +211,8 @@ class Vignette(models.Model):
 
     def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
         """Speichert einen ausschließlich intern ausgelösten Zustandsübergang."""
+        # Anders als beim Kern hält save() die Vignetten-Unveränderlichkeit;
+        # daher laufen ihre Zustandskanten über diese geschützte Schreibnaht.
         self._wechselt_zustand = True
         try:
             self.zustand = zustand
@@ -191,7 +226,7 @@ class Vignette(models.Model):
         quelle: Vignette = type(self).objects.select_for_update().get(pk=self.pk)
         if quelle.zustand != self.Zustand.FINAL:
             raise ValidationError("Nur finale Fassungen können bearbeitet werden.")
-        return type(self).objects.create(
+        return type(self).objects._erstellen(
             historie=quelle.historie,
             vorgaengerin=quelle,
             gepinnter_kern=quelle.gepinnter_kern,

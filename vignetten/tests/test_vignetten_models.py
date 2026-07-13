@@ -60,6 +60,18 @@ def test_rahmen_platzhalter_leitet_maennliche_formen_beider_akteure_ab() -> None
 class VignetteAnlegenTests(TestCase):
     """Die Manager-Methode erzeugt eine vollständige neue Vignettenlinie."""
 
+    def test_oeffentliches_create_umgeht_den_lebenszyklus_nicht(self) -> None:
+        """Neue Fassungen entstehen ausschließlich über die Anlege-Naht."""
+        with self.assertRaises(RuntimeError):
+            Vignette.objects.create(historie=Vignettenhistorie.objects.create())
+
+    def test_bulk_create_umgeht_den_lebenszyklus_nicht(self) -> None:
+        """Auch Masseneinfügen erzeugt keine Fassung neben der Anlege-Naht."""
+        with self.assertRaises(RuntimeError):
+            Vignette.objects.bulk_create(
+                [Vignette(historie=Vignettenhistorie.objects.create())]
+            )
+
     def _vignette_mit_zwei_finalen_kernen_anlegen(
         self,
     ) -> tuple[Vignette, Konto, Simulationskern]:
@@ -105,15 +117,15 @@ class VignetteConstraintTests(TestCase):
     def test_historie_hat_hoechstens_einen_entwurf(self) -> None:
         """Ein zweiter Entwurf derselben Historie scheitert am Unique-Index."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        Vignette.objects.create(historie=historie)
+        Vignette.objects._erstellen(historie=historie)
 
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects.create(historie=historie)
+            Vignette.objects._erstellen(historie=historie)
 
     def test_finalisiert_am_muss_genau_dem_zustand_entsprechen(self) -> None:
         """Eine finale Fassung darf keinen leeren Finalisierungszeitpunkt haben."""
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects.create(
+            Vignette.objects._erstellen(
                 historie=Vignettenhistorie.objects.create(),
                 zustand=Vignette.Zustand.FINAL,
                 arbeitsheft_text="Bearbeitung",
@@ -122,7 +134,7 @@ class VignetteConstraintTests(TestCase):
     def test_entwurf_darf_keinen_finalisierungszeitpunkt_haben(self) -> None:
         """Ein Entwurf kann keinen bereits gesetzten Finalisierungszeitpunkt tragen."""
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects.create(
+            Vignette.objects._erstellen(
                 historie=Vignettenhistorie.objects.create(),
                 finalisiert_am=timezone.now(),
             )
@@ -131,20 +143,20 @@ class VignetteConstraintTests(TestCase):
         """Eine archivierte Schwester kann nicht erneut final werden."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         finalisiert_am: datetime = timezone.now()
-        vorgaengerin: Vignette = Vignette.objects.create(
+        vorgaengerin: Vignette = Vignette.objects._erstellen(
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
             arbeitsheft_text="Bearbeitung",
         )
-        Vignette.objects.create(
+        Vignette.objects._erstellen(
             historie=historie,
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
             arbeitsheft_text="Bearbeitung",
         )
-        archivierte_schwester: Vignette = Vignette.objects.create(
+        archivierte_schwester: Vignette = Vignette.objects._erstellen(
             historie=historie,
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.ARCHIVIERT,
@@ -157,7 +169,7 @@ class VignetteConstraintTests(TestCase):
     def test_finale_fassung_braucht_arbeitsheft_text_oder_bild(self) -> None:
         """Die Arbeitsheft-OR-Constraint schützt finale Fassungen."""
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects.create(
+            Vignette.objects._erstellen(
                 historie=Vignettenhistorie.objects.create(),
                 zustand=Vignette.Zustand.FINAL,
                 finalisiert_am=timezone.now(),
@@ -183,14 +195,14 @@ class VignetteQuerySetTests(TestCase):
 
     def test_einbindbar_liefert_nur_finale_fassungen(self) -> None:
         """Entwürfe und archivierte Fassungen sind nicht einbindbar."""
-        Vignette.objects.create(historie=Vignettenhistorie.objects.create())
-        finale: Vignette = Vignette.objects.create(
+        Vignette.objects._erstellen(historie=Vignettenhistorie.objects.create())
+        finale: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
             arbeitsheft_text="Bearbeitung",
         )
-        Vignette.objects.create(
+        Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
@@ -202,7 +214,7 @@ class VignetteQuerySetTests(TestCase):
     def test_historie_archivieren_beruehrt_keine_fassung(self) -> None:
         """Das Archiv-Flag der Historie ist unabhängig vom Fassungslifecycle."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        vignette: Vignette = Vignette.objects.create(historie=historie)
+        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
 
         historie.archiviert = True
         historie.save(update_fields=["archiviert"])
@@ -225,7 +237,7 @@ class VignetteFinalisierenTests(TestCase):
             kern.finalisieren()
         if kern_zustand == Simulationskern.Zustand.ARCHIVIERT:
             kern.archivieren()
-        return Vignette.objects.create(
+        return Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag="Addiere 27 und 15.",
@@ -285,7 +297,7 @@ class VignetteFinalisierenTests(TestCase):
         finale.finalisieren()
         kern2: Simulationskern = finale.gepinnter_kern.bearbeiten()
         kern2.finalisieren()
-        archivierte: Vignette = Vignette.objects.create(
+        archivierte: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag="Addiere 27 und 15.",
@@ -364,7 +376,7 @@ class VignetteBearbeitenTests(TestCase):
         """Eine finale Fassung bleibt beim Anlegen ihres Nachfolgeentwurfs erhalten."""
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        finale: Vignette = Vignette.objects.create(
+        finale: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag="Addiere 27 und 15.",
@@ -403,7 +415,7 @@ class VignetteBearbeitenTests(TestCase):
         erster_kern.finalisieren()
         neuester_kern: Simulationskern = erster_kern.bearbeiten()
         neuester_kern.finalisieren()
-        entwurf: Vignette = Vignette.objects.create(
+        entwurf: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             gepinnter_kern=erster_kern,
         )
@@ -417,7 +429,7 @@ class VignetteBearbeitenTests(TestCase):
         """Die beiden Archiv-Kanten ändern nur den Zustand der finalen Fassung."""
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        vignette: Vignette = Vignette.objects.create(
+        vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag="Addiere 27 und 15.",
@@ -451,7 +463,7 @@ class VignetteBearbeitenTests(TestCase):
         """Finale und archivierte Fassungen bleiben als Datenspur erhalten."""
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        finale: Vignette = Vignette.objects.create(
+        finale: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag="Addiere 27 und 15.",
@@ -482,7 +494,7 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_zustandswechsel_sind_auf_lebenszyklus_methoden_beschraenkt(self) -> None:
         """Direkte ORM-Saves dürfen keine Kante des Automaten umgehen."""
-        entwurf: Vignette = Vignette.objects.create(
+        entwurf: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
         )
         entwurf.zustand = Vignette.Zustand.ARCHIVIERT
