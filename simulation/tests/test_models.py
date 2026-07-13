@@ -1,3 +1,7 @@
+"""Datenbankinvarianten des Simulationskerns."""
+
+from datetime import datetime
+
 import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -6,16 +10,20 @@ from simulation.models import KernHistorie, Simulationskern
 
 
 @pytest.mark.django_db
-def test_kern_historie_ist_ein_singleton():
+def test_kern_historie_ist_ein_singleton() -> None:
+    """Eine abweichende ID kann keine zweite Kern-Historie erzeugen."""
+
     KernHistorie.objects.create()
 
     with pytest.raises(IntegrityError), transaction.atomic():
-        KernHistorie.objects.create()
+        KernHistorie.objects.create(id=2)
 
 
 @pytest.mark.django_db
-def test_historie_can_have_only_one_entwurf():
-    historie = KernHistorie.objects.create()
+def test_historie_hat_hoechstens_einen_entwurf() -> None:
+    """Eine Kern-Historie nimmt keinen zweiten Entwurf an."""
+
+    historie: KernHistorie = KernHistorie.objects.create()
     Simulationskern.objects.create(historie=historie)
 
     with pytest.raises(IntegrityError), transaction.atomic():
@@ -23,10 +31,12 @@ def test_historie_can_have_only_one_entwurf():
 
 
 @pytest.mark.django_db
-def test_entarchivieren_zu_einer_schwester_wird_verhindert():
-    historie = KernHistorie.objects.create()
-    finalisiert_am = timezone.now()
-    vorgaengerin = Simulationskern.objects.create(
+def test_entarchivieren_zu_einer_schwester_wird_verhindert() -> None:
+    """Eine archivierte Schwester kann nicht wieder final werden."""
+
+    historie: KernHistorie = KernHistorie.objects.create()
+    finalisiert_am: datetime = timezone.now()
+    vorgaengerin: Simulationskern = Simulationskern.objects.create(
         historie=historie,
         zustand=Simulationskern.Zustand.FINAL,
         finalisiert_am=finalisiert_am,
@@ -37,7 +47,7 @@ def test_entarchivieren_zu_einer_schwester_wird_verhindert():
         zustand=Simulationskern.Zustand.FINAL,
         finalisiert_am=finalisiert_am,
     )
-    archivierte_schwester = Simulationskern.objects.create(
+    archivierte_schwester: Simulationskern = Simulationskern.objects.create(
         historie=historie,
         vorgaengerin=vorgaengerin,
         zustand=Simulationskern.Zustand.ARCHIVIERT,
@@ -58,9 +68,12 @@ def test_entarchivieren_zu_einer_schwester_wird_verhindert():
     ],
 )
 def test_finalisiert_am_muss_genau_dem_zustand_entsprechen(
-    zustand, finalisiert_am
-):
-    historie = KernHistorie.objects.create()
+    zustand: str,
+    finalisiert_am: datetime | None,
+) -> None:
+    """Entwürfe und finalisierte Fassungen tragen passende Zeitstempel."""
+
+    historie: KernHistorie = KernHistorie.objects.create()
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Simulationskern.objects.create(
