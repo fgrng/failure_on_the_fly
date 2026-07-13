@@ -4,7 +4,7 @@ status: accepted
 
 # UI-Design-Tokens auf Basis des PHSG Corporate Design
 
-Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folgen. Das CD ist jedoch für einen **Marketing-Webauftritt** gedacht, während FailureOnTheFly ein **Forschungs- und Trainingsinstrument** mit datendichten Ansichten (Vignetten-Editor, Erhebungs-Management, Transkripte) und einer ruhigen Gesprächssitzung ist. Wir übernehmen das CD deshalb als **CD-konformes, aber eigenständiges Tool-UI**: Farben werden nach Rolle vergeben (semantische Tokens), nicht flächig nach Farbname. Grundlage ist `docs/research/corporate-design-webapp.md`.
+Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folgen. Das CD ist jedoch für einen **Marketing-Webauftritt** gedacht, während FailureOnTheFly ein **Forschungs- und Trainingsinstrument** mit datendichten Ansichten (Vignetten-Editor, Erhebungs-Management, Transkripte) und einer ruhigen Gesprächssitzung ist. Wir übernehmen das CD deshalb als **CD-konformes, aber eigenständiges Tool-UI**: Farben werden nach Rolle vergeben (semantische Tokens), nicht flächig nach Farbname.
 
 ## Festlegungen
 

@@ -1,6 +1,5 @@
 /* Design-Tokens – abgeleitet aus dem PHSG Corporate Design (Guidelines 2026).
-   Siehe docs/adr/0023-ui-design-tokens-phsg-cd.md und
-   docs/research/corporate-design-webapp.md.
+   Siehe docs/adr/0023-ui-design-tokens-phsg-cd.md.
 
    Grundhaltung: CD-konform, aber als eigenständiges Tool-UI. Farben werden
    nach ROLLE vergeben (semantische Tokens unten), nicht nach Farbname. Die
