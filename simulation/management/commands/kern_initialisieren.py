@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from simulation.models import Simulationskern
 
 
-_PLATZHALTER_SYSTEM_PROMPT_VORLAGE_PFAD = (
+_PLATZHALTER_SYSTEM_PROMPT_VORLAGE_PFAD: Path = (
     Path(__file__).resolve().parents[2]
     / "vorlagen"
     / "platzhalter_system_prompt.txt"
