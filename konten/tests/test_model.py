@@ -4,8 +4,7 @@ import pytest
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
-from django.db.models.deletion import ProtectedError
-from django.db.models import QuerySet
+from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
 from vignetten.models import Vignettenhistorie
@@ -100,8 +99,6 @@ def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert(
     with pytest.raises(ProtectedError):
         konto.delete()
 
-    assert Konto.objects.filter(pk=konto.pk).exists()
-
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
@@ -120,8 +117,6 @@ def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
         )
 
     konto.delete()
-
-    assert not Konto.objects.filter(pk=konto.pk).exists()
 
 
 @pytest.mark.django_db

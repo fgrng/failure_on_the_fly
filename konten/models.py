@@ -1,13 +1,17 @@
 """Datenmodelle für Nutzerkonten."""
 
 from django.contrib.auth.models import AbstractUser
-from django.db.models.deletion import ProtectedError
+from django.db.models import ProtectedError
 
 
 class Konto(AbstractUser):
     """Das Nutzerkonto der Anwendung mit Djangos Standard-Anmeldefeldern."""
 
-    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+    ) -> tuple[int, dict[str, int]]:
         """Verhindert eigentümerlose aktive Vignettenhistorien."""
         from vignetten.models import Vignettenhistorie
 
@@ -20,4 +24,4 @@ class Konto(AbstractUser):
                     [historie],
                 )
 
-        return super().delete(*args, **kwargs)
+        return super().delete(using=using, keep_parents=keep_parents)
