@@ -6,9 +6,14 @@ from django.contrib.auth import authenticate, get_user_model
 from konten.models import Konto
 
 
-@pytest.mark.django_db
 def test_konto_ist_das_aktive_nutzermodell() -> None:
-    """Ein Konto meldet sich mit username an und behält Standardfelder."""
+    """Konto ist das von Django verwendete Nutzer-Modell."""
+    assert get_user_model() is Konto
+
+
+@pytest.mark.django_db
+def test_konto_behaelt_django_standardfelder() -> None:
+    """Ein Konto behält Djangos Standardfelder für Personendaten."""
     konto: Konto = get_user_model().objects.create_user(
         username="lehrerin",
         password="sicheres-passwort",
@@ -17,8 +22,7 @@ def test_konto_ist_das_aktive_nutzermodell() -> None:
         last_name="Lovelace",
     )
 
-    assert (konto._meta.label, konto.username, konto.email, konto.first_name, konto.last_name) == (
-        "konten.Konto",
+    assert (konto.username, konto.email, konto.first_name, konto.last_name) == (
         "lehrerin",
         "lehrerin@example.test",
         "Ada",
