@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Vignette anlegen{% endblock %}
+{% block title %}Entwurf bearbeiten{% endblock %}
 
 {% block content %}
-    <h1>Vignette anlegen</h1>
+    <h1>Entwurf bearbeiten</h1>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">Anlegen</button>
+        <button type="submit">Speichern</button>
     </form>
 {% endblock %}

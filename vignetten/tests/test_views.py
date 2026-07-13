@@ -1,10 +1,13 @@
 """HTTP-Tests für den Vignetten-Editor."""
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -13,10 +16,24 @@ from simulation.models import Simulationskern
 from vignetten.models import Vignette, Vignettenhistorie
 
 
+_GIF_INHALT: bytes = (
+    b"GIF87a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff"
+    b"!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00"
+    b"\x00\x02\x02D\x01\x00;"
+)
+
+
+def _gif_upload() -> SimpleUploadedFile:
+    """Erzeugt eine gültige kleine GIF-Datei für einen Formular-Upload."""
+    return SimpleUploadedFile("arbeitsblatt.gif", _GIF_INHALT, content_type="image/gif")
+
+
 class VignettenlisteTests(TestCase):
     """Die Liste zeigt nur Vignetten aus dem eigenen Eigentümer-Kreis."""
 
-    def test_zeigt_eigene_historie_mit_fallback_label_und_versteckt_fremde(self) -> None:
+    def test_zeigt_eigene_historie_mit_fallback_label_und_versteckt_fremde(
+        self,
+    ) -> None:
         """Autor:innen sehen nur ihre Historien, auch ohne vergebenen Namen."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
@@ -164,6 +181,144 @@ class VignetteDetailViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class VignetteBearbeitenViewTests(TestCase):
+    """Der Editor ändert ausschließlich eigene Entwürfe."""
+
+    def setUp(self) -> None:
+        """Legt einen angemeldeten Eigentümer mit offenem Entwurf an."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        self.historie.eigentuemerinnen.add(ada)
+        self.vignette: Vignette = Vignette.objects._erstellen(historie=self.historie)
+        self.client.force_login(ada)
+
+    def test_speichert_entwurf_mit_leeren_inhaltsfeldern(self) -> None:
+        """Entwürfe bleiben beim Bearbeiten bewusst lückentolerant."""
+        self.vignette.lernauftrag = "Wird gelöscht."
+        self.vignette.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+            {},
+        )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+        self.vignette.refresh_from_db()
+        self.assertEqual(self.vignette.lernauftrag, "")
+
+    def test_detail_verlinkt_editor_fuer_entwurf(self) -> None:
+        """Die Detailansicht bietet für einen Entwurf den Editor an."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+
+        self.assertContains(
+            response, reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+    def test_formular_akzeptiert_datei_uploads(self) -> None:
+        """Das Bearbeitungsformular überträgt Dateien als mehrteilige Formulardaten."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, 'enctype="multipart/form-data"')
+
+    def test_lagert_hochgeladenes_bild_unter_media_root_ab(self) -> None:
+        """Ein Bild aus dem Entwurf wird dauerhaft unter MEDIA_ROOT gespeichert."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(bearbeiten_url, {"arbeitsheft_bild": _gif_upload()})
+
+            self.vignette.refresh_from_db()
+            self.assertTrue(
+                Path(media_root, self.vignette.arbeitsheft_bild.name).is_file()
+            )
+
+    def test_zeigt_hochgeladenes_bild_im_detail(self) -> None:
+        """Die Detailansicht referenziert das hochgeladene Arbeitsheft-Bild."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root, MEDIA_URL="/media/"),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(bearbeiten_url, {"arbeitsheft_bild": _gif_upload()})
+            self.vignette.refresh_from_db()
+
+            response: HttpResponse = self.client.get(
+                reverse("vignetten:detail", args=[self.vignette.pk])
+            )
+
+            self.assertContains(response, self.vignette.arbeitsheft_bild.url)
+
+    def test_bildwechsel_erstellt_neue_datei_und_erhaelt_die_alte(self) -> None:
+        """Die nur ergänzende Ablage überschreibt oder löscht kein Bild."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(
+                bearbeiten_url,
+                {"arbeitsheft_bild": _gif_upload()},
+            )
+            self.vignette.refresh_from_db()
+            erster_pfad: str = self.vignette.arbeitsheft_bild.name
+
+            self.client.post(
+                bearbeiten_url,
+                {"arbeitsheft_bild": _gif_upload()},
+            )
+            self.vignette.refresh_from_db()
+
+            self.assertNotEqual(self.vignette.arbeitsheft_bild.name, erster_pfad)
+            self.assertTrue(Path(media_root, erster_pfad).is_file())
+            self.assertTrue(
+                Path(media_root, self.vignette.arbeitsheft_bild.name).is_file()
+            )
+
+    def test_versteckt_fremden_entwurf(self) -> None:
+        """Entwürfe anderer Eigentümerinnen bleiben über den Editor unsichtbar."""
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(grace)
+        fremde_vignette: Vignette = Vignette.objects._erstellen(
+            historie=fremde_historie
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[fremde_vignette.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_versteckt_eigene_finale_fassung(self) -> None:
+        """Finale Fassungen bleiben auch für ihre Eigentümerinnen unveränderlich."""
+        finale_vignette: Vignette = Vignette.objects._erstellen(
+            historie=self.historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[finale_vignette.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class VignettenLoginTests(TestCase):
     """Alle Editor-Einstiege verlangen eine Anmeldung."""
 
@@ -176,6 +331,7 @@ class VignettenLoginTests(TestCase):
             reverse("vignetten:liste"),
             reverse("vignetten:anlegen"),
             reverse("vignetten:detail", args=[vignette.pk]),
+            reverse("vignetten:bearbeiten", args=[vignette.pk]),
         )
         for url in urls:
             response: HttpResponse = self.client.get(url)

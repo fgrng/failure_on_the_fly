@@ -4,11 +4,18 @@
 
 {% block content %}
     <h1>Vignette</h1>
+    {% if vignette.zustand == "entwurf" %}
+        <p><a href="{% url 'vignetten:bearbeiten' vignette.pk %}">Entwurf bearbeiten</a></p>
+    {% endif %}
     <p>Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk }}</p>
     <h2>Aufgabenkontext</h2>
     <dl>
         <dt>Lernauftrag</dt><dd>{{ vignette.lernauftrag }}</dd>
         <dt>Arbeitsheft-Inhalt</dt><dd>{{ vignette.arbeitsheft_text }}</dd>
+        {% if vignette.arbeitsheft_bild %}
+            <dt>Arbeitsheft-Bild</dt>
+            <dd><img src="{{ vignette.arbeitsheft_bild.url }}" alt="Arbeitsheft-Inhalt"></dd>
+        {% endif %}
         <dt>Arbeitsheft-Beschreibung</dt><dd>{{ vignette.arbeitsheft_beschreibung }}</dd>
     </dl>
 {% endblock %}
