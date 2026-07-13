@@ -40,16 +40,30 @@ def test_anlegen_laesst_keine_lebenszyklusfelder_ueberschreiben() -> None:
 
 
 @pytest.mark.django_db
-def test_oeffentliche_orm_schreibrouten_werden_abgelehnt() -> None:
-    """Kern-Fassungen umgehen weder Anlegen noch Lebenszyklus-Methoden."""
+def test_direktes_anlegen_einer_kern_fassung_wird_abgelehnt() -> None:
+    """Neue Kern-Fassungen entstehen ausschließlich über die Anlege-Naht."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
 
     with pytest.raises(RuntimeError, match="Anlege-Naht"):
         Simulationskern.objects.create(historie=kern.historie)
+
+
+@pytest.mark.django_db
+def test_direktes_aktualisieren_einer_kern_fassung_wird_abgelehnt() -> None:
+    """Kern-Fassungen ändern sich ausschließlich über Lebenszyklus-Methoden."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+
     with pytest.raises(RuntimeError, match="Lebenszyklus-Methoden"):
         Simulationskern.objects.filter(pk=kern.pk).update(system_prompt_vorlage="x")
 
+
+@pytest.mark.django_db
+def test_finale_fassung_kann_nicht_gesammelt_geloescht_werden() -> None:
+    """Gesammeltes Löschen bewahrt finale Kern-Fassungen."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
 
     with pytest.raises(RuntimeError, match="gelöscht"):
@@ -57,23 +71,27 @@ def test_oeffentliche_orm_schreibrouten_werden_abgelehnt() -> None:
 
 
 @pytest.mark.django_db
-def test_finalisieren_prueft_den_vertrag_und_friert_den_entwurf_ein() -> None:
-    """Nur vertragskonforme Entwürfe können finale Kern-Fassungen werden."""
+@pytest.mark.parametrize(
+    ("vorlagenfeld", "platzhalter"),
+    [
+        ("system_prompt_vorlage", "$lehrperson_name"),
+        ("user_prompt_vorlage", "$lehrperson_name"),
+        ("rahmenhandlung_einleitung", "$fehlermuster_beschreibung"),
+        ("rahmenhandlung_debrief", "$fehlermuster_beschreibung"),
+    ],
+)
+def test_finalisieren_lehnt_vertragsfremde_platzhalter_je_feld_ab(
+    vorlagenfeld: str,
+    platzhalter: str,
+) -> None:
+    """Jede Vorlage wird beim Finalisieren gegen ihren Vertrag geprüft."""
 
-    ungueltig: Simulationskern = Simulationskern.objects.anlegen(
-        system_prompt_vorlage="$lehrperson_name",
+    kern: Simulationskern = Simulationskern.objects.anlegen(
+        **{vorlagenfeld: platzhalter},
     )
 
     with pytest.raises(ValidationError):
-        ungueltig.finalisieren()
-
-    ungueltig.system_prompt_vorlage = "$fehlermuster_beschreibung"
-    ungueltig.save()
-
-    ungueltig.finalisieren()
-
-    assert ungueltig.zustand == Simulationskern.Zustand.FINAL
-    assert ungueltig.finalisiert_am is not None
+        kern.finalisieren()
 
 
 @pytest.mark.django_db
@@ -122,11 +140,35 @@ def test_finale_fassung_ist_ausserhalb_des_lebenszyklus_unveraenderlich() -> Non
 
 
 @pytest.mark.django_db
-def test_nur_entwuerfe_duerfen_physisch_geloescht_werden() -> None:
-    """Finale und archivierte Fassungen bleiben für spätere Datenspuren erhalten."""
+def test_entwurf_kann_physisch_geloescht_werden() -> None:
+    """Ein Kern-Entwurf kann vollständig entfernt werden."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern_id: int = kern.pk
+
+    kern.delete()
+
+    assert not Simulationskern.objects.filter(pk=kern_id).exists()
+
+
+@pytest.mark.django_db
+def test_finale_fassung_kann_nicht_physisch_geloescht_werden() -> None:
+    """Finale Kern-Fassungen bleiben für spätere Datenspuren erhalten."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
+
+    with pytest.raises(RuntimeError, match="gelöscht"):
+        kern.delete()
+
+
+@pytest.mark.django_db
+def test_archivierte_fassung_kann_nicht_physisch_geloescht_werden() -> None:
+    """Archivierte Kern-Fassungen bleiben für spätere Datenspuren erhalten."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    kern.archivieren()
 
     with pytest.raises(RuntimeError, match="gelöscht"):
         kern.delete()

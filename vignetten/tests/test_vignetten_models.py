@@ -18,7 +18,7 @@ class VignetteAnlegenTests(TestCase):
     def _vignette_mit_zwei_finalen_kernen_anlegen(
         self,
     ) -> tuple[Vignette, Konto, Simulationskern]:
-        # Baut den gemeinsamen Ausgangszustand der drei Tests auf.
+        # Zwei finale Fassungen machen die Auswahl der neuesten Fassung prüfbar.
         konto: Konto = get_user_model().objects.create_user(username="ada")
         erster_kern: Simulationskern = Simulationskern.objects.anlegen()
         erster_kern.finalisieren()
