@@ -10,7 +10,7 @@ from django.utils import timezone
 from simulation.models import Simulationskern
 
 
-_PFLICHTFELDER: tuple[str, ...] = (
+_PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
     "lernauftrag",
     "arbeitsheft_beschreibung",
@@ -144,11 +144,12 @@ class Vignette(models.Model):
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
         if not self._state.adding:
-            vorherige: Vignette = type(self).objects.get(pk=self.pk)
-            if vorherige.zustand != self.Zustand.ENTWURF and any(
-                getattr(self, feld.attname) != getattr(vorherige, feld.attname)
-                for feld in self._meta.local_fields
-                if feld.name != "zustand"
+            gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
+            if gespeicherte_fassung.zustand != self.Zustand.ENTWURF and any(
+                getattr(self, modellfeld.attname)
+                != getattr(gespeicherte_fassung, modellfeld.attname)
+                for modellfeld in self._meta.local_fields
+                if modellfeld.name != "zustand"
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)
@@ -159,7 +160,9 @@ class Vignette(models.Model):
         if self.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können finalisiert werden.")
         fehlende_felder: list[str] = [
-            feld for feld in _PFLICHTFELDER if not getattr(self, feld)
+            feldname
+            for feldname in _PFLICHTFELD_NAMEN
+            if not getattr(self, feldname)
         ]
         if fehlende_felder:
             raise ValidationError(

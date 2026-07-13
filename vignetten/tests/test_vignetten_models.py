@@ -168,20 +168,22 @@ class VignetteQuerySetTests(TestCase):
 
 
 class VignetteFinalisierenTests(TestCase):
-    """Das Finalisieren prüft die Vignette an ihrer ORM-Naht."""
+    """Das Finalisieren prüft die Vignette über ihre öffentliche Modell-API."""
 
     def _vollstaendigen_entwurf_anlegen(
         self,
         kern_zustand: Simulationskern.Zustand = Simulationskern.Zustand.FINAL,
     ) -> Vignette:
+        # Erstellt einen vollständigen Entwurf mit einem Kern im gewünschten Zustand.
         historie: KernHistorie
         historie, _ = KernHistorie.objects.get_or_create()
+        finalisiert_am: datetime | None = None
+        if kern_zustand != Simulationskern.Zustand.ENTWURF:
+            finalisiert_am = timezone.now()
         kern: Simulationskern = Simulationskern.objects.create(
             historie=historie,
             zustand=kern_zustand,
-            finalisiert_am=timezone.now()
-            if kern_zustand != Simulationskern.Zustand.ENTWURF
-            else None,
+            finalisiert_am=finalisiert_am,
         )
         return Vignette.objects.create(
             historie=Vignettenhistorie.objects.create(),
