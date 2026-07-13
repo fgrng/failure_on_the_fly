@@ -4,9 +4,11 @@ import pytest
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
+from django.db.models.deletion import ProtectedError
 from django.db.models import QuerySet
 
 from konten.models import Konto
+from vignetten.models import Vignettenhistorie
 
 
 @pytest.mark.django_db
@@ -86,6 +88,40 @@ def test_konto_behaelt_django_standardfelder() -> None:
         "Ada",
         "Lovelace",
     )
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert() -> None:
+    """Eine aktive Vignettenhistorie darf nicht eigentümerlos werden."""
+    konto: Konto = get_user_model().objects.create_user(username="ada")
+    historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+    historie.eigentuemerinnen.add(konto)
+
+    with pytest.raises(ProtectedError):
+        konto.delete()
+
+    assert Konto.objects.filter(pk=konto.pk).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("archiviert", "mit_koeigentuemerin"), [(True, False), (False, True)]
+)
+def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
+    archiviert: bool, mit_koeigentuemerin: bool
+) -> None:
+    """Archivierte oder geteilte Historien blockieren keine Kontolöschung."""
+    konto: Konto = get_user_model().objects.create_user(username="ada")
+    historie: Vignettenhistorie = Vignettenhistorie.objects.create(archiviert=archiviert)
+    historie.eigentuemerinnen.add(konto)
+    if mit_koeigentuemerin:
+        historie.eigentuemerinnen.add(
+            get_user_model().objects.create_user(username="grace")
+        )
+
+    konto.delete()
+
+    assert not Konto.objects.filter(pk=konto.pk).exists()
 
 
 @pytest.mark.django_db
