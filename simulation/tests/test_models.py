@@ -5,9 +5,10 @@ from datetime import datetime
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
-from simulation.models import KernHistorie, Simulationskern
+from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
 
 
 @pytest.mark.django_db
@@ -114,3 +115,65 @@ def test_finalisiert_am_muss_genau_dem_zustand_entsprechen(
             zustand=zustand,
             finalisiert_am=finalisiert_am,
         )
+
+
+@pytest.mark.django_db
+def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None:
+    """Erneutes Aktivieren ersetzt die aktive Konfiguration statt sie zu ergänzen."""
+
+    erste: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="erstes-modell",
+        parameter={},
+    )
+    zweite: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="zweites-modell",
+        parameter={},
+    )
+
+    ModellKonfiguration.objects.aktivieren(erste)
+    ModellKonfiguration.objects.aktivieren(zweite)
+
+    assert ModellKonfiguration.objects.aktive() == zweite
+
+
+@pytest.mark.django_db
+def test_modell_konfiguration_ist_nach_dem_anlegen_unveraenderlich() -> None:
+    """Eine angelegte Modell-Konfiguration bleibt unveränderlich."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="erstes-modell",
+        parameter={"temperatur": 0.2},
+    )
+    konfiguration.sprachmodell = "zweites-modell"
+
+    with pytest.raises(RuntimeError, match="append-only"):
+        konfiguration.save()
+
+
+@pytest.mark.django_db
+def test_modell_konfiguration_kann_nicht_per_queryset_mutiert_werden() -> None:
+    """Die Append-only-Garantie gilt auch für die QuerySet-Schreibroute."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="erstes-modell",
+        parameter={},
+    )
+
+    with pytest.raises(RuntimeError, match="append-only"):
+        ModellKonfiguration.objects.filter(pk=konfiguration.pk).update(
+            sprachmodell="zweites-modell",
+        )
+
+
+@pytest.mark.django_db
+def test_aktive_modell_konfiguration_kann_nicht_geloescht_werden() -> None:
+    """Der aktive Zeiger schützt seine Konfiguration vor dem Löschen."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="erstes-modell",
+        parameter={},
+    )
+    ModellKonfiguration.objects.aktivieren(konfiguration)
+
+    with pytest.raises(ProtectedError):
+        konfiguration.delete()

@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 
+_UNVERAENDERLICH_FEHLERMELDUNG: str = "ModellKonfigurationen sind append-only."
+
 
 VERTRAG_PROMPT: frozenset[str] = frozenset(
     {
@@ -140,5 +142,75 @@ class Simulationskern(models.Model):
                     | (~Q(zustand="entwurf") & Q(finalisiert_am__isnull=False))
                 ),
                 name="simulation_finalisiert_am_passt_zu_zustand",
+            ),
+        ]
+
+
+class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
+    """QuerySets für unveränderliche Modell-Konfigurationen."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Massenänderungen an Modell-Konfigurationen."""
+
+        raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
+
+
+class ModellKonfigurationManager(
+    models.Manager.from_queryset(ModellKonfigurationQuerySet),
+):
+    """Zugang zur aktiven Modell-Konfiguration."""
+
+    def aktive(self) -> "ModellKonfiguration":
+        """Liefert die Konfiguration, auf die der aktive Zeiger verweist."""
+
+        return AktiveModellKonfiguration.objects.get(singleton=1).konfiguration
+
+    def aktivieren(
+        self,
+        konfiguration: "ModellKonfiguration",
+    ) -> "ModellKonfiguration":
+        """Setzt die einzige aktive Konfiguration."""
+
+        AktiveModellKonfiguration.objects.update_or_create(
+            singleton=1,
+            defaults={"konfiguration": konfiguration},
+        )
+        return konfiguration
+
+
+class ModellKonfiguration(models.Model):
+    """Unveränderliche Konfiguration eines Sprachmodells."""
+
+    sprachmodell: models.CharField = models.CharField(max_length=255)
+    parameter: models.JSONField = models.JSONField(default=dict)
+
+    objects: ModellKonfigurationManager = ModellKonfigurationManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Verhindert jede Mutation einer bereits angelegten Konfiguration."""
+
+        if not self._state.adding:
+            raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
+        super().save(*args, **kwargs)
+
+
+class AktiveModellKonfiguration(models.Model):
+    """Der einzige, veränderliche Zeiger auf eine Modell-Konfiguration."""
+
+    konfiguration: models.ForeignKey = models.ForeignKey(
+        ModellKonfiguration,
+        on_delete=models.PROTECT,
+    )
+    singleton: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        default=1,
+        unique=True,
+        editable=False,
+    )
+
+    class Meta:
+        constraints: list[models.BaseConstraint] = [
+            models.CheckConstraint(
+                condition=Q(singleton=1),
+                name="simulation_aktive_modell_konfiguration_ist_singleton",
             ),
         ]
