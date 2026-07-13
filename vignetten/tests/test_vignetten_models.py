@@ -166,16 +166,11 @@ class VignetteFinalisierenTests(TestCase):
         kern_zustand: Simulationskern.Zustand = Simulationskern.Zustand.FINAL,
     ) -> Vignette:
         # Erstellt einen vollständigen Entwurf mit einem Kern im gewünschten Zustand.
-        historie: KernHistorie
-        historie, _ = KernHistorie.objects.get_or_create()
-        finalisiert_am: datetime | None = None
+        kern: Simulationskern = Simulationskern.objects.anlegen()
         if kern_zustand != Simulationskern.Zustand.ENTWURF:
-            finalisiert_am = timezone.now()
-        kern: Simulationskern = Simulationskern.objects.create(
-            historie=historie,
-            zustand=kern_zustand,
-            finalisiert_am=finalisiert_am,
-        )
+            kern.finalisieren()
+        if kern_zustand == Simulationskern.Zustand.ARCHIVIERT:
+            kern.archivieren()
         return Vignette.objects.create(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
@@ -234,7 +229,25 @@ class VignetteFinalisierenTests(TestCase):
         """Finalisieren ist ausschließlich die Kante vom Entwurf nach final."""
         finale: Vignette = self._vollstaendigen_entwurf_anlegen()
         finale.finalisieren()
-        archivierte: Vignette = self._vollstaendigen_entwurf_anlegen()
+        kern2: Simulationskern = finale.gepinnter_kern.bearbeiten()
+        kern2.finalisieren()
+        archivierte: Vignette = Vignette.objects.create(
+            historie=Vignettenhistorie.objects.create(),
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Frau Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern2,
+        )
         archivierte.finalisieren()
         archivierte.zustand = Vignette.Zustand.ARCHIVIERT
         archivierte.save(update_fields=["zustand"])
