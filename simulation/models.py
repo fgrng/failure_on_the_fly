@@ -1,7 +1,40 @@
 """Datenmodell des Simulationskerns."""
 
+from string import Template
+
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+
+
+VERTRAG_PROMPT = frozenset(
+    {
+        "fehlermuster_beschreibung",
+        "lernauftrag",
+        "arbeitsheft_beschreibung",
+        "schuelerin_name",
+        "schuelerin_geschlecht",
+        "fach",
+        "thema",
+        "klassenstufe",
+    }
+)
+VERTRAG_RAHMEN = frozenset(
+    {
+        "schuelerin_name",
+        "schuelerin_geschlecht",
+        "lehrperson_name",
+        "lehrperson_geschlecht",
+        "fach",
+        "thema",
+        "klassenstufe",
+        "schuelerin_pronomen",
+        "schuelerin_possessiv",
+        "lehrperson_pronomen",
+        "lehrperson_possessiv",
+        "lehrperson_anrede",
+    }
+)
 
 
 class KernHistorie(models.Model):
@@ -67,6 +100,22 @@ class Simulationskern(models.Model):
         blank=True,
         default="",
     )
+
+    def clean(self) -> None:
+        """Lehnt Vorlagen mit Platzhaltern außerhalb ihres Vertrags ab."""
+
+        fehler: dict[str, str] = {}
+        for feld, vertrag in (
+            ("system_prompt_vorlage", VERTRAG_PROMPT),
+            ("user_prompt_vorlage", VERTRAG_PROMPT),
+            ("rahmenhandlung_einleitung", VERTRAG_RAHMEN),
+            ("rahmenhandlung_debrief", VERTRAG_RAHMEN),
+        ):
+            vorlage = Template(getattr(self, feld))
+            if not vorlage.is_valid() or not set(vorlage.get_identifiers()) <= vertrag:
+                fehler[feld] = "Enthält ungültige Platzhalter."
+        if fehler:
+            raise ValidationError(fehler)
 
     class Meta:
         constraints: list[models.BaseConstraint] = [

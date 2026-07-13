@@ -3,10 +3,43 @@
 from datetime import datetime
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from simulation.models import KernHistorie, Simulationskern
+
+
+@pytest.mark.django_db
+def test_vertragsfremder_prompt_platzhalter_wird_abgelehnt() -> None:
+    """Prompt-Vorlagen dürfen nur die vereinbarten Vignettenfelder ansprechen."""
+
+    kern = Simulationskern(system_prompt_vorlage="$lehrperson_name")
+
+    with pytest.raises(ValidationError):
+        kern.full_clean(exclude=["historie"])
+
+
+@pytest.mark.django_db
+def test_ungueltige_vorlagen_syntax_wird_abgelehnt() -> None:
+    """Eine Vorlage muss ein gültiges string.Template sein."""
+
+    kern = Simulationskern(system_prompt_vorlage="$")
+
+    with pytest.raises(ValidationError):
+        kern.full_clean(exclude=["historie"])
+
+
+@pytest.mark.django_db
+def test_vertragstreue_teilmengen_und_leere_vorlagen_werden_akzeptiert() -> None:
+    """Alle vier Vorlagen dürfen ihren Vertrag auch nur teilweise ausschöpfen."""
+
+    kern = Simulationskern(
+        system_prompt_vorlage="$fehlermuster_beschreibung",
+        rahmenhandlung_einleitung="$lehrperson_anrede $lehrperson_name",
+    )
+
+    kern.full_clean(exclude=["historie"])
 
 
 @pytest.mark.django_db
