@@ -26,7 +26,9 @@ class Vignettenhistorie(models.Model):
     archiviert: models.BooleanField = models.BooleanField(default=False)
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
-    objects: models.Manager["Vignettenhistorie"] = VignettenhistorieQuerySet.as_manager()
+    objects: models.Manager["Vignettenhistorie"] = (
+        VignettenhistorieQuerySet.as_manager()
+    )
 
 
 class VignetteQuerySet(models.QuerySet["Vignette"]):
@@ -38,16 +40,14 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
 
 
 class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
-    """Schreibnaht für neue Vignettenlinien."""
+    """Manager für neue Vignettenlinien."""
 
     @transaction.atomic
     def anlegen(self, konto: "Konto") -> "Vignette":
         """Legt einen Entwurf mit Historie und aktuellem finalem Kern an."""
         kern: Simulationskern = Simulationskern.objects.filter(
             zustand=Simulationskern.Zustand.FINAL
-        ).latest(
-            "finalisiert_am", "pk"
-        )
+        ).latest("finalisiert_am", "pk")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(konto)
         return self.create(historie=historie, gepinnter_kern=kern)

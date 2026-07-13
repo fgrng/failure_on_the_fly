@@ -13,10 +13,12 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 
 class VignetteAnlegenTests(TestCase):
-    """Die Schreibnaht erzeugt eine vollständige neue Vignettenlinie."""
+    """Die Manager-Methode erzeugt eine vollständige neue Vignettenlinie."""
 
-    def _anlegen(self) -> tuple[Vignette, Konto, Simulationskern]:
-        # Erzeugt die öffentliche Schreibnaht mit zwei finalen Kernfassungen.
+    def _vignette_mit_zwei_finalen_kernen_anlegen(
+        self,
+    ) -> tuple[Vignette, Konto, Simulationskern]:
+        # Baut den gemeinsamen Ausgangszustand der drei Tests auf.
         konto: Konto = get_user_model().objects.create_user(username="ada")
         historie: KernHistorie = KernHistorie.objects.create()
         finalisiert_am: datetime = timezone.now()
@@ -38,7 +40,7 @@ class VignetteAnlegenTests(TestCase):
     def test_anlegen_erstellt_entwurf(self) -> None:
         """Eine neue Vignette beginnt als Entwurf."""
         vignette: Vignette
-        vignette, _, _ = self._anlegen()
+        vignette, _, _ = self._vignette_mit_zwei_finalen_kernen_anlegen()
 
         self.assertEqual(vignette.zustand, Vignette.Zustand.ENTWURF)
 
@@ -46,7 +48,9 @@ class VignetteAnlegenTests(TestCase):
         """Eine neue Vignette pinnt den neuesten finalen Simulationskern."""
         vignette: Vignette
         neuester_kern: Simulationskern
-        vignette, _, neuester_kern = self._anlegen()
+        vignette, _, neuester_kern = (
+            self._vignette_mit_zwei_finalen_kernen_anlegen()
+        )
 
         self.assertEqual(vignette.gepinnter_kern, neuester_kern)
 
@@ -54,7 +58,7 @@ class VignetteAnlegenTests(TestCase):
         """Die anlegende Person gehört zur neuen Vignettenhistorie."""
         vignette: Vignette
         konto: Konto
-        vignette, konto, _ = self._anlegen()
+        vignette, konto, _ = self._vignette_mit_zwei_finalen_kernen_anlegen()
 
         self.assertEqual(list(vignette.historie.eigentuemerinnen.all()), [konto])
 
@@ -127,7 +131,7 @@ class VignetteConstraintTests(TestCase):
 
 
 class VignetteQuerySetTests(TestCase):
-    """Die Lesenähe bleibt an den zwei vereinbarten QuerySet-Nähten."""
+    """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
 
     def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
         """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
