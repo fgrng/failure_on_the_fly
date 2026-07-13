@@ -13,6 +13,10 @@
         </form>
     {% elif vignette.zustand == "final" %}
         <p>Finale Fassung</p>
+        <form method="post" action="{% url 'vignetten:reversionieren' vignette.pk %}">
+            {% csrf_token %}
+            <button type="submit">Re-Versionieren</button>
+        </form>
     {% endif %}
     <p>Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk }}</p>
     <h2>Aufgabenkontext</h2>

@@ -239,10 +239,21 @@ class Vignette(models.Model):
             historie=quelle.historie,
             vorgaengerin=quelle,
             gepinnter_kern=quelle.gepinnter_kern,
+            fehlermuster_beschreibung=quelle.fehlermuster_beschreibung,
+            lernauftrag=quelle.lernauftrag,
+            arbeitsheft_beschreibung=quelle.arbeitsheft_beschreibung,
+            arbeitsheft_text=quelle.arbeitsheft_text,
+            arbeitsheft_bild=quelle.arbeitsheft_bild.name,
             schuelerin_name=quelle.schuelerin_name,
             schuelerin_geschlecht=quelle.schuelerin_geschlecht,
             lehrperson_name=quelle.lehrperson_name,
             lehrperson_geschlecht=quelle.lehrperson_geschlecht,
+            fach=quelle.fach,
+            thema=quelle.thema,
+            klassenstufe=quelle.klassenstufe,
+            referenzdiagnose=quelle.referenzdiagnose,
+            budget_typ=quelle.budget_typ,
+            budget_wert=quelle.budget_wert,
         )
 
     @transaction.atomic

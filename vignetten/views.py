@@ -25,6 +25,17 @@ def _sichtbaren_entwurf_laden(request: HttpRequest, pk: int) -> Vignette:
     )
 
 
+def _sichtbare_finale_fassung_laden(request: HttpRequest, pk: int) -> Vignette:
+    """Lädt eine finale Fassung aus dem Eigentümer-Kreis."""
+    return get_object_or_404(
+        Vignette.objects.filter(
+            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
+            zustand=Vignette.Zustand.FINAL,
+        ),
+        pk=pk,
+    )
+
+
 @login_required
 def liste(request: HttpRequest) -> HttpResponse:
     """Zeigt die privaten Vignettenhistorien der eingeloggten Person."""
@@ -89,6 +100,21 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
             {"vignette": vignette, "finalisieren_form": form},
         )
     return redirect("vignetten:detail", pk=vignette.pk)
+
+
+@login_required
+def reversionieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    finale: Vignette = _sichtbare_finale_fassung_laden(request, pk)
+    entwurf: Vignette | None = Vignette.objects.filter(
+        historie=finale.historie,
+        zustand=Vignette.Zustand.ENTWURF,
+    ).first()
+    if entwurf is None:
+        entwurf = finale.bearbeiten()
+    return redirect("vignetten:bearbeiten", pk=entwurf.pk)
 
 
 @login_required
