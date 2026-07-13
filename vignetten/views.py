@@ -14,23 +14,14 @@ def _fallback_label(vignette: Vignette) -> str:
     return f"{vignette.fach}: {vignette.thema} (Klasse {vignette.klassenstufe})"
 
 
-def _sichtbaren_entwurf_laden(request: HttpRequest, pk: int) -> Vignette:
-    """Lädt einen bearbeitbaren Entwurf aus dem Eigentümer-Kreis."""
+def _sichtbare_fassung_laden(
+    request: HttpRequest, pk: int, zustand: Vignette.Zustand
+) -> Vignette:
+    """Lädt eine Fassung im erwarteten Zustand aus dem Eigentümer-Kreis."""
     return get_object_or_404(
         Vignette.objects.filter(
             historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
-            zustand=Vignette.Zustand.ENTWURF,
-        ),
-        pk=pk,
-    )
-
-
-def _sichtbare_finale_fassung_laden(request: HttpRequest, pk: int) -> Vignette:
-    """Lädt eine finale Fassung aus dem Eigentümer-Kreis."""
-    return get_object_or_404(
-        Vignette.objects.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
-            zustand=Vignette.Zustand.FINAL,
+            zustand=zustand,
         ),
         pk=pk,
     )
@@ -88,7 +79,9 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbaren_entwurf_laden(request, pk)
+    vignette: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.ENTWURF
+    )
     form: FinalisierenForm = FinalisierenForm(request.POST)
     try:
         vignette.finalisieren()
@@ -107,7 +100,9 @@ def reversionieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    finale: Vignette = _sichtbare_finale_fassung_laden(request, pk)
+    finale: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.FINAL
+    )
     entwurf: Vignette | None = Vignette.objects.filter(
         historie=finale.historie,
         zustand=Vignette.Zustand.ENTWURF,
@@ -120,7 +115,9 @@ def reversionieren(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die Inhaltsfelder eines eigenen Entwurfs."""
-    vignette: Vignette = _sichtbaren_entwurf_laden(request, pk)
+    vignette: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.ENTWURF
+    )
     if request.method == "POST":
         form: VignetteForm = VignetteForm(
             request.POST, request.FILES, instance=vignette

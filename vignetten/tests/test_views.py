@@ -418,115 +418,116 @@ class VignetteFinalisierenViewTests(TestCase):
 class VignetteReversionierenViewTests(TestCase):
     """Finale Fassungen können über den Editor erneut als Entwurf beginnen."""
 
-    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(self) -> None:
-        """Re-Versionieren führt zum Folgeentwurf derselben Vignettenhistorie."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+    _GEERBTE_FELDER: tuple[str, ...] = (
+        "historie",
+        "fehlermuster_beschreibung",
+        "lernauftrag",
+        "arbeitsheft_beschreibung",
+        "arbeitsheft_text",
+        "arbeitsheft_bild",
+        "schuelerin_name",
+        "schuelerin_geschlecht",
+        "lehrperson_name",
+        "lehrperson_geschlecht",
+        "fach",
+        "thema",
+        "klassenstufe",
+        "referenzdiagnose",
+        "budget_typ",
+        "budget_wert",
+        "gepinnter_kern",
+    )
+
+    def setUp(self) -> None:
+        """Legt eine eingeloggte Autorin mit finaler Vignette an."""
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            fehlermuster_beschreibung="Zählt Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            arbeitsheft_bild="arbeitshefte/finale-datei.gif",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Frau Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            referenzdiagnose="Stellenwerte werden nicht ausgerichtet.",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
-        self.client.force_login(ada)
+        self.finale: Vignette = Vignette.objects.anlegen(self.ada)
+        self.finale.fehlermuster_beschreibung = "Zählt Stellenwerte einzeln."
+        self.finale.lernauftrag = "Addiere 27 und 15."
+        self.finale.arbeitsheft_beschreibung = "27 + 15 = 312"
+        self.finale.arbeitsheft_text = "27 + 15 = 312"
+        self.finale.arbeitsheft_bild = "arbeitshefte/finale-datei.gif"
+        self.finale.schuelerin_name = "Mia"
+        self.finale.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.finale.lehrperson_name = "Frau Weber"
+        self.finale.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.finale.fach = "Mathematik"
+        self.finale.thema = "Addition"
+        self.finale.klassenstufe = "5"
+        self.finale.referenzdiagnose = "Stellenwerte werden nicht ausgerichtet."
+        self.finale.budget_typ = Vignette.BudgetTyp.SCHRITTE
+        self.finale.budget_wert = 5
+        self.finale.save()
+        self.finale.finalisieren()
+        self.client.force_login(self.ada)
 
+    def _geerbte_werte(self, vignette: Vignette) -> dict[str, object]:
+        # Bündelt den vollständigen Vererbungsvertrag für einen Vergleich.
+        werte: dict[str, object] = {
+            feldname: getattr(vignette, feldname)
+            for feldname in self._GEERBTE_FELDER
+        }
+        werte["arbeitsheft_bild"] = vignette.arbeitsheft_bild.name
+        return werte
+
+    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(self) -> None:
+        """Re-Versionieren führt zum Folgeentwurf derselben Vignettenhistorie."""
         response: HttpResponse = self.client.post(
-            reverse("vignetten:reversionieren", args=[finale.pk])
+            reverse("vignetten:reversionieren", args=[self.finale.pk])
         )
 
-        entwurf: Vignette = Vignette.objects.get(vorgaengerin=finale)
+        entwurf: Vignette = Vignette.objects.get(vorgaengerin=self.finale)
         self.assertRedirects(response, reverse("vignetten:bearbeiten", args=[entwurf.pk]))
-        self.assertEqual(entwurf.historie, finale.historie)
         self.assertEqual(entwurf.zustand, Vignette.Zustand.ENTWURF)
-        self.assertEqual(entwurf.fehlermuster_beschreibung, finale.fehlermuster_beschreibung)
-        self.assertEqual(entwurf.lernauftrag, finale.lernauftrag)
-        self.assertEqual(entwurf.arbeitsheft_beschreibung, finale.arbeitsheft_beschreibung)
-        self.assertEqual(entwurf.arbeitsheft_text, finale.arbeitsheft_text)
-        self.assertEqual(entwurf.arbeitsheft_bild.name, finale.arbeitsheft_bild.name)
-        self.assertEqual(entwurf.schuelerin_name, finale.schuelerin_name)
-        self.assertEqual(entwurf.lehrperson_name, finale.lehrperson_name)
-        self.assertEqual(entwurf.gepinnter_kern, finale.gepinnter_kern)
-        self.assertEqual(entwurf.referenzdiagnose, finale.referenzdiagnose)
-        self.assertEqual(entwurf.budget_typ, finale.budget_typ)
-        self.assertEqual(entwurf.budget_wert, finale.budget_wert)
-        finale.refresh_from_db()
-        self.assertEqual(finale.zustand, Vignette.Zustand.FINAL)
-        self.assertEqual(finale.arbeitsheft_bild.name, "arbeitshefte/finale-datei.gif")
+        self.assertEqual(self._geerbte_werte(entwurf), self._geerbte_werte(self.finale))
+
+    def test_laesst_die_finale_fassung_unveraendert(self) -> None:
+        """Re-Versionieren verändert Zustand und Bildpfad der Quelle nicht."""
+        self.client.post(
+            reverse("vignetten:reversionieren", args=[self.finale.pk])
+        )
+
+        self.finale.refresh_from_db()
+        self.assertEqual(
+            (self.finale.zustand, self.finale.arbeitsheft_bild.name),
+            (Vignette.Zustand.FINAL, "arbeitshefte/finale-datei.gif"),
+        )
 
     def test_detail_bietet_die_reversionieren_aktion_nur_fuer_finale_fassungen(
         self,
     ) -> None:
         """Die finale Detailansicht führt sichtbar zur Re-Versionierungs-Aktion."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            arbeitsheft_text="27 + 15 = 312",
-        )
-        entwurf: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create()
-        )
-        entwurf.historie.eigentuemerinnen.add(ada)
-        self.client.force_login(ada)
+        entwurf: Vignette = Vignette.objects.anlegen(self.ada)
 
         finale_response: HttpResponse = self.client.get(
-            reverse("vignetten:detail", args=[finale.pk])
+            reverse("vignetten:detail", args=[self.finale.pk])
         )
         entwurf_response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[entwurf.pk])
         )
 
         self.assertContains(
-            finale_response, reverse("vignetten:reversionieren", args=[finale.pk])
+            finale_response,
+            reverse("vignetten:reversionieren", args=[self.finale.pk]),
         )
         self.assertNotContains(entwurf_response, "Re-Versionieren")
 
     def test_erneute_aktion_oeffnet_den_bereits_vorhandenen_entwurf(self) -> None:
         """Ein doppelter Klick erzeugt keinen zweiten Entwurf derselben Historie."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            arbeitsheft_text="27 + 15 = 312",
-        )
-        vorhandener_entwurf: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            vorgaengerin=finale,
-        )
-        self.client.force_login(ada)
+        vorhandener_entwurf: Vignette = self.finale.bearbeiten()
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:reversionieren", args=[finale.pk])
+            reverse("vignetten:reversionieren", args=[self.finale.pk])
         )
 
         self.assertRedirects(
             response, reverse("vignetten:bearbeiten", args=[vorhandener_entwurf.pk])
         )
-        self.assertEqual(Vignette.objects.filter(historie=historie).count(), 2)
+        self.assertEqual(
+            Vignette.objects.filter(historie=self.finale.historie).count(), 2
+        )
 
 
 class VignettenLoginTests(TestCase):
