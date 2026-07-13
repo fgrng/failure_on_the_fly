@@ -2,6 +2,7 @@
 
 import random
 
+from django import forms
 from django.forms import ModelForm
 
 from .models import Vignette
@@ -41,6 +42,10 @@ class VignetteForm(ModelForm):
             "budget_typ",
             "budget_wert",
         ]
+
+
+class FinalisierenForm(forms.Form):
+    """Trägt die nicht feldgebundenen Fehler der Finalisieren-Aktion."""
 
 
 def zufaellige_akteure() -> dict[str, str]:

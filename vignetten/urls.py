@@ -11,5 +11,6 @@ urlpatterns: list[URLPattern] = [
     path("", views.liste, name="liste"),
     path("anlegen/", views.anlegen, name="anlegen"),
     path("<int:pk>/bearbeiten/", views.bearbeiten, name="bearbeiten"),
+    path("<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
     path("<int:pk>/", views.detail, name="detail"),
 ]

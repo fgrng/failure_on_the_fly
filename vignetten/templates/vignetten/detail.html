@@ -6,6 +6,13 @@
     <h1>Vignette</h1>
     {% if vignette.zustand == "entwurf" %}
         <p><a href="{% url 'vignetten:bearbeiten' vignette.pk %}">Entwurf bearbeiten</a></p>
+        <form method="post" action="{% url 'vignetten:finalisieren' vignette.pk %}">
+            {% csrf_token %}
+            {{ finalisieren_form.non_field_errors }}
+            <button type="submit">Finalisieren</button>
+        </form>
+    {% elif vignette.zustand == "final" %}
+        <p>Finale Fassung</p>
     {% endif %}
     <p>Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk }}</p>
     <h2>Aufgabenkontext</h2>

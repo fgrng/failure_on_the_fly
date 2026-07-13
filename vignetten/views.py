@@ -1,16 +1,28 @@
 """Views für den privaten Vignetten-Editor."""
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.core.exceptions import ValidationError
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import VignetteForm, zufaellige_akteure
+from .forms import FinalisierenForm, VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
 
 
 def _fallback_label(vignette: Vignette) -> str:
     """Leitet ein lesbares Label aus dem Unterrichtskontext ab."""
     return f"{vignette.fach}: {vignette.thema} (Klasse {vignette.klassenstufe})"
+
+
+def _sichtbaren_entwurf_laden(request: HttpRequest, pk: int) -> Vignette:
+    """Lädt einen bearbeitbaren Entwurf aus dem Eigentümer-Kreis."""
+    return get_object_or_404(
+        Vignette.objects.filter(
+            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
+            zustand=Vignette.Zustand.ENTWURF,
+        ),
+        pk=pk,
+    )
 
 
 @login_required
@@ -53,19 +65,36 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         ),
         pk=pk,
     )
-    return render(request, "vignetten/detail.html", {"vignette": vignette})
+    return render(
+        request,
+        "vignetten/detail.html",
+        {"vignette": vignette, "finalisieren_form": FinalisierenForm()},
+    )
+
+
+@login_required
+def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbaren_entwurf_laden(request, pk)
+    form = FinalisierenForm(request.POST)
+    try:
+        vignette.finalisieren()
+    except ValidationError as error:
+        form.add_error(None, error)
+        return render(
+            request,
+            "vignetten/detail.html",
+            {"vignette": vignette, "finalisieren_form": form},
+        )
+    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die Inhaltsfelder eines eigenen Entwurfs."""
-    vignette: Vignette = get_object_or_404(
-        Vignette.objects.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
-            zustand=Vignette.Zustand.ENTWURF,
-        ),
-        pk=pk,
-    )
+    vignette: Vignette = _sichtbaren_entwurf_laden(request, pk)
     if request.method == "POST":
         form: VignetteForm = VignetteForm(
             request.POST, request.FILES, instance=vignette
