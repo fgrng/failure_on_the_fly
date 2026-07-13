@@ -41,6 +41,7 @@ class VignettenlisteTests(TestCase):
         self.assertContains(response, "Mathematik: Brüche (Klasse 5)")
         self.assertContains(response, "Addition mit Übertrag")
         self.assertNotContains(response, "Versteckte Vignette")
+        self.assertContains(response, reverse("vignetten:anlegen"))
 
 
 class VignetteAnlegenViewTests(TestCase):
