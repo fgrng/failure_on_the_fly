@@ -7,6 +7,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
+from konten.models import Konto
 from simulation.models import KernHistorie, Simulationskern
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -14,33 +15,48 @@ from vignetten.models import Vignette, Vignettenhistorie
 class VignetteAnlegenTests(TestCase):
     """Die Schreibnaht erzeugt eine vollständige neue Vignettenlinie."""
 
-    def test_anlegen_erstellt_historie_entwurf_eigentuemerin_und_pin(self) -> None:
-        """Eine neue Vignette pinnt den neuesten finalen Simulationskern."""
-        konto = get_user_model().objects.create_user(username="ada")
-        historie = KernHistorie.objects.create()
+    def _anlegen(self) -> tuple[Vignette, Konto, Simulationskern]:
+        # Erzeugt die öffentliche Schreibnaht mit zwei finalen Kernfassungen.
+        konto: Konto = get_user_model().objects.create_user(username="ada")
+        historie: KernHistorie = KernHistorie.objects.create()
         finalisiert_am: datetime = timezone.now()
-        Simulationskern.objects.create(
+        erster_kern: Simulationskern = Simulationskern.objects.create(
             historie=historie,
             zustand=Simulationskern.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
         )
-        neuester_kern = Simulationskern.objects.create(
+        neuester_kern: Simulationskern = Simulationskern.objects.create(
             historie=historie,
-            vorgaengerin=Simulationskern.objects.first(),
+            vorgaengerin=erster_kern,
             zustand=Simulationskern.Zustand.FINAL,
             finalisiert_am=finalisiert_am + timezone.timedelta(seconds=1),
         )
+        vignette: Vignette = Vignette.objects.anlegen(konto)
 
-        vignette = Vignette.objects.anlegen(konto)
+        return vignette, konto, neuester_kern
 
-        self.assertEqual(
-            (
-                vignette.zustand,
-                vignette.gepinnter_kern,
-                list(vignette.historie.eigentuemerinnen.all()),
-            ),
-            (Vignette.Zustand.ENTWURF, neuester_kern, [konto]),
-        )
+    def test_anlegen_erstellt_entwurf(self) -> None:
+        """Eine neue Vignette beginnt als Entwurf."""
+        vignette: Vignette
+        vignette, _, _ = self._anlegen()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.ENTWURF)
+
+    def test_anlegen_pinnt_neuesten_finalen_kern(self) -> None:
+        """Eine neue Vignette pinnt den neuesten finalen Simulationskern."""
+        vignette: Vignette
+        neuester_kern: Simulationskern
+        vignette, _, neuester_kern = self._anlegen()
+
+        self.assertEqual(vignette.gepinnter_kern, neuester_kern)
+
+    def test_anlegen_traegt_konto_als_eigentuemerin_ein(self) -> None:
+        """Die anlegende Person gehört zur neuen Vignettenhistorie."""
+        vignette: Vignette
+        konto: Konto
+        vignette, konto, _ = self._anlegen()
+
+        self.assertEqual(list(vignette.historie.eigentuemerinnen.all()), [konto])
 
 
 class VignetteConstraintTests(TestCase):
@@ -48,7 +64,7 @@ class VignetteConstraintTests(TestCase):
 
     def test_historie_hat_hoechstens_einen_entwurf(self) -> None:
         """Ein zweiter Entwurf derselben Historie scheitert am Unique-Index."""
-        historie = Vignettenhistorie.objects.create()
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         Vignette.objects.create(historie=historie)
 
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -62,6 +78,43 @@ class VignetteConstraintTests(TestCase):
                 zustand=Vignette.Zustand.FINAL,
                 arbeitsheft_text="Bearbeitung",
             )
+
+    def test_entwurf_darf_keinen_finalisierungszeitpunkt_haben(self) -> None:
+        """Ein Entwurf kann keinen bereits gesetzten Finalisierungszeitpunkt tragen."""
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Vignette.objects.create(
+                historie=Vignettenhistorie.objects.create(),
+                finalisiert_am=timezone.now(),
+            )
+
+    def test_entarchivieren_zu_einer_schwester_wird_verhindert(self) -> None:
+        """Eine archivierte Schwester kann nicht erneut final werden."""
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        finalisiert_am: datetime = timezone.now()
+        vorgaengerin: Vignette = Vignette.objects.create(
+            historie=historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=finalisiert_am,
+            arbeitsheft_text="Bearbeitung",
+        )
+        Vignette.objects.create(
+            historie=historie,
+            vorgaengerin=vorgaengerin,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=finalisiert_am,
+            arbeitsheft_text="Bearbeitung",
+        )
+        archivierte_schwester: Vignette = Vignette.objects.create(
+            historie=historie,
+            vorgaengerin=vorgaengerin,
+            zustand=Vignette.Zustand.ARCHIVIERT,
+            finalisiert_am=finalisiert_am,
+            arbeitsheft_text="Bearbeitung",
+        )
+        archivierte_schwester.zustand = Vignette.Zustand.FINAL
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            archivierte_schwester.save()
 
     def test_finale_fassung_braucht_arbeitsheft_text_oder_bild(self) -> None:
         """Die Arbeitsheft-OR-Constraint schützt finale Fassungen."""
@@ -78,12 +131,12 @@ class VignetteQuerySetTests(TestCase):
 
     def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
         """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
-        ada = get_user_model().objects.create_user(username="ada")
-        grace = get_user_model().objects.create_user(username="grace")
-        linus = get_user_model().objects.create_user(username="linus")
-        geteilte_historie = Vignettenhistorie.objects.create()
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        linus: Konto = get_user_model().objects.create_user(username="linus")
+        geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         geteilte_historie.eigentuemerinnen.add(ada, grace)
-        fremde_historie = Vignettenhistorie.objects.create()
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         fremde_historie.eigentuemerinnen.add(linus)
 
         self.assertEqual(
@@ -93,7 +146,7 @@ class VignetteQuerySetTests(TestCase):
     def test_einbindbar_liefert_nur_finale_fassungen(self) -> None:
         """Entwürfe und archivierte Fassungen sind nicht einbindbar."""
         Vignette.objects.create(historie=Vignettenhistorie.objects.create())
-        finale = Vignette.objects.create(
+        finale: Vignette = Vignette.objects.create(
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),

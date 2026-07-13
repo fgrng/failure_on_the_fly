@@ -63,7 +63,7 @@ class Vignette(models.Model):
         FINAL: tuple[str, str] = "final", "Final"
         ARCHIVIERT: tuple[str, str] = "archiviert", "Archiviert"
 
-    class GESCHLECHT(models.TextChoices):
+    class Geschlecht(models.TextChoices):
         """Die kanonischen Geschlechter für die Rahmenhandlungsgrammatik."""
 
         MAENNLICH: tuple[str, str] = "männlich", "Männlich"
@@ -98,11 +98,11 @@ class Vignette(models.Model):
     )
     schuelerin_name: models.CharField = models.CharField(max_length=255, blank=True)
     schuelerin_geschlecht: models.CharField = models.CharField(
-        max_length=9, choices=GESCHLECHT, blank=True
+        max_length=9, choices=Geschlecht, blank=True
     )
     lehrperson_name: models.CharField = models.CharField(max_length=255, blank=True)
     lehrperson_geschlecht: models.CharField = models.CharField(
-        max_length=9, choices=GESCHLECHT, blank=True
+        max_length=9, choices=Geschlecht, blank=True
     )
     fach: models.CharField = models.CharField(max_length=255, blank=True)
     thema: models.CharField = models.CharField(max_length=255, blank=True)
@@ -121,6 +121,8 @@ class Vignette(models.Model):
     objects: VignetteManager = VignetteManager()
 
     class Meta:
+        """Datenbankinvarianten der Vignettenfassung."""
+
         # Absichtlich eigenständig gegenüber simulation (ADR-0017): Die
         # Vignette besitzt eigene Inhalte, Eigentümerschaft und Kern-Pin.
         constraints: list[models.BaseConstraint] = [

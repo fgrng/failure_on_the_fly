@@ -1,0 +1,1 @@
+"""Migrationen der vignetten-App."""
