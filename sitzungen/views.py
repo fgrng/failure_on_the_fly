@@ -78,15 +78,35 @@ def _gespraech_anzeigen(
 
 
 def _debrief_anzeigen(
-    request: HttpRequest, vignette: Vignette, kern: Simulationskern
+    request: HttpRequest,
+    vignette: Vignette,
+    kern: Simulationskern,
+    schritte: list[GespraechsschrittDaten],
 ) -> HttpResponse:
     """Rendert den Debrief nach dem Ende des Diagnosegesprächs."""
 
     return render(
         request,
         "sitzungen/probelauf_debrief.html",
-        {"debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette)},
+        {
+            "debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
+            "gespraechsschritte": schritte,
+        },
     )
+
+
+def _gespeicherten_debrief_anzeigen(
+    request: HttpRequest, sink: ScratchSink
+) -> HttpResponse:
+    """Rendert den Debrief aus dem festgehaltenen Probelaufzustand."""
+
+    vignette: Vignette = get_object_or_404(
+        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
+    )
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=sink.kern_pk
+    )
+    return _debrief_anzeigen(request, vignette, kern, sink.gespraechsschritte)
 
 
 def _probelauf_starten(
@@ -190,11 +210,11 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET", "POST"])
     sink: ScratchSink = ScratchSink(request.session)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
+    if sink.ist_beendet:
+        return _gespeicherten_debrief_anzeigen(request, sink)
     if request.method == "GET":
         sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, schritte)
-    if sink.ist_beendet:
-        return probelauf_beenden(request)
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
@@ -226,7 +246,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         return _gespraech_anzeigen(request, schritte, eingabe)
     if sink.budget_erschoepft(vignette):
         sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
-        return _debrief_anzeigen(request, vignette, kern)
+        return _debrief_anzeigen(request, vignette, kern, schritte)
     sink.zeitbudget_fortsetzen()
     return _gespraech_anzeigen(request, schritte)
 
@@ -238,14 +258,8 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sink: ScratchSink = ScratchSink(request.session)
-    vignette: Vignette = get_object_or_404(
-        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-    )
-    kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=sink.kern_pk
-    )
     sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
-    return _debrief_anzeigen(request, vignette, kern)
+    return _gespeicherten_debrief_anzeigen(request, sink)
 
 
 @login_required

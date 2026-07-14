@@ -280,13 +280,25 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
+        self.assertEqual(
+            self.client.session["probelauf"]["status"],
+            Sitzung.Status.ABGESCHLOSSEN,
+        )
         self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertContains(response, "Ich addiere einfach alles.")
         self.assertNotContains(response, "Budget")
         self.assertEqual(
             self.client.session["probelauf"]["gespraechsschritte"][0]["aeusserung"],
             "Ich addiere einfach alles.",
         )
         self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+
+        erneutes_oeffnen: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech")
+        )
+
+        self.assertContains(erneutes_oeffnen, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertNotContains(erneutes_oeffnen, "Ihre Nachricht")
 
         erneuter_versuch: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}

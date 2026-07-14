@@ -12,7 +12,7 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 
 class TrainingAnlegenTests(TestCase):
-    """Ausbilder:innen legen Trainings über die HTTP-Naht an."""
+    """Ausbilder:innen legen Trainings über die HTTP-Views an."""
 
     def test_legt_training_an_und_listet_nur_eigene_trainings(self) -> None:
         """Ein angelegtes Training erscheint nur bei seiner Eigentümerin."""
@@ -26,7 +26,7 @@ class TrainingAnlegenTests(TestCase):
         )
 
         training: Training = Training.objects.get(eigentuemerin=ada)
-        self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
+        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
         liste: HttpResponse = self.client.get(reverse("training:liste"))
         self.assertContains(liste, "Brüche üben")
         self.assertNotContains(liste, "Fremdes Training")
@@ -74,7 +74,7 @@ class TrainingKuratierenTests(TestCase):
         self.client.force_login(ada)
 
         detail: HttpResponse = self.client.get(
-            reverse("training:detail", args=[training.pk])
+            reverse("training:kuratieren", args=[training.pk])
         )
 
         self.assertContains(detail, "Brüche")
@@ -83,7 +83,9 @@ class TrainingKuratierenTests(TestCase):
         hinzufuegen: HttpResponse = self.client.post(
             reverse("training:vignette_hinzufuegen", args=[training.pk, finale.pk])
         )
-        self.assertRedirects(hinzufuegen, reverse("training:detail", args=[training.pk]))
+        self.assertRedirects(
+            hinzufuegen, reverse("training:kuratieren", args=[training.pk])
+        )
         self.assertEqual(list(training.vignetten.all()), [finale])
         self.assertEqual(
             self.client.post(
@@ -99,13 +101,16 @@ class TrainingKuratierenTests(TestCase):
             )
         )
         self.assertRedirects(
-            nach_veroeffentlichung, reverse("training:detail", args=[training.pk])
+            nach_veroeffentlichung,
+            reverse("training:kuratieren", args=[training.pk]),
         )
         self.assertEqual(list(training.vignetten.all()), [finale, zweite_finale])
         entfernen: HttpResponse = self.client.post(
             reverse("training:vignette_entfernen", args=[training.pk, finale.pk])
         )
-        self.assertRedirects(entfernen, reverse("training:detail", args=[training.pk]))
+        self.assertRedirects(
+            entfernen, reverse("training:kuratieren", args=[training.pk])
+        )
         self.client.post(
             reverse("training:vignette_entfernen", args=[training.pk, zweite_finale.pk])
         )
@@ -126,7 +131,7 @@ class TrainingSichtbarkeitTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
-            reverse("training:detail", args=[fremdes.pk])
+            reverse("training:kuratieren", args=[fremdes.pk])
         )
 
         self.assertEqual(response.status_code, 404)

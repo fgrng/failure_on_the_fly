@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}Vignette gewählt{% endblock %}
+
+{% block content %}
+    <h1>Vignette gewählt</h1>
+    <p>{{ vignette.historie.name|default:vignette.fach }}</p>
+    <p>Das persistierte Spielen dieser Vignette folgt im nächsten Schritt.</p>
+    <p><a href="{% url 'training:detail' training.pk %}">Zurück zum Training</a></p>
+{% endblock %}

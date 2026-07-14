@@ -116,7 +116,7 @@ def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() ->
 
 @pytest.mark.django_db
 def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
-    """Ein geglückter Zug steht sofort samt Denk- und nativer Reasoning-Spur in der DB."""
+    """Ein Gesprächsschritt steht sofort samt Denk- und nativer Reasoning-Spur in der DB."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [

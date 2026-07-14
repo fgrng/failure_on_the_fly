@@ -1,4 +1,4 @@
-"""Views für die Ausbilder-UI der Trainings."""
+"""Views für Trainingskatalog und Ausbilder-UI."""
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
@@ -24,9 +24,24 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
 
 
+def _veroeffentlichtes_training(pk: int) -> Training:
+    """Lädt ein Training, das im offenen Katalog sichtbar ist."""
+    return get_object_or_404(Training.objects.veroeffentlicht(), pk=pk)
+
+
+@login_required
+def katalog(request: HttpRequest) -> HttpResponse:
+    """Zeigt allen eingeloggten Konten veröffentlichte Trainings."""
+    return render(
+        request,
+        "training/katalog.html",
+        {"trainings": Training.objects.veroeffentlicht()},
+    )
+
+
 @login_required
 def liste(request: HttpRequest) -> HttpResponse:
-    """Listet die für die eingeloggte Person sichtbaren Trainings."""
+    """Listet die für die eingeloggte Person sichtbaren eigenen Trainings."""
     return render(
         request,
         "training/liste.html",
@@ -42,17 +57,31 @@ def anlegen(request: HttpRequest) -> HttpResponse:
         training: Training = form.save(commit=False)
         training.eigentuemerin = request.user
         training.save()
-        return redirect("training:detail", pk=training.pk)
+        return redirect("training:kuratieren", pk=training.pk)
     return render(request, "training/anlegen.html", {"form": form})
 
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt ein sichtbares Training."""
-    training: Training = _sichtbares_training(request, pk)
+    """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings."""
+    training: Training = _veroeffentlichtes_training(pk)
+    vignetten: QuerySet[Vignette] = training.vignetten.filter(
+        zustand=Vignette.Zustand.FINAL
+    )
     return render(
         request,
         "training/detail.html",
+        {"training": training, "vignetten": vignetten},
+    )
+
+
+@login_required
+def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt ein eigenes Training zur Kuratierung."""
+    training: Training = _sichtbares_training(request, pk)
+    return render(
+        request,
+        "training/kuratieren.html",
         {
             "training": training,
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
@@ -72,7 +101,7 @@ def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> Htt
         _eigene_finalen_vignetten(request), pk=vignette_pk
     )
     training.vignetten.add(vignette)
-    return redirect("training:detail", pk=training.pk)
+    return redirect("training:kuratieren", pk=training.pk)
 
 
 @login_required
@@ -83,7 +112,7 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
     training: Training = _sichtbares_training(request, pk)
     vignette: Vignette = get_object_or_404(training.vignetten, pk=vignette_pk)
     training.vignetten.remove(vignette)
-    return redirect("training:detail", pk=training.pk)
+    return redirect("training:kuratieren", pk=training.pk)
 
 
 @login_required
@@ -93,4 +122,18 @@ def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
     training.veroeffentlichen()
-    return redirect("training:detail", pk=training.pk)
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
+    """Bestätigt die Wahl einer Vignette aus einem Training."""
+    training: Training = _veroeffentlichtes_training(training_pk)
+    vignette: Vignette = get_object_or_404(
+        training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
+    )
+    return render(
+        request,
+        "training/wahl.html",
+        {"training": training, "vignette": vignette},
+    )

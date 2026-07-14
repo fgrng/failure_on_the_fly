@@ -3,6 +3,14 @@
 {% block title %}Probelauf{% endblock %}
 
 {% block content %}
+    {% for schritt in gespraechsschritte %}
+        <p>Sie: {{ schritt.eingabe }}</p>
+        <p>{{ schritt.aeusserung }}</p>
+        <p>Denkspur: {{ schritt.denkspur }}</p>
+        {% if schritt.native_reasoning_spur %}
+            <p>Native Reasoning-Spur: {{ schritt.native_reasoning_spur }}</p>
+        {% endif %}
+    {% endfor %}
     <h1>Debrief</h1>
     <p>{{ debrief }}</p>
     <form method="post">
