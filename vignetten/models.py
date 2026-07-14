@@ -355,6 +355,21 @@ class Vignette(models.Model):
         ]
 
 
+def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
+    """Liefert die Rohwerte der Vignette für Prompt-Vorlagen."""
+
+    return {
+        "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
+        "lernauftrag": vignette.lernauftrag,
+        "arbeitsheft_beschreibung": vignette.arbeitsheft_beschreibung,
+        "schuelerin_name": vignette.schuelerin_name,
+        "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
+        "fach": vignette.fach,
+        "thema": vignette.thema,
+        "klassenstufe": vignette.klassenstufe,
+    }
+
+
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:
     """Liefert die Rohwerte und Grammatikformen für die Rahmenhandlung."""
     pronomen_und_possessiv: dict[str, tuple[str, str]] = {

@@ -11,7 +11,39 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import Simulationskern
-from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
+from vignetten.models import (
+    Vignette,
+    Vignettenhistorie,
+    prompt_platzhalter,
+    rahmen_platzhalter,
+)
+
+
+def test_prompt_platzhalter_enthaelt_alle_rohen_prompt_werte() -> None:
+    """Der Prompt erhält genau die vorgesehenen Vignettenfelder ohne Ableitungen."""
+
+    vignette: Vignette = Vignette(
+        zustand=Vignette.Zustand.FINAL,
+        fehlermuster_beschreibung="Brüche werden addiert.",
+        lernauftrag="Addiere zwei Brüche.",
+        arbeitsheft_beschreibung="1/2 + 1/3 = 2/5",
+        schuelerin_name="Mia",
+        schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        fach="Mathematik",
+        thema="Brüche",
+        klassenstufe="5",
+    )
+
+    assert prompt_platzhalter(vignette) == {
+        "fehlermuster_beschreibung": "Brüche werden addiert.",
+        "lernauftrag": "Addiere zwei Brüche.",
+        "arbeitsheft_beschreibung": "1/2 + 1/3 = 2/5",
+        "schuelerin_name": "Mia",
+        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "fach": "Mathematik",
+        "thema": "Brüche",
+        "klassenstufe": "5",
+    }
 
 
 def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:

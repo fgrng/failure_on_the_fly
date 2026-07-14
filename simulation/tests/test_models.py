@@ -8,7 +8,22 @@ from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
+from simulation import render
 from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
+
+
+def test_render_substituiert_strikt_und_lehnt_abweichende_platzhalter_ab() -> None:
+    """Vorlagen brauchen genau die Werte, die ihr Vertrag vorsieht."""
+
+    assert render("$name arbeitet an $thema.", {"name": "Mia", "thema": "Brüche"}) == (
+        "Mia arbeitet an Brüche."
+    )
+
+    with pytest.raises(KeyError):
+        render("$name", {})
+
+    with pytest.raises(ValueError, match="Überzählige Platzhalter"):
+        render("$name", {"name": "Mia", "thema": "Brüche"})
 
 
 def _direkt_einfuegen(**werte: object) -> Simulationskern:
