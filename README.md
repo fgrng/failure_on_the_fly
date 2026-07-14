@@ -3,6 +3,13 @@
 Web-basierter Simulator von Schüler:innen mit Fehlermustern für das Üben
 diagnostischer Gesprächsführung.
 
+## Simulationskern
+
+Angemeldete Nutzer:innen können die aktuellste finale Kern-Fassung und die
+aktive Modell-Konfiguration read-only unter `/system/kern/` einsehen. Ist noch
+kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
+hin.
+
 ## Modell-Konfiguration
 
 Eine Modell-Konfiguration wählt über `sprachmodell` entweder den

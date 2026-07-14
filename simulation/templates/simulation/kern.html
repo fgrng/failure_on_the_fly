@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Simulationskern{% endblock %}
+
+{% block content %}
+<section class="area--system">
+    <header class="area-band"><h1>Simulationskern</h1></header>
+    {% if simulationskern %}
+        <p><span class="badge badge--final">{{ simulationskern.get_zustand_display }}</span></p>
+        <h2>System-Prompt-Vorlage</h2>
+        <pre>{{ simulationskern.system_prompt_vorlage }}</pre>
+        <h2>User-Prompt-Vorlage</h2>
+        <pre>{{ simulationskern.user_prompt_vorlage }}</pre>
+        <h2>Rahmenhandlung</h2>
+        <h3>Einleitung</h3>
+        <pre>{{ simulationskern.rahmenhandlung_einleitung }}</pre>
+        <h3>Debrief</h3>
+        <pre>{{ simulationskern.rahmenhandlung_debrief }}</pre>
+    {% else %}
+        <p>Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
+    {% endif %}
+    <h2>Modell-Konfiguration</h2>
+    {% if modell_konfiguration %}
+        <dl>
+            <dt>Sprachmodell</dt><dd>{{ modell_konfiguration.sprachmodell }}</dd>
+            <dt>Parameter</dt><dd><pre>{{ modell_konfiguration.parameter }}</pre></dd>
+        </dl>
+    {% else %}
+        <p>Keine aktive Modell-Konfiguration.</p>
+    {% endif %}
+</section>
+{% endblock %}
