@@ -136,3 +136,154 @@ a:hover {
     background: var(--color-surface-muted);
     color: var(--color-accent-hover);
 }
+.button--danger {
+    background: var(--color-danger);
+}
+.button--danger:hover {
+    background: var(--phsg-red-deep);
+}
+
+/* ---- Bereichs-Chrome ---- */
+.area--participant,
+.card--participant {
+    --area-solid: var(--color-area-participant-solid);
+    --area-on-solid: var(--color-area-participant-on-solid);
+    --area-tint: var(--color-area-participant-tint);
+}
+.area--authoring,
+.card--authoring {
+    --area-solid: var(--color-area-authoring-solid);
+    --area-on-solid: var(--color-area-authoring-on-solid);
+    --area-tint: var(--color-area-authoring-tint);
+}
+.area--research,
+.card--research {
+    --area-solid: var(--color-area-research-solid);
+    --area-on-solid: var(--color-area-research-on-solid);
+    --area-tint: var(--color-area-research-tint);
+}
+.area--system,
+.card--system {
+    --area-solid: var(--color-area-system-solid);
+    --area-on-solid: var(--color-area-system-on-solid);
+    --area-tint: var(--color-area-system-tint);
+}
+
+.area-band {
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--area-solid);
+    color: var(--area-on-solid);
+}
+.area-band :is(h1, h2, h3, h4) {
+    color: inherit;
+}
+
+/* ---- Karten und Status ---- */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-3);
+}
+.card {
+    overflow: hidden;
+    border: 1px solid var(--area-solid, var(--color-border));
+    border-radius: var(--radius);
+    background: var(--area-tint, var(--color-surface));
+}
+.card__header {
+    padding: var(--space-2) var(--space-3);
+    background: var(--area-solid, var(--color-surface-muted));
+    color: var(--area-on-solid, var(--color-text));
+}
+.card__header :is(h1, h2, h3, h4) {
+    margin: 0;
+    color: inherit;
+}
+.card__body {
+    padding: var(--space-3);
+}
+.card--disabled {
+    opacity: 0.6;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.75em;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+.badge--draft {
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+}
+.badge--final {
+    background: var(--phsg-green-light);
+    color: var(--phsg-green-deep);
+}
+.badge--archived {
+    background: var(--phsg-gray-200);
+    color: var(--color-text-muted);
+}
+
+/* ---- Formulare und Rückmeldungen ---- */
+.form label {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-weight: 600;
+}
+.form :is(input, textarea, select) {
+    width: 100%;
+    padding: var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+}
+.form textarea {
+    min-height: 8rem;
+    resize: vertical;
+}
+.form :is(input, textarea, select):focus {
+    border-color: var(--color-accent);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+.messages {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    list-style: none;
+}
+.message--success,
+.message--info,
+.message--warning,
+.message--error {
+    padding: var(--space-2);
+    border-left: 4px solid;
+    border-radius: var(--radius);
+}
+.message--success {
+    border-color: var(--phsg-green-dark);
+    background: var(--phsg-green-light);
+    color: var(--phsg-green-deep);
+}
+.message--info {
+    border-color: var(--phsg-blue-dark);
+    background: var(--phsg-blue-light);
+    color: var(--phsg-blue-deep);
+}
+.message--warning {
+    border-color: var(--phsg-yellow-dark);
+    background: var(--phsg-yellow-light);
+    color: var(--phsg-yellow-deep);
+}
+.message--error {
+    border-color: var(--color-danger);
+    background: var(--color-danger-tint);
+    color: var(--phsg-red-deep);
+}
