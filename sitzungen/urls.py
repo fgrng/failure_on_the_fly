@@ -14,4 +14,5 @@ urlpatterns: list[URLPattern] = [
         views.probelauf_starten,
         name="probelauf_starten",
     ),
+    path("probelauf/gespraech/", views.probelauf_gespraech, name="probelauf_gespraech"),
 ]

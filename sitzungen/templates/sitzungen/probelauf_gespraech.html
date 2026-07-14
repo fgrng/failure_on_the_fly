@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Probelauf{% endblock %}
+
+{% block content %}
+    <h1>Diagnosegespräch</h1>
+    {% for schritt in gespraechsschritte %}
+        <p>Sie: {{ schritt.eingabe }}</p>
+        <p>{{ schritt.aeusserung }}</p>
+        <p>Denkspur: {{ schritt.denkspur }}</p>
+        {% if schritt.native_reasoning_spur %}
+            <p>Native Reasoning-Spur: {{ schritt.native_reasoning_spur }}</p>
+        {% endif %}
+    {% endfor %}
+    <form method="post">
+        {% csrf_token %}
+        <label for="eingabe">Ihre Nachricht</label>
+        <textarea id="eingabe" name="eingabe" required></textarea>
+        <button type="submit">Senden</button>
+    </form>
+{% endblock %}

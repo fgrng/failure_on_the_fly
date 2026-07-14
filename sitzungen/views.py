@@ -8,7 +8,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 
-from simulation import render as simulation_render
+from simulation import antwort_versuchen, render as simulation_render
 from simulation.models import ModellKonfiguration, Simulationskern
 from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
 
@@ -70,4 +70,52 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         "sitzungen/probelauf_einleitung.html",
         {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+    )
+
+
+@login_required
+def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
+    """Führt einen schreibfreien Gesprächsschritt des Probelaufs aus."""
+
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    probelauf: dict[str, object] = request.session[_PROBELAUF_SESSION_SCHLUESSEL]
+    schritte: list[dict[str, str | None]] = probelauf["gespraechsschritte"]  # type: ignore[assignment]
+    if request.method == "GET":
+        return render(
+            request,
+            "sitzungen/probelauf_gespraech.html",
+            {"gespraechsschritte": schritte},
+        )
+    vignette: Vignette = get_object_or_404(
+        _eigene_entwuerfe(request.user), pk=probelauf["vignette_pk"]
+    )
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=probelauf["kern_pk"]
+    )
+    modell_konfiguration: ModellKonfiguration = get_object_or_404(
+        ModellKonfiguration.objects.all(), pk=probelauf["modell_konfiguration_pk"]
+    )
+    eingabe: str = request.POST["eingabe"]
+    antwortversuch = antwort_versuchen(
+        vignette,
+        kern,
+        modell_konfiguration,
+        [schritt["aeusserung"] for schritt in schritte if schritt["aeusserung"]],
+        eingabe,
+    )
+    if antwortversuch.antwort is not None:
+        schritte.append(
+            {
+                "eingabe": eingabe,
+                "denkspur": antwortversuch.antwort.denkspur,
+                "aeusserung": antwortversuch.antwort.aeusserung,
+                "native_reasoning_spur": antwortversuch.native_reasoning_spur,
+            }
+        )
+        request.session.modified = True
+    return render(
+        request,
+        "sitzungen/probelauf_gespraech.html",
+        {"gespraechsschritte": schritte},
     )
