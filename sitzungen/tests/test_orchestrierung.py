@@ -11,11 +11,11 @@ from vignetten.models import Vignette
 def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form() -> None:
     """Der schreibfreie Sink bewahrt jeden Zug in der späteren Persistenzform auf."""
 
-    session = SessionStore()
-    sink = ScratchSink(session)
-    vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
-    kern = Simulationskern(user_prompt_vorlage="$lernauftrag")
-    konfiguration = ModellKonfiguration(
+    session: SessionStore = SessionStore()
+    sink: ScratchSink = ScratchSink(session)
+    vignette: Vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
+    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
+    konfiguration: ModellKonfiguration = ModellKonfiguration(
         sprachmodell="fake",
         parameter={
             "skript": [
@@ -37,6 +37,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 
     assert session["probelauf"]["gespraechsschritte"] == [
         {
+            "reihenfolge": 1,
             "eingabe": "Wie hast du gerechnet?",
             "denkspur": "Ich addiere.",
             "aeusserung": "2/5.",
@@ -51,11 +52,11 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() -> None:
     """Ein endgültig verworfener Antwortversuch beendet die schreibfreie Sitzung."""
 
-    session = SessionStore()
-    sink = ScratchSink(session)
-    vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
-    kern = Simulationskern(user_prompt_vorlage="$lernauftrag")
-    konfiguration = ModellKonfiguration(
+    session: SessionStore = SessionStore()
+    sink: ScratchSink = ScratchSink(session)
+    vignette: Vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
+    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
+    konfiguration: ModellKonfiguration = ModellKonfiguration(
         sprachmodell="fake",
         parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
     )
@@ -72,6 +73,7 @@ def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() ->
 
     assert session["probelauf"]["gespraechsschritte"] == [
         {
+            "reihenfolge": 1,
             "eingabe": "Wie hast du gerechnet?",
             "denkspur": None,
             "aeusserung": None,

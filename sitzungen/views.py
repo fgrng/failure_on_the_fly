@@ -95,7 +95,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
-    sink = ScratchSink(request.session)
+    sink: ScratchSink = ScratchSink(request.session)
     probelauf: _ProbelaufSession = cast(_ProbelaufSession, sink.zustand)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if request.method == "GET":

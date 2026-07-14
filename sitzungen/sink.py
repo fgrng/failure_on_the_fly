@@ -21,6 +21,7 @@ class FehlversuchDaten(TypedDict):
 class GespraechsschrittDaten(TypedDict):
     """Die gemeinsame Speicherform eines Gesprächsschritts."""
 
+    reihenfolge: int
     eingabe: str
     denkspur: str | None
     aeusserung: str | None
@@ -66,6 +67,8 @@ class ScratchSink:
     """Hält einen Probelauf ausschließlich in der Django-Session."""
 
     def __init__(self, session: MutableMapping[str, Any]) -> None:
+        """Bindet den Sink an den Session-Speicher eines Probelaufs."""
+
         self.session: MutableMapping[str, Any] = session
 
     def sitzung_starten(
@@ -110,6 +113,7 @@ class ScratchSink:
 
         self.gespraechsschritte.append(
             {
+                "reihenfolge": len(self.gespraechsschritte) + 1,
                 "eingabe": eingabe,
                 "denkspur": denkspur,
                 "aeusserung": aeusserung,
@@ -126,6 +130,7 @@ class ScratchSink:
 
         self.gespraechsschritte.append(
             {
+                "reihenfolge": len(self.gespraechsschritte) + 1,
                 "eingabe": eingabe,
                 "denkspur": None,
                 "aeusserung": None,
@@ -148,7 +153,7 @@ class ScratchSink:
         self._als_geaendert_markieren()
 
     def _als_geaendert_markieren(self) -> None:
-        """Sorgt dafür, dass Django verschachtelte Session-Änderungen speichert."""
+        # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
 
         if hasattr(self.session, "modified"):
             self.session.modified = True

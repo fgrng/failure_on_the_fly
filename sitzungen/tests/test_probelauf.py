@@ -1,14 +1,11 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
-from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
@@ -156,6 +153,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(zweite_antwort, "Ich rechne eins plus eins und zwei plus drei.")
         self.assertEqual(self.client.session["probelauf"]["gespraechsschritte"], [
             {
+                "reihenfolge": 1,
                 "eingabe": "Wie rechnest du?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
@@ -163,6 +161,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 "fehlversuche": [],
             },
             {
+                "reihenfolge": 2,
                 "eingabe": "Und warum?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
@@ -216,14 +215,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.orchestrierung.antwort_versuchen", wraps=antwort_versuchen
-        ) as antworten:
-            self.client.post(
-                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
-            )
-            self.client.post(
-                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
-            )
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
+        )
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+        )
 
-        self.assertEqual(antworten.call_args.args[3], [""])
+        self.assertIn(
+            "Verlauf:\n\n\nEingabe:\nZweiter Schritt",
+            FakeSprachmodell.letzte_anfragen[-1][1],
+        )
