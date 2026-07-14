@@ -116,7 +116,7 @@ def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() ->
 
 @pytest.mark.django_db
 def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
-    """Ein geglückter Zug steht sofort samt Denk- und nativer Reasoning-Spur in der DB."""
+    """Ein geglückter Gesprächsschritt steht sofort samt Denk- und nativer Reasoning-Spur in der DB."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [
@@ -224,6 +224,22 @@ def test_db_sink_diagnose_schliesst_die_sitzung_ab() -> None:
         Diagnose.objects.get(sitzung=sitzung).text
         == "Zähler und Nenner werden addiert."
     )
+
+
+@pytest.mark.django_db
+def test_scratch_und_db_sink_schliessen_mit_diagnose_gleich_ab() -> None:
+    """Eine Diagnose vollzieht an beiden Sink-Zielen denselben Abschlussübergang."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
+
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        sink.diagnose_setzen("Zähler und Nenner werden addiert.")
+
+    assert scratch.session["probelauf"]["status"] == Sitzung.Status.ABGESCHLOSSEN
+    assert Sitzung.objects.get().status == Sitzung.Status.ABGESCHLOSSEN
 
 
 @pytest.mark.django_db

@@ -285,7 +285,7 @@ class ScratchSink:
         """Hält die im Probelauf verworfene Diagnose in der Session."""
 
         self._zustand["diagnose"] = text
-        self._als_geaendert_markieren()
+        self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
 
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Hält den Sitzungsstatus für den Probelauf fest."""
