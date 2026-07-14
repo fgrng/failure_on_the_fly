@@ -138,7 +138,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         vignette,
         kern,
         modell_konfiguration,
-        [schritt["aeusserung"] for schritt in schritte if schritt["aeusserung"]],
+        [schritt["aeusserung"] for schritt in schritte],
         eingabe,
     )
     if antwortversuch.antwort is not None:

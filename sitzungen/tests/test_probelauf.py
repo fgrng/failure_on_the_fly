@@ -1,11 +1,14 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
+from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
 from vignetten.models import Vignette
@@ -179,3 +182,25 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self.assertContains(response, "Denkspur:")
         self.assertNotContains(response, "Native Reasoning-Spur:")
+
+    def test_leere_aeusserung_bleibt_im_modellverlauf(self) -> None:
+        """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": [{"denkspur": "still", "aeusserung": ""}]},
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        with patch(
+            "sitzungen.views.antwort_versuchen", wraps=antwort_versuchen
+        ) as antworten:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
+            )
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+            )
+
+        self.assertEqual(antworten.call_args.args[3], [""])
