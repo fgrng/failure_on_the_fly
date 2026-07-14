@@ -70,7 +70,7 @@ def _ist_administratorin(konto: "Konto") -> bool:
     return konto.groups.filter(name="Administrator:in").exists()
 
 
-def _admin_erforderlich(request: HttpRequest) -> HttpResponse | None:
+def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
     """Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle."""
 
     if not _ist_administratorin(request.user):
@@ -148,7 +148,7 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
 def administratorin_probelauf_auswahl(request: HttpRequest) -> HttpResponse:
     """Zeigt Administrator:innen alle frei kombinierbaren Tripelbestandteile."""
 
-    verweigert: HttpResponse | None = _admin_erforderlich(request)
+    verweigert: HttpResponse | None = _administratorin_erforderlich(request)
     if verweigert is not None:
         return verweigert
     return render(
@@ -166,7 +166,7 @@ def administratorin_probelauf_auswahl(request: HttpRequest) -> HttpResponse:
 def administratorin_probelauf_starten(request: HttpRequest) -> HttpResponse:
     """Fixiert ein administrativ gewähltes Tripel in der Session."""
 
-    verweigert: HttpResponse | None = _admin_erforderlich(request)
+    verweigert: HttpResponse | None = _administratorin_erforderlich(request)
     if verweigert is not None:
         return verweigert
     if request.method != "POST":

@@ -207,14 +207,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertEqual(antworten.call_args.args[3], [""])
 
 
-class AdminProbelaufTests(TestCase):
+class AdministratorinProbelaufTests(TestCase):
     """Die HTTP-Naht erlaubt Administrator:innen ein freies Probelauf-Tripel."""
 
     def setUp(self) -> None:
         """Legt ein administrativ frei kombinierbares Tripel an."""
 
-        self.admin: Konto = get_user_model().objects.create_user(username="admin")
-        self.admin.groups.add(Group.objects.get(name="Administrator:in"))
+        self.administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        self.administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         autorin: Konto = get_user_model().objects.create_user(username="ada")
         finaler_kern: Simulationskern = Simulationskern.objects.anlegen()
         finaler_kern.finalisieren()
@@ -251,9 +251,9 @@ class AdminProbelaufTests(TestCase):
         self.vignette.save()
         self.vignette.finalisieren()
         self.gepinnter_kern_pk: int = self.vignette.gepinnter_kern_id
-        self.client.force_login(self.admin)
+        self.client.force_login(self.administratorin)
 
-    def test_admin_startet_freies_tripel_ohne_vignetten_pin_oder_aktive_konfiguration_zu_aendern(
+    def test_administratorin_startet_freies_tripel_ohne_vignetten_pin_oder_aktive_konfiguration_zu_aendern(
         self,
     ) -> None:
         """Der freie Auswähler speichert das gewählte Tripel nur in der Session."""
