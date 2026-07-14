@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from simulation import render as simulation_render
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
 from sitzungen.sink import GespraechsschrittDaten, ScratchSink
 from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
@@ -73,6 +74,18 @@ def _gespraech_anzeigen(
         request,
         "sitzungen/probelauf_gespraech.html",
         {"gespraechsschritte": schritte, "erneute_eingabe": erneute_eingabe},
+    )
+
+
+def _debrief_anzeigen(
+    request: HttpRequest, vignette: Vignette, kern: Simulationskern
+) -> HttpResponse:
+    """Rendert den Debrief nach dem Ende des Diagnosegesprächs."""
+
+    return render(
+        request,
+        "sitzungen/probelauf_debrief.html",
+        {"debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette)},
     )
 
 
@@ -178,7 +191,10 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     sink: ScratchSink = ScratchSink(request.session)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if request.method == "GET":
+        sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, schritte)
+    if sink.ist_beendet:
+        return probelauf_beenden(request)
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
@@ -191,6 +207,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
+    sink.zeitbudget_anhalten()
     antwortversuch = gespraechsschritt_ausfuehren(
         sink,
         vignette,
@@ -205,7 +222,12 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     )
     if antwortversuch.endgueltig_gescheitert:
         sink.gescheiterten_schritt_verwerfen()
+        sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, schritte, eingabe)
+    if sink.budget_erschoepft(vignette):
+        sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        return _debrief_anzeigen(request, vignette, kern)
+    sink.zeitbudget_fortsetzen()
     return _gespraech_anzeigen(request, schritte)
 
 
@@ -222,11 +244,8 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
     kern: Simulationskern = get_object_or_404(
         Simulationskern.objects.all(), pk=sink.kern_pk
     )
-    return render(
-        request,
-        "sitzungen/probelauf_debrief.html",
-        {"debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette)},
-    )
+    sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+    return _debrief_anzeigen(request, vignette, kern)
 
 
 @login_required

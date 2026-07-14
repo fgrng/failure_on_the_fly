@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -133,6 +134,33 @@ class ProbelaufStartTests(TestCase):
 class ProbelaufGespraechTests(ProbelaufStartTests):
     """Die HTTP-Naht führt das Diagnosegespräch schreibfrei Zug um Zug."""
 
+    def _domaenenzeilen_zaehlen(self) -> tuple[int, int, int, int, int]:
+        """Zählt die Probelauf-fremden Persistenzmodelle."""
+
+        return (
+            Teilnahme.objects.count(),
+            Sitzung.objects.count(),
+            Gespraechsschritt.objects.count(),
+            Fehlversuch.objects.count(),
+            Diagnose.objects.count(),
+        )
+
+    def _erfolgreiche_antwort_konfigurieren(self) -> None:
+        """Richtet den Fake für einen erfolgreichen Schritt ein."""
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {
+                        "denkspur": "Mia addiert Zähler und Nenner.",
+                        "aeusserung": "Ich addiere einfach alles.",
+                    }
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+
     def _endgueltigen_fehlschlag_ausloesen(self) -> HttpResponse:
         # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
 
@@ -228,6 +256,83 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
         self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
         self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
+
+    def test_schrittbudget_fuehrt_nach_letztem_schritt_unsichtbar_in_den_debrief(
+        self,
+    ) -> None:
+        """Der letzte erlaubte Gesprächsschritt endet erst nach seiner Antwort."""
+
+        self.entwurf.budget_typ = Vignette.BudgetTyp.SCHRITTE
+        self.entwurf.budget_wert = 1
+        self.entwurf.save()
+        self._erfolgreiche_antwort_konfigurieren()
+        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertNotContains(response, "Budget")
+        self.assertEqual(
+            self.client.session["probelauf"]["gespraechsschritte"][0]["aeusserung"],
+            "Ich addiere einfach alles.",
+        )
+        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+
+        erneuter_versuch: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+        )
+
+        self.assertContains(erneuter_versuch, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertEqual(len(self.client.session["probelauf"]["gespraechsschritte"]), 1)
+
+    def test_zeitbudget_pausiert_waehrend_des_modellaufrufs(self) -> None:
+        """Modellwartezeit erhöht den Zeitverbrauch des Probelaufs nicht."""
+
+        self.entwurf.budget_typ = Vignette.BudgetTyp.ZEIT
+        self.entwurf.budget_wert = 5
+        self.entwurf.save()
+        self._erfolgreiche_antwort_konfigurieren()
+        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        with patch("sitzungen.sink.monotonic", side_effect=[10, 14, 114]):
+            self.client.get(reverse("sitzungen:probelauf_gespraech"))
+            response: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie rechnest du?"},
+            )
+
+        self.assertContains(response, "Ich addiere einfach alles.")
+        self.assertNotContains(response, "Budget")
+        self.assertEqual(self.client.session["probelauf"]["verbrauchte_zeit"], 4)
+        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+
+    def test_zeitbudget_fuehrt_nach_laufendem_schritt_in_den_debrief(self) -> None:
+        """Ein abgelaufenes Zeitbudget schneidet die erzeugte Antwort nicht ab."""
+
+        self.entwurf.budget_typ = Vignette.BudgetTyp.ZEIT
+        self.entwurf.budget_wert = 5
+        self.entwurf.save()
+        self._erfolgreiche_antwort_konfigurieren()
+        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        with patch("sitzungen.sink.monotonic", side_effect=[10, 15]):
+            self.client.get(reverse("sitzungen:probelauf_gespraech"))
+            response: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie rechnest du?"},
+            )
+
+        self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertEqual(
+            self.client.session["probelauf"]["gespraechsschritte"][0]["aeusserung"],
+            "Ich addiere einfach alles.",
+        )
+        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
 
     def test_native_reasoning_spur_fehlt_ohne_anbieterwert(self) -> None:
         """Die native Spur ist ein optionaler Zusatz zur immer sichtbaren Denkspur."""

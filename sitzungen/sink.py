@@ -1,6 +1,7 @@
 """Naht für die Ziele einer Spielorchestrierung."""
 
 from collections.abc import MutableMapping
+from time import monotonic
 from typing import Any, Protocol, TypedDict, cast
 
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -85,6 +86,8 @@ class ScratchSink:
             "modell_konfiguration_pk": modell_konfiguration.pk,
             "gespraechsschritte": [],
         }
+        if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
+            self._zustand["verbrauchte_zeit"] = 0.0
 
     @property
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
@@ -117,6 +120,12 @@ class ScratchSink:
         """Kennzeichnet einen terminal fehlgeschlagenen Probelauf."""
 
         return self._zustand.get("status") == Sitzung.Status.GESCHEITERT
+
+    @property
+    def ist_beendet(self) -> bool:
+        """Kennzeichnet einen Probelauf, dessen Debrief bereits erreicht ist."""
+
+        return self._zustand.get("status") == Sitzung.Status.ABGESCHLOSSEN
 
     @property
     def freie_auswahl(self) -> bool:
@@ -196,6 +205,41 @@ class ScratchSink:
 
         self._zustand["freie_auswahl"] = True
         self._als_geaendert_markieren()
+
+    def budget_erschoepft(self, vignette: Vignette) -> bool:
+        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
+
+        if vignette.budget_wert is None:
+            return False
+        if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
+            return len(self.gespraechsschritte) >= vignette.budget_wert
+        return self.verbrauchte_zeit >= vignette.budget_wert
+
+    @property
+    def verbrauchte_zeit(self) -> float:
+        """Liefert die allein während des Autorinnenzugs gemessene Zeit."""
+
+        return cast(float, self._zustand.get("verbrauchte_zeit", 0.0))
+
+    def zeitbudget_fortsetzen(self) -> None:
+        """Startet die Uhr, wenn die Autorin wieder eine Eingabe verfassen kann."""
+
+        if (
+            "verbrauchte_zeit" in self._zustand
+            and "zeit_laeuft_seit" not in self._zustand
+        ):
+            self._zustand["zeit_laeuft_seit"] = monotonic()
+            self._als_geaendert_markieren()
+
+    def zeitbudget_anhalten(self) -> None:
+        """Hält die Uhr für Modellaufruf und Fehlversuche an."""
+
+        startzeit: float | None = self._zustand.pop("zeit_laeuft_seit", None)
+        if startzeit is not None:
+            self._zustand["verbrauchte_zeit"] = self.verbrauchte_zeit + (
+                monotonic() - startzeit
+            )
+            self._als_geaendert_markieren()
 
     def verwerfen(self) -> None:
         """Entfernt den vollständigen Probelaufzustand aus der Session."""
