@@ -12,6 +12,7 @@ from simulation.sprachmodell import (
     ContentFilter,
     FakeSprachmodell,
     Formatbruch,
+    LiteLLMSprachmodell,
     Sprachmodell,
 )
 
@@ -99,9 +100,11 @@ def antwort_versuchen(
 def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmodell:
     """Bildet den in der Konfiguration gewählten Adapter."""
 
-    if modell_konfiguration.sprachmodell != "fake":
-        raise ValueError("Unbekanntes Sprachmodell.")
-    return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
+    if modell_konfiguration.sprachmodell == "fake":
+        return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
+    return LiteLLMSprachmodell(
+        modell_konfiguration.sprachmodell, modell_konfiguration.parameter
+    )
 
 
 def _prompt_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
