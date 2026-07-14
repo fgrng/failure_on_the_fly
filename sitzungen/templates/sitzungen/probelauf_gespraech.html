@@ -18,4 +18,8 @@
         <textarea id="eingabe" name="eingabe" required></textarea>
         <button type="submit">Senden</button>
     </form>
+    <form method="post" action="{% url 'sitzungen:probelauf_beenden' %}">
+        {% csrf_token %}
+        <button type="submit">Gespräch beenden</button>
+    </form>
 {% endblock %}

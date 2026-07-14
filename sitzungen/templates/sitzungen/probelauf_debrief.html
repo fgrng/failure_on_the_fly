@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Probelauf{% endblock %}
+
+{% block content %}
+    <h1>Debrief</h1>
+    <p>{{ debrief }}</p>
+    <form method="post">
+        {% csrf_token %}
+        <label for="diagnose">Ihre Diagnose</label>
+        <textarea id="diagnose" name="diagnose" required></textarea>
+        <button type="submit">Probelauf beenden</button>
+    </form>
+{% endblock %}

@@ -178,6 +178,11 @@ class ScratchSink:
         self._zustand["status"] = status
         self._als_geaendert_markieren()
 
+    def verwerfen(self) -> None:
+        """Entfernt den vollständigen Probelaufzustand aus der Session."""
+
+        self.session.pop(_PROBELAUF_SESSION_SCHLUESSEL, None)
+
     def _als_geaendert_markieren(self) -> None:
         # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
 

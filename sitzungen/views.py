@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from simulation import render as simulation_render
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -115,3 +115,33 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         eingabe,
     )
     return _gespraech_anzeigen(request, schritte)
+
+
+@login_required
+def probelauf_beenden(request: HttpRequest) -> HttpResponse:
+    """Zeigt den Debrief des schreibfreien Probelaufs."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sink: ScratchSink = ScratchSink(request.session)
+    vignette: Vignette = get_object_or_404(
+        _eigene_entwuerfe(request.user), pk=sink.vignette_pk
+    )
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=sink.kern_pk
+    )
+    return render(
+        request,
+        "sitzungen/probelauf_debrief.html",
+        {"debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette)},
+    )
+
+
+@login_required
+def probelauf_debrief(request: HttpRequest) -> HttpResponse:
+    """Verwirft den Probelauf samt eingegebener Diagnose."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    ScratchSink(request.session).verwerfen()
+    return redirect("sitzungen:probelauf_auswahl")

@@ -15,4 +15,6 @@ urlpatterns: list[URLPattern] = [
         name="probelauf_starten",
     ),
     path("probelauf/gespraech/", views.probelauf_gespraech, name="probelauf_gespraech"),
+    path("probelauf/beenden/", views.probelauf_beenden, name="probelauf_beenden"),
+    path("probelauf/debrief/", views.probelauf_debrief, name="probelauf_debrief"),
 ]
