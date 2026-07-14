@@ -170,7 +170,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         if (result.commits.length > 0) {
           await sandbox.run({
             name: "Reviewer #" + issue.id,
-            agent: sandcastle.codex("gpt-5.6-sol"),
+            agent: sandcastle.codex("gpt-5.6-terra", { effort: "medium" }),
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
               BRANCH: issue.branch,
@@ -235,7 +235,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     copyToWorktree,
     name: "Merger",
     maxIterations: 10,
-    agent: sandcastle.claudeCode("claude-opus-4-6"),
+    agent: sandcastle.codex("gpt-5.6-sol", { effort: "high" }),
     promptFile: "./.sandcastle/merge-prompt.md",
     promptArgs: {
       BRANCHES: completedBranches.map((b) => `- ${b}`).join("\n"),

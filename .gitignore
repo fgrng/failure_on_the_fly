@@ -6,3 +6,4 @@ staticfiles/
 media/
 .env
 .DS_Store
+.claude/worktrees/
