@@ -147,10 +147,10 @@ class LiteLLMSprachmodell:
         rohantwort: str = ""
         try:
             auswahl: Any = modellantwort.choices[0]
+            nachricht: Any = getattr(auswahl, "message", None)
+            rohantwort = str(getattr(nachricht, "content", ""))
             if getattr(auswahl, "finish_reason", None) == "content_filter":
-                raise ContentFilter
-            nachricht: Any = auswahl.message
-            rohantwort = str(nachricht.content)
+                raise ContentFilter(rohantwort)
             inhalt: object = json.loads(rohantwort)
             if not isinstance(inhalt, dict) or set(inhalt) != {
                 "denkspur",
