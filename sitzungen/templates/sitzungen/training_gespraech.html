@@ -21,5 +21,9 @@
             {% csrf_token %}
             <button type="submit">Gespräch beenden</button>
         </form>
+        <form method="post" action="{% url 'sitzungen:training_abbrechen' %}">
+            {% csrf_token %}
+            <button type="submit">Training abbrechen</button>
+        </form>
     {% endif %}
 {% endblock %}

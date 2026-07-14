@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -205,3 +205,66 @@ class TrainingskatalogTests(TestCase):
         self.assertEqual(Sitzung.objects.count(), 2)
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.get().teilnahme_id, sitzung.teilnahme_id)
+
+
+class TrainingsabbruchTests(TestCase):
+    """Teilnehmer:innen können eine Trainingssitzung gewollt abbrechen."""
+
+    def _sitzung_starten(
+        self, skript: list[dict[str, str]] | None = None
+    ) -> Training:
+        """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
+        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake", parameter={"skript": skript or []}
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        training: Training = Training.objects.create(
+            name="Bruchrechnung", eigentuemerin=ausbilderin
+        )
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            gepinnter_kern=kern,
+        )
+        training.vignetten.add(vignette)
+        training.veroeffentlichen()
+        self.client.force_login(teilnehmerin)
+        self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
+        return training
+
+    def test_abbrechen_beendet_die_sitzung_ohne_diagnose(self) -> None:
+        """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""
+        training: Training = self._sitzung_starten()
+
+        response: HttpResponse = self.client.post(reverse("sitzungen:training_abbrechen"))
+
+        self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
+        self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_endgueltiger_fehlschlag_bewahrt_abbruchschritt_und_fehler(self) -> None:
+        """Der technische Abbruch bleibt mit Fehlversuchen statt Diagnose erhalten."""
+        self._sitzung_starten([{"fehler": "anbieterfehler"}] * 3)
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.GESCHEITERT)
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.get(sitzung=sitzung)
+        self.assertIsNone(schritt.aeusserung)
+        self.assertEqual(Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3)
+        self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())

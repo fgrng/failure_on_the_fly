@@ -359,6 +359,20 @@ def _training_fehler_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpRes
     )
 
 
+def _training_zur_auswahl_zurueckkehren(
+    request: HttpRequest, sitzung: Sitzung
+) -> HttpResponse:
+    """Löst die aktive Sitzung und kehrt zur Auswahl ihres Trainings zurück."""
+
+    from training.models import Trainingsbindung
+
+    training_pk: int = get_object_or_404(
+        Trainingsbindung, teilnahme=sitzung.teilnahme
+    ).training_id
+    request.session.pop("training_sitzung_pk", None)
+    return redirect("training:detail", pk=training_pk)
+
+
 @login_required
 def training_gespraech(request: HttpRequest) -> HttpResponse:
     """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
@@ -416,6 +430,20 @@ def training_beenden(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def training_abbrechen(request: HttpRequest) -> HttpResponse:
+    """Bricht eine Trainingssitzung ohne Diagnose gewollt ab."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    if sitzung.status != Sitzung.Status.LAUFEND:
+        return _training_fehler_anzeigen(request, sitzung)
+    _training_zeitbudget_anhalten(request)
+    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    return _training_zur_auswahl_zurueckkehren(request, sitzung)
+
+
+@login_required
 def training_debrief(request: HttpRequest) -> HttpResponse:
     """Speichert die Diagnose und kehrt zur freien Trainingswahl zurück."""
 
@@ -425,10 +453,4 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return _training_fehler_anzeigen(request, sitzung)
     DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
-    from training.models import Trainingsbindung
-
-    training_pk: int = get_object_or_404(
-        Trainingsbindung, teilnahme=sitzung.teilnahme
-    ).training_id
-    request.session.pop("training_sitzung_pk", None)
-    return redirect("training:detail", pk=training_pk)
+    return _training_zur_auswahl_zurueckkehren(request, sitzung)
