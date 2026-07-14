@@ -5,7 +5,7 @@ from django.urls.resolvers import URLPattern
 
 from . import views
 
-app_name = "sitzungen"
+app_name: str = "sitzungen"
 
 urlpatterns: list[URLPattern] = [
     path("probelauf/", views.probelauf_auswahl, name="probelauf_auswahl"),

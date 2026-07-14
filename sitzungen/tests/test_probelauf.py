@@ -7,13 +7,15 @@ from django.urls import reverse
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 
 class ProbelaufStartTests(TestCase):
     """Die HTTP-Naht startet einen Probelauf über einem festen Tripel."""
 
     def setUp(self) -> None:
+        """Legt die sichtbaren und fremden Entwürfe für die HTTP-Tests an."""
+
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         self.kern: Simulationskern = Simulationskern.objects.anlegen(
@@ -27,26 +29,20 @@ class ProbelaufStartTests(TestCase):
             sprachmodell="fake", parameter={"skript": []}
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
-        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Eigener Entwurf"
-        )
-        eigene_historie.eigentuemerinnen.add(self.ada)
-        self.entwurf: Vignette = Vignette.objects._erstellen(
-            historie=eigene_historie,
-            gepinnter_kern=self.kern,
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Brüche",
-            klassenstufe="5",
-        )
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Fremder Entwurf"
-        )
-        fremde_historie.eigentuemerinnen.add(grace)
-        Vignette.objects._erstellen(historie=fremde_historie, gepinnter_kern=self.kern)
+        self.entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        self.entwurf.historie.name = "Eigener Entwurf"
+        self.entwurf.historie.save()
+        self.entwurf.schuelerin_name = "Mia"
+        self.entwurf.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.entwurf.lehrperson_name = "Weber"
+        self.entwurf.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+        self.entwurf.fach = "Mathematik"
+        self.entwurf.thema = "Brüche"
+        self.entwurf.klassenstufe = "5"
+        self.entwurf.save()
+        fremder_entwurf: Vignette = Vignette.objects.anlegen(grace)
+        fremder_entwurf.historie.name = "Fremder Entwurf"
+        fremder_entwurf.historie.save()
         self.client.force_login(self.ada)
 
     def test_auswahl_zeigt_nur_eigene_entwuerfe_und_startet_rahmenhandlung(
@@ -84,7 +80,12 @@ class ProbelaufStartTests(TestCase):
 
         self.client.get(reverse("sitzungen:probelauf_auswahl"))
 
-        self.assertEqual(self.client.session["probelauf"]["vignette_pk"], self.entwurf.pk)
+        self.assertEqual(self.client.session["probelauf"], {
+            "vignette_pk": self.entwurf.pk,
+            "kern_pk": self.kern.pk,
+            "modell_konfiguration_pk": self.konfiguration.pk,
+            "gespraechsschritte": [],
+        })
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
