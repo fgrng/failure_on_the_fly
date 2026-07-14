@@ -12,15 +12,23 @@ from simulation import render
 from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
 
 
-def test_render_substituiert_strikt_und_lehnt_abweichende_platzhalter_ab() -> None:
-    """Vorlagen brauchen genau die Werte, die ihr Vertrag vorsieht."""
+def test_render_substituiert_alle_vereinbarten_platzhalter() -> None:
+    """Eine Vorlage wird mit ihren vereinbarten Werten gefüllt."""
 
     assert render("$name arbeitet an $thema.", {"name": "Mia", "thema": "Brüche"}) == (
         "Mia arbeitet an Brüche."
     )
 
+
+def test_render_lehnt_fehlende_platzhalter_ab() -> None:
+    """Jeder Platzhalter der Vorlage braucht einen Wert."""
+
     with pytest.raises(KeyError):
         render("$name", {})
+
+
+def test_render_lehnt_ueberzaehlige_platzhalter_ab() -> None:
+    """Das Mapping darf keine nicht verwendeten Werte enthalten."""
 
     with pytest.raises(ValueError, match="Überzählige Platzhalter"):
         render("$name", {"name": "Mia", "thema": "Brüche"})
