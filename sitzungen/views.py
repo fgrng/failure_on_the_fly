@@ -63,6 +63,20 @@ def _probelauf_vignetten(
     return _eigene_entwuerfe(konto)
 
 
+def _probelauf_vignette_und_kern(
+    request: HttpRequest, sink: ScratchSink
+) -> tuple[Vignette, Simulationskern]:
+    """Lädt die im Probelauf gepinnten und weiterhin zugänglichen Bestandteile."""
+
+    vignette: Vignette = get_object_or_404(
+        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
+    )
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=sink.kern_pk
+    )
+    return vignette, kern
+
+
 def _gespraech_anzeigen(
     request: HttpRequest,
     schritte: list[GespraechsschrittDaten],
@@ -191,24 +205,14 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     sink: ScratchSink = ScratchSink(request.session)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if sink.ist_beendet:
-        vignette: Vignette = get_object_or_404(
-            _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-        )
-        kern: Simulationskern = get_object_or_404(
-            Simulationskern.objects.all(), pk=sink.kern_pk
-        )
+        vignette, kern = _probelauf_vignette_und_kern(request, sink)
         return _debrief_anzeigen(request, vignette, kern)
     if request.method == "GET":
         sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, schritte)
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
-    vignette: Vignette = get_object_or_404(
-        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-    )
-    kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=sink.kern_pk
-    )
+    vignette, kern = _probelauf_vignette_und_kern(request, sink)
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
@@ -244,12 +248,7 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sink: ScratchSink = ScratchSink(request.session)
-    vignette: Vignette = get_object_or_404(
-        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-    )
-    kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=sink.kern_pk
-    )
+    vignette, kern = _probelauf_vignette_und_kern(request, sink)
     sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
     return _debrief_anzeigen(request, vignette, kern)
 
