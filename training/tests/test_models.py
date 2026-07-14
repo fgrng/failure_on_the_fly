@@ -8,13 +8,12 @@ from django.utils import timezone
 
 from konten.models import Konto
 from sitzungen.models import Teilnahme
-from training.models import Training
-from training.models import Trainingsbindung
+from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
 
 
 @pytest.mark.django_db
-def test_veroeffentlichen_ueberfuehrt_einen_entwurf_und_lehnt_wiederholung_ab() -> None:
+def test_veroeffentlichen_ueberfuehrt_einen_entwurf() -> None:
     """Ein Training kann genau einmal vom Entwurf veröffentlicht werden."""
 
     training: Training = Training.objects.create(
@@ -26,11 +25,47 @@ def test_veroeffentlichen_ueberfuehrt_einen_entwurf_und_lehnt_wiederholung_ab() 
 
     training.refresh_from_db()
     assert training.zustand == Training.Zustand.VEROEFFENTLICHT
+
+
+@pytest.mark.django_db
+def test_veroeffentlichen_lehnt_wiederholung_ab() -> None:
+    """Ein veröffentlichtes Training kann nicht erneut veröffentlicht werden."""
+
+    training: Training = Training.objects.create(
+        name="Bruchrechnung",
+        eigentuemerin=Konto.objects.create_user(username="ada"),
+    )
+    training.veroeffentlichen()
+
     with pytest.raises(ValidationError, match="Nur Entwürfe"):
         training.veroeffentlichen()
+
+
+@pytest.mark.django_db
+def test_training_verhindert_direkte_zustandswechsel_beim_speichern() -> None:
+    """Der Zustand eines gespeicherten Trainings wechselt nur im Lebenszyklus."""
+
+    training: Training = Training.objects.create(
+        name="Bruchrechnung",
+        eigentuemerin=Konto.objects.create_user(username="ada"),
+    )
+    training.veroeffentlichen()
     training.zustand = Training.Zustand.ENTWURF
+
     with pytest.raises(ValidationError, match="Zustandswechsel"):
         training.save()
+
+
+@pytest.mark.django_db
+def test_training_verhindert_massenhafte_zustandswechsel() -> None:
+    """Der QuerySet-Weg umgeht die Lebenszyklus-Naht nicht."""
+
+    training: Training = Training.objects.create(
+        name="Bruchrechnung",
+        eigentuemerin=Konto.objects.create_user(username="ada"),
+    )
+    training.veroeffentlichen()
+
     with pytest.raises(RuntimeError, match="Lebenszyklus"):
         Training.objects.filter(pk=training.pk).update(zustand=Training.Zustand.ENTWURF)
 

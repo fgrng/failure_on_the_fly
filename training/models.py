@@ -10,9 +10,7 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-_ZUSTANDSWECHSEL_FEHLERMELDUNG = (
-    "Zustandswechsel laufen über die " "Lebenszyklus-Methoden."
-)
+_ZUSTANDSWECHSEL_FEHLERMELDUNG = "Zustandswechsel laufen über die Lebenszyklus-Methoden."
 
 
 class TrainingQuerySet(models.QuerySet["Training"]):

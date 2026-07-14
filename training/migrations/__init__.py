@@ -1,0 +1,1 @@
+"""Datenbankmigrationen der Training-App."""
