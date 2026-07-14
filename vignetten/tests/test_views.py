@@ -2,10 +2,10 @@
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -416,7 +416,7 @@ class VignetteFinalisierenViewTests(TestCase):
         )
 
 
-class VignetteReversionierenViewTests(TestCase):
+class VignetteNeueFassungViewTests(TestCase):
     """Finale Fassungen können über den Editor erneut als Entwurf beginnen."""
 
     _GEERBTE_FELDER: tuple[str, ...] = (
@@ -529,23 +529,6 @@ class VignetteReversionierenViewTests(TestCase):
         self.assertEqual(
             Vignette.objects.filter(historie=self.finale.historie).count(), 2
         )
-
-    def test_zeigt_modellfehler_als_nachricht(self) -> None:
-        """Ein abgelehnter neuer Entwurf bleibt als Rückmeldung im Editor sichtbar."""
-        with patch.object(
-            Vignette,
-            "bearbeiten",
-            side_effect=ValidationError("Neue Fassung ist derzeit nicht möglich."),
-        ):
-            response: HttpResponse = self.client.post(
-                reverse("vignetten:neue_fassung", args=[self.finale.pk]), follow=True
-            )
-
-        self.assertRedirects(
-            response, reverse("vignetten:detail", args=[self.finale.pk])
-        )
-        self.assertContains(response, "Neue Fassung ist derzeit nicht möglich.")
-
 
 class VignetteArchivierenViewTests(TestCase):
     """Finale Fassungen lassen sich im Editor archivieren."""

@@ -1,5 +1,7 @@
 """Views für den privaten Vignetten-Editor."""
 
+from typing import Callable
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -35,6 +37,24 @@ def _sichtbare_fassung_laden(
         ),
         pk=pk,
     )
+
+
+def _lebenszyklus_aktion_ausfuehren(
+    request: HttpRequest,
+    pk: int,
+    zustand: Vignette.Zustand,
+    aktion: Callable[[Vignette], None],
+) -> HttpResponse:
+    """Führt eine zustandsgebundene Aktion aus und zeigt Modellfehler an."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    vignette: Vignette = _sichtbare_fassung_laden(request, pk, zustand)
+    try:
+        aktion(vignette)
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
@@ -89,61 +109,45 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.ENTWURF
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Vignette.Zustand.ENTWURF,
+        Vignette.finalisieren,
     )
-    try:
-        vignette.finalisieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
-    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine eigene finale Fassung."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.FINAL
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Vignette.Zustand.FINAL,
+        Vignette.archivieren,
     )
-    try:
-        vignette.archivieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
-    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
 def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Macht eine eigene archivierte Fassung wieder final."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.ARCHIVIERT
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Vignette.Zustand.ARCHIVIERT,
+        Vignette.entarchivieren,
     )
-    try:
-        vignette.entarchivieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
-    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
 def vorspulen(request: HttpRequest, pk: int) -> HttpResponse:
     """Pinnt einen eigenen Entwurf auf den aktuellen finalen Kern."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.ENTWURF
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Vignette.Zustand.ENTWURF,
+        Vignette.vorspulen,
     )
-    try:
-        vignette.vorspulen()
-    except ValidationError as error:
-        messages.error(request, error.message)
-    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
