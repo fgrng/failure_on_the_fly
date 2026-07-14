@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Probelauf starten{% endblock %}
+
+{% block content %}
+    <h1>Probelauf starten</h1>
+    <ul>
+        {% for entwurf in entwuerfe %}
+            <li>
+                {{ entwurf.historie.name }}
+                <form method="post" action="{% url 'sitzungen:probelauf_starten' entwurf.pk %}">
+                    {% csrf_token %}
+                    <button type="submit">Probelauf starten</button>
+                </form>
+            </li>
+        {% empty %}
+            <li>Keine Vignettenentwürfe vorhanden.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

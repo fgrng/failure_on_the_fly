@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "konten",
     "simulation",
+    "sitzungen",
     "vignetten",
 ]
 
