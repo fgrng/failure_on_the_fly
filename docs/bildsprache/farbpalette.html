@@ -1,0 +1,402 @@
+<title>Bildsprache — Farbpalette</title>
+<style>
+  :root {
+    --bg:#f5f7f6; --surface:#ffffff; --ink:#26302c; --muted:#6f7170;
+    --border:#dfe3e1; --accent:#009b56; --accent-hover:#2c512c; --focus:#1fc070;
+    --font-head:"Platypi",Georgia,"Times New Roman",serif;
+    --font-body:"Albert Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --code:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161f1b; --surface:#1f2a25; --ink:#eaefec; --muted:#a6b0ab;
+      --border:#33413a; --accent:#3fd489; --accent-hover:#8fe6b6; --focus:#3fd489; }
+  }
+  :root[data-theme="light"] { --bg:#f5f7f6; --surface:#ffffff; --ink:#26302c; --muted:#6f7170;
+    --border:#dfe3e1; --accent:#009b56; --accent-hover:#2c512c; --focus:#1fc070; }
+  :root[data-theme="dark"] { --bg:#161f1b; --surface:#1f2a25; --ink:#eaefec; --muted:#a6b0ab;
+    --border:#33413a; --accent:#3fd489; --accent-hover:#8fe6b6; --focus:#3fd489; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body);
+    line-height:1.55; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1080px; margin-inline:auto; padding:clamp(24px,5vw,60px) clamp(16px,4vw,40px); }
+  header.page { max-width:64ch; margin-bottom:clamp(28px,4vw,44px); }
+  .eyebrow { font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent);
+    font-weight:600; margin:0 0 .6rem; }
+  h1 { font-family:var(--font-head); font-weight:500; line-height:1.12;
+    font-size:clamp(1.9rem,4.5vw,2.8rem); margin:0 0 .5rem; text-wrap:balance; }
+  .lede { font-size:1.05rem; color:var(--muted); margin:.4rem 0 0; }
+  section { margin-top:clamp(34px,5vw,56px); }
+  h2 { font-family:var(--font-head); font-weight:500; font-size:1.5rem; margin:0 0 .3rem;
+    display:flex; align-items:baseline; gap:.6rem; }
+  .note { color:var(--muted); font-size:.92rem; margin:.2rem 0 1.1rem; max-width:72ch; }
+  code { font-family:var(--code); font-size:.82em; }
+  /* Live-Komponenten */
+  .demo { display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:22px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+  .btn { font:inherit; font-weight:600; border:1px solid transparent; border-radius:8px;
+    padding:8px 20px; background:var(--accent); color:#fff; cursor:pointer; }
+  .btn:hover { background:var(--accent-hover); }
+  .btn.sec { background:transparent; border-color:var(--accent); color:var(--accent); }
+  .btn.danger { background:#bf4850; }
+  .btn.danger:hover { background:#651819; }
+  .lnk { color:var(--accent); text-decoration:none; font-weight:500; border-bottom:1px solid currentColor; }
+  .focusbox { padding:8px 16px; border-radius:8px; background:var(--surface);
+    border:1px solid var(--border); outline:2px solid var(--focus); outline-offset:2px; font-size:.9rem; }
+  .footbar { background:#1c3e37; color:#fff; padding:12px 18px; border-radius:8px; font-size:.9rem; }
+  :root[data-theme="dark"] .footbar, .footbar { }
+  /* Semantik-Tabelle */
+  .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; }
+  th, td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
+  tr:last-child td { border-bottom:none; }
+  th { font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  td .hex, .prim { color:var(--muted); }
+  .dot { display:inline-block; width:22px; height:22px; border-radius:6px; border:1px solid transparent; }
+  /* Graustufen-Rampe */
+  .ramp { display:flex; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .ramp-cell { flex:1; min-width:0; padding:16px 6px 12px; display:flex; flex-direction:column;
+    gap:4px; align-items:center; font-size:.66rem; }
+  .ramp-cell span { font-weight:700; }
+  .ramp-cell code { font-size:.6rem; opacity:.85; }
+  /* Primaries */
+  .prims { display:flex; gap:16px; flex-wrap:wrap; }
+  .prim-card { flex:1; min-width:180px; padding:24px; border-radius:12px; display:flex;
+    flex-direction:column; gap:4px; }
+  .prim-card strong { font-size:1.1rem; }
+  .prim-card small { opacity:.85; font-family:var(--code); font-size:.72rem; }
+  /* Sekundärpalette-Grid */
+  .sec-grid { display:grid; grid-template-columns:auto repeat(4,1fr); gap:8px; }
+  .sec-corner { }
+  .sec-th { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+    align-self:end; padding-bottom:4px; text-align:center; }
+  .sec-rh { display:flex; align-items:center; font-family:var(--font-head); font-size:1rem;
+    color:var(--ink); padding-right:6px; }
+  .sec-cell { border-radius:10px; padding:14px 12px 12px; min-height:74px; display:flex;
+    flex-direction:column; justify-content:space-between; gap:6px; }
+  .sec-cell code { font-size:.72rem; }
+  .wt { font-size:.64rem; font-weight:700; letter-spacing:.03em; padding:1px 6px; border-radius:999px;
+    align-self:flex-start; background:rgba(255,255,255,.22); }
+  .wt.no { background:rgba(0,0,0,.22); }
+  /* Bereichs-Farbcodierung */
+  .areas { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+  .area-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 20px; }
+  .area-card h3 { font-family:var(--font-head); font-weight:500; font-size:1.15rem; margin:0 0 .3rem; }
+  .area-use { color:var(--muted); font-size:.85rem; margin:0 0 .9rem; }
+  .area-hue { margin-top:.6rem; }
+  .area-tones { display:flex; gap:0; border-radius:7px; overflow:hidden; border:1px solid var(--border); }
+  .area-tones span { flex:1; height:26px; }
+  .area-chip { margin-top:6px; font-size:.75rem; font-weight:600; padding:4px 10px; border-radius:6px; display:inline-block; }
+  .miniwarn { font-weight:700; background:rgba(0,0,0,.28); padding:0 5px; border-radius:4px; font-size:.66rem; }
+  .flag { background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--focus);
+    border-radius:10px; padding:14px 18px; margin-top:14px; font-size:.9rem; }
+  .flag strong { color:var(--accent); }
+  .rules { background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:22px 26px; }
+  .rules li { margin:.4rem 0; max-width:74ch; }
+  footer.page { margin-top:clamp(30px,4vw,48px); color:var(--muted); font-size:.82rem;
+    border-top:1px solid var(--border); padding-top:1rem; }
+  @media (max-width:640px) {
+    .ramp { flex-wrap:wrap; } .ramp-cell { flex:1 0 25%; }
+    .sec-grid { font-size:.9em; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <p class="eyebrow">FailureOnTheFly · Bildsprache</p>
+    <h1>Farbpalette: alle festgelegten Farben und ihre Rollen</h1>
+    <p class="lede">Sämtliche in <code>static/css/tokens.css</code> (ADR-0023) definierten Farben —
+      von den heute genutzten semantischen Rollen bis zur angelegten, noch ungenutzten
+      Sekundärpalette. Farben werden nach <strong>Rolle</strong> vergeben, nicht nach Farbname.</p>
+  </header>
+
+  <section>
+    <h2>Bereichs-Farbcodierung <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— Farbe nach Funktionsbereich</span></h2>
+    <p class="note">Hauptelemente und die Teilnehmenden-Sicht bleiben <strong>Grün / Mint</strong>.
+      Die übrigen Bereiche erhalten je eine Sekundär-Familie; neue Bereiche erben die Farbe ihres
+      Kontexts. <strong>Entschieden:</strong> Bereichsfarbe tönt nur das <em>Chrome</em>
+      (Header, Kacheln, Badges); die interaktiven <strong>Grün-Akzente (Buttons, Links) bleiben
+      überall konsistent</strong>.</p>
+    <div class="areas">
+          <div class="area-card">
+            <h3>Teilnehmende &amp; Kern</h3>
+            <p class="area-use">Sitzungen durchspielen, Fragebogen-Items, globale Hauptelemente und Navigation.</p>
+            
+              <div class="area-hue">
+                <div class="area-tones">
+                  <span style="background:#d8ecd8"></span>
+                  <span style="background:#1fc070"></span>
+                  <span style="background:#009b56"></span>
+                  <span style="background:#2c512c"></span>
+                </div>
+                <div class="area-chip" style="background:#009b56;color:#fff">Grün-Header</div>
+              </div>
+              <div class="area-hue">
+                <div class="area-tones">
+                  <span style="background:#c7e6e2"></span>
+                  <span style="background:#56ba9d"></span>
+                  <span style="background:#00836a"></span>
+                  <span style="background:#1c3e37"></span>
+                </div>
+                <div class="area-chip" style="background:#00836a;color:#fff">Mint-Header</div>
+              </div>
+          </div>
+
+          <div class="area-card">
+            <h3>Ausbildungspraxis</h3>
+            <p class="area-use">Autor:innen-Bereich (Vignetten-Editor), Trainings — und künftige Ausbildungs-Bereiche.</p>
+            
+              <div class="area-hue">
+                <div class="area-tones">
+                  <span style="background:#fefbd3"></span>
+                  <span style="background:#c8d73b"></span>
+                  <span style="background:#967231"></span>
+                  <span style="background:#3d301a"></span>
+                </div>
+                <div class="area-chip" style="background:#967231;color:#fff">Gelb-Header</div>
+              </div>
+          </div>
+
+          <div class="area-card">
+            <h3>Forschung &amp; Erhebung</h3>
+            <p class="area-use">Erhebungs-Management, Datenspur / Export — und künftige Forschungs-Bereiche.</p>
+            
+              <div class="area-hue">
+                <div class="area-tones">
+                  <span style="background:#e5d3e7"></span>
+                  <span style="background:#b982b6"></span>
+                  <span style="background:#7b2d61"></span>
+                  <span style="background:#422335"></span>
+                </div>
+                <div class="area-chip" style="background:#7b2d61;color:#fff">Violett-Header</div>
+              </div>
+          </div>
+
+          <div class="area-card">
+            <h3>System &amp; Administration</h3>
+            <p class="area-use">Nutzer-/Rollenverwaltung, Modell-Konfiguration, Simulationskern — und künftige Systembereiche.</p>
+            
+              <div class="area-hue">
+                <div class="area-tones">
+                  <span style="background:#dcf1fc"></span>
+                  <span style="background:#50bacd"></span>
+                  <span style="background:#005d75"></span>
+                  <span style="background:#1e2c39"></span>
+                </div>
+                <div class="area-chip" style="background:#005d75;color:#fff">Blau-Header</div>
+              </div>
+          </div></div>
+    <div class="flag" style="border-left-color:#bf4850"><strong style="color:#bf4850">Rot ist keine
+      Bereichsfarbe.</strong> Rot ist reserviert als <strong>Warn- und Gefahrenfarbe</strong>
+      (Fehler, destruktive Aktionen). Der System-/Admin-Bereich nutzt darum <strong>Blau</strong>.</div>
+    <div class="flag"><strong>Zu beachten — Gelb trägt kaum weisse Schrift.</strong> Bei Gelb
+      erreicht nur der <em>Deep</em>-Ton sicheren Kontrast mit Weiss; <em>Dark</em> ist grenzwertig
+      (siehe Badge oben und Kontrast-Check unten). Für Gelb braucht es eine Sonderregel — z. B.
+      dunkle Schrift auf hellem Gelb statt der ADR-Standardregel „Dark-Ton + weiss".</div>
+  </section>
+
+  <section>
+    <h2>Semantische Rollen <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— so werden Farben heute vergeben</span></h2>
+    <p class="note">Feature-UIs verwenden ausschliesslich diese Tokens, nie direkt Hex-Werte oder
+      die <code>--phsg-*</code>-Primitive (ADR-0023, Consequences).</p>
+    <div class="demo">
+      <button class="btn">Primär-Button</button>
+      <button class="btn sec">Sekundär</button>
+      <a href="#" class="lnk" onclick="return false">Ein Link</a>
+      <button class="btn danger">Löschen</button>
+      <span class="focusbox">Fokus-Ring</span>
+      <span class="footbar">Footer-Fläche · Deep-Mint</span>
+    </div>
+    <div class="tablewrap" style="margin-top:16px">
+      <table>
+        <thead><tr><th></th><th>Token</th><th>Hex</th><th>Primitiv</th><th>Anwendungszweck</th></tr></thead>
+        <tbody><tr>
+          <td><span class="dot" style="background:#383836;border-color:#383836"></span></td>
+          <td><code>--color-text</code></td>
+          <td><code class="hex">#383836</code></td>
+          <td class="prim">Grayscale-900</td>
+          <td>Primärer Lesetext</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#6f7170;border-color:#6f7170"></span></td>
+          <td><code>--color-text-muted</code></td>
+          <td><code class="hex">#6f7170</code></td>
+          <td class="prim">Grayscale-700 (Option A)</td>
+          <td>Sekundärtext</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#ffffff;border-color:#d8dad9"></span></td>
+          <td><code>--color-text-on-accent</code></td>
+          <td><code class="hex">#ffffff</code></td>
+          <td class="prim">Weiss</td>
+          <td>Text auf Farbflächen</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#009b56;border-color:#009b56"></span></td>
+          <td><code>--color-accent</code></td>
+          <td><code class="hex">#009b56</code></td>
+          <td class="prim">Green-Dark</td>
+          <td>Links, Buttons, aktive Nav</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#2c512c;border-color:#2c512c"></span></td>
+          <td><code>--color-accent-hover</code></td>
+          <td><code class="hex">#2c512c</code></td>
+          <td class="prim">Green-Deep</td>
+          <td>Hover / aktiv</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#1fc070;border-color:#1fc070"></span></td>
+          <td><code>--color-focus</code></td>
+          <td><code class="hex">#1fc070</code></td>
+          <td class="prim">Bright-Green</td>
+          <td>Fokus-Ring, Highlights</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#ffffff;border-color:#d8dad9"></span></td>
+          <td><code>--color-surface</code></td>
+          <td><code class="hex">#ffffff</code></td>
+          <td class="prim">Weiss</td>
+          <td>Flächen / Karten</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#f5f7f6;border-color:#d8dad9"></span></td>
+          <td><code>--color-surface-muted</code></td>
+          <td><code class="hex">#f5f7f6</code></td>
+          <td class="prim">Grayscale-050</td>
+          <td>Ruhige Flächen</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#d8dad9;border-color:#d8dad9"></span></td>
+          <td><code>--color-border</code></td>
+          <td><code class="hex">#d8dad9</code></td>
+          <td class="prim">Grayscale-200</td>
+          <td>Rahmen / Trennlinien</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#1c3e37;border-color:#1c3e37"></span></td>
+          <td><code>--color-footer-bg</code></td>
+          <td><code class="hex">#1c3e37</code></td>
+          <td class="prim">Deep-Mint</td>
+          <td>Footer-Grund</td>
+        </tr>
+<tr>
+          <td><span class="dot" style="background:#ffffff;border-color:#d8dad9"></span></td>
+          <td><code>--color-footer-text</code></td>
+          <td><code class="hex">#ffffff</code></td>
+          <td class="prim">Weiss</td>
+          <td>Footer-Text</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Primärfarben <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— Logofarben, verbindlich</span></h2>
+    <div class="prims"><div class="prim-card" style="background:#1fc070;color:#111111">
+          <strong>Bright-Green</strong><code>#1fc070</code><small>--phsg-bright-green</small></div><div class="prim-card" style="background:#1c3e37;color:#ffffff">
+          <strong>Deep-Mint</strong><code>#1c3e37</code><small>--phsg-deep-mint</small></div></div>
+  </section>
+
+  <section>
+    <h2>Graustufen <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— für digitale Anwendungen</span></h2>
+    <div class="ramp"><div class="ramp-cell" style="background:#ffffff;color:#111111"><span>White</span><code>#ffffff</code></div><div class="ramp-cell" style="background:#f5f7f6;color:#111111"><span>050</span><code>#f5f7f6</code></div><div class="ramp-cell" style="background:#ececec;color:#111111"><span>100</span><code>#ececec</code></div><div class="ramp-cell" style="background:#d8dad9;color:#111111"><span>200</span><code>#d8dad9</code></div><div class="ramp-cell" style="background:#c5c7c6;color:#111111"><span>300</span><code>#c5c7c6</code></div><div class="ramp-cell" style="background:#b2b4b3;color:#111111"><span>400</span><code>#b2b4b3</code></div><div class="ramp-cell" style="background:#9d9f9e;color:#111111"><span>500</span><code>#9d9f9e</code></div><div class="ramp-cell" style="background:#878988;color:#111111"><span>600</span><code>#878988</code></div><div class="ramp-cell" style="background:#6f7170;color:#ffffff"><span>700</span><code>#6f7170</code></div><div class="ramp-cell" style="background:#555756;color:#ffffff"><span>800</span><code>#555756</code></div><div class="ramp-cell" style="background:#383836;color:#ffffff"><span>900</span><code>#383836</code></div><div class="ramp-cell" style="background:#000000;color:#ffffff"><span>Black</span><code>#000000</code></div></div>
+  </section>
+
+  <section>
+    <h2>Sekundärpalette <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— angelegt, noch ungenutzt</span></h2>
+    <p class="note">Reserviert für Kategorie-Kacheln u. Ä. ADR-0023 sieht dafür die
+      <strong>Dark-Töne mit weisser Schrift</strong> vor. Das Badge je Feld zeigt den Kontrast
+      weisser Schrift auf dem Ton (AA ≥ 4,5:1 · AA·L ≥ 3:1 für grosse Schrift).</p>
+    <div class="sec-grid"><div class='sec-corner'></div><div class='sec-th'>Light</div><div class='sec-th'>Bright</div><div class='sec-th'>Dark</div><div class='sec-th'>Deep</div><div class='sec-rh'>Grün</div><div class="sec-cell" style="background:#d8ecd8;color:#111111">
+              <code>#d8ecd8</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.2:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#1fc070;color:#111111">
+              <code>#1fc070</code>
+              <span class="wt no" title="Kontrast weisse Schrift 2.4:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#009b56;color:#ffffff">
+              <code>#009b56</code>
+              <span class="wt warn" title="Kontrast weisse Schrift 3.6:1">weiss AA·L</span>
+            </div><div class="sec-cell" style="background:#2c512c;color:#ffffff">
+              <code>#2c512c</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 9.1:1">weiss AAA</span>
+            </div><div class='sec-rh'>Mint</div><div class="sec-cell" style="background:#c7e6e2;color:#111111">
+              <code>#c7e6e2</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.3:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#56ba9d;color:#111111">
+              <code>#56ba9d</code>
+              <span class="wt no" title="Kontrast weisse Schrift 2.4:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#00836a;color:#ffffff">
+              <code>#00836a</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 4.7:1">weiss AA</span>
+            </div><div class="sec-cell" style="background:#1c3e37;color:#ffffff">
+              <code>#1c3e37</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 11.7:1">weiss AAA</span>
+            </div><div class='sec-rh'>Blau</div><div class="sec-cell" style="background:#dcf1fc;color:#111111">
+              <code>#dcf1fc</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.2:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#50bacd;color:#111111">
+              <code>#50bacd</code>
+              <span class="wt no" title="Kontrast weisse Schrift 2.3:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#005d75;color:#ffffff">
+              <code>#005d75</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 7.4:1">weiss AAA</span>
+            </div><div class="sec-cell" style="background:#1e2c39;color:#ffffff">
+              <code>#1e2c39</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 14.2:1">weiss AAA</span>
+            </div><div class='sec-rh'>Rot</div><div class="sec-cell" style="background:#fbddde;color:#111111">
+              <code>#fbddde</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.3:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#ee7e7e;color:#111111">
+              <code>#ee7e7e</code>
+              <span class="wt no" title="Kontrast weisse Schrift 2.7:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#bf4850;color:#ffffff">
+              <code>#bf4850</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 4.9:1">weiss AA</span>
+            </div><div class="sec-cell" style="background:#651819;color:#ffffff">
+              <code>#651819</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 12.4:1">weiss AAA</span>
+            </div><div class='sec-rh'>Violett</div><div class="sec-cell" style="background:#e5d3e7;color:#111111">
+              <code>#e5d3e7</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.4:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#b982b6;color:#ffffff">
+              <code>#b982b6</code>
+              <span class="wt warn" title="Kontrast weisse Schrift 3.0:1">weiss AA·L</span>
+            </div><div class="sec-cell" style="background:#7b2d61;color:#ffffff">
+              <code>#7b2d61</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 8.8:1">weiss AAA</span>
+            </div><div class="sec-cell" style="background:#422335;color:#ffffff">
+              <code>#422335</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 13.8:1">weiss AAA</span>
+            </div><div class='sec-rh'>Gelb</div><div class="sec-cell" style="background:#fefbd3;color:#111111">
+              <code>#fefbd3</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.1:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#c8d73b;color:#111111">
+              <code>#c8d73b</code>
+              <span class="wt no" title="Kontrast weisse Schrift 1.6:1">weiss —</span>
+            </div><div class="sec-cell" style="background:#967231;color:#ffffff">
+              <code>#967231</code>
+              <span class="wt warn" title="Kontrast weisse Schrift 4.4:1">weiss AA·L</span>
+            </div><div class="sec-cell" style="background:#3d301a;color:#ffffff">
+              <code>#3d301a</code>
+              <span class="wt ok" title="Kontrast weisse Schrift 12.8:1">weiss AAA</span>
+            </div></div>
+  </section>
+
+  <section>
+    <h2>Regeln aus ADR-0023</h2>
+    <div class="rules"><ul>
+      <li>Text auf Farbflächen ist <strong>stets weiss</strong>.</li>
+      <li>Farbige Boxen/Kacheln später aus den <strong>Dark</strong>-Tönen der Sekundärpalette.</li>
+      <li>CD-konform, aber eigenständiges <strong>Tool-UI</strong>: keine grossflächigen
+        Marketing-Farbflächen, die datendichte Ansichten unlesbar machen.</li>
+      <li>Vorerst nur <strong>Light Mode</strong> (Dark Mode nicht ausgeschlossen; die Trennung
+        Primitiv/semantisch ist darauf vorbereitet).</li>
+    </ul></div>
+  </section>
+
+  <footer class="page">
+    Quelle: <code>static/css/tokens.css</code> · <code>docs/adr/0023-ui-design-tokens-phsg-cd.md</code>.
+    Kontrastwerte nach WCAG 2.x (relative Luminanz). Referenz zur Bildsprache-Exploration.
+  </footer>
+</div>

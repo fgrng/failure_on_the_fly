@@ -31,6 +31,6 @@ Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folg
 ## Consequences
 
 - Neue Feature-UIs verwenden ausschliesslich die semantischen Tokens, nicht direkt Farb-Hex-Werte oder die `--phsg-*`-Primitive.
-- Die Sekundärpalette ist als Primitiv-Tokens angelegt, aber ungenutzt, bis Kategorie-Kacheln o. Ä. gebaut werden (dann Dark-Töne, weisse Schrift).
+- Die Sekundärpalette ist als Primitiv-Tokens angelegt, aber ungenutzt, bis Kategorie-Kacheln o. Ä. gebaut werden (dann Dark-Töne, weisse Schrift). — Inzwischen belegt durch `docs/adr/0024` (Farbcodierung nach Funktionsbereich).
 - Font- und Lib-Dateien liegen im Repo unter `static/`; bei Updates müssen sie neu bezogen werden (keine automatische CDN-Aktualisierung).
 - Dark Mode müsste die semantischen Tokens pro Theme überschreiben — die Trennung Primitiv/semantisch ist darauf vorbereitet.
