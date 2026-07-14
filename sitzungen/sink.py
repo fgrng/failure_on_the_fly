@@ -155,6 +155,13 @@ class ScratchSink:
         )
         self._als_geaendert_markieren()
 
+    def fehlschlag_verwerfen(self) -> None:
+        """Entfernt einen endgültig gescheiterten Schritt aus dem Probelauf."""
+
+        self.gespraechsschritte.pop()
+        self._zustand.pop("status")
+        self._als_geaendert_markieren()
+
     def gescheiterten_schritt_anhaengen(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:

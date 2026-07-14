@@ -65,13 +65,14 @@ def _probelauf_vignetten(
 def _gespraech_anzeigen(
     request: HttpRequest,
     schritte: list[GespraechsschrittDaten],
+    erneute_eingabe: str | None = None,
 ) -> HttpResponse:
     """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
 
     return render(
         request,
         "sitzungen/probelauf_gespraech.html",
-        {"gespraechsschritte": schritte},
+        {"gespraechsschritte": schritte, "erneute_eingabe": erneute_eingabe},
     )
 
 
@@ -190,7 +191,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
-    gespraechsschritt_ausfuehren(
+    antwortversuch = gespraechsschritt_ausfuehren(
         sink,
         vignette,
         kern,
@@ -202,6 +203,9 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         ],
         eingabe,
     )
+    if antwortversuch.endgueltig_gescheitert:
+        sink.fehlschlag_verwerfen()
+        return _gespraech_anzeigen(request, schritte, eingabe)
     return _gespraech_anzeigen(request, schritte)
 
 

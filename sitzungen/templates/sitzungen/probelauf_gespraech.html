@@ -12,14 +12,29 @@
             <p>Native Reasoning-Spur: {{ schritt.native_reasoning_spur }}</p>
         {% endif %}
     {% endfor %}
-    <form method="post">
-        {% csrf_token %}
-        <label for="eingabe">Ihre Nachricht</label>
-        <textarea id="eingabe" name="eingabe" required></textarea>
-        <button type="submit">Senden</button>
-    </form>
+    {% if erneute_eingabe is not None %}
+        <p role="alert">Die Antwort konnte nicht erzeugt werden.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="eingabe" value="{{ erneute_eingabe }}">
+            <button type="submit">Erneut senden</button>
+        </form>
+    {% else %}
+        <form method="post">
+            {% csrf_token %}
+            <label for="eingabe">Ihre Nachricht</label>
+            <textarea id="eingabe" name="eingabe" required></textarea>
+            <button type="submit">Senden</button>
+        </form>
+    {% endif %}
     <form method="post" action="{% url 'sitzungen:probelauf_beenden' %}">
         {% csrf_token %}
-        <button type="submit">Gespräch beenden</button>
+        <button type="submit">
+            {% if erneute_eingabe is not None %}
+                Gespräch beenden → Debrief
+            {% else %}
+                Gespräch beenden
+            {% endif %}
+        </button>
     </form>
 {% endblock %}

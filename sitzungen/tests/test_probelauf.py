@@ -244,8 +244,10 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             FakeSprachmodell.letzte_anfragen[-1][1],
         )
 
-    def test_gescheiterter_probelauf_nimmt_keinen_weiteren_schritt_an(self) -> None:
-        """Der endgültig gescheiterte Schritt beendet das Diagnosegespräch."""
+    def test_endgueltiger_fehlschlag_zeigt_aktionen_ohne_den_verlauf_zu_aendern(
+        self,
+    ) -> None:
+        """Ein gescheiterter Antwortversuch bleibt unsichtbar neben dem Verlauf."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
@@ -254,22 +256,44 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                     {"fehler": "anbieterfehler"},
                     {"fehler": "anbieterfehler"},
                     {"fehler": "anbieterfehler"},
-                    {"denkspur": "unverwendet", "aeusserung": "unverwendet"},
                 ]
             },
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        session = self.client.session
+        session["probelauf"]["gespraechsschritte"] = [
+            {
+                "reihenfolge": 1,
+                "eingabe": "Wie rechnest du?",
+                "denkspur": "Mia addiert Zähler und Nenner.",
+                "aeusserung": "Ich addiere einfach alles.",
+                "native_reasoning_spur": None,
+                "fehlversuche": [],
+            }
+        ]
+        session.save()
 
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
-        )
         response: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
         )
 
-        self.assertContains(response, "Erster Schritt")
-        self.assertNotContains(response, "Zweiter Schritt")
+        self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
+        self.assertContains(response, "Erneut senden")
+        self.assertContains(response, "Gespräch beenden → Debrief")
+        self.assertContains(response, reverse("sitzungen:probelauf_beenden"))
+        self.assertContains(response, "Ich addiere einfach alles.")
+        self.assertNotContains(response, "anbieterfehler")
+        self.assertEqual(self.client.session["probelauf"]["gespraechsschritte"], [
+            {
+                "reihenfolge": 1,
+                "eingabe": "Wie rechnest du?",
+                "denkspur": "Mia addiert Zähler und Nenner.",
+                "aeusserung": "Ich addiere einfach alles.",
+                "native_reasoning_spur": None,
+                "fehlversuche": [],
+            }
+        ])
 
     def test_beenden_zeigt_debrief_und_verwirft_diagnose_schreibfrei(self) -> None:
         """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
