@@ -78,3 +78,16 @@ class TrainingssitzungTests(TestCase):
         sitzung: Sitzung = Sitzung.objects.get()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_abbrechen_nach_gespraechsende_bleibt_im_debrief(self) -> None:
+        """Ein veralteter Abbruch-POST macht einen Abschluss nicht zum Fehler."""
+        self._sitzung_starten([])
+        self.client.post(reverse("sitzungen:training_beenden"))
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_abbrechen")
+        )
+
+        self.assertContains(response, "Debrief")
+        self.assertNotContains(response, "Die Antwort konnte nicht erzeugt werden.")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)

@@ -50,7 +50,7 @@ Die vom Simulationskern vorgegebene Situationsrahmung, die ausschließlich der T
 _Avoid_: Setting, Szenario, Narrativ
 
 **Sitzung**:
-Ein Durchlauf genau einer Vignette: Rahmenhandlung, Diagnosegespräch, Debrief und Diagnose. Die atomare Auswertungseinheit; jedes Spielen einer Vignette ist eine eigene Sitzung.
+Ein Durchlauf genau einer Vignette und die atomare Auswertungseinheit; jedes Spielen einer Vignette ist eine eigene Sitzung. Regulär umfasst sie Rahmenhandlung, Diagnosegespräch, Debrief und Diagnose. Ein gewollter Abbruch oder ein technisches Scheitern beendet sie ohne Diagnose.
 _Avoid_: Gespräch, Durchlauf, Konversation, Session
 
 **Diagnosegespräch**:
@@ -66,11 +66,11 @@ Ein Austauschpaar aus einer Eingabe der Teilnehmer:in und der darauffolgenden An
 _Avoid_: Nachricht, Turn, Zug
 
 **Debrief**:
-Der Abschnitt der Rahmenhandlung, in dem die erfahrene Lehrperson nach dem Diagnosegespräch um die Diagnose bittet. Er beendet jede Sitzung und erreicht keinen Prompt.
+Der Abschnitt der Rahmenhandlung, in dem die erfahrene Lehrperson nach dem Diagnosegespräch um die Diagnose bittet. Er beendet jede regulär abgeschlossene Sitzung und erreicht keinen Prompt.
 _Avoid_: Nachbesprechung, Reflexion, Auswertung
 
 **Diagnose**:
-Die freie Beschreibung des beobachteten Fehlermusters durch die Teilnehmer:in, genau einmal am Ende jeder Sitzung. Sie wird erfasst, nicht bewertet.
+Die freie Beschreibung des beobachteten Fehlermusters durch die Teilnehmer:in, genau einmal am Ende jeder regulär abgeschlossenen Sitzung. Sie wird erfasst, nicht bewertet; abgebrochene und gescheiterte Sitzungen haben keine.
 _Avoid_: Diagnoseurteil, Befund, Einschätzung, Bewertung
 
 **Transkript**:

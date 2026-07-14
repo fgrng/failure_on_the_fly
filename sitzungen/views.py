@@ -436,8 +436,12 @@ def training_abbrechen(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
-    if sitzung.status != Sitzung.Status.LAUFEND:
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
         return _training_fehler_anzeigen(request, sitzung)
+    if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
+        return _training_debrief_anzeigen(request, sitzung)
+    if sitzung.status == Sitzung.Status.ABGEBROCHEN:
+        return _training_zur_auswahl_zurueckkehren(request, sitzung)
     _training_zeitbudget_anhalten(request)
     DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
