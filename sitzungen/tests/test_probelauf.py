@@ -11,6 +11,7 @@ from konten.models import Konto
 from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -83,6 +84,11 @@ class ProbelaufStartTests(TestCase):
         anzahl_vignetten: int = Vignette.objects.count()
         anzahl_kerne: int = Simulationskern.objects.count()
         anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
+        anzahl_teilnahmen: int = Teilnahme.objects.count()
+        anzahl_sitzungen: int = Sitzung.objects.count()
+        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
+        anzahl_fehlversuche: int = Fehlversuch.objects.count()
+        anzahl_diagnosen: int = Diagnose.objects.count()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         self.client.get(reverse("sitzungen:probelauf_auswahl"))
@@ -96,6 +102,11 @@ class ProbelaufStartTests(TestCase):
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
+        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
+        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
+        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
+        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
+        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
 
 
 class ProbelaufGespraechTests(ProbelaufStartTests):
@@ -144,12 +155,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                 "native_reasoning_spur": "native erste Spur",
+                "fehlversuche": [],
             },
             {
                 "eingabe": "Und warum?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                 "native_reasoning_spur": "native erste Spur",
+                "fehlversuche": [],
             },
         ])
         zweiter_prompt: str = FakeSprachmodell.letzte_anfragen[-1][1]
@@ -194,7 +207,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         with patch(
-            "sitzungen.views.antwort_versuchen", wraps=antwort_versuchen
+            "sitzungen.orchestrierung.antwort_versuchen", wraps=antwort_versuchen
         ) as antworten:
             self.client.post(
                 reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
