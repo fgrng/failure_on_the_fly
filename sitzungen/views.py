@@ -190,11 +190,17 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET", "POST"])
     sink: ScratchSink = ScratchSink(request.session)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
+    if sink.ist_beendet:
+        vignette: Vignette = get_object_or_404(
+            _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
+        )
+        kern: Simulationskern = get_object_or_404(
+            Simulationskern.objects.all(), pk=sink.kern_pk
+        )
+        return _debrief_anzeigen(request, vignette, kern)
     if request.method == "GET":
         sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, schritte)
-    if sink.ist_beendet:
-        return probelauf_beenden(request)
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(

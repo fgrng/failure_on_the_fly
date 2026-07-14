@@ -295,6 +295,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(erneuter_versuch, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertEqual(len(self.client.session["probelauf"]["gespraechsschritte"]), 1)
 
+        erneuter_aufruf: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech")
+        )
+
+        self.assertContains(erneuter_aufruf, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertNotContains(erneuter_aufruf, "Ihre Nachricht")
+
     def test_zeitbudget_pausiert_waehrend_des_modellaufrufs(self) -> None:
         """Modellwartezeit erhöht den Zeitverbrauch des Probelaufs nicht."""
 
@@ -311,6 +318,29 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             )
 
         self.assertContains(response, "Ich addiere einfach alles.")
+        self.assertNotContains(response, "Budget")
+        self.assertEqual(self.client.session["probelauf"]["verbrauchte_zeit"], 4)
+        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+
+    def test_zeitbudget_pausiert_waehrend_endgueltiger_fehlversuche(self) -> None:
+        """Fehlversuche des Modells kosten keine Zeit aus dem Autorinnenzug."""
+
+        self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        with patch("sitzungen.sink.monotonic", side_effect=[10, 14, 114]):
+            self.client.get(reverse("sitzungen:probelauf_gespraech"))
+            response: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie rechnest du?"},
+            )
+
+        self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
         self.assertNotContains(response, "Budget")
         self.assertEqual(self.client.session["probelauf"]["verbrauchte_zeit"], 4)
         self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
