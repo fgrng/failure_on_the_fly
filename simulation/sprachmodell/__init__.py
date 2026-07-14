@@ -30,13 +30,22 @@ class Antwort:
 class Formatbruch(Exception):
     """Die strukturierte Ausgabe des Sprachmodells ist ungültig."""
 
+    def __init__(self, rohantwort: str = "") -> None:
+        self.rohantwort: str = rohantwort
+
 
 class Anbieterfehler(Exception):
     """Der Anbieter konnte keine Modellantwort liefern."""
 
+    def __init__(self, rohantwort: str = "") -> None:
+        self.rohantwort: str = rohantwort
+
 
 class ContentFilter(Exception):
     """Der Anbieter hat die Modellantwort gefiltert."""
+
+    def __init__(self, rohantwort: str = "") -> None:
+        self.rohantwort: str = rohantwort
 
 
 class Sprachmodell(Protocol):
@@ -70,25 +79,25 @@ class FakeSprachmodell:
         type(self).letzte_anfragen.append((system_prompt, user_prompt, ausgabe_schema))
         eintrag: Mapping[str, Any] = self.skript.pop(0)
         if (fehler := eintrag.get("fehler")) == "formatbruch":
-            raise Formatbruch
+            raise Formatbruch(str(eintrag.get("rohantwort", "")))
         if fehler == "anbieterfehler":
-            raise Anbieterfehler
+            raise Anbieterfehler(str(eintrag.get("rohantwort", "")))
         if fehler == "content_filter":
-            raise ContentFilter
+            raise ContentFilter(str(eintrag.get("rohantwort", "")))
         try:
             antwort: Antwort = Antwort(
                 denkspur=eintrag["denkspur"],
                 aeusserung=eintrag["aeusserung"],
             )
         except KeyError as exc:
-            raise Formatbruch from exc
+            raise Formatbruch(str(eintrag.get("rohantwort", ""))) from exc
         if not isinstance(antwort.denkspur, str) or not isinstance(antwort.aeusserung, str):
-            raise Formatbruch
+            raise Formatbruch(str(eintrag.get("rohantwort", "")))
         native_reasoning_spur: object = eintrag.get("native_reasoning_spur")
         if native_reasoning_spur is not None and not isinstance(
             native_reasoning_spur, str
         ):
-            raise Formatbruch
+            raise Formatbruch(str(eintrag.get("rohantwort", "")))
         return antwort, native_reasoning_spur
 
 
@@ -135,30 +144,32 @@ class LiteLLMSprachmodell:
         except Exception as exc:
             raise Anbieterfehler from exc
 
+        rohantwort: str = ""
         try:
             auswahl: Any = modellantwort.choices[0]
             if getattr(auswahl, "finish_reason", None) == "content_filter":
                 raise ContentFilter
             nachricht: Any = auswahl.message
-            inhalt: object = json.loads(nachricht.content)
+            rohantwort = str(nachricht.content)
+            inhalt: object = json.loads(rohantwort)
             if not isinstance(inhalt, dict) or set(inhalt) != {
                 "denkspur",
                 "aeusserung",
             }:
-                raise Formatbruch
+                raise Formatbruch(rohantwort)
             antwort: Antwort = Antwort(
                 denkspur=inhalt["denkspur"], aeusserung=inhalt["aeusserung"]
             )
         except ContentFilter:
             raise
         except (AttributeError, IndexError, KeyError, TypeError, json.JSONDecodeError) as exc:
-            raise Formatbruch from exc
+            raise Formatbruch(rohantwort) from exc
         if not isinstance(antwort.denkspur, str) or not isinstance(antwort.aeusserung, str):
-            raise Formatbruch
+            raise Formatbruch(rohantwort)
 
         native_reasoning_spur: object = getattr(nachricht, "reasoning_content", None)
         if native_reasoning_spur is None:
             native_reasoning_spur = getattr(nachricht, "thinking", None)
         if native_reasoning_spur is not None and not isinstance(native_reasoning_spur, str):
-            raise Formatbruch
+            raise Formatbruch(rohantwort)
         return antwort, native_reasoning_spur

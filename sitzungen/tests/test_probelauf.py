@@ -133,6 +133,11 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         anzahl_vignetten: int = Vignette.objects.count()
         anzahl_kerne: int = Simulationskern.objects.count()
         anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
+        anzahl_teilnahmen: int = Teilnahme.objects.count()
+        anzahl_sitzungen: int = Sitzung.objects.count()
+        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
+        anzahl_fehlversuche: int = Fehlversuch.objects.count()
+        anzahl_diagnosen: int = Diagnose.objects.count()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         erste_antwort: HttpResponse = self.client.post(
@@ -171,6 +176,11 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
+        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
+        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
+        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
+        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
+        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
 
     def test_native_reasoning_spur_fehlt_ohne_anbieterwert(self) -> None:
         """Die native Spur ist ein optionaler Zusatz zur immer sichtbaren Denkspur."""

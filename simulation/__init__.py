@@ -29,6 +29,7 @@ class Fehlversuch:
     """Ein maschinell verworfener Modellaufruf."""
 
     grund: str
+    rohantwort: str
 
 
 @dataclass(frozen=True)
@@ -86,12 +87,12 @@ def antwort_versuchen(
                 user_prompt,
                 AUSGABE_SCHEMA,
             )
-        except Formatbruch:
-            fehlversuche.append(Fehlversuch("Formatbruch"))
-        except Anbieterfehler:
-            fehlversuche.append(Fehlversuch("Anbieterfehler"))
-        except ContentFilter:
-            fehlversuche.append(Fehlversuch("Content-Filter"))
+        except Formatbruch as exc:
+            fehlversuche.append(Fehlversuch("Formatbruch", exc.rohantwort))
+        except Anbieterfehler as exc:
+            fehlversuche.append(Fehlversuch("Anbieterfehler", exc.rohantwort))
+        except ContentFilter as exc:
+            fehlversuche.append(Fehlversuch("Content-Filter", exc.rohantwort))
         else:
             return Antwortversuch(antwort, native_reasoning_spur, fehlversuche)
     return Antwortversuch(None, None, fehlversuche)

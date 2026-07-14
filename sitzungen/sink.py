@@ -1,9 +1,10 @@
 """Naht für die Ziele einer Spielorchestrierung."""
 
 from collections.abc import MutableMapping
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol, TypedDict, cast
 
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.models import Sitzung
 from vignetten.models import Vignette
 
 
@@ -57,7 +58,7 @@ class SitzungSink(Protocol):
     def diagnose_setzen(self, text: str) -> None:
         """Bewahrt die abschließende Diagnose auf."""
 
-    def status_setzen(self, status: str) -> None:
+    def status_setzen(self, status: Sitzung.Status) -> None:
         """Setzt den Lebenszyklusstatus der Sitzung."""
 
 
@@ -86,7 +87,15 @@ class ScratchSink:
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
         """Liefert die gespeicherten Schritte für Ansicht und Modellverlauf."""
 
-        return self.session[_PROBELAUF_SESSION_SCHLUESSEL]["gespraechsschritte"]
+        return cast(list[GespraechsschrittDaten], self.zustand["gespraechsschritte"])
+
+    @property
+    def zustand(self) -> MutableMapping[str, Any]:
+        """Liefert den privaten Session-Zustand des Scratch-Sinks."""
+
+        return cast(
+            MutableMapping[str, Any], self.session[_PROBELAUF_SESSION_SCHLUESSEL]
+        )
 
     def gespraechsschritt_anhaengen(
         self,
@@ -129,13 +138,13 @@ class ScratchSink:
     def diagnose_setzen(self, text: str) -> None:
         """Hält die im Probelauf verworfene Diagnose in der Session."""
 
-        self.session[_PROBELAUF_SESSION_SCHLUESSEL]["diagnose"] = text
+        self.zustand["diagnose"] = text
         self._als_geaendert_markieren()
 
-    def status_setzen(self, status: str) -> None:
+    def status_setzen(self, status: Sitzung.Status) -> None:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
-        self.session[_PROBELAUF_SESSION_SCHLUESSEL]["status"] = status
+        self.zustand["status"] = status
         self._als_geaendert_markieren()
 
     def _als_geaendert_markieren(self) -> None:

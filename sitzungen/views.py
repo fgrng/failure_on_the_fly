@@ -18,9 +18,6 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-_PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
-
-
 class _ProbelaufSession(TypedDict):
     """Der schreibfreie Probelaufzustand in der Django-Session."""
 
@@ -45,15 +42,6 @@ def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     platzhalter: dict[str, str] = rahmen_platzhalter(vignette)
     namen: list[str] = Template(vorlage).get_identifiers()
     return simulation_render(vorlage, {name: platzhalter[name] for name in namen})
-
-
-def _probelauf_aus_session(request: HttpRequest) -> _ProbelaufSession:
-    """Liest den beim Probelaufstart festgelegten Session-Zustand."""
-
-    return cast(
-        _ProbelaufSession,
-        request.session[_PROBELAUF_SESSION_SCHLUESSEL],
-    )
 
 
 def _gespraech_anzeigen(
@@ -107,8 +95,8 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
-    probelauf: _ProbelaufSession = _probelauf_aus_session(request)
     sink = ScratchSink(request.session)
+    probelauf: _ProbelaufSession = cast(_ProbelaufSession, sink.zustand)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if request.method == "GET":
         return _gespraech_anzeigen(request, schritte)

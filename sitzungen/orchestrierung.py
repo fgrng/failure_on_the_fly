@@ -38,7 +38,7 @@ def gespraechsschritt_ausfuehren(
         eingabe,
     )
     fehlversuche: list[FehlversuchDaten] = [
-        {"grund": fehlversuch.grund, "rohantwort": ""}
+        {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
         for fehlversuch in antwortversuch.fehlversuche
     ]
     if antwortversuch.antwort is None:

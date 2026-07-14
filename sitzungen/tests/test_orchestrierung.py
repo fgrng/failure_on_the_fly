@@ -19,7 +19,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         sprachmodell="fake",
         parameter={
             "skript": [
-                {"fehler": "formatbruch"},
+                {"fehler": "formatbruch", "rohantwort": "keine JSON-Antwort"},
                 {"denkspur": "Ich addiere.", "aeusserung": "2/5."},
             ]
         },
@@ -41,7 +41,9 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
             "denkspur": "Ich addiere.",
             "aeusserung": "2/5.",
             "native_reasoning_spur": None,
-            "fehlversuche": [{"grund": "Formatbruch", "rohantwort": ""}],
+            "fehlversuche": [
+                {"grund": "Formatbruch", "rohantwort": "keine JSON-Antwort"}
+            ],
         }
     ]
 
