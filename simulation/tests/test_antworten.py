@@ -173,7 +173,7 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
 
 
 def test_ausgabe_schema_fuehrt_denkspur_vor_aeusserung() -> None:
-    """Das normativ geordnete Structured Output erzeugt die Denkspur zuerst."""
+    """Die normativ geordnete strukturierte Ausgabe erzeugt die Denkspur zuerst."""
 
     assert list(AUSGABE_SCHEMA["properties"]) == ["denkspur", "aeusserung"]
 

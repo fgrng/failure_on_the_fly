@@ -25,7 +25,7 @@ class Antwort:
 
 
 class Formatbruch(Exception):
-    """Das Structured Output des Sprachmodells ist ungültig."""
+    """Die strukturierte Ausgabe des Sprachmodells ist ungültig."""
 
 
 class Anbieterfehler(Exception):
