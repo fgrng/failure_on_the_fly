@@ -90,11 +90,37 @@ class ScratchSink:
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
         """Liefert die gespeicherten Schritte für Ansicht und Modellverlauf."""
 
-        return cast(list[GespraechsschrittDaten], self.zustand["gespraechsschritte"])
+        return cast(
+            list[GespraechsschrittDaten], self._zustand["gespraechsschritte"]
+        )
 
     @property
-    def zustand(self) -> MutableMapping[str, Any]:
-        """Liefert den privaten Session-Zustand des Scratch-Sinks."""
+    def vignette_pk(self) -> int:
+        """Liefert die beim Probelaufstart gepinnte Vignette."""
+
+        return cast(int, self._zustand["vignette_pk"])
+
+    @property
+    def kern_pk(self) -> int:
+        """Liefert den beim Probelaufstart gepinnten Simulationskern."""
+
+        return cast(int, self._zustand["kern_pk"])
+
+    @property
+    def modell_konfiguration_pk(self) -> int:
+        """Liefert die beim Probelaufstart gepinnte Modell-Konfiguration."""
+
+        return cast(int, self._zustand["modell_konfiguration_pk"])
+
+    @property
+    def ist_gescheitert(self) -> bool:
+        """Kennzeichnet einen terminal fehlgeschlagenen Probelauf."""
+
+        return self._zustand.get("status") == Sitzung.Status.GESCHEITERT
+
+    @property
+    def _zustand(self) -> MutableMapping[str, Any]:
+        # Kapselt die untypisierte Session-Struktur innerhalb des Scratch-Sinks.
 
         return cast(
             MutableMapping[str, Any], self.session[_PROBELAUF_SESSION_SCHLUESSEL]
@@ -126,7 +152,7 @@ class ScratchSink:
     def gescheiterten_schritt_anhaengen(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Hängt den answerless Schritt in gemeinsamer Speicherform an."""
+        """Hängt den antwortlosen Schritt in gemeinsamer Speicherform an."""
 
         self.gespraechsschritte.append(
             {
@@ -143,13 +169,13 @@ class ScratchSink:
     def diagnose_setzen(self, text: str) -> None:
         """Hält die im Probelauf verworfene Diagnose in der Session."""
 
-        self.zustand["diagnose"] = text
+        self._zustand["diagnose"] = text
         self._als_geaendert_markieren()
 
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
-        self.zustand["status"] = status
+        self._zustand["status"] = status
         self._als_geaendert_markieren()
 
     def _als_geaendert_markieren(self) -> None:

@@ -226,3 +226,30 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             "Verlauf:\n\n\nEingabe:\nZweiter Schritt",
             FakeSprachmodell.letzte_anfragen[-1][1],
         )
+
+    def test_gescheiterter_probelauf_nimmt_keinen_weiteren_schritt_an(self) -> None:
+        """Der endgültig gescheiterte Schritt beendet das Diagnosegespräch."""
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {"fehler": "anbieterfehler"},
+                    {"fehler": "anbieterfehler"},
+                    {"fehler": "anbieterfehler"},
+                    {"denkspur": "unverwendet", "aeusserung": "unverwendet"},
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
+        )
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+        )
+
+        self.assertContains(response, "Erster Schritt")
+        self.assertNotContains(response, "Zweiter Schritt")

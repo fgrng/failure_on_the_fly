@@ -1,7 +1,7 @@
 """Schreibfreie Views für den Probelauf einer Autorin."""
 
 from string import Template
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
@@ -16,15 +16,6 @@ from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
 
 if TYPE_CHECKING:
     from konten.models import Konto
-
-
-class _ProbelaufSession(TypedDict):
-    """Der schreibfreie Probelaufzustand in der Django-Session."""
-
-    vignette_pk: int
-    kern_pk: int
-    modell_konfiguration_pk: int
-    gespraechsschritte: list[GespraechsschrittDaten]
 
 
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
@@ -96,18 +87,19 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
     sink: ScratchSink = ScratchSink(request.session)
-    probelauf: _ProbelaufSession = cast(_ProbelaufSession, sink.zustand)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if request.method == "GET":
         return _gespraech_anzeigen(request, schritte)
+    if sink.ist_gescheitert:
+        return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user), pk=probelauf["vignette_pk"]
+        _eigene_entwuerfe(request.user), pk=sink.vignette_pk
     )
     kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=probelauf["kern_pk"]
+        Simulationskern.objects.all(), pk=sink.kern_pk
     )
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
-        ModellKonfiguration.objects.all(), pk=probelauf["modell_konfiguration_pk"]
+        ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
     gespraechsschritt_ausfuehren(

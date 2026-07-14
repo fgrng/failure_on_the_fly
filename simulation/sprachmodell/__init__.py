@@ -27,25 +27,23 @@ class Antwort:
     aeusserung: str
 
 
-class Formatbruch(Exception):
+class _Modellantwortfehler(Exception):
+    """Ein verworfener Modellaufruf mit seiner Rohantwort."""
+
+    def __init__(self, rohantwort: str = "") -> None:
+        self.rohantwort: str = rohantwort
+
+
+class Formatbruch(_Modellantwortfehler):
     """Die strukturierte Ausgabe des Sprachmodells ist ungültig."""
 
-    def __init__(self, rohantwort: str = "") -> None:
-        self.rohantwort: str = rohantwort
 
-
-class Anbieterfehler(Exception):
+class Anbieterfehler(_Modellantwortfehler):
     """Der Anbieter konnte keine Modellantwort liefern."""
 
-    def __init__(self, rohantwort: str = "") -> None:
-        self.rohantwort: str = rohantwort
 
-
-class ContentFilter(Exception):
+class ContentFilter(_Modellantwortfehler):
     """Der Anbieter hat die Modellantwort gefiltert."""
-
-    def __init__(self, rohantwort: str = "") -> None:
-        self.rohantwort: str = rohantwort
 
 
 class Sprachmodell(Protocol):
