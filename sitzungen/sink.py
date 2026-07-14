@@ -83,6 +83,14 @@ class DBSink:
         self.teilnahme: Teilnahme = teilnahme
         self.sitzung: Sitzung | None = None
 
+    @classmethod
+    def fuer_sitzung(cls, sitzung: Sitzung) -> "DBSink":
+        """Stellt den Sink für eine bereits persistierte Sitzung wieder her."""
+
+        sink: DBSink = cls(sitzung.teilnahme)
+        sink.sitzung = sitzung
+        return sink
+
     def sitzung_starten(
         self,
         vignette: Vignette,

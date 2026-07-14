@@ -1,12 +1,18 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import TrainingForm
-from .models import Training
+from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.orchestrierung import sitzung_starten
+from sitzungen.rahmen import rahmen_rendern
+from sitzungen.sink import DBSink
+
+from .models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -127,13 +133,58 @@ def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
-    """Bestätigt die Wahl einer Vignette aus einem Training."""
+    """Bestätigt oder startet die Wahl einer Vignette aus einem Training."""
     training: Training = _veroeffentlichtes_training(training_pk)
     vignette: Vignette = get_object_or_404(
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
+    if request.method == "POST":
+        return _sitzung_starten(request, training, vignette)
     return render(
         request,
         "training/wahl.html",
         {"training": training, "vignette": vignette},
+    )
+
+
+def _sitzung_starten(
+    request: HttpRequest, training: Training, vignette: Vignette
+) -> HttpResponse:
+    """Bindet das Konto atomar und startet die Sitzung über den DB-Sink."""
+
+    with transaction.atomic():
+        bindung: Trainingsbindung | None = Trainingsbindung.objects.filter(
+            training=training, konto=request.user
+        ).select_related("teilnahme").first()
+        if bindung is None:
+            from sitzungen.models import Teilnahme
+
+            try:
+                with transaction.atomic():
+                    bindung = Trainingsbindung.objects.create(
+                        teilnahme=Teilnahme.objects.create(),
+                        training=training,
+                        konto=request.user,
+                    )
+            except IntegrityError:
+                bindung = Trainingsbindung.objects.select_related("teilnahme").get(
+                    training=training, konto=request.user
+                )
+        kern: Simulationskern | None = vignette.gepinnter_kern
+        if kern is None:
+            raise RuntimeError("Trainingsvignetten brauchen einen gepinnten Simulationskern.")
+        sink: DBSink = DBSink(bindung.teilnahme)
+        sitzung_starten(
+            sink,
+            vignette,
+            kern,
+            ModellKonfiguration.objects.aktive(),
+        )
+    request.session["training_sitzung_pk"] = sink.sitzung.pk
+    if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
+        request.session["training_verbrauchte_zeit"] = 0.0
+    return render(
+        request,
+        "sitzungen/training_einleitung.html",
+        {"einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
     )

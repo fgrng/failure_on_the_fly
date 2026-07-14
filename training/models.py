@@ -94,6 +94,14 @@ class Trainingsbindung(models.Model):
         "konten.Konto", on_delete=models.PROTECT
     )
 
+    class Meta:
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["training", "konto"],
+                name="training_bindung_ist_je_konto_eindeutig",
+            )
+        ]
+
 
 def _pruefe_finale_vignetten(
     sender: type[models.Model],

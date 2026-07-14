@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Training{% endblock %}
+
+{% block content %}
+    {% for schritt in gespraechsschritte %}
+        <p>Sie: {{ schritt.eingabe }}</p>
+        <p>{{ schritt.aeusserung }}</p>
+    {% endfor %}
+    <h1>Debrief</h1>
+    <p>{{ debrief }}</p>
+    <form method="post">
+        {% csrf_token %}
+        <label for="diagnose">Ihre Diagnose</label>
+        <textarea id="diagnose" name="diagnose" required></textarea>
+        <button type="submit">Training beenden</button>
+    </form>
+{% endblock %}

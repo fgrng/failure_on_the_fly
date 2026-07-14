@@ -5,6 +5,9 @@
 {% block content %}
     <h1>Vignette gewählt</h1>
     <p>{{ vignette.historie.name|default:vignette.fach }}</p>
-    <p>Das persistierte Spielen dieser Vignette folgt im nächsten Schritt.</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Training starten</button>
+    </form>
     <p><a href="{% url 'training:detail' training.pk %}">Zurück zum Training</a></p>
 {% endblock %}

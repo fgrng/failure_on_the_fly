@@ -27,4 +27,7 @@ urlpatterns: list[URLPattern] = [
     path("probelauf/gespraech/", views.probelauf_gespraech, name="probelauf_gespraech"),
     path("probelauf/beenden/", views.probelauf_beenden, name="probelauf_beenden"),
     path("probelauf/debrief/", views.probelauf_debrief, name="probelauf_debrief"),
+    path("training/gespraech/", views.training_gespraech, name="training_gespraech"),
+    path("training/beenden/", views.training_beenden, name="training_beenden"),
+    path("training/debrief/", views.training_debrief, name="training_debrief"),
 ]

@@ -1,25 +1,27 @@
 """Schreibfreie Views für den Probelauf."""
 
-from string import Template
 from typing import TYPE_CHECKING
+from time import monotonic
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
-from simulation import render as simulation_render
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung
+from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
-from sitzungen.sink import GespraechsschrittDaten, ScratchSink
-from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
+from sitzungen.rahmen import rahmen_rendern
+from sitzungen.sink import DBSink, GespraechsschrittDaten, ScratchSink
+from vignetten.models import Vignette, Vignettenhistorie
 
 if TYPE_CHECKING:
     from konten.models import Konto
 
 
 _ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
+_TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "training_verbrauchte_zeit"
+_TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "training_zeit_laeuft_seit"
 
 
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
@@ -29,14 +31,6 @@ def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
         historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto),
         zustand=Vignette.Zustand.ENTWURF,
     )
-
-
-def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
-    """Übergibt dem strikten Renderer nur die benutzten Rahmenplatzhalter."""
-
-    platzhalter: dict[str, str] = rahmen_platzhalter(vignette)
-    namen: list[str] = Template(vorlage).get_identifiers()
-    return simulation_render(vorlage, {name: platzhalter[name] for name in namen})
 
 
 def _ist_administratorin(konto: "Konto") -> bool:
@@ -103,7 +97,7 @@ def _debrief_anzeigen(
         request,
         "sitzungen/probelauf_debrief.html",
         {
-            "debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
+            "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
             "gespraechsschritte": schritte,
         },
     )
@@ -135,7 +129,7 @@ def _probelauf_starten(
     return render(
         request,
         "sitzungen/probelauf_einleitung.html",
-        {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+        {"einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
     )
 
 
@@ -280,3 +274,167 @@ def probelauf_debrief(request: HttpRequest) -> HttpResponse:
     )
     sink.verwerfen()
     return redirect(ziel)
+
+
+def _training_sitzung(request: HttpRequest) -> Sitzung:
+    """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto."""
+
+    from training.models import Trainingsbindung
+
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        pk=request.session["training_sitzung_pk"],
+    )
+    get_object_or_404(
+        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
+    )
+    return sitzung
+
+
+def _training_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
+    """Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge."""
+
+    return sitzung.gespraechsschritt_set.order_by("reihenfolge")
+
+
+def _training_zeitbudget_fortsetzen(request: HttpRequest, sitzung: Sitzung) -> None:
+    """Startet die unsichtbare Uhr ausschließlich während des Teilnehmer:innenzugs."""
+
+    if (
+        sitzung.vignette.budget_typ == Vignette.BudgetTyp.ZEIT
+        and _TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL not in request.session
+    ):
+        request.session[_TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = monotonic()
+
+
+def _training_zeitbudget_anhalten(request: HttpRequest) -> None:
+    """Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort."""
+
+    startzeit: float | None = request.session.pop(
+        _TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL, None
+    )
+    if startzeit is not None:
+        request.session[_TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL] = (
+            request.session.get(_TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0)
+            + monotonic()
+            - startzeit
+        )
+
+
+def _training_budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
+    """Prüft das unsichtbare Gesprächsbudget nach einem vollständigen Schritt."""
+
+    if sitzung.vignette.budget_wert is None:
+        return False
+    if sitzung.vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
+        return _training_schritte(sitzung).count() >= sitzung.vignette.budget_wert
+    return (
+        request.session.get(_TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0)
+        >= sitzung.vignette.budget_wert
+    )
+
+
+def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
+    """Rendert den Debrief einer persistierten Trainingssitzung."""
+
+    return render(
+        request,
+        "sitzungen/training_debrief.html",
+        {
+            "debrief": rahmen_rendern(
+                sitzung.simulationskern.rahmenhandlung_debrief, sitzung.vignette
+            ),
+            "gespraechsschritte": _training_schritte(sitzung),
+        },
+    )
+
+
+@login_required
+def training_gespraech(request: HttpRequest) -> HttpResponse:
+    """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
+
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
+        return _training_debrief_anzeigen(request, sitzung)
+    schritte: QuerySet[Gespraechsschritt] = _training_schritte(sitzung)
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return render(
+            request,
+            "sitzungen/training_gespraech.html",
+            {"gespraechsschritte": schritte, "ist_gescheitert": True},
+        )
+    if request.method == "GET":
+        _training_zeitbudget_fortsetzen(request, sitzung)
+        return render(
+            request,
+            "sitzungen/training_gespraech.html",
+            {"gespraechsschritte": schritte},
+        )
+    _training_zeitbudget_anhalten(request)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
+    antwortversuch = gespraechsschritt_ausfuehren(
+        sink,
+        sitzung.vignette,
+        sitzung.simulationskern,
+        sitzung.modell_konfiguration,
+        list(schritte.exclude(aeusserung__isnull=True).values_list("aeusserung", flat=True)),
+        request.POST["eingabe"],
+    )
+    if antwortversuch.endgueltig_gescheitert:
+        return render(
+            request,
+            "sitzungen/training_gespraech.html",
+            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
+        )
+    if _training_budget_erschoepft(request, sitzung):
+        sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        return _training_debrief_anzeigen(request, sitzung)
+    _training_zeitbudget_fortsetzen(request, sitzung)
+    return render(
+        request,
+        "sitzungen/training_gespraech.html",
+        {"gespraechsschritte": _training_schritte(sitzung)},
+    )
+
+
+@login_required
+def training_beenden(request: HttpRequest) -> HttpResponse:
+    """Beendet das Diagnosegespräch vorzeitig und zeigt seinen Debrief."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return render(
+            request,
+            "sitzungen/training_gespraech.html",
+            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
+        )
+    _training_zeitbudget_anhalten(request)
+    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+    return _training_debrief_anzeigen(request, sitzung)
+
+
+@login_required
+def training_debrief(request: HttpRequest) -> HttpResponse:
+    """Speichert die Diagnose und kehrt zur freien Trainingswahl zurück."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return render(
+            request,
+            "sitzungen/training_gespraech.html",
+            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
+        )
+    DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    from training.models import Trainingsbindung
+
+    training_pk: int = get_object_or_404(
+        Trainingsbindung, teilnahme=sitzung.teilnahme
+    ).training_id
+    request.session.pop("training_sitzung_pk", None)
+    return redirect("training:detail", pk=training_pk)
