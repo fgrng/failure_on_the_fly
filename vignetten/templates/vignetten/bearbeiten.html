@@ -3,10 +3,12 @@
 {% block title %}Entwurf bearbeiten{% endblock %}
 
 {% block content %}
-    <h1>Entwurf bearbeiten</h1>
-    <form method="post" enctype="multipart/form-data">
+<section class="area--authoring">
+    <header class="area-band"><h1>Entwurf bearbeiten</h1></header>
+    <form class="form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">Speichern</button>
+        <button class="button" type="submit">Speichern</button>
     </form>
+</section>
 {% endblock %}

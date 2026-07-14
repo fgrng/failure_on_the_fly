@@ -1,17 +1,27 @@
 """Views für den privaten Vignetten-Editor."""
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import FinalisierenForm, VignetteForm, zufaellige_akteure
+from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
 
 
 def _fallback_label(vignette: Vignette) -> str:
     """Leitet ein lesbares Label aus dem Unterrichtskontext ab."""
     return f"{vignette.fach}: {vignette.thema} (Klasse {vignette.klassenstufe})"
+
+
+def _zustand_badge(vignette: Vignette) -> str:
+    """Ordnet Modellzustände den gemeinsamen Badge-Klassen zu."""
+    return {
+        Vignette.Zustand.ENTWURF: "draft",
+        Vignette.Zustand.FINAL: "final",
+        Vignette.Zustand.ARCHIVIERT: "archived",
+    }[vignette.zustand]
 
 
 def _sichtbare_fassung_laden(
@@ -37,6 +47,8 @@ def liste(request: HttpRequest) -> HttpResponse:
             {
                 "label": historie.name or _fallback_label(neueste_fassung),
                 "fassung_pk": neueste_fassung.pk,
+                "zustand": neueste_fassung.get_zustand_display(),
+                "zustand_badge": _zustand_badge(neueste_fassung),
             }
         )
     return render(request, "vignetten/liste.html", {"historien": historien})
@@ -70,7 +82,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "vignetten/detail.html",
-        {"vignette": vignette, "finalisieren_form": FinalisierenForm()},
+        {"vignette": vignette, "zustand_badge": _zustand_badge(vignette)},
     )
 
 
@@ -82,21 +94,60 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     vignette: Vignette = _sichtbare_fassung_laden(
         request, pk, Vignette.Zustand.ENTWURF
     )
-    form: FinalisierenForm = FinalisierenForm(request.POST)
     try:
         vignette.finalisieren()
     except ValidationError as error:
-        form.add_error(None, error)
-        return render(
-            request,
-            "vignetten/detail.html",
-            {"vignette": vignette, "finalisieren_form": form},
-        )
+        messages.error(request, error.message)
     return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
-def reversionieren(request: HttpRequest, pk: int) -> HttpResponse:
+def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Archiviert eine eigene finale Fassung."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.FINAL
+    )
+    try:
+        vignette.archivieren()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("vignetten:detail", pk=vignette.pk)
+
+
+@login_required
+def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Macht eine eigene archivierte Fassung wieder final."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.ARCHIVIERT
+    )
+    try:
+        vignette.entarchivieren()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("vignetten:detail", pk=vignette.pk)
+
+
+@login_required
+def vorspulen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Pinnt einen eigenen Entwurf auf den aktuellen finalen Kern."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbare_fassung_laden(
+        request, pk, Vignette.Zustand.ENTWURF
+    )
+    try:
+        vignette.vorspulen()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("vignetten:detail", pk=vignette.pk)
+
+
+@login_required
+def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -108,8 +159,15 @@ def reversionieren(request: HttpRequest, pk: int) -> HttpResponse:
         zustand=Vignette.Zustand.ENTWURF,
     ).first()
     if entwurf is None:
-        entwurf = finale.bearbeiten()
-    return redirect("vignetten:bearbeiten", pk=entwurf.pk)
+        try:
+            entwurf = finale.bearbeiten()
+        except ValidationError as error:
+            messages.error(request, error.message)
+            return redirect("vignetten:detail", pk=finale.pk)
+    return redirect("vignetten:detail", pk=entwurf.pk)
+
+
+reversionieren = neue_fassung
 
 
 @login_required

@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -352,13 +353,13 @@ class VignetteFinalisierenViewTests(TestCase):
         self.vignette.save()
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:finalisieren", args=[self.vignette.pk])
+            reverse("vignetten:finalisieren", args=[self.vignette.pk]), follow=True
         )
 
         self.assertContains(response, fehlermeldung)
 
-    def test_zeigt_finalisieren_aber_keine_vorspulen_aktion(self) -> None:
-        """Der Entwurf bietet nur die vorgesehene Lebenszyklus-Aktion an."""
+    def test_zeigt_finalisieren_und_vorspulen_aktionen(self) -> None:
+        """Der Entwurf bietet seine beiden zulässigen Lebenszyklus-Aktionen an."""
         response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[self.vignette.pk])
         )
@@ -366,22 +367,22 @@ class VignetteFinalisierenViewTests(TestCase):
             response,
             reverse("vignetten:finalisieren", args=[self.vignette.pk]),
         )
-        self.assertNotContains(response, "vorspulen")
+        self.assertContains(
+            response,
+            reverse("vignetten:vorspulen", args=[self.vignette.pk]),
+        )
 
     def test_finalisiert_vollstaendigen_eigenen_entwurf(self) -> None:
         """Ein vollständiger Entwurf wird über HTTP zur finalen Fassung."""
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:finalisieren", args=[self.vignette.pk])
+            reverse("vignetten:finalisieren", args=[self.vignette.pk]), follow=True
         )
 
         self.assertRedirects(
             response, reverse("vignetten:detail", args=[self.vignette.pk])
         )
-        detail_response: HttpResponse = self.client.get(
-            reverse("vignetten:detail", args=[self.vignette.pk])
-        )
-        self.assertContains(detail_response, "Finale Fassung")
+        self.assertContains(response, 'badge--final')
 
     def test_zeigt_fehler_fuer_fehlendes_pflichtfeld(self) -> None:
         """Ein fehlendes Pflichtfeld wird verständlich benannt."""
@@ -475,18 +476,18 @@ class VignetteReversionierenViewTests(TestCase):
     def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(self) -> None:
         """Re-Versionieren führt zum Folgeentwurf derselben Vignettenhistorie."""
         response: HttpResponse = self.client.post(
-            reverse("vignetten:reversionieren", args=[self.finale.pk])
+            reverse("vignetten:neue_fassung", args=[self.finale.pk])
         )
 
         entwurf: Vignette = Vignette.objects.get(vorgaengerin=self.finale)
-        self.assertRedirects(response, reverse("vignetten:bearbeiten", args=[entwurf.pk]))
+        self.assertRedirects(response, reverse("vignetten:detail", args=[entwurf.pk]))
         self.assertEqual(entwurf.zustand, Vignette.Zustand.ENTWURF)
         self.assertEqual(self._geerbte_werte(entwurf), self._geerbte_werte(self.finale))
 
     def test_laesst_die_finale_fassung_unveraendert(self) -> None:
         """Re-Versionieren verändert Zustand und Bildpfad der Quelle nicht."""
         self.client.post(
-            reverse("vignetten:reversionieren", args=[self.finale.pk])
+            reverse("vignetten:neue_fassung", args=[self.finale.pk])
         )
 
         self.finale.refresh_from_db()
@@ -495,10 +496,10 @@ class VignetteReversionierenViewTests(TestCase):
             (Vignette.Zustand.FINAL, "arbeitshefte/finale-datei.gif"),
         )
 
-    def test_detail_bietet_die_reversionieren_aktion_nur_fuer_finale_fassungen(
+    def test_detail_bietet_die_neue_fassung_aktion_nur_fuer_finale_fassungen(
         self,
     ) -> None:
-        """Die finale Detailansicht führt sichtbar zur Re-Versionierungs-Aktion."""
+        """Die finale Detailansicht führt sichtbar zur Aktion Neue Fassung."""
         entwurf: Vignette = Vignette.objects.anlegen(self.ada)
 
         finale_response: HttpResponse = self.client.get(
@@ -510,23 +511,156 @@ class VignetteReversionierenViewTests(TestCase):
 
         self.assertContains(
             finale_response,
-            reverse("vignetten:reversionieren", args=[self.finale.pk]),
+            reverse("vignetten:neue_fassung", args=[self.finale.pk]),
         )
-        self.assertNotContains(entwurf_response, "Re-Versionieren")
+        self.assertNotContains(entwurf_response, "Neue Fassung")
 
     def test_erneute_aktion_oeffnet_den_bereits_vorhandenen_entwurf(self) -> None:
         """Ein doppelter Klick erzeugt keinen zweiten Entwurf derselben Historie."""
         vorhandener_entwurf: Vignette = self.finale.bearbeiten()
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:reversionieren", args=[self.finale.pk])
+            reverse("vignetten:neue_fassung", args=[self.finale.pk])
         )
 
         self.assertRedirects(
-            response, reverse("vignetten:bearbeiten", args=[vorhandener_entwurf.pk])
+            response, reverse("vignetten:detail", args=[vorhandener_entwurf.pk])
         )
         self.assertEqual(
             Vignette.objects.filter(historie=self.finale.historie).count(), 2
+        )
+
+    def test_zeigt_modellfehler_als_nachricht(self) -> None:
+        """Ein abgelehnter neuer Entwurf bleibt als Rückmeldung im Editor sichtbar."""
+        with patch.object(
+            Vignette,
+            "bearbeiten",
+            side_effect=ValidationError("Neue Fassung ist derzeit nicht möglich."),
+        ):
+            response: HttpResponse = self.client.post(
+                reverse("vignetten:neue_fassung", args=[self.finale.pk]), follow=True
+            )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[self.finale.pk])
+        )
+        self.assertContains(response, "Neue Fassung ist derzeit nicht möglich.")
+
+
+class VignetteArchivierenViewTests(TestCase):
+    """Finale Fassungen lassen sich im Editor archivieren."""
+
+    def test_archiviert_eigene_finale_fassung_ueber_post(self) -> None:
+        """Die Archivierungs-URL ruft den Lebenszyklus nur für Eigentümer:innen auf."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        finale: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="27 + 15 = 312",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:archivieren", args=[finale.pk])
+        )
+
+        self.assertRedirects(response, reverse("vignetten:detail", args=[finale.pk]))
+        finale.refresh_from_db()
+        self.assertEqual(finale.zustand, Vignette.Zustand.ARCHIVIERT)
+
+    def test_entarchiviert_eigene_archivierte_fassung_ueber_post(self) -> None:
+        """Eine archivierte Fassung wird über die Gegenaktion wieder final."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        archivierte: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            zustand=Vignette.Zustand.ARCHIVIERT,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="27 + 15 = 312",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:entarchivieren", args=[archivierte.pk])
+        )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[archivierte.pk])
+        )
+        archivierte.refresh_from_db()
+        self.assertEqual(archivierte.zustand, Vignette.Zustand.FINAL)
+
+    def test_aktionen_sind_post_only_und_fuer_fremde_historien_unsichtbar(self) -> None:
+        """Jede Aktion schützt Methode und Eigentümer-Kreis an der HTTP-Naht."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        eigene_historie.eigentuemerinnen.add(ada)
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(grace)
+        eigene_fassungen: tuple[tuple[str, Vignette], ...] = (
+            (
+                "finalisieren",
+                Vignette.objects._erstellen(historie=eigene_historie),
+            ),
+            (
+                "vorspulen",
+                Vignette.objects._erstellen(
+                    historie=Vignettenhistorie.objects.create()
+                ),
+            ),
+            (
+                "archivieren",
+                Vignette.objects._erstellen(
+                    historie=Vignettenhistorie.objects.create(),
+                    zustand=Vignette.Zustand.FINAL,
+                    finalisiert_am=timezone.now(),
+                    arbeitsheft_text="Inhalt",
+                ),
+            ),
+            (
+                "entarchivieren",
+                Vignette.objects._erstellen(
+                    historie=Vignettenhistorie.objects.create(),
+                    zustand=Vignette.Zustand.ARCHIVIERT,
+                    finalisiert_am=timezone.now(),
+                    arbeitsheft_text="Inhalt",
+                ),
+            ),
+            (
+                "neue_fassung",
+                Vignette.objects._erstellen(
+                    historie=Vignettenhistorie.objects.create(),
+                    zustand=Vignette.Zustand.FINAL,
+                    finalisiert_am=timezone.now(),
+                    arbeitsheft_text="Inhalt",
+                ),
+            ),
+        )
+        for _, vignette in eigene_fassungen[1:]:
+            vignette.historie.eigentuemerinnen.add(ada)
+        fremde_finale: Vignette = Vignette.objects._erstellen(
+            historie=fremde_historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Inhalt",
+        )
+        self.client.force_login(ada)
+
+        for name, vignette in eigene_fassungen:
+            self.assertEqual(
+                self.client.get(reverse(f"vignetten:{name}", args=[vignette.pk])).status_code,
+                405,
+            )
+        self.assertEqual(
+            self.client.post(
+                reverse("vignetten:archivieren", args=[fremde_finale.pk])
+            ).status_code,
+            404,
         )
 
 
@@ -544,6 +678,10 @@ class VignettenLoginTests(TestCase):
             reverse("vignetten:detail", args=[vignette.pk]),
             reverse("vignetten:bearbeiten", args=[vignette.pk]),
             reverse("vignetten:finalisieren", args=[vignette.pk]),
+            reverse("vignetten:archivieren", args=[vignette.pk]),
+            reverse("vignetten:entarchivieren", args=[vignette.pk]),
+            reverse("vignetten:vorspulen", args=[vignette.pk]),
+            reverse("vignetten:neue_fassung", args=[vignette.pk]),
             reverse("vignetten:reversionieren", args=[vignette.pk]),
         )
         for url in urls:

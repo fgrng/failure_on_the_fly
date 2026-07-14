@@ -3,19 +3,32 @@
 {% block title %}Vignette{% endblock %}
 
 {% block content %}
-    <h1>Vignette</h1>
+<section class="area--authoring">
+    <header class="area-band"><h1>Vignette</h1></header>
+    <p><span class="badge badge--{{ zustand_badge }}">{{ vignette.get_zustand_display }}</span></p>
     {% if vignette.zustand == "entwurf" %}
-        <p><a href="{% url 'vignetten:bearbeiten' vignette.pk %}">Entwurf bearbeiten</a></p>
+        <p><a class="button button--secondary" href="{% url 'vignetten:bearbeiten' vignette.pk %}">Entwurf bearbeiten</a></p>
         <form method="post" action="{% url 'vignetten:finalisieren' vignette.pk %}">
             {% csrf_token %}
-            {{ finalisieren_form.non_field_errors }}
-            <button type="submit">Finalisieren</button>
+            <button class="button" type="submit">Finalisieren</button>
+        </form>
+        <form method="post" action="{% url 'vignetten:vorspulen' vignette.pk %}">
+            {% csrf_token %}
+            <button class="button button--secondary" type="submit">Auf aktuellen Kern vorspulen</button>
         </form>
     {% elif vignette.zustand == "final" %}
-        <p>Finale Fassung</p>
-        <form method="post" action="{% url 'vignetten:reversionieren' vignette.pk %}">
+        <form method="post" action="{% url 'vignetten:neue_fassung' vignette.pk %}">
             {% csrf_token %}
-            <button type="submit">Re-Versionieren</button>
+            <button class="button" type="submit">Neue Fassung</button>
+        </form>
+        <form method="post" action="{% url 'vignetten:archivieren' vignette.pk %}">
+            {% csrf_token %}
+            <button class="button button--danger" type="submit">Archivieren</button>
+        </form>
+    {% elif vignette.zustand == "archiviert" %}
+        <form method="post" action="{% url 'vignetten:entarchivieren' vignette.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Entarchivieren</button>
         </form>
     {% endif %}
     <p>Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk }}</p>
@@ -29,4 +42,22 @@
         {% endif %}
         <dt>Arbeitsheft-Beschreibung</dt><dd>{{ vignette.arbeitsheft_beschreibung }}</dd>
     </dl>
+    <h2>Akteure</h2>
+    <dl>
+        <dt>Simulierte Schüler:in</dt><dd>{{ vignette.schuelerin_name }} ({{ vignette.get_schuelerin_geschlecht_display }})</dd>
+        <dt>Erfahrene Lehrperson</dt><dd>{{ vignette.lehrperson_name }} ({{ vignette.get_lehrperson_geschlecht_display }})</dd>
+    </dl>
+    <h2>Unterrichtskontext</h2>
+    <dl>
+        <dt>Fach</dt><dd>{{ vignette.fach }}</dd>
+        <dt>Thema</dt><dd>{{ vignette.thema }}</dd>
+        <dt>Klassenstufe</dt><dd>{{ vignette.klassenstufe }}</dd>
+    </dl>
+    <h2>Gesprächsbudget</h2>
+    <p>{{ vignette.get_budget_typ_display }}: {{ vignette.budget_wert }}</p>
+    <h2>Fehlermuster</h2>
+    <p>{{ vignette.fehlermuster_beschreibung }}</p>
+    <h2>Referenzdiagnose</h2>
+    <p>{{ vignette.referenzdiagnose }}</p>
+</section>
 {% endblock %}

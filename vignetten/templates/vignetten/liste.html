@@ -3,13 +3,21 @@
 {% block title %}Meine Vignetten{% endblock %}
 
 {% block content %}
-    <h1>Meine Vignetten</h1>
-    <p><a href="{% url 'vignetten:anlegen' %}">Vignette anlegen</a></p>
-    <ul>
+<section class="area--authoring">
+    <header class="area-band"><h1>Meine Vignetten</h1></header>
+    <p><a class="button" href="{% url 'vignetten:anlegen' %}">Vignette anlegen</a></p>
+    <div class="card-grid">
         {% for eintrag in historien %}
-            <li><a href="{% url 'vignetten:detail' eintrag.fassung_pk %}">{{ eintrag.label }}</a></li>
+            <article class="card card--authoring">
+                <header class="card__header"><h2>{{ eintrag.label }}</h2></header>
+                <div class="card__body">
+                    <p><span class="badge badge--{{ eintrag.zustand_badge }}">{{ eintrag.zustand }}</span></p>
+                    <a href="{% url 'vignetten:detail' eintrag.fassung_pk %}">Vignette öffnen</a>
+                </div>
+            </article>
         {% empty %}
-            <li>Noch keine Vignetten vorhanden.</li>
+            <p>Noch keine Vignetten vorhanden.</p>
         {% endfor %}
-    </ul>
+    </div>
+</section>
 {% endblock %}
