@@ -11,6 +11,7 @@ from konten.models import Konto
 from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
+from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung
 from vignetten.models import Vignette
 
 
@@ -26,7 +27,10 @@ class ProbelaufStartTests(TestCase):
             rahmenhandlung_einleitung=(
                 "$lehrperson_anrede $lehrperson_name begleitet Sie bei "
                 "$fach in Klasse $klassenstufe."
-            )
+            ),
+            rahmenhandlung_debrief=(
+                "$lehrperson_anrede $lehrperson_name fragt nach Ihrer Diagnose."
+            ),
         )
         self.kern.finalisieren()
         self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
@@ -96,6 +100,19 @@ class ProbelaufStartTests(TestCase):
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
+
+    def test_gespraech_kann_bereits_aus_der_einleitung_beendet_werden(self) -> None:
+        """Auch ohne Gesprächsschritt ist der Debrief erreichbar."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einleitung, "Gespräch beenden")
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden")
+        )
+        self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
 
 
 class ProbelaufGespraechTests(ProbelaufStartTests):
@@ -204,3 +221,47 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             )
 
         self.assertEqual(antworten.call_args.args[3], [""])
+
+    def test_beenden_zeigt_debrief_und_verwirft_diagnose_schreibfrei(self) -> None:
+        """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {
+                        "denkspur": "Mia addiert Zähler und Nenner.",
+                        "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
+                    }
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        anzahl_sitzungen: int = Sitzung.objects.count()
+        anzahl_schritte: int = Gespraechsschritt.objects.count()
+        anzahl_diagnosen: int = Diagnose.objects.count()
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        self.assertContains(einleitung, "Frau Weber begleitet Sie bei Mathematik in Klasse 5.")
+        schritt: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.assertContains(schritt, "Ich rechne eins plus eins und zwei plus drei.")
+        self.assertContains(schritt, "Mia addiert Zähler und Nenner.")
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden")
+        )
+
+        self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertContains(debrief, "Ihre Diagnose")
+        ende: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_debrief"), {"diagnose": "Brüche werden addiert."}
+        )
+
+        self.assertRedirects(ende, reverse("sitzungen:probelauf_auswahl"))
+        self.assertNotIn("probelauf", self.client.session)
+        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
+        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_schritte)
+        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
