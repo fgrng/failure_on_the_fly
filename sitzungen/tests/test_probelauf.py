@@ -13,6 +13,13 @@ from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, 
 from vignetten.models import Vignette
 
 
+_ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
+    {"fehler": "anbieterfehler"},
+    {"fehler": "anbieterfehler"},
+    {"fehler": "anbieterfehler"},
+]
+
+
 class ProbelaufStartTests(TestCase):
     """Die HTTP-Naht startet einen Probelauf über einem festen Tripel."""
 
@@ -125,6 +132,30 @@ class ProbelaufStartTests(TestCase):
 
 class ProbelaufGespraechTests(ProbelaufStartTests):
     """Die HTTP-Naht führt das Diagnosegespräch schreibfrei Zug um Zug."""
+
+    def _endgueltigen_fehlschlag_ausloesen(self) -> HttpResponse:
+        # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        session = self.client.session
+        session["probelauf"]["gespraechsschritte"] = [
+            {
+                "reihenfolge": 1,
+                "eingabe": "Wie rechnest du?",
+                "denkspur": "Mia addiert Zähler und Nenner.",
+                "aeusserung": "Ich addiere einfach alles.",
+                "native_reasoning_spur": None,
+                "fehlversuche": [],
+            }
+        ]
+        session.save()
+        return self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+        )
 
     def test_antwort_und_denkspur_werden_live_angezeigt_und_in_session_behalten(
         self,
@@ -244,56 +275,60 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             FakeSprachmodell.letzte_anfragen[-1][1],
         )
 
-    def test_endgueltiger_fehlschlag_zeigt_aktionen_ohne_den_verlauf_zu_aendern(
-        self,
-    ) -> None:
-        """Ein gescheiterter Antwortversuch bleibt unsichtbar neben dem Verlauf."""
+    def test_endgueltiger_fehlschlag_zeigt_fehlermeldung(self) -> None:
+        """Ein endgültiger Fehlschlag wird an der Stelle des Schritts erklärt."""
 
-        self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {"fehler": "anbieterfehler"},
-                    {"fehler": "anbieterfehler"},
-                    {"fehler": "anbieterfehler"},
-                ]
-            },
-        )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        session = self.client.session
-        session["probelauf"]["gespraechsschritte"] = [
-            {
-                "reihenfolge": 1,
-                "eingabe": "Wie rechnest du?",
-                "denkspur": "Mia addiert Zähler und Nenner.",
-                "aeusserung": "Ich addiere einfach alles.",
-                "native_reasoning_spur": None,
-                "fehlversuche": [],
-            }
-        ]
-        session.save()
-
-        response: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
-        )
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
+
+    def test_endgueltiger_fehlschlag_zeigt_erneutes_senden(self) -> None:
+        """Ein endgültiger Fehlschlag bietet das Wiederholen derselben Eingabe an."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
         self.assertContains(response, "Erneut senden")
+
+    def test_endgueltiger_fehlschlag_bewahrt_eingabe_fuer_wiederholung(self) -> None:
+        """Ein endgültiger Fehlschlag bewahrt die Eingabe im Wiederholungsformular."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
+        self.assertContains(
+            response,
+            '<input type="hidden" name="eingabe" value="Und warum?">',
+            html=True,
+        )
+
+    def test_endgueltiger_fehlschlag_zeigt_beenden_im_debrief(self) -> None:
+        """Ein endgültiger Fehlschlag bietet das Beenden in den Debrief an."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
         self.assertContains(response, "Gespräch beenden → Debrief")
-        self.assertContains(response, reverse("sitzungen:probelauf_beenden"))
+
+    def test_endgueltiger_fehlschlag_bewahrt_den_sichtbaren_verlauf(self) -> None:
+        """Ein endgültiger Fehlschlag lässt vorherige Äußerungen sichtbar."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
         self.assertContains(response, "Ich addiere einfach alles.")
+
+    def test_endgueltiger_fehlschlag_verbirgt_fehlergrund(self) -> None:
+        """Ein endgültiger Fehlschlag zeigt keine Fehlversuchsgründe an."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
         self.assertNotContains(response, "anbieterfehler")
-        self.assertEqual(self.client.session["probelauf"]["gespraechsschritte"], [
-            {
-                "reihenfolge": 1,
-                "eingabe": "Wie rechnest du?",
-                "denkspur": "Mia addiert Zähler und Nenner.",
-                "aeusserung": "Ich addiere einfach alles.",
-                "native_reasoning_spur": None,
-                "fehlversuche": [],
-            }
-        ])
+
+    def test_beenden_zeigt_debrief_nach_endgueltigem_fehlschlag(self) -> None:
+        """Das Beenden führt nach einem endgültigen Fehlschlag in den Debrief."""
+
+        self._endgueltigen_fehlschlag_ausloesen()
+
+        response: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+
+        self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
 
     def test_beenden_zeigt_debrief_und_verwirft_diagnose_schreibfrei(self) -> None:
         """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
