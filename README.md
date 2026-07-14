@@ -3,6 +3,12 @@
 Web-basierter Simulator von Schüler:innen mit Fehlermustern für das Üben
 diagnostischer Gesprächsführung.
 
+## Start und Anmeldung
+
+Die öffentliche Startseite unter `/` verlinkt auf den Vignetten-Editor und die
+Ansicht des Simulationskerns. Diese Bereiche erfordern ein Nutzerkonto; die
+Anmeldung erfolgt unter `/accounts/login/`.
+
 ## Simulationskern
 
 Angemeldete Nutzer:innen können die aktuellste finale Kern-Fassung und die
