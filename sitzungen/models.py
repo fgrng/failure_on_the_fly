@@ -93,6 +93,8 @@ class Gespraechsschritt(models.Model):
     objects: GespraechsschrittManager = GespraechsschrittManager()
 
     class Meta:
+        """Sichert die Struktur jedes gespeicherten Gesprächsschritts."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["sitzung", "reihenfolge"],

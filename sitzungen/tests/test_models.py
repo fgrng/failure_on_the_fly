@@ -33,6 +33,7 @@ def _sitzung_anlegen() -> Sitzung:
         modell_konfiguration=konfiguration,
     )
 
+
 def test_teilnahme_traegt_nur_ihre_eigene_identitaet() -> None:
     """Sitzungen kennen weder Training noch Konto als Aufrufer."""
 
@@ -102,7 +103,12 @@ def test_answerless_gespraechsschritt_mit_fehlversuch_wird_gespeichert() -> None
         sitzung=sitzung,
         eingabe="Warum?",
         reihenfolge=1,
-        fehlversuche=[Fehlversuch(grund="Formatbruch", rohantwort="Keine gültige Antwort")],
+        fehlversuche=[
+            Fehlversuch(
+                grund="Formatbruch",
+                rohantwort="Keine gültige Antwort",
+            )
+        ],
     )
 
     assert schritt.denkspur is None
@@ -119,7 +125,12 @@ def test_answerless_gespraechsschritt_beendet_das_diagnosegespraech() -> None:
         sitzung=sitzung,
         eingabe="Warum?",
         reihenfolge=1,
-        fehlversuche=[Fehlversuch(grund="Formatbruch", rohantwort="Keine gültige Antwort")],
+        fehlversuche=[
+            Fehlversuch(
+                grund="Formatbruch",
+                rohantwort="Keine gültige Antwort",
+            )
+        ],
     )
 
     with pytest.raises(IntegrityError), transaction.atomic():
@@ -140,7 +151,12 @@ def test_der_letzte_fehlversuch_eines_answerless_schritts_bleibt_gespeichert() -
         sitzung=_sitzung_anlegen(),
         eingabe="Warum?",
         reihenfolge=1,
-        fehlversuche=[Fehlversuch(grund="Formatbruch", rohantwort="Keine Antwort")],
+        fehlversuche=[
+            Fehlversuch(
+                grund="Formatbruch",
+                rohantwort="Keine Antwort",
+            )
+        ],
     )
 
     with pytest.raises(IntegrityError), transaction.atomic():
