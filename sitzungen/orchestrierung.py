@@ -4,7 +4,6 @@ from collections.abc import Sequence
 
 from simulation import Antwortversuch, antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung
 from sitzungen.sink import FehlversuchDaten, SitzungSink
 from vignetten.models import Vignette
 
@@ -46,7 +45,6 @@ def gespraechsschritt_ausfuehren(
             eingabe=eingabe,
             fehlversuche=fehlversuche,
         )
-        sink.status_setzen(Sitzung.Status.GESCHEITERT)
         return antwortversuch
     sink.gespraechsschritt_anhaengen(
         eingabe=eingabe,

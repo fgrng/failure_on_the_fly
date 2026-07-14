@@ -6,7 +6,13 @@ from typing import Any, Protocol, TypedDict, cast
 from django.db import transaction
 
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from vignetten.models import Vignette
 
 
@@ -56,7 +62,7 @@ class SitzungSink(Protocol):
     def gescheiterten_schritt_anhaengen(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Bewahrt einen endgültig gescheiterten Gesprächsschritt auf."""
+        """Bewahrt einen endgültig fehlgeschlagenen Schritt und beendet die Sitzung."""
 
     def diagnose_setzen(self, text: str) -> None:
         """Bewahrt die abschließende Diagnose auf."""
@@ -119,7 +125,7 @@ class DBSink:
     def gescheiterten_schritt_anhaengen(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Schreibt einen antwortlosen Schritt samt seinen Fehlversuchen atomar."""
+        """Schreibt Abbruchschritt und gescheiterten Status atomar."""
 
         with transaction.atomic():
             Gespraechsschritt.objects.answerless_anlegen(
@@ -130,6 +136,7 @@ class DBSink:
                     Fehlversuch(**fehlversuch) for fehlversuch in fehlversuche
                 ],
             )
+            self.status_setzen(Sitzung.Status.GESCHEITERT)
 
     def diagnose_setzen(self, text: str) -> None:
         """Speichert die Diagnose und schließt die Sitzung gemeinsam ab."""
@@ -146,14 +153,14 @@ class DBSink:
 
     @property
     def _sitzung(self) -> Sitzung:
-        """Liefert die gestartete Sitzung oder weist auf einen falschen Ablauf hin."""
+        # Liefert die gestartete Sitzung oder weist auf einen falschen Ablauf hin.
 
         if self.sitzung is None:
             raise RuntimeError("Der DB-Sink braucht zuerst eine gestartete Sitzung.")
         return self.sitzung
 
     def _naechste_reihenfolge(self) -> int:
-        """Bestimmt die fortlaufende Position des nächsten Gesprächsschritts."""
+        # Bestimmt die fortlaufende Position des nächsten Gesprächsschritts.
 
         return self._sitzung.gespraechsschritt_set.count() + 1
 
@@ -260,7 +267,7 @@ class ScratchSink:
     def gescheiterten_schritt_anhaengen(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Hängt den antwortlosen Schritt in gemeinsamer Speicherform an."""
+        """Hängt den antwortlosen Schritt an und beendet den Probelauf."""
 
         self.gespraechsschritte.append(
             {
@@ -272,7 +279,7 @@ class ScratchSink:
                 "fehlversuche": fehlversuche,
             }
         )
-        self._als_geaendert_markieren()
+        self.status_setzen(Sitzung.Status.GESCHEITERT)
 
     def diagnose_setzen(self, text: str) -> None:
         """Hält die im Probelauf verworfene Diagnose in der Session."""

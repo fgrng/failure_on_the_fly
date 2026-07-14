@@ -5,7 +5,13 @@ from django.contrib.sessions.backends.db import SessionStore
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
 from sitzungen.sink import DBSink, ScratchSink
 from vignetten.models import Vignette
@@ -14,14 +20,17 @@ from vignetten.models import Vignette
 def _persistierbares_tripel(
     skript: list[dict[str, str]],
 ) -> tuple[Vignette, Simulationskern, ModellKonfiguration]:
-    """Legt das minimale, vom Fake ausführbare Sitzungs-Tripel an."""
+    # Legt das minimale, vom Fake ausführbare Sitzungs-Tripel an.
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     return (
         Vignette.objects.anlegen(Konto.objects.create_user(username="ada")),
         kern,
-        ModellKonfiguration.objects.create(sprachmodell="fake", parameter={"skript": skript}),
+        ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": skript},
+        ),
     )
 
 
@@ -172,7 +181,9 @@ def test_db_sink_haengt_fehlversuche_neben_den_erfolgreichen_schritt() -> None:
     schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
     assert schritt.aeusserung == "2/5."
     assert list(
-        Fehlversuch.objects.filter(gespraechsschritt=schritt).values("grund", "rohantwort")
+        Fehlversuch.objects.filter(gespraechsschritt=schritt).values(
+            "grund", "rohantwort"
+        )
     ) == [{"grund": "Formatbruch", "rohantwort": "Kein JSON."}]
 
 
@@ -209,7 +220,10 @@ def test_db_sink_diagnose_schliesst_die_sitzung_ab() -> None:
 
     sitzung: Sitzung = Sitzung.objects.get()
     assert sitzung.status == Sitzung.Status.ABGESCHLOSSEN
-    assert Diagnose.objects.get(sitzung=sitzung).text == "Zähler und Nenner werden addiert."
+    assert (
+        Diagnose.objects.get(sitzung=sitzung).text
+        == "Zähler und Nenner werden addiert."
+    )
 
 
 @pytest.mark.django_db
