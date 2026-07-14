@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 AUTH_USER_MODEL: str = "konten.Konto"
+LOGIN_REDIRECT_URL: str = "start"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

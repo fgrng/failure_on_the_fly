@@ -22,9 +22,9 @@
                 {% endif %}
                 {% block nav %}
                     <a href="{% url 'start' %}">Start</a>
+                    <a href="{% url 'vignetten:liste' %}">Vignetten</a>
+                    <a href="{% url 'simulation:kern' %}">System</a>
                     {% if user.is_authenticated %}
-                        <a href="{% url 'vignetten:liste' %}">Vignetten</a>
-                        <a href="{% url 'simulation:kern' %}">System</a>
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
                             <button class="button button--secondary" type="submit">Logout</button>

@@ -9,7 +9,7 @@ from konten.models import Konto
 
 
 class StartseiteTests(TestCase):
-    """Die Startseite ist die öffentliche Navigationsnaht."""
+    """Die Startseite ist der öffentliche Navigationseinstieg."""
 
     def test_ausbildungskachel_verweist_auf_die_vignettenliste(self) -> None:
         """Die Ausbildungskachel führt zum Vignetten-Editor."""
@@ -34,6 +34,8 @@ class StartseiteTests(TestCase):
         response: HttpResponse = self.client.get(reverse("start"))
 
         self.assertContains(response, f'href="{reverse("login")}"')
+        self.assertContains(response, f'href="{reverse("vignetten:liste")}"')
+        self.assertContains(response, f'href="{reverse("simulation:kern")}"')
 
     def test_angemeldete_navigation_bietet_den_logout(self) -> None:
         """Angemeldete Konten können sich über die Navigation abmelden."""
@@ -49,3 +51,16 @@ class StartseiteTests(TestCase):
         response: HttpResponse = self.client.get(reverse("login"))
 
         self.assertContains(response, 'name="password"')
+
+    def test_direkter_login_fuehrt_zur_startseite(self) -> None:
+        """Ein Login ohne Weiterleitungsziel endet auf einer vorhandenen Seite."""
+        get_user_model().objects.create_user(
+            username="ada", password="sicheres-passwort"
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("login"),
+            {"username": "ada", "password": "sicheres-passwort"},
+        )
+
+        self.assertRedirects(response, reverse("start"))
