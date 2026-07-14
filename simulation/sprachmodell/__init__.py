@@ -130,6 +130,8 @@ class LiteLLMSprachmodell:
                 },
                 **self.parameter,
             )
+        except litellm.ContentPolicyViolationError as exc:
+            raise ContentFilter from exc
         except Exception as exc:
             raise Anbieterfehler from exc
 
@@ -139,7 +141,10 @@ class LiteLLMSprachmodell:
                 raise ContentFilter
             nachricht: Any = auswahl.message
             inhalt: object = json.loads(nachricht.content)
-            if not isinstance(inhalt, dict):
+            if not isinstance(inhalt, dict) or set(inhalt) != {
+                "denkspur",
+                "aeusserung",
+            }:
                 raise Formatbruch
             antwort: Antwort = Antwort(
                 denkspur=inhalt["denkspur"], aeusserung=inhalt["aeusserung"]
