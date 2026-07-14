@@ -1,7 +1,7 @@
 """Schreibfreie Views für den Probelauf einer Autorin."""
 
 from string import Template
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
@@ -19,6 +19,24 @@ if TYPE_CHECKING:
 _PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
 
 
+class _Gespraechsschritt(TypedDict):
+    """Ein erfolgreicher, nur in der Session gehaltener Gesprächsschritt."""
+
+    eingabe: str
+    denkspur: str
+    aeusserung: str
+    native_reasoning_spur: str | None
+
+
+class _ProbelaufSession(TypedDict):
+    """Der schreibfreie Probelaufzustand in der Django-Session."""
+
+    vignette_pk: int
+    kern_pk: int
+    modell_konfiguration_pk: int
+    gespraechsschritte: list[_Gespraechsschritt]
+
+
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
     """Liefert die Entwürfe aus dem Eigentümer-Kreis eines Kontos."""
 
@@ -34,6 +52,28 @@ def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     platzhalter: dict[str, str] = rahmen_platzhalter(vignette)
     namen: list[str] = Template(vorlage).get_identifiers()
     return simulation_render(vorlage, {name: platzhalter[name] for name in namen})
+
+
+def _probelauf_aus_session(request: HttpRequest) -> _ProbelaufSession:
+    """Liest den beim Probelaufstart festgelegten Session-Zustand."""
+
+    return cast(
+        _ProbelaufSession,
+        request.session[_PROBELAUF_SESSION_SCHLUESSEL],
+    )
+
+
+def _gespraech_anzeigen(
+    request: HttpRequest,
+    schritte: list[_Gespraechsschritt],
+) -> HttpResponse:
+    """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
+
+    return render(
+        request,
+        "sitzungen/probelauf_gespraech.html",
+        {"gespraechsschritte": schritte},
+    )
 
 
 @login_required
@@ -60,12 +100,13 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if kern is None:
         raise RuntimeError("Probeläufe brauchen einen gepinnten Simulationskern.")
     modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
-    request.session[_PROBELAUF_SESSION_SCHLUESSEL] = {
+    probelauf: _ProbelaufSession = {
         "vignette_pk": vignette.pk,
         "kern_pk": kern.pk,
         "modell_konfiguration_pk": modell_konfiguration.pk,
         "gespraechsschritte": [],
     }
+    request.session[_PROBELAUF_SESSION_SCHLUESSEL] = probelauf
     return render(
         request,
         "sitzungen/probelauf_einleitung.html",
@@ -79,14 +120,10 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
-    probelauf: dict[str, object] = request.session[_PROBELAUF_SESSION_SCHLUESSEL]
-    schritte: list[dict[str, str | None]] = probelauf["gespraechsschritte"]  # type: ignore[assignment]
+    probelauf: _ProbelaufSession = _probelauf_aus_session(request)
+    schritte: list[_Gespraechsschritt] = probelauf["gespraechsschritte"]
     if request.method == "GET":
-        return render(
-            request,
-            "sitzungen/probelauf_gespraech.html",
-            {"gespraechsschritte": schritte},
-        )
+        return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
         _eigene_entwuerfe(request.user), pk=probelauf["vignette_pk"]
     )
@@ -114,8 +151,4 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
             }
         )
         request.session.modified = True
-    return render(
-        request,
-        "sitzungen/probelauf_gespraech.html",
-        {"gespraechsschritte": schritte},
-    )
+    return _gespraech_anzeigen(request, schritte)
