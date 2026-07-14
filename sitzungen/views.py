@@ -1,7 +1,7 @@
-"""Schreibfreie Views für den Probelauf."""
+"""Views für Probeläufe und persistierte Trainingssitzungen."""
 
-from typing import TYPE_CHECKING
 from time import monotonic
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
@@ -349,6 +349,16 @@ def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpRe
     )
 
 
+def _training_fehler_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
+    """Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung."""
+
+    return render(
+        request,
+        "sitzungen/training_gespraech.html",
+        {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
+    )
+
+
 @login_required
 def training_gespraech(request: HttpRequest) -> HttpResponse:
     """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
@@ -360,11 +370,7 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
         return _training_debrief_anzeigen(request, sitzung)
     schritte: QuerySet[Gespraechsschritt] = _training_schritte(sitzung)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return render(
-            request,
-            "sitzungen/training_gespraech.html",
-            {"gespraechsschritte": schritte, "ist_gescheitert": True},
-        )
+        return _training_fehler_anzeigen(request, sitzung)
     if request.method == "GET":
         _training_zeitbudget_fortsetzen(request, sitzung)
         return render(
@@ -383,11 +389,7 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
-        return render(
-            request,
-            "sitzungen/training_gespraech.html",
-            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
-        )
+        return _training_fehler_anzeigen(request, sitzung)
     if _training_budget_erschoepft(request, sitzung):
         sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
         return _training_debrief_anzeigen(request, sitzung)
@@ -407,11 +409,7 @@ def training_beenden(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return render(
-            request,
-            "sitzungen/training_gespraech.html",
-            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
-        )
+        return _training_fehler_anzeigen(request, sitzung)
     _training_zeitbudget_anhalten(request)
     DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGESCHLOSSEN)
     return _training_debrief_anzeigen(request, sitzung)
@@ -425,11 +423,7 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return render(
-            request,
-            "sitzungen/training_gespraech.html",
-            {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
-        )
+        return _training_fehler_anzeigen(request, sitzung)
     DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     from training.models import Trainingsbindung
 
