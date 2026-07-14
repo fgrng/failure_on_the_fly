@@ -6,20 +6,36 @@
 <h1>FailureOnTheFly</h1>
 <div class="card-grid">
     <article class="card card--authoring">
-        <header class="card__header"><h2>Ausbildung</h2></header>
-        <div class="card__body"><a href="{% url 'vignetten:liste' %}">Vignetten verwalten</a></div>
+        <header class="card__header">
+            <h2>Ausbildung</h2>
+        </header>
+        <div class="card__body">
+            <a href="{% url 'vignetten:liste' %}">Vignetten verwalten</a>
+        </div>
     </article>
     <article class="card card--system">
-        <header class="card__header"><h2>System</h2></header>
-        <div class="card__body"><a href="{% url 'simulation:kern' %}">Simulationskern ansehen</a></div>
+        <header class="card__header">
+            <h2>System</h2>
+        </header>
+        <div class="card__body">
+            <a href="{% url 'simulation:kern' %}">Simulationskern ansehen</a>
+        </div>
     </article>
     <article class="card card--participant card--disabled">
-        <header class="card__header"><h2>Teilnehmer</h2></header>
-        <div class="card__body"><p>geplant</p></div>
+        <header class="card__header">
+            <h2>Teilnehmer</h2>
+        </header>
+        <div class="card__body">
+            <p>geplant</p>
+        </div>
     </article>
     <article class="card card--research card--disabled">
-        <header class="card__header"><h2>Forschung</h2></header>
-        <div class="card__body"><p>geplant</p></div>
+        <header class="card__header">
+            <h2>Forschung</h2>
+        </header>
+        <div class="card__body">
+            <p>geplant</p>
+        </div>
     </article>
 </div>
 {% endblock %}

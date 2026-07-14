@@ -15,13 +15,13 @@ class StartseiteTests(TestCase):
         """Die Ausbildungskachel führt zum Vignetten-Editor."""
         response: HttpResponse = self.client.get(reverse("start"))
 
-        self.assertContains(response, reverse("vignetten:liste"))
+        self.assertContains(response, f'href="{reverse("vignetten:liste")}"')
 
     def test_systemkachel_verweist_auf_den_simulationskern(self) -> None:
         """Die Systemkachel führt zur Systemansicht."""
         response: HttpResponse = self.client.get(reverse("start"))
 
-        self.assertContains(response, reverse("simulation:kern"))
+        self.assertContains(response, f'href="{reverse("simulation:kern")}"')
 
     def test_unverfuegbare_bereiche_sind_als_geplant_markiert(self) -> None:
         """Teilnahme und Forschung bleiben bis zur Umsetzung als geplant."""
@@ -33,7 +33,7 @@ class StartseiteTests(TestCase):
         """Ohne Anmeldung führt die globale Navigation zur Loginseite."""
         response: HttpResponse = self.client.get(reverse("start"))
 
-        self.assertContains(response, reverse("login"))
+        self.assertContains(response, f'href="{reverse("login")}"')
 
     def test_angemeldete_navigation_bietet_den_logout(self) -> None:
         """Angemeldete Konten können sich über die Navigation abmelden."""
