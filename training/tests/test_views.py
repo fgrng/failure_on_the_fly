@@ -1,6 +1,7 @@
 """HTTP-Tests für die Ausbilder-UI der Trainings."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -17,6 +18,7 @@ class TrainingAnlegenTests(TestCase):
     def test_legt_training_an_und_listet_nur_eigene_trainings(self) -> None:
         """Ein angelegtes Training erscheint nur bei seiner Eigentümerin."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         Training.objects.create(name="Fremdes Training", eigentuemerin=grace)
         self.client.force_login(ada)
@@ -31,6 +33,49 @@ class TrainingAnlegenTests(TestCase):
         self.assertContains(liste, "Brüche üben")
         self.assertNotContains(liste, "Fremdes Training")
 
+    def test_konto_ohne_ausbilderrolle_kann_kein_training_anlegen(self) -> None:
+        """Die Ausbilder-UI weist eingeloggte Teilnehmer:innen zurück."""
+        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        self.client.force_login(teilnehmerin)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:anlegen"), {"name": "Kein Training"}
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.client.get(reverse("training:liste")).status_code, 403)
+        for url in (
+            reverse("training:kuratieren", args=[1]),
+            reverse("training:vignette_hinzufuegen", args=[1, 1]),
+            reverse("training:vignette_entfernen", args=[1, 1]),
+            reverse("training:veroeffentlichen", args=[1]),
+        ):
+            self.assertEqual(self.client.post(url).status_code, 403)
+        self.assertFalse(Training.objects.exists())
+
+    def test_administratorin_erreicht_alle_eigenen_trainings(self) -> None:
+        """Die administrative Sonderrolle darf die Ausbilder-UI vollständig nutzen."""
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        eigenes: Training = Training.objects.create(name="Brüche", eigentuemerin=ada)
+        fremdes: Training = Training.objects.create(name="Prozente", eigentuemerin=grace)
+        self.client.force_login(administratorin)
+
+        liste: HttpResponse = self.client.get(reverse("training:liste"))
+        angelegt: HttpResponse = self.client.post(
+            reverse("training:anlegen"), {"name": "Neues Training"}
+        )
+        veroeffentlicht: HttpResponse = self.client.post(
+            reverse("training:veroeffentlichen", args=[eigenes.pk])
+        )
+
+        self.assertContains(liste, eigenes.name)
+        self.assertContains(liste, fremdes.name)
+        self.assertEqual(angelegt.status_code, 302)
+        self.assertEqual(veroeffentlicht.status_code, 302)
+
 
 class TrainingKuratierenTests(TestCase):
     """Ausbilder:innen kuratieren finale Vignetten ihres Eigentümer-Kreises."""
@@ -40,6 +85,7 @@ class TrainingKuratierenTests(TestCase):
     ) -> None:
         """Auswahl, Austausch und Veröffentlichen laufen über HTTP."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         eigene_historie.eigentuemerinnen.add(ada)
@@ -124,6 +170,7 @@ class TrainingSichtbarkeitTests(TestCase):
     def test_fremdes_training_gibt_auch_ueber_die_detail_url_404(self) -> None:
         """Die Detail-View lädt ausschließlich über sichtbar_fuer()."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         fremdes: Training = Training.objects.create(
             name="Fremdes Training", eigentuemerin=grace

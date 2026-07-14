@@ -4,6 +4,7 @@ from time import monotonic
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
@@ -405,7 +406,6 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
     if antwortversuch.endgueltig_gescheitert:
         return _training_fehler_anzeigen(request, sitzung)
     if _training_budget_erschoepft(request, sitzung):
-        sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
         return _training_debrief_anzeigen(request, sitzung)
     _training_zeitbudget_fortsetzen(request, sitzung)
     return render(
@@ -425,7 +425,6 @@ def training_beenden(request: HttpRequest) -> HttpResponse:
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return _training_fehler_anzeigen(request, sitzung)
     _training_zeitbudget_anhalten(request)
-    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGESCHLOSSEN)
     return _training_debrief_anzeigen(request, sitzung)
 
 
@@ -454,7 +453,11 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
-    if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _training_fehler_anzeigen(request, sitzung)
-    DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    with transaction.atomic():
+        sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        if sitzung.status == Sitzung.Status.GESCHEITERT:
+            return _training_fehler_anzeigen(request, sitzung)
+        if sitzung.status != Sitzung.Status.LAUFEND:
+            return _training_zur_auswahl_zurueckkehren(request, sitzung)
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     return _training_zur_auswahl_zurueckkehren(request, sitzung)

@@ -16,7 +16,13 @@ from vignetten.models import Vignette, Vignettenhistorie
 class TrainingssitzungTests(TestCase):
     """Die Sitzungs-Views bewahren terminale Trainingszustände."""
 
-    def _sitzung_starten(self, skript: list[dict[str, str]]) -> Training:
+    def _sitzung_starten(
+        self,
+        skript: list[dict[str, str]],
+        *,
+        budget_typ: Vignette.BudgetTyp = Vignette.BudgetTyp.SCHRITTE,
+        budget_wert: int = 3,
+    ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
@@ -44,8 +50,8 @@ class TrainingssitzungTests(TestCase):
             fach="Mathematik",
             thema="Brüche",
             klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=3,
+            budget_typ=budget_typ,
+            budget_wert=budget_wert,
             gepinnter_kern=kern,
         )
         training.vignetten.add(vignette)
@@ -71,6 +77,7 @@ class TrainingssitzungTests(TestCase):
     def test_abbrechen_setzt_den_gewollten_status_ohne_diagnose(self) -> None:
         """Ein aktiver Abbruch bleibt vom technischen Scheitern unterscheidbar."""
         training: Training = self._sitzung_starten([])
+        self.client.post(reverse("sitzungen:training_beenden"))
 
         response: HttpResponse = self.client.post(reverse("sitzungen:training_abbrechen"))
 
@@ -79,15 +86,70 @@ class TrainingssitzungTests(TestCase):
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
 
-    def test_abbrechen_nach_gespraechsende_bleibt_im_debrief(self) -> None:
-        """Ein veralteter Abbruch-POST macht einen Abschluss nicht zum Fehler."""
-        self._sitzung_starten([])
-        self.client.post(reverse("sitzungen:training_beenden"))
-
-        response: HttpResponse = self.client.post(
-            reverse("sitzungen:training_abbrechen")
+        session = self.client.session
+        session["training_sitzung_pk"] = sitzung.pk
+        session.save()
+        stale_diagnose: HttpResponse = self.client.post(
+            reverse("sitzungen:training_debrief"), {"diagnose": "Bruchfehler"}
         )
 
-        self.assertContains(response, "Debrief")
-        self.assertNotContains(response, "Die Antwort konnte nicht erzeugt werden.")
+        self.assertRedirects(stale_diagnose, reverse("training:detail", args=[training.pk]))
+        sitzung.refresh_from_db()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
+        self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_schrittbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
+        """Auch ein ausgeschöpftes Schrittbudget schließt erst mit Diagnose ab."""
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
+            budget_wert=1,
+        )
+
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(debrief, "Debrief")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+        self.assertFalse(Diagnose.objects.exists())
+
+        fertig: HttpResponse = self.client.post(
+            reverse("sitzungen:training_debrief"), {"diagnose": "Bruchfehler"}
+        )
+
+        self.assertEqual(fertig.status_code, 302)
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertEqual(Diagnose.objects.get().text, "Bruchfehler")
+
+    def test_debrief_nach_vorzeitigem_gespraechsende_bleibt_laufend(self) -> None:
+        """Der Debrief schließt die Sitzung erst mit ihrer Diagnose ab."""
+        training: Training = self._sitzung_starten([])
+        self.client.post(reverse("sitzungen:training_beenden"))
+
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.LAUFEND)
+        self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_debrief"), {"diagnose": "Bruchfehler"}
+        )
+
+        self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertEqual(Diagnose.objects.get(sitzung=sitzung).text, "Bruchfehler")
+
+    def test_zeitbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
+        """Auch ein ausgeschöpftes Zeitbudget schließt erst mit Diagnose ab."""
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
+            budget_typ=Vignette.BudgetTyp.ZEIT,
+            budget_wert=0,
+        )
+
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(debrief, "Debrief")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+        self.assertFalse(Diagnose.objects.exists())

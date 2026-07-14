@@ -1,5 +1,7 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
+from typing import TYPE_CHECKING
+
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
@@ -14,6 +16,29 @@ from sitzungen.sink import DBSink
 
 from .models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
+
+if TYPE_CHECKING:
+    from konten.models import Konto
+
+
+_AUSBILDERIN_GRUPPE: str = "Ausbilder:in"
+_ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
+
+
+def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
+    """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
+
+    return konto.groups.filter(
+        name__in=[_AUSBILDERIN_GRUPPE, _ADMINISTRATORIN_GRUPPE]
+    ).exists()
+
+
+def _ausbilderin_erforderlich(request: HttpRequest) -> HttpResponse | None:
+    """Weist Konten ohne Ausbilder- oder Administrationsrolle ab."""
+
+    if not _ausbilderin_oder_administratorin(request.user):
+        return HttpResponse(status=403)
+    return None
 
 
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
@@ -48,6 +73,9 @@ def katalog(request: HttpRequest) -> HttpResponse:
 @login_required
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die für die eingeloggte Person sichtbaren eigenen Trainings."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     return render(
         request,
         "training/liste.html",
@@ -58,6 +86,9 @@ def liste(request: HttpRequest) -> HttpResponse:
 @login_required
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt ein Training für die eingeloggte Person an."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     form: TrainingForm = TrainingForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         training: Training = form.save(commit=False)
@@ -84,6 +115,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt ein eigenes Training zur Kuratierung."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     training: Training = _sichtbares_training(request, pk)
     return render(
         request,
@@ -100,6 +134,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Nimmt eine eigene finale Vignette in ein sichtbares Training auf."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
@@ -113,6 +150,9 @@ def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> Htt
 @login_required
 def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Entfernt eine gebundene Vignette aus einem sichtbaren Training."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
@@ -124,6 +164,9 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
 @login_required
 def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
     """Veröffentlicht einen sichtbaren Trainingsentwurf."""
+    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
