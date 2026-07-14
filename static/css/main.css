@@ -140,7 +140,7 @@ a:hover {
     background: var(--color-danger);
 }
 .button--danger:hover {
-    background: var(--phsg-red-deep);
+    background: var(--color-danger-emphasis);
 }
 
 /* ---- Bereichs-Chrome ---- */
@@ -148,25 +148,21 @@ a:hover {
 .card--participant {
     --area-solid: var(--color-area-participant-solid);
     --area-on-solid: var(--color-area-participant-on-solid);
-    --area-tint: var(--color-area-participant-tint);
 }
 .area--authoring,
 .card--authoring {
     --area-solid: var(--color-area-authoring-solid);
     --area-on-solid: var(--color-area-authoring-on-solid);
-    --area-tint: var(--color-area-authoring-tint);
 }
 .area--research,
 .card--research {
     --area-solid: var(--color-area-research-solid);
     --area-on-solid: var(--color-area-research-on-solid);
-    --area-tint: var(--color-area-research-tint);
 }
 .area--system,
 .card--system {
     --area-solid: var(--color-area-system-solid);
     --area-on-solid: var(--color-area-system-on-solid);
-    --area-tint: var(--color-area-system-tint);
 }
 
 .area-band {
@@ -189,7 +185,7 @@ a:hover {
     overflow: hidden;
     border: 1px solid var(--area-solid, var(--color-border));
     border-radius: var(--radius);
-    background: var(--area-tint, var(--color-surface));
+    background: var(--color-surface);
 }
 .card__header {
     padding: var(--space-2) var(--space-3);
@@ -209,7 +205,7 @@ a:hover {
 
 .badge {
     display: inline-block;
-    padding: 0.25em 0.75em;
+    padding: var(--space-1) var(--space-2);
     border-radius: 999px;
     font-size: 0.875rem;
     font-weight: 600;
@@ -219,11 +215,11 @@ a:hover {
     color: var(--color-text-muted);
 }
 .badge--final {
-    background: var(--phsg-green-light);
-    color: var(--phsg-green-deep);
+    background: var(--color-success);
+    color: var(--color-text-on-accent);
 }
 .badge--archived {
-    background: var(--phsg-gray-200);
+    background: var(--color-border);
     color: var(--color-text-muted);
 }
 
@@ -233,7 +229,9 @@ a:hover {
     margin-bottom: var(--space-1);
     font-weight: 600;
 }
-.form :is(input, textarea, select) {
+input,
+textarea,
+select {
     width: 100%;
     padding: var(--space-1);
     border: 1px solid var(--color-border);
@@ -242,11 +240,13 @@ a:hover {
     color: var(--color-text);
     font: inherit;
 }
-.form textarea {
+textarea {
     min-height: 8rem;
     resize: vertical;
 }
-.form :is(input, textarea, select):focus {
+input:focus,
+textarea:focus,
+select:focus {
     border-color: var(--color-accent);
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
@@ -268,22 +268,22 @@ a:hover {
     border-radius: var(--radius);
 }
 .message--success {
-    border-color: var(--phsg-green-dark);
-    background: var(--phsg-green-light);
-    color: var(--phsg-green-deep);
+    border-color: var(--color-success);
+    background: var(--color-surface);
+    color: var(--color-text);
 }
 .message--info {
-    border-color: var(--phsg-blue-dark);
-    background: var(--phsg-blue-light);
-    color: var(--phsg-blue-deep);
+    border-color: var(--color-info);
+    background: var(--color-surface);
+    color: var(--color-text);
 }
 .message--warning {
-    border-color: var(--phsg-yellow-dark);
-    background: var(--phsg-yellow-light);
-    color: var(--phsg-yellow-deep);
+    border-color: var(--color-danger);
+    background: var(--color-surface);
+    color: var(--color-text);
 }
 .message--error {
     border-color: var(--color-danger);
-    background: var(--color-danger-tint);
-    color: var(--phsg-red-deep);
+    background: var(--color-danger);
+    color: var(--color-text-on-accent);
 }

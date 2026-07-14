@@ -26,7 +26,7 @@
     --phsg-black: #000000;
 
     /* ---- Primitive: Sekundärpalette (Light / Bright / Dark / Deep) ----
-       Vorerst ungenutzt; angelegt für spätere Kategorie-Kacheln u. Ä. */
+       Quelle für die semantischen Bereichs- und Rückmeldungsfarben. */
     --phsg-green-light: #d8ecd8;
     --phsg-green-bright: #1fc070;
     --phsg-green-dark: #009b56;
@@ -83,6 +83,11 @@
     --color-area-system-tint: var(--phsg-blue-light);
     --color-danger: var(--phsg-red-dark);
     --color-danger-tint: var(--phsg-red-light);
+    --color-danger-emphasis: var(--phsg-red-deep);
+
+    /* ---- Semantisch: Status- und Rückmeldungsfarben ---- */
+    --color-success: var(--phsg-green-dark);
+    --color-info: var(--phsg-blue-dark);
 
     /* ---- Typografie ---- */
     --font-heading: "Platypi", Georgia, serif;

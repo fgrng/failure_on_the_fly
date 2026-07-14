@@ -21,6 +21,9 @@ TOKENS: tuple[tuple[str, str], ...] = (
     ("--color-area-system-tint", "--phsg-blue-light"),
     ("--color-danger", "--phsg-red-dark"),
     ("--color-danger-tint", "--phsg-red-light"),
+    ("--color-danger-emphasis", "--phsg-red-deep"),
+    ("--color-success", "--phsg-green-dark"),
+    ("--color-info", "--phsg-blue-dark"),
 )
 COMPONENT_SELECTORS: tuple[str, ...] = (
     ".area-band",
@@ -72,7 +75,20 @@ def test_design_system_exposes_shared_component(selector: str, main_css: str) ->
     assert selector in main_css
 
 
-def test_cards_default_to_the_surface_tint(main_css: str) -> None:
-    """Karten ohne Bereichsfarbe verwenden die neutrale Oberfläche."""
+def test_card_body_stays_on_the_neutral_surface(main_css: str) -> None:
+    """Bereichsfarben bleiben im Rahmen und Kopf statt im Karteninhalt."""
 
-    assert "background: var(--area-tint, var(--color-surface));" in main_css
+    assert "background: var(--color-surface);" in main_css
+    assert "background: var(--area-tint" not in main_css
+
+
+def test_form_controls_are_styled_without_a_form_wrapper(main_css: str) -> None:
+    """Die generischen Formularstile benötigen keine zusätzliche Hülle."""
+
+    assert "input,\ntextarea,\nselect {" in main_css
+
+
+def test_components_only_consume_semantic_color_tokens(main_css: str) -> None:
+    """Komponenten greifen nicht direkt auf PHSG-Farbprimitive zu."""
+
+    assert "var(--phsg-" not in main_css
