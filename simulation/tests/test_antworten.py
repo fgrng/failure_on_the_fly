@@ -54,7 +54,7 @@ def test_antwort_versuchen_haelt_formatbruch_neben_der_antwort_fest() -> None:
             sprachmodell="fake",
             parameter={
                 "skript": [
-                    {"fehler": "formatbruch"},
+                    {"fehler": "formatbruch", "rohantwort": "keine JSON-Antwort"},
                     {"denkspur": "Ich addiere.", "aeusserung": "2/5."},
                 ]
             },
@@ -65,6 +65,7 @@ def test_antwort_versuchen_haelt_formatbruch_neben_der_antwort_fest() -> None:
 
     assert antwortversuch.antwort is not None
     assert antwortversuch.fehlversuche[0].grund == "Formatbruch"
+    assert antwortversuch.fehlversuche[0].rohantwort == "keine JSON-Antwort"
 
 
 def test_antwort_versuchen_haelt_anbieterfehler_neben_der_antwort_fest() -> None:

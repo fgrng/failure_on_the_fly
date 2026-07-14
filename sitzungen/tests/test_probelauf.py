@@ -1,16 +1,14 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
-from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -83,6 +81,11 @@ class ProbelaufStartTests(TestCase):
         anzahl_vignetten: int = Vignette.objects.count()
         anzahl_kerne: int = Simulationskern.objects.count()
         anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
+        anzahl_teilnahmen: int = Teilnahme.objects.count()
+        anzahl_sitzungen: int = Sitzung.objects.count()
+        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
+        anzahl_fehlversuche: int = Fehlversuch.objects.count()
+        anzahl_diagnosen: int = Diagnose.objects.count()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         self.client.get(reverse("sitzungen:probelauf_auswahl"))
@@ -96,6 +99,11 @@ class ProbelaufStartTests(TestCase):
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
+        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
+        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
+        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
+        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
+        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
 
 
 class ProbelaufGespraechTests(ProbelaufStartTests):
@@ -122,6 +130,11 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         anzahl_vignetten: int = Vignette.objects.count()
         anzahl_kerne: int = Simulationskern.objects.count()
         anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
+        anzahl_teilnahmen: int = Teilnahme.objects.count()
+        anzahl_sitzungen: int = Sitzung.objects.count()
+        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
+        anzahl_fehlversuche: int = Fehlversuch.objects.count()
+        anzahl_diagnosen: int = Diagnose.objects.count()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         erste_antwort: HttpResponse = self.client.post(
@@ -140,16 +153,20 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(zweite_antwort, "Ich rechne eins plus eins und zwei plus drei.")
         self.assertEqual(self.client.session["probelauf"]["gespraechsschritte"], [
             {
+                "reihenfolge": 1,
                 "eingabe": "Wie rechnest du?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                 "native_reasoning_spur": "native erste Spur",
+                "fehlversuche": [],
             },
             {
+                "reihenfolge": 2,
                 "eingabe": "Und warum?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                 "native_reasoning_spur": "native erste Spur",
+                "fehlversuche": [],
             },
         ])
         zweiter_prompt: str = FakeSprachmodell.letzte_anfragen[-1][1]
@@ -158,6 +175,11 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
+        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
+        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
+        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
+        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
+        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
 
     def test_native_reasoning_spur_fehlt_ohne_anbieterwert(self) -> None:
         """Die native Spur ist ein optionaler Zusatz zur immer sichtbaren Denkspur."""
@@ -193,14 +215,41 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.views.antwort_versuchen", wraps=antwort_versuchen
-        ) as antworten:
-            self.client.post(
-                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
-            )
-            self.client.post(
-                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
-            )
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
+        )
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+        )
 
-        self.assertEqual(antworten.call_args.args[3], [""])
+        self.assertIn(
+            "Verlauf:\n\n\nEingabe:\nZweiter Schritt",
+            FakeSprachmodell.letzte_anfragen[-1][1],
+        )
+
+    def test_gescheiterter_probelauf_nimmt_keinen_weiteren_schritt_an(self) -> None:
+        """Der endgültig gescheiterte Schritt beendet das Diagnosegespräch."""
+
+        self.konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {"fehler": "anbieterfehler"},
+                    {"fehler": "anbieterfehler"},
+                    {"fehler": "anbieterfehler"},
+                    {"denkspur": "unverwendet", "aeusserung": "unverwendet"},
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
+        )
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+        )
+
+        self.assertContains(response, "Erster Schritt")
+        self.assertNotContains(response, "Zweiter Schritt")

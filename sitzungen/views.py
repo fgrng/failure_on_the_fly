@@ -1,40 +1,21 @@
 """Schreibfreie Views für den Probelauf einer Autorin."""
 
 from string import Template
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 
-from simulation import antwort_versuchen, render as simulation_render
+from simulation import render as simulation_render
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
+from sitzungen.sink import GespraechsschrittDaten, ScratchSink
 from vignetten.models import Vignette, Vignettenhistorie, rahmen_platzhalter
 
 if TYPE_CHECKING:
     from konten.models import Konto
-
-
-_PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
-
-
-class _Gespraechsschritt(TypedDict):
-    """Ein erfolgreicher, nur in der Session gehaltener Gesprächsschritt."""
-
-    eingabe: str
-    denkspur: str
-    aeusserung: str
-    native_reasoning_spur: str | None
-
-
-class _ProbelaufSession(TypedDict):
-    """Der schreibfreie Probelaufzustand in der Django-Session."""
-
-    vignette_pk: int
-    kern_pk: int
-    modell_konfiguration_pk: int
-    gespraechsschritte: list[_Gespraechsschritt]
 
 
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
@@ -54,18 +35,9 @@ def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     return simulation_render(vorlage, {name: platzhalter[name] for name in namen})
 
 
-def _probelauf_aus_session(request: HttpRequest) -> _ProbelaufSession:
-    """Liest den beim Probelaufstart festgelegten Session-Zustand."""
-
-    return cast(
-        _ProbelaufSession,
-        request.session[_PROBELAUF_SESSION_SCHLUESSEL],
-    )
-
-
 def _gespraech_anzeigen(
     request: HttpRequest,
-    schritte: list[_Gespraechsschritt],
+    schritte: list[GespraechsschrittDaten],
 ) -> HttpResponse:
     """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
 
@@ -100,13 +72,7 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if kern is None:
         raise RuntimeError("Probeläufe brauchen einen gepinnten Simulationskern.")
     modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
-    probelauf: _ProbelaufSession = {
-        "vignette_pk": vignette.pk,
-        "kern_pk": kern.pk,
-        "modell_konfiguration_pk": modell_konfiguration.pk,
-        "gespraechsschritte": [],
-    }
-    request.session[_PROBELAUF_SESSION_SCHLUESSEL] = probelauf
+    sitzung_starten(ScratchSink(request.session), vignette, kern, modell_konfiguration)
     return render(
         request,
         "sitzungen/probelauf_einleitung.html",
@@ -120,35 +86,32 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
-    probelauf: _ProbelaufSession = _probelauf_aus_session(request)
-    schritte: list[_Gespraechsschritt] = probelauf["gespraechsschritte"]
+    sink: ScratchSink = ScratchSink(request.session)
+    schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if request.method == "GET":
         return _gespraech_anzeigen(request, schritte)
+    if sink.ist_gescheitert:
+        return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user), pk=probelauf["vignette_pk"]
+        _eigene_entwuerfe(request.user), pk=sink.vignette_pk
     )
     kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=probelauf["kern_pk"]
+        Simulationskern.objects.all(), pk=sink.kern_pk
     )
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
-        ModellKonfiguration.objects.all(), pk=probelauf["modell_konfiguration_pk"]
+        ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
-    antwortversuch = antwort_versuchen(
+    gespraechsschritt_ausfuehren(
+        sink,
         vignette,
         kern,
         modell_konfiguration,
-        [schritt["aeusserung"] for schritt in schritte],
+        [
+            schritt["aeusserung"]
+            for schritt in schritte
+            if schritt["aeusserung"] is not None
+        ],
         eingabe,
     )
-    if antwortversuch.antwort is not None:
-        schritte.append(
-            {
-                "eingabe": eingabe,
-                "denkspur": antwortversuch.antwort.denkspur,
-                "aeusserung": antwortversuch.antwort.aeusserung,
-                "native_reasoning_spur": antwortversuch.native_reasoning_spur,
-            }
-        )
-        request.session.modified = True
     return _gespraech_anzeigen(request, schritte)

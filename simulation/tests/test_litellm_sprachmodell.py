@@ -121,14 +121,21 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
 
     completion = Mock(
         return_value=SimpleNamespace(
-            choices=[SimpleNamespace(finish_reason="content_filter")]
+            choices=[
+                SimpleNamespace(
+                    finish_reason="content_filter",
+                    message=SimpleNamespace(content="Gefilterte Rohantwort"),
+                )
+            ]
         )
     )
 
-    with pytest.raises(ContentFilter):
+    with pytest.raises(ContentFilter) as exc_info:
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System", "Eingabe", AUSGABE_SCHEMA
         )
+
+    assert exc_info.value.rohantwort == "Gefilterte Rohantwort"
 
 
 def test_litellm_adapter_kennzeichnet_content_policy_exception_als_filter() -> None:
