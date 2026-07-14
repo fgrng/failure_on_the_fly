@@ -1,6 +1,7 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
-from typing import TYPE_CHECKING
+from functools import wraps
+from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
 _AUSBILDERIN_GRUPPE: str = "Ausbilder:in"
 _ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
+P = ParamSpec("P")
 
 
 def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
@@ -33,12 +35,23 @@ def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
     ).exists()
 
 
-def _ausbilderin_erforderlich(request: HttpRequest) -> HttpResponse | None:
-    """Weist Konten ohne Ausbilder- oder Administrationsrolle ab."""
+def _ausbilderin_erforderlich(
+    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
+) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
+    """Schützt eine View der Ausbilder-UI mit der Rollenprüfung."""
 
-    if not _ausbilderin_oder_administratorin(request.user):
-        return HttpResponse(status=403)
-    return None
+    @wraps(view)
+    def geschuetzte_view(
+        request: HttpRequest,
+        /,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> HttpResponse:
+        if not _ausbilderin_oder_administratorin(request.user):
+            return HttpResponse(status=403)
+        return view(request, *args, **kwargs)
+
+    return geschuetzte_view
 
 
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
@@ -71,11 +84,9 @@ def katalog(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
-    """Listet die für die eingeloggte Person sichtbaren eigenen Trainings."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
+    """Listet die für die eingeloggte Person sichtbaren Trainings."""
     return render(
         request,
         "training/liste.html",
@@ -84,11 +95,9 @@ def liste(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt ein Training für die eingeloggte Person an."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
     form: TrainingForm = TrainingForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         training: Training = form.save(commit=False)
@@ -113,11 +122,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt ein eigenes Training zur Kuratierung."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
+    """Zeigt ein sichtbares Training zur Kuratierung."""
     training: Training = _sichtbares_training(request, pk)
     return render(
         request,
@@ -132,11 +139,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Nimmt eine eigene finale Vignette in ein sichtbares Training auf."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
@@ -148,11 +153,9 @@ def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> Htt
 
 
 @login_required
+@_ausbilderin_erforderlich
 def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Entfernt eine gebundene Vignette aus einem sichtbaren Training."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
@@ -162,11 +165,9 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
 
 
 @login_required
+@_ausbilderin_erforderlich
 def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
     """Veröffentlicht einen sichtbaren Trainingsentwurf."""
-    verweigert: HttpResponse | None = _ausbilderin_erforderlich(request)
-    if verweigert is not None:
-        return verweigert
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)

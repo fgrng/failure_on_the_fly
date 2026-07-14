@@ -53,7 +53,7 @@ class TrainingAnlegenTests(TestCase):
             self.assertEqual(self.client.post(url).status_code, 403)
         self.assertFalse(Training.objects.exists())
 
-    def test_administratorin_erreicht_alle_eigenen_trainings(self) -> None:
+    def test_administratorin_erreicht_alle_sichtbaren_trainings(self) -> None:
         """Die administrative Sonderrolle darf die Ausbilder-UI vollständig nutzen."""
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
         administratorin.groups.add(Group.objects.get(name="Administrator:in"))
