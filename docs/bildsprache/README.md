@@ -30,6 +30,25 @@ Originale (1024²) in `originale/`.
 Das Bildmodell gibt der stehenden Figur hartnäckig ein Gesichtsprofil + Frisur. Nächste Runde:
 strikt von hinten, nur Hinterköpfe erzwingen.
 
+## Bereichs-Farbcodierung (Entscheidung)
+
+Erweitert ADR-0023 (Sekundärpalette war „angelegt, aber ungenutzt"). Belegt jetzt:
+
+| Bereich | Farbe |
+|---|---|
+| Teilnehmende & Kern (Sitzung, Fragebogen, Hauptelemente) | **Grün / Mint** |
+| Ausbildungspraxis (Autor:innen, Trainings; neue Ausbildungs-Bereiche) | **Gelb** |
+| Forschung & Erhebung (Erhebungs-Management, Export; neue Forschungs-Bereiche) | **Violett** |
+| System & Administration (Nutzerverwaltung, Modell-Konfiguration, Simulationskern; neue Systembereiche) | **Blau** |
+| *(Rot)* | **Warn-/Gefahrenfarbe** — kein Bereich (Fehler, destruktive Aktionen) |
+
+**Entschieden:** Bereichsfarbe tönt nur das **Chrome** (Header, Kacheln, Badges); interaktive
+Grün-Akzente (Buttons, Links) bleiben überall konsistent. Visualisiert in `farbpalette.html`.
+
+**Rest-Punkt (vor ADR-Formalisierung):**
+- **Gelb + weisse Schrift:** Nur der Deep-Ton trägt sicheren Kontrast; ADR-Regel „Dark-Ton + weiss"
+  greift bei Gelb nicht. Sonderregel nötig (dunkle Schrift auf hellem Gelb).
+
 ## Herstellung
 
 Generiert mit `agy` (Nano Banana 2 / Google-Bildmodell), Prompt je Stil identisch bis auf die
@@ -37,4 +56,18 @@ Stil-Direktive. Wegwerf-Material zur Stilentscheidung — **nicht** die finalen 
 
 ## Verdict
 
-> _(offen — hier eintragen, sobald die Stilrichtung gewählt ist)_
+**Aquarell** gewählt, verwischter Brushstroke-Look, **Erste-Person-POV** (Teilnehmer:in = Nutzerin,
+nie im Bild).
+
+**Erzähllogik (3 Beats):**
+1. **Hospitation / Einstieg** — Blick aus der hinteren Reihe nach vorne; ganzer Klassenraum,
+   Lehrperson vorne läutet die Arbeitsphase ein. **Gewählt: Variante B (Schulklasse, luftig)**
+   → `originale/hospitation-einstieg-b.png`.
+2. **Gesprächsanlass** — über die Schulter aufs Arbeitsheft (Fehlermuster). **Gewählt: pov-a
+   (klar & mittig)** → `originale/hospitation-pov-a.png`. Heft-Inhalt bewusst abstrakt, ohne
+   Mathe-Symbole.
+3. **Debrief** — erfahrene Lehrperson fragt nach der Diagnose. **Gewählt: Version 1 (frontal,
+   aufgelöstes Gesicht)** → `originale/szene-debrief.png`.
+
+**Drei Kern-Bilder gesetzt:** Einstieg B · Gesprächsanlass pov-a · Debrief V1.
+Nächster Block: restliche Bildsprache (Buttons, Rahmungen, Icons, abstrakter Sprecher-Anker im Gespräch).
