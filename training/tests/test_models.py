@@ -42,6 +42,33 @@ def test_veroeffentlichen_lehnt_wiederholung_ab() -> None:
 
 
 @pytest.mark.django_db
+def test_veroeffentlichen_lehnt_veralteten_entwurf_ab() -> None:
+    """Auch eine veraltete Instanz kann ein Training nicht erneut veröffentlichen."""
+
+    training: Training = Training.objects.create(
+        name="Bruchrechnung",
+        eigentuemerin=Konto.objects.create_user(username="ada"),
+    )
+    veralteter_entwurf: Training = Training.objects.get(pk=training.pk)
+    training.veroeffentlichen()
+
+    with pytest.raises(ValidationError, match="Nur Entwürfe"):
+        veralteter_entwurf.veroeffentlichen()
+
+
+@pytest.mark.django_db
+def test_training_muss_als_entwurf_angelegt_werden() -> None:
+    """Veröffentlichen bleibt der einzige Einstieg in den veröffentlichten Zustand."""
+
+    with pytest.raises(ValidationError, match="Lebenszyklus"):
+        Training.objects.create(
+            name="Bruchrechnung",
+            eigentuemerin=Konto.objects.create_user(username="ada"),
+            zustand=Training.Zustand.VEROEFFENTLICHT,
+        )
+
+
+@pytest.mark.django_db
 def test_training_verhindert_direkte_zustandswechsel_beim_speichern() -> None:
     """Der Zustand eines gespeicherten Trainings wechselt nur im Lebenszyklus."""
 
@@ -99,6 +126,30 @@ def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
     training.vignetten.add(finale)
     training.veroeffentlichen()
     training.vignetten.remove(finale)
+
+    assert list(training.vignetten.all()) == []
+
+
+@pytest.mark.django_db
+def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() -> None:
+    """Die Rückwärtsrelation akzeptiert finale Fassungen und Archivieren entfernt sie."""
+
+    training: Training = Training.objects.create(
+        name="Bruchrechnung",
+        eigentuemerin=Konto.objects.create_user(username="ada"),
+    )
+    Vignette.objects._erstellen(historie=Vignettenhistorie.objects.create())
+    finale: Vignette = Vignette.objects._erstellen(
+        historie=Vignettenhistorie.objects.create(),
+        zustand=Vignette.Zustand.FINAL,
+        finalisiert_am=timezone.now(),
+        arbeitsheft_text="Bearbeitung",
+    )
+
+    finale.training_set.add(training)
+    assert list(training.vignetten.all()) == [finale]
+
+    finale.archivieren()
 
     assert list(training.vignetten.all()) == []
 

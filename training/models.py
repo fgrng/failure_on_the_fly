@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed
+from django.db.models.signals import m2m_changed, post_save
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -53,6 +53,8 @@ class Training(models.Model):
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert direkte Zustandswechsel."""
+        if self._state.adding and self.zustand != self.Zustand.ENTWURF:
+            raise ValidationError(_ZUSTANDSWECHSEL_FEHLERMELDUNG)
         if not self._state.adding:
             gespeichertes_training: Training = type(self).objects.get(pk=self.pk)
             if self.zustand != gespeichertes_training.zustand and not getattr(
@@ -64,7 +66,10 @@ class Training(models.Model):
     @transaction.atomic
     def veroeffentlichen(self) -> None:
         """Veröffentlicht genau einen Entwurf."""
-        if self.zustand != self.Zustand.ENTWURF:
+        gespeichertes_training: Training = type(self).objects.select_for_update().get(
+            pk=self.pk
+        )
+        if gespeichertes_training.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können veröffentlicht werden.")
         self._wechselt_zustand = True
         try:
@@ -88,7 +93,9 @@ class Trainingsbindung(models.Model):
 
 def _pruefe_finale_vignetten(
     sender: type[models.Model],
+    instance: models.Model,
     action: str,
+    reverse: bool,
     pk_set: set[int] | None,
     **kwargs: object,
 ) -> None:
@@ -97,6 +104,10 @@ def _pruefe_finale_vignetten(
         return
     from vignetten.models import Vignette
 
+    if reverse:
+        if instance.zustand != Vignette.Zustand.FINAL:
+            raise ValidationError("Trainings können nur finale Vignetten einbinden.")
+        return
     if (
         Vignette.objects.filter(pk__in=pk_set)
         .exclude(zustand=Vignette.Zustand.FINAL)
@@ -109,4 +120,23 @@ m2m_changed.connect(
     _pruefe_finale_vignetten,
     sender=Training.vignetten.through,
     dispatch_uid="training.pruefe_finale_vignetten",
+)
+
+
+def _archivierte_vignette_aus_trainings_entfernen(
+    sender: type[models.Model],
+    instance: models.Model,
+    **kwargs: object,
+) -> None:
+    """Entfernt eine gerade archivierte Vignette aus allen Trainings."""
+    from vignetten.models import Vignette
+
+    if instance.zustand == Vignette.Zustand.ARCHIVIERT:
+        Training.vignetten.through.objects.filter(vignette_id=instance.pk).delete()
+
+
+post_save.connect(
+    _archivierte_vignette_aus_trainings_entfernen,
+    sender="vignetten.Vignette",
+    dispatch_uid="training.archivierte_vignette_aus_trainings_entfernen",
 )
