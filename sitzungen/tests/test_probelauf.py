@@ -161,6 +161,15 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
 
+    def _budget_konfigurieren(
+        self, budget_typ: Vignette.BudgetTyp, budget_wert: int
+    ) -> None:
+        """Setzt das Gesprächsbudget des Probelaufentwurfs."""
+
+        self.entwurf.budget_typ = budget_typ
+        self.entwurf.budget_wert = budget_wert
+        self.entwurf.save()
+
     def _endgueltigen_fehlschlag_ausloesen(self) -> HttpResponse:
         # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
 
@@ -262,9 +271,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
     ) -> None:
         """Der letzte erlaubte Gesprächsschritt endet erst nach seiner Antwort."""
 
-        self.entwurf.budget_typ = Vignette.BudgetTyp.SCHRITTE
-        self.entwurf.budget_wert = 1
-        self.entwurf.save()
+        self._budget_konfigurieren(Vignette.BudgetTyp.SCHRITTE, 1)
         self._erfolgreiche_antwort_konfigurieren()
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
@@ -291,9 +298,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
     def test_zeitbudget_pausiert_waehrend_des_modellaufrufs(self) -> None:
         """Modellwartezeit erhöht den Zeitverbrauch des Probelaufs nicht."""
 
-        self.entwurf.budget_typ = Vignette.BudgetTyp.ZEIT
-        self.entwurf.budget_wert = 5
-        self.entwurf.save()
+        self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self._erfolgreiche_antwort_konfigurieren()
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
@@ -313,9 +318,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
     def test_zeitbudget_fuehrt_nach_laufendem_schritt_in_den_debrief(self) -> None:
         """Ein abgelaufenes Zeitbudget schneidet die erzeugte Antwort nicht ab."""
 
-        self.entwurf.budget_typ = Vignette.BudgetTyp.ZEIT
-        self.entwurf.budget_wert = 5
-        self.entwurf.save()
+        self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self._erfolgreiche_antwort_konfigurieren()
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))

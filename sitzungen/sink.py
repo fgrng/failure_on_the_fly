@@ -10,6 +10,8 @@ from vignetten.models import Vignette
 
 
 _PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
+_VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "verbrauchte_zeit"
+_ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "zeit_laeuft_seit"
 
 
 class FehlversuchDaten(TypedDict):
@@ -87,7 +89,7 @@ class ScratchSink:
             "gespraechsschritte": [],
         }
         if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
-            self._zustand["verbrauchte_zeit"] = 0.0
+            self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = 0.0
 
     @property
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
@@ -219,24 +221,26 @@ class ScratchSink:
     def verbrauchte_zeit(self) -> float:
         """Liefert die allein während des Autorinnenzugs gemessene Zeit."""
 
-        return cast(float, self._zustand.get("verbrauchte_zeit", 0.0))
+        return cast(float, self._zustand.get(_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0))
 
     def zeitbudget_fortsetzen(self) -> None:
         """Startet die Uhr, wenn die Autorin wieder eine Eingabe verfassen kann."""
 
         if (
-            "verbrauchte_zeit" in self._zustand
-            and "zeit_laeuft_seit" not in self._zustand
+            _VERBRAUCHTE_ZEIT_SCHLUESSEL in self._zustand
+            and _ZEIT_LAEUFT_SEIT_SCHLUESSEL not in self._zustand
         ):
-            self._zustand["zeit_laeuft_seit"] = monotonic()
+            self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = monotonic()
             self._als_geaendert_markieren()
 
     def zeitbudget_anhalten(self) -> None:
         """Hält die Uhr für Modellaufruf und Fehlversuche an."""
 
-        startzeit: float | None = self._zustand.pop("zeit_laeuft_seit", None)
+        startzeit: float | None = self._zustand.pop(
+            _ZEIT_LAEUFT_SEIT_SCHLUESSEL, None
+        )
         if startzeit is not None:
-            self._zustand["verbrauchte_zeit"] = self.verbrauchte_zeit + (
+            self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = self.verbrauchte_zeit + (
                 monotonic() - startzeit
             )
             self._als_geaendert_markieren()
