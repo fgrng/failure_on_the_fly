@@ -218,6 +218,10 @@ a:hover {
     background: var(--color-success);
     color: var(--color-text-on-accent);
 }
+.badge--system {
+    background: var(--color-area-system-tint);
+    color: var(--color-text);
+}
 .badge--archived {
     background: var(--color-border);
     color: var(--color-text-muted);

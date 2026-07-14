@@ -37,6 +37,7 @@ COMPONENT_SELECTORS: tuple[str, ...] = (
     ".badge",
     ".badge--draft",
     ".badge--final",
+    ".badge--system",
     ".badge--archived",
     ".form label",
     ".button--danger",
