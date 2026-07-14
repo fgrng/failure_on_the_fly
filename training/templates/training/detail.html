@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{{ training.name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ training.name }}</h1>
+    <p>{{ training.get_zustand_display }}</p>
+    {% if training.zustand == "entwurf" %}
+        <form method="post" action="{% url 'training:veroeffentlichen' training.pk %}">
+            {% csrf_token %}
+            <button type="submit">Veröffentlichen</button>
+        </form>
+    {% endif %}
+    <h2>Vignetten</h2>
+    <ul>
+        {% for vignette in training.vignetten.all %}
+            <li>
+                {{ vignette.fach }}
+                <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}">
+                    {% csrf_token %}
+                    <button type="submit">Entfernen</button>
+                </form>
+            </li>
+        {% empty %}
+            <li>Noch keine Vignetten aufgenommen.</li>
+        {% endfor %}
+    </ul>
+    <h2>Finale Vignetten aufnehmen</h2>
+    <ul>
+        {% for vignette in verfuegbare_vignetten %}
+            <li>
+                {{ vignette.fach }}
+                <form method="post" action="{% url 'training:vignette_hinzufuegen' training.pk vignette.pk %}">
+                    {% csrf_token %}
+                    <button type="submit">Aufnehmen</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

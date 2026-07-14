@@ -28,6 +28,10 @@ class TrainingQuerySet(models.QuerySet["Training"]):
             return self
         return self.filter(eigentuemerin=konto)
 
+    def veroeffentlicht(self) -> models.QuerySet["Training"]:
+        """Liefert die für Teilnehmende sichtbaren Trainings."""
+        return self.filter(zustand=Training.Zustand.VEROEFFENTLICHT)
+
 
 class Training(models.Model):
     """Ein von einer Ausbilderin kuratierter Satz finaler Vignetten."""
