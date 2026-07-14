@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ training.name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ training.name }}</h1>
+    <ul>
+        {% for vignette in training.vignetten.all %}
+            <li>
+                <a href="{% url 'training:wahl' training.pk vignette.pk %}">
+                    {{ vignette.historie.name|default:vignette.fach }}
+                </a>
+            </li>
+        {% empty %}
+            <li>Dieses Training enthält keine Vignetten.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

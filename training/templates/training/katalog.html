@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Trainings{% endblock %}
+
+{% block content %}
+    <h1>Trainings</h1>
+    <ul>
+        {% for training in trainings %}
+            <li><a href="{% url 'training:detail' training.pk %}">{{ training.name }}</a></li>
+        {% empty %}
+            <li>Keine veröffentlichten Trainings vorhanden.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}
