@@ -63,6 +63,20 @@ def _probelauf_vignetten(
     return _eigene_entwuerfe(konto)
 
 
+def _probelauf_vignette_und_kern(
+    request: HttpRequest, sink: ScratchSink
+) -> tuple[Vignette, Simulationskern]:
+    """Lädt die im Probelauf gepinnten und weiterhin zugänglichen Bestandteile."""
+
+    vignette: Vignette = get_object_or_404(
+        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
+    )
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=sink.kern_pk
+    )
+    return vignette, kern
+
+
 def _gespraech_anzeigen(
     request: HttpRequest,
     schritte: list[GespraechsschrittDaten],
@@ -100,12 +114,7 @@ def _gespeicherten_debrief_anzeigen(
 ) -> HttpResponse:
     """Rendert den Debrief aus dem festgehaltenen Probelaufzustand."""
 
-    vignette: Vignette = get_object_or_404(
-        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-    )
-    kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=sink.kern_pk
-    )
+    vignette, kern = _probelauf_vignette_und_kern(request, sink)
     return _debrief_anzeigen(request, vignette, kern, sink.gespraechsschritte)
 
 
@@ -217,12 +226,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         return _gespraech_anzeigen(request, schritte)
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
-    vignette: Vignette = get_object_or_404(
-        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
-    )
-    kern: Simulationskern = get_object_or_404(
-        Simulationskern.objects.all(), pk=sink.kern_pk
-    )
+    vignette, kern = _probelauf_vignette_und_kern(request, sink)
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
