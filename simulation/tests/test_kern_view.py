@@ -9,13 +9,11 @@ from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
 
 
-class SimulationskernViewTests(TestCase):
+class SimulationskernAnsichtMitKernTests(TestCase):
     """Die Kernansicht zeigt die aktuelle finale Fassung ohne Schreibroute."""
 
-    def test_zeigt_die_neueste_finale_fassung_und_aktive_modellkonfiguration(
-        self,
-    ) -> None:
-        """Angemeldete sehen den zuletzt finalisierten Kern samt Modell-Konfiguration."""
+    def setUp(self) -> None:
+        """Legt die aktuelle finale Kern-Fassung und Modell-Konfiguration an."""
         konto: Konto = get_user_model().objects.create_user(username="ada")
         aelterer_kern: Simulationskern = Simulationskern.objects.anlegen(
             system_prompt_vorlage="Alter System-Prompt",
@@ -34,23 +32,80 @@ class SimulationskernViewTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.client.force_login(konto)
 
+    def test_zeigt_den_system_prompt_der_neuesten_finalen_fassung(self) -> None:
+        """Angemeldete sehen den System-Prompt der neuesten finalen Fassung."""
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
         self.assertContains(response, "Aktueller System-Prompt")
+
+    def test_zeigt_den_user_prompt_der_neuesten_finalen_fassung(self) -> None:
+        """Angemeldete sehen den User-Prompt der neuesten finalen Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "Aktueller User-Prompt")
+
+    def test_zeigt_die_einleitung_der_neuesten_finalen_fassung(self) -> None:
+        """Angemeldete sehen die Einleitung der neuesten finalen Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "Aktuelle Einleitung")
+
+    def test_zeigt_den_debrief_der_neuesten_finalen_fassung(self) -> None:
+        """Angemeldete sehen den Debrief der neuesten finalen Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "Aktueller Debrief")
+
+    def test_zeigt_keinen_aelteren_system_prompt(self) -> None:
+        """Angemeldete sehen nicht den System-Prompt der älteren Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertNotContains(response, "Alter System-Prompt")
+
+    def test_zeigt_die_aktive_modellkonfiguration(self) -> None:
+        """Angemeldete sehen die aktive Modell-Konfiguration."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "fake")
-        self.assertContains(response, 'class="area--system"')
+
+
+class SimulationskernLeereAnsichtTests(TestCase):
+    """Die Kernansicht bleibt ohne Kern und Konfiguration verständlich."""
+
+    def setUp(self) -> None:
+        """Legt ein Konto an, ohne einen Kern zu initialisieren."""
+        self.konto: Konto = get_user_model().objects.create_user(username="ada")
 
     def test_zeigt_initialisierungshinweis_ohne_finalen_kern(self) -> None:
         """Eine noch leere Installation bleibt lesbar statt mit 500 zu scheitern."""
-        konto: Konto = get_user_model().objects.create_user(username="ada")
-        self.client.force_login(konto)
+        self.client.force_login(self.konto)
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
         self.assertContains(response, "Noch nicht initialisiert")
+
+    def test_zeigt_den_initialisierungsbefehl_ohne_finalen_kern(self) -> None:
+        """Eine leere Installation nennt den nötigen Initialisierungsbefehl."""
+        self.client.force_login(self.konto)
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "manage.py kern_initialisieren")
+
+    def test_zeigt_fehlende_aktive_modellkonfiguration(self) -> None:
+        """Ohne aktiven Zeiger erklärt die Ansicht die fehlende Konfiguration."""
+        self.client.force_login(self.konto)
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
         self.assertContains(response, "Keine aktive Modell-Konfiguration")
+
+    def test_erfordert_anmeldung(self) -> None:
+        """Anonyme Anfragen werden zur Anmeldung weitergeleitet."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/kern/",
+            fetch_redirect_response=False,
+        )

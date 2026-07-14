@@ -1,4 +1,4 @@
-"""Read-only Views für den Simulationskern."""
+"""Schreibgeschützte Views für den Simulationskern."""
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
@@ -10,12 +10,11 @@ from .models import AktiveModellKonfiguration, ModellKonfiguration, Simulationsk
 @login_required
 def kern(request: HttpRequest) -> HttpResponse:
     """Zeigt die jüngste finale Kern-Fassung und aktive Modell-Konfiguration."""
-    try:
-        simulationskern: Simulationskern | None = Simulationskern.objects.filter(
-            zustand=Simulationskern.Zustand.FINAL
-        ).latest("finalisiert_am", "pk")
-    except Simulationskern.DoesNotExist:
-        simulationskern = None
+    simulationskern: Simulationskern | None = (
+        Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL)
+        .order_by("-finalisiert_am", "-pk")
+        .first()
+    )
     try:
         modell_konfiguration: ModellKonfiguration | None = (
             ModellKonfiguration.objects.aktive()
