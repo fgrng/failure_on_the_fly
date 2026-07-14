@@ -1,7 +1,7 @@
-"""Schreibfreie Views für den Probelauf einer Autorin."""
+"""Schreibfreie Views für den Probelauf."""
 
 from string import Template
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import QuerySet
@@ -35,6 +35,7 @@ class _ProbelaufSession(TypedDict):
     kern_pk: int
     modell_konfiguration_pk: int
     gespraechsschritte: list[_Gespraechsschritt]
+    freie_auswahl: NotRequired[bool]
 
 
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
@@ -63,6 +64,20 @@ def _probelauf_aus_session(request: HttpRequest) -> _ProbelaufSession:
     )
 
 
+def _ist_administratorin(konto: "Konto") -> bool:
+    """Prüft die administrative Rolle über ihre Django-Group."""
+
+    return konto.groups.filter(name="Administrator:in").exists()
+
+
+def _admin_erforderlich(request: HttpRequest) -> HttpResponse | None:
+    """Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle."""
+
+    if not _ist_administratorin(request.user):
+        return HttpResponse(status=403)
+    return None
+
+
 def _gespraech_anzeigen(
     request: HttpRequest,
     schritte: list[_Gespraechsschritt],
@@ -73,6 +88,32 @@ def _gespraech_anzeigen(
         request,
         "sitzungen/probelauf_gespraech.html",
         {"gespraechsschritte": schritte},
+    )
+
+
+def _probelauf_starten(
+    request: HttpRequest,
+    vignette: Vignette,
+    kern: Simulationskern,
+    modell_konfiguration: ModellKonfiguration,
+    *,
+    freie_auswahl: bool = False,
+) -> HttpResponse:
+    """Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung."""
+
+    probelauf: _ProbelaufSession = {
+        "vignette_pk": vignette.pk,
+        "kern_pk": kern.pk,
+        "modell_konfiguration_pk": modell_konfiguration.pk,
+        "gespraechsschritte": [],
+    }
+    if freie_auswahl:
+        probelauf["freie_auswahl"] = True
+    request.session[_PROBELAUF_SESSION_SCHLUESSEL] = probelauf
+    return render(
+        request,
+        "sitzungen/probelauf_einleitung.html",
+        {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
     )
 
 
@@ -100,17 +141,51 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if kern is None:
         raise RuntimeError("Probeläufe brauchen einen gepinnten Simulationskern.")
     modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
-    probelauf: _ProbelaufSession = {
-        "vignette_pk": vignette.pk,
-        "kern_pk": kern.pk,
-        "modell_konfiguration_pk": modell_konfiguration.pk,
-        "gespraechsschritte": [],
-    }
-    request.session[_PROBELAUF_SESSION_SCHLUESSEL] = probelauf
+    return _probelauf_starten(request, vignette, kern, modell_konfiguration)
+
+
+@login_required
+def administratorin_probelauf_auswahl(request: HttpRequest) -> HttpResponse:
+    """Zeigt Administrator:innen alle frei kombinierbaren Tripelbestandteile."""
+
+    verweigert: HttpResponse | None = _admin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     return render(
         request,
-        "sitzungen/probelauf_einleitung.html",
-        {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+        "sitzungen/administratorin_probelauf_auswahl.html",
+        {
+            "kerne": Simulationskern.objects.all(),
+            "modell_konfigurationen": ModellKonfiguration.objects.all(),
+            "vignetten": Vignette.objects.einbindbar(),
+        },
+    )
+
+
+@login_required
+def administratorin_probelauf_starten(request: HttpRequest) -> HttpResponse:
+    """Fixiert ein administrativ gewähltes Tripel in der Session."""
+
+    verweigert: HttpResponse | None = _admin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=request.POST["kern_pk"]
+    )
+    modell_konfiguration: ModellKonfiguration = get_object_or_404(
+        ModellKonfiguration.objects.all(), pk=request.POST["modell_konfiguration_pk"]
+    )
+    vignette: Vignette = get_object_or_404(
+        Vignette.objects.einbindbar(), pk=request.POST["vignette_pk"]
+    )
+    return _probelauf_starten(
+        request,
+        vignette,
+        kern,
+        modell_konfiguration,
+        freie_auswahl=True,
     )
 
 
@@ -124,9 +199,12 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     schritte: list[_Gespraechsschritt] = probelauf["gespraechsschritte"]
     if request.method == "GET":
         return _gespraech_anzeigen(request, schritte)
-    vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user), pk=probelauf["vignette_pk"]
+    vignetten: QuerySet[Vignette] = (
+        Vignette.objects.einbindbar()
+        if probelauf.get("freie_auswahl")
+        else _eigene_entwuerfe(request.user)
     )
+    vignette: Vignette = get_object_or_404(vignetten, pk=probelauf["vignette_pk"])
     kern: Simulationskern = get_object_or_404(
         Simulationskern.objects.all(), pk=probelauf["kern_pk"]
     )

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Probelauf für Administrator:innen starten{% endblock %}
+
+{% block content %}
+    <h1>Probelauf für Administrator:innen starten</h1>
+    <form method="post" action="{% url 'sitzungen:administratorin_probelauf_starten' %}">
+        {% csrf_token %}
+        <label for="kern_pk">Simulationskern</label>
+        <select id="kern_pk" name="kern_pk">
+            {% for kern in kerne %}
+                <option value="{{ kern.pk }}">{{ kern.pk }} ({{ kern.get_zustand_display }})</option>
+            {% endfor %}
+        </select>
+        <label for="modell_konfiguration_pk">Modell-Konfiguration</label>
+        <select id="modell_konfiguration_pk" name="modell_konfiguration_pk">
+            {% for konfiguration in modell_konfigurationen %}
+                <option value="{{ konfiguration.pk }}">{{ konfiguration.pk }}: {{ konfiguration.sprachmodell }}</option>
+            {% endfor %}
+        </select>
+        <label for="vignette_pk">Vignette</label>
+        <select id="vignette_pk" name="vignette_pk">
+            {% for vignette in vignetten %}
+                <option value="{{ vignette.pk }}">{{ vignette.pk }}: {{ vignette.fach }} – {{ vignette.thema }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Probelauf starten</button>
+    </form>
+{% endblock %}
