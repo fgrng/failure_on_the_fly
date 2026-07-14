@@ -1,6 +1,7 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -313,3 +314,102 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
         self.assertEqual(Gespraechsschritt.objects.count(), anzahl_schritte)
         self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
+
+
+class AdministratorinProbelaufTests(TestCase):
+    """Die HTTP-Naht erlaubt Administrator:innen ein freies Probelauf-Tripel."""
+
+    def setUp(self) -> None:
+        """Legt ein administrativ frei kombinierbares Tripel an."""
+
+        self.administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        self.administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        autorin: Konto = get_user_model().objects.create_user(username="ada")
+        finaler_kern: Simulationskern = Simulationskern.objects.anlegen()
+        finaler_kern.finalisieren()
+        self.kern_entwurf: Simulationskern = finaler_kern.bearbeiten()
+        self.kern_entwurf.rahmenhandlung_einleitung = "$lehrperson_name begleitet Sie."
+        self.kern_entwurf.rahmenhandlung_debrief = "$lehrperson_name beendet den Probelauf."
+        self.kern_entwurf.save()
+        aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake"
+        )
+        ModellKonfiguration.objects.aktivieren(aktive_konfiguration)
+        self.test_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [{"denkspur": "Sie zählt Zähler und Nenner.", "aeusserung": "So."}]
+            },
+        )
+        self.vignette: Vignette = Vignette.objects.anlegen(autorin)
+        for feld, wert in {
+            "fehlermuster_beschreibung": "Zähler und Nenner addieren",
+            "lernauftrag": "Addiere Brüche.",
+            "arbeitsheft_beschreibung": "Eine Rechnung.",
+            "arbeitsheft_text": "1/2 + 1/3 = 2/5",
+            "schuelerin_name": "Mia",
+            "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+            "lehrperson_name": "Weber",
+            "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
+            "fach": "Mathematik",
+            "thema": "Brüche",
+            "klassenstufe": "5",
+            "budget_typ": Vignette.BudgetTyp.SCHRITTE,
+            "budget_wert": 3,
+        }.items():
+            setattr(self.vignette, feld, wert)
+        self.vignette.save()
+        self.vignette.finalisieren()
+        self.gepinnter_kern_pk: int = self.vignette.gepinnter_kern_id
+        self.client.force_login(self.administratorin)
+
+    def test_administratorin_startet_freies_tripel_ohne_vignetten_pin_oder_aktive_konfiguration_zu_aendern(
+        self,
+    ) -> None:
+        """Der freie Auswähler speichert das gewählte Tripel nur in der Session."""
+
+        auswahl: HttpResponse = self.client.get(
+            reverse("sitzungen:administratorin_probelauf_auswahl")
+        )
+
+        self.assertContains(auswahl, str(self.kern_entwurf.pk))
+        self.assertContains(auswahl, str(self.test_konfiguration.pk))
+        self.assertContains(auswahl, str(self.vignette.pk))
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:administratorin_probelauf_starten"),
+            {
+                "kern_pk": self.kern_entwurf.pk,
+                "modell_konfiguration_pk": self.test_konfiguration.pk,
+                "vignette_pk": self.vignette.pk,
+            },
+        )
+
+        self.assertContains(response, "Weber begleitet Sie.")
+        gespraech: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
+        )
+        self.assertContains(gespraech, "Sie zählt Zähler und Nenner.")
+        self.assertEqual(self.client.session["probelauf"]["kern_pk"], self.kern_entwurf.pk)
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+        self.assertContains(debrief, "Weber beendet den Probelauf.")
+        ende: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_debrief"), {"diagnose": "Bruchfehler"}
+        )
+        self.assertRedirects(
+            ende, reverse("sitzungen:administratorin_probelauf_auswahl")
+        )
+        self.assertNotIn("probelauf", self.client.session)
+        self.vignette.refresh_from_db()
+        self.assertEqual(self.vignette.gepinnter_kern_id, self.gepinnter_kern_pk)
+        self.assertNotEqual(ModellKonfiguration.objects.aktive(), self.test_konfiguration)
+
+    def test_nicht_administratorin_erreicht_freien_auswaehler_nicht(self) -> None:
+        """Der administrative Einstieg ist ausschließlich der Group vorbehalten."""
+
+        self.client.force_login(get_user_model().objects.create_user(username="grace"))
+
+        response: HttpResponse = self.client.get(
+            reverse("sitzungen:administratorin_probelauf_auswahl")
+        )
+
+        self.assertEqual(response.status_code, 403)

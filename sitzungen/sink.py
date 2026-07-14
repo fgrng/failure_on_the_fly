@@ -119,6 +119,12 @@ class ScratchSink:
         return self._zustand.get("status") == Sitzung.Status.GESCHEITERT
 
     @property
+    def freie_auswahl(self) -> bool:
+        """Kennzeichnet ein administrativ frei gewähltes Tripel."""
+
+        return bool(self._zustand.get("freie_auswahl"))
+
+    @property
     def _zustand(self) -> MutableMapping[str, Any]:
         # Kapselt die untypisierte Session-Struktur innerhalb des Scratch-Sinks.
 
@@ -176,6 +182,12 @@ class ScratchSink:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
         self._zustand["status"] = status
+        self._als_geaendert_markieren()
+
+    def freie_auswahl_setzen(self) -> None:
+        """Markiert das Tripel als administrativ frei gewählt."""
+
+        self._zustand["freie_auswahl"] = True
         self._als_geaendert_markieren()
 
     def verwerfen(self) -> None:

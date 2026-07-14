@@ -1,4 +1,4 @@
-"""Schreibfreie Views für den Probelauf einer Autorin."""
+"""Schreibfreie Views für den Probelauf."""
 
 from string import Template
 from typing import TYPE_CHECKING
@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
+_ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
+
+
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
     """Liefert die Entwürfe aus dem Eigentümer-Kreis eines Kontos."""
 
@@ -35,6 +38,30 @@ def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     return simulation_render(vorlage, {name: platzhalter[name] for name in namen})
 
 
+def _ist_administratorin(konto: "Konto") -> bool:
+    # Prüft die administrative Rolle über ihre Django-Group.
+
+    return konto.groups.filter(name=_ADMINISTRATORIN_GRUPPE).exists()
+
+
+def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
+    # Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle.
+
+    if not _ist_administratorin(request.user):
+        return HttpResponse(status=403)
+    return None
+
+
+def _probelauf_vignetten(
+    konto: "Konto", sink: ScratchSink
+) -> QuerySet[Vignette]:
+    """Begrenzt Vignetten passend zum gewählten Probelauf-Einstieg."""
+
+    if sink.freie_auswahl:
+        return Vignette.objects.einbindbar()
+    return _eigene_entwuerfe(konto)
+
+
 def _gespraech_anzeigen(
     request: HttpRequest,
     schritte: list[GespraechsschrittDaten],
@@ -45,6 +72,27 @@ def _gespraech_anzeigen(
         request,
         "sitzungen/probelauf_gespraech.html",
         {"gespraechsschritte": schritte},
+    )
+
+
+def _probelauf_starten(
+    request: HttpRequest,
+    vignette: Vignette,
+    kern: Simulationskern,
+    modell_konfiguration: ModellKonfiguration,
+    *,
+    freie_auswahl: bool = False,
+) -> HttpResponse:
+    # Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung.
+
+    sink: ScratchSink = ScratchSink(request.session)
+    sitzung_starten(sink, vignette, kern, modell_konfiguration)
+    if freie_auswahl:
+        sink.freie_auswahl_setzen()
+    return render(
+        request,
+        "sitzungen/probelauf_einleitung.html",
+        {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
     )
 
 
@@ -72,11 +120,51 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if kern is None:
         raise RuntimeError("Probeläufe brauchen einen gepinnten Simulationskern.")
     modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
-    sitzung_starten(ScratchSink(request.session), vignette, kern, modell_konfiguration)
+    return _probelauf_starten(request, vignette, kern, modell_konfiguration)
+
+
+@login_required
+def administratorin_probelauf_auswahl(request: HttpRequest) -> HttpResponse:
+    """Zeigt Administrator:innen alle frei kombinierbaren Tripelbestandteile."""
+
+    verweigert: HttpResponse | None = _administratorin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
     return render(
         request,
-        "sitzungen/probelauf_einleitung.html",
-        {"einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+        "sitzungen/administratorin_probelauf_auswahl.html",
+        {
+            "kerne": Simulationskern.objects.all(),
+            "modell_konfigurationen": ModellKonfiguration.objects.all(),
+            "vignetten": Vignette.objects.einbindbar(),
+        },
+    )
+
+
+@login_required
+def administratorin_probelauf_starten(request: HttpRequest) -> HttpResponse:
+    """Fixiert ein administrativ gewähltes Tripel in der Session."""
+
+    verweigert: HttpResponse | None = _administratorin_erforderlich(request)
+    if verweigert is not None:
+        return verweigert
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    kern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.all(), pk=request.POST["kern_pk"]
+    )
+    modell_konfiguration: ModellKonfiguration = get_object_or_404(
+        ModellKonfiguration.objects.all(), pk=request.POST["modell_konfiguration_pk"]
+    )
+    vignette: Vignette = get_object_or_404(
+        Vignette.objects.einbindbar(), pk=request.POST["vignette_pk"]
+    )
+    return _probelauf_starten(
+        request,
+        vignette,
+        kern,
+        modell_konfiguration,
+        freie_auswahl=True,
     )
 
 
@@ -93,7 +181,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     if sink.ist_gescheitert:
         return _gespraech_anzeigen(request, schritte)
     vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user), pk=sink.vignette_pk
+        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
     )
     kern: Simulationskern = get_object_or_404(
         Simulationskern.objects.all(), pk=sink.kern_pk
@@ -125,7 +213,7 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sink: ScratchSink = ScratchSink(request.session)
     vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user), pk=sink.vignette_pk
+        _probelauf_vignetten(request.user, sink), pk=sink.vignette_pk
     )
     kern: Simulationskern = get_object_or_404(
         Simulationskern.objects.all(), pk=sink.kern_pk
@@ -143,5 +231,11 @@ def probelauf_debrief(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    ScratchSink(request.session).verwerfen()
-    return redirect("sitzungen:probelauf_auswahl")
+    sink: ScratchSink = ScratchSink(request.session)
+    ziel: str = (
+        "sitzungen:administratorin_probelauf_auswahl"
+        if sink.freie_auswahl
+        else "sitzungen:probelauf_auswahl"
+    )
+    sink.verwerfen()
+    return redirect(ziel)

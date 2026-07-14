@@ -10,6 +10,16 @@ app_name: str = "sitzungen"
 urlpatterns: list[URLPattern] = [
     path("probelauf/", views.probelauf_auswahl, name="probelauf_auswahl"),
     path(
+        "probelauf/administratorin/",
+        views.administratorin_probelauf_auswahl,
+        name="administratorin_probelauf_auswahl",
+    ),
+    path(
+        "probelauf/administratorin/starten/",
+        views.administratorin_probelauf_starten,
+        name="administratorin_probelauf_starten",
+    ),
+    path(
         "probelauf/<int:pk>/starten/",
         views.probelauf_starten,
         name="probelauf_starten",
