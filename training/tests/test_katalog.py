@@ -88,3 +88,34 @@ class TrainingskatalogTests(TestCase):
             f"{reverse('login')}?next={reverse('training:katalog')}",
             fetch_redirect_response=False,
         )
+
+    def test_versteckt_nachtraeglich_archivierte_vignette(self) -> None:
+        """Archivierte Fassungen bleiben trotz bestehender Bindung unspielbar."""
+        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        studierende: Konto = get_user_model().objects.create_user(username="grace")
+        training: Training = Training.objects.create(
+            name="Bruchrechnung", eigentuemerin=ausbilderin
+        )
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+            name="Archivierte Brüche"
+        )
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="3/4 ist größer als 2/3.",
+        )
+        training.vignetten.add(vignette)
+        vignette.archivieren()
+        training.veroeffentlichen()
+        self.client.force_login(studierende)
+
+        detail: HttpResponse = self.client.get(
+            reverse("training:detail", args=[training.pk])
+        )
+        wahl: HttpResponse = self.client.get(
+            reverse("training:wahl", args=[training.pk, vignette.pk])
+        )
+
+        self.assertNotContains(detail, "Archivierte Brüche")
+        self.assertEqual(wahl.status_code, 404)

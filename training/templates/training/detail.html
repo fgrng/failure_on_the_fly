@@ -5,7 +5,7 @@
 {% block content %}
     <h1>{{ training.name }}</h1>
     <ul>
-        {% for vignette in training.vignetten.all %}
+        {% for vignette in vignetten %}
             <li>
                 <a href="{% url 'training:wahl' training.pk vignette.pk %}">
                     {{ vignette.historie.name|default:vignette.fach }}
