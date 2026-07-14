@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 
 _PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
+_ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
 
 
 class _Gespraechsschritt(TypedDict):
@@ -65,13 +66,13 @@ def _probelauf_aus_session(request: HttpRequest) -> _ProbelaufSession:
 
 
 def _ist_administratorin(konto: "Konto") -> bool:
-    """Prüft die administrative Rolle über ihre Django-Group."""
+    # Prüft die administrative Rolle über ihre Django-Group.
 
-    return konto.groups.filter(name="Administrator:in").exists()
+    return konto.groups.filter(name=_ADMINISTRATORIN_GRUPPE).exists()
 
 
 def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
-    """Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle."""
+    # Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle.
 
     if not _ist_administratorin(request.user):
         return HttpResponse(status=403)
@@ -99,7 +100,7 @@ def _probelauf_starten(
     *,
     freie_auswahl: bool = False,
 ) -> HttpResponse:
-    """Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung."""
+    # Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung.
 
     probelauf: _ProbelaufSession = {
         "vignette_pk": vignette.pk,
