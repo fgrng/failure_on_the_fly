@@ -3,7 +3,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 import litellm
 
@@ -95,9 +95,15 @@ class FakeSprachmodell:
 class LiteLLMSprachmodell:
     """Routet den konfigurierten Modell-String über LiteLLM."""
 
-    def __init__(self, modell: str, parameter: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        modell: str,
+        parameter: Mapping[str, Any],
+        completion: Callable[..., Any] | None = None,
+    ) -> None:
         self.modell: str = modell
         self.parameter: dict[str, Any] = dict(parameter)
+        self.completion: Callable[..., Any] = completion or litellm.completion
 
     def antworten(
         self,
@@ -105,10 +111,10 @@ class LiteLLMSprachmodell:
         user_prompt: str,
         ausgabe_schema: Mapping[str, object],
     ) -> tuple[Antwort, str | None]:
-        """Fordert JSON an und trennt die native Spur vom Structured Output."""
+        """Fordert eine JSON-Ausgabe an und trennt die native Reasoning-Spur ab."""
 
         try:
-            modellantwort: Any = litellm.completion(
+            modellantwort = self.completion(
                 model=self.modell,
                 messages=[
                     {"role": "system", "content": system_prompt},

@@ -32,10 +32,9 @@ def test_litellm_adapter_reicht_konfiguration_schema_und_native_spur_durch() -> 
         )
     )
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
-        antwort, native_reasoning_spur = LiteLLMSprachmodell(
-            "anthropic/claude-opus-4-8", {"temperature": 0.2}
-        ).antworten("System", "Eingabe", AUSGABE_SCHEMA)
+    antwort, native_reasoning_spur = LiteLLMSprachmodell(
+        "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
+    ).antworten("System", "Eingabe", AUSGABE_SCHEMA)
 
     assert antwort.denkspur == "Ich addiere."
     assert antwort.aeusserung == "2/5."
@@ -75,10 +74,9 @@ def test_litellm_adapter_zieht_native_spur_aus_thinking() -> None:
         )
     )
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
-        _, native_reasoning_spur = LiteLLMSprachmodell("openai/gpt-test", {}).antworten(
-            "System", "Eingabe", AUSGABE_SCHEMA
-        )
+    _, native_reasoning_spur = LiteLLMSprachmodell(
+        "openai/gpt-test", {}, completion
+    ).antworten("System", "Eingabe", AUSGABE_SCHEMA)
 
     assert native_reasoning_spur == "native Spur"
 
@@ -91,7 +89,8 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
             choices=[
                 SimpleNamespace(
                     message=SimpleNamespace(
-                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}'
+                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}',
+                        reasoning_content="native Spur",
                     )
                 )
             ]
@@ -110,6 +109,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
         )
 
     assert antwortversuch.antwort is not None
+    assert antwortversuch.native_reasoning_spur == "native Spur"
     assert completion.call_args.kwargs["model"] == "openai/gpt-test"
     assert completion.call_args.kwargs["max_tokens"] == 100
 
@@ -123,11 +123,8 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
         )
     )
 
-    with (
-        patch("simulation.sprachmodell.litellm.completion", completion),
-        pytest.raises(ContentFilter),
-    ):
-        LiteLLMSprachmodell("openai/gpt-test", {}).antworten(
+    with pytest.raises(ContentFilter):
+        LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System", "Eingabe", AUSGABE_SCHEMA
         )
 
@@ -137,10 +134,7 @@ def test_litellm_adapter_kennzeichnet_fehlende_antworthuelle_als_formatbruch() -
 
     completion = Mock(return_value=SimpleNamespace(choices=[]))
 
-    with (
-        patch("simulation.sprachmodell.litellm.completion", completion),
-        pytest.raises(Formatbruch),
-    ):
-        LiteLLMSprachmodell("openai/gpt-test", {}).antworten(
+    with pytest.raises(Formatbruch):
+        LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System", "Eingabe", AUSGABE_SCHEMA
         )
