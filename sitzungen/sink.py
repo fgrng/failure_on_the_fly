@@ -3,8 +3,10 @@
 from collections.abc import MutableMapping
 from typing import Any, Protocol, TypedDict, cast
 
+from django.db import transaction
+
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -61,6 +63,99 @@ class SitzungSink(Protocol):
 
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Setzt den Lebenszyklusstatus der Sitzung."""
+
+
+class DBSink:
+    """Persistiert eine Sitzung inkrementell über die ORM-Modelle."""
+
+    def __init__(self, teilnahme: Teilnahme) -> None:
+        """Bindet den Sink an die Teilnahme, zu der die Sitzung gehört."""
+
+        self.teilnahme: Teilnahme = teilnahme
+        self.sitzung: Sitzung | None = None
+
+    def sitzung_starten(
+        self,
+        vignette: Vignette,
+        simulationskern: Simulationskern,
+        modell_konfiguration: ModellKonfiguration,
+    ) -> None:
+        """Legt die identitätstragende Sitzung sofort an."""
+
+        self.sitzung = Sitzung.objects.create(
+            teilnahme=self.teilnahme,
+            vignette=vignette,
+            simulationskern=simulationskern,
+            modell_konfiguration=modell_konfiguration,
+        )
+
+    def gespraechsschritt_anhaengen(
+        self,
+        *,
+        eingabe: str,
+        denkspur: str,
+        aeusserung: str,
+        native_reasoning_spur: str | None,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        """Schreibt einen geglückten Schritt und seine Fehlversuche atomar."""
+
+        with transaction.atomic():
+            schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+                sitzung=self._sitzung,
+                eingabe=eingabe,
+                denkspur=denkspur,
+                aeusserung=aeusserung,
+                native_reasoning_spur=native_reasoning_spur,
+                reihenfolge=self._naechste_reihenfolge(),
+            )
+            Fehlversuch.objects.bulk_create(
+                [
+                    Fehlversuch(gespraechsschritt=schritt, **fehlversuch)
+                    for fehlversuch in fehlversuche
+                ]
+            )
+
+    def gescheiterten_schritt_anhaengen(
+        self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
+    ) -> None:
+        """Schreibt einen antwortlosen Schritt samt seinen Fehlversuchen atomar."""
+
+        with transaction.atomic():
+            Gespraechsschritt.objects.answerless_anlegen(
+                sitzung=self._sitzung,
+                eingabe=eingabe,
+                reihenfolge=self._naechste_reihenfolge(),
+                fehlversuche=[
+                    Fehlversuch(**fehlversuch) for fehlversuch in fehlversuche
+                ],
+            )
+
+    def diagnose_setzen(self, text: str) -> None:
+        """Speichert die Diagnose und schließt die Sitzung gemeinsam ab."""
+
+        with transaction.atomic():
+            Diagnose.objects.create(sitzung=self._sitzung, text=text)
+            self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+
+    def status_setzen(self, status: Sitzung.Status) -> None:
+        """Persistiert einen Statusübergang sofort."""
+
+        self._sitzung.status = status
+        self._sitzung.save(update_fields=["status"])
+
+    @property
+    def _sitzung(self) -> Sitzung:
+        """Liefert die gestartete Sitzung oder weist auf einen falschen Ablauf hin."""
+
+        if self.sitzung is None:
+            raise RuntimeError("Der DB-Sink braucht zuerst eine gestartete Sitzung.")
+        return self.sitzung
+
+    def _naechste_reihenfolge(self) -> int:
+        """Bestimmt die fortlaufende Position des nächsten Gesprächsschritts."""
+
+        return self._sitzung.gespraechsschritt_set.count() + 1
 
 
 class ScratchSink:
