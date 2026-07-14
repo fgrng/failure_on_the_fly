@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_htmx",
     "konten",
+    "seeds",
     "simulation",
     "sitzungen",
     "training",
