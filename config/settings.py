@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "konten",
     "simulation",
     "sitzungen",
+    "training",
     "vignetten",
 ]
 
