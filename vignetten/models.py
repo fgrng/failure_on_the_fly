@@ -186,6 +186,16 @@ class Vignette(models.Model):
 
     objects: VignetteManager = VignetteManager()
 
+    @property
+    def lehrperson_bildkuerzel(self) -> str:
+        """Kürzel für die geschlechtsabhängige Rahmenhandlungs-Illustration (Einstieg, Debrief)."""
+        return "m" if self.lehrperson_geschlecht == self.Geschlecht.MAENNLICH else "w"
+
+    @property
+    def schuelerin_bildkuerzel(self) -> str:
+        """Kürzel für die geschlechtsabhängige Gesprächsanlass-Illustration."""
+        return "m" if self.schuelerin_geschlecht == self.Geschlecht.MAENNLICH else "w"
+
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
         if self._state.adding:

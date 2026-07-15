@@ -85,7 +85,7 @@ The session illustrations use a **transparent** background so the watercolour si
 
 - **Ask the model for a real alpha channel** in the prompt (e.g. *"save as PNG with a genuinely
   transparent background, real alpha channel, no white fill"*). Nano Banana (via `agy`) produces
-  proper RGBA with soft partial-alpha edges and no white halos.
+  proper RGBA with soft partial-alpha edges and no white halos. **IMPORTANT:** Ask the model to "auf reinweißem Grund malen, kein Schachbrett" (paint on a pure white background, no checkerboard). Otherwise, the image generation might bake a fake transparency checkerboard pattern directly into the image.
 - **Do NOT freistellen a paper-ground image post-hoc.** Naive flood-fill background removal on the
   existing warm-paper originals produces white halos around the soft watercolour fades and leaves
   white islands in enclosed light regions. Transparency must come from generation.

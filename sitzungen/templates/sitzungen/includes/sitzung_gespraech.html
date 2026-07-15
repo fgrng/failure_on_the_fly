@@ -4,7 +4,7 @@
         <span>Diagnosegespräch</span>
         <h1 id="session-gespraech-title">Eine Diagnose entwickeln</h1>
     </header>
-    <img class="session-illustration" src="{% static 'images/session/gespraechsanlass.webp' %}" alt="Aquarell über die Schulter einer lernenden Person, die auf ein aufgeschlagenes Heft mit angedeuteter, unleserlicher Handschrift blickt." width="800" height="800" loading="lazy" decoding="async">
+    <img class="session-illustration" src="{% static 'images/session/gespraechsanlass-'|add:vignette.schuelerin_bildkuerzel|add:'.webp' %}" alt="Aquarell über die Schulter einer lernenden Person, die auf ein aufgeschlagenes Heft mit angedeuteter, unleserlicher Handschrift blickt." width="800" height="800" loading="lazy" decoding="async">
 
     {% if gespraechseinleitung %}
         <p class="session-conversation__copy">{{ gespraechseinleitung }}</p>
