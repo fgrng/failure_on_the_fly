@@ -344,13 +344,12 @@ class Vignettenposition(models.Model):
     def clean(self) -> None:
         """Bindet Sitzung und gezogene Fassung an dieselbe Teilnahme."""
 
+        sitzung = self.sitzung
+        erhebungsbindung = self.erhebungsbindung
         fehler: dict[str, str] = {}
-        if (
-            self.sitzung.teilnahme_id
-            != self.erhebungsbindung.teilnahme_id
-        ):
+        if sitzung.teilnahme_id != erhebungsbindung.teilnahme_id:
             fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
-        if self.sitzung.vignette_id != self.vignette_id:
+        if sitzung.vignette_id != self.vignette_id:
             fehler["vignette"] = "Die Vignette stimmt nicht mit der Sitzung überein."
         if fehler:
             raise ValidationError(fehler)

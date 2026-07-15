@@ -20,6 +20,24 @@ from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
+def _erhebungsbindung_anlegen(
+    konto: Konto, teilnahme: Teilnahme
+) -> Erhebungsbindung:
+    """Erstellt eine Erhebungsbindung mit der kleinsten gültigen Umgebung."""
+
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    stichprobe: Stichprobe = Stichprobe.objects.create(
+        erhebung=erhebung,
+        beginn=timezone.now(),
+        ende=timezone.now(),
+    )
+    return Erhebungsbindung.objects.create(
+        stichprobe=stichprobe,
+        teilnahme=teilnahme,
+        token="2345-6789",
+    )
+
+
 @pytest.mark.django_db
 def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
     """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
@@ -37,18 +55,8 @@ def test_vignettenpositionen_einer_teilnahme_sind_nach_position_geordnet() -> No
     """Die Datenspur bewahrt die gezogene Vignetten-Reihenfolge je Teilnahme."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
-    stichprobe: Stichprobe = Stichprobe.objects.create(
-        erhebung=erhebung,
-        beginn=timezone.now(),
-        ende=timezone.now(),
-    )
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=stichprobe,
-        teilnahme=teilnahme,
-        token="2345-6789",
-    )
+    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     erste_vignette: Vignette = Vignette.objects.anlegen(konto)
@@ -95,16 +103,8 @@ def test_vignettenposition_lehnt_sitzung_einer_anderen_teilnahme_ab() -> None:
     """Eine Vignettenposition bleibt bei ihrer eigenen Erhebungsbindung."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
-    stichprobe: Stichprobe = Stichprobe.objects.create(
-        erhebung=erhebung,
-        beginn=timezone.now(),
-        ende=timezone.now(),
-    )
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=stichprobe,
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
+    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(
+        konto, Teilnahme.objects.create()
     )
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
@@ -130,18 +130,8 @@ def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None
     """Die Datenspur bewahrt die tatsächlich in der Sitzung gezogene Fassung."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
-    stichprobe: Stichprobe = Stichprobe.objects.create(
-        erhebung=erhebung,
-        beginn=timezone.now(),
-        ende=timezone.now(),
-    )
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=stichprobe,
-        teilnahme=teilnahme,
-        token="2345-6789",
-    )
+    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     sitzungs_vignette: Vignette = Vignette.objects.anlegen(konto)
