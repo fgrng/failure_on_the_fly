@@ -286,5 +286,6 @@ def _sitzung_starten(
             ),
             "gespraechsschritte": [],
             "ist_probelauf": False,
+            "spracheingabe_verfuegbar": bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         },
     )

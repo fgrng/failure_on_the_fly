@@ -49,6 +49,7 @@ def _sitzung_anzeigen(
     erneute_eingabe: str | None = None,
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
+    spracheingabe_verfuegbar: bool = False,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -64,6 +65,7 @@ def _sitzung_anzeigen(
         "ist_gescheitert": ist_gescheitert,
         "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,
+        "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
@@ -441,6 +443,7 @@ def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpRe
         gespraechsschritte=_training_schritte(sitzung),
         ist_probelauf=False,
         zeigt_debrief=True,
+        spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
 
@@ -468,6 +471,7 @@ def _training_gespraech_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=False,
         ist_gescheitert=ist_gescheitert,
+        spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
 

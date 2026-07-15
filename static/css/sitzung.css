@@ -132,6 +132,17 @@
 .gespraechseingabe textarea { min-height: 104px; padding: var(--space-2) calc(var(--space-8) + var(--space-6)) var(--space-2) var(--space-2); border-radius: 14px; }
 .gespraechseingabe__senden { position: absolute; right: var(--space-1); bottom: var(--space-1); }
 
+.spracheingabe {
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+}
+
+.spracheingabe h2 { margin: 0 0 var(--space-1); font-size: 1rem; }
+.spracheingabe__status { margin: var(--space-1) 0 0; color: var(--color-text-muted); }
+.spracheingabe--aufnahme { background: var(--color-area-participant-tint); }
+
 .gespraechseingabe--fehler {
     padding: var(--space-3);
     border: 1px solid var(--color-danger);

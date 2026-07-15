@@ -82,6 +82,7 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Addiere zwei Brüche.")
         self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")
         self.assertContains(self.start_response, "Ihre nächste Frage")
+        self.assertContains(self.start_response, "Aufnahme starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:

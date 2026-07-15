@@ -19,12 +19,16 @@
     </div>
 {% else %}
     <div class="gespraechseingabe">
-        <form class="gespraechseingabe__formular" method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
             <button class="button gespraechseingabe__senden" type="submit">Senden</button>
         </form>
+        {% if spracheingabe_verfuegbar %}
+            {% url 'sitzungen:transkription' as transkription_url %}
+            {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" transkription_url=transkription_url %}
+        {% endif %}
     </div>
 {% endif %}
 

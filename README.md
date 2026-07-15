@@ -23,6 +23,12 @@ Audio zur Transkription an einen externen Auftragsverarbeiter übermittelt werde
 darf. Das Audio wird danach nicht gespeichert. Bei Ablehnung bleibt das Training
 uneingeschränkt über die Tastatur spielbar.
 
+Nach Einwilligung lässt sich jede Frage im Diagnosegespräch per Tastatur oder
+über „Aufnahme starten“ eingeben. Die Aufnahme wird bewusst beendet, direkt
+transkribiert und anschließend automatisch als Gesprächsschritt abgeschickt;
+das Transkript wird davor nicht bearbeitet. Bei einer leeren oder fehlgeschlagenen
+Transkription kann die Aufnahme wiederholt werden.
+
 ## Lokale Entwicklungsumgebung
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
