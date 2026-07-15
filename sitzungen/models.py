@@ -7,6 +7,16 @@ from django.db.models import Q
 class Teilnahme(models.Model):
     """Die anonyme Klammer für Sitzungen eines Aufrufers."""
 
+    audioverarbeitung_eingewilligt: models.BooleanField = models.BooleanField(
+        null=True,
+        default=None,
+    )
+
+    @property
+    def hat_in_audioverarbeitung_eingewilligt(self) -> bool:
+        """Macht die serverseitige Voraussetzung für Transkription abfragbar."""
+        return self.audioverarbeitung_eingewilligt is True
+
 
 class Sitzung(models.Model):
     """Eine persistierte Sitzung einer Vignette."""

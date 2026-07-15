@@ -61,8 +61,12 @@ class TrainingssitzungTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
-        self.start_response: HttpResponse = self.client.post(
+        self.client.post(
             reverse("training:wahl", args=[training.pk, vignette.pk])
+        )
+        self.start_response: HttpResponse = self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {"audioverarbeitung_eingewilligt": "ja"},
         )
         return training
 

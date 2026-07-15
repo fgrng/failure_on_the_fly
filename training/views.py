@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import TrainingForm
@@ -183,7 +183,14 @@ def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpRespon
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
     if request.method == "POST":
-        return _sitzung_starten(request, training, vignette)
+        bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
+        if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
+            return render(
+                request,
+                "training/einwilligung.html",
+                {"training": training, "vignette": vignette},
+            )
+        return _sitzung_starten(request, bindung, vignette)
     return render(
         request,
         "training/wahl.html",
@@ -191,11 +198,34 @@ def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpRespon
     )
 
 
-def _sitzung_starten(
-    request: HttpRequest, training: Training, vignette: Vignette
+@login_required
+def einwilligung(
+    request: HttpRequest, training_pk: int, vignette_pk: int
 ) -> HttpResponse:
-    """Bindet das Konto atomar und startet die Sitzung über den DB-Sink."""
+    """Hält die Entscheidung zur externen Audioverarbeitung an der Teilnahme fest."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _veroeffentlichtes_training(training_pk)
+    vignette: Vignette = get_object_or_404(
+        training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
+    )
+    bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
+    if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
+        return HttpResponseBadRequest("Die Einwilligung wurde bereits festgehalten.")
+    entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
+    if entscheidung not in {"ja", "nein"}:
+        return HttpResponseBadRequest("Bitte stimmen Sie zu oder lehnen Sie ab.")
+    bindung.teilnahme.audioverarbeitung_eingewilligt = (
+        entscheidung == "ja"
+    )
+    bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
+    return _sitzung_starten(request, bindung, vignette)
 
+
+def _trainingsbindung_laden_oder_anlegen(
+    request: HttpRequest, training: Training
+) -> Trainingsbindung:
+    """Lädt oder erzeugt die eine Trainingsbindung der teilnehmenden Person."""
     with transaction.atomic():
         bindung: Trainingsbindung | None = Trainingsbindung.objects.filter(
             training=training, konto=request.user
@@ -214,6 +244,15 @@ def _sitzung_starten(
                 bindung = Trainingsbindung.objects.select_related("teilnahme").get(
                     training=training, konto=request.user
                 )
+    return bindung
+
+
+def _sitzung_starten(
+    request: HttpRequest, bindung: Trainingsbindung, vignette: Vignette
+) -> HttpResponse:
+    """Bindet das Konto atomar und startet die Sitzung über den DB-Sink."""
+
+    with transaction.atomic():
         kern: Simulationskern | None = vignette.gepinnter_kern
         if kern is None:
             raise RuntimeError("Trainingsvignetten brauchen einen gepinnten Simulationskern.")
