@@ -36,18 +36,16 @@ Erweitert ADR-0023 (Sekundärpalette war „angelegt, aber ungenutzt"). Belegt j
 
 | Bereich | Farbe |
 |---|---|
-| Teilnehmende & Kern (Sitzung, Fragebogen, Hauptelemente) | **Grün / Mint** |
-| Ausbildungspraxis (Autor:innen, Trainings; neue Ausbildungs-Bereiche) | **Gelb** |
+| Teilnehmen & Trainingspraxis (Sitzung, Fragebogen, Trainings) | **Grün / Mint** |
+| Autor:in & Entwicklung (Vignetten-Editor, Simulationskern) | **Gelb** |
 | Forschung & Erhebung (Erhebungs-Management, Export; neue Forschungs-Bereiche) | **Violett** |
-| System & Administration (Nutzerverwaltung, Modell-Konfiguration, Simulationskern; neue Systembereiche) | **Blau** |
+| System & Administration (Nutzerverwaltung, Modell-Konfiguration; neue Systembereiche) | **Blau** |
 | *(Rot)* | **Warn-/Gefahrenfarbe** — kein Bereich (Fehler, destruktive Aktionen) |
 
 **Entschieden:** Bereichsfarbe tönt nur das **Chrome** (Header, Kacheln, Badges); interaktive
 Grün-Akzente (Buttons, Links) bleiben überall konsistent. Visualisiert in `farbpalette.html`.
 
-**Rest-Punkt (vor ADR-Formalisierung):**
-- **Gelb + weisse Schrift:** Nur der Deep-Ton trägt sicheren Kontrast; ADR-Regel „Dark-Ton + weiss"
-  greift bei Gelb nicht. Sonderregel nötig (dunkle Schrift auf hellem Gelb).
+Die konkrete Zuordnung und die Gelb-Sonderregel sind in `docs/adr/0024` festgelegt.
 
 ## Herstellung
 
@@ -71,10 +69,18 @@ nie im Bild).
 
 **Drei Kern-Bilder gesetzt:** Einstieg B · Gesprächsanlass pov-a · Debrief V1.
 Die 1024²-Originale bleiben unter `originale/`. Für die Sitzungsansicht liegen
-auf 800² skalierte WebP-Exporte unter `static/images/session/`:
+auf 800² skalierte WebP-Exporte unter `static/images/sitzung/`:
 
 - `rahmenhandlung-einstieg.webp`
 - `gespraechsanlass.webp`
 - `rahmenhandlung-debrief.webp`
 
-Nächster Block: restliche Bildsprache (Buttons, Rahmungen, Icons, abstrakter Sprecher-Anker im Gespräch).
+## Bewusst nicht weiterverfolgt
+
+- Die Textlabels und unterschiedlich ausgerichteten Sprechblasen unterscheiden die Beteiligten
+  im Diagnosegespräch ausreichend. Ein zusätzlicher abstrakter Sprecher-Anker wird vorerst
+  nicht gestaltet.
+- Leere Zustände und Onboarding erhalten vorerst keine eigene Aquarell-Gestaltung. Ein
+  konkreter Bedarf kann diese Entscheidung später wieder öffnen.
+
+Offen bleibt allein die Festlegung eines konsistenten Icon-Stils.

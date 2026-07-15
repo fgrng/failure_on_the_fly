@@ -1,0 +1,155 @@
+.sitzung-seite {
+    width: min(100%, 720px);
+    margin-inline: auto;
+    padding-bottom: var(--space-7);
+}
+
+.sitzung-abschnitt,
+.rahmenhandlung {
+    padding: var(--space-5) 0;
+    border-top: 1px solid var(--color-border);
+}
+
+.rahmenhandlung { padding-top: 0; border-top: 0; }
+
+.sitzung-illustration {
+    display: block;
+    width: min(100%, 420px);
+    height: auto;
+    margin: var(--space-3) auto;
+}
+
+.sitzung-abschnitt-kopf {
+    padding-bottom: var(--space-2);
+    border-bottom: 3px solid var(--color-text);
+}
+
+.sitzung-abschnitt-kopf span {
+    color: var(--color-area-participant-solid);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.sitzung-abschnitt-kopf h1 {
+    margin: var(--space-1) 0 0;
+    font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.rahmenhandlung__text,
+.gespraechseinleitung__text,
+.aufgabenkontext p,
+.sitzung-debrief__aufforderung {
+    font-family: var(--font-heading);
+    font-size: 1.45rem;
+    line-height: 1.5;
+}
+
+.rahmenhandlung__text { margin: var(--space-3) 0 0; }
+.gespraechseinleitung__text { margin: var(--space-3) 0 0; }
+.sitzung-debrief__aufforderung { margin: var(--space-4) 0 0; }
+
+.aufgabenkontext {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+}
+
+.aufgabenkontext h2 {
+    margin: 0 0 var(--space-1);
+    font-family: var(--font-body);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.aufgabenkontext p { margin: 0; }
+.arbeitsheft-inhalt { white-space: pre-wrap; }
+.aufgabenkontext img { display: block; max-width: 100%; height: auto; }
+.aufgabenkontext--arbeitsheft { margin-top: var(--space-3); }
+
+.diagnosegespraech-verlauf {
+    display: grid;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.gespraechsschritt { display: grid; gap: 12px; }
+.gespraechsschritt__eingabe,
+.gespraechsschritt__aeusserung { max-width: 88%; }
+
+.gespraechsschritt :is(.gespraechsschritt__eingabe, .gespraechsschritt__aeusserung) span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.gespraechsschritt :is(.gespraechsschritt__eingabe, .gespraechsschritt__aeusserung) p {
+    margin: 0;
+    padding: 14px 18px;
+    border-radius: 18px;
+}
+
+.gespraechsschritt__eingabe { justify-self: end; }
+.gespraechsschritt__eingabe span { text-align: right; }
+.gespraechsschritt__eingabe p {
+    border-bottom-right-radius: 4px;
+    background: var(--color-surface-muted);
+}
+
+.gespraechsschritt__aeusserung p {
+    border-bottom-left-radius: 4px;
+    background: var(--color-text);
+    color: var(--color-surface);
+}
+
+.denkspur {
+    margin-left: var(--space-4);
+    padding-left: var(--space-2);
+    border-left: 2px solid var(--color-area-authoring-solid);
+    color: var(--color-text-muted);
+    font-size: .9rem;
+}
+
+.denkspur summary { color: var(--color-text); cursor: pointer; font-weight: 650; }
+.denkspur p { margin: var(--space-1) 0 0; }
+
+.gespraechseingabe {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+}
+
+.gespraechseingabe__formular { position: relative; }
+.gespraechseingabe label,
+.diagnose label { display: block; margin-bottom: var(--space-1); font-weight: 650; }
+.gespraechseingabe textarea { min-height: 104px; padding: 14px 110px 14px 16px; border-radius: 14px; }
+.gespraechseingabe__senden { position: absolute; right: 10px; bottom: 10px; }
+
+.gespraechseingabe--fehler {
+    padding: var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius);
+    background: var(--color-danger-tint);
+}
+
+.gespraechseingabe--fehler p { margin-top: 0; }
+.sitzung-aktionen { display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-2); }
+.sitzung-aktionen form { margin: 0; }
+.sitzung-aktion-link { border: 0; background: transparent; color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer; }
+.sitzung-aktion-link--ruhig { color: var(--color-text-muted); font-weight: 500; }
+
+.diagnose { margin-top: var(--space-4); }
+.diagnose .button { margin-top: var(--space-2); }
+
+@media (max-width: 760px) {
+    .gespraechsschritt__eingabe,
+    .gespraechsschritt__aeusserung { max-width: 94%; }
+    .sitzung-illustration { width: min(100%, 360px); }
+}

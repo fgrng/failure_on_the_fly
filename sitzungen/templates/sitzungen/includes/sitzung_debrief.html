@@ -1,12 +1,12 @@
 {% load static %}
-<section id="session-debrief" class="session-section session-debrief" aria-labelledby="session-debrief-title">
-    <header class="session-section-head">
+<section id="sitzung-debrief" class="sitzung-abschnitt sitzung-debrief" aria-labelledby="sitzung-debrief-titel">
+    <header class="sitzung-abschnitt-kopf">
         <span>Rahmenhandlung · Debrief</span>
-        <h1 id="session-debrief-title">Ihre Diagnose</h1>
+        <h1 id="sitzung-debrief-titel">Ihre Diagnose</h1>
     </header>
-    <img class="session-illustration" src="{% static 'images/session/rahmenhandlung-debrief.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
-    <p class="session-debrief__prompt">{{ debrief }}</p>
-    <form class="session-diagnosis" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
+    <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
+    <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
+    <form class="diagnose" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
         {% csrf_token %}
         <label for="diagnose">Was ist Ihnen aufgefallen?</label>
         <textarea id="diagnose" name="diagnose" rows="4" required></textarea>

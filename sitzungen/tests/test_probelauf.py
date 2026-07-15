@@ -97,7 +97,7 @@ class ProbelaufStartTests(TestCase):
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
 
-        self.assertContains(einleitung, 'id="session-fortsetzung"')
+        self.assertContains(einleitung, 'id="sitzung-fortsetzung"')
         self.assertContains(einleitung, "rahmenhandlung-einstieg.webp")
         self.assertContains(einleitung, "gespraechsanlass.webp")
         self.assertContains(einleitung, 'id="eingabe"')
@@ -108,7 +108,7 @@ class ProbelaufStartTests(TestCase):
             headers={"HX-Request": "true"},
         )
 
-        self.assertContains(gespraech, 'id="session-gespraech"')
+        self.assertContains(gespraech, 'id="diagnosegespraech"')
         self.assertNotContains(gespraech, "<!DOCTYPE html>")
 
         debrief: HttpResponse = self.client.post(
@@ -116,8 +116,8 @@ class ProbelaufStartTests(TestCase):
             headers={"HX-Request": "true"},
         )
 
-        self.assertContains(debrief, 'id="session-gespraech"')
-        self.assertContains(debrief, 'id="session-debrief"')
+        self.assertContains(debrief, 'id="diagnosegespraech"')
+        self.assertContains(debrief, 'id="sitzung-debrief"')
         self.assertContains(debrief, "rahmenhandlung-debrief.webp")
         self.assertNotContains(debrief, "<!DOCTYPE html>")
 

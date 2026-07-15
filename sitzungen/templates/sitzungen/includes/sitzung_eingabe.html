@@ -7,10 +7,10 @@
 {% endif %}
 
 {% if ist_gescheitert or erneute_eingabe is not None %}
-    <div class="session-composer session-composer--error" role="alert">
+    <div class="gespraechseingabe gespraechseingabe--fehler" role="alert">
         <p>Die Antwort konnte nicht erzeugt werden.</p>
         {% if erneute_eingabe is not None %}
-            <form method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#session-fortsetzung" hx-swap="innerHTML">
+            <form method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
                 {% csrf_token %}
                 <input type="hidden" name="eingabe" value="{{ erneute_eingabe }}">
                 <button class="button" type="submit">Erneut senden</button>
@@ -18,26 +18,26 @@
         {% endif %}
     </div>
 {% else %}
-    <div class="session-composer">
-        <form class="session-composer__form" method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#session-fortsetzung" hx-swap="innerHTML">
+    <div class="gespraechseingabe">
+        <form class="gespraechseingabe__formular" method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
-            <button class="button session-composer__send" type="submit">Senden</button>
+            <button class="button gespraechseingabe__senden" type="submit">Senden</button>
         </form>
     </div>
 {% endif %}
 
 {% if not ist_gescheitert %}
-    <div class="session-actions">
-        <form method="post" action="{{ beenden_url }}" hx-post="{{ beenden_url }}" hx-target="#session-fortsetzung" hx-swap="innerHTML">
+    <div class="sitzung-aktionen">
+        <form method="post" action="{{ beenden_url }}" hx-post="{{ beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
             {% csrf_token %}
-            <button class="session-action-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
+            <button class="sitzung-aktion-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
         </form>
         {% if not ist_probelauf %}
             <form method="post" action="{% url 'sitzungen:training_abbrechen' %}">
                 {% csrf_token %}
-                <button class="session-action-link session-action-link--quiet" type="submit">Training abbrechen</button>
+                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Training abbrechen</button>
             </form>
         {% endif %}
     </div>

@@ -89,7 +89,9 @@ def test_form_controls_are_styled_without_a_form_wrapper(main_css: str) -> None:
     assert "input,\ntextarea,\nselect {" in main_css
 
 
-def test_components_only_consume_semantic_color_tokens(main_css: str) -> None:
-    """Komponenten greifen nicht direkt auf PHSG-Farbprimitive zu."""
+def test_feature_styles_only_consume_semantic_color_tokens() -> None:
+    """Feature-CSS greift nicht direkt auf PHSG-Farbprimitive zu."""
 
-    assert "var(--phsg-" not in main_css
+    for path in (STATIC / "css").glob("*.css"):
+        if path.name != "tokens.css":
+            assert "var(--phsg-" not in path.read_text(), path

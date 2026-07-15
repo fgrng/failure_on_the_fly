@@ -28,6 +28,13 @@ class StartseiteTests(TestCase):
 
         self.assertContains(response, "Abmelden")
 
+    def test_bereichskarten_folgen_der_farbcodierung(self) -> None:
+        """Simulationskern und Vignetten teilen sich den Entwicklungsbereich."""
+        response: HttpResponse = self.client.get(reverse("start"))
+
+        self.assertContains(response, 'card card--authoring', count=1)
+        self.assertContains(response, 'card card--system card--disabled', count=1)
+
     def test_loginseite_rendert_das_passwortfeld(self) -> None:
         """Djangos Login-URL liefert ein verwendbares Formular aus."""
         response: HttpResponse = self.client.get(reverse("login"))
