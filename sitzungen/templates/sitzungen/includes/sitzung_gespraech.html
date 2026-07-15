@@ -4,7 +4,7 @@
         <span>Diagnosegespräch</span>
         <h1 id="diagnosegespraech-titel">Eine Diagnose entwickeln</h1>
     </header>
-    <img class="sitzung-illustration" src="{% static 'images/sitzung/gespraechsanlass.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
+    <img class="sitzung-illustration" src="{% static 'images/sitzung/gespraechsanlass-'|add:vignette.schuelerin_bildkuerzel|add:'.webp' %}" alt="Aquarell über die Schulter einer lernenden Person, die auf ein aufgeschlagenes Heft mit angedeuteter, unleserlicher Handschrift blickt." width="800" height="800" loading="lazy" decoding="async">
 
     {% if gespraechseinleitung %}
         <p class="gespraechseinleitung__text">{{ gespraechseinleitung }}</p>

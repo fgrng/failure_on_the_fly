@@ -15,7 +15,7 @@
                 <span>{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} · Rahmenhandlung</span>
                 <h1 id="rahmenhandlung-titel">Die Ausgangslage</h1>
             </header>
-            <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-einstieg.webp' %}" alt="" width="800" height="800" decoding="async">
+            <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-einstieg-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell aus der hinteren Reihe eines Klassenzimmers: Lernende sitzen von hinten gesehen an ihren Pulten, vorne steht eine Lehrperson an der Wandtafel." width="800" height="800" decoding="async">
             <p class="rahmenhandlung__text">{{ einleitung }}</p>
             <div class="aufgabenkontext">
                 <section>

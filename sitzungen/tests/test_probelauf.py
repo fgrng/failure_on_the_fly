@@ -99,8 +99,8 @@ class ProbelaufStartTests(TestCase):
 
         self.assertContains(einleitung, 'class="sitzung-seite"')
         self.assertContains(einleitung, 'id="sitzung-fortsetzung"')
-        self.assertContains(einleitung, "rahmenhandlung-einstieg.webp")
-        self.assertContains(einleitung, "gespraechsanlass.webp")
+        self.assertContains(einleitung, "rahmenhandlung-einstieg-w.webp")
+        self.assertContains(einleitung, "gespraechsanlass-w.webp")
         self.assertContains(einleitung, 'id="eingabe"')
         self.assertNotContains(einleitung, "Diagnosegespräch beginnen")
 
@@ -119,7 +119,7 @@ class ProbelaufStartTests(TestCase):
 
         self.assertContains(debrief, 'id="diagnosegespraech"')
         self.assertContains(debrief, 'id="sitzung-debrief"')
-        self.assertContains(debrief, "rahmenhandlung-debrief.webp")
+        self.assertContains(debrief, "rahmenhandlung-debrief-w.webp")
         self.assertNotContains(debrief, "<!DOCTYPE html>")
 
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(

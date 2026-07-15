@@ -81,8 +81,8 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten([])
 
         self.assertContains(self.start_response, "Die Ausgangslage")
-        self.assertContains(self.start_response, "rahmenhandlung-einstieg.webp")
-        self.assertContains(self.start_response, "gespraechsanlass.webp")
+        self.assertContains(self.start_response, "rahmenhandlung-einstieg-w.webp")
+        self.assertContains(self.start_response, "gespraechsanlass-w.webp")
         self.assertContains(self.start_response, "Mia zeigt Ihnen die Bearbeitung.")
         self.assertContains(self.start_response, "Addiere zwei Brüche.")
         self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")

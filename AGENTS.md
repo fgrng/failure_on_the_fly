@@ -15,3 +15,7 @@ The `ready-for-agent` / `ready-for-human` roles are spelled `AFK` / `HITL` in th
 ## Domain Docs
 
 Single-context layout: CONTEXT.md + docs/adr/ at the repo root. See docs/agents/domain.md.
+
+## Image Generation
+
+Framing-story illustrations (`static/images/session/`) are generated with the `agy` CLI (Nano Banana, quota-limited). See docs/agents/image-generation.md.

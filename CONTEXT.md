@@ -46,7 +46,7 @@ _Avoid_: Bildbeschreibung, Alt-Text, Bearbeitungsbeschreibung
 ## Sitzung einer Vignette
 
 **Rahmenhandlung**:
-Die vom Simulationskern vorgegebene Situationsrahmung, die ausschließlich der Teilnehmer:in angezeigt wird: Hospitationseinleitung, Gesprächseinleitung und Debrief. Sie erreicht keinen Prompt und wird je Sitzung dargeboten.
+Die vom Simulationskern vorgegebene Situationsrahmung, die ausschließlich der Teilnehmer:in angezeigt wird: Hospitationseinleitung, Gesprächseinleitung und Debrief. Sie erreicht keinen Prompt und wird je Sitzung dargeboten. Ihre visuelle Repräsentation (Illustrationen) passt sich dynamisch an das Geschlecht der jeweiligen Lehrperson und Schüler:in an.
 _Avoid_: Setting, Szenario, Narrativ
 
 **Hospitationseinleitung**:

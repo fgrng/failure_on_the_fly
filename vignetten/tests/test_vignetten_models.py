@@ -90,6 +90,23 @@ def test_rahmen_platzhalter_leitet_maennliche_formen_beider_akteure_ab() -> None
     assert platzhalter["lehrperson_anrede"] == "Herr"
 
 
+def test_bildkuerzel_mappt_geschlecht_auf_w_oder_m() -> None:
+    """Die Bildkürzel übersetzen MAENNLICH zu 'm', ansonsten immer 'w'."""
+    vignette_m: Vignette = Vignette(
+        schuelerin_geschlecht=Vignette.Geschlecht.MAENNLICH,
+        lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+    )
+    assert vignette_m.schuelerin_bildkuerzel == "m"
+    assert vignette_m.lehrperson_bildkuerzel == "m"
+
+    vignette_w: Vignette = Vignette(
+        schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        lehrperson_geschlecht="",
+    )
+    assert vignette_w.schuelerin_bildkuerzel == "w"
+    assert vignette_w.lehrperson_bildkuerzel == "w"
+
+
 class VignetteAnlegenTests(TestCase):
     """Die Manager-Methode erzeugt eine vollständige neue Vignettenlinie."""
 
