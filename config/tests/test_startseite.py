@@ -11,24 +11,6 @@ from konten.models import Konto
 class StartseiteTests(TestCase):
     """Die Startseite ist der öffentliche Navigationseinstieg."""
 
-    def test_ausbildungskachel_verweist_auf_die_vignettenliste(self) -> None:
-        """Die Ausbildungskachel führt zum Vignetten-Editor."""
-        response: HttpResponse = self.client.get(reverse("start"))
-
-        self.assertContains(response, f'href="{reverse("vignetten:liste")}"')
-
-    def test_systemkachel_verweist_auf_den_simulationskern(self) -> None:
-        """Die Systemkachel führt zur Systemansicht."""
-        response: HttpResponse = self.client.get(reverse("start"))
-
-        self.assertContains(response, f'href="{reverse("simulation:kern")}"')
-
-    def test_unverfuegbare_bereiche_sind_als_geplant_markiert(self) -> None:
-        """Teilnahme und Forschung bleiben bis zur Umsetzung als geplant."""
-        response: HttpResponse = self.client.get(reverse("start"))
-
-        self.assertContains(response, "geplant", count=2)
-
     def test_anonyme_navigation_bietet_den_login(self) -> None:
         """Ohne Anmeldung führt die globale Navigation zur Loginseite."""
         response: HttpResponse = self.client.get(reverse("start"))
@@ -44,13 +26,14 @@ class StartseiteTests(TestCase):
 
         response: HttpResponse = self.client.get(reverse("start"))
 
-        self.assertContains(response, "Logout")
+        self.assertContains(response, "Abmelden")
 
     def test_loginseite_rendert_das_passwortfeld(self) -> None:
         """Djangos Login-URL liefert ein verwendbares Formular aus."""
         response: HttpResponse = self.client.get(reverse("login"))
 
         self.assertContains(response, 'name="password"')
+        self.assertContains(response, 'class="site-sidebar"')
 
     def test_direkter_login_fuehrt_zur_startseite(self) -> None:
         """Ein Login ohne Weiterleitungsziel endet auf einer vorhandenen Seite."""

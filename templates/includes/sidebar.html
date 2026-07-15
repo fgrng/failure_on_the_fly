@@ -1,0 +1,62 @@
+<aside class="site-sidebar" aria-label="Hauptnavigation">
+    <div class="site-sidebar__head">
+        <a href="{% url 'start' %}">FailureOnTheFly</a>
+    </div>
+
+    <nav class="sidebar-nav">
+        <section class="sidebar-nav__group sidebar-nav__group--development">
+            <h2>Entwicklung</h2>
+            <div>
+                <a href="{% url 'vignetten:liste' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name != "anlegen" %} aria-current="page"{% endif %}>Vignetten ansehen</a>
+                <a href="{% url 'vignetten:anlegen' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neue Vignette erstellen</a>
+                {% if user.is_superuser %}
+                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern verwalten</a>
+                {% else %}
+                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern ansehen</a>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="sidebar-nav__group sidebar-nav__group--education">
+            <h2>Ausbildung</h2>
+            <div>
+                <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "katalog" %} aria-current="page"{% endif %}>Trainingskataloge ansehen</a>
+                <a href="{% url 'training:anlegen' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Trainingskatalog erstellen</a>
+                <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>
+                <a href="{% url 'training:liste' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "liste" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "kuratieren" %} aria-current="page"{% endif %}>Meine Trainings</a>
+            </div>
+        </section>
+
+        <section class="sidebar-nav__group sidebar-nav__group--research">
+            <h2>Forschung</h2>
+            <div>
+                <span>Erhebungen <small>geplant</small></span>
+                <span>Datenspuren <small>geplant</small></span>
+            </div>
+        </section>
+
+        <section class="sidebar-nav__group sidebar-nav__group--system">
+            <h2>System</h2>
+            <div>
+                <span>Modell-Konfiguration <small>geplant</small></span>
+                <a href="{% url 'admin:index' %}"{% if request.resolver_match.namespace == "admin" %} aria-current="page"{% endif %}>Administration</a>
+            </div>
+        </section>
+    </nav>
+
+    {% if user.is_authenticated %}
+        <div class="sidebar-account">
+            <span class="sidebar-account__avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</span>
+            <span>
+                <strong>{{ user.get_full_name|default:user.username }}</strong>
+                <small>{{ user.groups.first.name|default:"Nutzer:in" }}</small>
+            </span>
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" title="Abmelden">Abmelden</button>
+            </form>
+        </div>
+    {% else %}
+        <a class="sidebar-login" href="{% url 'login' %}">Anmelden</a>
+    {% endif %}
+</aside>

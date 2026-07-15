@@ -1,0 +1,158 @@
+.sidebar-layout {
+    --sidebar-width: 352px;
+    padding-left: var(--sidebar-width);
+    background: var(--color-surface);
+}
+
+.sidebar-layout > .site-main {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: 0;
+    padding: var(--space-7) var(--space-4);
+}
+
+.site-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 10;
+    width: var(--sidebar-width);
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-4) 28px var(--space-3);
+    overflow-y: auto;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+}
+
+.site-sidebar a { text-decoration: none; }
+
+.site-sidebar__head a {
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.sidebar-nav {
+    display: grid;
+    gap: 12px;
+    margin-top: var(--space-4);
+}
+
+.sidebar-nav__group { display: grid; gap: 5px; }
+
+.sidebar-nav__group h2 {
+    margin: 0;
+    padding: 9px 12px;
+    border-left: 4px solid;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+
+.sidebar-nav__group > div {
+    display: grid;
+    gap: 3px;
+    padding-inline: 4px;
+}
+
+.sidebar-nav__group a,
+.sidebar-nav__group > div > span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--color-text);
+    font-size: .88rem;
+    font-weight: 600;
+}
+
+.sidebar-nav__group a:hover,
+.sidebar-nav__group a[aria-current="page"] {
+    background: var(--color-surface);
+    color: var(--color-accent-hover);
+}
+
+.sidebar-nav__group a[aria-current="page"] {
+    box-shadow: inset 3px 0 var(--color-accent);
+}
+
+.sidebar-nav__group > div > span { color: var(--color-text-muted); }
+.sidebar-nav__group small { font-size: .65rem; font-weight: 500; }
+.sidebar-nav__group--development h2 { border-color: var(--color-area-authoring-solid); background: var(--color-area-authoring-tint); }
+.sidebar-nav__group--education h2 { border-color: var(--color-area-participant-solid); background: var(--color-area-participant-tint); }
+.sidebar-nav__group--research h2 { border-color: var(--color-area-research-solid); background: var(--color-area-research-tint); }
+.sidebar-nav__group--system h2 { border-color: var(--color-area-system-solid); background: var(--color-area-system-tint); }
+
+.sidebar-account {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 11px;
+    margin-top: auto;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    font-size: .86rem;
+}
+
+.sidebar-account__avatar {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-area-authoring-tint);
+    color: var(--color-text);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.sidebar-account small {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+}
+
+.sidebar-account form { margin: 0; }
+.sidebar-account button {
+    padding: var(--space-1);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    cursor: pointer;
+}
+
+.sidebar-login {
+    margin-top: auto;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    font-weight: 600;
+    text-align: center;
+}
+
+.sidebar-login:hover {
+    background: var(--color-accent-hover);
+    color: var(--color-text-on-accent);
+}
+
+@media (max-width: 760px) {
+    .sidebar-layout { padding-left: 0; }
+    .site-sidebar {
+        position: static;
+        width: 100%;
+        max-height: none;
+        padding: var(--space-3);
+        border-right: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+    .sidebar-layout > .site-main { padding: var(--space-4) var(--space-3); }
+    .sidebar-account,
+    .sidebar-login { margin-top: var(--space-3); }
+}

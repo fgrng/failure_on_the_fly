@@ -8,34 +8,14 @@
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/navigation.css' %}">
+    {% block extra_head %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
 </head>
-<body>
-    <header class="site-header">
-        <div class="site-header__inner">
-            <a class="site-brand" href="/">FailureOnTheFly</a>
-            <nav class="site-nav" aria-label="Hauptnavigation">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'training:katalog' %}">Trainings</a>
-                    <a href="{% url 'training:liste' %}">Meine Trainings</a>
-                {% endif %}
-                {% block nav %}
-                    <a href="{% url 'start' %}">Start</a>
-                    <a href="{% url 'vignetten:liste' %}">Vignetten</a>
-                    <a href="{% url 'simulation:kern' %}">System</a>
-                    {% if user.is_authenticated %}
-                        <form method="post" action="{% url 'logout' %}">
-                            {% csrf_token %}
-                            <button class="button button--secondary" type="submit">Logout</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'login' %}">Login</a>
-                    {% endif %}
-                {% endblock %}
-            </nav>
-        </div>
-    </header>
+<body class="sidebar-layout">
+    {% include "includes/sidebar.html" %}
 
     <main class="site-main">
         {% if messages %}
@@ -48,10 +28,5 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="site-footer">
-        <div class="site-footer__inner">
-            {% block footer %}FailureOnTheFly{% endblock %}
-        </div>
-    </footer>
 </body>
 </html>
