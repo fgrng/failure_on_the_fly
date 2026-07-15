@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if ist_probelauf %}Probelauf{% else %}Training{% endif %}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/session.css' %}">
+{% endblock %}
+
+{% block content %}
+    <article class="session-page">
+        <section class="session-frame" aria-labelledby="session-frame-title">
+            <header class="session-section-head">
+                <span>{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} · Rahmenhandlung</span>
+                <h1 id="session-frame-title">Die Ausgangslage</h1>
+            </header>
+            <img class="session-illustration" src="{% static 'images/session/rahmenhandlung-einstieg.webp' %}" alt="" width="800" height="800" decoding="async">
+            <p class="session-frame__copy">{{ einleitung }}</p>
+            <div class="session-task">
+                <section>
+                    <h2>Lernauftrag</h2>
+                    <p>{{ vignette.lernauftrag }}</p>
+                </section>
+            </div>
+        </section>
+        <div id="session-fortsetzung">
+            {% include "sitzungen/includes/sitzung_fortsetzung.html" %}
+        </div>
+    </article>
+{% endblock %}

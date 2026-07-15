@@ -1,0 +1,15 @@
+{% load static %}
+<section id="session-debrief" class="session-section session-debrief" aria-labelledby="session-debrief-title">
+    <header class="session-section-head">
+        <span>Rahmenhandlung · Debrief</span>
+        <h1 id="session-debrief-title">Ihre Diagnose</h1>
+    </header>
+    <img class="session-illustration" src="{% static 'images/session/rahmenhandlung-debrief.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
+    <p class="session-debrief__prompt">{{ debrief }}</p>
+    <form class="session-diagnosis" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
+        {% csrf_token %}
+        <label for="diagnose">Was ist Ihnen aufgefallen?</label>
+        <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
+        <button class="button" type="submit">{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} beenden</button>
+    </form>
+</section>

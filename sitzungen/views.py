@@ -25,12 +25,64 @@ _TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "training_verbrauchte_zeit"
 _TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "training_zeit_laeuft_seit"
 
 
+def _ist_htmx(request: HttpRequest) -> bool:
+    """Erkennt einen partiellen Seitenaufbau durch die vorhandene HTMX-Naht."""
+
+    return request.headers.get("HX-Request") == "true"
+
+
+def _sitzung_anzeigen(
+    request: HttpRequest,
+    *,
+    vignette: Vignette,
+    kern: Simulationskern,
+    gespraechsschritte: list[GespraechsschrittDaten] | QuerySet[Gespraechsschritt],
+    ist_probelauf: bool,
+    erneute_eingabe: str | None = None,
+    ist_gescheitert: bool = False,
+    zeigt_debrief: bool = False,
+) -> HttpResponse:
+    """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
+
+    context: dict[str, object] = {
+        "vignette": vignette,
+        "einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette),
+        "gespraechseinleitung": rahmen_rendern(
+            kern.rahmenhandlung_gespraechseinleitung, vignette
+        ),
+        "gespraechsschritte": gespraechsschritte,
+        "ist_probelauf": ist_probelauf,
+        "erneute_eingabe": erneute_eingabe,
+        "ist_gescheitert": ist_gescheitert,
+        "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
+        "zeigt_debrief": zeigt_debrief,
+    }
+    template: str = (
+        "sitzungen/includes/sitzung_fortsetzung.html"
+        if _ist_htmx(request)
+        else "sitzungen/sitzung.html"
+    )
+    return render(request, template, context)
+
+
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
     """Liefert die Entwürfe aus dem Eigentümer-Kreis eines Kontos."""
 
     return Vignette.objects.filter(
         historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto),
         zustand=Vignette.Zustand.ENTWURF,
+    )
+
+
+def _eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
+    """Liefert alle Fassungen aus dem Eigentümer-Kreis eines Kontos.
+
+    Ein Probelauf ist schreibfrei; deshalb darf er über jede eigene
+    Fassung laufen – Entwurf wie finalisiert oder archiviert.
+    """
+
+    return Vignette.objects.filter(
+        historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto),
     )
 
 
@@ -55,7 +107,7 @@ def _probelauf_vignetten(
 
     if sink.freie_auswahl:
         return Vignette.objects.einbindbar()
-    return _eigene_entwuerfe(konto)
+    return _eigene_vignetten(konto)
 
 
 def _probelauf_vignette_und_kern(
@@ -74,15 +126,20 @@ def _probelauf_vignette_und_kern(
 
 def _gespraech_anzeigen(
     request: HttpRequest,
+    vignette: Vignette,
+    kern: Simulationskern,
     schritte: list[GespraechsschrittDaten],
     erneute_eingabe: str | None = None,
 ) -> HttpResponse:
     """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
 
-    return render(
+    return _sitzung_anzeigen(
         request,
-        "sitzungen/probelauf_gespraech.html",
-        {"gespraechsschritte": schritte, "erneute_eingabe": erneute_eingabe},
+        vignette=vignette,
+        kern=kern,
+        gespraechsschritte=schritte,
+        ist_probelauf=True,
+        erneute_eingabe=erneute_eingabe,
     )
 
 
@@ -94,13 +151,13 @@ def _debrief_anzeigen(
 ) -> HttpResponse:
     """Rendert den Debrief nach dem Ende des Diagnosegesprächs."""
 
-    return render(
+    return _sitzung_anzeigen(
         request,
-        "sitzungen/probelauf_debrief.html",
-        {
-            "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
-            "gespraechsschritte": schritte,
-        },
+        vignette=vignette,
+        kern=kern,
+        gespraechsschritte=schritte,
+        ist_probelauf=True,
+        zeigt_debrief=True,
     )
 
 
@@ -127,10 +184,12 @@ def _probelauf_starten(
     sitzung_starten(sink, vignette, kern, modell_konfiguration)
     if freie_auswahl:
         sink.freie_auswahl_setzen()
-    return render(
+    return _sitzung_anzeigen(
         request,
-        "sitzungen/probelauf_einleitung.html",
-        {"einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+        vignette=vignette,
+        kern=kern,
+        gespraechsschritte=sink.gespraechsschritte,
+        ist_probelauf=True,
     )
 
 
@@ -151,7 +210,7 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = get_object_or_404(
-        _eigene_entwuerfe(request.user).select_related("gepinnter_kern"),
+        _eigene_vignetten(request.user).select_related("gepinnter_kern"),
         pk=pk,
     )
     kern: Simulationskern | None = vignette.gepinnter_kern
@@ -216,12 +275,12 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if sink.ist_beendet:
         return _gespeicherten_debrief_anzeigen(request, sink)
+    vignette, kern = _probelauf_vignette_und_kern(request, sink)
     if request.method == "GET":
         sink.zeitbudget_fortsetzen()
-        return _gespraech_anzeigen(request, schritte)
+        return _gespraech_anzeigen(request, vignette, kern, schritte)
     if sink.ist_gescheitert:
-        return _gespraech_anzeigen(request, schritte)
-    vignette, kern = _probelauf_vignette_und_kern(request, sink)
+        return _gespraech_anzeigen(request, vignette, kern, schritte)
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
@@ -242,12 +301,12 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     if antwortversuch.endgueltig_gescheitert:
         sink.gescheiterten_schritt_verwerfen()
         sink.zeitbudget_fortsetzen()
-        return _gespraech_anzeigen(request, schritte, eingabe)
+        return _gespraech_anzeigen(request, vignette, kern, schritte, eingabe)
     if sink.budget_erschoepft(vignette):
         sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
         return _debrief_anzeigen(request, vignette, kern, schritte)
     sink.zeitbudget_fortsetzen()
-    return _gespraech_anzeigen(request, schritte)
+    return _gespraech_anzeigen(request, vignette, kern, schritte)
 
 
 @login_required
@@ -338,25 +397,40 @@ def _training_budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
 def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
     """Rendert den Debrief einer persistierten Trainingssitzung."""
 
-    return render(
+    return _sitzung_anzeigen(
         request,
-        "sitzungen/training_debrief.html",
-        {
-            "debrief": rahmen_rendern(
-                sitzung.simulationskern.rahmenhandlung_debrief, sitzung.vignette
-            ),
-            "gespraechsschritte": _training_schritte(sitzung),
-        },
+        vignette=sitzung.vignette,
+        kern=sitzung.simulationskern,
+        gespraechsschritte=_training_schritte(sitzung),
+        ist_probelauf=False,
+        zeigt_debrief=True,
     )
 
 
 def _training_fehler_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
     """Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung."""
 
-    return render(
+    return _training_gespraech_anzeigen(
+        request, sitzung, _training_schritte(sitzung), ist_gescheitert=True
+    )
+
+
+def _training_gespraech_anzeigen(
+    request: HttpRequest,
+    sitzung: Sitzung,
+    schritte: QuerySet[Gespraechsschritt],
+    *,
+    ist_gescheitert: bool = False,
+) -> HttpResponse:
+    """Rendert das persistierte Training in der gemeinsamen Sitzungsansicht."""
+
+    return _sitzung_anzeigen(
         request,
-        "sitzungen/training_gespraech.html",
-        {"gespraechsschritte": _training_schritte(sitzung), "ist_gescheitert": True},
+        vignette=sitzung.vignette,
+        kern=sitzung.simulationskern,
+        gespraechsschritte=schritte,
+        ist_probelauf=False,
+        ist_gescheitert=ist_gescheitert,
     )
 
 
@@ -388,11 +462,7 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
         return _training_fehler_anzeigen(request, sitzung)
     if request.method == "GET":
         _training_zeitbudget_fortsetzen(request, sitzung)
-        return render(
-            request,
-            "sitzungen/training_gespraech.html",
-            {"gespraechsschritte": schritte},
-        )
+        return _training_gespraech_anzeigen(request, sitzung, schritte)
     _training_zeitbudget_anhalten(request)
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
     antwortversuch = gespraechsschritt_ausfuehren(
@@ -408,10 +478,8 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
     if _training_budget_erschoepft(request, sitzung):
         return _training_debrief_anzeigen(request, sitzung)
     _training_zeitbudget_fortsetzen(request, sitzung)
-    return render(
-        request,
-        "sitzungen/training_gespraech.html",
-        {"gespraechsschritte": _training_schritte(sitzung)},
+    return _training_gespraech_anzeigen(
+        request, sitzung, _training_schritte(sitzung)
     )
 
 

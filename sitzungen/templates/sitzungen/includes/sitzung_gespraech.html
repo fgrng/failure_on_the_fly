@@ -1,0 +1,51 @@
+{% load static %}
+<section id="session-gespraech" class="session-section" aria-labelledby="session-gespraech-title">
+    <header class="session-section-head">
+        <span>Diagnosegespräch</span>
+        <h1 id="session-gespraech-title">Eine Diagnose entwickeln</h1>
+    </header>
+    <img class="session-illustration" src="{% static 'images/session/gespraechsanlass.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
+
+    {% if gespraechseinleitung %}
+        <p class="session-conversation__copy">{{ gespraechseinleitung }}</p>
+    {% endif %}
+
+    <section class="session-task session-task--workbook">
+        <h2>Arbeitsheft von {{ vignette.schuelerin_name }}</h2>
+        {% if vignette.arbeitsheft_bild %}
+            <img src="{{ vignette.arbeitsheft_bild.url }}" alt="{{ vignette.arbeitsheft_beschreibung }}">
+        {% else %}
+            <p class="session-task__work">{{ vignette.arbeitsheft_text }}</p>
+        {% endif %}
+    </section>
+
+    <div class="dialogue" aria-label="Bisheriges Diagnosegespräch">
+        {% for schritt in gespraechsschritte %}
+            <article class="dialogue-turn">
+                <div class="dialogue-message dialogue-message--participant">
+                    <span>Sie</span>
+                    <p>{{ schritt.eingabe }}</p>
+                </div>
+                {% if schritt.aeusserung %}
+                    <div class="dialogue-message dialogue-message--student">
+                        <span>Schüler:in</span>
+                        <p>{{ schritt.aeusserung }}</p>
+                    </div>
+                {% endif %}
+                {% if ist_probelauf and schritt.denkspur %}
+                    <details class="thought">
+                        <summary>Denkspur ansehen</summary>
+                        <p>{{ schritt.denkspur }}</p>
+                        {% if schritt.native_reasoning_spur %}
+                            <p><strong>Native Reasoning-Spur:</strong> {{ schritt.native_reasoning_spur }}</p>
+                        {% endif %}
+                    </details>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+
+    {% if not gespraech_beendet %}
+        {% include "sitzungen/includes/sitzung_eingabe.html" %}
+    {% endif %}
+</section>

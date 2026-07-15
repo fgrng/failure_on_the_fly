@@ -52,7 +52,7 @@ Grün-Akzente (Buttons, Links) bleiben überall konsistent. Visualisiert in `far
 ## Herstellung
 
 Generiert mit `agy` (Nano Banana 2 / Google-Bildmodell), Prompt je Stil identisch bis auf die
-Stil-Direktive. Wegwerf-Material zur Stilentscheidung — **nicht** die finalen Assets.
+Stil-Direktive. Die nicht gewählten Varianten bleiben Wegwerf-Material zur Stilentscheidung.
 
 ## Verdict
 
@@ -70,4 +70,11 @@ nie im Bild).
    aufgelöstes Gesicht)** → `originale/szene-debrief.png`.
 
 **Drei Kern-Bilder gesetzt:** Einstieg B · Gesprächsanlass pov-a · Debrief V1.
+Die 1024²-Originale bleiben unter `originale/`. Für die Sitzungsansicht liegen
+auf 800² skalierte WebP-Exporte unter `static/images/session/`:
+
+- `rahmenhandlung-einstieg.webp`
+- `gespraechsanlass.webp`
+- `rahmenhandlung-debrief.webp`
+
 Nächster Block: restliche Bildsprache (Buttons, Rahmungen, Icons, abstrakter Sprecher-Anker im Gespräch).

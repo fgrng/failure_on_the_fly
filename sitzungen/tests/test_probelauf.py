@@ -34,6 +34,9 @@ class ProbelaufStartTests(TestCase):
                 "$lehrperson_anrede $lehrperson_name begleitet Sie bei "
                 "$fach in Klasse $klassenstufe."
             ),
+            rahmenhandlung_gespraechseinleitung=(
+                "$schuelerin_name zeigt Ihnen die Bearbeitung."
+            ),
             rahmenhandlung_debrief=(
                 "$lehrperson_anrede $lehrperson_name fragt nach Ihrer Diagnose."
             ),
@@ -74,9 +77,11 @@ class ProbelaufStartTests(TestCase):
         )
 
         self.assertContains(response, "Frau Weber begleitet Sie bei Mathematik in Klasse 5.")
-        self.assertContains(response, reverse("sitzungen:probelauf_gespraech"))
+        self.assertContains(response, "Mia zeigt Ihnen die Bearbeitung.")
+        self.assertContains(response, "Ihre nächste Frage")
+        self.assertNotContains(response, "Diagnosegespräch beginnen")
         gespraech: HttpResponse = self.client.get(reverse("sitzungen:probelauf_gespraech"))
-        self.assertContains(gespraech, "Ihre Nachricht")
+        self.assertContains(gespraech, "Ihre nächste Frage")
         session = self.client.session
         self.assertEqual(session["probelauf"], {
             "vignette_pk": self.entwurf.pk,
@@ -84,6 +89,37 @@ class ProbelaufStartTests(TestCase):
             "modell_konfiguration_pk": self.konfiguration.pk,
             "gespraechsschritte": [],
         })
+
+    def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
+        """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einleitung, 'id="session-fortsetzung"')
+        self.assertContains(einleitung, "rahmenhandlung-einstieg.webp")
+        self.assertContains(einleitung, "gespraechsanlass.webp")
+        self.assertContains(einleitung, 'id="eingabe"')
+        self.assertNotContains(einleitung, "Diagnosegespräch beginnen")
+
+        gespraech: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech"),
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertContains(gespraech, 'id="session-gespraech"')
+        self.assertNotContains(gespraech, "<!DOCTYPE html>")
+
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden"),
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertContains(debrief, 'id="session-gespraech"')
+        self.assertContains(debrief, 'id="session-debrief"')
+        self.assertContains(debrief, "rahmenhandlung-debrief.webp")
+        self.assertNotContains(debrief, "<!DOCTYPE html>")
 
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,
@@ -298,7 +334,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertContains(erneutes_oeffnen, "Frau Weber fragt nach Ihrer Diagnose.")
-        self.assertNotContains(erneutes_oeffnen, "Ihre Nachricht")
+        self.assertNotContains(erneutes_oeffnen, "Ihre nächste Frage")
 
         erneuter_versuch: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
@@ -312,7 +348,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertContains(erneuter_aufruf, "Frau Weber fragt nach Ihrer Diagnose.")
-        self.assertNotContains(erneuter_aufruf, "Ihre Nachricht")
+        self.assertNotContains(erneuter_aufruf, "Ihre nächste Frage")
 
     def test_zeitbudget_pausiert_waehrend_des_modellaufrufs(self) -> None:
         """Modellwartezeit erhöht den Zeitverbrauch des Probelaufs nicht."""
@@ -400,7 +436,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
-        self.assertContains(response, "Denkspur:")
+        self.assertContains(response, "Denkspur ansehen")
         self.assertNotContains(response, "Native Reasoning-Spur:")
 
     def test_leere_aeusserung_bleibt_im_modellverlauf(self) -> None:
@@ -455,7 +491,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
 
-        self.assertContains(response, "Gespräch beenden → Debrief")
+        self.assertContains(response, "Gespräch beenden und Debrief anzeigen")
 
     def test_endgueltiger_fehlschlag_bewahrt_den_sichtbaren_verlauf(self) -> None:
         """Ein endgültiger Fehlschlag lässt vorherige Äußerungen sichtbar."""
@@ -538,6 +574,9 @@ class AdministratorinProbelaufTests(TestCase):
         finaler_kern.finalisieren()
         self.kern_entwurf: Simulationskern = finaler_kern.bearbeiten()
         self.kern_entwurf.rahmenhandlung_einleitung = "$lehrperson_name begleitet Sie."
+        self.kern_entwurf.rahmenhandlung_gespraechseinleitung = (
+            "$schuelerin_name zeigt Ihnen das Arbeitsheft."
+        )
         self.kern_entwurf.rahmenhandlung_debrief = "$lehrperson_name beendet den Probelauf."
         self.kern_entwurf.save()
         aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
@@ -594,6 +633,7 @@ class AdministratorinProbelaufTests(TestCase):
         )
 
         self.assertContains(response, "Weber begleitet Sie.")
+        self.assertContains(response, "Mia zeigt Ihnen das Arbeitsheft.")
         gespraech: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
         )

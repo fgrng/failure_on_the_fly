@@ -229,6 +229,14 @@ def _sitzung_starten(
         request.session["training_verbrauchte_zeit"] = 0.0
     return render(
         request,
-        "sitzungen/training_einleitung.html",
-        {"einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette)},
+        "sitzungen/sitzung.html",
+        {
+            "vignette": vignette,
+            "einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette),
+            "gespraechseinleitung": rahmen_rendern(
+                kern.rahmenhandlung_gespraechseinleitung, vignette
+            ),
+            "gespraechsschritte": [],
+            "ist_probelauf": False,
+        },
     )

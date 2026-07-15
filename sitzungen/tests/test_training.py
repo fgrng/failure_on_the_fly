@@ -26,7 +26,11 @@ class TrainingssitzungTests(TestCase):
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern: Simulationskern = Simulationskern.objects.anlegen(
+            rahmenhandlung_gespraechseinleitung=(
+                "$schuelerin_name zeigt Ihnen die Bearbeitung."
+            )
+        )
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
@@ -57,8 +61,24 @@ class TrainingssitzungTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
-        self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
+        self.start_response: HttpResponse = self.client.post(
+            reverse("training:wahl", args=[training.pk, vignette.pk])
+        )
         return training
+
+    def test_training_startet_mit_rahmenhandlung_und_eingabefeld(self) -> None:
+        """Auch die persistierte Sitzung beginnt vollständig auf einer Seite."""
+
+        self._sitzung_starten([])
+
+        self.assertContains(self.start_response, "Die Ausgangslage")
+        self.assertContains(self.start_response, "rahmenhandlung-einstieg.webp")
+        self.assertContains(self.start_response, "gespraechsanlass.webp")
+        self.assertContains(self.start_response, "Mia zeigt Ihnen die Bearbeitung.")
+        self.assertContains(self.start_response, "Addiere zwei Brüche.")
+        self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")
+        self.assertContains(self.start_response, "Ihre nächste Frage")
+        self.assertNotContains(self.start_response, "Gespräch beginnen")
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:
         """Ein answerless Schritt zeigt den Fehler und lässt keine Diagnose mehr zu."""

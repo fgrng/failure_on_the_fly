@@ -130,6 +130,7 @@ class TrainingskatalogTests(TestCase):
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(
             rahmenhandlung_einleitung="Frau Weber begleitet Sie.",
+            rahmenhandlung_gespraechseinleitung="Mia zeigt Ihnen ihre Bearbeitung.",
             rahmenhandlung_debrief="Frau Weber fragt nach Ihrer Diagnose.",
         )
         kern.finalisieren()
@@ -177,6 +178,7 @@ class TrainingskatalogTests(TestCase):
         einleitung: HttpResponse = self.client.post(wahl_url)
 
         self.assertContains(einleitung, "Frau Weber begleitet Sie.")
+        self.assertContains(einleitung, "Mia zeigt Ihnen ihre Bearbeitung.")
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.count(), 1)
         gespraech: HttpResponse = self.client.post(
