@@ -4,7 +4,7 @@
         <span>Rahmenhandlung · Debrief</span>
         <h1 id="session-debrief-title">Ihre Diagnose</h1>
     </header>
-    <img class="session-illustration" src="{% static 'images/session/rahmenhandlung-debrief.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
+    <img class="session-illustration" src="{% static 'images/session/rahmenhandlung-debrief.webp' %}" alt="Aquarell einer Lehrperson am Tisch im Gespräch, Gesicht bewusst unausgeformt; auf dem Tisch zwei Kaffeebecher und Notizblätter." width="800" height="800" loading="lazy" decoding="async">
     <p class="session-debrief__prompt">{{ debrief }}</p>
     <form class="session-diagnosis" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
         {% csrf_token %}
