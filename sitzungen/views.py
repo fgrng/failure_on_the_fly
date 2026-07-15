@@ -1,5 +1,6 @@
 """Views für Probeläufe und persistierte Trainingssitzungen."""
 
+from collections.abc import Callable
 from time import monotonic
 from typing import TYPE_CHECKING
 
@@ -14,7 +15,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     LeeresTranskript,
-    OpenAITranskription,
+    Transkription,
     TranskriptionsAnbieterfehler,
 )
 from sitzungen.models import Gespraechsschritt, Sitzung
@@ -358,26 +359,33 @@ def _training_sitzung(request: HttpRequest) -> Sitzung:
     return sitzung
 
 
-@login_required
-def transkription(request: HttpRequest) -> HttpResponse:
-    """Überführt eine eingewilligte Aufnahme unmittelbar in Text."""
+def transkriptions_endpunkt(
+    anbieter: Transkription,
+) -> Callable[[HttpRequest], HttpResponse]:
+    """Erzeugt den geschützten Endpunkt für einen Transkriptions-Anbieter."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = _training_sitzung(request)
-    if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
-        return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
-    if not settings.TRANSKRIPTION_ZERO_RETENTION:
-        return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
-    try:
-        text: str = OpenAITranskription().transkribieren(request.FILES["audio"].read())
-    except LeeresTranskript:
-        return JsonResponse({"status": "leeres_transkript"}, status=422)
-    except TranskriptionsAnbieterfehler:
-        return JsonResponse({"status": "anbieterfehler"}, status=502)
-    except AnbieterNichtErreichbar:
-        return JsonResponse({"status": "anbieter_nicht_erreichbar"}, status=503)
-    return JsonResponse({"text": text})
+    @login_required
+    def endpunkt(request: HttpRequest) -> HttpResponse:
+        # Prüft die Vorbedingungen, bevor Audio den Anbieter erreichen kann.
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        sitzung: Sitzung = _training_sitzung(request)
+        if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
+            return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
+        if not settings.TRANSKRIPTION_ZERO_RETENTION:
+            return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
+        audio: bytes = request.FILES["audio"].read()
+        try:
+            text: str = anbieter.transkribieren(audio)
+        except LeeresTranskript:
+            return JsonResponse({"status": "leeres_transkript"}, status=422)
+        except TranskriptionsAnbieterfehler:
+            return JsonResponse({"status": "anbieterfehler"}, status=502)
+        except AnbieterNichtErreichbar:
+            return JsonResponse({"status": "anbieter_nicht_erreichbar"}, status=503)
+        return JsonResponse({"text": text})
+
+    return endpunkt
 
 
 def _training_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
