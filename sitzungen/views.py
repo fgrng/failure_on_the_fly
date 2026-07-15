@@ -4,12 +4,19 @@ from time import monotonic
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.transkription import (
+    AnbieterNichtErreichbar,
+    LeeresTranskript,
+    OpenAITranskription,
+    TranskriptionsAnbieterfehler,
+)
 from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
 from sitzungen.rahmen import rahmen_rendern
@@ -349,6 +356,28 @@ def _training_sitzung(request: HttpRequest) -> Sitzung:
         Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
     )
     return sitzung
+
+
+@login_required
+def transkription(request: HttpRequest) -> HttpResponse:
+    """Überführt eine eingewilligte Aufnahme unmittelbar in Text."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
+        return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
+    if not settings.TRANSKRIPTION_ZERO_RETENTION:
+        return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
+    try:
+        text: str = OpenAITranskription().transkribieren(request.FILES["audio"].read())
+    except LeeresTranskript:
+        return JsonResponse({"status": "leeres_transkript"}, status=422)
+    except TranskriptionsAnbieterfehler:
+        return JsonResponse({"status": "anbieterfehler"}, status=502)
+    except AnbieterNichtErreichbar:
+        return JsonResponse({"status": "anbieter_nicht_erreichbar"}, status=503)
+    return JsonResponse({"text": text})
 
 
 def _training_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
