@@ -175,7 +175,11 @@ class TrainingskatalogTests(TestCase):
         self.client.force_login(studierende)
         wahl_url: str = reverse("training:wahl", args=[training.pk, vignette.pk])
 
-        einleitung: HttpResponse = self.client.post(wahl_url)
+        self.client.post(wahl_url)
+        einleitung: HttpResponse = self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {"audioverarbeitung_eingewilligt": "ja"},
+        )
 
         self.assertContains(einleitung, "Frau Weber begleitet Sie.")
         self.assertContains(einleitung, "Mia zeigt Ihnen ihre Bearbeitung.")
@@ -208,12 +212,81 @@ class TrainingskatalogTests(TestCase):
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.get().teilnahme_id, sitzung.teilnahme_id)
 
+    def test_einwilligung_wird_an_der_teilnahme_gespeichert_bevor_die_sitzung_startet(
+        self,
+    ) -> None:
+        """Audioverarbeitung beginnt erst nach der dokumentierten Einwilligung."""
+        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        training: Training = Training.objects.create(
+            name="Bruchrechnung", eigentuemerin=ausbilderin
+        )
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            gepinnter_kern=kern,
+        )
+        training.vignetten.add(vignette)
+        training.veroeffentlichen()
+        self.client.force_login(teilnehmerin)
+        wahl_url: str = reverse("training:wahl", args=[training.pk, vignette.pk])
+
+        einwilligung: HttpResponse = self.client.post(wahl_url)
+
+        self.assertContains(einwilligung, "Audio zur Transkription")
+        self.assertFalse(Sitzung.objects.exists())
+        teilnahme: Teilnahme = Teilnahme.objects.get()
+        self.assertFalse(teilnahme.hat_in_audioverarbeitung_eingewilligt)
+
+        ungueltig: HttpResponse = self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {"audioverarbeitung_eingewilligt": "vielleicht"},
+        )
+
+        self.assertEqual(ungueltig.status_code, 400)
+        teilnahme.refresh_from_db()
+        self.assertIsNone(teilnahme.audioverarbeitung_eingewilligt)
+        self.assertFalse(Sitzung.objects.exists())
+
+        start: HttpResponse = self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {"audioverarbeitung_eingewilligt": "ja"},
+        )
+
+        teilnahme.refresh_from_db()
+        self.assertTrue(teilnahme.hat_in_audioverarbeitung_eingewilligt)
+        self.assertContains(start, "Die Ausgangslage")
+
+        wiederholung: HttpResponse = self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {"audioverarbeitung_eingewilligt": "nein"},
+        )
+
+        self.assertEqual(wiederholung.status_code, 400)
+        teilnahme.refresh_from_db()
+        self.assertTrue(teilnahme.hat_in_audioverarbeitung_eingewilligt)
+
 
 class TrainingsabbruchTests(TestCase):
     """Teilnehmer:innen können eine Trainingssitzung gewollt abbrechen."""
 
     def _sitzung_starten(
-        self, skript: list[dict[str, str]] | None = None
+        self,
+        skript: list[dict[str, str]] | None = None,
+        *,
+        audioverarbeitung_eingewilligt: bool = True,
     ) -> Training:
         """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
@@ -242,7 +315,31 @@ class TrainingsabbruchTests(TestCase):
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
+        self.client.post(
+            reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+            {
+                "audioverarbeitung_eingewilligt": (
+                    "ja" if audioverarbeitung_eingewilligt else "nein"
+                )
+            },
+        )
         return training
+
+    def test_ablehnung_startet_das_training_mit_tastatureingabe(self) -> None:
+        """Die verweigerte Einwilligung ist kein Abbruch der Teilnahme."""
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
+            audioverarbeitung_eingewilligt=False,
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(response, "Ich addiere alles.")
+        self.assertFalse(
+            Teilnahme.objects.get().hat_in_audioverarbeitung_eingewilligt
+        )
 
     def test_abbrechen_beendet_die_sitzung_ohne_diagnose(self) -> None:
         """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""

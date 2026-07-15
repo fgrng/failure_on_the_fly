@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Audioverarbeitung{% endblock %}
+
+{% block content %}
+    <h1>Audioverarbeitung</h1>
+    <p>Audio zur Transkription wird an einen externen Auftragsverarbeiter übermittelt und danach nicht gespeichert.</p>
+    <form method="post" action="{% url 'training:einwilligung' training.pk vignette.pk %}">
+        {% csrf_token %}
+        <button type="submit" name="audioverarbeitung_eingewilligt" value="ja">Einwilligen und Training starten</button>
+        <button type="submit" name="audioverarbeitung_eingewilligt" value="nein">Ohne Audio fortfahren</button>
+    </form>
+{% endblock %}

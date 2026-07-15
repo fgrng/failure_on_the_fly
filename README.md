@@ -16,6 +16,13 @@ aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Is
 kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
 hin.
 
+## Audioverarbeitung im Training
+
+Vor dem ersten Start eines Trainings entscheiden Teilnehmende einmalig, ob ihr
+Audio zur Transkription an einen externen Auftragsverarbeiter übermittelt werden
+darf. Das Audio wird danach nicht gespeichert. Bei Ablehnung bleibt das Training
+uneingeschränkt über die Tastatur spielbar.
+
 ## Lokale Entwicklungsumgebung
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
