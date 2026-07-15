@@ -28,7 +28,8 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 
 2. **Konfiguration anlegen.** Kopiere `.env.example` nach `.env` und trage die
    Werte ein — mindestens einen beliebigen `SECRET_KEY`, `DEBUG=True` und für
-   echte Diagnosegespräche `OPENAI_API_KEY`:
+   echte Diagnosegespräche `OPENAI_API_KEY`. Audio-Transkription bleibt ohne
+   `TRANSKRIPTION_ZERO_RETENTION=True` bewusst gesperrt:
 
    ```
    cp .env.example .env
