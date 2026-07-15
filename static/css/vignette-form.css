@@ -1,0 +1,28 @@
+/* Eigenheiten des Vignetten-Formulars: Feld-Steuerelemente und Aktionszeile.
+   Rahmen, Kopf, Abschnitte und Feld-Raster kommen aus page.css. */
+
+.vignette-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+.vignette-field > small {
+    display: block;
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+}
+
+.vignette-field textarea { min-height: 116px; }
+.vignette-field input[type="file"] { padding: 10px; background: var(--color-surface); }
+.vignette-field .errorlist { margin: 5px 0 0; padding: 0; color: var(--color-danger); font-size: .78rem; list-style: none; }
+
+.vignette-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}

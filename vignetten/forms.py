@@ -41,6 +41,19 @@ class VignetteForm(ModelForm):
             "budget_typ",
             "budget_wert",
         ]
+        labels: dict[str, str] = {
+            "fehlermuster_beschreibung": "Fehlermuster Beschreibung",
+            "arbeitsheft_beschreibung": "Arbeitsheft Beschreibung",
+            "arbeitsheft_text": "Arbeitsheft Text",
+            "arbeitsheft_bild": "Arbeitsheft Bild",
+            "schuelerin_name": "Schüler:in Name",
+            "schuelerin_geschlecht": "Schüler:in Geschlecht",
+            "lehrperson_name": "Lehrperson Name",
+            "lehrperson_geschlecht": "Lehrperson Geschlecht",
+            "referenzdiagnose": "Referenzdiagnose (optional)",
+            "budget_typ": "Budget Typ",
+            "budget_wert": "Budget Wert",
+        }
 
 
 class FinalisierenForm(Form):

@@ -1,23 +1,108 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Meine Vignetten{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-<section class="area--authoring">
-    <header class="area-band"><h1>Meine Vignetten</h1></header>
-    <p><a class="button" href="{% url 'vignetten:anlegen' %}">Vignette anlegen</a></p>
-    <div class="card-grid">
-        {% for eintrag in historien %}
-            <article class="card card--authoring">
-                <header class="card__header"><h2>{{ eintrag.label }}</h2></header>
-                <div class="card__body">
-                    <p><span class="badge badge--{{ eintrag.zustand_badge }}">{{ eintrag.zustand }}</span></p>
-                    <a href="{% url 'vignetten:detail' eintrag.fassung_pk %}">Vignette öffnen</a>
-                </div>
-            </article>
-        {% empty %}
-            <p>Noch keine Vignetten vorhanden.</p>
-        {% endfor %}
-    </div>
+<section class="page vignette-index-page">
+    <header class="page-head">
+        <div>
+            <p>Entwicklung</p>
+            <h1>Meine Vignetten</h1>
+            <span>Vignetten entwerfen, prüfen und für Trainings vorbereiten.</span>
+        </div>
+        <a class="button" href="{% url 'vignetten:anlegen' %}">Neue Vignette erstellen</a>
+    </header>
+
+    {% if historien %}
+        {{ historien|json_script:"vignetten-data" }}
+        <div
+            x-data="{
+                rows: JSON.parse(document.getElementById('vignetten-data').textContent),
+                q: '',
+                zustand: '',
+                sortKey: 'label',
+                sortDir: 1,
+                get zustaende() {
+                    return [...new Set(this.rows.map(r => r.zustand))].sort();
+                },
+                get sichtbar() {
+                    const q = this.q.trim().toLowerCase();
+                    return this.rows
+                        .filter(r => !this.zustand || r.zustand === this.zustand)
+                        .filter(r => !q || [r.label, r.fach, r.thema, r.klassenstufe]
+                            .join(' ').toLowerCase().includes(q))
+                        .sort((a, b) => {
+                            const x = (a[this.sortKey] ?? '').toString().toLowerCase();
+                            const y = (b[this.sortKey] ?? '').toString().toLowerCase();
+                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDir;
+                        });
+                },
+                sortiere(key) {
+                    if (this.sortKey === key) { this.sortDir *= -1; }
+                    else { this.sortKey = key; this.sortDir = 1; }
+                },
+                pfeilKlasse(key) {
+                    if (this.sortKey !== key) return '';
+                    return this.sortDir === 1
+                        ? 'table__sort-arrow--auf'
+                        : 'table__sort-arrow--ab';
+                }
+            }"
+        >
+            <div class="table-toolbar">
+                <input
+                    type="search"
+                    class="table-toolbar__search"
+                    placeholder="Suchen (Name, Fach, Thema, Klasse)…"
+                    aria-label="Vignetten durchsuchen"
+                    x-model="q"
+                >
+                <select class="table-toolbar__filter" aria-label="Nach Zustand filtern" x-model="zustand">
+                    <option value="">Alle Zustände</option>
+                    <template x-for="z in zustaende" :key="z">
+                        <option :value="z" x-text="z"></option>
+                    </template>
+                </select>
+                <span class="table-toolbar__count" x-text="sichtbar.length + ' von ' + rows.length"></span>
+            </div>
+
+            <div class="table-wrap vignette-index-table">
+                <table class="table table--sortable">
+                    <thead>
+                        <tr>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('label')">Name<span class="table__sort-arrow" :class="pfeilKlasse('label')"></span></button></th>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('fach')">Fach<span class="table__sort-arrow" :class="pfeilKlasse('fach')"></span></button></th>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('thema')">Thema<span class="table__sort-arrow" :class="pfeilKlasse('thema')"></span></button></th>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('klassenstufe')">Klasse<span class="table__sort-arrow" :class="pfeilKlasse('klassenstufe')"></span></button></th>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('zustand')">Zustand<span class="table__sort-arrow" :class="pfeilKlasse('zustand')"></span></button></th>
+                            <th scope="col">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in sichtbar" :key="r.url">
+                            <tr>
+                                <td x-text="r.label"></td>
+                                <td x-text="r.fach"></td>
+                                <td x-text="r.thema"></td>
+                                <td x-text="r.klassenstufe"></td>
+                                <td><span class="badge" :class="'badge--' + r.zustand_badge" x-text="r.zustand"></span></td>
+                                <td><a class="button button--secondary" :href="r.url">Öffnen</a></td>
+                            </tr>
+                        </template>
+                        <tr x-show="sichtbar.length === 0">
+                            <td colspan="6" class="table__empty">Keine Vignetten passen zu Suche und Filter.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <p>Noch keine Vignetten vorhanden.</p>
+    {% endif %}
 </section>
 {% endblock %}

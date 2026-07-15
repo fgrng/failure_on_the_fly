@@ -1,0 +1,40 @@
+/* Eigenheiten der Vignetten-Liste und -Detailansicht.
+   Rahmen, Kopf, Abschnitte und Feld-Raster kommen aus page.css. */
+
+/* ---- Liste: randlose Tabelle mit eigener Toolbar ---- */
+.vignette-index-page .table-toolbar {
+    margin-top: 0;
+    padding-block: var(--space-2);
+    border-top: 1px solid var(--color-border);
+}
+
+.vignette-index-table {
+    border-width: 1px 0;
+    border-radius: 0;
+}
+
+.vignette-index-table .table thead th { background: var(--color-surface); }
+.vignette-index-table .button { padding: 6px 12px; }
+
+/* ---- Detail: Aktionsleiste, Bild, Kern-Hinweis ---- */
+.vignette-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0 var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.vignette-detail-actions form { margin: 0; }
+
+.vignette-detail-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+}
+
+.vignette-detail-kern {
+    margin: var(--space-3) 0 0;
+    color: var(--color-text-muted);
+}

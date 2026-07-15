@@ -1,14 +1,84 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Vignette anlegen{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
 {% block content %}
-<section class="area--authoring">
-    <header class="area-band"><h1>Vignette anlegen</h1></header>
-    <form class="form" method="post" enctype="multipart/form-data">
+<section class="page area--authoring">
+    <header class="page-head">
+        <div>
+            <p>Neue Vignette</p>
+            <h1>Schritt für Schritt zur Trainingssituation</h1>
+            <span>Die Angaben sind nach ihrem fachlichen Zusammenhang geordnet.</span>
+        </div>
+    </header>
+    <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button class="button" type="submit">Anlegen</button>
+        {{ form.non_field_errors }}
+
+        <section class="page-section" aria-labelledby="section-context">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-context">Unterrichtskontext</h2><small>Wo findet die Situation statt?</small></span>
+            </header>
+            <div class="field-grid field-grid--three">
+                {% include "vignetten/includes/form_field.html" with field=form.fach %}
+                {% include "vignetten/includes/form_field.html" with field=form.thema %}
+                {% include "vignetten/includes/form_field.html" with field=form.klassenstufe %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-actors">
+            <header class="page-section__head">
+                <b>02</b><span><h2 id="section-actors">Akteure</h2><small>Wer begegnet sich in der Rahmenhandlung?</small></span>
+            </header>
+            <div class="field-grid">
+                {% include "vignetten/includes/form_field.html" with field=form.schuelerin_name %}
+                {% include "vignetten/includes/form_field.html" with field=form.schuelerin_geschlecht %}
+                {% include "vignetten/includes/form_field.html" with field=form.lehrperson_name %}
+                {% include "vignetten/includes/form_field.html" with field=form.lehrperson_geschlecht %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-task">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-task">Aufgabenkontext</h2><small>Was sieht und bearbeitet die simulierte Schüler:in?</small></span>
+            </header>
+            <div class="field-grid">
+                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag wide=True %}
+                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_text %}
+                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bild %}
+                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_beschreibung wide=True %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-pattern">
+            <header class="page-section__head">
+                <b>04</b><span><h2 id="section-pattern">Fehlermuster</h2><small>Wie denkt die simulierte Schüler:in?</small></span>
+            </header>
+            <div class="field-grid">
+                {% include "vignetten/includes/form_field.html" with field=form.fehlermuster_beschreibung %}
+                {% include "vignetten/includes/form_field.html" with field=form.referenzdiagnose %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-budget">
+            <header class="page-section__head">
+                <b>05</b><span><h2 id="section-budget">Gesprächsbudget</h2><small>Wann endet das Diagnosegespräch?</small></span>
+            </header>
+            <div class="field-grid">
+                {% include "vignetten/includes/form_field.html" with field=form.budget_typ %}
+                {% include "vignetten/includes/form_field.html" with field=form.budget_wert %}
+            </div>
+        </section>
+
+        <div class="vignette-form-actions">
+            <a href="{% url 'vignetten:liste' %}">Abbrechen</a>
+            <button class="button" type="submit">Vignette anlegen</button>
+        </div>
     </form>
 </section>
 {% endblock %}

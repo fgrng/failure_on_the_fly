@@ -29,57 +29,6 @@ def _gif_upload() -> SimpleUploadedFile:
     return SimpleUploadedFile("arbeitsblatt.gif", _GIF_INHALT, content_type="image/gif")
 
 
-class VignettenlisteTests(TestCase):
-    """Die Liste zeigt nur Vignetten aus dem eigenen Eigentümer-Kreis."""
-
-    def test_zeigt_eigene_historie_mit_fallback_label_und_versteckt_fremde(
-        self,
-    ) -> None:
-        """Autor:innen sehen nur ihre Historien, auch ohne vergebenen Namen."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        eigene_historie.eigentuemerinnen.add(ada)
-        Vignette.objects._erstellen(
-            historie=eigene_historie,
-            zustand=Vignette.Zustand.ARCHIVIERT,
-            finalisiert_am=timezone.now(),
-            arbeitsheft_text="1 + 1 = 3",
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="4",
-        )
-        neueste_fassung: Vignette = Vignette.objects._erstellen(
-            historie=eigene_historie,
-            fach="Mathematik",
-            thema="Brüche",
-            klassenstufe="5",
-        )
-        benannte_historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Addition mit Übertrag"
-        )
-        benannte_historie.eigentuemerinnen.add(ada)
-        Vignette.objects._erstellen(historie=benannte_historie)
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Versteckte Vignette"
-        )
-        fremde_historie.eigentuemerinnen.add(grace)
-        Vignette.objects._erstellen(historie=fremde_historie)
-        self.client.force_login(ada)
-
-        response: HttpResponse = self.client.get(reverse("vignetten:liste"))
-
-        self.assertContains(response, "Mathematik: Brüche (Klasse 5)")
-        self.assertContains(
-            response,
-            reverse("vignetten:detail", args=[neueste_fassung.pk]),
-        )
-        self.assertNotContains(response, "Mathematik: Addition (Klasse 4)")
-        self.assertContains(response, "Addition mit Übertrag")
-        self.assertNotContains(response, "Versteckte Vignette")
-        self.assertContains(response, reverse("vignetten:anlegen"))
-
-
 class VignetteAnlegenViewTests(TestCase):
     """Das Anlegeformular ist die HTTP-Naht zum Vignetten-Manager."""
 

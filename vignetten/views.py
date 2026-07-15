@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
@@ -66,9 +67,12 @@ def liste(request: HttpRequest) -> HttpResponse:
         historien.append(
             {
                 "label": historie.name or _fallback_label(neueste_fassung),
-                "fassung_pk": neueste_fassung.pk,
+                "fach": neueste_fassung.fach,
+                "thema": neueste_fassung.thema,
+                "klassenstufe": neueste_fassung.klassenstufe,
                 "zustand": neueste_fassung.get_zustand_display(),
                 "zustand_badge": _zustand_badge(neueste_fassung),
+                "url": reverse("vignetten:detail", args=[neueste_fassung.pk]),
             }
         )
     return render(request, "vignetten/liste.html", {"historien": historien})
