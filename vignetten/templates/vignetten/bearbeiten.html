@@ -17,9 +17,9 @@
         {{ thema_werte|json_script:"thema-werte" }}
         {% for field in form %}
             {% if field.name == "fach" %}
-                {% include "vignetten/includes/autovervollstaendigung_field.html" with werte_id="fach-werte" %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with field=field werte_id="fach-werte" %}
             {% elif field.name == "thema" %}
-                {% include "vignetten/includes/autovervollstaendigung_field.html" with werte_id="thema-werte" %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with field=field werte_id="thema-werte" %}
             {% else %}
                 <p>
                     {{ field.label_tag }}

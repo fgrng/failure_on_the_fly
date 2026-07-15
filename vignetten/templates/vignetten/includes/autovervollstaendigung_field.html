@@ -5,11 +5,15 @@
         vorschlaege: [],
         suche(eingabe) {
             const suchbegriff = eingabe.trim().toLocaleLowerCase();
-            this.vorschlaege = suchbegriff ? this.werte
+            if (!suchbegriff) {
+                this.vorschlaege = [];
+                return;
+            }
+            this.vorschlaege = this.werte
                 .map(wert => ({ wert, score: this.score(suchbegriff, wert.toLocaleLowerCase()) }))
                 .filter(({ wert, score }) => wert.toLocaleLowerCase().includes(suchbegriff) || score &lt;= Math.max(2, Math.ceil(suchbegriff.length * .3)))
                 .sort((a, b) => a.score - b.score || a.wert.localeCompare(b.wert, 'de'))
-                .slice(0, 5) : [];
+                .slice(0, 5);
         },
         auswaehlen(wert) {
             this.$refs.eingabe.value = wert;
@@ -20,7 +24,6 @@
             return wert.includes(suchbegriff) ? 0 : this.levenshtein(suchbegriff, wert);
         },
         levenshtein(a, b) {
-            // Bewusst ohne JS-Test: Der Django-Test sichert die serverseitige Datenquelle.
             let vorherige = Array.from({ length: b.length + 1 }, (_, index) => index);
             Array.from(a).forEach((zeichen, index) => {
                 const aktuelle = [index + 1];
