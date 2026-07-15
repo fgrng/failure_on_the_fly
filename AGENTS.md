@@ -8,9 +8,9 @@ When changing public-facing behavior, check README.md to see if the documentatio
 
 Issues and Specs live as GitHub issues in fgrng/failure_on_the_fly, managed via the gh CLI. See docs/agents/issue-tracker.md.
 
-## Triage Labels
+## Issue Labels
 
-Default canonical labels, except `ready-for-agent` is spelled `Sandcastle` in this repo. See docs/agents/triage-labels.md.
+The `ready-for-agent` / `ready-for-human` roles are spelled `AFK` / `HITL` in this repo. See docs/agents/issue-labels.md for the full label set.
 
 ## Domain Docs
 

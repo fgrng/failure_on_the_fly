@@ -1,6 +1,6 @@
 # Backlog: GitHub
 
-Issues and Specs for this repo live as GitHub issues. Use the `gh` CLI for all operations. A `Spec`-labelled issue describes a requirement and is decomposed into `Ticket`-labelled sub-issues; only tickets carry `Sandcastle` and get run by AFK agents. See [triage-labels.md](./triage-labels.md#spec-vs-ticket).
+Issues and Specs for this repo live as GitHub issues. Use the `gh` CLI for all operations. A `Spec`-labelled issue describes a requirement and is decomposed into `Ticket`-labelled sub-issues; only tickets carry `AFK` and get run by AFK agents. See [issue-labels.md](./issue-labels.md#spec-und-ticket).
 
 ## Conventions
 
