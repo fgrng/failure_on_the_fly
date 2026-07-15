@@ -103,6 +103,23 @@ class Erhebung(models.Model):
 
         return models.QuerySet(model=type(self), using=self._state.db)
 
+    def _status_wechseln(
+        self,
+        erwarteter_status: str,
+        zielstatus: str,
+        fehlermeldung: str,
+        **aktualisierungen: object,
+    ) -> None:
+        # Schreibt einen geprüften Lebenszyklus-Übergang und aktualisiert die Instanz.
+
+        if not self._schreibqueryset().filter(
+            pk=self.pk, status=erwarteter_status
+        ).update(status=zielstatus, **aktualisierungen):
+            raise ValidationError(fehlermeldung)
+        self.status = zielstatus
+        for feld, wert in aktualisierungen.items():
+            setattr(self, feld, wert)
+
     @transaction.atomic
     def finalisieren(self) -> None:
         """Finalisiert einen Entwurf und pinnt die aktive Modell-Konfiguration."""
@@ -110,15 +127,12 @@ class Erhebung(models.Model):
         from simulation.models import ModellKonfiguration
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
-        if not self._schreibqueryset().filter(
-            pk=self.pk, status=self.Status.ENTWURF
-        ).update(
-            status=self.Status.FINAL,
+        self._status_wechseln(
+            erwarteter_status=self.Status.ENTWURF,
+            zielstatus=self.Status.FINAL,
+            fehlermeldung="Nur Entwürfe können finalisiert werden.",
             modell_konfiguration=konfiguration,
-        ):
-            raise ValidationError("Nur Entwürfe können finalisiert werden.")
-        self.status = self.Status.FINAL
-        self.modell_konfiguration = konfiguration
+        )
 
     @transaction.atomic
     def zurueckziehen(self) -> None:
@@ -131,11 +145,11 @@ class Erhebung(models.Model):
                 "Erhebungen mit nicht archivierten Stichproben können nicht "
                 "zurückgezogen werden."
             )
-        if not self._schreibqueryset().filter(
-            pk=self.pk, status=self.Status.FINAL
-        ).update(status=self.Status.ENTWURF):
-            raise ValidationError("Nur finale Erhebungen können zurückgezogen werden.")
-        self.status = self.Status.ENTWURF
+        self._status_wechseln(
+            erwarteter_status=self.Status.FINAL,
+            zielstatus=self.Status.ENTWURF,
+            fehlermeldung="Nur finale Erhebungen können zurückgezogen werden.",
+        )
 
     @transaction.atomic
     def archivieren(self) -> None:
@@ -146,21 +160,21 @@ class Erhebung(models.Model):
             raise ValidationError(
                 "Erhebungen mit laufenden Stichproben können nicht archiviert werden."
             )
-        if not self._schreibqueryset().filter(
-            pk=self.pk, status=self.Status.FINAL
-        ).update(status=self.Status.ARCHIVIERT):
-            raise ValidationError("Nur finale Erhebungen können archiviert werden.")
-        self.status = self.Status.ARCHIVIERT
+        self._status_wechseln(
+            erwarteter_status=self.Status.FINAL,
+            zielstatus=self.Status.ARCHIVIERT,
+            fehlermeldung="Nur finale Erhebungen können archiviert werden.",
+        )
 
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Erhebung wieder final."""
 
-        if not self._schreibqueryset().filter(
-            pk=self.pk, status=self.Status.ARCHIVIERT
-        ).update(status=self.Status.FINAL):
-            raise ValidationError("Nur archivierte Erhebungen können entarchiviert werden.")
-        self.status = self.Status.FINAL
+        self._status_wechseln(
+            erwarteter_status=self.Status.ARCHIVIERT,
+            zielstatus=self.Status.FINAL,
+            fehlermeldung="Nur archivierte Erhebungen können entarchiviert werden.",
+        )
 
 
 class StichprobeQuerySet(models.QuerySet["Stichprobe"]):
@@ -190,6 +204,7 @@ class Stichprobe(models.Model):
     archiviert: models.BooleanField = models.BooleanField(default=False)
 
     objects: models.Manager["Stichprobe"] = StichprobeQuerySet.as_manager()
+    _wird_archiviert: bool
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Hält Archivieren an der Lebenszyklus-Methode."""
