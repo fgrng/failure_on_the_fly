@@ -22,6 +22,7 @@ class TrainingssitzungTests(TestCase):
         *,
         budget_typ: Vignette.BudgetTyp = Vignette.BudgetTyp.SCHRITTE,
         budget_wert: int = 3,
+        audioverarbeitung_eingewilligt: bool = True,
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
@@ -66,7 +67,11 @@ class TrainingssitzungTests(TestCase):
         )
         self.start_response: HttpResponse = self.client.post(
             reverse("training:einwilligung", args=[training.pk, vignette.pk]),
-            {"audioverarbeitung_eingewilligt": "ja"},
+            {
+                "audioverarbeitung_eingewilligt": (
+                    "ja" if audioverarbeitung_eingewilligt else "nein"
+                )
+            },
         )
         return training
 
@@ -84,6 +89,14 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertContains(self.start_response, "Aufnahme starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
+
+    def test_training_ohne_audioeinwilligung_zeigt_nur_tastatureingabe(self) -> None:
+        """Abgelehnte Einwilligung blendet die Aufnahme-Steuerung aus."""
+
+        self._sitzung_starten([], audioverarbeitung_eingewilligt=False)
+
+        self.assertContains(self.start_response, "Ihre nächste Frage")
+        self.assertNotContains(self.start_response, "Aufnahme starten")
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:
         """Ein answerless Schritt zeigt den Fehler und lässt keine Diagnose mehr zu."""

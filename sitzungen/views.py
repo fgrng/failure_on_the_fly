@@ -443,7 +443,6 @@ def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpRe
         gespraechsschritte=_training_schritte(sitzung),
         ist_probelauf=False,
         zeigt_debrief=True,
-        spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
 
