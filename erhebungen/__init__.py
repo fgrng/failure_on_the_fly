@@ -1,0 +1,1 @@
+"""Domänenobjekte für Erhebungen."""
