@@ -321,3 +321,53 @@ class Erhebungsbindung(models.Model):
                 Sitzung.Status.GESCHEITERT,
             ]
         ).exists() or not self.teilnahme.sitzung_set.exists()
+
+
+class Vignettenposition(models.Model):
+    """Eine gezogene Vignetten-Fassung an ihrer Position in einer Teilnahme."""
+
+    erhebungsbindung: models.ForeignKey = models.ForeignKey(
+        Erhebungsbindung,
+        on_delete=models.CASCADE,
+        related_name="vignettenpositionen",
+    )
+    sitzung: models.OneToOneField = models.OneToOneField(
+        "sitzungen.Sitzung",
+        on_delete=models.CASCADE,
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+    vignette: models.ForeignKey = models.ForeignKey(
+        "vignetten.Vignette",
+        on_delete=models.PROTECT,
+    )
+
+    def clean(self) -> None:
+        """Bindet Sitzung und gezogene Fassung an dieselbe Teilnahme."""
+
+        fehler: dict[str, str] = {}
+        if (
+            self.sitzung.teilnahme_id
+            != self.erhebungsbindung.teilnahme_id
+        ):
+            fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
+        if self.sitzung.vignette_id != self.vignette_id:
+            fehler["vignette"] = "Die Vignette stimmt nicht mit der Sitzung überein."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur Positionen aus einer konsistenten Datenspur."""
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        """Hält die Reihenfolge je Teilnahme eindeutig und lesbar."""
+
+        ordering: list[str] = ["position"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "position"],
+                name="erhebungen_position_ist_je_teilnahme_eindeutig",
+            ),
+        ]
