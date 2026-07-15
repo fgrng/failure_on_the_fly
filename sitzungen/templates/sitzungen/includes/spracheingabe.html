@@ -1,5 +1,5 @@
-<section class="spracheingabe" data-spracheingabe data-formular-id="{{ formular_id }}" data-eingabe-id="{{ eingabe_id }}" data-transkription-url="{{ transkription_url }}" aria-label="Frage aufnehmen">
-    <h2>Frage aufnehmen</h2>
+<section class="spracheingabe" data-spracheingabe data-formular-id="{{ formular_id }}" data-eingabe-id="{{ eingabe_id }}" data-tastatureingabe-id="{{ tastatureingabe_id }}" data-transkription-url="{{ transkription_url }}" data-automatisch-absenden="{{ automatisch_absenden }}" aria-label="{{ aufnahme_titel }}">
+    <h2>{{ aufnahme_titel }}</h2>
     <button class="button spracheingabe__steuerung" type="button" aria-pressed="false">Aufnahme starten</button>
-    <p class="spracheingabe__status" aria-live="polite">Starten Sie die Aufnahme und beenden Sie sie, wenn Ihre Frage vollständig ist.</p>
+    <p class="spracheingabe__status" aria-live="polite">{{ aufnahme_hinweis }}</p>
 </section>

@@ -6,10 +6,15 @@
     </header>
     <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief.webp' %}" alt="" width="800" height="800" loading="lazy" decoding="async">
     <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
-    <form class="diagnose" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
+    <form id="diagnose-formular" class="diagnose" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
         {% csrf_token %}
         <label for="diagnose">Was ist Ihnen aufgefallen?</label>
         <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
+        <textarea id="diagnose-transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
         <button class="button" type="submit">{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} beenden</button>
     </form>
+    {% if spracheingabe_verfuegbar %}
+        {% url 'sitzungen:transkription' as transkription_url %}
+        {% include "sitzungen/includes/spracheingabe.html" with formular_id="diagnose-formular" eingabe_id="diagnose-transkript" tastatureingabe_id="diagnose" transkription_url=transkription_url automatisch_absenden="false" aufnahme_titel="Diagnose aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn dieser Teil Ihrer Diagnose vollständig ist." %}
+    {% endif %}
 </section>

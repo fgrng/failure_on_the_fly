@@ -1,7 +1,7 @@
 (() => {
     const meldungen = {
-        leeres_transkript: "Es wurde kein Text erkannt. Nehmen Sie Ihre Frage bitte erneut auf.",
-        anbieterfehler: "Die Transkription ist fehlgeschlagen. Nehmen Sie Ihre Frage bitte erneut auf.",
+        leeres_transkript: "Es wurde kein Text erkannt. Nehmen Sie bitte erneut auf.",
+        anbieterfehler: "Die Transkription ist fehlgeschlagen. Nehmen Sie bitte erneut auf.",
         anbieter_nicht_erreichbar: "Die Transkription ist derzeit nicht erreichbar. Versuchen Sie es bitte erneut.",
     };
 
@@ -11,6 +11,7 @@
 
         const formular = document.getElementById(bereich.dataset.formularId);
         const eingabe = document.getElementById(bereich.dataset.eingabeId);
+        const tastatureingabe = document.getElementById(bereich.dataset.tastatureingabeId);
         const steuerung = bereich.querySelector(".spracheingabe__steuerung");
         const status = bereich.querySelector(".spracheingabe__status");
         if (!formular || !eingabe || !steuerung || !status) return;
@@ -47,9 +48,14 @@
                 });
                 const ergebnis = await antwort.json();
                 if (!antwort.ok) throw new Error(ergebnis.status);
-                eingabe.readOnly = true;
-                eingabe.value = ergebnis.text;
-                formular.requestSubmit();
+                const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
+                if (automatischAbsenden) eingabe.readOnly = true;
+                eingabe.value = automatischAbsenden
+                    ? ergebnis.text
+                    : `${eingabe.value}${eingabe.value ? "\n" : ""}${ergebnis.text}`;
+                eingabe.hidden = false;
+                zustand("Das Transkript wurde hinzugefügt. Sie können weiter aufnehmen oder tippen.");
+                if (automatischAbsenden) formular.requestSubmit();
             } catch (fehler) {
                 if (["einwilligung_verweigert", "zero_retention_fehlt"].includes(fehler.message)) {
                     aufnahme_deaktivieren("Die Transkription ist nicht verfügbar. Nutzen Sie die Tastatureingabe.");
@@ -78,12 +84,17 @@
                 recorder.start();
                 steuerung.textContent = "Aufnahme beenden";
                 steuerung.setAttribute("aria-pressed", "true");
-                zustand("Aufnahme läuft. Beenden Sie die Aufnahme, wenn Ihre Frage vollständig ist.", true);
+                zustand("Aufnahme läuft. Beenden Sie die Aufnahme, wenn sie vollständig ist.", true);
             } catch {
                 mikrofon_verweigert();
             }
         };
 
+        if (tastatureingabe) {
+            formular.addEventListener("submit", () => {
+                tastatureingabe.value += `${tastatureingabe.value && eingabe.value ? "\n" : ""}${eingabe.value}`;
+            });
+        }
         steuerung.addEventListener("click", () => (recorder?.state === "recording" ? stoppen() : starten()));
     };
 

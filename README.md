@@ -26,8 +26,10 @@ uneingeschränkt über die Tastatur spielbar.
 Nach Einwilligung lässt sich jede Frage im Diagnosegespräch per Tastatur oder
 über „Aufnahme starten“ eingeben. Die Aufnahme wird bewusst beendet, direkt
 transkribiert und anschließend automatisch als Gesprächsschritt abgeschickt;
-das Transkript wird davor nicht bearbeitet. Bei einer leeren oder fehlgeschlagenen
-Transkription kann die Aufnahme wiederholt werden.
+das Transkript wird davor nicht bearbeitet. Im Debrief kann die Diagnose ebenfalls
+in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie bewusst
+und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann
+die Aufnahme wiederholt werden.
 
 ## Lokale Entwicklungsumgebung
 
