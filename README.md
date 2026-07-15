@@ -31,6 +31,13 @@ in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie b
 und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann
 die Aufnahme wiederholt werden.
 
+## Erhebungsteilnahme
+
+Ein Teilnahme-Link einer Stichprobe legt im Browser eine pseudonyme Teilnahme an
+oder setzt sie fort. Dafür ist kein Nutzerkonto erforderlich; die
+Forschungsdaten sind über ein ablesbares Teilnahme-Token von Trainingsaktivitäten
+getrennt.
+
 ## Lokale Entwicklungsumgebung
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.

@@ -24,6 +24,7 @@ urlpatterns = [
     path("", TemplateView.as_view(template_name="start.html"), name="start"),
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
+    path('erhebungen/', include('erhebungen.urls')),
     path('sitzungen/', include('sitzungen.urls')),
     path('system/', include('simulation.urls')),
     path('trainings/', include('training.urls')),
