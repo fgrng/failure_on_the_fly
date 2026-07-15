@@ -15,3 +15,7 @@ Default canonical labels, except `ready-for-agent` is spelled `Sandcastle` in th
 ## Domain Docs
 
 Single-context layout: CONTEXT.md + docs/adr/ at the repo root. See docs/agents/domain.md.
+
+## Image Generation
+
+Framing-story illustrations (`static/images/session/`) are generated with the `agy` CLI (Nano Banana, quota-limited). See docs/agents/image-generation.md.
