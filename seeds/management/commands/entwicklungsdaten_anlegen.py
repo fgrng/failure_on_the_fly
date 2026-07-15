@@ -18,7 +18,10 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from konten.apps import KONTOROLLEN
+from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.standardkern import STANDARDKERN_VORLAGEN
 from training.models import Training
 from vignetten.models import Vignette
 
@@ -26,101 +29,89 @@ from vignetten.models import Vignette
 # Ein bewusst schwaches, dokumentiertes Entwicklungspasswort für alle Testkonten.
 ENTWICKLUNGSPASSWORT: str = "entwicklung"
 
-# Die Testkonten je Rolle. Der Schlüssel ist der Anmeldename, der Wert die Rolle
-# (Gruppenname aus konten.apps.KONTOROLLEN) oder None für ein reines
-# Teilnehmerinnenkonto ohne Sonderrolle.
-TESTKONTEN: dict[str, str | None] = {
-    "admin": "Administrator:in",
-    "autorin": "Autor:in",
-    "ausbilderin": "Ausbilder:in",
-    "forschende": "Forschende:r",
-    "studi": None,
+# Die Testkonten. Der Schlüssel ist der Anmeldename, der Wert die Liste der
+# zugewiesenen Rollen (Gruppennamen aus konten.apps.KONTOROLLEN). "autor" trägt
+# alle Rollen gleichzeitig, "studi" ist ein reines Teilnehmerinnenkonto ohne
+# Sonderrolle.
+TESTKONTEN: dict[str, list[str]] = {
+    "autor": list(KONTOROLLEN),
+    "studi": [],
 }
 
-# Ein funktionsfähiger Simulationskern für einen echten Testlauf. Die Vorlagen
-# nutzen ausschließlich vertragskonforme Platzhalter (siehe VERTRAG_PROMPT bzw.
-# VERTRAG_RAHMEN in simulation.models).
-SYSTEM_PROMPT_VORLAGE: str = (
-    "Du bist $schuelerin_name, eine simulierte Schüler:in der Klassenstufe "
-    "$klassenstufe im Fach $fach zum Thema $thema.\n\n"
-    "Du wendest durchgehend und konsequent dieses Fehlermuster an:\n"
-    "$fehlermuster_beschreibung\n\n"
-    "Du bleibst in der Rolle der Schüler:in, sprichst altersgemäß und gibst "
-    "dein Fehlermuster niemals als solches zu erkennen. Du kennst deine "
-    "eigene Denkweise als richtig."
-)
-USER_PROMPT_VORLAGE: str = (
-    "Deine Aufgabe war:\n$lernauftrag\n\n"
-    "Deine Bearbeitung im Arbeitsheft:\n$arbeitsheft_beschreibung"
-)
-RAHMEN_EINLEITUNG: str = (
-    "Du hospitierst im Fach $fach in einer $klassenstufe. "
-    "$lehrperson_anrede $lehrperson_name bittet dich, mit $schuelerin_name über "
-    "$schuelerin_possessiv Bearbeitung ins Gespräch zu kommen."
-)
-RAHMEN_DEBRIEF: str = (
-    "$lehrperson_anrede $lehrperson_name kommt auf dich zu: „Und, was ist Ihnen "
-    "bei $schuelerin_name aufgefallen?“"
-)
-
-# Die aktive Modell-Konfiguration für den manuellen Testlauf: OpenAI über
-# LiteLLM. Braucht OPENAI_API_KEY in der .env (siehe .env.example).
+# Die optionale OpenAI-Konfiguration für einen echten Modelllauf.
 SIMULATIONSMODELL: str = "openai/gpt-4o"
 SIMULATIONSPARAMETER: dict[str, object] = {"temperature": 0.2}
 
-# Ein kleines Fake-Skript für Offline-Klicktests ohne API-Schlüssel. Zum
-# Aktivieren: ModellKonfiguration.objects.aktivieren(fake_konfiguration).
+# Die aktive Fake-Antwort für beliebig viele Offline-Gesprächsschritte. Der
+# Adapter wird je Schritt neu erzeugt und beginnt deshalb immer von vorn.
 FAKE_SKRIPT: list[dict[str, str]] = [
-    {"denkspur": "Ich addiere Zähler und Nenner.", "aeusserung": "Das ist doch 2/7!"},
-    {"denkspur": "Wieder Zähler und Nenner getrennt.", "aeusserung": "Also 3/9."},
+    {
+        "denkspur": "Ich bleibe bei meiner eigenen Regel und prüfe die Frage damit.",
+        "aeusserung": "Ich habe die Zeichen so gelesen und dann genau so gerechnet.",
+    },
 ]
 
 # Die finalen Vignetten des Seeds. Jede beschreibt ein stabiles Fehlermuster.
 VIGNETTEN: list[dict[str, object]] = [
     {
-        "historienname": "Brüche addieren",
+        "historienname": "Gleichheitszeichen als Rechenaufforderung",
         "fehlermuster_beschreibung": (
-            "Beim Addieren zweier Brüche addierst du Zähler mit Zähler und "
-            "Nenner mit Nenner (1/2 + 1/3 = 2/5)."
+            "Du verstehst das Gleichheitszeichen als Aufforderung, die Rechnung "
+            "links davon auszurechnen, nicht als Zeichen dafür, dass beide Seiten "
+            "denselben Wert haben. Bei einer Platzhalteraufgabe trägst du deshalb "
+            "das Ergebnis der linken Rechnung in die Lücke ein und beachtest den "
+            "Term rechts von der Lücke nicht weiter."
         ),
-        "lernauftrag": "Berechne 1/2 + 1/3 und begründe dein Vorgehen.",
+        "lernauftrag": "Setze die passende Zahl ein: 8 + 4 = ___ + 5.",
         "arbeitsheft_beschreibung": (
-            "Notiert steht: 1/2 + 1/3 = 2/5, daneben die Rechnung 1+1=2 und 2+3=5."
+            "Auf dem Arbeitsblatt steht die Platzhalteraufgabe 8 + 4 = ___ + 5. "
+            "Lukas hat 12 in die Lücke eingetragen."
         ),
-        "arbeitsheft_text": "1/2 + 1/3 = 2/5",
-        "schuelerin_name": "Mia",
-        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
-        "lehrperson_name": "Berger",
-        "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
-        "fach": "Mathematik",
-        "thema": "Bruchrechnung",
-        "klassenstufe": "6. Klasse",
-        "referenzdiagnose": (
-            "Zähler-Nenner-Addition: Der Bruchstrich wird als Trenner zweier "
-            "unabhängiger Zahlen statt als Division gedeutet."
-        ),
-        "budget_typ": Vignette.BudgetTyp.SCHRITTE,
-        "budget_wert": 12,
-    },
-    {
-        "historienname": "Multiplikation mit Null",
-        "fehlermuster_beschreibung": (
-            "Du behandelst die Multiplikation mit 0 wie eine Addition mit 0: "
-            "Ein Faktor 0 lässt die andere Zahl unverändert (7 · 0 = 7)."
-        ),
-        "lernauftrag": "Berechne 7 · 0 und 0 · 4.",
-        "arbeitsheft_beschreibung": "Notiert steht: 7 · 0 = 7 und 0 · 4 = 4.",
-        "arbeitsheft_text": "7 · 0 = 7\n0 · 4 = 4",
-        "schuelerin_name": "Jonas",
+        "arbeitsheft_text": "8 + 4 = 12 + 5",
+        "schuelerin_name": "Lukas",
         "schuelerin_geschlecht": Vignette.Geschlecht.MAENNLICH,
         "lehrperson_name": "Berger",
         "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
         "fach": "Mathematik",
-        "thema": "Multiplikation",
-        "klassenstufe": "3. Klasse",
+        "thema": "Gleichheitszeichen und Platzhalter",
+        "klassenstufe": "5. Klasse",
         "referenzdiagnose": (
-            "Verwechslung des neutralen Elements: Die 0 der Addition wird auf "
-            "die Multiplikation übertragen."
+            "Operationales Verständnis des Gleichheitszeichens: Lukas deutet es "
+            "als Rechenaufforderung statt relational als Äquivalenzzeichen. Er "
+            "fokussiert 8 + 4 und blendet + 5 rechts vom Platzhalter aus."
+        ),
+        "budget_typ": Vignette.BudgetTyp.SCHRITTE,
+        "budget_wert": 10,
+    },
+    {
+        "historienname": "Variablen als Objektbezeichnungen",
+        "fehlermuster_beschreibung": (
+            "Du verstehst Variablen als Abkürzungen für Gegenstände oder Wörter, "
+            "nicht als Platzhalter für Anzahlen. Deshalb liest du 6S als sechs "
+            "Studierende und P als einen Professor und schreibst 6S = P. Auch bei "
+            "Nachfragen hältst du an dieser Abkürzungslogik fest."
+        ),
+        "lernauftrag": (
+            "An einer Universität gibt es sechsmal so viele Studierende wie "
+            "Professoren. Schreibe eine Gleichung mit S für die Anzahl der "
+            "Studierenden und P für die Anzahl der Professoren."
+        ),
+        "arbeitsheft_beschreibung": (
+            "Julia hat zur beschriebenen Beziehung die Gleichung 6S = P "
+            "aufgeschrieben."
+        ),
+        "arbeitsheft_text": "6S = P",
+        "schuelerin_name": "Julia",
+        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "lehrperson_name": "Kant",
+        "lehrperson_geschlecht": Vignette.Geschlecht.MAENNLICH,
+        "fach": "Mathematik",
+        "thema": "Variablen und Gleichungen",
+        "klassenstufe": "7. Klasse",
+        "referenzdiagnose": (
+            "Variable als Objektbezeichnung: Julia liest S und P als Etiketten "
+            "für Studierende und Professoren statt als Anzahlen. Dadurch kehrt "
+            "sie die Beziehung S = 6P zur Gleichung 6S = P um."
         ),
         "budget_typ": Vignette.BudgetTyp.SCHRITTE,
         "budget_wert": 10,
@@ -142,73 +133,83 @@ class Command(BaseCommand):
             )
 
         with transaction.atomic():
-            konten = self._konten_anlegen()
-            kern = self._kern_sicherstellen()
+            konten: dict[str, object] = self._konten_anlegen()
+            kern: Simulationskern = self._kern_sicherstellen()
             self._modell_konfiguration_sicherstellen()
-            vignetten = self._vignetten_anlegen(konten["autorin"], kern)
-            self._trainings_anlegen(konten["ausbilderin"], vignetten)
+            vignetten: list[Vignette] = self._vignetten_anlegen(konten["autor"], kern)
+            self._trainings_anlegen(konten["autor"], vignetten)
 
         self._zusammenfassung_ausgeben()
 
     def _konten_anlegen(self) -> dict[str, object]:
-        """Legt je Rolle ein Testkonto an und weist die passende Gruppe zu."""
-        konto_modell = get_user_model()
+        """Legt je Testkonto an und weist die zugehörigen Gruppen zu."""
+        konto_modell: type[Konto] = get_user_model()
         konten: dict[str, object] = {}
-        for anmeldename, rolle in TESTKONTEN.items():
+        for anmeldename, rollen in TESTKONTEN.items():
             konto, neu = konto_modell.objects.get_or_create(username=anmeldename)
             if neu:
                 konto.set_password(ENTWICKLUNGSPASSWORT)
-                if rolle == "Administrator:in":
+                if "Administrator:in" in rollen:
                     konto.is_staff = True
                     konto.is_superuser = True
                 konto.save()
-            if rolle is not None:
+            for rolle in rollen:
                 konto.groups.add(Group.objects.get(name=rolle))
             konten[anmeldename] = konto
             self.stdout.write(
-                f"  Konto {anmeldename} ({rolle or 'ohne Rolle'}) "
+                f"  Konto {anmeldename} ({', '.join(rollen) or 'ohne Rolle'}) "
                 f"{'angelegt' if neu else 'vorhanden'}."
             )
         return konten
 
     def _kern_sicherstellen(self) -> Simulationskern:
-        """Stellt genau eine finale Simulationskern-Fassung bereit."""
-        final = Simulationskern.objects.filter(
+        """Stellt die aktuelle Standardkern-Fassung bereit."""
+        final: Simulationskern | None = Simulationskern.objects.filter(
             zustand=Simulationskern.Zustand.FINAL
         ).order_by("-finalisiert_am", "-pk").first()
-        if final is not None:
+        if final is not None and all(
+            getattr(final, feld) == wert
+            for feld, wert in STANDARDKERN_VORLAGEN.items()
+        ):
             self.stdout.write("  Simulationskern vorhanden.")
             return final
-        if Simulationskern.objects.exists():
+        if Simulationskern.objects.filter(
+            zustand=Simulationskern.Zustand.ENTWURF
+        ).exists():
             raise CommandError(
-                "Es existiert bereits ein nicht-finaler Simulationskern-Entwurf; "
+                "Es existiert bereits ein Simulationskern-Entwurf; "
                 "bitte manuell finalisieren."
             )
-        kern = Simulationskern.objects.anlegen(
-            system_prompt_vorlage=SYSTEM_PROMPT_VORLAGE,
-            user_prompt_vorlage=USER_PROMPT_VORLAGE,
-            rahmenhandlung_einleitung=RAHMEN_EINLEITUNG,
-            rahmenhandlung_debrief=RAHMEN_DEBRIEF,
+        kern: Simulationskern = (
+            final.bearbeiten()
+            if final is not None
+            else Simulationskern.objects.anlegen(**STANDARDKERN_VORLAGEN)
         )
+        if final is not None:
+            for feld, wert in STANDARDKERN_VORLAGEN.items():
+                setattr(kern, feld, wert)
+            kern.save(update_fields=list(STANDARDKERN_VORLAGEN))
         kern.finalisieren()
         self.stdout.write("  Simulationskern angelegt und finalisiert.")
         return kern
 
     def _modell_konfiguration_sicherstellen(self) -> None:
-        """Legt eine OpenAI- und eine Fake-Konfiguration an und aktiviert OpenAI."""
-        openai = ModellKonfiguration.objects.filter(
+        """Legt OpenAI und Fake an und aktiviert Fake für Offline-Klicktests."""
+        ModellKonfiguration.objects.filter(
             sprachmodell=SIMULATIONSMODELL
         ).first() or ModellKonfiguration.objects.create(
             sprachmodell=SIMULATIONSMODELL, parameter=SIMULATIONSPARAMETER
         )
-        if not ModellKonfiguration.objects.filter(sprachmodell="fake").exists():
-            ModellKonfiguration.objects.create(
-                sprachmodell="fake", parameter={"skript": FAKE_SKRIPT}
-            )
-        ModellKonfiguration.objects.aktivieren(openai)
+        fake_parameter: dict[str, object] = {"skript": FAKE_SKRIPT}
+        fake: ModellKonfiguration = ModellKonfiguration.objects.filter(
+            sprachmodell="fake", parameter=fake_parameter
+        ).first() or ModellKonfiguration.objects.create(
+            sprachmodell="fake", parameter=fake_parameter
+        )
+        ModellKonfiguration.objects.aktivieren(fake)
         self.stdout.write(
-            f"  Modell-Konfiguration '{SIMULATIONSMODELL}' aktiv "
-            "(Fake-Konfig für Offline-Tests angelegt)."
+            "  Modell-Konfiguration 'fake' für Offline-Tests aktiv "
+            f"('{SIMULATIONSMODELL}' ebenfalls vorhanden)."
         )
 
     def _vignetten_anlegen(
@@ -219,16 +220,25 @@ class Command(BaseCommand):
 
         finale: list[Vignette] = []
         for beschreibung in VIGNETTEN:
-            historienname = str(beschreibung["historienname"])
-            vorhandene = Vignette.objects.filter(
+            historienname: str = str(beschreibung["historienname"])
+            vorhandene: Vignette | None = Vignette.objects.filter(
                 historie__name=historienname, zustand=Vignette.Zustand.FINAL
-            ).first()
+            ).order_by("-finalisiert_am", "-pk").first()
             if vorhandene is not None:
-                finale.append(vorhandene)
-                self.stdout.write(f"  Vignette '{historienname}' vorhanden.")
+                if vorhandene.gepinnter_kern_id == kern.pk:
+                    finale.append(vorhandene)
+                    self.stdout.write(f"  Vignette '{historienname}' vorhanden.")
+                    continue
+                neue_fassung: Vignette = vorhandene.bearbeiten()
+                neue_fassung.vorspulen()
+                neue_fassung.finalisieren()
+                finale.append(neue_fassung)
+                self.stdout.write(
+                    f"  Vignette '{historienname}' auf neuen Kern vorgespult."
+                )
                 continue
 
-            vignette = Vignette.objects.anlegen(autorin)
+            vignette: Vignette = Vignette.objects.anlegen(autorin)
             historie: Vignettenhistorie = vignette.historie
             historie.name = historienname
             historie.save(update_fields=["name"])
@@ -249,21 +259,39 @@ class Command(BaseCommand):
         veroeffentlicht, neu = Training.objects.get_or_create(
             name="Diagnose-Grundlagen", eigentuemerin=ausbilderin
         )
+        veroeffentlicht.vignetten.set(vignetten)
         if neu:
-            veroeffentlicht.vignetten.add(*vignetten)
             veroeffentlicht.veroeffentlichen()
             self.stdout.write("  Training 'Diagnose-Grundlagen' angelegt und veröffentlicht.")
         else:
             self.stdout.write("  Training 'Diagnose-Grundlagen' vorhanden.")
 
-        entwurf, neu = Training.objects.get_or_create(
-            name="Entwurf: Bruchrechnung vertiefen", eigentuemerin=ausbilderin
-        )
+        entwurf: Training | None = Training.objects.filter(
+            name__in=(
+                "Entwurf: Gleichheitszeichen diagnostizieren",
+                "Entwurf: Bruchrechnung vertiefen",
+            ),
+            eigentuemerin=ausbilderin,
+        ).first()
+        neu = entwurf is None
+        if entwurf is None:
+            entwurf = Training.objects.create(
+                name="Entwurf: Gleichheitszeichen diagnostizieren",
+                eigentuemerin=ausbilderin,
+            )
+        elif entwurf.name != "Entwurf: Gleichheitszeichen diagnostizieren":
+            entwurf.name = "Entwurf: Gleichheitszeichen diagnostizieren"
+            entwurf.save(update_fields=["name"])
+        entwurf.vignetten.set(vignetten[:1])
         if neu and vignetten:
-            entwurf.vignetten.add(vignetten[0])
-            self.stdout.write("  Training 'Entwurf: Bruchrechnung vertiefen' als Entwurf angelegt.")
+            self.stdout.write(
+                "  Training 'Entwurf: Gleichheitszeichen diagnostizieren' "
+                "als Entwurf angelegt."
+            )
         elif not neu:
-            self.stdout.write("  Training 'Entwurf: Bruchrechnung vertiefen' vorhanden.")
+            self.stdout.write(
+                "  Training 'Entwurf: Gleichheitszeichen diagnostizieren' vorhanden."
+            )
 
     def _zusammenfassung_ausgeben(self) -> None:
         """Nennt die Anmeldedaten für den manuellen Testlauf."""
@@ -271,6 +299,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Passwort für alle Testkonten: {ENTWICKLUNGSPASSWORT}")
         self.stdout.write("Konten: " + ", ".join(TESTKONTEN))
         self.stdout.write(
-            "Aktives Modell: "
-            f"{SIMULATIONSMODELL} (setze OPENAI_API_KEY in der .env)."
+            "Aktives Modell: fake (für echte Antworten "
+            f"'{SIMULATIONSMODELL}' mit OPENAI_API_KEY aktivieren)."
         )
