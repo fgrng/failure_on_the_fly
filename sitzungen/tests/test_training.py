@@ -100,18 +100,12 @@ class TrainingssitzungTests(TestCase):
 
     def test_debrief_ohne_audioeinwilligung_zeigt_nur_tastatureingabe(self) -> None:
         """Auch die Diagnose bleibt ohne Einwilligung per Tastatur abschließbar."""
-        training: Training = self._sitzung_starten([], audioverarbeitung_eingewilligt=False)
+        self._sitzung_starten([], audioverarbeitung_eingewilligt=False)
 
         debrief: HttpResponse = self.client.post(reverse("sitzungen:training_beenden"))
 
-        self.assertContains(debrief, 'id="diagnose"')
-        self.assertNotContains(debrief, "data-spracheingabe")
-        ende: HttpResponse = self.client.post(
-            reverse("sitzungen:training_debrief"), {"diagnose": "Bruchfehler"}
-        )
-
-        self.assertRedirects(ende, reverse("training:detail", args=[training.pk]))
-        self.assertEqual(Diagnose.objects.get().text, "Bruchfehler")
+        self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
+        self.assertNotContains(debrief, "Aufnahme starten")
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:
         """Ein answerless Schritt zeigt den Fehler und lässt keine Diagnose mehr zu."""

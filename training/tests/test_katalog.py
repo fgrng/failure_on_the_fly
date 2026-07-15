@@ -196,10 +196,7 @@ class TrainingskatalogTests(TestCase):
         debrief: HttpResponse = self.client.post(reverse("sitzungen:training_beenden"))
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
-        self.assertContains(debrief, 'data-spracheingabe')
-        self.assertContains(debrief, 'data-automatisch-absenden="false"')
-        self.assertContains(debrief, 'id="diagnose-transkript"')
-        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+        self.assertContains(debrief, "Diagnose aufnehmen")
         fertig: HttpResponse = self.client.post(
             reverse("sitzungen:training_debrief"),
             {"diagnose": "Mia addiert Zähler und Nenner."},

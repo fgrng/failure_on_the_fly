@@ -15,6 +15,7 @@
         const steuerung = bereich.querySelector(".spracheingabe__steuerung");
         const status = bereich.querySelector(".spracheingabe__status");
         if (!formular || !eingabe || !steuerung || !status) return;
+        const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
 
         let recorder;
         let stream;
@@ -36,6 +37,9 @@
         const mikrofon_verweigert = () => aufnahme_deaktivieren(
             "Der Mikrofonzugriff wurde nicht erteilt. Nutzen Sie die Tastatureingabe."
         );
+        const textAnhaengen = (ziel, text) => {
+            ziel.value += `${ziel.value ? "\n" : ""}${text}`;
+        };
         const transkribieren = async () => {
             zustand("Ihre Aufnahme wird transkribiert.");
             const daten = new FormData();
@@ -48,11 +52,13 @@
                 });
                 const ergebnis = await antwort.json();
                 if (!antwort.ok) throw new Error(ergebnis.status);
-                const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
-                if (automatischAbsenden) eingabe.readOnly = true;
-                eingabe.value = automatischAbsenden
-                    ? ergebnis.text
-                    : `${eingabe.value}${eingabe.value ? "\n" : ""}${ergebnis.text}`;
+                if (automatischAbsenden) {
+                    eingabe.readOnly = true;
+                    eingabe.value = ergebnis.text;
+                } else {
+                    textAnhaengen(eingabe, ergebnis.text);
+                    if (tastatureingabe) tastatureingabe.required = false;
+                }
                 eingabe.hidden = false;
                 zustand("Das Transkript wurde hinzugefügt. Sie können weiter aufnehmen oder tippen.");
                 if (automatischAbsenden) formular.requestSubmit();
@@ -92,7 +98,7 @@
 
         if (tastatureingabe) {
             formular.addEventListener("submit", () => {
-                tastatureingabe.value += `${tastatureingabe.value && eingabe.value ? "\n" : ""}${eingabe.value}`;
+                textAnhaengen(tastatureingabe, eingabe.value);
             });
         }
         steuerung.addEventListener("click", () => (recorder?.state === "recording" ? stoppen() : starten()));
