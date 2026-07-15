@@ -55,6 +55,20 @@ class VignetteForm(ModelForm):
             "budget_wert": "Budget Wert",
         }
 
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Ergänzt die beiden Unterrichtskontext-Felder um Alpine-Hooks."""
+        super().__init__(*args, **kwargs)
+        for feldname in ("fach", "thema"):
+            self.fields[feldname].widget.attrs.update(
+                {
+                    "x-ref": "eingabe",
+                    "@input": "suche($event.target.value)",
+                    "@focus": "suche($event.target.value)",
+                    "@keydown.escape": "vorschlaege = []",
+                    "autocomplete": "off",
+                }
+            )
+
 
 class FinalisierenForm(Form):
     """Trägt die nicht feldgebundenen Fehler der Finalisieren-Aktion."""

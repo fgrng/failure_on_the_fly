@@ -27,6 +27,16 @@ def _zustand_badge(vignette: Vignette) -> str:
     }[vignette.zustand]
 
 
+def _unterrichtskontext_werte() -> dict[str, list[str]]:
+    """Liefert das gemeinsame Vokabular aus allen finalen Vignetten."""
+    return {
+        f"{feld}_werte": list(
+            Vignette.objects.einbindbar().values_list(feld, flat=True).distinct()
+        )
+        for feld in ("fach", "thema")
+    }
+
+
 def _sichtbare_fassung_laden(
     request: HttpRequest, pk: int, zustand: Vignette.Zustand
 ) -> Vignette:
@@ -91,7 +101,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
             return redirect("vignetten:detail", pk=vignette.pk)
     else:
         form = VignetteForm(initial=zufaellige_akteure())
-    return render(request, "vignetten/anlegen.html", {"form": form})
+    return render(request, "vignetten/anlegen.html", {"form": form, **_unterrichtskontext_werte()})
 
 
 @login_required
@@ -193,4 +203,8 @@ def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
             return redirect("vignetten:detail", pk=vignette.pk)
     else:
         form = VignetteForm(instance=vignette)
-    return render(request, "vignetten/bearbeiten.html", {"form": form})
+    return render(
+        request,
+        "vignetten/bearbeiten.html",
+        {"form": form, **_unterrichtskontext_werte()},
+    )

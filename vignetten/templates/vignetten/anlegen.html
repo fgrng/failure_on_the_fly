@@ -19,14 +19,16 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.non_field_errors }}
+        {{ fach_werte|json_script:"fach-werte" }}
+        {{ thema_werte|json_script:"thema-werte" }}
 
         <section class="page-section" aria-labelledby="section-context">
             <header class="page-section__head">
                 <b>01</b><span><h2 id="section-context">Unterrichtskontext</h2><small>Wo findet die Situation statt?</small></span>
             </header>
             <div class="field-grid field-grid--three">
-                {% include "vignetten/includes/form_field.html" with field=form.fach %}
-                {% include "vignetten/includes/form_field.html" with field=form.thema %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with field=form.fach werte_id="fach-werte" %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with field=form.thema werte_id="thema-werte" %}
                 {% include "vignetten/includes/form_field.html" with field=form.klassenstufe %}
             </div>
         </section>

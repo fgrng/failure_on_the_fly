@@ -12,6 +12,12 @@ Rollen sind damit **additiv**: Wer eine Erhebung oder ein Training zusammenstell
 
 Geteilt bleibt allein der **Simulationskern**, der Administrator:innen gehört. Alles Fachliche ist privat.
 
+> **Nachgeführt durch #65 (Vignetten-Editor):** `fach` und `thema` sind eine
+> bewusste, eng begrenzte Ausnahme: Als geteiltes Curriculum-Vokabular dürfen
+> ihre Bezeichner aus allen finalen Vignetten als unverbindliche Vorschläge im
+> Editor erscheinen. Die Vignetteninhalte selbst bleiben privat; insbesondere
+> ersetzt dieser Vorschlagspool nicht `sichtbar_fuer`.
+
 ## Consequences
 
 - **Zwei Forschende an derselben Studie können sich keine Vignette teilen.** Eine Ausbilder:in kann kein Training aus den Vignetten ihrer Fachkollegin bauen. Das ist der Preis des einfachsten denkbaren Zugriffsmodells, und es ist die Sorte Einschränkung, die nach dem ersten realen Nutzungsversuch fallen könnte. Diese Entscheidung ist ausdrücklich **revidierbar** — sie ist eine Zugriffsregel, kein Datenmodell-Fakt.

@@ -269,6 +269,61 @@ class VignetteBearbeitenViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class VignetteAutovervollstaendigungViewTests(TestCase):
+    """Die Editoren erhalten das gemeinsame Unterrichtsvokabular."""
+
+    def test_liefert_finale_fach_und_thema_werte_dedupliziert_an_beide_editoren(
+        self,
+    ) -> None:
+        """Entwürfe und Archiviertes erweitern den globalen Vorschlagspool nicht."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        eigene_historie.eigentuemerinnen.add(ada)
+        entwurf: Vignette = Vignette.objects._erstellen(historie=eigene_historie)
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        Vignette.objects._erstellen(
+            historie=fremde_historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Finaler Inhalt",
+            fach="Mathematik",
+            thema="Bruchrechnung",
+        )
+        Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Weiterer finaler Inhalt",
+            fach="Mathematik",
+            thema="Addition",
+        )
+        Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(),
+            fach="Entwurf-Fach",
+            thema="Entwurf-Thema",
+        )
+        Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(),
+            zustand=Vignette.Zustand.ARCHIVIERT,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Archivierter Inhalt",
+            fach="Archiv-Fach",
+            thema="Archiv-Thema",
+        )
+        self.client.force_login(ada)
+
+        responses: tuple[HttpResponse, ...] = (
+            self.client.get(reverse("vignetten:anlegen")),
+            self.client.get(reverse("vignetten:bearbeiten", args=[entwurf.pk])),
+        )
+
+        for response in responses:
+            self.assertCountEqual(response.context["fach_werte"], ["Mathematik"])
+            self.assertCountEqual(
+                response.context["thema_werte"], ["Bruchrechnung", "Addition"]
+            )
+
+
 class VignetteFinalisierenViewTests(TestCase):
     """Entwürfe lassen sich mit lesbaren Fehlermeldungen finalisieren."""
 

@@ -1,13 +1,34 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Entwurf bearbeiten{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
 
 {% block content %}
 <section class="area--authoring">
     <header class="area-band"><h1>Entwurf bearbeiten</h1></header>
     <form class="form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+        {{ form.non_field_errors }}
+        {{ fach_werte|json_script:"fach-werte" }}
+        {{ thema_werte|json_script:"thema-werte" }}
+        {% for field in form %}
+            {% if field.name == "fach" %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with werte_id="fach-werte" %}
+            {% elif field.name == "thema" %}
+                {% include "vignetten/includes/autovervollstaendigung_field.html" with werte_id="thema-werte" %}
+            {% else %}
+                <p>
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                    {{ field.errors }}
+                </p>
+            {% endif %}
+        {% endfor %}
         <button class="button" type="submit">Speichern</button>
     </form>
 </section>

@@ -1,0 +1,42 @@
+<div
+    class="vignette-autovervollstaendigung"
+    x-data="{
+        werte: JSON.parse(document.getElementById('{{ werte_id }}').textContent),
+        vorschlaege: [],
+        suche(eingabe) {
+            const suchbegriff = eingabe.trim().toLocaleLowerCase();
+            this.vorschlaege = suchbegriff ? this.werte
+                .map(wert => ({ wert, score: this.score(suchbegriff, wert.toLocaleLowerCase()) }))
+                .filter(({ wert, score }) => wert.toLocaleLowerCase().includes(suchbegriff) || score &lt;= Math.max(2, Math.ceil(suchbegriff.length * .3)))
+                .sort((a, b) => a.score - b.score || a.wert.localeCompare(b.wert, 'de'))
+                .slice(0, 5) : [];
+        },
+        auswaehlen(wert) {
+            this.$refs.eingabe.value = wert;
+            this.vorschlaege = [];
+            this.$refs.eingabe.focus();
+        },
+        score(suchbegriff, wert) {
+            return wert.includes(suchbegriff) ? 0 : this.levenshtein(suchbegriff, wert);
+        },
+        levenshtein(a, b) {
+            // Bewusst ohne JS-Test: Der Django-Test sichert die serverseitige Datenquelle.
+            let vorherige = Array.from({ length: b.length + 1 }, (_, index) => index);
+            Array.from(a).forEach((zeichen, index) => {
+                const aktuelle = [index + 1];
+                Array.from(b).forEach((anderes, andererIndex) => {
+                    aktuelle.push(Math.min(aktuelle[andererIndex] + 1, vorherige[andererIndex + 1] + 1, vorherige[andererIndex] + (zeichen === anderes ? 0 : 1)));
+                });
+                vorherige = aktuelle;
+            });
+            return vorherige[b.length];
+        },
+    }"
+>
+    {% include "vignetten/includes/form_field.html" with field=field %}
+    <ul class="vignette-vorschlaege" x-cloak x-show="vorschlaege.length" role="listbox">
+        <template x-for="vorschlag in vorschlaege" :key="vorschlag.wert">
+            <li><button type="button" @mousedown.prevent="auswaehlen(vorschlag.wert)" x-text="vorschlag.wert"></button></li>
+        </template>
+    </ul>
+</div>
