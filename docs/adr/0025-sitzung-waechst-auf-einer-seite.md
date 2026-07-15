@@ -28,4 +28,6 @@ Ablauforchestrierung bleiben getrennt.
 - Das Diagnosegespräch verwendet unterscheidbare Sprechblasen für die Eingabe
   der Teilnehmer:in und die Antwort der simulierten Schüler:in.
 - Die Lesespalte bleibt schmal und zentriert, damit längere Gesprächsverläufe
-  mit kurzen Augenbewegungen lesbar bleiben.
+  mit kurzen Augenbewegungen lesbar bleiben. Auf breiten Ansichten belegt sie
+  die mittleren vier der acht Hauptspalten; unterhalb von 1050 px nutzt sie die
+  volle Breite.

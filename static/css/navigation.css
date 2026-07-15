@@ -5,11 +5,16 @@
 }
 
 .sidebar-layout > .site-main {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    column-gap: var(--space-3);
     width: 100%;
-    max-width: 1440px;
+    max-width: var(--content-max-width);
     margin-inline: 0;
     padding: var(--space-7) var(--space-4);
 }
+
+:where(.site-main) > * { grid-column: 1 / -1; }
 
 .site-sidebar {
     position: fixed;
@@ -18,7 +23,7 @@
     width: var(--sidebar-width);
     display: flex;
     flex-direction: column;
-    padding: var(--space-4) 28px var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-3);
     overflow-y: auto;
     border-right: 1px solid var(--color-border);
     background: var(--color-surface-muted);
@@ -35,15 +40,15 @@
 
 .sidebar-nav {
     display: grid;
-    gap: 12px;
+    gap: var(--space-2);
     margin-top: var(--space-4);
 }
 
-.sidebar-nav__group { display: grid; gap: 5px; }
+.sidebar-nav__group { display: grid; gap: var(--space-1); }
 
 .sidebar-nav__group h2 {
     margin: 0;
-    padding: 9px 12px;
+    padding: var(--space-1) var(--space-2);
     border-left: 4px solid;
     border-radius: var(--radius);
     font-family: var(--font-body);
@@ -55,8 +60,8 @@
 
 .sidebar-nav__group > div {
     display: grid;
-    gap: 3px;
-    padding-inline: 4px;
+    gap: var(--space-1);
+    padding-inline: var(--space-1);
 }
 
 .sidebar-nav__group a,
@@ -64,7 +69,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px;
+    padding: var(--space-1) var(--space-2);
     border-radius: 6px;
     color: var(--color-text);
     font-size: .88rem;
@@ -92,7 +97,7 @@
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 11px;
+    gap: var(--space-2);
     margin-top: auto;
     padding-top: var(--space-2);
     border-top: 1px solid var(--color-border);
@@ -129,7 +134,7 @@
 
 .sidebar-login {
     margin-top: auto;
-    padding: 10px 12px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius);
     background: var(--color-accent);
     color: var(--color-text-on-accent);
@@ -140,6 +145,10 @@
 .sidebar-login:hover {
     background: var(--color-accent-hover);
     color: var(--color-text-on-accent);
+}
+
+@media (max-width: 1050px) {
+    .sidebar-layout > .site-main { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 760px) {

@@ -302,7 +302,7 @@ select:focus {
     display: inline-block;
     width: 0;
     height: 0;
-    margin-left: 6px;
+    margin-left: var(--space-1);
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
 }

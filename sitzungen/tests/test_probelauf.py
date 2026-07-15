@@ -97,6 +97,7 @@ class ProbelaufStartTests(TestCase):
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
 
+        self.assertContains(einleitung, 'class="sitzung-seite"')
         self.assertContains(einleitung, 'id="sitzung-fortsetzung"')
         self.assertContains(einleitung, "rahmenhandlung-einstieg.webp")
         self.assertContains(einleitung, "gespraechsanlass.webp")

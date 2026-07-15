@@ -14,7 +14,7 @@
 }
 
 .vignette-index-table .table thead th { background: var(--color-surface); }
-.vignette-index-table .button { padding: 6px 12px; }
+.vignette-index-table .button { padding: var(--space-1) var(--space-2); }
 
 /* ---- Detail: Aktionsleiste, Bild, Kern-Hinweis ---- */
 .vignette-detail-actions {

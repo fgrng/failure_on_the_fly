@@ -33,7 +33,7 @@
 }
 
 .system-page-placeholders h3 {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1);
     color: var(--color-text-muted);
     font-family: var(--font-body);
     font-size: .86rem;
@@ -42,7 +42,7 @@
 
 .system-page-placeholders ul {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;

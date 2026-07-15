@@ -93,7 +93,7 @@
     --font-heading: "Platypi", Georgia, serif;
     --font-body: "Albert Sans", system-ui, sans-serif;
 
-    /* ---- Spacing: 8×8-Raster (Achterraster) ---- */
+    /* ---- Spacing: 8-px-Abstandsraster ---- */
     --space-1: 8px;
     --space-2: 16px;
     --space-3: 24px;
@@ -104,6 +104,6 @@
     --space-8: 64px;
 
     /* ---- Layout ---- */
-    --content-max-width: 1152px; /* 144 × 8 */
+    --content-max-width: 1440px;
     --radius: 8px;
 }

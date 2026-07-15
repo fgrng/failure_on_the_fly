@@ -1,6 +1,6 @@
 .sitzung-seite {
-    width: min(100%, 720px);
-    margin-inline: auto;
+    grid-column: 3 / span 4;
+    min-width: 0;
     padding-bottom: var(--space-7);
 }
 
@@ -78,13 +78,13 @@
     margin-top: var(--space-4);
 }
 
-.gespraechsschritt { display: grid; gap: 12px; }
+.gespraechsschritt { display: grid; gap: var(--space-2); }
 .gespraechsschritt__eingabe,
 .gespraechsschritt__aeusserung { max-width: 88%; }
 
 .gespraechsschritt :is(.gespraechsschritt__eingabe, .gespraechsschritt__aeusserung) span {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     color: var(--color-text-muted);
     font-size: .75rem;
     font-weight: 700;
@@ -92,7 +92,7 @@
 
 .gespraechsschritt :is(.gespraechsschritt__eingabe, .gespraechsschritt__aeusserung) p {
     margin: 0;
-    padding: 14px 18px;
+    padding: var(--space-2);
     border-radius: 18px;
 }
 
@@ -129,8 +129,8 @@
 .gespraechseingabe__formular { position: relative; }
 .gespraechseingabe label,
 .diagnose label { display: block; margin-bottom: var(--space-1); font-weight: 650; }
-.gespraechseingabe textarea { min-height: 104px; padding: 14px 110px 14px 16px; border-radius: 14px; }
-.gespraechseingabe__senden { position: absolute; right: 10px; bottom: 10px; }
+.gespraechseingabe textarea { min-height: 104px; padding: var(--space-2) calc(var(--space-8) + var(--space-6)) var(--space-2) var(--space-2); border-radius: 14px; }
+.gespraechseingabe__senden { position: absolute; right: var(--space-1); bottom: var(--space-1); }
 
 .gespraechseingabe--fehler {
     padding: var(--space-3);
@@ -147,6 +147,10 @@
 
 .diagnose { margin-top: var(--space-4); }
 .diagnose .button { margin-top: var(--space-2); }
+
+@media (max-width: 1050px) {
+    .sitzung-seite { grid-column: 1 / -1; }
+}
 
 @media (max-width: 760px) {
     .gespraechsschritt__eingabe,
