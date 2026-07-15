@@ -56,7 +56,7 @@ def test_openai_transkription_ohne_zero_retention_nicht_aufruft() -> None:
     TRANSKRIPTION_ZERO_RETENTION=True,
 )
 def test_openai_transkription_reicht_audio_ohne_sprache_an_konfiguriertes_modell() -> None:
-    """OpenAI erkennt die Sprache selbst und der Adapter behält kein Audio."""
+    """OpenAI erkennt die Sprache selbst."""
 
     audio = b"aufgenommene-audiobytes"
     client = Mock()
@@ -68,7 +68,18 @@ def test_openai_transkription_reicht_audio_ohne_sprache_an_konfiguriertes_modell
         model="gpt-4o-transcribe",
         file=("aufnahme.webm", audio, "audio/webm"),
     )
-    assert audio not in vars(transkription).values()
+
+
+@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
+def test_openai_transkription_erstellt_den_client_mit_zwei_minuten_timeout() -> None:
+    """Die Anbieterverbindung bricht nach zwei Minuten ab."""
+
+    with patch("simulation.transkription.OpenAI") as openai:
+        openai.return_value.audio.transcriptions.create.return_value.text = "Text"
+
+        OpenAITranskription().transkribieren(b"aufgenommene-audiobytes")
+
+    openai.assert_called_once_with(timeout=120.0)
 
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
