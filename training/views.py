@@ -73,6 +73,17 @@ def _veroeffentlichtes_training(pk: int) -> Training:
     return get_object_or_404(Training.objects.veroeffentlicht(), pk=pk)
 
 
+def _veroeffentlichtes_training_mit_finaler_vignette(
+    training_pk: int, vignette_pk: int
+) -> tuple[Training, Vignette]:
+    """Lädt eine finale Vignette aus einem veröffentlichten Training."""
+    training: Training = _veroeffentlichtes_training(training_pk)
+    vignette: Vignette = get_object_or_404(
+        training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
+    )
+    return training, vignette
+
+
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
     """Zeigt allen eingeloggten Konten veröffentlichte Trainings."""
@@ -178,12 +189,13 @@ def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
     """Bestätigt oder startet die Wahl einer Vignette aus einem Training."""
-    training: Training = _veroeffentlichtes_training(training_pk)
-    vignette: Vignette = get_object_or_404(
-        training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
+    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
+        training_pk, vignette_pk
     )
     if request.method == "POST":
-        bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
+        bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(
+            request, training
+        )
         if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
             return render(
                 request,
@@ -205,9 +217,8 @@ def einwilligung(
     """Hält die Entscheidung zur externen Audioverarbeitung an der Teilnahme fest."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    training: Training = _veroeffentlichtes_training(training_pk)
-    vignette: Vignette = get_object_or_404(
-        training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
+    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
+        training_pk, vignette_pk
     )
     bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
@@ -215,9 +226,7 @@ def einwilligung(
     entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
     if entscheidung not in {"ja", "nein"}:
         return HttpResponseBadRequest("Bitte stimmen Sie zu oder lehnen Sie ab.")
-    bindung.teilnahme.audioverarbeitung_eingewilligt = (
-        entscheidung == "ja"
-    )
+    bindung.teilnahme.audioverarbeitung_eingewilligt = entscheidung == "ja"
     bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
     return _sitzung_starten(request, bindung, vignette)
 

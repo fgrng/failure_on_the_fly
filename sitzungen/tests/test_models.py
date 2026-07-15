@@ -34,13 +34,12 @@ def _sitzung_anlegen() -> Sitzung:
     )
 
 
-def test_teilnahme_traegt_nur_ihre_eigene_identitaet() -> None:
-    """Sitzungen kennen weder Training noch Konto als Aufrufer."""
+def test_teilnahme_beginnt_ohne_einwilligung_zur_audioverarbeitung() -> None:
+    """Neue Teilnahmen haben noch keine Entscheidung zur Audioverarbeitung."""
 
-    assert [feld.name for feld in Teilnahme._meta.fields] == [
-        "id",
-        "audioverarbeitung_eingewilligt",
-    ]
+    teilnahme: Teilnahme = Teilnahme()
+
+    assert teilnahme.audioverarbeitung_eingewilligt is None
 
 
 @pytest.mark.django_db
