@@ -67,7 +67,7 @@
                     aufnahme_deaktivieren("Die Transkription ist nicht verfügbar. Nutzen Sie die Tastatureingabe.");
                     return;
                 }
-                zustand(meldungen[fehler.message] || "Die Transkription ist fehlgeschlagen. Nehmen Sie Ihre Frage bitte erneut auf.");
+                zustand(meldungen[fehler.message] || "Die Transkription ist fehlgeschlagen. Nehmen Sie bitte erneut auf.");
                 zuruecksetzen();
             }
         };
