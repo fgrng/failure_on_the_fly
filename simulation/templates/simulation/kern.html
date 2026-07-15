@@ -1,32 +1,76 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Simulationskern{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+{% endblock %}
+
 {% block content %}
-<section class="area--system">
-    <header class="area-band"><h1>Simulationskern</h1></header>
-    {% if simulationskern %}
-        <p><span class="badge badge--system">{{ simulationskern.get_zustand_display }}</span></p>
-        <h2>System-Prompt-Vorlage</h2>
-        <pre>{{ simulationskern.system_prompt_vorlage }}</pre>
-        <h2>User-Prompt-Vorlage</h2>
-        <pre>{{ simulationskern.user_prompt_vorlage }}</pre>
-        <h2>Rahmenhandlung</h2>
-        <h3>Einleitung</h3>
-        <pre>{{ simulationskern.rahmenhandlung_einleitung }}</pre>
-        <h3>Debrief</h3>
-        <pre>{{ simulationskern.rahmenhandlung_debrief }}</pre>
-    {% else %}
-        <p>Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
-    {% endif %}
-    <h2>Modell-Konfiguration</h2>
-    {% if modell_konfiguration %}
-        <dl>
-            <dt>Sprachmodell</dt><dd>{{ modell_konfiguration.sprachmodell }}</dd>
-            <dt>Parameter</dt><dd><pre>{{ modell_konfiguration.parameter }}</pre></dd>
-        </dl>
-    {% else %}
-        <p>Keine aktive Modell-Konfiguration.</p>
-    {% endif %}
+<section class="page system-page">
+    <header class="page-head">
+        <div>
+            <p>Entwicklung</p>
+            <h1>Simulationskern</h1>
+            <span>Aktuelle Verhaltensspezifikation und aktive Modell-Konfiguration.</span>
+        </div>
+        {% if simulationskern %}<span class="badge badge--system">{{ simulationskern.get_zustand_display }}</span>{% endif %}
+    </header>
+
+    <section class="page-section" aria-labelledby="system-story">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="system-story">Rahmenhandlung</h2><small>Hospitationseinleitung, Gesprächseinleitung und Debrief jeder Sitzung</small></span>
+        </header>
+        <div class="system-page-fields">
+            <div class="system-page-field-list">
+                {% if simulationskern %}
+                    <section class="page-field"><h3>Hospitationseinleitung</h3><pre>{{ simulationskern.rahmenhandlung_einleitung }}</pre></section>
+                    <section class="page-field"><h3>Gesprächseinleitung</h3><pre>{{ simulationskern.rahmenhandlung_gespraechseinleitung }}</pre></section>
+                    <section class="page-field"><h3>Debrief</h3><pre>{{ simulationskern.rahmenhandlung_debrief }}</pre></section>
+                {% else %}
+                    <p class="system-page-empty">Noch keine Rahmenhandlung vorhanden.</p>
+                {% endif %}
+            </div>
+            <aside class="system-page-placeholders">
+                <h3>Erlaubte Platzhalter</h3>
+                <ul>{% for platzhalter in rahmen_platzhalter %}<li><code>${{ platzhalter }}</code></li>{% endfor %}</ul>
+            </aside>
+        </div>
+    </section>
+
+    <section class="page-section" aria-labelledby="system-prompts">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="system-prompts">Prompt-Vorlagen</h2><small>Verhalten und Gesprächseingabe der Simulation</small></span>
+        </header>
+        <div class="system-page-fields">
+            <div class="system-page-field-list">
+                {% if simulationskern %}
+                    <section class="page-field"><h3>System-Prompt-Vorlage</h3><pre>{{ simulationskern.system_prompt_vorlage }}</pre></section>
+                    <section class="page-field"><h3>User-Prompt-Vorlage</h3><pre>{{ simulationskern.user_prompt_vorlage }}</pre></section>
+                {% else %}
+                    <p class="system-page-empty">Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
+                {% endif %}
+            </div>
+            <aside class="system-page-placeholders">
+                <h3>Erlaubte Platzhalter</h3>
+                <ul>{% for platzhalter in prompt_platzhalter %}<li><code>${{ platzhalter }}</code></li>{% endfor %}</ul>
+            </aside>
+        </div>
+    </section>
+
+    <section class="page-section" aria-labelledby="system-model">
+        <header class="page-section__head">
+            <b>03</b><span><h2 id="system-model">Modell-Konfiguration</h2><small>Aktives Sprachmodell und seine Parameter</small></span>
+        </header>
+        {% if modell_konfiguration %}
+            <dl class="field-grid">
+                <div><dt>Sprachmodell</dt><dd>{{ modell_konfiguration.sprachmodell }}</dd></div>
+                <div><dt>Parameter</dt><dd><pre>{{ modell_konfiguration.parameter }}</pre></dd></div>
+            </dl>
+        {% else %}
+            <p class="system-page-empty">Keine aktive Modell-Konfiguration.</p>
+        {% endif %}
+    </section>
 </section>
 {% endblock %}

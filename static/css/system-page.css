@@ -1,0 +1,56 @@
+/* Eigenheiten der Simulationskern-Seite: Vorlagen als <pre>, Platzhalter-Spalte.
+   Rahmen, Kopf, Abschnitte und Feld-Raster kommen aus page.css. */
+
+/* Inhalt links, erlaubte Platzhalter als schmale Spalte rechts. */
+.system-page-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(190px, .32fr);
+    gap: var(--space-3);
+    align-items: start;
+}
+
+.system-page-field-list { display: grid; gap: var(--space-3); }
+
+.system-page pre {
+    margin: 0;
+    padding: var(--space-2);
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+    font: inherit;
+    font-size: .86rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.system-page-empty { margin: 0; color: var(--color-text-muted); }
+
+.system-page-placeholders {
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--color-border);
+}
+
+.system-page-placeholders h3 {
+    margin: 0 0 6px;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+.system-page-placeholders ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.system-page-placeholders code { font-size: .78rem; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+    .system-page-fields { grid-template-columns: 1fr; }
+    .system-page-placeholders { padding: var(--space-2) 0 0; border-top: 1px solid var(--color-border); border-left: 0; }
+}

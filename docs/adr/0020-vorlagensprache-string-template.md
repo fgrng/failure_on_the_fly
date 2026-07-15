@@ -4,7 +4,7 @@ status: accepted
 
 # Die Vorlagen des Simulationskerns sind `string.Template`, nicht Django-Templates
 
-Die vier Vorlagen einer Kern-Fassung — System-Prompt, User-Prompt, Rahmenhandlungs-Einleitung und Debrief — verwenden `string.Template` aus der Standardbibliothek mit `$name`-Platzhaltern. Das ist eine bewusste Abweichung vom Naheliegenden: In einem Django-Projekt würde man Django-Templates erwarten.
+Die fünf Vorlagen einer Kern-Fassung — System-Prompt, User-Prompt, Hospitationseinleitung, Gesprächseinleitung und Debrief — verwenden `string.Template` aus der Standardbibliothek mit `$name`-Platzhaltern. Das ist eine bewusste Abweichung vom Naheliegenden: In einem Django-Projekt würde man Django-Templates erwarten.
 
 ## Warum nicht Django-Templates
 

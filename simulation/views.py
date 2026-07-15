@@ -4,7 +4,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from .models import AktiveModellKonfiguration, ModellKonfiguration, Simulationskern
+from .models import (
+    VERTRAG_PROMPT,
+    VERTRAG_RAHMEN,
+    AktiveModellKonfiguration,
+    ModellKonfiguration,
+    Simulationskern,
+)
 
 
 @login_required
@@ -27,5 +33,7 @@ def kern(request: HttpRequest) -> HttpResponse:
         {
             "simulationskern": simulationskern,
             "modell_konfiguration": modell_konfiguration,
+            "prompt_platzhalter": sorted(VERTRAG_PROMPT),
+            "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
         },
     )

@@ -46,8 +46,16 @@ _Avoid_: Bildbeschreibung, Alt-Text, Bearbeitungsbeschreibung
 ## Sitzung einer Vignette
 
 **Rahmenhandlung**:
-Die vom Simulationskern vorgegebene Situationsrahmung, die ausschließlich der Teilnehmer:in angezeigt wird: die Einleitung mit den Akteuren und der Hospitationssituation sowie der Debrief. Sie erreicht keinen Prompt und wird je Sitzung dargeboten.
+Die vom Simulationskern vorgegebene Situationsrahmung, die ausschließlich der Teilnehmer:in angezeigt wird: Hospitationseinleitung, Gesprächseinleitung und Debrief. Sie erreicht keinen Prompt und wird je Sitzung dargeboten.
 _Avoid_: Setting, Szenario, Narrativ
+
+**Hospitationseinleitung**:
+Der Abschnitt der Rahmenhandlung, der die allgemeine Hospitationssituation und die erfahrene Lehrperson einführt.
+_Avoid_: Ausgangslage, allgemeine Einleitung
+
+**Gesprächseinleitung**:
+Der Abschnitt der Rahmenhandlung, der die konkrete Begegnung mit der simulierten Schüler:in unmittelbar vor dem Diagnosegespräch einführt.
+_Avoid_: Gesprächsanlass, Gesprächssituation
 
 **Sitzung**:
 Ein Durchlauf genau einer Vignette und die atomare Auswertungseinheit; jedes Spielen einer Vignette ist eine eigene Sitzung. Regulär umfasst sie Rahmenhandlung, Diagnosegespräch, Debrief und Diagnose. Ein gewollter Abbruch oder ein technisches Scheitern beendet sie ohne Diagnose.

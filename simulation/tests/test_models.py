@@ -100,6 +100,7 @@ def test_finale_fassung_kann_nicht_gesammelt_geloescht_werden() -> None:
         ("system_prompt_vorlage", "$lehrperson_name"),
         ("user_prompt_vorlage", "$lehrperson_name"),
         ("rahmenhandlung_einleitung", "$fehlermuster_beschreibung"),
+        ("rahmenhandlung_gespraechseinleitung", "$fehlermuster_beschreibung"),
         ("rahmenhandlung_debrief", "$fehlermuster_beschreibung"),
     ],
 )
@@ -138,6 +139,7 @@ def test_bearbeiten_einer_finalen_fassung_erzeugt_einen_neuen_entwurf() -> None:
 
     finale_fassung: Simulationskern = Simulationskern.objects.anlegen(
         system_prompt_vorlage="$fehlermuster_beschreibung",
+        rahmenhandlung_gespraechseinleitung="$schuelerin_name beginnt das Gespräch.",
     )
     finale_fassung.finalisieren()
 
@@ -147,6 +149,10 @@ def test_bearbeiten_einer_finalen_fassung_erzeugt_einen_neuen_entwurf() -> None:
     assert entwurf.zustand == Simulationskern.Zustand.ENTWURF
     assert entwurf.historie == finale_fassung.historie
     assert entwurf.vorgaengerin == finale_fassung
+    assert (
+        entwurf.rahmenhandlung_gespraechseinleitung
+        == finale_fassung.rahmenhandlung_gespraechseinleitung
+    )
     assert finale_fassung.zustand == Simulationskern.Zustand.FINAL
 
 
@@ -262,7 +268,7 @@ def test_ungueltige_vorlagen_syntax_wird_abgelehnt() -> None:
 
 @pytest.mark.django_db
 def test_vertragstreue_teilmengen_und_leere_vorlagen_werden_akzeptiert() -> None:
-    """Alle vier Vorlagen dürfen ihren Vertrag auch nur teilweise ausschöpfen."""
+    """Alle fünf Vorlagen dürfen ihren Vertrag auch nur teilweise ausschöpfen."""
 
     kern: Simulationskern = Simulationskern(
         system_prompt_vorlage="$fehlermuster_beschreibung",

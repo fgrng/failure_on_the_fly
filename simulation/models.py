@@ -105,6 +105,7 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
         system_prompt_vorlage: str = "",
         user_prompt_vorlage: str = "",
         rahmenhandlung_einleitung: str = "",
+        rahmenhandlung_gespraechseinleitung: str = "",
         rahmenhandlung_debrief: str = "",
     ) -> "Simulationskern":
         """Legt die erste Kern-Fassung als Entwurf mit Historie an."""
@@ -117,6 +118,7 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
             system_prompt_vorlage=system_prompt_vorlage,
             user_prompt_vorlage=user_prompt_vorlage,
             rahmenhandlung_einleitung=rahmenhandlung_einleitung,
+            rahmenhandlung_gespraechseinleitung=rahmenhandlung_gespraechseinleitung,
             rahmenhandlung_debrief=rahmenhandlung_debrief,
         )
 
@@ -177,6 +179,10 @@ class Simulationskern(models.Model):
         blank=True,
         default="",
     )
+    rahmenhandlung_gespraechseinleitung: models.TextField = models.TextField(
+        blank=True,
+        default="",
+    )
     rahmenhandlung_debrief: models.TextField = models.TextField(
         blank=True,
         default="",
@@ -231,6 +237,9 @@ class Simulationskern(models.Model):
             system_prompt_vorlage=self.system_prompt_vorlage,
             user_prompt_vorlage=self.user_prompt_vorlage,
             rahmenhandlung_einleitung=self.rahmenhandlung_einleitung,
+            rahmenhandlung_gespraechseinleitung=(
+                self.rahmenhandlung_gespraechseinleitung
+            ),
             rahmenhandlung_debrief=self.rahmenhandlung_debrief,
         )
 
@@ -286,6 +295,7 @@ class Simulationskern(models.Model):
             ("system_prompt_vorlage", VERTRAG_PROMPT),
             ("user_prompt_vorlage", VERTRAG_PROMPT),
             ("rahmenhandlung_einleitung", VERTRAG_RAHMEN),
+            ("rahmenhandlung_gespraechseinleitung", VERTRAG_RAHMEN),
             ("rahmenhandlung_debrief", VERTRAG_RAHMEN),
         ):
             vorlage: Template = Template(getattr(self, vorlagenfeld))

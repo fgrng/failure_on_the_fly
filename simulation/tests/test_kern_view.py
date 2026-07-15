@@ -23,6 +23,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         kern.system_prompt_vorlage = "Aktueller System-Prompt"
         kern.user_prompt_vorlage = "Aktueller User-Prompt"
         kern.rahmenhandlung_einleitung = "Aktuelle Einleitung"
+        kern.rahmenhandlung_gespraechseinleitung = "Aktuelle Gesprächseinleitung"
         kern.rahmenhandlung_debrief = "Aktueller Debrief"
         kern.save()
         kern.finalisieren()
@@ -56,6 +57,12 @@ class SimulationskernAnsichtMitKernTests(TestCase):
 
         self.assertContains(response, "Aktueller Debrief")
 
+    def test_zeigt_die_gespraechseinleitung_der_neuesten_finalen_fassung(self) -> None:
+        """Angemeldete sehen die Gesprächseinleitung der neuesten Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, "Aktuelle Gesprächseinleitung")
+
     def test_zeigt_keinen_aelteren_system_prompt(self) -> None:
         """Angemeldete sehen nicht den System-Prompt der älteren Fassung."""
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
@@ -67,6 +74,13 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
         self.assertContains(response, "fake")
+
+    def test_zeigt_die_erlaubten_platzhalter_beider_vertraege(self) -> None:
+        """Die Referenzspalten stammen aus Prompt- und Rahmenvertrag."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, "$fehlermuster_beschreibung")
+        self.assertContains(response, "$lehrperson_anrede")
 
 
 class SimulationskernLeereAnsichtTests(TestCase):

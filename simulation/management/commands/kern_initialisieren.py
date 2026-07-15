@@ -1,17 +1,9 @@
 """Initialisiert den Simulationskern einer frischen Instanz."""
 
-from pathlib import Path
-
 from django.core.management.base import BaseCommand
 
 from simulation.models import Simulationskern
-
-
-_PLATZHALTER_SYSTEM_PROMPT_VORLAGE_PFAD: Path = (
-    Path(__file__).resolve().parents[2]
-    / "vorlagen"
-    / "platzhalter_system_prompt.txt"
-)
+from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
 class Command(BaseCommand):
@@ -24,8 +16,6 @@ class Command(BaseCommand):
             return
 
         kern: Simulationskern = Simulationskern.objects.anlegen(
-            system_prompt_vorlage=_PLATZHALTER_SYSTEM_PROMPT_VORLAGE_PFAD.read_text(
-                encoding="utf-8",
-            ),
+            **STANDARDKERN_VORLAGEN
         )
         kern.finalisieren()

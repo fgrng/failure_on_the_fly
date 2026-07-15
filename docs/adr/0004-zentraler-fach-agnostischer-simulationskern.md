@@ -8,7 +8,7 @@ Verhaltens- und Logikregeln der Simulation werden **einmal zentral spezifiziert*
 
 ## Der Kern hat zwei Hälften, die sich nie berühren
 
-Die **Prompt-Vorlagen** — System-Prompt-Vorlage und User-Prompt-Vorlage — sprechen ausschließlich zur simulierten Schüler:in. Die **Rahmenhandlung** spricht ausschließlich zur Teilnehmer:in: eine Einleitung mit den Akteuren und der Hospitationssituation, und ein Debrief, in dem die erfahrene Lehrperson um die Diagnose bittet. Kein Wort der Rahmenhandlung erreicht je einen Prompt.
+Die **Prompt-Vorlagen** — System-Prompt-Vorlage und User-Prompt-Vorlage — sprechen ausschließlich zur simulierten Schüler:in. Die **Rahmenhandlung** spricht ausschließlich zur Teilnehmer:in: eine Hospitationseinleitung, eine Gesprächseinleitung für die konkrete Begegnung mit der simulierten Schüler:in und ein Debrief, in dem die erfahrene Lehrperson um die Diagnose bittet. Kein Wort der Rahmenhandlung erreicht je einen Prompt.
 
 Die Rahmenhandlung wird **je Sitzung** dargeboten, nicht je Teilnahme: Jede Vignettensitzung ist ihre eigene Hospitation. Eine Sitzung, die ihren narrativen Rahmen von außen bezöge, wäre nicht mehr die atomare Auswertungseinheit, als die sie definiert ist. Die Rahmenhandlung ist selbst eine Vorlage — ihre Platzhalter füllt die Vignette mit ihren Akteuren und ihrem Unterrichtskontext (siehe ADR-0010).
 
