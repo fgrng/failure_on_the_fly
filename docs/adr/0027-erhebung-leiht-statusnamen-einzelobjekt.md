@@ -15,7 +15,7 @@ festhalten. Ein erneutes Finalisieren pinnt die dann aktive Modell-Konfiguration
 neu. `archiviert` ist ebenfalls kein physisches Löschen und kann zurück zu
 `final` führen, solange keine laufende Stichprobe dem widerspricht.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Erhebung als versioniertes Artefakt** — verworfen. Eine neue Fassung würde
   Teilnahme-Links und ihre Daten von dem Design trennen, das sie tatsächlich
@@ -23,10 +23,11 @@ neu. `archiviert` ist ebenfalls kein physisches Löschen und kann zurück zu
 - **Eigene Statusnamen** — verworfen. Die drei Namen beschreiben die nötige
   Steuerung verständlich, ohne eine Fassungshistorie zu behaupten.
 
-## Consequences
+## Folgen
 
-- Die Lebenszyklus-Methoden bewachen die reversiblen Übergänge; es gibt keine
-  Historie und keinen Fassungsklon.
-- Finale Erhebungen können ihr eingebundenes Design nicht mehr still ändern.
+- Die folgenden Lebenszyklus-Methoden bewachen die reversiblen Übergänge; es
+  gibt keine Historie und keinen Fassungsklon.
+- Das eingebundene Design einer finalen Erhebung darf nicht still geändert
+  werden.
 - Stichproben und Datenspur entscheiden, wann ein Rückweg nicht mehr zulässig
   ist.

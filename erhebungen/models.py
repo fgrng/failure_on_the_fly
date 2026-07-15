@@ -19,7 +19,7 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
 
 
 class Erhebung(models.Model):
-    """Ein Untersuchungsdesign mit finalen Vignetten und Fragebogen-Items."""
+    """Ein Untersuchungsdesign mit konfigurierbaren Texten und Reihenfolgeregel."""
 
     class Status(models.TextChoices):
         """Die Zustände einer Erhebung."""
