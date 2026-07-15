@@ -10,8 +10,8 @@ def teilnahme_links_setzen(
     apps: migrations.StateApps, schema_editor: migrations.BaseDatabaseSchemaEditor
 ) -> None:
     """Gibt auch bestehenden Stichproben jeweils einen eigenen Teilnahme-Link."""
-    stichprobe = apps.get_model("erhebungen", "Stichprobe")
-    for eintrag in stichprobe.objects.filter(teilnahme_link__isnull=True):
+    Stichprobe: type[models.Model] = apps.get_model("erhebungen", "Stichprobe")
+    for eintrag in Stichprobe.objects.filter(teilnahme_link__isnull=True):
         eintrag.teilnahme_link = uuid4()
         eintrag.save(update_fields=["teilnahme_link"])
 

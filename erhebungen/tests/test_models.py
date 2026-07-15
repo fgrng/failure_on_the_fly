@@ -63,7 +63,10 @@ def test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens() -> None:
     erste: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
     zweite: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
 
-    assert re.fullmatch(r"[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}", erste.token)
+    assert re.fullmatch(
+        r"[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}",
+        erste.token,
+    )
     assert erste.token != zweite.token
 
 
@@ -86,8 +89,8 @@ def test_anlegen_wiederholt_token_nach_kollision() -> None:
     )
 
     with patch(
-        "erhebungen.models._teilnahme_token",
-        side_effect=["2345-6789", "ABCD-EFGH"],
+        "erhebungen.models.choice",
+        side_effect=[*"23456789", *"ABCDEFGH"],
     ):
         bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
 
