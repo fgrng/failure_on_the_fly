@@ -62,11 +62,11 @@ class OpenAITranskription:
                 model=settings.TRANSKRIPTION_MODELL,
                 file=("aufnahme.webm", audio, "audio/webm"),
             )
+            text: object = ergebnis.text
         except APIConnectionError as exc:
             raise AnbieterNichtErreichbar from exc
         except Exception as exc:
             raise TranskriptionsAnbieterfehler from exc
-        text: object = ergebnis.text
         if not isinstance(text, str) or not text.strip():
             raise LeeresTranskript
         return text

@@ -107,3 +107,14 @@ def test_openai_transkription_kennzeichnet_leere_antwort() -> None:
 
     with pytest.raises(LeeresTranskript):
         OpenAITranskription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
+@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
+def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler() -> None:
+    """Eine unerwartete Anbieternachricht bleibt kein technisches Detail der Naht."""
+
+    client = Mock()
+    client.audio.transcriptions.create.return_value = object()
+
+    with pytest.raises(TranskriptionsAnbieterfehler):
+        OpenAITranskription(client).transkribieren(b"aufgenommene-audiobytes")
