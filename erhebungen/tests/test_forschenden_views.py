@@ -152,16 +152,33 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.eigene_finale: Vignette = _finale_vignette_anlegen(self.ada, "Mathematik")
         self.client.force_login(self.ada)
 
-    def test_nimmt_eigene_finale_vignette_auf_und_entfernt_sie_wieder(self) -> None:
+    def test_bietet_nur_eigene_finale_vignetten_zur_aufnahme_an(self) -> None:
         """Die Detailseite bietet nur noch nicht aufgenommene eigene Finale an."""
 
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_finale: Vignette = _finale_vignette_anlegen(grace, "Physik")
+        _finale_vignette_anlegen(grace, "Physik")
         entwurf: Vignette = Vignette.objects.anlegen(self.ada)
 
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
+        self.assertContains(detail, "Mathematik")
+        self.assertNotContains(detail, "Physik")
+        self.assertNotContains(
+            detail,
+            reverse(
+                "erhebungen:vignette_hinzufuegen",
+                args=[self.erhebung.pk, entwurf.pk],
+            ),
+        )
+
+    def test_lehnt_fremde_und_unfertige_vignetten_ab(self) -> None:
+        """Nur eigene finale Vignetten lassen sich in den Entwurf aufnehmen."""
+
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        fremde_finale: Vignette = _finale_vignette_anlegen(grace, "Physik")
+        entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+
         fremde_aufnehmen: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:vignette_hinzufuegen",
@@ -174,6 +191,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, entwurf.pk],
             )
         )
+        self.assertEqual(fremde_aufnehmen.status_code, 404)
+        self.assertEqual(entwurf_aufnehmen.status_code, 404)
+
+    def test_nimmt_finale_vignette_auf_und_entfernt_sie_wieder(self) -> None:
+        """Die Aufnahme erscheint an erster Position und lässt sich zurücknehmen."""
+
         aufnehmen: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:vignette_hinzufuegen",
@@ -181,35 +204,30 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             )
         )
 
-        self.assertContains(detail, "Mathematik")
-        self.assertNotContains(detail, "Physik")
-        self.assertNotContains(
-            detail,
+        self.assertRedirects(aufnehmen, reverse("erhebungen:detail", args=[self.erhebung.pk]))
+        aufgenommen: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(aufgenommen, "Position 1")
+
+        entfernt: HttpResponse = self.client.post(
             reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, entwurf.pk],
+                "erhebungen:vignette_entfernen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            )
+        )
+
+        self.assertRedirects(entfernt, reverse("erhebungen:detail", args=[self.erhebung.pk]))
+        self.assertNotContains(
+            self.client.get(reverse("erhebungen:detail", args=[self.erhebung.pk])),
+            reverse(
+                "erhebungen:vignette_entfernen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
             ),
         )
-        self.assertEqual(fremde_aufnehmen.status_code, 404)
-        self.assertEqual(entwurf_aufnehmen.status_code, 404)
-        self.assertRedirects(aufnehmen, reverse("erhebungen:detail", args=[self.erhebung.pk]))
-        self.assertEqual(
-            Erhebungsvignette.objects.get(erhebung=self.erhebung).position, 1
-        )
-        self.assertEqual(
-            self.client.post(
-                reverse(
-                    "erhebungen:vignette_entfernen",
-                    args=[self.erhebung.pk, self.eigene_finale.pk],
-                )
-            ).status_code,
-            302,
-        )
-        self.assertFalse(Erhebungsvignette.objects.filter(erhebung=self.erhebung).exists())
-        self.assertEqual(fremde_finale.zustand, Vignette.Zustand.FINAL)
 
-    def test_speichert_texte_randomisierung_und_feste_reihenfolge(self) -> None:
-        """Ein Entwurf speichert Texte und die übermittelte Mitgliedschaftsordnung."""
+    def test_speichert_texte_und_feste_reihenfolge(self) -> None:
+        """Ein Entwurf zeigt die gespeicherten Texte und Reihenfolge wieder an."""
 
         zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
         erste_zugehoerigkeit: Erhebungsvignette = Erhebungsvignette.objects.create(
@@ -231,17 +249,26 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         self.assertRedirects(speichern, reverse("erhebungen:detail", args=[self.erhebung.pk]))
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.instruktionstext, "Bitte diagnostizieren Sie.")
-        self.assertEqual(self.erhebung.einwilligungstext, "Ich willige ein.")
-        self.assertEqual(self.erhebung.abschlusstext, "Vielen Dank.")
-        self.assertEqual(
-            list(
-                self.erhebung.vignettenzugehoerigkeiten.values_list(
-                    "vignette_id", flat=True
-                )
-            ),
-            [zweite.pk, self.eigene_finale.pk],
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(detail, "Bitte diagnostizieren Sie.")
+        self.assertContains(detail, "Ich willige ein.")
+        self.assertContains(detail, "Vielen Dank.")
+        self.assertContains(
+            detail,
+            f'<option value="{zweite_zugehoerigkeit.pk}" selected>',
+        )
+        self.assertContains(
+            detail,
+            f'<option value="{erste_zugehoerigkeit.pk}" selected>',
+        )
+
+    def test_zufaellige_reihenfolge_blendet_positionswahl_aus(self) -> None:
+        """Eine zufällige Reihenfolge hat keine bearbeitbare Positionswahl."""
+
+        Erhebungsvignette.objects.create(
+            erhebung=self.erhebung, vignette=self.eigene_finale, position=1
         )
 
         zufaellig: HttpResponse = self.client.post(
@@ -250,12 +277,11 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         self.assertRedirects(zufaellig, reverse("erhebungen:detail", args=[self.erhebung.pk]))
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG)
-        self.assertEqual(
-            list(self.erhebung.vignettenzugehoerigkeiten.values_list("position", flat=True)),
-            [None, None],
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
+        self.assertContains(detail, 'value="zufällig" selected')
+        self.assertNotContains(detail, "Reihenfolge der aufgenommenen Vignetten:")
 
     def test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen(self) -> None:
         """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
