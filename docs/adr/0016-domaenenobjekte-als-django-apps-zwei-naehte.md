@@ -16,7 +16,7 @@ apps/
   vignetten/         Vignette, Vignettenhistorie
   sitzungen/         Teilnahme, Sitzung, Gesprächsschritt, Fehlversuch, Diagnose
   training/          Training, Trainingsbindung
-  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Item-Zuordnung, Item-Antwort
+  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Ablauf, Item-Zuordnung, Item-Antwort
   datenspuren/       Datenspur
 ```
 
@@ -24,7 +24,7 @@ apps/
 
 ## Der Graph ist azyklisch, und die Richtung ist eine Aussage
 
-`training` und `erhebungen` zeigen auf `sitzungen`; `sitzungen` zeigt auf `vignetten` und `simulation` (die defensive Protokollierung der verwendeten Fassungen aus ADR-0003); `vignetten` zeigt auf `simulation` (der gepinnte Kern aus ADR-0004). `fragebogen_items` ist ein **Blatt**: die Item-Bibliothek weiß nicht, wer ihre Items beantwortet. `datenspuren` ist das gegenüberliegende Blatt: Es kennt alles, und nichts kennt es.
+`training` und `erhebungen` zeigen auf `sitzungen`; `sitzungen` zeigt auf `vignetten` und `simulation` (die defensive Protokollierung der verwendeten Fassungen aus ADR-0003); `vignetten` zeigt auf `simulation` (der gepinnte Kern aus ADR-0004). `erhebungen` besitzt zusätzlich den Ablauf, der seine Erhebungsbindungen und die daraus entstehenden Sitzungen sequenziert. `fragebogen_items` ist ein **Blatt**: die Item-Bibliothek weiß nicht, wer ihre Items beantwortet. `datenspuren` ist das gegenüberliegende Blatt: Es kennt alles, und nichts kennt es.
 
 Daraus folgt, was `sitzungen` **nicht** darf: Es kennt weder Training noch Erhebung. Eine Sitzung ist laut Glossar die atomare Auswertungseinheit; ein `sitzungen`, das seine beiden Aufrufer kennt, wäre es nicht mehr.
 
@@ -36,7 +36,9 @@ Das **Sprachmodell** (`simulation/sprachmodell/`): ein Protokoll mit einer Metho
 
 Die eine Methode nimmt System-Prompt, User-Prompt und das Ausgabeschema und liefert **zweierlei**: das geparste Structured-Output-Objekt, aus dem Denkspur und Äußerung stammen (ADR-0005), und eine **optionale native Reasoning-Spur**. Letztere reist an dem Schema vorbei, weil sie kein Feld der Modellantwort ist, sondern ein Nebenprodukt des Anbieters. Ein Protokoll, das nur das geparste Objekt zurückgibt, könnte sie nicht durchreichen — und ADR-0005 verlangt, dass sie am Gesprächsschritt aufbewahrt wird, wenn es sie gibt. Ob sie je gefüllt wird, hängt vom Anbieter ab (siehe `docs/open-questions.md`, Frage 7); die Naht muss sie unabhängig davon tragen können.
 
-Der **Ablauf** (`sitzungen/ablauf.py`): die Frage „welche Vignette kommt als Nächstes, und was danach?", mit zwei Adaptern. Im Training freie Reihenfolge, beliebig oft, kein Fragebogen, kein Ende; in der Erhebung festgelegte oder randomisierte Reihenfolge, Andockpunkte (ADR-0008) und ein definiertes Ende. Der Adapter wird von der aufrufenden View hineingereicht, nicht von `sitzungen` nachgeschlagen — sonst kennte `sitzungen` seine Aufrufer doch.
+Der **Sink** (`sitzungen/sink.py`): das Ziel einer Spielorchestrierung, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Die Orchestrierung kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.
+
+Der Ablauf ist keine Naht: `erhebungen/ablauf.py` sequenziert ausschließlich Erhebungsbindungen, und Training hat keinen entsprechenden Ablauf. `naechster_schritt(teilnahme)` liefert eine Vignetten-Fassung, künftig ein Fragebogen-Item oder das Ende direkt aus dem Erhebungsmodell.
 
 Sonst keine. Kein Repository-Interface, kein Service-Layer, kein framework-freier Domänenkern. Die Datenbank wird nicht hinter einem Interface versteckt, HTTP wird nicht ausgetauscht; Interfaces an Stellen, an denen nichts variiert, kosten Lesbarkeit ohne Gegenwert.
 
@@ -63,7 +65,7 @@ Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates un
 
 ## Consequences
 
-- Die Ablauf-Naht führt implizit das Konzept eines Ablauf-Schritts ein: `naechster_schritt(teilnahme)` liefert eine Vignette, ein Fragebogen-Item oder das Ende. Das Konzept existiert, aber es hat **keine Tabelle**, und es bekommt keine: Instruktion, Einwilligungstext, Start- und Endseite sind Textfelder an der Erhebung, die der Ablauf an den Rändern ausliefert, ohne sie als Schritte auszugeben. Dasselbe gilt für den Hinweis, **dass** das Gespräch begrenzt ist, den ADR-0012 verlangt. Damit erledigt dieses ADR eine zuvor offene Frage: Ein allgemeiner Ablauf-Schritt als Objekt wird nicht eingeführt. Sollte ein Rand je verzweigen oder wiederholt werden müssen, ist das der Zeitpunkt, ihn zu einem Schritt zu machen — und ein neues ADR.
+- Der Ablauf führt implizit das Konzept eines Ablauf-Schritts ein: `erhebungen.ablauf.naechster_schritt(teilnahme)` liefert eine Vignette, ein Fragebogen-Item oder das Ende. Das Konzept existiert, aber es hat **keine Tabelle**, und es bekommt keine: Instruktion, Einwilligungstext, Start- und Endseite sind Textfelder an der Erhebung, die der Ablauf an den Rändern ausliefert, ohne sie als Schritte auszugeben. Dasselbe gilt für den Hinweis, **dass** das Gespräch begrenzt ist, den ADR-0012 verlangt. Damit erledigt dieses ADR eine zuvor offene Frage: Ein allgemeiner Ablauf-Schritt als Objekt wird nicht eingeführt. Sollte ein Rand je verzweigen oder wiederholt werden müssen, ist das der Zeitpunkt, ihn zu einem Schritt zu machen — und ein neues ADR.
 - **Antwortversuch** ist ein neuer Begriff und nicht dasselbe wie ein Gesprächsschritt: Er ist flüchtig, er darf scheitern, und er trägt die Fehlversuche mit sich, die ein Gesprächsschritt neben sich stellt. Er enthält auch keine Eingabe — die liegt beim Aufruf bereits vor. Er erzeugt die zweite Hälfte eines Gesprächsschritts, nicht den Gesprächsschritt.
 - Der Antwortversuch ist **nicht** die Rückgabe der Sprachmodell-Naht. Zwischen beiden sitzt die begrenzte Wiederholung aus ADR-0011: Ein Antwortversuch fasst *n* Modellrückgaben zusammen, von denen *n−1* als Fehlversuche verworfen wurden. Dass die Wiederholung in `simulation` liegt und nicht hinter der Naht, ist der Grund, warum der deterministische Fake die Fehlversuch-Schreibbahn überhaupt prüfen kann.
 - Die App heißt `fragebogen_items` und nicht `fragebogen`, weil sie den Fragebogen gerade **nicht** enthält: Er ist laut ADR-0008 der Sammelbegriff für die Items *einer Erhebung* samt ihren Andockpunkten, und Zuordnung, Andockpunkt, Reihenfolge und Item-Antwort liegen alle in `erhebungen`. Ein `fragebogen/`, in dem kein Fragebogen wohnt, schickte jede Suche an den falschen Ort. `items` schied aus, weil das Glossar den Begriff unter _Avoid_ führt.

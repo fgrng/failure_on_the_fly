@@ -1,7 +1,8 @@
 """Datenmodelle für Erhebungen und Stichproben."""
 
 from datetime import datetime
-from secrets import choice
+from random import Random
+from secrets import choice, randbits
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -365,6 +366,11 @@ class Erhebungsbindung(models.Model):
         on_delete=models.PROTECT,
     )
     token: models.CharField = models.CharField(max_length=9, unique=True)
+    randomisierungs_seed: models.PositiveBigIntegerField = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     objects: ErhebungsbindungManager = ErhebungsbindungManager()
 
@@ -382,6 +388,60 @@ class Erhebungsbindung(models.Model):
                 Sitzung.Status.GESCHEITERT,
             ]
         ).exists() or not self.teilnahme.sitzung_set.exists()
+
+    @transaction.atomic
+    def vignetten_ziehen(self) -> None:
+        """Schreibt die Reihenfolge dieser Teilnahme genau einmal fest."""
+
+        if self.vignettenziehungen.exists():
+            return
+        zugehoerigkeiten = list(
+            self.stichprobe.erhebung.vignettenzugehoerigkeiten.all()
+        )
+        if self.stichprobe.erhebung.randomisierung == Erhebung.Randomisierung.ZUFAELLIG:
+            if self.randomisierungs_seed is None:
+                self.randomisierungs_seed = randbits(63)
+                self.save(update_fields=["randomisierungs_seed"])
+            Random(self.randomisierungs_seed).shuffle(zugehoerigkeiten)
+        Vignettenziehung.objects.bulk_create(
+            [
+                Vignettenziehung(
+                    erhebungsbindung=self,
+                    vignette=zugehoerigkeit.vignette,
+                    position=position,
+                )
+                for position, zugehoerigkeit in enumerate(zugehoerigkeiten, start=1)
+            ]
+        )
+
+
+class Vignettenziehung(models.Model):
+    """Die einmal festgeschriebene Reihenfolge einer Erhebungsteilnahme."""
+
+    erhebungsbindung: models.ForeignKey = models.ForeignKey(
+        Erhebungsbindung,
+        on_delete=models.CASCADE,
+        related_name="vignettenziehungen",
+    )
+    vignette: models.ForeignKey = models.ForeignKey(
+        "vignetten.Vignette", on_delete=models.PROTECT
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+
+    class Meta:
+        """Bewahrt jede gezogene Fassung und ihre Position eindeutig."""
+
+        ordering: list[str] = ["position"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "position"],
+                name="erhebungen_ziehung_position_ist_je_teilnahme_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "vignette"],
+                name="erhebungen_ziehung_vignette_ist_je_teilnahme_eindeutig",
+            ),
+        ]
 
 
 class Vignettenposition(models.Model):

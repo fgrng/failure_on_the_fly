@@ -12,18 +12,14 @@ Entschieden ist inzwischen in `docs/adr/0019`: Die **Vignettenhistorie** trägt 
 
 Offen bleibt der **Wechsel** selbst: Was geschieht mit dem offenen Entwurf, und wandern Trainings und Erhebungen der weggegangenen Person mit? Zu bedenken ist dabei, dass `docs/adr/0015` die Privatheit ausdrücklich als **revidierbar** bezeichnet. Fällt sie, wird aus der Eigentümerschaft eine Zugriffsregel mit mehreren Beteiligten; der Fremdschlüssel an der Historie bliebe richtig, wäre aber nicht mehr die ganze Antwort.
 
-## 2. Randomisierung
-
-Erwähnt, aber nie präzisiert. Randomisiert wird vermutlich die **Reihenfolge der Vignetten** innerhalb einer Teilnahme. Offen ist, ob es weitere Randomisierungsachsen gibt, ob die gezogene Reihenfolge Teil der Datenspur ist (sie sollte es sein) und ob Randomisierung pro Erhebung an- und abschaltbar ist.
-
-## 3. Export-Formate und Granularität
+## 2. Export-Formate und Granularität
 
 Die Vision nennt CSV und JSON. Offen ist, welche Tabellen bzw. Objekte der Export ausgibt und auf welcher Ebene: eine Zeile je Sitzung, je Teilnahme oder je Gesprächsschritt? Wie werden Transkript und Denkspur — beide mehrzeilig — in ein tabellarisches Format überführt? Werden die verwendeten Fassungen von Vignette, Simulationskern und Modell-Konfiguration als IDs oder als eingebetteter Inhalt exportiert? Und wie erscheinen die **Fehlversuche** aus `docs/adr/0011`, die neben dem Transkript stehen?
 
-## 4. Wiederholversuche und Sitzungsobergrenze
+## 3. Wiederholversuche und Sitzungsobergrenze
 
 `docs/adr/0011` lässt begrenzte Wiederholungen eines gescheiterten Gesprächsschritts zu, ohne die Grenze zu nennen. Offen: Wie viele Versuche, bevor eine Sitzung aufgibt, und was sieht die Teilnehmer:in dann? Getrennt davon verlangt `docs/adr/0012` eine **harte Obergrenze** gegen ewig offene Sitzungen — sie hat nichts mit dem Gesprächsbudget zu tun und ist noch unbeziffert.
 
-## 5. Zulässige Anbieter und Modelle
+## 4. Zulässige Anbieter und Modelle
 
 `docs/adr/0005` schreibt fest, dass die Denkspur immer aus dem Structured Output stammt. Damit sind nur Anbieter und Modelle zulässig, die das beherrschen. Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
