@@ -6,6 +6,7 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+    {% if prototyp_variante %}<link rel="stylesheet" href="{% static 'css/prototyp-98.css' %}">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -310,6 +311,8 @@
             </section>
         {% endif %}
     {% endif %}
+
+    {% if prototyp_variante %}{% include "erhebungen/prototyp_98_items.html" %}{% endif %}
 
     <div class="vignette-form-actions" style="margin-top: 2rem;">
         <a class="button button--secondary" href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a>

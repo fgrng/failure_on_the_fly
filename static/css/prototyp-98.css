@@ -1,0 +1,115 @@
+/* PROTOTYP zu Issue #98 — WEGWERFCODE. Nach der Entscheidung löschen. */
+
+.prototyp-chrome {
+    margin: var(--space-5) 0 var(--space-3);
+    padding: var(--space-3);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+.prototyp-frost {
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-left: 3px solid var(--color-area-research-solid);
+    background: var(--color-area-research-tint);
+    font-size: 0.875rem;
+}
+
+.prototyp-korb {
+    list-style: none;
+    margin: 0;
+    padding: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    min-height: 6rem;
+}
+
+.prototyp-korb--ziel {
+    border-style: dashed;
+    background: var(--color-area-research-tint);
+}
+
+.prototyp-korb--gesperrt {
+    border-style: solid;
+    background: var(--color-surface-muted);
+}
+
+.prototyp-andockpunkt {
+    margin-bottom: var(--space-4);
+}
+
+.prototyp-karte {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.prototyp-karte[draggable="true"] {
+    cursor: grab;
+}
+
+.prototyp-karte__griff {
+    color: var(--color-text-muted);
+}
+
+.prototyp-karte__nummer {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--color-area-research-solid);
+    color: var(--color-area-research-on-solid);
+    font-size: 0.75rem;
+}
+
+.prototyp-karte__text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.prototyp-leer {
+    padding: var(--space-3);
+    color: var(--color-text-muted);
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.prototyp-switcher {
+    position: fixed;
+    bottom: var(--space-4);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-radius: 999px;
+    background: var(--phsg-gray-900);
+    color: var(--phsg-white);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
+    font-size: 0.875rem;
+}
+
+.prototyp-switcher button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}

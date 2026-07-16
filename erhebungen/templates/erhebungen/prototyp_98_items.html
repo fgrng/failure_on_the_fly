@@ -1,0 +1,360 @@
+{% comment %}
+PROTOTYP zu Issue #98 — WEGWERFCODE. Drei Varianten der Zuordnungs-UI
+(Fragebogen-Items an der Erhebung), umschaltbar über ?variant=A|B|C.
+Nichts wird gespeichert: alle Aktionen laufen clientseitig in Alpine auf
+Stub-Daten aus erhebungen/prototyp_98.py. Nach der Entscheidung: löschen.
+{% endcomment %}
+
+{{ prototyp_bibliothek|json_script:"prototyp-bibliothek" }}
+{{ prototyp_zugeordnet|json_script:"prototyp-zugeordnet" }}
+
+<div id="prototyp-98" x-data="{
+        gesperrt: false,
+        bibliothek: JSON.parse(document.getElementById('prototyp-bibliothek').textContent),
+        zugeordnet: JSON.parse(document.getElementById('prototyp-zugeordnet').textContent),
+        q: '',
+        gezogen: null,
+
+        get sichtbareBibliothek() {
+            const q = this.q.trim().toLowerCase();
+            return this.bibliothek.filter(i => !q || i.text.toLowerCase().includes(q));
+        },
+        liste(andockpunkt) {
+            return this.zugeordnet
+                .filter(i => i.andockpunkt === andockpunkt)
+                .sort((a, b) => a.position - b.position);
+        },
+        typLabel(typ) { return typ === 'likert' ? 'Likert' : 'Freitext'; },
+        aufnehmen(pk, andockpunkt) {
+            if (this.gesperrt) return;
+            const index = this.bibliothek.findIndex(i => i.pk === pk);
+            if (index === -1) return;
+            const item = this.bibliothek.splice(index, 1)[0];
+            this.zugeordnet.push({ ...item, andockpunkt, position: this.liste(andockpunkt).length + 1 });
+        },
+        entfernen(pk) {
+            if (this.gesperrt) return;
+            const index = this.zugeordnet.findIndex(i => i.pk === pk);
+            if (index === -1) return;
+            const item = this.zugeordnet.splice(index, 1)[0];
+            this.bibliothek.push({ pk: item.pk, text: item.text, typ: item.typ });
+            this.neuNummerieren(item.andockpunkt);
+        },
+        andockpunktSetzen(pk, andockpunkt) {
+            if (this.gesperrt) return;
+            const item = this.zugeordnet.find(i => i.pk === pk);
+            if (!item || item.andockpunkt === andockpunkt) return;
+            const alt = item.andockpunkt;
+            item.andockpunkt = andockpunkt;
+            item.position = this.liste(andockpunkt).length;
+            this.neuNummerieren(alt);
+            this.neuNummerieren(andockpunkt);
+        },
+        verschieben(pk, delta) {
+            if (this.gesperrt) return;
+            const item = this.zugeordnet.find(i => i.pk === pk);
+            const reihe = this.liste(item.andockpunkt);
+            const index = reihe.findIndex(i => i.pk === pk);
+            const ziel = index + delta;
+            if (ziel < 0 || ziel >= reihe.length) return;
+            [reihe[index].position, reihe[ziel].position] = [reihe[ziel].position, reihe[index].position];
+        },
+        positionSetzen(pk, position) {
+            if (this.gesperrt) return;
+            const item = this.zugeordnet.find(i => i.pk === pk);
+            const reihe = this.liste(item.andockpunkt).filter(i => i.pk !== pk);
+            reihe.splice(Number(position) - 1, 0, item);
+            reihe.forEach((i, n) => i.position = n + 1);
+        },
+        neuNummerieren(andockpunkt) {
+            this.liste(andockpunkt).forEach((i, n) => i.position = n + 1);
+        },
+        ablegen(andockpunkt, zielPk) {
+            if (this.gesperrt || this.gezogen === null) return;
+            const pk = this.gezogen;
+            this.gezogen = null;
+            if (this.bibliothek.some(i => i.pk === pk)) this.aufnehmen(pk, andockpunkt);
+            else this.andockpunktSetzen(pk, andockpunkt);
+            if (zielPk !== null && zielPk !== pk) {
+                const ziel = this.zugeordnet.find(i => i.pk === zielPk);
+                if (ziel && ziel.andockpunkt === andockpunkt) this.positionSetzen(pk, ziel.position);
+            }
+        }
+    }"
+>
+
+    <div class="prototyp-chrome">
+        <strong>Prototyp #98</strong> — Variante {{ prototyp_variante }}: {{ prototyp_variantenname }}.
+        Stub-Daten, nichts wird gespeichert.
+        <label style="margin-left: 1rem;">
+            <input type="checkbox" x-model="gesperrt"> Ansicht: finalisiert (gesperrt)
+        </label>
+    </div>
+
+{% if prototyp_variante == "A" %}
+    {% comment %} A — Zwei Andockpunkt-Bereiche: die Vignettenauswahl zweimal, je Andockpunkt einer. {% endcomment %}
+    <template x-for="bereich in [
+            { schluessel: 'nach_sitzung', nummer: '04', titel: 'Items nach jeder Vignettensitzung', hinweis: 'Diese Items werden nach jeder einzelnen Sitzung vorgelegt.' },
+            { schluessel: 'am_ende', nummer: '05', titel: 'Items am Ende', hinweis: 'Diese Items werden einmal nach allen Sitzungen vorgelegt.' }
+        ]" :key="bereich.schluessel">
+        <section class="page-section">
+            <header class="page-section__head">
+                <b x-text="bereich.nummer"></b>
+                <span>
+                    <h2 x-text="bereich.titel"></h2>
+                    <small x-text="bereich.hinweis"></small>
+                </span>
+            </header>
+
+            <p class="prototyp-frost" x-show="!gesperrt">
+                Mit dem Finalisieren friert diese Batterie ein und ist danach nicht mehr änderbar.
+            </p>
+
+            <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                <div class="vignette-field" x-show="!gesperrt">
+                    <p><strong>Bibliothek</strong></p>
+                    <div class="table-toolbar">
+                        <input type="search" class="table-toolbar__search" placeholder="Suchen…" x-model="q">
+                    </div>
+                    <div class="table-wrap vignette-index-table">
+                        <table class="table">
+                            <thead><tr><th scope="col">Item</th><th scope="col">Typ</th><th scope="col">Aktion</th></tr></thead>
+                            <tbody>
+                                <template x-for="item in sichtbareBibliothek" :key="item.pk">
+                                    <tr>
+                                        <td x-text="item.text"></td>
+                                        <td><span class="badge" x-text="typLabel(item.typ)"></span></td>
+                                        <td><button class="button button--secondary button--small" type="button" @click="aufnehmen(item.pk, bereich.schluessel)">Aufnehmen</button></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="sichtbareBibliothek.length === 0">
+                                    <td colspan="3" class="table__empty">Keine weiteren Items verfügbar.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="vignette-field" :style="gesperrt ? 'grid-column: 1 / -1' : ''">
+                    <p><strong>Aufgenommen</strong></p>
+                    <div class="table-wrap vignette-index-table">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Nr.</th><th scope="col">Item</th><th scope="col">Typ</th>
+                                    <th scope="col" x-show="!gesperrt">Reihenfolge</th>
+                                    <th scope="col" x-show="!gesperrt">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(item, n) in liste(bereich.schluessel)" :key="item.pk">
+                                    <tr>
+                                        <td x-text="n + 1"></td>
+                                        <td x-text="item.text"></td>
+                                        <td><span class="badge" x-text="typLabel(item.typ)"></span></td>
+                                        <td x-show="!gesperrt">
+                                            <button class="button button--secondary button--small" type="button" @click="verschieben(item.pk, -1)" :disabled="n === 0">↑</button>
+                                            <button class="button button--secondary button--small" type="button" @click="verschieben(item.pk, 1)" :disabled="n === liste(bereich.schluessel).length - 1">↓</button>
+                                        </td>
+                                        <td x-show="!gesperrt">
+                                            <button class="button button--danger button--small" type="button" @click="entfernen(item.pk)">Entfernen</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="liste(bereich.schluessel).length === 0">
+                                    <td colspan="5" class="table__empty">Keine Items zugeordnet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+{% endif %}
+
+{% if prototyp_variante == "B" %}
+    {% comment %} B — Eine Bibliothek links, zwei Körbe rechts; Zuordnung und Reihenfolge per Drag & Drop. {% endcomment %}
+    <section class="page-section">
+        <header class="page-section__head">
+            <b>04</b>
+            <span>
+                <h2>Fragebogen-Items</h2>
+                <small>Ziehen Sie Items aus der Bibliothek in einen Andockpunkt; die Reihenfolge im Korb ergibt die Vorlagereihenfolge.</small>
+            </span>
+        </header>
+
+        <p class="prototyp-frost" x-show="!gesperrt">
+            Mit dem Finalisieren frieren beide Körbe ein und sind danach nicht mehr änderbar.
+        </p>
+
+        <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1.2fr; align-items: start;" :style="gesperrt ? 'grid-template-columns: 1fr' : ''">
+            <div class="vignette-field" x-show="!gesperrt">
+                <p><strong>Bibliothek</strong></p>
+                <div class="table-toolbar">
+                    <input type="search" class="table-toolbar__search" placeholder="Suchen…" x-model="q">
+                </div>
+                <ul class="prototyp-korb prototyp-korb--quelle">
+                    <template x-for="item in sichtbareBibliothek" :key="item.pk">
+                        <li class="prototyp-karte" draggable="true" @dragstart="gezogen = item.pk">
+                            <span class="prototyp-karte__griff">⠿</span>
+                            <span class="prototyp-karte__text">
+                                <span x-text="item.text"></span>
+                                <span class="badge" x-text="typLabel(item.typ)"></span>
+                            </span>
+                        </li>
+                    </template>
+                    <li class="prototyp-leer" x-show="sichtbareBibliothek.length === 0">Keine weiteren Items.</li>
+                </ul>
+            </div>
+
+            <div class="vignette-field">
+                <template x-for="korb in [
+                        { schluessel: 'nach_sitzung', titel: 'Nach jeder Vignettensitzung', hinweis: 'wiederholt sich je Sitzung' },
+                        { schluessel: 'am_ende', titel: 'Am Ende', hinweis: 'einmal nach allen Sitzungen' }
+                    ]" :key="korb.schluessel">
+                    <div class="prototyp-andockpunkt">
+                        <p>
+                            <strong x-text="korb.titel"></strong>
+                            <small x-text="' — ' + korb.hinweis"></small>
+                        </p>
+                        <ul class="prototyp-korb prototyp-korb--ziel" :class="gesperrt && 'prototyp-korb--gesperrt'"
+                            @dragover.prevent @drop.prevent="ablegen(korb.schluessel, null)">
+                            <template x-for="(item, n) in liste(korb.schluessel)" :key="item.pk">
+                                <li class="prototyp-karte" :draggable="!gesperrt"
+                                    @dragstart="gezogen = item.pk"
+                                    @dragover.prevent @drop.prevent.stop="ablegen(korb.schluessel, item.pk)">
+                                    <span class="prototyp-karte__griff" x-show="!gesperrt">⠿</span>
+                                    <span class="prototyp-karte__nummer" x-text="n + 1"></span>
+                                    <span class="prototyp-karte__text">
+                                        <span x-text="item.text"></span>
+                                        <span class="badge" x-text="typLabel(item.typ)"></span>
+                                    </span>
+                                    <button class="button button--danger button--small" type="button" x-show="!gesperrt" @click="entfernen(item.pk)">×</button>
+                                </li>
+                            </template>
+                            <li class="prototyp-leer" x-show="liste(korb.schluessel).length === 0">
+                                <span x-text="gesperrt ? 'Keine Items.' : 'Items hierher ziehen.'"></span>
+                            </li>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </section>
+{% endif %}
+
+{% if prototyp_variante == "C" %}
+    {% comment %} C — Eine Zuordnungstabelle: Andockpunkt und Position als Feld je Zeile (nah an der Vignetten-Prior-Art). {% endcomment %}
+    <section class="page-section">
+        <header class="page-section__head">
+            <b>04</b>
+            <span>
+                <h2>Fragebogen-Items</h2>
+                <small>Nehmen Sie Items auf und setzen Sie je Zeile Andockpunkt und Position.</small>
+            </span>
+        </header>
+
+        <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1.4fr; align-items: start;" :style="gesperrt ? 'grid-template-columns: 1fr' : ''">
+            <div class="vignette-field" x-show="!gesperrt">
+                <p><strong>Bibliothek</strong></p>
+                <div class="table-toolbar">
+                    <input type="search" class="table-toolbar__search" placeholder="Suchen…" x-model="q">
+                    <span class="table-toolbar__count" x-text="sichtbareBibliothek.length + ' von ' + bibliothek.length"></span>
+                </div>
+                <div class="table-wrap vignette-index-table">
+                    <table class="table">
+                        <thead><tr><th scope="col">Item</th><th scope="col">Aktion</th></tr></thead>
+                        <tbody>
+                            <template x-for="item in sichtbareBibliothek" :key="item.pk">
+                                <tr>
+                                    <td>
+                                        <span x-text="item.text"></span>
+                                        <span class="badge" x-text="typLabel(item.typ)"></span>
+                                    </td>
+                                    <td><button class="button button--secondary button--small" type="button" @click="aufnehmen(item.pk, 'nach_sitzung')">Aufnehmen</button></td>
+                                </tr>
+                            </template>
+                            <tr x-show="sichtbareBibliothek.length === 0">
+                                <td colspan="2" class="table__empty">Keine weiteren Items verfügbar.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="vignette-field">
+                <p><strong>Zugeordnete Items</strong></p>
+                <p class="prototyp-frost" x-show="!gesperrt">
+                    Mit dem Finalisieren friert diese Tabelle ein und ist danach nicht mehr änderbar.
+                </p>
+                <div class="table-wrap vignette-index-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Item</th>
+                                <th scope="col">Andockpunkt</th>
+                                <th scope="col">Position</th>
+                                <th scope="col" x-show="!gesperrt">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="andockpunkt in ['nach_sitzung', 'am_ende']" :key="andockpunkt">
+                                <template x-for="item in liste(andockpunkt)" :key="item.pk">
+                                    <tr>
+                                        <td>
+                                            <span x-text="item.text"></span>
+                                            <span class="badge" x-text="typLabel(item.typ)"></span>
+                                        </td>
+                                        <td>
+                                            <select x-show="!gesperrt" :value="item.andockpunkt" @change="andockpunktSetzen(item.pk, $event.target.value)">
+                                                <option value="nach_sitzung">nach jeder Vignettensitzung</option>
+                                                <option value="am_ende">am Ende</option>
+                                            </select>
+                                            <span x-show="gesperrt" x-text="item.andockpunkt === 'nach_sitzung' ? 'nach jeder Vignettensitzung' : 'am Ende'"></span>
+                                        </td>
+                                        <td>
+                                            <select x-show="!gesperrt" :value="item.position" @change="positionSetzen(item.pk, $event.target.value)">
+                                                <template x-for="n in liste(item.andockpunkt).length" :key="n">
+                                                    <option :value="n" x-text="n"></option>
+                                                </template>
+                                            </select>
+                                            <span x-show="gesperrt" x-text="item.position"></span>
+                                        </td>
+                                        <td x-show="!gesperrt">
+                                            <button class="button button--danger button--small" type="button" @click="entfernen(item.pk)">Entfernen</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                            <tr x-show="zugeordnet.length === 0">
+                                <td colspan="4" class="table__empty">Noch keine Items zugeordnet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endif %}
+</div>
+
+{% comment %} Wegwerf-Switcher: fixierte Leiste, ←/→ blättern durch die Varianten. {% endcomment %}
+<div class="prototyp-switcher" x-data="{
+        varianten: {{ prototyp_varianten|safe }},
+        aktuell: '{{ prototyp_variante }}',
+        blaettern(delta) {
+            const index = this.varianten.indexOf(this.aktuell);
+            const ziel = this.varianten[(index + delta + this.varianten.length) % this.varianten.length];
+            const url = new URL(window.location);
+            url.searchParams.set('variant', ziel);
+            window.location = url;
+        }
+    }"
+    @keydown.arrow-left.window="if (!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) blaettern(-1)"
+    @keydown.arrow-right.window="if (!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) blaettern(1)"
+>
+    <button type="button" @click="blaettern(-1)" aria-label="Vorige Variante">←</button>
+    <span>{{ prototyp_variante }} — {{ prototyp_variantenname }}</span>
+    <button type="button" @click="blaettern(1)" aria-label="Nächste Variante">→</button>
+</div>

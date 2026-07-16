@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Callable, Concatenate, ParamSpec
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -23,6 +24,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from .ablauf import naechster_schritt
+from .prototyp_98 import kontext as prototyp_98_kontext
 from .models import (
     Erhebung,
     Erhebungsbindung,
@@ -170,6 +172,12 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
             "stichproben": stichproben,
+            # PROTOTYP #98 — mit prototyp_98.py und dem Template wieder entfernen.
+            **(
+                prototyp_98_kontext(request.GET.get("variant"))
+                if settings.DEBUG
+                else {}
+            ),
         },
     )
 
