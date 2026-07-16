@@ -101,6 +101,35 @@
                     </form>
                 {% endif %}
             {% endif %}
+            {% if erhebung.status == erhebung.Status.FINAL %}
+                <h2>Stichproben</h2>
+                <form method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}">
+                    {% csrf_token %}
+                    <p>
+                        <label for="id_beginn">Beginn</label>
+                        <input id="id_beginn" type="datetime-local" name="beginn" required>
+                    </p>
+                    <p>
+                        <label for="id_ende">Ende</label>
+                        <input id="id_ende" type="datetime-local" name="ende" required>
+                    </p>
+                    <button type="submit">Stichprobe anlegen</button>
+                </form>
+                <ul>
+                    {% for stichprobe in stichproben %}
+                        <li>
+                            <dl>
+                                <div><dt>Zeitraum</dt><dd>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</dd></div>
+                                <div><dt>Phase</dt><dd>{{ stichprobe.phase }}</dd></div>
+                                <div><dt>Teilnahmen</dt><dd>{{ stichprobe.teilnahmezahl }}</dd></div>
+                                <div><dt>Teilnahme-Link</dt><dd><input type="text" value="{{ stichprobe.teilnahme_url }}" readonly></dd></div>
+                            </dl>
+                        </li>
+                    {% empty %}
+                        <li>Noch keine Stichproben angelegt.</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
             <p><a href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a></p>
         </section>
     </div>

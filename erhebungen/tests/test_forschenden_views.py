@@ -1,5 +1,7 @@
 """HTTP-Tests für die Forschenden-UI der Erhebungen."""
 
+from datetime import datetime, timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -429,3 +431,108 @@ class ErhebungenFinalisierenTests(TestCase):
 
         self.assertNotContains(detail, "Zurückziehen")
         self.assertContains(versuch, "können nicht zurückgezogen werden")
+
+
+class StichprobenAnlegenTests(TestCase):
+    """Forschende legen Stichproben unter finalen Erhebungen an."""
+
+    def setUp(self) -> None:
+        """Richtet eine finale Erhebung einer eingeloggten Forschenden ein."""
+
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.erhebung: Erhebung = Erhebung.objects.create(
+            name="Brüche", eigentuemerin=self.ada
+        )
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung.finalisieren()
+        self.client.force_login(self.ada)
+
+    def test_legt_stichprobe_mit_zeitraum_und_teilnahme_link_an(self) -> None:
+        """Die Detailseite erzeugt den öffentlichen Link für den eingegebenen Zeitraum."""
+
+        anlegen: HttpResponse = self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
+            {"beginn": "2026-08-01T09:00", "ende": "2026-08-31T17:00"},
+        )
+
+        stichprobe: Stichprobe = Stichprobe.objects.get(erhebung=self.erhebung)
+        self.assertRedirects(anlegen, reverse("erhebungen:detail", args=[self.erhebung.pk]))
+        self.assertEqual(
+            stichprobe.beginn, timezone.make_aware(datetime(2026, 8, 1, 9))
+        )
+        self.assertEqual(
+            stichprobe.ende, timezone.make_aware(datetime(2026, 8, 31, 17))
+        )
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(
+            detail,
+            detail.wsgi_request.build_absolute_uri(
+                reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
+            ),
+        )
+
+    def test_zeigt_phase_und_anzahl_teilnahmen_je_stichprobe(self) -> None:
+        """Die Detailseite ordnet jede Stichprobe zeitlich und nach Datenvolumen ein."""
+
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "Phase</dt><dd>laufend")
+        self.assertContains(detail, "Teilnahmen</dt><dd>1")
+
+    def test_laesst_stichproben_nur_auf_eigenen_finalen_erhebungen_an(self) -> None:
+        """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""
+
+        entwurf: Erhebung = Erhebung.objects.create(
+            name="Entwurf", eigentuemerin=self.ada
+        )
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        fremde: Erhebung = Erhebung.objects.create(
+            name="Fremd", eigentuemerin=grace
+        )
+        zeitraum: dict[str, str] = {
+            "beginn": "2026-08-01T09:00",
+            "ende": "2026-08-31T17:00",
+        }
+
+        entwurf_antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[entwurf.pk]), zeitraum
+        )
+        fremd_antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[fremde.pk]), zeitraum
+        )
+
+        self.assertRedirects(
+            entwurf_antwort, reverse("erhebungen:detail", args=[entwurf.pk])
+        )
+        self.assertEqual(fremd_antwort.status_code, 404)
+        self.assertFalse(Stichprobe.objects.filter(erhebung=entwurf).exists())
+
+    def test_lehnt_zeitraum_mit_ende_vor_beginn_ab(self) -> None:
+        """Der Zeitraum einer Stichprobe endet nicht vor seinem Beginn."""
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
+            {"beginn": "2026-08-31T17:00", "ende": "2026-08-01T09:00"},
+        )
+
+        self.assertEqual(antwort.status_code, 400)
+        self.assertFalse(Stichprobe.objects.filter(erhebung=self.erhebung).exists())

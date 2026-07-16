@@ -33,6 +33,11 @@ urlpatterns: list[URLPattern] = [
     path(
         "eigene/<int:pk>/zurueckziehen/", views.zurueckziehen, name="zurueckziehen"
     ),
+    path(
+        "eigene/<int:pk>/stichproben/anlegen/",
+        views.stichprobe_anlegen,
+        name="stichprobe_anlegen",
+    ),
     path("teilnahme/<uuid:teilnahme_link>/", views.teilnehmen, name="teilnehmen"),
     path(
         "teilnahme/<uuid:teilnahme_link>/einwilligung/",

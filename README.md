@@ -50,7 +50,9 @@ bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
 Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
 Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
-datentragende Stichprobe möglich.
+datentragende Stichprobe möglich. Unter einer finalen Erhebung lassen sich
+Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
+Teilnahme-Link, die aktuelle Phase und die Zahl ihrer Teilnahmen.
 
 ## Lokale Entwicklungsumgebung
 

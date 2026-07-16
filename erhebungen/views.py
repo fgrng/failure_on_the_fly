@@ -1,5 +1,6 @@
 """Öffentlicher Einstieg in pseudonyme Erhebungen."""
 
+from datetime import datetime
 from functools import wraps
 from typing import Callable, Concatenate, ParamSpec
 from uuid import UUID
@@ -9,7 +10,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, QuerySet
+from django.db.models import Count, F, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -18,6 +19,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .ablauf import naechster_schritt
 from .models import (
@@ -109,6 +112,13 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine eigene Erhebung zur weiteren Bearbeitung."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    stichproben: QuerySet[Stichprobe] = erhebung.stichprobe_set.annotate(
+        teilnahmezahl=Count("erhebungsbindung")
+    )
+    for stichprobe in stichproben:
+        stichprobe.teilnahme_url = request.build_absolute_uri(
+            reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
+        )
     return render(
         request,
         "erhebungen/detail.html",
@@ -121,8 +131,33 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 pk__in=erhebung.vignetten.values("pk")
             ),
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
+            "stichproben": stichproben,
         },
     )
+
+
+@login_required
+@_forschende_erforderlich
+def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Legt unter einer finalen eigenen Erhebung eine Stichprobe an."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.FINAL:
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+    beginn: datetime | None = parse_datetime(request.POST.get("beginn", ""))
+    ende: datetime | None = parse_datetime(request.POST.get("ende", ""))
+    if beginn is None or ende is None:
+        return HttpResponseBadRequest("Beginn und Ende müssen gültige Zeitpunkte sein.")
+    if timezone.is_naive(beginn):
+        beginn = timezone.make_aware(beginn)
+    if timezone.is_naive(ende):
+        ende = timezone.make_aware(ende)
+    if ende < beginn:
+        return HttpResponseBadRequest("Das Ende darf nicht vor dem Beginn liegen.")
+    Stichprobe.objects.create(erhebung=erhebung, beginn=beginn, ende=ende)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
