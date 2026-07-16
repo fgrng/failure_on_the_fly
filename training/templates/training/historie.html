@@ -1,23 +1,20 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Trainingskataloge{% endblock %}
+{% block title %}Meine Trainings{% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
 {% endblock %}
 
 {% block content %}
-<section class="page vignette-index-page">
+<section class="page area--participant">
     <header class="page-head">
         <div>
             <p>Ausbildung</p>
-            <h1>Trainingskataloge</h1>
-            <span>Verfügbare Trainings durchsuchen und starten.</span>
+            <h1>Meine Trainings</h1>
+            <span>Historie der durchgeführten Trainings.</span>
         </div>
-        {% if ist_ausbilderin %}
-            <a class="button" href="{% url 'training:anlegen' %}">Neuen Trainingskatalog erstellen</a>
-        {% endif %}
     </header>
 
     {{ trainings|json_script:"trainings-data" }}
@@ -25,13 +22,11 @@
         x-data="{
             rows: JSON.parse(document.getElementById('trainings-data').textContent),
             q: '',
-            nurEigene: false,
             sortKey: 'name',
             sortDir: 1,
             get sichtbar() {
                 const q = this.q.trim().toLowerCase();
                 return this.rows
-                    .filter(r => !this.nurEigene || r.is_own)
                     .filter(r => !q || (r.name || '').toLowerCase().includes(q))
                     .sort((a, b) => {
                         const x = (a[this.sortKey] ?? '').toString().toLowerCase();
@@ -56,14 +51,9 @@
                 type="search"
                 class="table-toolbar__search"
                 placeholder="Suchen (Name)…"
-                aria-label="Trainings durchsuchen"
+                aria-label="Historie durchsuchen"
                 x-model="q"
             >
-            {% if ist_ausbilderin %}
-                <label class="table-toolbar__toggle" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; font-size: 0.9rem;">
-                    <input type="checkbox" x-model="nurEigene"> Eigene Trainingskataloge
-                </label>
-            {% endif %}
             <span class="table-toolbar__count" x-text="sichtbar.length + ' von ' + rows.length"></span>
         </div>
 
@@ -71,31 +61,21 @@
             <table class="table table--sortable">
                 <thead>
                     <tr>
-                        <th scope="col"><button type="button" class="table__sort" @click="sortiere('name')">Name<span class="table__sort-arrow" :class="pfeilKlasse('name')"></span></button></th>
-                        {% if ist_ausbilderin %}
-                            <th scope="col">Zustand</th>
-                        {% endif %}
+                        <th scope="col"><button type="button" class="table__sort" @click="sortiere('name')">Training<span class="table__sort-arrow" :class="pfeilKlasse('name')"></span></button></th>
+                        <th scope="col"><button type="button" class="table__sort" @click="sortiere('sort_progress')">Vignetten bearbeitet<span class="table__sort-arrow" :class="pfeilKlasse('sort_progress')"></span></button></th>
                         <th scope="col">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-for="r in sichtbar" :key="r.url">
+                    <template x-for="(r, i) in sichtbar" :key="i">
                         <tr>
                             <td x-text="r.name"></td>
-                            {% if ist_ausbilderin %}
-                                <td>
-                                    <template x-if="r.zustand">
-                                        <span class="badge" :class="'badge--' + r.zustand_badge" x-text="r.zustand"></span>
-                                    </template>
-                                </td>
-                            {% endif %}
-                            <td>
-                                <a class="button button--secondary" :href="r.url" x-text="r.action_label || 'Öffnen'"></a>
-                            </td>
+                            <td x-text="r.fortschritt"></td>
+                            <td><a class="button button--secondary" :href="r.url">Ansehen</a></td>
                         </tr>
                     </template>
                     <tr x-show="sichtbar.length === 0">
-                        <td colspan="{% if ist_ausbilderin %}3{% else %}2{% endif %}" class="table__empty">Keine Trainings passen zu Suche und Filter.</td>
+                        <td colspan="3" class="table__empty">Keine durchgeführten Trainings gefunden.</td>
                     </tr>
                 </tbody>
             </table>

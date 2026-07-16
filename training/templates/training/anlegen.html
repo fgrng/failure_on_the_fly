@@ -1,12 +1,38 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Training anlegen{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
 {% block content %}
-    <h1>Training anlegen</h1>
+<section class="page area--authoring">
+    <header class="page-head">
+        <div>
+            <p>Neues Training</p>
+            <h1>Training erstellen</h1>
+            <span>Geben Sie den Namen des neuen Trainings ein.</span>
+        </div>
+    </header>
     <form method="post">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Anlegen</button>
+        {{ form.non_field_errors }}
+        
+        <section class="page-section" aria-labelledby="section-basics">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-basics">Grunddaten</h2><small>Bezeichnung des Trainings</small></span>
+            </header>
+            <div class="field-grid">
+                {% include "vignetten/includes/form_field.html" with field=form.name wide=True %}
+            </div>
+        </section>
+
+        <div class="vignette-form-actions">
+            <a href="{% url 'training:liste' %}">Abbrechen</a>
+            <button class="button" type="submit">Training anlegen</button>
+        </div>
     </form>
+</section>
 {% endblock %}

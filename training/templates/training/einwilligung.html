@@ -1,13 +1,34 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Audioverarbeitung{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-    <h1>Audioverarbeitung</h1>
-    <p>Audio zur Transkription wird an einen externen Auftragsverarbeiter übermittelt und danach nicht gespeichert.</p>
-    <form method="post" action="{% url 'training:einwilligung' training.pk vignette.pk %}">
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Training starten</p>
+            <h1>Audioverarbeitung</h1>
+            <span>Einwilligung erforderlich</span>
+        </div>
+    </header>
+
+    <div class="messages" style="margin-top: var(--space-4);">
+        <div class="message--info">
+            Audio zur Transkription wird an einen externen Auftragsverarbeiter übermittelt und danach nicht gespeichert.
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'training:einwilligung' training.pk vignette.pk %}" style="margin-top: var(--space-4);">
         {% csrf_token %}
-        <button type="submit" name="audioverarbeitung_eingewilligt" value="ja">Einwilligen und Training starten</button>
-        <button type="submit" name="audioverarbeitung_eingewilligt" value="nein">Ohne Audio fortfahren</button>
+        <div class="vignette-form-actions" style="justify-content: flex-start; display: flex; gap: var(--space-3);">
+            <button class="button" type="submit" name="audioverarbeitung_eingewilligt" value="ja">Einwilligen und Training starten</button>
+            <button class="button button--secondary" type="submit" name="audioverarbeitung_eingewilligt" value="nein">Ohne Audio fortfahren</button>
+        </div>
     </form>
+</section>
 {% endblock %}

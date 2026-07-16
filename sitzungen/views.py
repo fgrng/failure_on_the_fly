@@ -80,6 +80,7 @@ def _sitzung_anzeigen(
     erneute_eingabe: str | None = None,
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
+    ist_lesend: bool = False,
     spracheingabe_verfuegbar: bool = False,
     navigation: Sitzungsnavigation | None = None,
 ) -> HttpResponse:
@@ -97,6 +98,7 @@ def _sitzung_anzeigen(
         "ist_gescheitert": ist_gescheitert,
         "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,
+        "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
         "navigation": navigation or sitzungsnavigation(ist_probelauf),
     }
@@ -641,3 +643,28 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
             return _training_zur_auswahl_zurueckkehren(request, sitzung)
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
+
+
+@login_required
+def training_sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt eine vergangene Trainingssitzung schreibgeschützt an."""
+
+    from training.models import Trainingsbindung
+
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        pk=pk,
+    )
+    get_object_or_404(
+        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
+    )
+
+    return _sitzung_anzeigen(
+        request,
+        vignette=sitzung.vignette,
+        kern=sitzung.simulationskern,
+        gespraechsschritte=_persistierte_schritte(sitzung),
+        ist_probelauf=False,
+        zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
+        ist_lesend=True,
+    )

@@ -20,10 +20,10 @@
         <section class="sidebar-nav__group sidebar-nav__group--education">
             <h2>Ausbildung</h2>
             <div>
-                <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "katalog" %} aria-current="page"{% endif %}>Trainingskataloge ansehen</a>
+                <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "katalog" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "kuratieren" %} aria-current="page"{% endif %}>Trainingskataloge ansehen</a>
                 <a href="{% url 'training:anlegen' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Trainingskatalog erstellen</a>
                 <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>
-                <a href="{% url 'training:liste' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "liste" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "kuratieren" %} aria-current="page"{% endif %}>Meine Trainings</a>
+                <a href="{% url 'training:historie' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "historie" %} aria-current="page"{% endif %}>Meine Trainings</a>
             </div>
         </section>
 

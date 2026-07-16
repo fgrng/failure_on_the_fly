@@ -1,40 +1,96 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}{{ training.name }}{% endblock %}
+{% block title %}Training kuratieren{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
 
 {% block content %}
-    <h1>{{ training.name }}</h1>
-    <p>{{ training.get_zustand_display }}</p>
-    {% if training.zustand == "entwurf" %}
-        <form method="post" action="{% url 'training:veroeffentlichen' training.pk %}">
-            {% csrf_token %}
-            <button type="submit">Veröffentlichen</button>
-        </form>
-    {% endif %}
-    <h2>Vignetten</h2>
-    <ul>
-        {% for vignette in training.vignetten.all %}
-            <li>
-                {{ vignette.fach }}
-                <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}">
-                    {% csrf_token %}
-                    <button type="submit">Entfernen</button>
-                </form>
-            </li>
-        {% empty %}
-            <li>Noch keine Vignetten aufgenommen.</li>
-        {% endfor %}
-    </ul>
-    <h2>Finale Vignetten aufnehmen</h2>
-    <ul>
-        {% for vignette in verfuegbare_vignetten %}
-            <li>
-                {{ vignette.fach }}
-                <form method="post" action="{% url 'training:vignette_hinzufuegen' training.pk vignette.pk %}">
-                    {% csrf_token %}
-                    <button type="submit">Aufnehmen</button>
-                </form>
-            </li>
-        {% endfor %}
-    </ul>
+<section class="page">
+    <header class="page-head">
+        <div>
+            <p>Training kuratieren</p>
+            <h1>{{ training.name }}</h1>
+        </div>
+        <span class="badge badge--{{ zustand_badge }}">{{ training.get_zustand_display }}</span>
+    </header>
+
+    <div class="vignette-detail-actions">
+        {% if training.zustand == "entwurf" %}
+            <form method="post" action="{% url 'training:veroeffentlichen' training.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Veröffentlichen</button>
+            </form>
+        {% endif %}
+        <a class="button button--secondary" href="{% url 'training:liste' %}">Zurück zur Übersicht</a>
+    </div>
+
+    <section class="page-section" aria-labelledby="section-configured">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="section-configured">Vignetten</h2><small>Aktuell im Training enthalten</small></span>
+        </header>
+        <div class="table-wrap vignette-index-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Name / Fach</th>
+                        <th scope="col">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vignette in training.vignetten.all %}
+                        <tr>
+                            <td>{{ vignette.historie.name|default:vignette.fach }}</td>
+                            <td>
+                                <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}" style="margin: 0;">
+                                    {% csrf_token %}
+                                    <button class="button button--danger" type="submit">Entfernen</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2" class="table__empty">Noch keine Vignetten aufgenommen.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-section" aria-labelledby="section-available">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="section-available">Finale Vignetten aufnehmen</h2><small>Verfügbare Vignetten aus dem eigenen Katalog</small></span>
+        </header>
+        <div class="table-wrap vignette-index-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Name / Fach</th>
+                        <th scope="col">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vignette in verfuegbare_vignetten %}
+                        <tr>
+                            <td>{{ vignette.historie.name|default:vignette.fach }}</td>
+                            <td>
+                                <form method="post" action="{% url 'training:vignette_hinzufuegen' training.pk vignette.pk %}" style="margin: 0;">
+                                    {% csrf_token %}
+                                    <button class="button button--secondary" type="submit">Aufnehmen</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2" class="table__empty">Keine weiteren finalen Vignetten verfügbar.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
 {% endblock %}

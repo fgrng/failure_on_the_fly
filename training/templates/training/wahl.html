@@ -1,13 +1,28 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Vignette gewählt{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-    <h1>Vignette gewählt</h1>
-    <p>{{ vignette.historie.name|default:vignette.fach }}</p>
-    <form method="post">
-        {% csrf_token %}
-        <button type="submit">Training starten</button>
-    </form>
-    <p><a href="{% url 'training:detail' training.pk %}">Zurück zum Training</a></p>
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Training starten</p>
+            <h1>Vignette gewählt</h1>
+            <span>{{ vignette.historie.name|default:vignette.fach }}</span>
+        </div>
+    </header>
+
+    <div class="vignette-form-actions" style="margin-top: var(--space-4); display: flex; gap: var(--space-3); align-items: center;">
+        <a class="button button--secondary" href="{% url 'training:detail' training.pk %}">Zurück zum Training</a>
+        <form method="post" style="margin: 0;">
+            {% csrf_token %}
+            <button class="button" type="submit">Training starten</button>
+        </form>
+    </div>
+</section>
 {% endblock %}

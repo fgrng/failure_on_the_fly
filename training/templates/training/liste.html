@@ -1,15 +1,101 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Meine Trainings{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-    <h1>Meine Trainings</h1>
-    <p><a href="{% url 'training:anlegen' %}">Training anlegen</a></p>
-    <ul>
-        {% for training in trainings %}
-            <li><a href="{% url 'training:kuratieren' training.pk %}">{{ training.name }}</a></li>
-        {% empty %}
-            <li>Noch keine Trainings vorhanden.</li>
-        {% endfor %}
-    </ul>
+<section class="page vignette-index-page">
+    <header class="page-head">
+        <div>
+            <p>Ausbildung</p>
+            <h1>Meine Trainings</h1>
+            <span>Trainings anlegen, Vignetten zuweisen und veröffentlichen.</span>
+        </div>
+        <a class="button" href="{% url 'training:anlegen' %}">Neues Training anlegen</a>
+    </header>
+
+    {% if trainings %}
+        {{ trainings|json_script:"trainings-data" }}
+        <div
+            x-data="{
+                rows: JSON.parse(document.getElementById('trainings-data').textContent),
+                q: '',
+                zustand: '',
+                sortKey: 'name',
+                sortDir: 1,
+                get zustaende() {
+                    return [...new Set(this.rows.map(r => r.zustand))].sort();
+                },
+                get sichtbar() {
+                    const q = this.q.trim().toLowerCase();
+                    return this.rows
+                        .filter(r => !this.zustand || r.zustand === this.zustand)
+                        .filter(r => !q || (r.name || '').toLowerCase().includes(q))
+                        .sort((a, b) => {
+                            const x = (a[this.sortKey] ?? '').toString().toLowerCase();
+                            const y = (b[this.sortKey] ?? '').toString().toLowerCase();
+                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDir;
+                        });
+                },
+                sortiere(key) {
+                    if (this.sortKey === key) { this.sortDir *= -1; }
+                    else { this.sortKey = key; this.sortDir = 1; }
+                },
+                pfeilKlasse(key) {
+                    if (this.sortKey !== key) return '';
+                    return this.sortDir === 1
+                        ? 'table__sort-arrow--auf'
+                        : 'table__sort-arrow--ab';
+                }
+            }"
+        >
+            <div class="table-toolbar">
+                <input
+                    type="search"
+                    class="table-toolbar__search"
+                    placeholder="Suchen (Name)…"
+                    aria-label="Trainings durchsuchen"
+                    x-model="q"
+                >
+                <select class="table-toolbar__filter" aria-label="Nach Zustand filtern" x-model="zustand">
+                    <option value="">Alle Zustände</option>
+                    <template x-for="z in zustaende" :key="z">
+                        <option :value="z" x-text="z"></option>
+                    </template>
+                </select>
+                <span class="table-toolbar__count" x-text="sichtbar.length + ' von ' + rows.length"></span>
+            </div>
+
+            <div class="table-wrap vignette-index-table">
+                <table class="table table--sortable">
+                    <thead>
+                        <tr>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('name')">Name<span class="table__sort-arrow" :class="pfeilKlasse('name')"></span></button></th>
+                            <th scope="col"><button type="button" class="table__sort" @click="sortiere('zustand')">Zustand<span class="table__sort-arrow" :class="pfeilKlasse('zustand')"></span></button></th>
+                            <th scope="col">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in sichtbar" :key="r.url">
+                            <tr>
+                                <td x-text="r.name"></td>
+                                <td><span class="badge" :class="'badge--' + r.zustand_badge" x-text="r.zustand"></span></td>
+                                <td><a class="button button--secondary" :href="r.url">Kuratieren</a></td>
+                            </tr>
+                        </template>
+                        <tr x-show="sichtbar.length === 0">
+                            <td colspan="3" class="table__empty">Keine Trainings passen zu Suche und Filter.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <p>Noch keine Trainings vorhanden.</p>
+    {% endif %}
+</section>
 {% endblock %}

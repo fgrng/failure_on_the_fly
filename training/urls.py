@@ -10,6 +10,7 @@ app_name: str = "training"
 urlpatterns: list[URLPattern] = [
     path("", views.katalog, name="katalog"),
     path("eigene/", views.liste, name="liste"),
+    path("historie/", views.historie, name="historie"),
     path("anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.kuratieren, name="kuratieren"),
     path(

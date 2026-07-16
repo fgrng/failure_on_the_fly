@@ -24,13 +24,13 @@ class TrainingAnlegenTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("training:anlegen"), {"name": "Brüche üben"}
+            reverse("training:anlegen"), {"name": "Gleichungen"}
         )
 
         training: Training = Training.objects.get(eigentuemerin=ada)
         self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
         liste: HttpResponse = self.client.get(reverse("training:liste"))
-        self.assertContains(liste, "Brüche üben")
+        self.assertContains(liste, "Gleichungen")
         self.assertNotContains(liste, "Fremdes Training")
 
     def test_konto_ohne_ausbilderrolle_kann_kein_training_anlegen(self) -> None:
@@ -59,7 +59,7 @@ class TrainingAnlegenTests(TestCase):
         administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        eigenes: Training = Training.objects.create(name="Brüche", eigentuemerin=ada)
+        eigenes: Training = Training.objects.create(name="Bruchrechnung", eigentuemerin=ada)
         fremdes: Training = Training.objects.create(name="Prozente", eigentuemerin=grace)
         self.client.force_login(administratorin)
 

@@ -1,18 +1,85 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ training.name }}{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-    <h1>{{ training.name }}</h1>
-    <ul>
-        {% for vignette in vignetten %}
-            <li>
-                <a href="{% url 'training:wahl' training.pk vignette.pk %}">
-                    {{ vignette.historie.name|default:vignette.fach }}
-                </a>
-            </li>
-        {% empty %}
-            <li>Dieses Training enthält keine Vignetten.</li>
-        {% endfor %}
-    </ul>
+<section class="page">
+    <header class="page-head">
+        <div>
+            <p>Training ansehen</p>
+            <h1>{{ training.name }}</h1>
+            <span>Wählen Sie eine Vignette, um das Training zu beginnen.</span>
+        </div>
+        <a class="button button--secondary" href="{% url 'training:katalog' %}">Zurück zum Katalog</a>
+    </header>
+
+    <section class="page-section" aria-labelledby="section-vignetten">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="section-vignetten">Verfügbare Vignetten</h2><small>Trainingsinhalte und Historie</small></span>
+        </header>
+        <div class="table-wrap vignette-index-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Name / Fach</th>
+                        <th scope="col">Ihre Sitzungen</th>
+                        <th scope="col">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for daten in vignetten_daten %}
+                        <tr>
+                            <td>{{ daten.name }}</td>
+                            <td>
+                                {% if daten.sitzungen %}
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                                        {% if daten.sitzungen_nach_status.laufend %}
+                                            <span class="badge badge--draft">{{ daten.sitzungen_nach_status.laufend }}x Laufend</span>
+                                        {% endif %}
+                                        {% if daten.sitzungen_nach_status.abgeschlossen %}
+                                            <span class="badge badge--final">{{ daten.sitzungen_nach_status.abgeschlossen }}x Abgeschlossen</span>
+                                        {% endif %}
+                                        {% if daten.sitzungen_nach_status.abgebrochen %}
+                                            <span class="badge badge--archived">{{ daten.sitzungen_nach_status.abgebrochen }}x Abgebrochen</span>
+                                        {% endif %}
+                                        {% if daten.sitzungen_nach_status.gescheitert %}
+                                            <span class="badge badge--archived">{{ daten.sitzungen_nach_status.gescheitert }}x Gescheitert</span>
+                                        {% endif %}
+                                    </div>
+                                    <details>
+                                        <summary style="cursor: pointer; font-size: 0.875rem;">Sitzungsverlauf ansehen</summary>
+                                        <ul style="list-style: none; padding: 0.5rem 0 0 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem;">
+                                            {% for sitzung in daten.sitzungen %}
+                                                <li>
+                                                    <a href="{{ sitzung.url }}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;">
+                                                        <span class="badge badge--{{ sitzung.status_badge }}">{{ sitzung.status }}</span>
+                                                        <small style="color: var(--color-primary-600); text-decoration: underline;">Ansehen &rarr;</small>
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </details>
+                                {% else %}
+                                    <span style="color: var(--color-grey-500); font-style: italic;">Noch keine</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a class="button" href="{{ daten.url }}">Neu starten</a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="table__empty">Dieses Training enthält keine Vignetten.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
 {% endblock %}

@@ -19,31 +19,33 @@
         {% endif %}
     </section>
 
-    <div class="diagnosegespraech-verlauf" aria-label="Bisheriges Diagnosegespräch">
-        {% for schritt in gespraechsschritte %}
-            <article class="gespraechsschritt">
-                <div class="gespraechsschritt__eingabe">
-                    <span>Sie</span>
-                    <p>{{ schritt.eingabe }}</p>
-                </div>
-                {% if schritt.aeusserung %}
-                    <div class="gespraechsschritt__aeusserung">
-                        <span>Schüler:in</span>
-                        <p>{{ schritt.aeusserung }}</p>
+    {% if gespraechsschritte %}
+        <div class="diagnosegespraech-verlauf" aria-label="Bisheriges Diagnosegespräch">
+            {% for schritt in gespraechsschritte %}
+                <article class="gespraechsschritt">
+                    <div class="gespraechsschritt__eingabe">
+                        <span>Sie</span>
+                        <p>{{ schritt.eingabe }}</p>
                     </div>
-                {% endif %}
-                {% if ist_probelauf and schritt.denkspur %}
-                    <details class="denkspur">
-                        <summary>Denkspur ansehen</summary>
-                        <p>{{ schritt.denkspur }}</p>
-                        {% if schritt.native_reasoning_spur %}
-                            <p><strong>Native Reasoning-Spur:</strong> {{ schritt.native_reasoning_spur }}</p>
-                        {% endif %}
-                    </details>
-                {% endif %}
-            </article>
-        {% endfor %}
-    </div>
+                    {% if schritt.aeusserung %}
+                        <div class="gespraechsschritt__aeusserung">
+                            <span>Schüler:in</span>
+                            <p>{{ schritt.aeusserung }}</p>
+                        </div>
+                    {% endif %}
+                    {% if ist_probelauf and schritt.denkspur %}
+                        <details class="denkspur">
+                            <summary>Denkspur ansehen</summary>
+                            <p>{{ schritt.denkspur }}</p>
+                            {% if schritt.native_reasoning_spur %}
+                                <p><strong>Native Reasoning-Spur:</strong> {{ schritt.native_reasoning_spur }}</p>
+                            {% endif %}
+                        </details>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     {% if not gespraech_beendet %}
         {% include "sitzungen/includes/sitzung_eingabe.html" %}

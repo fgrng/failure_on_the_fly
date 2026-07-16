@@ -8,6 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -18,6 +19,7 @@ from sitzungen.views import sitzungsnavigation
 
 from .models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
+from sitzungen.models import Sitzung
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -63,6 +65,14 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     )
 
 
+def _zustand_badge(training: Training) -> str:
+    """Ordnet Modellzustände den gemeinsamen Badge-Klassen zu."""
+    return {
+        Training.Zustand.ENTWURF: "draft",
+        Training.Zustand.VEROEFFENTLICHT: "final",
+    }[training.zustand]
+
+
 def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     """Lädt ein für die eingeloggte Person sichtbares Training."""
 
@@ -87,11 +97,64 @@ def _veroeffentlichtes_training_mit_finaler_vignette(
 
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
-    """Zeigt allen eingeloggten Konten veröffentlichte Trainings."""
+    """Zeigt allen eingeloggten Konten veröffentlichte Trainings und ggf. eigene Entwürfe."""
+    qs = Training.objects.veroeffentlicht()
+    sichtbare_pks = set()
+    if _ausbilderin_oder_administratorin(request.user):
+        sichtbare_trainings = Training.objects.sichtbar_fuer(request.user)
+        qs = qs | sichtbare_trainings
+        sichtbare_pks = set(sichtbare_trainings.values_list("pk", flat=True))
+
+    trainings: list[dict[str, object]] = []
+    for training in qs.distinct():
+        is_curatable = training.pk in sichtbare_pks
+        trainings.append(
+            {
+                "name": training.name,
+                "zustand": training.get_zustand_display(),
+                "zustand_badge": _zustand_badge(training),
+                "is_own": training.eigentuemerin_id == request.user.id,
+                "url": reverse("training:kuratieren", args=[training.pk]) if is_curatable else reverse("training:detail", args=[training.pk]),
+                "action_label": "Kuratieren" if is_curatable else "Öffnen",
+            }
+        )
     return render(
         request,
         "training/katalog.html",
-        {"trainings": Training.objects.veroeffentlicht()},
+        {
+            "trainings": trainings,
+            "ist_ausbilderin": _ausbilderin_oder_administratorin(request.user),
+        },
+    )
+
+
+@login_required
+def historie(request: HttpRequest) -> HttpResponse:
+    """Zeigt die Historie der durchgeführten Trainings aus Teilnehmer:innen-Sicht."""
+    bindungen = Trainingsbindung.objects.filter(
+        konto=request.user
+    ).select_related('training', 'teilnahme')
+    
+    trainings = []
+    for bindung in bindungen:
+        training = bindung.training
+        vignetten_gesamt = training.vignetten.filter(zustand=Vignette.Zustand.FINAL).count()
+        abgeschlossene_vignetten = Sitzung.objects.filter(
+            teilnahme=bindung.teilnahme,
+            status=Sitzung.Status.ABGESCHLOSSEN
+        ).values('vignette_id').distinct().count()
+        
+        trainings.append({
+            "name": training.name,
+            "url": reverse("training:detail", args=[training.pk]),
+            "fortschritt": f"{abgeschlossene_vignetten} / {vignetten_gesamt}",
+            "sort_progress": abgeschlossene_vignetten / (vignetten_gesamt if vignetten_gesamt else 1),
+        })
+    
+    return render(
+        request,
+        "training/historie.html",
+        {"trainings": trainings},
     )
 
 
@@ -99,10 +162,20 @@ def katalog(request: HttpRequest) -> HttpResponse:
 @_ausbilderin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die für die eingeloggte Person sichtbaren Trainings."""
+    trainings: list[dict[str, object]] = []
+    for training in Training.objects.sichtbar_fuer(request.user):
+        trainings.append(
+            {
+                "name": training.name,
+                "zustand": training.get_zustand_display(),
+                "zustand_badge": _zustand_badge(training),
+                "url": reverse("training:kuratieren", args=[training.pk]),
+            }
+        )
     return render(
         request,
         "training/liste.html",
-        {"trainings": Training.objects.sichtbar_fuer(request.user)},
+        {"trainings": trainings},
     )
 
 
@@ -121,15 +194,50 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings."""
+    """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings inkl. eigener Sitzungen."""
     training: Training = _veroeffentlichtes_training(pk)
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )
+    
+    sitzungen_nach_vignette = {}
+    if request.user.is_authenticated:
+        bindung = Trainingsbindung.objects.filter(training=training, konto=request.user).first()
+        if bindung:
+            for sitzung in Sitzung.objects.filter(teilnahme=bindung.teilnahme).order_by('-id'):
+                sitzungen_nach_vignette.setdefault(sitzung.vignette_id, []).append(sitzung)
+                
+    vignetten_daten = []
+    for v in vignetten:
+        sitzungen = sitzungen_nach_vignette.get(v.pk, [])
+        sitzungen_nach_status = {
+            "laufend": 0,
+            "abgeschlossen": 0,
+            "abgebrochen": 0,
+            "gescheitert": 0,
+        }
+        sitzungen_liste = []
+        for s in sitzungen:
+            status = s.status
+            sitzungen_nach_status[status] += 1
+            sitzungen_liste.append({
+                "id": s.pk,
+                "status": s.get_status_display(),
+                "status_badge": "final" if s.status == Sitzung.Status.ABGESCHLOSSEN else ("draft" if s.status == Sitzung.Status.LAUFEND else "archived"),
+                "url": reverse("sitzungen:training_sitzung_ansehen", args=[s.pk]),
+            })
+        
+        vignetten_daten.append({
+            "name": v.historie.name if v.historie.name else v.fach,
+            "sitzungen": sitzungen_liste,
+            "sitzungen_nach_status": sitzungen_nach_status,
+            "url": reverse("training:wahl", args=[training.pk, v.pk]),
+        })
+
     return render(
         request,
         "training/detail.html",
-        {"training": training, "vignetten": vignetten},
+        {"training": training, "vignetten_daten": vignetten_daten},
     )
 
 
@@ -143,6 +251,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
         "training/kuratieren.html",
         {
             "training": training,
+            "zustand_badge": _zustand_badge(training),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
@@ -287,5 +396,7 @@ def _sitzung_starten(
             "ist_probelauf": False,
             "navigation": sitzungsnavigation(ist_probelauf=False),
             "spracheingabe_verfuegbar": bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+            "zeigt_debrief": False,
+            "ist_lesend": False,
         },
     )
