@@ -1,46 +1,146 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ erhebung.name }}{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-    <div class="page area--research">
-        <header class="area-band"><h1>{{ erhebung.name }}</h1></header>
-        <section class="page-section">
-            <div class="page-section__head">
-                <b>01</b>
-                <div>
-                    <h2>Entwurf</h2>
-                    <small>{{ erhebung.get_status_display }}</small>
-                </div>
-            </div>
-            {% if erhebung.status == erhebung.Status.ENTWURF %}
-                <form method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
+<section class="page">
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen</p>
+            <h1>{{ erhebung.name }}</h1>
+        </div>
+        <span class="badge badge--{{ erhebung.status|lower }}">{{ erhebung.get_status_display }}</span>
+    </header>
+
+    <div class="vignette-detail-actions">
+        {% if erhebung.status == erhebung.Status.ENTWURF %}
+            <form method="post" action="{% url 'erhebungen:finalisieren' erhebung.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Finalisieren</button>
+            </form>
+        {% else %}
+            {% if kann_zurueckziehen %}
+                <form method="post" action="{% url 'erhebungen:zurueckziehen' erhebung.pk %}">
                     {% csrf_token %}
-                    <p>
-                        <label for="id_randomisierung">Reihenfolge</label>
-                        <select id="id_randomisierung" name="randomisierung">
-                            {% for wert, bezeichnung in erhebung.Randomisierung.choices %}
-                                <option value="{{ wert }}"{% if wert == erhebung.randomisierung %} selected{% endif %}>{{ bezeichnung }}</option>
-                            {% endfor %}
-                        </select>
-                    </p>
-                    <p>
+                    <button class="button button--secondary" type="submit">Zurückziehen</button>
+                </form>
+            {% endif %}
+            {% if kann_archivieren %}
+                <form method="post" action="{% url 'erhebungen:archivieren' erhebung.pk %}">
+                    {% csrf_token %}
+                    <button class="button button--danger" type="submit">Erhebung archivieren</button>
+                </form>
+            {% elif kann_entarchivieren %}
+                <form method="post" action="{% url 'erhebungen:entarchivieren' erhebung.pk %}">
+                    {% csrf_token %}
+                    <button class="button" type="submit">Erhebung entarchivieren</button>
+                </form>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if erhebung.status == erhebung.Status.ENTWURF %}
+        <div id="erhebung-entwurf-editor" x-data="{
+                randomisierung: '{{ erhebung.randomisierung }}',
+                aufgenommeneRows: JSON.parse(document.getElementById('aufgenommene-daten').textContent),
+                verfuegbareRows: JSON.parse(document.getElementById('verfuegbare-daten').textContent),
+                qAufg: '', sortKeyAufg: 'label', sortDirAufg: 1,
+                qVerf: '', sortKeyVerf: 'label', sortDirVerf: 1,
+
+                get sichtbarAufg() {
+                    const q = this.qAufg.trim().toLowerCase();
+                    return this.aufgenommeneRows
+                        .filter(r => !q || [r.label, r.fach, r.thema].join(' ').toLowerCase().includes(q))
+                        .sort((a, b) => {
+                            const x = (a[this.sortKeyAufg] ?? '').toString().toLowerCase();
+                            const y = (b[this.sortKeyAufg] ?? '').toString().toLowerCase();
+                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDirAufg;
+                        });
+                },
+                get sichtbarVerf() {
+                    const q = this.qVerf.trim().toLowerCase();
+                    return this.verfuegbareRows
+                        .filter(r => !q || [r.label, r.fach, r.thema].join(' ').toLowerCase().includes(q))
+                        .sort((a, b) => {
+                            const x = (a[this.sortKeyVerf] ?? '').toString().toLowerCase();
+                            const y = (b[this.sortKeyVerf] ?? '').toString().toLowerCase();
+                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDirVerf;
+                        });
+                },
+                sortiereAufg(key) { if (this.sortKeyAufg === key) this.sortDirAufg *= -1; else { this.sortKeyAufg = key; this.sortDirAufg = 1; } },
+                sortiereVerf(key) { if (this.sortKeyVerf === key) this.sortDirVerf *= -1; else { this.sortKeyVerf = key; this.sortDirVerf = 1; } },
+                pfeilKlasseAufg(key) { return this.sortKeyAufg !== key ? '' : (this.sortDirAufg === 1 ? 'table__sort-arrow--auf' : 'table__sort-arrow--ab'); },
+                pfeilKlasseVerf(key) { return this.sortKeyVerf !== key ? '' : (this.sortDirVerf === 1 ? 'table__sort-arrow--auf' : 'table__sort-arrow--ab'); },
+
+                async toggleVignette(url) {
+                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                    const formData = new FormData();
+                    formData.append('csrfmiddlewaretoken', csrfToken);
+                    const response = await fetch(url, { method: 'POST', body: formData });
+                    const html = await response.text();
+                    
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    this.aufgenommeneRows = JSON.parse(doc.getElementById('aufgenommene-daten').textContent);
+                    this.verfuegbareRows = JSON.parse(doc.getElementById('verfuegbare-daten').textContent);
+                    
+                    const newPositions = doc.getElementById('vignetten-positionen-inhalt');
+                    const currentPositions = document.getElementById('vignetten-positionen-inhalt');
+                    if (newPositions && currentPositions) {
+                        currentPositions.innerHTML = newPositions.innerHTML;
+                    }
+                }
+            }"
+        >
+        {{ aufgenommene_daten|json_script:"aufgenommene-daten" }}
+        {{ verfuegbare_daten|json_script:"verfuegbare-daten" }}
+
+        <form method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
+            {% csrf_token %}
+            <section class="page-section" aria-labelledby="section-config">
+                <header class="page-section__head">
+                    <b>01</b><span><h2 id="section-config">Konfiguration</h2><small>Instruktion, Einwilligung und Abschluss definieren.</small></span>
+                </header>
+                <div class="field-grid">
+                    <div class="vignette-field page-field--wide">
                         <label for="id_instruktionstext">Instruktion</label>
                         <textarea id="id_instruktionstext" name="instruktionstext">{{ erhebung.instruktionstext }}</textarea>
-                    </p>
-                    <p>
+                    </div>
+                    <div class="vignette-field page-field--wide">
                         <label for="id_einwilligungstext">Einwilligung</label>
                         <textarea id="id_einwilligungstext" name="einwilligungstext">{{ erhebung.einwilligungstext }}</textarea>
-                    </p>
-                    <p>
+                    </div>
+                    <div class="vignette-field page-field--wide">
                         <label for="id_abschlusstext">Abschluss</label>
                         <textarea id="id_abschlusstext" name="abschlusstext">{{ erhebung.abschlusstext }}</textarea>
-                    </p>
-                    {% if erhebung.randomisierung == erhebung.Randomisierung.FEST %}
-                        <p>Reihenfolge der aufgenommenen Vignetten:</p>
-                        <ol>
+                    </div>
+                </div>
+            </section>
+
+            <section class="page-section" aria-labelledby="section-order">
+                <header class="page-section__head">
+                    <b>02</b><span><h2 id="section-order">Reihenfolge</h2><small>Präsentationsreihenfolge der Vignetten konfigurieren.</small></span>
+                </header>
+                <div class="field-grid">
+                    <div class="vignette-field page-field--wide">
+                        <label for="id_randomisierung">Modus der Reihenfolge</label>
+                        <select id="id_randomisierung" name="randomisierung" x-model="randomisierung">
+                            {% for wert, bezeichnung in erhebung.Randomisierung.choices %}
+                                <option value="{{ wert }}">{{ bezeichnung }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="vignetten-positionen" class="vignette-field page-field--wide" x-show="randomisierung === '{{ erhebung.Randomisierung.FEST }}'" x-cloak>
+                        <p style="margin-bottom: 1rem;"><strong>Positionen (feste Reihenfolge)</strong></p>
+                        <div id="vignetten-positionen-inhalt" class="field-grid">
                             {% for zugehoerigkeit in vignettenzugehoerigkeiten %}
-                                <li>
+                                <div class="vignette-field page-field--wide">
                                     <label for="id_vignette_{{ forloop.counter }}">Position {{ forloop.counter }}</label>
                                     <select id="id_vignette_{{ forloop.counter }}" name="vignetten">
                                         {% for option in vignettenzugehoerigkeiten %}
@@ -49,133 +149,170 @@
                                             </option>
                                         {% endfor %}
                                     </select>
-                                </li>
+                                </div>
                             {% endfor %}
-                        </ol>
-                    {% endif %}
-                    <button type="submit">Konfiguration speichern</button>
-                </form>
-                <h2>Vignetten</h2>
-                <ul>
-                    {% for zugehoerigkeit in vignettenzugehoerigkeiten %}
-                        <li>
-                            {{ zugehoerigkeit.vignette.historie.name|default:zugehoerigkeit.vignette.fach }}
-                            <form method="post" action="{% url 'erhebungen:vignette_entfernen' erhebung.pk zugehoerigkeit.vignette.pk %}">
-                                {% csrf_token %}
-                                <button type="submit">Entfernen</button>
-                            </form>
-                        </li>
-                    {% empty %}
-                        <li>Noch keine Vignetten aufgenommen.</li>
-                    {% endfor %}
-                </ul>
-                <h2>Finale Vignetten aufnehmen</h2>
-                <ul>
-                    {% for vignette in verfuegbare_vignetten %}
-                        <li>
-                            {{ vignette.historie.name|default:vignette.fach }}
-                            <form method="post" action="{% url 'erhebungen:vignette_hinzufuegen' erhebung.pk vignette.pk %}">
-                                {% csrf_token %}
-                                <button type="submit">Aufnehmen</button>
-                            </form>
-                        </li>
-                    {% empty %}
-                    <li>Keine weiteren finalen Vignetten verfügbar.</li>
-                    {% endfor %}
-                </ul>
-                <form method="post" action="{% url 'erhebungen:finalisieren' erhebung.pk %}">
-                    {% csrf_token %}
-                    <button type="submit">Finalisieren</button>
-                </form>
-            {% else %}
-                <p>Das finale Design ist gesperrt.</p>
-                <h2>Gepinnte Modell-Konfiguration</h2>
-                <dl>
-                    <div><dt>Sprachmodell</dt><dd>{{ erhebung.modell_konfiguration.sprachmodell }}</dd></div>
-                    <div><dt>Parameter</dt><dd>{{ erhebung.modell_konfiguration.parameter }}</dd></div>
-                </dl>
-                {% if kann_zurueckziehen %}
-                    <form method="post" action="{% url 'erhebungen:zurueckziehen' erhebung.pk %}">
-                        {% csrf_token %}
-                        <button type="submit">Zurückziehen</button>
-                    </form>
-                {% endif %}
-                {% if kann_archivieren %}
-                    <form method="post" action="{% url 'erhebungen:archivieren' erhebung.pk %}">
-                        {% csrf_token %}
-                        <button type="submit">Erhebung archivieren</button>
-                    </form>
-                {% elif kann_entarchivieren %}
-                    <form method="post" action="{% url 'erhebungen:entarchivieren' erhebung.pk %}">
-                        {% csrf_token %}
-                        <button type="submit">Erhebung entarchivieren</button>
-                    </form>
-                {% endif %}
-            {% endif %}
-            {% if erhebung.status == erhebung.Status.FINAL %}
-                <h2>Stichproben</h2>
-                <form method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}">
-                    {% csrf_token %}
-                    <p>
-                        <label for="id_beginn">Beginn</label>
-                        <input
-                            id="id_beginn"
-                            type="datetime-local"
-                            name="beginn"
-                            required
-                        >
-                    </p>
-                    <p>
-                        <label for="id_ende">Ende</label>
-                        <input
-                            id="id_ende"
-                            type="datetime-local"
-                            name="ende"
-                            required
-                        >
-                    </p>
-                    <button type="submit">Stichprobe anlegen</button>
-                </form>
-                <ul>
-                    {% for stichprobe in stichproben %}
-                        <li>
-                            <dl>
-                                <div>
-                                    <dt>Zeitraum</dt>
-                                    <dd>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</dd>
-                                </div>
-                                <div>
-                                    <dt>Phase</dt>
-                                    <dd>{{ stichprobe.phase }}</dd>
-                                </div>
-                                <div>
-                                    <dt>Teilnahmen</dt>
-                                    <dd>{{ stichprobe.teilnahmezahl }}</dd>
-                                </div>
-                                <div>
-                                    <dt>Teilnahme-Link</dt>
-                                    <dd>
-                                        <input
-                                            type="text"
-                                            value="{{ stichprobe.teilnahme_url }}"
-                                            readonly
-                                        >
-                                    </dd>
-                                </div>
-                            </dl>
-                            {% if not stichprobe.archiviert and not stichprobe.traegt_daten %}
-                                <form method="post" action="{% url 'erhebungen:stichprobe_archivieren' erhebung.pk stichprobe.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit">Stichprobe archivieren</button>
-                                </form>
+                            {% if not vignettenzugehoerigkeiten %}
+                                <p>Noch keine Vignetten aufgenommen.</p>
                             {% endif %}
-                        </li>
-                    {% empty %}
-                        <li>Noch keine Stichproben angelegt.</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-            <p><a href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="vignette-form-actions">
+                <button class="button" type="submit">Konfiguration speichern</button>
+            </div>
+        </form>
+
+        <section class="page-section" aria-labelledby="section-vignettes">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-vignettes">Vignetten verwalten</h2><small>Fügen Sie der Erhebung finale Vignetten hinzu oder entfernen Sie diese.</small></span>
+            </header>
+            <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                
+                <!-- Verfügbare Vignetten Table (LEFT) -->
+                <div class="vignette-field">
+                    <p><strong>Finale Vignetten aufnehmen</strong></p>
+                    <div class="table-toolbar">
+                        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="Verfügbare Vignetten durchsuchen" x-model="qVerf">
+                        <span class="table-toolbar__count" x-text="sichtbarVerf.length + ' von ' + verfuegbareRows.length"></span>
+                    </div>
+                    <div class="table-wrap vignette-index-table">
+                        <table class="table table--sortable">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><button type="button" class="table__sort" @click="sortiereVerf('label')">Name<span class="table__sort-arrow" :class="pfeilKlasseVerf('label')"></span></button></th>
+                                    <th scope="col">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="r in sichtbarVerf" :key="r.pk">
+                                    <tr>
+                                        <td x-text="r.label"></td>
+                                        <td>
+                                            <button class="button button--secondary button--small" type="button" @click="toggleVignette(r.aufnehmen_url)">Aufnehmen</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="sichtbarVerf.length === 0">
+                                    <td colspan="2" class="table__empty">Keine weiteren finalen Vignetten verfügbar.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Aufgenommene Vignetten Table (RIGHT) -->
+                <div class="vignette-field">
+                    <p><strong>Aufgenommene Vignetten</strong></p>
+                    <div class="table-toolbar">
+                        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="Aufgenommene Vignetten durchsuchen" x-model="qAufg">
+                        <span class="table-toolbar__count" x-text="sichtbarAufg.length + ' von ' + aufgenommeneRows.length"></span>
+                    </div>
+                    <div class="table-wrap vignette-index-table">
+                        <table class="table table--sortable">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><button type="button" class="table__sort" @click="sortiereAufg('label')">Name<span class="table__sort-arrow" :class="pfeilKlasseAufg('label')"></span></button></th>
+                                    <th scope="col">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="r in sichtbarAufg" :key="r.pk">
+                                    <tr>
+                                        <td x-text="r.label"></td>
+                                        <td>
+                                            <button class="button button--danger button--small" type="button" @click="toggleVignette(r.entfernen_url)">Entfernen</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="sichtbarAufg.length === 0">
+                                    <td colspan="2" class="table__empty">Keine Vignetten gefunden.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
         </section>
+        </div>
+
+
+    {% else %}
+        <section class="page-section" aria-labelledby="section-config">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-config">Gepinnte Konfiguration</h2><small>Das finale Design ist gesperrt.</small></span>
+            </header>
+            <dl class="field-grid field-grid--three">
+                <div><dt>Sprachmodell</dt><dd>{{ erhebung.modell_konfiguration.sprachmodell }}</dd></div>
+                <div><dt>Parameter</dt><dd>{{ erhebung.modell_konfiguration.parameter }}</dd></div>
+            </dl>
+        </section>
+
+        {% if erhebung.status == erhebung.Status.FINAL %}
+            <section class="page-section" aria-labelledby="section-stichproben">
+                <header class="page-section__head">
+                    <b>02</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
+                </header>
+                <div class="field-grid page-field--wide">
+                    <form method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}" style="margin-bottom: 2rem;">
+                        {% csrf_token %}
+                        <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                            <div class="vignette-field">
+                                <label for="id_beginn">Beginn</label>
+                                <input id="id_beginn" type="datetime-local" name="beginn" required>
+                            </div>
+                            <div class="vignette-field">
+                                <label for="id_ende">Ende</label>
+                                <input id="id_ende" type="datetime-local" name="ende" required>
+                            </div>
+                            <button class="button" type="submit" style="margin-bottom: 0.5rem;">Stichprobe anlegen</button>
+                        </div>
+                    </form>
+
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Zeitraum</th>
+                                    <th scope="col">Phase</th>
+                                    <th scope="col">Teilnahmen</th>
+                                    <th scope="col">Link</th>
+                                    <th scope="col">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stichprobe in stichproben %}
+                                    <tr>
+                                        <td>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</td>
+                                        <td>{{ stichprobe.phase }}</td>
+                                        <td>{{ stichprobe.teilnahmezahl }}</td>
+                                        <td><input type="text" value="{{ stichprobe.teilnahme_url }}" readonly style="width: 100%;"></td>
+                                        <td>
+                                            {% if not stichprobe.archiviert and not stichprobe.traegt_daten %}
+                                                <form method="post" action="{% url 'erhebungen:stichprobe_archivieren' erhebung.pk stichprobe.pk %}">
+                                                    {% csrf_token %}
+                                                    <button class="button button--secondary button--small" type="submit">Archivieren</button>
+                                                </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="table__empty">Noch keine Stichproben angelegt.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        {% endif %}
+    {% endif %}
+
+    <div class="vignette-form-actions" style="margin-top: 2rem;">
+        <a class="button button--secondary" href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a>
     </div>
+</section>
 {% endblock %}

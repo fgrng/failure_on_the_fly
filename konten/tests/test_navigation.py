@@ -65,7 +65,7 @@ from konten.models import Konto
             {
                 "zeige_entwicklung": True,
                 "zeige_ausbildung_kuratieren": True,
-                "zeige_teilnahme": True,
+                "zeige_teilnahme": False,
                 "zeige_forschung": True,
                 "zeige_system": True,
                 "simulationskern_verwalten": True,
@@ -131,16 +131,18 @@ class SidebarNavigationTests(TestCase):
         self.assertIn("Meine Erhebungen", sidebar)
         self.assertIn("Neue Erhebung anlegen", sidebar)
 
-    def test_administratorin_sieht_alle_bereiche(self) -> None:
-        """Die Gruppenrolle der Administration überschreibt alle Sichtbarkeiten."""
+    def test_administratorin_sieht_alle_bereiche_ausser_teilnahme(self) -> None:
+        """Die Gruppenrolle der Administration überschreibt fast alle Sichtbarkeiten."""
         sidebar: str = self._sidebar_fuer("Administrator:in")
 
         for text in (
             "Vignetten ansehen",
             "Simulationskern verwalten",
             "Trainingskatalog erstellen",
-            "Training starten",
             "Meine Erhebungen",
             "Administration",
         ):
             self.assertIn(text, sidebar)
+
+        self.assertNotIn("Training starten", sidebar)
+        self.assertNotIn("Meine Trainings", sidebar)

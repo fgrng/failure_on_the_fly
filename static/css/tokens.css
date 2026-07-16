@@ -7,103 +7,109 @@
    nur als Quelle für die semantischen Tokens. Vorerst nur Light Mode. */
 
 :root {
-    /* ---- Primitive: Primärfarben (Logofarben, verbindlich) ---- */
-    --phsg-bright-green: #1fc070;
-    --phsg-deep-mint: #1c3e37;
+   /* ---- Primitive: Primärfarben (Logofarben, verbindlich) ---- */
+   --phsg-bright-green: #1fc070;
+   --phsg-deep-mint: #1c3e37;
 
-    /* ---- Primitive: Graustufen (für digitale Anwendungen) ---- */
-    --phsg-white: #ffffff;
-    --phsg-gray-050: #f5f7f6;
-    --phsg-gray-100: #ececec;
-    --phsg-gray-200: #d8dad9;
-    --phsg-gray-300: #c5c7c6;
-    --phsg-gray-400: #b2b4b3;
-    --phsg-gray-500: #9d9f9e;
-    --phsg-gray-600: #878988;
-    --phsg-gray-700: #6f7170;
-    --phsg-gray-800: #555756;
-    --phsg-gray-900: #383836;
-    --phsg-black: #000000;
+   /* ---- Primitive: Graustufen (für digitale Anwendungen) ---- */
+   --phsg-white: #ffffff;
+   --phsg-gray-050: #f5f7f6;
+   --phsg-gray-100: #ececec;
+   --phsg-gray-200: #d8dad9;
+   --phsg-gray-300: #c5c7c6;
+   --phsg-gray-400: #b2b4b3;
+   --phsg-gray-500: #9d9f9e;
+   --phsg-gray-600: #878988;
+   --phsg-gray-700: #6f7170;
+   --phsg-gray-800: #555756;
+   --phsg-gray-900: #383836;
+   --phsg-black: #000000;
 
-    /* ---- Primitive: Sekundärpalette (Light / Bright / Dark / Deep) ----
+   /* ---- Primitive: Sekundärpalette (Light / Bright / Dark / Deep) ----
        Quelle für die semantischen Bereichs- und Rückmeldungsfarben. */
-    --phsg-green-light: #d8ecd8;
-    --phsg-green-bright: #1fc070;
-    --phsg-green-dark: #009b56;
-    --phsg-green-deep: #2c512c;
-    --phsg-mint-light: #c7e6e2;
-    --phsg-mint-bright: #56ba9d;
-    --phsg-mint-dark: #00836a;
-    --phsg-mint-deep: #1c3e37;
-    --phsg-blue-light: #dcf1fc;
-    --phsg-blue-bright: #50bacd;
-    --phsg-blue-dark: #005d75;
-    --phsg-blue-deep: #1e2c39;
-    --phsg-red-light: #fbddde;
-    --phsg-red-bright: #ee7e7e;
-    --phsg-red-dark: #bf4850;
-    --phsg-red-deep: #651819;
-    --phsg-purple-light: #e5d3e7;
-    --phsg-purple-bright: #b982b6;
-    --phsg-purple-dark: #7b2d61;
-    --phsg-purple-deep: #422335;
-    --phsg-yellow-light: #fefbd3;
-    --phsg-yellow-bright: #c8d73b;
-    --phsg-yellow-dark: #967231;
-    --phsg-yellow-deep: #3d301a;
+   --phsg-green-light: #d8ecd8;
+   --phsg-green-bright: #1fc070;
+   --phsg-green-dark: #009b56;
+   --phsg-green-deep: #2c512c;
+   --phsg-mint-light: #c7e6e2;
+   --phsg-mint-bright: #56ba9d;
+   --phsg-mint-dark: #00836a;
+   --phsg-mint-deep: #1c3e37;
+   --phsg-blue-light: #dcf1fc;
+   --phsg-blue-bright: #50bacd;
+   --phsg-blue-dark: #005d75;
+   --phsg-blue-deep: #1e2c39;
+   --phsg-red-light: #fbddde;
+   --phsg-red-bright: #ee7e7e;
+   --phsg-red-dark: #bf4850;
+   --phsg-red-deep: #651819;
+   --phsg-purple-light: #e5d3e7;
+   --phsg-purple-bright: #b982b6;
+   --phsg-purple-dark: #7b2d61;
+   --phsg-purple-deep: #422335;
+   --phsg-yellow-light: #fefbd3;
+   --phsg-yellow-bright: #c8d73b;
+   --phsg-yellow-dark: #967231;
+   --phsg-yellow-deep: #3d301a;
 
-    /* ---- Semantisch: Farben nach Rolle ---- */
-    --color-text: var(--phsg-gray-900);        /* primärer Lesetext */
-    --color-text-muted: var(--phsg-gray-700);  /* sekundär, ADR-0023 Option A */
-    --color-text-on-accent: var(--phsg-white); /* Text auf Farbflächen: weiss */
+   /* ---- Semantisch: Farben nach Rolle ---- */
+   --color-text: var(--phsg-gray-900);
+   /* primärer Lesetext */
+   --color-text-muted: var(--phsg-gray-700);
+   /* sekundär, ADR-0023 Option A */
+   --color-text-on-accent: var(--phsg-white);
+   /* Text auf Farbflächen: weiss */
 
-    --color-accent: var(--phsg-green-dark);      /* Links, Buttons, aktive Nav */
-    --color-accent-hover: var(--phsg-green-deep);/* Hover/aktiv */
-    --color-focus: var(--phsg-bright-green);     /* Fokus-Ring, Highlights */
+   --color-accent: var(--phsg-green-dark);
+   /* Links, Buttons, aktive Nav */
+   --color-accent-hover: var(--phsg-green-deep);
+   /* Hover/aktiv */
+   --color-focus: var(--phsg-bright-green);
+   /* Fokus-Ring, Highlights */
 
-    --color-surface: var(--phsg-white);
-    --color-surface-muted: var(--phsg-gray-050);
-    --color-border: var(--phsg-gray-200);
+   --color-surface: var(--phsg-white);
+   --color-surface-muted: var(--phsg-gray-050);
+   --color-border: var(--phsg-gray-200);
 
-    --color-footer-bg: var(--phsg-deep-mint);
-    --color-footer-text: var(--phsg-white);
+   --color-footer-bg: var(--phsg-deep-mint);
+   --color-footer-text: var(--phsg-white);
 
-    /* ---- Semantisch: Bereichs- und Gefahrfarben (ADR-0024) ---- */
-    --color-area-participant-solid: var(--phsg-mint-dark);
-    --color-area-participant-on-solid: var(--phsg-white);
-    --color-area-participant-tint: var(--phsg-green-light);
-    --color-area-authoring-solid: var(--phsg-yellow-light);
-    --color-area-authoring-on-solid: var(--phsg-yellow-deep);
-    --color-area-authoring-tint: var(--phsg-yellow-light);
-    --color-area-research-solid: var(--phsg-purple-dark);
-    --color-area-research-on-solid: var(--phsg-white);
-    --color-area-research-tint: var(--phsg-purple-light);
-    --color-area-system-solid: var(--phsg-blue-dark);
-    --color-area-system-on-solid: var(--phsg-white);
-    --color-area-system-tint: var(--phsg-blue-light);
-    --color-danger: var(--phsg-red-dark);
-    --color-danger-tint: var(--phsg-red-light);
-    --color-danger-emphasis: var(--phsg-red-deep);
+   /* ---- Semantisch: Bereichs- und Gefahrfarben (ADR-0024) ---- */
+   --color-area-participant-solid: var(--phsg-mint-dark);
+   --color-area-participant-on-solid: var(--phsg-white);
+   --color-area-participant-tint: var(--phsg-green-light);
+   --color-area-authoring-solid: var(--phsg-yellow-dark);
+   --color-area-authoring-on-solid: var(--phsg-white);
+   --color-area-authoring-tint: var(--phsg-yellow-light);
+   --color-area-research-solid: var(--phsg-purple-dark);
+   --color-area-research-on-solid: var(--phsg-white);
+   --color-area-research-tint: var(--phsg-purple-light);
+   --color-area-system-solid: var(--phsg-blue-dark);
+   --color-area-system-on-solid: var(--phsg-white);
+   --color-area-system-tint: var(--phsg-blue-light);
+   --color-danger: var(--phsg-red-dark);
+   --color-danger-tint: var(--phsg-red-light);
+   --color-danger-emphasis: var(--phsg-red-deep);
 
-    /* ---- Semantisch: Status- und Rückmeldungsfarben ---- */
-    --color-success: var(--phsg-green-dark);
-    --color-info: var(--phsg-blue-dark);
+   /* ---- Semantisch: Status- und Rückmeldungsfarben ---- */
+   --color-success: var(--phsg-green-dark);
+   --color-info: var(--phsg-blue-dark);
 
-    /* ---- Typografie ---- */
-    --font-heading: "Platypi", Georgia, serif;
-    --font-body: "Albert Sans", system-ui, sans-serif;
+   /* ---- Typografie ---- */
+   --font-heading: "Platypi", Georgia, serif;
+   --font-body: "Albert Sans", system-ui, sans-serif;
 
-    /* ---- Spacing: 8-px-Abstandsraster ---- */
-    --space-1: 8px;
-    --space-2: 16px;
-    --space-3: 24px;
-    --space-4: 32px;
-    --space-5: 40px;
-    --space-6: 48px;
-    --space-7: 56px;
-    --space-8: 64px;
+   /* ---- Spacing: 8-px-Abstandsraster ---- */
+   --space-1: 8px;
+   --space-2: 16px;
+   --space-3: 24px;
+   --space-4: 32px;
+   --space-5: 40px;
+   --space-6: 48px;
+   --space-7: 56px;
+   --space-8: 64px;
 
-    /* ---- Layout ---- */
-    --content-max-width: 1440px;
-    --radius: 8px;
+   /* ---- Layout ---- */
+   --content-max-width: 1440px;
+   --radius: 8px;
 }

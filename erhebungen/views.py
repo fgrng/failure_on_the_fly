@@ -130,17 +130,42 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         stichprobe.teilnahme_url = request.build_absolute_uri(
             reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
         )
+        
+    vignettenzugehoerigkeiten = erhebung.vignettenzugehoerigkeiten.select_related(
+        "vignette", "vignette__historie"
+    )
+    aufgenommene = []
+    for z in vignettenzugehoerigkeiten:
+        aufgenommene.append({
+            "pk": z.vignette.pk,
+            "label": z.vignette.historie.name or z.vignette.fach,
+            "fach": z.vignette.fach,
+            "thema": z.vignette.thema,
+            "entfernen_url": reverse("erhebungen:vignette_entfernen", args=[erhebung.pk, z.vignette.pk]),
+        })
+
+    verfuegbare_vignetten = _eigene_finalen_vignetten(request).exclude(
+        pk__in=erhebung.vignetten.values("pk")
+    )
+    verfuegbare = []
+    for v in verfuegbare_vignetten:
+        verfuegbare.append({
+            "pk": v.pk,
+            "label": v.historie.name or v.fach,
+            "fach": v.fach,
+            "thema": v.thema,
+            "aufnehmen_url": reverse("erhebungen:vignette_hinzufuegen", args=[erhebung.pk, v.pk]),
+        })
+
     return render(
         request,
         "erhebungen/detail.html",
         {
             "erhebung": erhebung,
-            "vignettenzugehoerigkeiten": erhebung.vignettenzugehoerigkeiten.select_related(
-                "vignette", "vignette__historie"
-            ),
-            "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
-                pk__in=erhebung.vignetten.values("pk")
-            ),
+            "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
+            "aufgenommene_daten": aufgenommene,
+            "verfuegbare_daten": verfuegbare,
+            "verfuegbare_vignetten": verfuegbare_vignetten,
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
