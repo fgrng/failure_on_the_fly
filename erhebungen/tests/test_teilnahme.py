@@ -51,19 +51,23 @@ class ErhebungsteilnahmeTests(TestCase):
         self.url: str = reverse(
             "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
         )
+        self.kern: Simulationskern | None = None
 
     def _vignette_anlegen(
         self,
         *,
         budget_typ: str = Vignette.BudgetTyp.SCHRITTE,
         budget_wert: int = 1,
+        position: int = 1,
     ) -> Vignette:
         """Bindet eine spielbare finale Vignette an die Erhebung."""
 
-        kern: Simulationskern = Simulationskern.objects.anlegen(
-            rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
-        )
-        kern.finalisieren()
+        if self.kern is None:
+            self.kern = Simulationskern.objects.anlegen(
+                rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
+            )
+            self.kern.finalisieren()
+        kern: Simulationskern = self.kern
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Brüche vergleichen"
         )
@@ -89,7 +93,7 @@ class ErhebungsteilnahmeTests(TestCase):
         Erhebungsvignette.objects.create(
             erhebung=self.erhebung,
             vignette=vignette,
-            position=1,
+            position=position,
         )
         return vignette
 
@@ -236,7 +240,7 @@ class ErhebungsteilnahmeTests(TestCase):
         sitzung: Sitzung = Sitzung.objects.get()
         abschluss_antwort: HttpResponse = self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
-            {"diagnose": "Bruchfehler"},
+            {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
         )
         self.assertRedirects(
             abschluss_antwort,
@@ -244,6 +248,70 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+
+    def test_debrief_setzt_direkt_mit_der_naechsten_vignette_fort(self) -> None:
+        """Der Ablauf startet nach einer Diagnose sofort die nächste Ziehung."""
+
+        erste: Vignette = self._vignette_anlegen()
+        zweite: Vignette = self._vignette_anlegen(position=2)
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+
+        self.assertRedirects(
+            antwort, reverse("erhebungen:gespraech", args=[bindung.token])
+        )
+        self.assertEqual(
+            list(
+                Vignettenposition.objects.values_list("vignette_id", "position")
+            ),
+            [(erste.pk, 1), (zweite.pk, 2)],
+        )
+
+    def test_staler_debrief_beendet_die_folgesitzung_nicht(self) -> None:
+        """Ein zweiter Debrief-POST bleibt an seiner abgeschlossenen Sitzung gebunden."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        erste_sitzung: Sitzung = Sitzung.objects.get()
+        debrief_url: str = reverse("erhebungen:debrief", args=[bindung.token])
+        daten: dict[str, str | int] = {
+            "diagnose": "Bruchfehler",
+            "sitzung_pk": erste_sitzung.pk,
+        }
+
+        self.client.post(debrief_url, daten)
+        antwort: HttpResponse = self.client.post(debrief_url, daten)
+
+        self.assertEqual(antwort.status_code, 400)
+        self.assertEqual(
+            Sitzung.objects.get(pk=erste_sitzung.pk).status,
+            Sitzung.Status.ABGESCHLOSSEN,
+        )
+        self.assertEqual(
+            Sitzung.objects.exclude(pk=erste_sitzung.pk).get().status,
+            Sitzung.Status.LAUFEND,
+        )
 
     def test_zeitbudget_ist_von_training_und_anderen_sitzungen_getrennt(self) -> None:
         """Fremder Zeitverbrauch beendet die Erhebungssitzung nicht."""

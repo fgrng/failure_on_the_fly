@@ -30,7 +30,7 @@ from .models import (
     Stichprobe,
     Vignettenposition,
 )
-from simulation.models import Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.sink import DBSink
@@ -354,15 +354,24 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
+    if not _naechste_sitzung_starten(bindung, stichprobe.erhebung):
+        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+    return redirect("erhebungen:gespraech", token=bindung.token)
+
+
+def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> bool:
+    # Startet die nächste gezogene Vignette und hält ihre Position fest.
+
     vignette: Vignette | None = naechster_schritt(bindung.teilnahme)
     if vignette is None:
-        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+        return False
     kern: Simulationskern | None = vignette.gepinnter_kern
-    if kern is None or stichprobe.erhebung.modell_konfiguration is None:
+    modell_konfiguration: ModellKonfiguration | None = erhebung.modell_konfiguration
+    if kern is None or modell_konfiguration is None:
         raise RuntimeError("Erhebungsvignetten brauchen Kern und Modell-Konfiguration.")
     with transaction.atomic():
         sink: DBSink = DBSink(bindung.teilnahme)
-        sitzung_starten(sink, vignette, kern, stichprobe.erhebung.modell_konfiguration)
+        sitzung_starten(sink, vignette, kern, modell_konfiguration)
         position: int = bindung.vignettenziehungen.get(vignette=vignette).position
         Vignettenposition.objects.create(
             erhebungsbindung=bindung,
@@ -370,7 +379,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             vignette=vignette,
             position=position,
         )
-    return redirect("erhebungen:gespraech", token=bindung.token)
+    return True
 
 
 def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
@@ -426,15 +435,19 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
+    uebermittelte_sitzung_pk: str | None = request.POST.get("sitzung_pk")
+    if uebermittelte_sitzung_pk != str(sitzung.pk):
+        return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        if sitzung.status != Sitzung.Status.LAUFEND:
+            return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
-    ziel: str = (
-        "erhebungen:abschluss"
-        if naechster_schritt(bindung.teilnahme) is None
-        else "erhebungen:instruktion"
+    if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
+        return redirect("erhebungen:gespraech", token=bindung.token)
+    return redirect(
+        "erhebungen:abschluss", teilnahme_link=bindung.stichprobe.teilnahme_link
     )
-    return redirect(ziel, teilnahme_link=bindung.stichprobe.teilnahme_link)
 
 
 def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:

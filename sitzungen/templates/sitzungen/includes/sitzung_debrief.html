@@ -8,6 +8,7 @@
     <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
     <form id="diagnose-formular" class="diagnose" method="post" action="{{ navigation.debrief_url }}">
         {% csrf_token %}
+        {% if sitzung_pk %}<input type="hidden" name="sitzung_pk" value="{{ sitzung_pk }}">{% endif %}
         <label for="diagnose">Was ist Ihnen aufgefallen?</label>
         <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
         <textarea id="diagnose-transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
