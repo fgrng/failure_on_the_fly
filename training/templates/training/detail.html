@@ -4,7 +4,7 @@
 {% block title %}{{ training.name }}{% endblock %}
 
 {% block extra_head %}
-    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+<link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -20,7 +20,9 @@
 
     <section class="page-section" aria-labelledby="section-vignetten">
         <header class="page-section__head">
-            <b>01</b><span><h2 id="section-vignetten">Verfügbare Vignetten</h2><small>Trainingsinhalte und Historie</small></span>
+            <b>01</b><span>
+                <h2 id="section-vignetten">Verfügbare Vignetten</h2><small>Trainingsinhalte und Historie</small>
+            </span>
         </header>
         <div class="table-wrap vignette-index-table">
             <table class="table">
@@ -33,64 +35,64 @@
                 </thead>
                 <tbody>
                     {% for daten in vignetten_daten %}
-                        <tr>
-                            <td>{{ daten.name }}</td>
-                            <td>
-                                {% if daten.sitzungen_nach_status.laufend or daten.sitzungen_nach_status.abgeschlossen or daten.sitzungen_nach_status.abgebrochen or daten.sitzungen_nach_status.gescheitert %}
-                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                        {% if daten.sitzungen_nach_status.laufend %}
-                                            <details class="dropdown" style="position: relative;">
-                                                <summary class="badge badge--draft" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.laufend|length }} Laufend ▾</summary>
-                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
-                                                    {% for sitzung in daten.sitzungen_nach_status.laufend %}
-                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </details>
-                                        {% endif %}
-                                        {% if daten.sitzungen_nach_status.abgeschlossen %}
-                                            <details class="dropdown" style="position: relative;">
-                                                <summary class="badge badge--final" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgeschlossen|length }} Abgeschlossen ▾</summary>
-                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
-                                                    {% for sitzung in daten.sitzungen_nach_status.abgeschlossen %}
-                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </details>
-                                        {% endif %}
-                                        {% if daten.sitzungen_nach_status.abgebrochen %}
-                                            <details class="dropdown" style="position: relative;">
-                                                <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgebrochen|length }} Abgebrochen ▾</summary>
-                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
-                                                    {% for sitzung in daten.sitzungen_nach_status.abgebrochen %}
-                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </details>
-                                        {% endif %}
-                                        {% if daten.sitzungen_nach_status.gescheitert %}
-                                            <details class="dropdown" style="position: relative;">
-                                                <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.gescheitert|length }} Gescheitert ▾</summary>
-                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
-                                                    {% for sitzung in daten.sitzungen_nach_status.gescheitert %}
-                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </details>
-                                        {% endif %}
-                                    </div>
-                                {% else %}
-                                    <span style="color: var(--color-grey-500); font-style: italic;">Noch keine</span>
+                    <tr>
+                        <td>{{ daten.name }}</td>
+                        <td>
+                            {% if daten.sitzungen_nach_status.laufend or daten.sitzungen_nach_status.abgeschlossen or daten.sitzungen_nach_status.abgebrochen or daten.sitzungen_nach_status.gescheitert %}
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                {% if daten.sitzungen_nach_status.laufend %}
+                                <details class="dropdown" style="position: relative;">
+                                    <summary class="badge badge--draft" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.laufend|length }} laufend ▾</summary>
+                                    <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                        {% for sitzung in daten.sitzungen_nach_status.laufend %}
+                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
                                 {% endif %}
-                            </td>
-                            <td>
-                                <a class="button" href="{{ daten.url }}">Neu starten</a>
-                            </td>
-                        </tr>
+                                {% if daten.sitzungen_nach_status.abgeschlossen %}
+                                <details class="dropdown" style="position: relative;">
+                                    <summary class="badge badge--final" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgeschlossen|length }} abgeschlossen ▾</summary>
+                                    <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                        {% for sitzung in daten.sitzungen_nach_status.abgeschlossen %}
+                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                                {% endif %}
+                                {% if daten.sitzungen_nach_status.abgebrochen %}
+                                <details class="dropdown" style="position: relative;">
+                                    <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgebrochen|length }} abgebrochen ▾</summary>
+                                    <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                        {% for sitzung in daten.sitzungen_nach_status.abgebrochen %}
+                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                                {% endif %}
+                                {% if daten.sitzungen_nach_status.gescheitert %}
+                                <details class="dropdown" style="position: relative;">
+                                    <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.gescheitert|length }} gescheitert ▾</summary>
+                                    <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                        {% for sitzung in daten.sitzungen_nach_status.gescheitert %}
+                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span style="color: var(--color-grey-500); font-style: italic;">Noch keine</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="button" href="{{ daten.url }}">Neu starten</a>
+                        </td>
+                    </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="3" class="table__empty">Dieses Training enthält keine Vignetten.</td>
-                        </tr>
+                    <tr>
+                        <td colspan="3" class="table__empty">Dieses Training enthält keine Vignetten.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
