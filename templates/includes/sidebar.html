@@ -27,13 +27,18 @@
             </div>
         </section>
 
-        <section class="sidebar-nav__group sidebar-nav__group--research">
-            <h2>Forschung</h2>
-            <div>
-                <span>Erhebungen <small>geplant</small></span>
-                <span>Datenspuren <small>geplant</small></span>
-            </div>
-        </section>
+        {% for gruppe in user.groups.all %}
+            {% if gruppe.name == "Forschende:r" %}
+                <section class="sidebar-nav__group sidebar-nav__group--research">
+                    <h2>Forschung</h2>
+                    <div>
+                        <a href="{% url 'erhebungen:liste' %}"{% if request.resolver_match.namespace == "erhebungen" and request.resolver_match.url_name != "anlegen" %} aria-current="page"{% endif %}>Meine Erhebungen</a>
+                        <a href="{% url 'erhebungen:anlegen' %}"{% if request.resolver_match.namespace == "erhebungen" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neue Erhebung anlegen</a>
+                        <span>Datenspuren <small>geplant</small></span>
+                    </div>
+                </section>
+            {% endif %}
+        {% endfor %}
 
         <section class="sidebar-nav__group sidebar-nav__group--system">
             <h2>System</h2>
