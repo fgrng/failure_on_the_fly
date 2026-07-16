@@ -8,17 +8,24 @@
         <section class="page-section">
             <div class="page-section__head">
                 <b>01</b>
-                <div><h2>Erhebungen</h2></div>
+                <div>
+                    <h2>Erhebungen</h2>
+                </div>
             </div>
             <div>
                 <p><a href="{% url 'erhebungen:anlegen' %}">Neue Erhebung anlegen</a></p>
                 <ul>
                     {% for erhebung in erhebungen %}
                         <li>
-                            <a href="{% url 'erhebungen:detail' erhebung.pk %}">{{ erhebung.name }}</a>
+                            <a href="{% url 'erhebungen:detail' erhebung.pk %}">
+                                {{ erhebung.name }}
+                            </a>
                             <small>{{ erhebung.get_status_display }}</small>
                             {% if erhebung.status == erhebung.Status.ENTWURF %}
-                                <form method="post" action="{% url 'erhebungen:loeschen' erhebung.pk %}">
+                                <form
+                                    method="post"
+                                    action="{% url 'erhebungen:loeschen' erhebung.pk %}"
+                                >
                                     {% csrf_token %}
                                     <button class="button button--danger" type="submit">Entwurf löschen</button>
                                 </form>

@@ -8,11 +8,16 @@
         <section class="page-section">
             <div class="page-section__head">
                 <b>01</b>
-                <div><h2>Name</h2></div>
+                <div>
+                    <h2>Name</h2>
+                </div>
             </div>
             <form method="post">
                 {% csrf_token %}
-                <p><label for="id_name">Name</label> <input id="id_name" name="name" required></p>
+                <p>
+                    <label for="id_name">Name</label>
+                    <input id="id_name" name="name" required>
+                </p>
                 <button type="submit">Anlegen</button>
             </form>
         </section>

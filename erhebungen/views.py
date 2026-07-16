@@ -71,7 +71,8 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine eigene Erhebung zur weiteren Bearbeitung."""
 
-    return render(request, "erhebungen/detail.html", {"erhebung": _sichtbare_erhebung(request, pk)})
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    return render(request, "erhebungen/detail.html", {"erhebung": erhebung})
 
 
 @login_required
