@@ -45,6 +45,9 @@ persistierte Sitzungen gespielt; Gespräch, Diagnose und interne Denkspur bleibe
 Teil der Datenspur, wobei die Denkspur nie in der Teilnehmer:innenansicht erscheint.
 Nach jeder Diagnose beginnt unmittelbar die nächste gezogene Vignette; nach der
 letzten endet die Teilnahme mit dem Abschlusstext ohne Fragebogen oder Wiederholung.
+Ein Gespräch kann vorzeitig in den Debrief geführt oder ohne Diagnose abgebrochen
+werden; bei einem endgültigen Modellfehler bleibt der fehlerhafte Schritt erhalten.
+Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetzbar.
 
 ## Erhebungen verwalten
 
