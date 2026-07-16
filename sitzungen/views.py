@@ -1,16 +1,20 @@
 """Views für Probeläufe und persistierte Trainingssitzungen."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from time import monotonic
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
+from simulation import Antwortversuch
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.transkription import (
     AnbieterNichtErreichbar,
@@ -25,6 +29,7 @@ from sitzungen.sink import DBSink, GespraechsschrittDaten, ScratchSink
 from vignetten.models import Vignette, Vignettenhistorie
 
 if TYPE_CHECKING:
+    from erhebungen.models import Erhebungsbindung
     from konten.models import Konto
 
 
@@ -33,10 +38,51 @@ _TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "training_verbrauchte_zeit"
 _TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "training_zeit_laeuft_seit"
 
 
+@dataclass(frozen=True)
+class _Sitzungsnavigation:
+    """Die Routen und Bezeichnung einer angezeigten Sitzung."""
+
+    bezeichnung: str
+    gespraech_url: str
+    beenden_url: str
+    debrief_url: str
+    abbrechen_url: str | None
+
+
 def _ist_htmx(request: HttpRequest) -> bool:
     """Erkennt einen partiellen Seitenaufbau durch die vorhandene HTMX-Naht."""
 
     return request.headers.get("HX-Request") == "true"
+
+
+def _sitzungsnavigation(
+    ist_probelauf: bool, teilnahme_token: str | None
+) -> _Sitzungsnavigation:
+    # Bündelt die modusspezifischen Routen für die gemeinsame Sitzungsansicht.
+
+    if ist_probelauf:
+        return _Sitzungsnavigation(
+            bezeichnung="Probelauf",
+            gespraech_url=reverse("sitzungen:probelauf_gespraech"),
+            beenden_url=reverse("sitzungen:probelauf_beenden"),
+            debrief_url=reverse("sitzungen:probelauf_debrief"),
+            abbrechen_url=None,
+        )
+    if teilnahme_token is not None:
+        return _Sitzungsnavigation(
+            bezeichnung="Erhebung",
+            gespraech_url=reverse("sitzungen:erhebung_gespraech", args=[teilnahme_token]),
+            beenden_url=reverse("sitzungen:erhebung_beenden", args=[teilnahme_token]),
+            debrief_url=reverse("sitzungen:erhebung_debrief", args=[teilnahme_token]),
+            abbrechen_url=None,
+        )
+    return _Sitzungsnavigation(
+        bezeichnung="Training",
+        gespraech_url=reverse("sitzungen:training_gespraech"),
+        beenden_url=reverse("sitzungen:training_beenden"),
+        debrief_url=reverse("sitzungen:training_debrief"),
+        abbrechen_url=reverse("sitzungen:training_abbrechen"),
+    )
 
 
 def _sitzung_anzeigen(
@@ -50,6 +96,7 @@ def _sitzung_anzeigen(
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
     spracheingabe_verfuegbar: bool = False,
+    teilnahme_token: str | None = None,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -66,6 +113,7 @@ def _sitzung_anzeigen(
         "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
+        "navigation": _sitzungsnavigation(ist_probelauf, teilnahme_token),
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
@@ -390,14 +438,14 @@ def transkriptions_endpunkt(
     return endpunkt
 
 
-def _training_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
-    """Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge."""
+def _persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
+    # Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge.
 
     return sitzung.gespraechsschritt_set.order_by("reihenfolge")
 
 
-def _training_zeitbudget_fortsetzen(request: HttpRequest, sitzung: Sitzung) -> None:
-    """Startet die unsichtbare Uhr ausschließlich während des Teilnehmer:innenzugs."""
+def _zeitbudget_fortsetzen(request: HttpRequest, sitzung: Sitzung) -> None:
+    # Startet die unsichtbare Uhr ausschließlich während des Teilnehmer:innenzugs.
 
     if (
         sitzung.vignette.budget_typ == Vignette.BudgetTyp.ZEIT
@@ -406,8 +454,8 @@ def _training_zeitbudget_fortsetzen(request: HttpRequest, sitzung: Sitzung) -> N
         request.session[_TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = monotonic()
 
 
-def _training_zeitbudget_anhalten(request: HttpRequest) -> None:
-    """Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort."""
+def _zeitbudget_anhalten(request: HttpRequest) -> None:
+    # Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort.
 
     startzeit: float | None = request.session.pop(
         _TRAINING_ZEIT_LAEUFT_SEIT_SCHLUESSEL, None
@@ -420,49 +468,59 @@ def _training_zeitbudget_anhalten(request: HttpRequest) -> None:
         )
 
 
-def _training_budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
-    """Prüft das unsichtbare Gesprächsbudget nach einem vollständigen Schritt."""
+def _budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
+    # Prüft das unsichtbare Gesprächsbudget nach einem vollständigen Schritt.
 
     if sitzung.vignette.budget_wert is None:
         return False
     if sitzung.vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-        return _training_schritte(sitzung).count() >= sitzung.vignette.budget_wert
+        return _persistierte_schritte(sitzung).count() >= sitzung.vignette.budget_wert
     return (
         request.session.get(_TRAINING_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0)
         >= sitzung.vignette.budget_wert
     )
 
 
-def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
-    """Rendert den Debrief einer persistierten Trainingssitzung."""
+def _persistierten_debrief_anzeigen(
+    request: HttpRequest, sitzung: Sitzung, teilnahme_token: str | None = None
+) -> HttpResponse:
+    # Rendert den Debrief einer persistierten Sitzung.
 
     return _sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=_training_schritte(sitzung),
+        gespraechsschritte=_persistierte_schritte(sitzung),
         ist_probelauf=False,
         zeigt_debrief=True,
+        teilnahme_token=teilnahme_token,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
 
-def _training_fehler_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
-    """Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung."""
+def _persistierten_fehler_anzeigen(
+    request: HttpRequest, sitzung: Sitzung, teilnahme_token: str | None = None
+) -> HttpResponse:
+    # Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung.
 
-    return _training_gespraech_anzeigen(
-        request, sitzung, _training_schritte(sitzung), ist_gescheitert=True
+    return _persistiertes_gespraech_anzeigen(
+        request,
+        sitzung,
+        _persistierte_schritte(sitzung),
+        ist_gescheitert=True,
+        teilnahme_token=teilnahme_token,
     )
 
 
-def _training_gespraech_anzeigen(
+def _persistiertes_gespraech_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
     schritte: QuerySet[Gespraechsschritt],
     *,
     ist_gescheitert: bool = False,
+    teilnahme_token: str | None = None,
 ) -> HttpResponse:
-    """Rendert das persistierte Training in der gemeinsamen Sitzungsansicht."""
+    # Rendert eine persistierte Sitzung in der gemeinsamen Sitzungsansicht.
 
     return _sitzung_anzeigen(
         request,
@@ -471,6 +529,7 @@ def _training_gespraech_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=False,
         ist_gescheitert=ist_gescheitert,
+        teilnahme_token=teilnahme_token,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
@@ -497,14 +556,14 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET", "POST"])
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
-        return _training_debrief_anzeigen(request, sitzung)
-    schritte: QuerySet[Gespraechsschritt] = _training_schritte(sitzung)
+        return _persistierten_debrief_anzeigen(request, sitzung)
+    schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _training_fehler_anzeigen(request, sitzung)
+        return _persistierten_fehler_anzeigen(request, sitzung)
     if request.method == "GET":
-        _training_zeitbudget_fortsetzen(request, sitzung)
-        return _training_gespraech_anzeigen(request, sitzung, schritte)
-    _training_zeitbudget_anhalten(request)
+        _zeitbudget_fortsetzen(request, sitzung)
+        return _persistiertes_gespraech_anzeigen(request, sitzung, schritte)
+    _zeitbudget_anhalten(request)
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
     antwortversuch = gespraechsschritt_ausfuehren(
         sink,
@@ -515,12 +574,12 @@ def training_gespraech(request: HttpRequest) -> HttpResponse:
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
-        return _training_fehler_anzeigen(request, sitzung)
-    if _training_budget_erschoepft(request, sitzung):
-        return _training_debrief_anzeigen(request, sitzung)
-    _training_zeitbudget_fortsetzen(request, sitzung)
-    return _training_gespraech_anzeigen(
-        request, sitzung, _training_schritte(sitzung)
+        return _persistierten_fehler_anzeigen(request, sitzung)
+    if _budget_erschoepft(request, sitzung):
+        return _persistierten_debrief_anzeigen(request, sitzung)
+    _zeitbudget_fortsetzen(request, sitzung)
+    return _persistiertes_gespraech_anzeigen(
+        request, sitzung, _persistierte_schritte(sitzung)
     )
 
 
@@ -532,9 +591,9 @@ def training_beenden(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _training_fehler_anzeigen(request, sitzung)
-    _training_zeitbudget_anhalten(request)
-    return _training_debrief_anzeigen(request, sitzung)
+        return _persistierten_fehler_anzeigen(request, sitzung)
+    _zeitbudget_anhalten(request)
+    return _persistierten_debrief_anzeigen(request, sitzung)
 
 
 @login_required
@@ -545,12 +604,12 @@ def training_abbrechen(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _training_fehler_anzeigen(request, sitzung)
+        return _persistierten_fehler_anzeigen(request, sitzung)
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
-        return _training_debrief_anzeigen(request, sitzung)
+        return _persistierten_debrief_anzeigen(request, sitzung)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _training_zur_auswahl_zurueckkehren(request, sitzung)
-    _training_zeitbudget_anhalten(request)
+    _zeitbudget_anhalten(request)
     DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
 
@@ -565,8 +624,95 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status == Sitzung.Status.GESCHEITERT:
-            return _training_fehler_anzeigen(request, sitzung)
+            return _persistierten_fehler_anzeigen(request, sitzung)
         if sitzung.status != Sitzung.Status.LAUFEND:
             return _training_zur_auswahl_zurueckkehren(request, sitzung)
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
+
+
+def _erhebung_sitzung(token: str) -> tuple[Sitzung, "Erhebungsbindung"]:
+    # Löst eine laufende Erhebungssitzung allein über ihr Teilnahme-Token auf.
+
+    from erhebungen.models import Erhebungsbindung, Stichprobe
+
+    bindung: Erhebungsbindung = get_object_or_404(
+        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"), token=token
+    )
+    if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+        raise PermissionDenied
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        teilnahme=bindung.teilnahme,
+        status=Sitzung.Status.LAUFEND,
+    )
+    return sitzung, bindung
+
+
+def erhebung_gespraech(request: HttpRequest, token: str) -> HttpResponse:
+    """Führt einen DB-persistierten Gesprächsschritt ohne Login über das Token aus."""
+
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    sitzung: Sitzung
+    _bindung: Erhebungsbindung
+    sitzung, _bindung = _erhebung_sitzung(token)
+    schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
+    if request.method == "GET":
+        _zeitbudget_fortsetzen(request, sitzung)
+        return _persistiertes_gespraech_anzeigen(
+            request, sitzung, schritte, teilnahme_token=token
+        )
+    _zeitbudget_anhalten(request)
+    antwortversuch: Antwortversuch = gespraechsschritt_ausfuehren(
+        DBSink.fuer_sitzung(sitzung),
+        sitzung.vignette,
+        sitzung.simulationskern,
+        sitzung.modell_konfiguration,
+        list(schritte.exclude(aeusserung__isnull=True).values_list("aeusserung", flat=True)),
+        request.POST["eingabe"],
+    )
+    if antwortversuch.endgueltig_gescheitert:
+        return _persistierten_fehler_anzeigen(request, sitzung, token)
+    if _budget_erschoepft(request, sitzung):
+        return _persistierten_debrief_anzeigen(request, sitzung, token)
+    _zeitbudget_fortsetzen(request, sitzung)
+    return _persistiertes_gespraech_anzeigen(
+        request,
+        sitzung,
+        _persistierte_schritte(sitzung),
+        teilnahme_token=token,
+    )
+
+
+def erhebung_beenden(request: HttpRequest, token: str) -> HttpResponse:
+    """Zeigt für die tokenaufgelöste Sitzung den Debrief."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung
+    _bindung: Erhebungsbindung
+    sitzung, _bindung = _erhebung_sitzung(token)
+    _zeitbudget_anhalten(request)
+    return _persistierten_debrief_anzeigen(request, sitzung, token)
+
+
+def erhebung_debrief(request: HttpRequest, token: str) -> HttpResponse:
+    """Schließt die Sitzung mit Diagnose und setzt die Erhebung fort."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung
+    bindung: Erhebungsbindung
+    sitzung, bindung = _erhebung_sitzung(token)
+    with transaction.atomic():
+        sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    from erhebungen.ablauf import naechster_schritt
+
+    ziel: str = (
+        "erhebungen:abschluss"
+        if naechster_schritt(bindung.teilnahme) is None
+        else "erhebungen:instruktion"
+    )
+    return redirect(ziel, teilnahme_link=bindung.stichprobe.teilnahme_link)

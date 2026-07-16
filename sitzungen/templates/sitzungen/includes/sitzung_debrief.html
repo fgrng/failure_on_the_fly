@@ -6,12 +6,12 @@
     </header>
     <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell einer Lehrperson am Tisch im Gespräch, Gesicht bewusst unausgeformt; auf dem Tisch zwei Kaffeebecher und Notizblätter." width="800" height="800" loading="lazy" decoding="async">
     <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
-    <form id="diagnose-formular" class="diagnose" method="post" action="{% if ist_probelauf %}{% url 'sitzungen:probelauf_debrief' %}{% else %}{% url 'sitzungen:training_debrief' %}{% endif %}">
+    <form id="diagnose-formular" class="diagnose" method="post" action="{{ navigation.debrief_url }}">
         {% csrf_token %}
         <label for="diagnose">Was ist Ihnen aufgefallen?</label>
         <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
         <textarea id="diagnose-transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
-        <button class="button" type="submit">{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} beenden</button>
+        <button class="button" type="submit">{{ navigation.bezeichnung }} beenden</button>
     </form>
     {% if spracheingabe_verfuegbar %}
         {% url 'sitzungen:transkription' as transkription_url %}

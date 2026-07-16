@@ -1,16 +1,8 @@
-{% if ist_probelauf %}
-    {% url 'sitzungen:probelauf_gespraech' as gespraech_url %}
-    {% url 'sitzungen:probelauf_beenden' as beenden_url %}
-{% else %}
-    {% url 'sitzungen:training_gespraech' as gespraech_url %}
-    {% url 'sitzungen:training_beenden' as beenden_url %}
-{% endif %}
-
 {% if ist_gescheitert or erneute_eingabe is not None %}
     <div class="gespraechseingabe gespraechseingabe--fehler" role="alert">
         <p>Die Antwort konnte nicht erzeugt werden.</p>
         {% if erneute_eingabe is not None %}
-            <form method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+            <form method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
                 {% csrf_token %}
                 <input type="hidden" name="eingabe" value="{{ erneute_eingabe }}">
                 <button class="button" type="submit">Erneut senden</button>
@@ -19,7 +11,7 @@
     </div>
 {% else %}
     <div class="gespraechseingabe">
-        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ gespraech_url }}" hx-post="{{ gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
@@ -34,12 +26,12 @@
 
 {% if not ist_gescheitert %}
     <div class="sitzung-aktionen">
-        <form method="post" action="{{ beenden_url }}" hx-post="{{ beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+        <form method="post" action="{{ navigation.beenden_url }}" hx-post="{{ navigation.beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
             {% csrf_token %}
             <button class="sitzung-aktion-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
         </form>
-        {% if not ist_probelauf %}
-            <form method="post" action="{% url 'sitzungen:training_abbrechen' %}">
+        {% if navigation.abbrechen_url %}
+            <form method="post" action="{{ navigation.abbrechen_url }}">
                 {% csrf_token %}
                 <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Training abbrechen</button>
             </form>

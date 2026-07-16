@@ -7,9 +7,17 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from erhebungen.models import Erhebung, Erhebungsbindung, Stichprobe
+from erhebungen.models import (
+    Erhebung,
+    Erhebungsbindung,
+    Erhebungsvignette,
+    Stichprobe,
+    Vignettenposition,
+)
 from konten.models import Konto
-from simulation.models import ModellKonfiguration
+from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.models import Gespraechsschritt, Sitzung
+from vignetten.models import Vignette, Vignettenhistorie
 
 
 class ErhebungsteilnahmeTests(TestCase):
@@ -19,7 +27,12 @@ class ErhebungsteilnahmeTests(TestCase):
         """Legt eine finale Erhebung mit laufender Stichprobe an."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."}
+                ]
+            },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung: Erhebung = Erhebung.objects.create(
@@ -145,3 +158,77 @@ class ErhebungsteilnahmeTests(TestCase):
         ).get()
         self.assertNotEqual(zweite_bindung.teilnahme_id, erster_browser.teilnahme_id)
         self.assertFalse(zweite_bindung.teilnahme.einwilligung_erteilt)
+
+    def test_token_spielt_eine_vignette_bis_zum_abschluss(self) -> None:
+        """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""
+
+        kern: Simulationskern = Simulationskern.objects.anlegen(
+            rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
+        )
+        kern.finalisieren()
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+            name="Brüche vergleichen"
+        )
+        historie.eigentuemerinnen.add(self.erhebung.eigentuemerin)
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            lernauftrag="Addiere Brüche.",
+            arbeitsheft_beschreibung="Eine falsche Bruchrechnung.",
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            fach="Mathematik",
+            thema="Brüche",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=1,
+            gepinnter_kern=kern,
+        )
+        Erhebungsvignette.objects.create(
+            erhebung=self.erhebung,
+            vignette=vignette,
+            position=1,
+        )
+
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        start_antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        gespraech_url: str = reverse(
+            "sitzungen:erhebung_gespraech", args=[bindung.token]
+        )
+        self.assertRedirects(start_antwort, gespraech_url)
+        self.assertEqual(Vignettenposition.objects.get().position, 1)
+        fortsetzung: HttpResponse = self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        self.assertRedirects(fortsetzung, gespraech_url)
+        self.assertEqual(Sitzung.objects.count(), 1)
+
+        debrief: HttpResponse = self.client.post(
+            gespraech_url, {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(debrief, "Debrief")
+        self.assertNotContains(debrief, "Geheime Regel.")
+        self.assertEqual(Gespraechsschritt.objects.get().denkspur, "Geheime Regel.")
+        sitzung: Sitzung = Sitzung.objects.get()
+        abschluss_antwort: HttpResponse = self.client.post(
+            reverse("sitzungen:erhebung_debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler"},
+        )
+        self.assertRedirects(
+            abschluss_antwort,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+        )
+        sitzung.refresh_from_db()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)

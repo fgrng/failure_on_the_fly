@@ -6,4 +6,8 @@
     <h1>Instruktion</h1>
     <p>{{ erhebung.instruktionstext }}</p>
     <p>Das Diagnosegespräch ist begrenzt.</p>
+    <form method="post" action="{% url 'erhebungen:spielen' teilnahme_link=stichprobe.teilnahme_link %}">
+        {% csrf_token %}
+        <button type="submit">Vignette beginnen</button>
+    </form>
 {% endblock %}

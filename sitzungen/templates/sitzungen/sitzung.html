@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{% if ist_probelauf %}Probelauf{% else %}Training{% endif %}{% endblock %}
+{% block title %}{{ navigation.bezeichnung }}{% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/sitzung.css' %}">
@@ -12,7 +12,7 @@
     <article class="sitzung-seite">
         <section class="rahmenhandlung" aria-labelledby="rahmenhandlung-titel">
             <header class="sitzung-abschnitt-kopf">
-                <span>{% if ist_probelauf %}Probelauf{% else %}Training{% endif %} · Rahmenhandlung</span>
+                <span>{{ navigation.bezeichnung }} · Rahmenhandlung</span>
                 <h1 id="rahmenhandlung-titel">Die Ausgangslage</h1>
             </header>
             <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-einstieg-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell aus der hinteren Reihe eines Klassenzimmers: Lernende sitzen von hinten gesehen an ihren Pulten, vorne steht eine Lehrperson an der Wandtafel." width="800" height="800" decoding="async">

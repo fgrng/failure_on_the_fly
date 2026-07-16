@@ -18,7 +18,18 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe
+from .ablauf import naechster_schritt
+from .models import (
+    Erhebung,
+    Erhebungsbindung,
+    Erhebungsvignette,
+    Stichprobe,
+    Vignettenposition,
+)
+from simulation.models import Simulationskern
+from sitzungen.models import Sitzung
+from sitzungen.orchestrierung import sitzung_starten
+from sitzungen.sink import DBSink
 from vignetten.models import Vignette, Vignettenhistorie
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
@@ -281,7 +292,53 @@ def instruktion(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
         return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
-    return render(request, "erhebungen/instruktion.html", {"erhebung": stichprobe.erhebung})
+    return render(
+        request,
+        "erhebungen/instruktion.html",
+        {"erhebung": stichprobe.erhebung, "stichprobe": stichprobe},
+    )
+
+
+def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
+    """Startet die nächste gezogene Vignette über den persistenten DB-Sink."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
+    bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
+    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
+        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    if Sitzung.objects.filter(
+        teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND
+    ).exists():
+        return redirect("sitzungen:erhebung_gespraech", token=bindung.token)
+    vignette: Vignette | None = naechster_schritt(bindung.teilnahme)
+    if vignette is None:
+        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+    kern: Simulationskern | None = vignette.gepinnter_kern
+    if kern is None or stichprobe.erhebung.modell_konfiguration is None:
+        raise RuntimeError("Erhebungsvignetten brauchen Kern und Modell-Konfiguration.")
+    with transaction.atomic():
+        sink: DBSink = DBSink(bindung.teilnahme)
+        sitzung_starten(sink, vignette, kern, stichprobe.erhebung.modell_konfiguration)
+        position: int = bindung.vignettenziehungen.get(vignette=vignette).position
+        Vignettenposition.objects.create(
+            erhebungsbindung=bindung,
+            sitzung=sink.sitzung,
+            vignette=vignette,
+            position=position,
+        )
+    return redirect("sitzungen:erhebung_gespraech", token=bindung.token)
+
+
+def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
+    """Zeigt nach allen Vignetten das definierte Ende der Erhebung."""
+
+    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
+    bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
+    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
+        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    return render(request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung})
 
 
 def _bindung_aus_session(
