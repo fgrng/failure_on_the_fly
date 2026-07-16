@@ -16,7 +16,7 @@ def naechster_schritt(teilnahme: Teilnahme) -> Vignette | FragebogenItem | None:
 
     bindung = teilnahme.erhebungsbindung
     bindung.vignetten_ziehen()
-    vignetten = bindung.vignettenziehungen.select_related("vignette")
+    ziehungen = bindung.vignettenziehungen.select_related("vignette")
     gespielte_ids = teilnahme.sitzung_set.values_list("vignette_id", flat=True)
-    ziehung = vignetten.exclude(vignette_id__in=gespielte_ids).first()
+    ziehung = ziehungen.exclude(vignette_id__in=gespielte_ids).first()
     return ziehung.vignette if ziehung else None

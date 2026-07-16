@@ -395,7 +395,7 @@ class Erhebungsbindung(models.Model):
 
         if self.vignettenziehungen.exists():
             return
-        zugehoerigkeiten = list(
+        zugehoerigkeiten: list[Erhebungsvignette] = list(
             self.stichprobe.erhebung.vignettenzugehoerigkeiten.all()
         )
         if self.stichprobe.erhebung.randomisierung == Erhebung.Randomisierung.ZUFAELLIG:

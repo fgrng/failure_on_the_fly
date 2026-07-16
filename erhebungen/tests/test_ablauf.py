@@ -92,7 +92,7 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         eigentuemerin=konto,
         randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
     )
-    vignetten = [_finale_vignette_anlegen(konto) for _ in range(3)]
+    vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(3)]
     for vignette in vignetten:
         Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
     stichprobe: Stichprobe = Stichprobe.objects.create(
