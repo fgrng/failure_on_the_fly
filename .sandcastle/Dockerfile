@@ -51,6 +51,18 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # sandboxes, so `uv sync` finds it ready and only needs to link the .venv.
 RUN uv python install 3.14
 
+# Warm uv's cache with the project's locked dependencies. The per-sandbox
+# `uv sync` hook in main.mts otherwise re-downloads every wheel (notably
+# litellm's large transitive tree) on each container start, which overruns the
+# 60s hook timeout. The workspace is bind-mounted at runtime, so a .venv built
+# here would be shadowed — but the uv cache (~/.local/share/uv) survives, so the
+# runtime `uv sync` installs from cache (offline, fast) instead of downloading.
+# Rebuild the image (sandcastle docker build-image) after changing uv.lock.
+COPY --chown=agent:agent pyproject.toml uv.lock /home/agent/prime/
+RUN cd /home/agent/prime \
+  && uv sync --frozen \
+  && rm -rf /home/agent/prime
+
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
 # and overrides the working directory to /home/agent/workspace at container start.
 # Structure your Dockerfile so that /home/agent/workspace can serve as the project root.
