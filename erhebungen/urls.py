@@ -38,4 +38,6 @@ urlpatterns: list[URLPattern] = [
         views.instruktion,
         name="instruktion",
     ),
+    path("teilnahme/<uuid:teilnahme_link>/spielen/", views.spielen, name="spielen"),
+    path("teilnahme/<uuid:teilnahme_link>/abschluss/", views.abschluss, name="abschluss"),
 ]

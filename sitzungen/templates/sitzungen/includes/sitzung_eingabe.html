@@ -1,6 +1,9 @@
 {% if ist_probelauf %}
     {% url 'sitzungen:probelauf_gespraech' as gespraech_url %}
     {% url 'sitzungen:probelauf_beenden' as beenden_url %}
+{% elif erhebung_token %}
+    {% url 'sitzungen:erhebung_gespraech' erhebung_token as gespraech_url %}
+    {% url 'sitzungen:erhebung_beenden' erhebung_token as beenden_url %}
 {% else %}
     {% url 'sitzungen:training_gespraech' as gespraech_url %}
     {% url 'sitzungen:training_beenden' as beenden_url %}
@@ -38,7 +41,7 @@
             {% csrf_token %}
             <button class="sitzung-aktion-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
         </form>
-        {% if not ist_probelauf %}
+        {% if not ist_probelauf and not erhebung_token %}
             <form method="post" action="{% url 'sitzungen:training_abbrechen' %}">
                 {% csrf_token %}
                 <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Training abbrechen</button>

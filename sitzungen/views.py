@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
@@ -25,6 +26,7 @@ from sitzungen.sink import DBSink, GespraechsschrittDaten, ScratchSink
 from vignetten.models import Vignette, Vignettenhistorie
 
 if TYPE_CHECKING:
+    from erhebungen.models import Erhebungsbindung
     from konten.models import Konto
 
 
@@ -50,6 +52,7 @@ def _sitzung_anzeigen(
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
     spracheingabe_verfuegbar: bool = False,
+    erhebung_token: str | None = None,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -66,6 +69,7 @@ def _sitzung_anzeigen(
         "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
+        "erhebung_token": erhebung_token,
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
@@ -433,7 +437,9 @@ def _training_budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
     )
 
 
-def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
+def _training_debrief_anzeigen(
+    request: HttpRequest, sitzung: Sitzung, erhebung_token: str | None = None
+) -> HttpResponse:
     """Rendert den Debrief einer persistierten Trainingssitzung."""
 
     return _sitzung_anzeigen(
@@ -443,15 +449,22 @@ def _training_debrief_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpRe
         gespraechsschritte=_training_schritte(sitzung),
         ist_probelauf=False,
         zeigt_debrief=True,
+        erhebung_token=erhebung_token,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
 
-def _training_fehler_anzeigen(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
+def _training_fehler_anzeigen(
+    request: HttpRequest, sitzung: Sitzung, erhebung_token: str | None = None
+) -> HttpResponse:
     """Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung."""
 
     return _training_gespraech_anzeigen(
-        request, sitzung, _training_schritte(sitzung), ist_gescheitert=True
+        request,
+        sitzung,
+        _training_schritte(sitzung),
+        ist_gescheitert=True,
+        erhebung_token=erhebung_token,
     )
 
 
@@ -461,6 +474,7 @@ def _training_gespraech_anzeigen(
     schritte: QuerySet[Gespraechsschritt],
     *,
     ist_gescheitert: bool = False,
+    erhebung_token: str | None = None,
 ) -> HttpResponse:
     """Rendert das persistierte Training in der gemeinsamen Sitzungsansicht."""
 
@@ -471,6 +485,7 @@ def _training_gespraech_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=False,
         ist_gescheitert=ist_gescheitert,
+        erhebung_token=erhebung_token,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
     )
 
@@ -570,3 +585,79 @@ def training_debrief(request: HttpRequest) -> HttpResponse:
             return _training_zur_auswahl_zurueckkehren(request, sitzung)
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
+
+
+def _erhebung_sitzung(token: str) -> tuple[Sitzung, "Erhebungsbindung"]:
+    """Löst eine laufende Erhebungssitzung allein über ihr Teilnahme-Token auf."""
+
+    from erhebungen.models import Erhebungsbindung, Stichprobe
+
+    bindung = get_object_or_404(
+        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"), token=token
+    )
+    if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+        raise PermissionDenied
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        teilnahme=bindung.teilnahme,
+        status=Sitzung.Status.LAUFEND,
+    )
+    return sitzung, bindung
+
+
+def erhebung_gespraech(request: HttpRequest, token: str) -> HttpResponse:
+    """Führt einen DB-persistierten Gesprächsschritt ohne Login über das Token aus."""
+
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    sitzung, _ = _erhebung_sitzung(token)
+    schritte: QuerySet[Gespraechsschritt] = _training_schritte(sitzung)
+    if request.method == "GET":
+        _training_zeitbudget_fortsetzen(request, sitzung)
+        return _training_gespraech_anzeigen(request, sitzung, schritte, erhebung_token=token)
+    _training_zeitbudget_anhalten(request)
+    antwortversuch = gespraechsschritt_ausfuehren(
+        DBSink.fuer_sitzung(sitzung),
+        sitzung.vignette,
+        sitzung.simulationskern,
+        sitzung.modell_konfiguration,
+        list(schritte.exclude(aeusserung__isnull=True).values_list("aeusserung", flat=True)),
+        request.POST["eingabe"],
+    )
+    if antwortversuch.endgueltig_gescheitert:
+        return _training_fehler_anzeigen(request, sitzung, token)
+    if _training_budget_erschoepft(request, sitzung):
+        return _training_debrief_anzeigen(request, sitzung, token)
+    _training_zeitbudget_fortsetzen(request, sitzung)
+    return _training_gespraech_anzeigen(
+        request, sitzung, _training_schritte(sitzung), erhebung_token=token
+    )
+
+
+def erhebung_beenden(request: HttpRequest, token: str) -> HttpResponse:
+    """Zeigt für die tokenaufgelöste Sitzung den Debrief."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung, _ = _erhebung_sitzung(token)
+    _training_zeitbudget_anhalten(request)
+    return _training_debrief_anzeigen(request, sitzung, token)
+
+
+def erhebung_debrief(request: HttpRequest, token: str) -> HttpResponse:
+    """Schließt die Sitzung mit Diagnose und setzt die Erhebung fort."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung, bindung = _erhebung_sitzung(token)
+    with transaction.atomic():
+        sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    from erhebungen.ablauf import naechster_schritt
+
+    ziel: str = (
+        "erhebungen:abschluss"
+        if naechster_schritt(bindung.teilnahme) is None
+        else "erhebungen:instruktion"
+    )
+    return redirect(ziel, teilnahme_link=bindung.stichprobe.teilnahme_link)
