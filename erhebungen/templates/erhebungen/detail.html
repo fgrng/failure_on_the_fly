@@ -10,9 +10,80 @@
                 <b>01</b>
                 <div>
                     <h2>Entwurf</h2>
-                    <small>Weitere Bearbeitung folgt in den nächsten Slices.</small>
+                    <small>{{ erhebung.get_status_display }}</small>
                 </div>
             </div>
+            {% if erhebung.status == erhebung.Status.ENTWURF %}
+                <form method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
+                    {% csrf_token %}
+                    <p>
+                        <label for="id_randomisierung">Reihenfolge</label>
+                        <select id="id_randomisierung" name="randomisierung">
+                            {% for wert, bezeichnung in erhebung.Randomisierung.choices %}
+                                <option value="{{ wert }}"{% if wert == erhebung.randomisierung %} selected{% endif %}>{{ bezeichnung }}</option>
+                            {% endfor %}
+                        </select>
+                    </p>
+                    <p>
+                        <label for="id_instruktionstext">Instruktion</label>
+                        <textarea id="id_instruktionstext" name="instruktionstext">{{ erhebung.instruktionstext }}</textarea>
+                    </p>
+                    <p>
+                        <label for="id_einwilligungstext">Einwilligung</label>
+                        <textarea id="id_einwilligungstext" name="einwilligungstext">{{ erhebung.einwilligungstext }}</textarea>
+                    </p>
+                    <p>
+                        <label for="id_abschlusstext">Abschluss</label>
+                        <textarea id="id_abschlusstext" name="abschlusstext">{{ erhebung.abschlusstext }}</textarea>
+                    </p>
+                    {% if erhebung.randomisierung == erhebung.Randomisierung.FEST %}
+                        <p>Reihenfolge der aufgenommenen Vignetten:</p>
+                        <ol>
+                            {% for zugehoerigkeit in vignettenzugehoerigkeiten %}
+                                <li>
+                                    <label for="id_vignette_{{ forloop.counter }}">Position {{ forloop.counter }}</label>
+                                    <select id="id_vignette_{{ forloop.counter }}" name="vignetten">
+                                        {% for option in vignettenzugehoerigkeiten %}
+                                            <option value="{{ option.pk }}"{% if option.pk == zugehoerigkeit.pk %} selected{% endif %}>
+                                                {{ option.vignette.historie.name|default:option.vignette.fach }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    {% endif %}
+                    <button type="submit">Konfiguration speichern</button>
+                </form>
+                <h2>Vignetten</h2>
+                <ul>
+                    {% for zugehoerigkeit in vignettenzugehoerigkeiten %}
+                        <li>
+                            {{ zugehoerigkeit.vignette.historie.name|default:zugehoerigkeit.vignette.fach }}
+                            <form method="post" action="{% url 'erhebungen:vignette_entfernen' erhebung.pk zugehoerigkeit.vignette.pk %}">
+                                {% csrf_token %}
+                                <button type="submit">Entfernen</button>
+                            </form>
+                        </li>
+                    {% empty %}
+                        <li>Noch keine Vignetten aufgenommen.</li>
+                    {% endfor %}
+                </ul>
+                <h2>Finale Vignetten aufnehmen</h2>
+                <ul>
+                    {% for vignette in verfuegbare_vignetten %}
+                        <li>
+                            {{ vignette.historie.name|default:vignette.fach }}
+                            <form method="post" action="{% url 'erhebungen:vignette_hinzufuegen' erhebung.pk vignette.pk %}">
+                                {% csrf_token %}
+                                <button type="submit">Aufnehmen</button>
+                            </form>
+                        </li>
+                    {% empty %}
+                        <li>Keine weiteren finalen Vignetten verfügbar.</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
             <p><a href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a></p>
         </section>
     </div>

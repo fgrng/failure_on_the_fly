@@ -7,6 +7,7 @@ from uuid import UUID
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import F, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -15,7 +16,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Erhebung, Erhebungsbindung, Stichprobe
+from .models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe
+from vignetten.models import Vignette, Vignettenhistorie
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _FORSCHENDE_GRUPPE: str = "Forschende:r"
@@ -45,6 +47,14 @@ def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
     """Lädt eine für die eingeloggte Forschende sichtbare Erhebung."""
 
     return get_object_or_404(Erhebung.objects.sichtbar_fuer(request.user), pk=pk)
+
+
+def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
+    """Liefert einbindbare Fassungen aus dem Eigentümer-Kreis der Forschenden."""
+
+    return Vignette.objects.einbindbar().filter(
+        historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
+    )
 
 
 @login_required
@@ -79,7 +89,111 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine eigene Erhebung zur weiteren Bearbeitung."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    return render(request, "erhebungen/detail.html", {"erhebung": erhebung})
+    return render(
+        request,
+        "erhebungen/detail.html",
+        {
+            "erhebung": erhebung,
+            "vignettenzugehoerigkeiten": erhebung.vignettenzugehoerigkeiten.select_related(
+                "vignette", "vignette__historie"
+            ),
+            "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
+                pk__in=erhebung.vignetten.values("pk")
+            ),
+        },
+    )
+
+
+@login_required
+@_forschende_erforderlich
+def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
+    """Nimmt eine eigene finale Fassung in einen eigenen Entwurf auf."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+    vignette: Vignette = get_object_or_404(_eigene_finalen_vignetten(request), pk=vignette_pk)
+    position: int | None = None
+    if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
+        position = erhebung.vignettenzugehoerigkeiten.count() + 1
+    Erhebungsvignette.objects.get_or_create(
+        erhebung=erhebung, vignette=vignette, defaults={"position": position}
+    )
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
+    """Entfernt eine finale Fassung aus einem eigenen Entwurf."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status == Erhebung.Status.ENTWURF:
+        get_object_or_404(erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk).delete()
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+def _feste_reihenfolge_setzen(erhebung: Erhebung, zugehoerigkeit_ids: list[str]) -> None:
+    """Schreibt eine vollständige Reihenfolge ohne die eindeutigen Positionen zu kreuzen."""
+
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
+        erhebung.vignettenzugehoerigkeiten.select_for_update()
+    )
+    vorhandene_ids: list[int] = list(zugehoerigkeiten.values_list("pk", flat=True))
+    try:
+        neue_ids: list[int] = [int(pk) for pk in zugehoerigkeit_ids]
+    except ValueError:
+        return
+    if len(neue_ids) != len(set(neue_ids)) or set(neue_ids) != set(vorhandene_ids):
+        return
+    bisherige_positionen: list[int] = list(
+        zugehoerigkeiten.values_list("position", flat=True)
+    )
+    zugehoerigkeiten.update(position=F("position") + max(bisherige_positionen, default=0))
+    for position, zugehoerigkeit_id in enumerate(neue_ids, start=1):
+        zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
+
+
+@login_required
+@_forschende_erforderlich
+@transaction.atomic
+def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
+    """Speichert die konfigurierbaren Texte, Regel und feste Reihenfolge eines Entwurfs."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+    randomisierung: str = request.POST.get("randomisierung", erhebung.randomisierung)
+    if randomisierung not in Erhebung.Randomisierung.values:
+        return HttpResponseBadRequest("Unbekannte Randomisierungsregel.")
+    erhebung.instruktionstext = request.POST.get(
+        "instruktionstext", erhebung.instruktionstext
+    )
+    erhebung.einwilligungstext = request.POST.get(
+        "einwilligungstext", erhebung.einwilligungstext
+    )
+    erhebung.abschlusstext = request.POST.get("abschlusstext", erhebung.abschlusstext)
+    erhebung.randomisierung = randomisierung
+    erhebung.save(
+        update_fields=[
+            "instruktionstext",
+            "einwilligungstext",
+            "abschlusstext",
+            "randomisierung",
+        ]
+    )
+    if (
+        randomisierung == Erhebung.Randomisierung.FEST
+        and "vignetten" in request.POST
+    ):
+        _feste_reihenfolge_setzen(erhebung, request.POST.getlist("vignetten"))
+    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
