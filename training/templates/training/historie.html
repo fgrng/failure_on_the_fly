@@ -63,6 +63,7 @@
                     <tr>
                         <th scope="col"><button type="button" class="table__sort" @click="sortiere('name')">Training<span class="table__sort-arrow" :class="pfeilKlasse('name')"></span></button></th>
                         <th scope="col"><button type="button" class="table__sort" @click="sortiere('sort_progress')">Vignetten bearbeitet<span class="table__sort-arrow" :class="pfeilKlasse('sort_progress')"></span></button></th>
+                        <th scope="col">Sitzungen gesamt</th>
                         <th scope="col">Aktion</th>
                     </tr>
                 </thead>
@@ -71,6 +72,22 @@
                         <tr>
                             <td x-text="r.name"></td>
                             <td x-text="r.fortschritt"></td>
+                            <td>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <template x-if="r.sitzungen_nach_status.laufend">
+                                        <span class="badge badge--draft" x-text="r.sitzungen_nach_status.laufend + ' laufend'"></span>
+                                    </template>
+                                    <template x-if="r.sitzungen_nach_status.abgeschlossen">
+                                        <span class="badge badge--final" x-text="r.sitzungen_nach_status.abgeschlossen + ' abgeschlossen'"></span>
+                                    </template>
+                                    <template x-if="r.sitzungen_nach_status.abgebrochen">
+                                        <span class="badge badge--archived" x-text="r.sitzungen_nach_status.abgebrochen + ' abgebrochen'"></span>
+                                    </template>
+                                    <template x-if="r.sitzungen_nach_status.gescheitert">
+                                        <span class="badge badge--archived" x-text="r.sitzungen_nach_status.gescheitert + ' gescheitert'"></span>
+                                    </template>
+                                </div>
+                            </td>
                             <td><a class="button button--secondary" :href="r.url">Ansehen</a></td>
                         </tr>
                     </template>

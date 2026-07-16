@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -164,6 +164,19 @@ def historie(request: HttpRequest) -> HttpResponse:
             teilnahme=bindung.teilnahme,
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).values("vignette_id").distinct().count()
+        
+        sitzungen_counts = Sitzung.objects.filter(
+            teilnahme=bindung.teilnahme
+        ).values("status").annotate(count=Count("id"))
+        sitzungen_nach_status = {
+            "laufend": 0,
+            "abgeschlossen": 0,
+            "abgebrochen": 0,
+            "gescheitert": 0,
+        }
+        for row in sitzungen_counts:
+            sitzungen_nach_status[row["status"]] = row["count"]
+
         trainings.append(
             {
                 "name": training.name,
@@ -171,6 +184,7 @@ def historie(request: HttpRequest) -> HttpResponse:
                 "fortschritt": f"{abgeschlossene_vignetten} / {vignetten_gesamt}",
                 "sort_progress": abgeschlossene_vignetten
                 / (vignetten_gesamt if vignetten_gesamt else 1),
+                "sitzungen_nach_status": sitzungen_nach_status,
             }
         )
 
@@ -236,16 +250,14 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     vignetten_daten: list[dict[str, object]] = []
     for vignette in vignetten:
         sitzungen = sitzungen_nach_vignette.get(vignette.pk, [])
-        sitzungen_nach_status: dict[str, int] = {
-            Sitzung.Status.LAUFEND: 0,
-            Sitzung.Status.ABGESCHLOSSEN: 0,
-            Sitzung.Status.ABGEBROCHEN: 0,
-            Sitzung.Status.GESCHEITERT: 0,
+        sitzungen_nach_status: dict[str, list[dict[str, object]]] = {
+            "laufend": [],
+            "abgeschlossen": [],
+            "abgebrochen": [],
+            "gescheitert": [],
         }
-        sitzungen_liste: list[dict[str, object]] = []
         for sitzung in sitzungen:
-            sitzungen_nach_status[sitzung.status] += 1
-            sitzungen_liste.append(
+            sitzungen_nach_status[sitzung.status].append(
                 {
                     "id": sitzung.pk,
                     "status": sitzung.get_status_display(),
@@ -259,7 +271,6 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         vignetten_daten.append(
             {
                 "name": vignette.historie.name or vignette.fach,
-                "sitzungen": sitzungen_liste,
                 "sitzungen_nach_status": sitzungen_nach_status,
                 "url": reverse("training:wahl", args=[training.pk, vignette.pk]),
             }

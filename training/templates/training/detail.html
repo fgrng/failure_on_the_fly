@@ -36,34 +36,49 @@
                         <tr>
                             <td>{{ daten.name }}</td>
                             <td>
-                                {% if daten.sitzungen %}
-                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                                {% if daten.sitzungen_nach_status.laufend or daten.sitzungen_nach_status.abgeschlossen or daten.sitzungen_nach_status.abgebrochen or daten.sitzungen_nach_status.gescheitert %}
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                                         {% if daten.sitzungen_nach_status.laufend %}
-                                            <span class="badge badge--draft">{{ daten.sitzungen_nach_status.laufend }}x Laufend</span>
+                                            <details class="dropdown" style="position: relative;">
+                                                <summary class="badge badge--draft" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.laufend|length }} Laufend ▾</summary>
+                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                                    {% for sitzung in daten.sitzungen_nach_status.laufend %}
+                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
                                         {% endif %}
                                         {% if daten.sitzungen_nach_status.abgeschlossen %}
-                                            <span class="badge badge--final">{{ daten.sitzungen_nach_status.abgeschlossen }}x Abgeschlossen</span>
+                                            <details class="dropdown" style="position: relative;">
+                                                <summary class="badge badge--final" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgeschlossen|length }} Abgeschlossen ▾</summary>
+                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                                    {% for sitzung in daten.sitzungen_nach_status.abgeschlossen %}
+                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
                                         {% endif %}
                                         {% if daten.sitzungen_nach_status.abgebrochen %}
-                                            <span class="badge badge--archived">{{ daten.sitzungen_nach_status.abgebrochen }}x Abgebrochen</span>
+                                            <details class="dropdown" style="position: relative;">
+                                                <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.abgebrochen|length }} Abgebrochen ▾</summary>
+                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                                    {% for sitzung in daten.sitzungen_nach_status.abgebrochen %}
+                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
                                         {% endif %}
                                         {% if daten.sitzungen_nach_status.gescheitert %}
-                                            <span class="badge badge--archived">{{ daten.sitzungen_nach_status.gescheitert }}x Gescheitert</span>
+                                            <details class="dropdown" style="position: relative;">
+                                                <summary class="badge badge--archived" style="cursor: pointer; list-style: none;">{{ daten.sitzungen_nach_status.gescheitert|length }} Gescheitert ▾</summary>
+                                                <ul style="position: absolute; top: 100%; left: 0; z-index: 10; list-style: none; padding: 0.5rem; margin: 0.25rem 0 0 0; background: white; border: 1px solid var(--color-grey-300); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: max-content; display: flex; flex-direction: column; gap: 0.25rem;">
+                                                    {% for sitzung in daten.sitzungen_nach_status.gescheitert %}
+                                                        <li><a href="{{ sitzung.url }}" style="text-decoration: none; color: var(--color-primary-600); display: block; padding: 0.25rem 0.5rem; border-radius: 4px;" onmouseover="this.style.backgroundColor='var(--color-grey-100)'" onmouseout="this.style.backgroundColor='transparent'">Sitzung #{{ sitzung.id }}</a></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
                                         {% endif %}
                                     </div>
-                                    <details>
-                                        <summary style="cursor: pointer; font-size: 0.875rem;">Sitzungsverlauf ansehen</summary>
-                                        <ul style="list-style: none; padding: 0.5rem 0 0 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem;">
-                                            {% for sitzung in daten.sitzungen %}
-                                                <li>
-                                                    <a href="{{ sitzung.url }}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;">
-                                                        <span class="badge badge--{{ sitzung.status_badge }}">{{ sitzung.status }}</span>
-                                                        <small style="color: var(--color-primary-600); text-decoration: underline;">Ansehen &rarr;</small>
-                                                    </a>
-                                                </li>
-                                            {% endfor %}
-                                        </ul>
-                                    </details>
                                 {% else %}
                                     <span style="color: var(--color-grey-500); font-style: italic;">Noch keine</span>
                                 {% endif %}
