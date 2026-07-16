@@ -3,11 +3,13 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
 
 from konten.navigation import navigation
+from konten.models import Konto
 
 
 @pytest.mark.django_db
@@ -75,9 +77,9 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
     rollen: list[str], erwartet: dict[str, bool]
 ) -> None:
     """Die Navigation kennt Gruppenrollen und den Admin-Override zentral."""
-    konto = get_user_model().objects.create_user(username="ada")
+    konto: Konto = get_user_model().objects.create_user(username="ada")
     konto.groups.add(*Group.objects.filter(name__in=rollen))
-    request = RequestFactory().get("/")
+    request: HttpRequest = RequestFactory().get("/")
     request.user = konto
 
     assert navigation(request) == erwartet
@@ -87,14 +89,14 @@ class SidebarNavigationTests(TestCase):
     """Die Sidebar verwendet ausschließlich die berechneten Booleans."""
 
     def _sidebar_fuer(self, *rollen: str) -> str:
-        konto = get_user_model().objects.create_user(username="ada")
+        konto: Konto = get_user_model().objects.create_user(username="ada")
         konto.groups.add(*Group.objects.filter(name__in=rollen))
         self.client.force_login(konto)
         return self.client.get(reverse("training:katalog")).content.decode()
 
     def test_teilnehmerin_sieht_nur_teilnahme_links(self) -> None:
         """Ein Konto ohne Gruppe erhält nur den Teil der Ausbildung zur Teilnahme."""
-        sidebar = self._sidebar_fuer()
+        sidebar: str = self._sidebar_fuer()
 
         self.assertIn("Training starten", sidebar)
         self.assertIn("Meine Trainings", sidebar)
@@ -105,7 +107,7 @@ class SidebarNavigationTests(TestCase):
 
     def test_ausbilderin_sieht_nur_kuratierung_in_der_ausbildung(self) -> None:
         """Die Ausbilderrolle enthält nicht automatisch die Teilnahme."""
-        sidebar = self._sidebar_fuer("Ausbilder:in")
+        sidebar: str = self._sidebar_fuer("Ausbilder:in")
 
         self.assertIn("Trainingskataloge ansehen", sidebar)
         self.assertIn("Trainingskatalog erstellen", sidebar)
@@ -115,7 +117,7 @@ class SidebarNavigationTests(TestCase):
 
     def test_autorin_sieht_entwicklung_mit_lesendem_kern_link(self) -> None:
         """Autorinnen können den Kern ansehen, aber nicht verwalten."""
-        sidebar = self._sidebar_fuer("Autor:in")
+        sidebar: str = self._sidebar_fuer("Autor:in")
 
         self.assertIn("Vignetten ansehen", sidebar)
         self.assertIn("Simulationskern ansehen", sidebar)
@@ -124,14 +126,14 @@ class SidebarNavigationTests(TestCase):
 
     def test_forschende_sieht_forschungsbereich(self) -> None:
         """Die Forschung hängt nicht mehr an einer Template-Gruppenschleife."""
-        sidebar = self._sidebar_fuer("Forschende:r")
+        sidebar: str = self._sidebar_fuer("Forschende:r")
 
         self.assertIn("Meine Erhebungen", sidebar)
         self.assertIn("Neue Erhebung anlegen", sidebar)
 
     def test_administratorin_sieht_alle_bereiche(self) -> None:
         """Die Gruppenrolle der Administration überschreibt alle Sichtbarkeiten."""
-        sidebar = self._sidebar_fuer("Administrator:in")
+        sidebar: str = self._sidebar_fuer("Administrator:in")
 
         for text in (
             "Vignetten ansehen",

@@ -19,7 +19,7 @@ KONTOROLLEN: tuple[str, ...] = (
     FORSCHENDE_GRUPPE,
     ADMINISTRATORIN_GRUPPE,
 )
-P = ParamSpec("P")
+P: ParamSpec = ParamSpec("P")
 
 
 def _rollen(konto: "Konto") -> set[str]:
@@ -60,8 +60,8 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
             "simulationskern_verwalten": False,
         }
 
-    rollen = _rollen(request.user)
-    ist_administratorin = ADMINISTRATORIN_GRUPPE in rollen
+    rollen: set[str] = _rollen(request.user)
+    ist_administratorin: bool = ADMINISTRATORIN_GRUPPE in rollen
     return {
         "zeige_entwicklung": ist_administratorin or AUTORIN_GRUPPE in rollen,
         "zeige_ausbildung_kuratieren": ist_administratorin
