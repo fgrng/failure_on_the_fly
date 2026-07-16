@@ -83,6 +83,7 @@ def _sitzung_anzeigen(
     ist_lesend: bool = False,
     spracheingabe_verfuegbar: bool = False,
     navigation: Sitzungsnavigation | None = None,
+    sitzung_pk: int | None = None,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -101,6 +102,7 @@ def _sitzung_anzeigen(
         "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
         "navigation": navigation or sitzungsnavigation(ist_probelauf),
+        "sitzung_pk": sitzung_pk,
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
@@ -493,6 +495,7 @@ def persistierten_debrief_anzeigen(
         zeigt_debrief=True,
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        sitzung_pk=sitzung.pk,
     )
 
 

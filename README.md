@@ -41,6 +41,8 @@ Einwilligung und die Instruktion; diese weist darauf hin, dass das
 Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
 persistierte Sitzungen gespielt; Gespräch, Diagnose und interne Denkspur bleiben
 Teil der Datenspur, wobei die Denkspur nie in der Teilnehmer:innenansicht erscheint.
+Nach jeder Diagnose beginnt unmittelbar die nächste gezogene Vignette; nach der
+letzten endet die Teilnahme mit dem Abschlusstext ohne Fragebogen oder Wiederholung.
 
 ## Erhebungen verwalten
 
