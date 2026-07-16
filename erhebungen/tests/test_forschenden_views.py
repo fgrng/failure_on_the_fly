@@ -495,8 +495,10 @@ class StichprobenAnlegenTests(TestCase):
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
 
-        self.assertContains(detail, "Phase</dt><dd>laufend")
-        self.assertContains(detail, "Teilnahmen</dt><dd>1")
+        self.assertContains(detail, "<dt>Phase</dt>")
+        self.assertContains(detail, "<dd>laufend</dd>")
+        self.assertContains(detail, "<dt>Teilnahmen</dt>")
+        self.assertContains(detail, "<dd>1</dd>")
 
     def test_laesst_stichproben_nur_auf_eigenen_finalen_erhebungen_an(self) -> None:
         """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""

@@ -107,11 +107,21 @@
                     {% csrf_token %}
                     <p>
                         <label for="id_beginn">Beginn</label>
-                        <input id="id_beginn" type="datetime-local" name="beginn" required>
+                        <input
+                            id="id_beginn"
+                            type="datetime-local"
+                            name="beginn"
+                            required
+                        >
                     </p>
                     <p>
                         <label for="id_ende">Ende</label>
-                        <input id="id_ende" type="datetime-local" name="ende" required>
+                        <input
+                            id="id_ende"
+                            type="datetime-local"
+                            name="ende"
+                            required
+                        >
                     </p>
                     <button type="submit">Stichprobe anlegen</button>
                 </form>
@@ -119,10 +129,28 @@
                     {% for stichprobe in stichproben %}
                         <li>
                             <dl>
-                                <div><dt>Zeitraum</dt><dd>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</dd></div>
-                                <div><dt>Phase</dt><dd>{{ stichprobe.phase }}</dd></div>
-                                <div><dt>Teilnahmen</dt><dd>{{ stichprobe.teilnahmezahl }}</dd></div>
-                                <div><dt>Teilnahme-Link</dt><dd><input type="text" value="{{ stichprobe.teilnahme_url }}" readonly></dd></div>
+                                <div>
+                                    <dt>Zeitraum</dt>
+                                    <dd>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Phase</dt>
+                                    <dd>{{ stichprobe.phase }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Teilnahmen</dt>
+                                    <dd>{{ stichprobe.teilnahmezahl }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Teilnahme-Link</dt>
+                                    <dd>
+                                        <input
+                                            type="text"
+                                            value="{{ stichprobe.teilnahme_url }}"
+                                            readonly
+                                        >
+                                    </dd>
+                                </div>
                             </dl>
                         </li>
                     {% empty %}
