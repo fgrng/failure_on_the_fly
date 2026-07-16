@@ -174,7 +174,7 @@ class Erhebung(models.Model):
     def archivieren(self) -> None:
         """Archiviert eine Erhebung ohne laufende Stichprobe."""
 
-        if not self.kann_archiviert_werden:
+        if self.hat_laufende_stichprobe:
             raise ValidationError(
                 "Erhebungen mit laufenden Stichproben können nicht archiviert werden."
             )

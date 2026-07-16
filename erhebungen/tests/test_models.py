@@ -394,6 +394,18 @@ def test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt() -> None:
 
 
 @pytest.mark.django_db
+def test_archivieren_akzeptiert_nur_finale_erhebungen() -> None:
+    """Ein Entwurf folgt beim Archivieren seinem Lebenszyklus-Guard."""
+
+    erhebung: Erhebung = Erhebung.objects.create(
+        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    )
+
+    with pytest.raises(ValidationError, match="Nur finale Erhebungen"):
+        erhebung.archivieren()
+
+
+@pytest.mark.django_db
 def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
     """Eine archivierte Erhebung kann mit ihrem unveränderten Design zurückkehren."""
 

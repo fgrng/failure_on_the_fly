@@ -80,6 +80,17 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     )
 
 
+def _validierte_aktion_ausfuehren(
+    request: HttpRequest, aktion: Callable[[], None]
+) -> None:
+    """Führt eine Domänenaktion aus und zeigt ihren Validierungsfehler an."""
+
+    try:
+        aktion()
+    except ValidationError as error:
+        messages.error(request, error.message)
+
+
 @login_required
 @_forschende_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
@@ -173,10 +184,7 @@ def stichprobe_archivieren(request: HttpRequest, pk: int, stichprobe_pk: int) ->
     stichprobe: Stichprobe = get_object_or_404(
         erhebung.stichprobe_set, pk=stichprobe_pk
     )
-    try:
-        stichprobe.archivieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
+    _validierte_aktion_ausfuehren(request, stichprobe.archivieren)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -293,10 +301,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    try:
-        erhebung.finalisieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
+    _validierte_aktion_ausfuehren(request, erhebung.finalisieren)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -308,10 +313,7 @@ def zurueckziehen(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    try:
-        erhebung.zurueckziehen()
-    except ValidationError as error:
-        messages.error(request, error.message)
+    _validierte_aktion_ausfuehren(request, erhebung.zurueckziehen)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -323,10 +325,7 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    try:
-        erhebung.archivieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
+    _validierte_aktion_ausfuehren(request, erhebung.archivieren)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -338,10 +337,7 @@ def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    try:
-        erhebung.entarchivieren()
-    except ValidationError as error:
-        messages.error(request, error.message)
+    _validierte_aktion_ausfuehren(request, erhebung.entarchivieren)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
