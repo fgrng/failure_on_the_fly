@@ -450,6 +450,70 @@ class ErhebungsteilnahmeTests(TestCase):
             403,
         )
 
+    def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
+        """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {"fehler": "formatbruch", "rohantwort": "{unvollständig"},
+                    {
+                        "denkspur": "Geheime Regel.",
+                        "aeusserung": "Ich addiere.",
+                        "native_reasoning_spur": "Anbieter-Spur.",
+                    },
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung = Erhebung.objects.create(
+            name="Datenspur",
+            eigentuemerin=self.erhebung.eigentuemerin,
+        )
+        self.erhebung.finalisieren()
+        self.stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        self.url = reverse(
+            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
+        )
+        vignette: Vignette = self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        self.client.post(
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            {"eingabe": "Wie rechnest du?"},
+        )
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
+        )
+
+        sitzung.refresh_from_db()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertEqual(sitzung.vignette, vignette)
+        self.assertEqual(sitzung.simulationskern, vignette.gepinnter_kern)
+        self.assertEqual(sitzung.modell_konfiguration, konfiguration)
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.get(sitzung=sitzung)
+        self.assertEqual(schritt.eingabe, "Wie rechnest du?")
+        self.assertEqual(schritt.aeusserung, "Ich addiere.")
+        self.assertEqual(schritt.denkspur, "Geheime Regel.")
+        self.assertEqual(schritt.native_reasoning_spur, "Anbieter-Spur.")
+        fehlversuch: Fehlversuch = Fehlversuch.objects.get(gespraechsschritt=schritt)
+        self.assertEqual(fehlversuch.grund, "Formatbruch")
+        self.assertEqual(fehlversuch.rohantwort, "{unvollständig")
+        self.assertEqual(sitzung.diagnose.text, "Bruchfehler")
+        position: Vignettenposition = Vignettenposition.objects.get(
+            erhebungsbindung=bindung
+        )
+        self.assertEqual(position.sitzung, sitzung)
+        self.assertEqual(position.vignette, vignette)
+        self.assertEqual(position.position, 1)
+
     def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
         """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""
 
