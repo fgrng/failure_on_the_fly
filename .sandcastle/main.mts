@@ -59,15 +59,20 @@ const codexSandbox = () =>
   });
 
 // Hooks run inside the sandbox before the agent starts. uv sync ensures fresh
-// dependencies; the managed Python 3.14 toolchain is pre-provisioned in the
-// image (see .sandcastle/Dockerfile), so sync only links the .venv instead of
-// re-downloading the interpreter. The second command copies the Codex auth
+// dependencies; both the managed Python 3.14 toolchain and the project's locked
+// wheels are pre-provisioned in the image (see .sandcastle/Dockerfile), so sync
+// installs from uv's warm cache and only links the .venv instead of downloading
+// the interpreter and dependencies. The second command copies the Codex auth
 // material from the read-only mount into CODEX_HOME so the Codex CLI is
 // authenticated.
 const hooks = {
   sandbox: {
     onSandboxReady: [
-      { command: "uv sync" },
+      // The image (see .sandcastle/Dockerfile) pre-warms uv's cache, so this
+      // normally installs from cache in seconds. The raised timeout is a safety
+      // net for a cold cache (first run after a uv.lock change / image rebuild),
+      // where wheels are still downloaded.
+      { command: "uv sync", timeoutMs: 120_000 },
       {
         command: [
           `mkdir -p "${sandboxCodexHome}"`,
