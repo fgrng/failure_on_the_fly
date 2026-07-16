@@ -150,8 +150,8 @@ class Erhebung(models.Model):
             )
         if not self.kann_zurueckgezogen_werden:
             raise ValidationError(
-                "Erhebungen mit nicht archivierten Stichproben können nicht "
-                "zurückgezogen werden."
+                "Erhebungen mit nicht archivierten Stichproben oder datentragenden "
+                "Stichproben können nicht zurückgezogen werden."
             )
         self._status_wechseln(
             erwarteter_status=self.Status.FINAL,

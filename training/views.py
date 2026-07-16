@@ -14,6 +14,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import DBSink
+from sitzungen.views import sitzungsnavigation
 
 from .models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
@@ -273,8 +274,6 @@ def _sitzung_starten(
             ModellKonfiguration.objects.aktive(),
         )
     request.session["training_sitzung_pk"] = sink.sitzung.pk
-    if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
-        request.session["training_verbrauchte_zeit"] = 0.0
     return render(
         request,
         "sitzungen/sitzung.html",
@@ -286,6 +285,7 @@ def _sitzung_starten(
             ),
             "gespraechsschritte": [],
             "ist_probelauf": False,
+            "navigation": sitzungsnavigation(ist_probelauf=False),
             "spracheingabe_verfuegbar": bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         },
     )

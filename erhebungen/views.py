@@ -17,6 +17,7 @@ from django.http import (
     HttpResponseNotAllowed,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .ablauf import naechster_schritt
 from .models import (
@@ -30,6 +31,12 @@ from simulation.models import Simulationskern
 from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.sink import DBSink
+from sitzungen.views import (
+    Sitzungsnavigation,
+    persistiertes_gespraech,
+    persistierten_debrief_anzeigen,
+    zeitbudget_anhalten,
+)
 from vignetten.models import Vignette, Vignettenhistorie
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
@@ -226,7 +233,7 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_forschende_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
+    """Finalisiert einen eigenen Entwurf über dessen Domänenmethode."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -311,7 +318,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if Sitzung.objects.filter(
         teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND
     ).exists():
-        return redirect("sitzungen:erhebung_gespraech", token=bindung.token)
+        return redirect("erhebungen:gespraech", token=bindung.token)
     vignette: Vignette | None = naechster_schritt(bindung.teilnahme)
     if vignette is None:
         return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
@@ -328,7 +335,71 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             vignette=vignette,
             position=position,
         )
-    return redirect("sitzungen:erhebung_gespraech", token=bindung.token)
+    return redirect("erhebungen:gespraech", token=bindung.token)
+
+
+def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
+    # Hält die Erhebungsrouten in der App, der die Erhebungsbindung gehört.
+
+    return Sitzungsnavigation(
+        bezeichnung="Erhebung",
+        gespraech_url=reverse("erhebungen:gespraech", args=[token]),
+        beenden_url=reverse("erhebungen:gespraech_beenden", args=[token]),
+        debrief_url=reverse("erhebungen:debrief", args=[token]),
+        abbrechen_url=None,
+    )
+
+
+def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
+    # Löst die laufende Sitzung in ihrer besitzenden Erhebungs-App auf.
+
+    bindung: Erhebungsbindung = get_object_or_404(
+        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"), token=token
+    )
+    if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+        raise PermissionDenied
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        teilnahme=bindung.teilnahme,
+        status=Sitzung.Status.LAUFEND,
+    )
+    return sitzung, bindung
+
+
+def gespraech(request: HttpRequest, token: str) -> HttpResponse:
+    """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
+
+    sitzung, _bindung = _erhebungssitzung(token)
+    return persistiertes_gespraech(request, sitzung, _sitzungsnavigation(token))
+
+
+def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
+    """Zeigt für die tokenaufgelöste Sitzung den Debrief."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung, _bindung = _erhebungssitzung(token)
+    zeitbudget_anhalten(request, sitzung)
+    return persistierten_debrief_anzeigen(
+        request, sitzung, _sitzungsnavigation(token)
+    )
+
+
+def debrief(request: HttpRequest, token: str) -> HttpResponse:
+    """Schließt die Sitzung mit Diagnose und setzt die Erhebung fort."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung, bindung = _erhebungssitzung(token)
+    with transaction.atomic():
+        sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    ziel: str = (
+        "erhebungen:abschluss"
+        if naechster_schritt(bindung.teilnahme) is None
+        else "erhebungen:instruktion"
+    )
+    return redirect(ziel, teilnahme_link=bindung.stichprobe.teilnahme_link)
 
 
 def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:

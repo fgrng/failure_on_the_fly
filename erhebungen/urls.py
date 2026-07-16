@@ -46,4 +46,11 @@ urlpatterns: list[URLPattern] = [
     ),
     path("teilnahme/<uuid:teilnahme_link>/spielen/", views.spielen, name="spielen"),
     path("teilnahme/<uuid:teilnahme_link>/abschluss/", views.abschluss, name="abschluss"),
+    path("teilnahme/token/<str:token>/gespraech/", views.gespraech, name="gespraech"),
+    path(
+        "teilnahme/token/<str:token>/gespraech/beenden/",
+        views.gespraech_beenden,
+        name="gespraech_beenden",
+    ),
+    path("teilnahme/token/<str:token>/debrief/", views.debrief, name="debrief"),
 ]

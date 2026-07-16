@@ -379,6 +379,8 @@ class ErhebungenFinalisierenTests(TestCase):
         self.assertContains(response, "Final")
         self.assertContains(response, "gpt-forschung")
         self.assertNotContains(response, "Konfiguration speichern")
+        self.assertNotContains(response, "Finale Vignetten aufnehmen")
+        self.assertNotContains(response, ">Entfernen<")
 
     def test_nicht_archivierte_stichprobe_versteckt_zurueckziehen(self) -> None:
         """Eine laufende Stichprobe sperrt den Rückweg schon in der UI."""

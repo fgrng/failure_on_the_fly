@@ -1,6 +1,7 @@
 """HTTP-Tests für den pseudonymen Erhebungszugang."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.http import HttpResponse
 from django.test import Client, TestCase
@@ -50,6 +51,47 @@ class ErhebungsteilnahmeTests(TestCase):
         self.url: str = reverse(
             "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
         )
+
+    def _vignette_anlegen(
+        self,
+        *,
+        budget_typ: str = Vignette.BudgetTyp.SCHRITTE,
+        budget_wert: int = 1,
+    ) -> Vignette:
+        """Bindet eine spielbare finale Vignette an die Erhebung."""
+
+        kern: Simulationskern = Simulationskern.objects.anlegen(
+            rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
+        )
+        kern.finalisieren()
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+            name="Brüche vergleichen"
+        )
+        historie.eigentuemerinnen.add(self.erhebung.eigentuemerin)
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            lernauftrag="Addiere Brüche.",
+            arbeitsheft_beschreibung="Eine falsche Bruchrechnung.",
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Weber",
+            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            fach="Mathematik",
+            thema="Brüche",
+            klassenstufe="5",
+            budget_typ=budget_typ,
+            budget_wert=budget_wert,
+            gepinnter_kern=kern,
+        )
+        Erhebungsvignette.objects.create(
+            erhebung=self.erhebung,
+            vignette=vignette,
+            position=1,
+        )
+        return vignette
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
@@ -162,37 +204,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_token_spielt_eine_vignette_bis_zum_abschluss(self) -> None:
         """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""
 
-        kern: Simulationskern = Simulationskern.objects.anlegen(
-            rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
-        )
-        kern.finalisieren()
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Brüche vergleichen"
-        )
-        historie.eigentuemerinnen.add(self.erhebung.eigentuemerin)
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag="Addiere Brüche.",
-            arbeitsheft_beschreibung="Eine falsche Bruchrechnung.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Brüche",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=1,
-            gepinnter_kern=kern,
-        )
-        Erhebungsvignette.objects.create(
-            erhebung=self.erhebung,
-            vignette=vignette,
-            position=1,
-        )
+        self._vignette_anlegen()
 
         self.client.get(self.url)
         self.client.post(
@@ -204,7 +216,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
         gespraech_url: str = reverse(
-            "sitzungen:erhebung_gespraech", args=[bindung.token]
+            "erhebungen:gespraech", args=[bindung.token]
         )
         self.assertRedirects(start_antwort, gespraech_url)
         self.assertEqual(Vignettenposition.objects.get().position, 1)
@@ -223,7 +235,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Gespraechsschritt.objects.get().denkspur, "Geheime Regel.")
         sitzung: Sitzung = Sitzung.objects.get()
         abschluss_antwort: HttpResponse = self.client.post(
-            reverse("sitzungen:erhebung_debrief", args=[bindung.token]),
+            reverse("erhebungen:debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler"},
         )
         self.assertRedirects(
@@ -232,3 +244,33 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+
+    def test_zeitbudget_ist_von_training_und_anderen_sitzungen_getrennt(self) -> None:
+        """Fremder Zeitverbrauch beendet die Erhebungssitzung nicht."""
+
+        self._vignette_anlegen(
+            budget_typ=Vignette.BudgetTyp.ZEIT,
+            budget_wert=5,
+        )
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        session = self.client.session
+        session["training_verbrauchte_zeit"] = 999.0
+        session.save()
+
+        with patch("sitzungen.views.monotonic", side_effect=[10.0, 11.0, 11.0]):
+            self.client.get(gespraech_url)
+            antwort: HttpResponse = self.client.post(
+                gespraech_url, {"eingabe": "Wie rechnest du?"}
+            )
+
+        self.assertNotContains(antwort, "Debrief")
+        self.assertContains(antwort, "Ich addiere.")
