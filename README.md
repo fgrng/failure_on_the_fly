@@ -43,8 +43,10 @@ Diagnosegespräch begrenzt ist.
 ## Erhebungen verwalten
 
 Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` ihre
-eigenen Erhebungen. Dort lassen sich neue Entwürfe anlegen und reine Entwürfe
-löschen; finale Erhebungen bleiben erhalten.
+eigenen Erhebungen. In einem Entwurf wählen sie eigene finale Vignetten,
+bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
+Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
+Erhebungen bleiben unveränderlich erhalten.
 
 ## Lokale Entwicklungsumgebung
 
