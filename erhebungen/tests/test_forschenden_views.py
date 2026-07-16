@@ -5,10 +5,12 @@ from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from konten.models import Konto
-from erhebungen.models import Erhebung, Erhebungsvignette
+from erhebungen.models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.models import Teilnahme
 from vignetten.models import Vignette
 
 
@@ -343,3 +345,107 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertEqual(archiv_aufnehmen.status_code, 302)
         self.erhebung.refresh_from_db()
         self.assertEqual(self.erhebung.instruktionstext, "")
+
+
+class ErhebungenFinalisierenTests(TestCase):
+    """Forschende finalisieren Entwürfe über die Detailseite."""
+
+    def test_finalisieren_sperrt_design_und_zeigt_gepinnte_konfiguration(self) -> None:
+        """Die Detailseite zeigt den finalen, gepinnten Zustand statt Editoren."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("erhebungen:finalisieren", args=[erhebung.pk]), follow=True
+        )
+
+        erhebung.refresh_from_db()
+        self.assertEqual(erhebung.status, Erhebung.Status.FINAL)
+        self.assertEqual(erhebung.modell_konfiguration, konfiguration)
+        self.assertContains(response, "Final")
+        self.assertContains(response, "gpt-forschung")
+        self.assertNotContains(response, "Konfiguration speichern")
+
+    def test_nicht_archivierte_stichprobe_versteckt_zurueckziehen(self) -> None:
+        """Eine laufende Stichprobe sperrt den Rückweg schon in der UI."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung.finalisieren()
+        Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        )
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+
+        self.assertNotContains(detail, "Zurückziehen")
+
+    def test_zurueckziehen_macht_die_erhebung_wieder_bearbeitbar(self) -> None:
+        """Eine datenfreie finale Erhebung kehrt über die Aktion zum Entwurf zurück."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung.finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("erhebungen:zurueckziehen", args=[erhebung.pk]), follow=True
+        )
+
+        erhebung.refresh_from_db()
+        self.assertEqual(erhebung.status, Erhebung.Status.ENTWURF)
+        self.assertContains(response, "Konfiguration speichern")
+
+    def test_datentragende_archivierte_stichprobe_versteckt_zurueckziehen(self) -> None:
+        """Auch eine archivierte Stichprobe mit Datenspur sperrt den Rückweg."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        )
+        stichprobe.archivieren()
+        Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        versuch: HttpResponse = self.client.post(
+            reverse("erhebungen:zurueckziehen", args=[erhebung.pk]), follow=True
+        )
+
+        erhebung.refresh_from_db()
+        self.assertNotContains(detail, "Zurückziehen")
+        self.assertEqual(erhebung.status, Erhebung.Status.FINAL)
+        self.assertContains(versuch, "können nicht zurückgezogen werden")

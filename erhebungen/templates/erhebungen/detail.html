@@ -80,9 +80,26 @@
                             </form>
                         </li>
                     {% empty %}
-                        <li>Keine weiteren finalen Vignetten verfügbar.</li>
+                    <li>Keine weiteren finalen Vignetten verfügbar.</li>
                     {% endfor %}
                 </ul>
+                <form method="post" action="{% url 'erhebungen:finalisieren' erhebung.pk %}">
+                    {% csrf_token %}
+                    <button type="submit">Finalisieren</button>
+                </form>
+            {% else %}
+                <p>Das finale Design ist gesperrt.</p>
+                <h2>Gepinnte Modell-Konfiguration</h2>
+                <dl>
+                    <div><dt>Sprachmodell</dt><dd>{{ erhebung.modell_konfiguration.sprachmodell }}</dd></div>
+                    <div><dt>Parameter</dt><dd>{{ erhebung.modell_konfiguration.parameter }}</dd></div>
+                </dl>
+                {% if kann_zurueckziehen %}
+                    <form method="post" action="{% url 'erhebungen:zurueckziehen' erhebung.pk %}">
+                        {% csrf_token %}
+                        <button type="submit">Zurückziehen</button>
+                    </form>
+                {% endif %}
             {% endif %}
             <p><a href="{% url 'erhebungen:liste' %}">Zu meinen Erhebungen</a></p>
         </section>

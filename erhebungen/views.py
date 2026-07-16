@@ -5,7 +5,9 @@ from typing import Callable, Concatenate, ParamSpec
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, QuerySet
 from django.http import (
@@ -100,6 +102,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=erhebung.vignetten.values("pk")
             ),
+            "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
         },
     )
 
@@ -207,6 +210,36 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
     if erhebung.status == Erhebung.Status.ENTWURF:
         erhebung.delete()
     return redirect("erhebungen:liste")
+
+
+@login_required
+@_forschende_erforderlich
+def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    try:
+        erhebung.finalisieren()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def zurueckziehen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zieht eine eigene finale Erhebung zurück, wenn ihr Guard es erlaubt."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    try:
+        erhebung.zurueckziehen()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:

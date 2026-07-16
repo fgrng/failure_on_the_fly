@@ -27,6 +27,8 @@ urlpatterns: list[URLPattern] = [
         name="konfiguration_speichern",
     ),
     path("eigene/<int:pk>/loeschen/", views.loeschen, name="loeschen"),
+    path("eigene/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
+    path("eigene/<int:pk>/zurueckziehen/", views.zurueckziehen, name="zurueckziehen"),
     path("teilnahme/<uuid:teilnahme_link>/", views.teilnehmen, name="teilnehmen"),
     path(
         "teilnahme/<uuid:teilnahme_link>/einwilligung/",

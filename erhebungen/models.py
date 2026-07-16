@@ -144,9 +144,9 @@ class Erhebung(models.Model):
     def zurueckziehen(self) -> None:
         """Macht eine datenfreie finale Erhebung wieder bearbeitbar."""
 
-        if self.stichprobe_set.filter(archiviert=False).exists() or any(
-            stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all()
-        ):
+        if self.status != self.Status.FINAL:
+            raise ValidationError("Nur finale Erhebungen können zurückgezogen werden.")
+        if not self.kann_zurueckgezogen_werden:
             raise ValidationError(
                 "Erhebungen mit nicht archivierten Stichproben können nicht "
                 "zurückgezogen werden."
@@ -155,6 +155,15 @@ class Erhebung(models.Model):
             erwarteter_status=self.Status.FINAL,
             zielstatus=self.Status.ENTWURF,
             fehlermeldung="Nur finale Erhebungen können zurückgezogen werden.",
+        )
+
+    @property
+    def kann_zurueckgezogen_werden(self) -> bool:
+        """Prüft den Rückzugs-Guard für finale, datenfreie Erhebungen."""
+
+        return self.status == self.Status.FINAL and not (
+            self.stichprobe_set.filter(archiviert=False).exists()
+            or any(stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all())
         )
 
     @transaction.atomic
