@@ -80,6 +80,8 @@ class ErhebungsteilnahmeTests(TestCase):
             fortsetzung,
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
+        self.assertEqual(Erhebungsbindung.objects.count(), 1)
+        self.assertEqual(Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id)
 
     def test_einwilligung_und_instruktion_zeigen_die_erhebungstexte(self) -> None:
         """Die Teilnahme informiert vor dem Spiel über Zustimmung und Begrenzung."""
