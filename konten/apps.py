@@ -3,13 +3,7 @@
 from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
-
-KONTOROLLEN: tuple[str, ...] = (
-    "Autor:in",
-    "Ausbilder:in",
-    "Forschende:r",
-    "Administrator:in",
-)
+from .navigation import KONTOROLLEN
 
 
 def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:

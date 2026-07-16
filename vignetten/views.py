@@ -9,9 +9,10 @@ from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from konten.navigation import autorin_erforderlich as _autorin_erforderlich
+
 from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
-
 
 def _fallback_label(vignette: Vignette) -> str:
     """Leitet ein lesbares Label aus dem Unterrichtskontext ab."""
@@ -69,6 +70,7 @@ def _lebenszyklus_aktion_ausfuehren(
 
 
 @login_required
+@_autorin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Zeigt die privaten Vignettenhistorien der eingeloggten Person."""
     historien: list[dict[str, object]] = []
@@ -89,6 +91,7 @@ def liste(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine Vignette mit dem vom Manager gewählten Kern an."""
     if request.method == "POST":
@@ -105,6 +108,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
     vignette: Vignette = get_object_or_404(
@@ -121,6 +125,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen eigenen Entwurf über dessen Modell-Schreibnaht."""
     return _lebenszyklus_aktion_ausfuehren(
@@ -132,6 +137,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine eigene finale Fassung."""
     return _lebenszyklus_aktion_ausfuehren(
@@ -143,6 +149,7 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Macht eine eigene archivierte Fassung wieder final."""
     return _lebenszyklus_aktion_ausfuehren(
@@ -154,6 +161,7 @@ def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def vorspulen(request: HttpRequest, pk: int) -> HttpResponse:
     """Pinnt einen eigenen Entwurf auf den aktuellen finalen Kern."""
     return _lebenszyklus_aktion_ausfuehren(
@@ -165,6 +173,7 @@ def vorspulen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_autorin_erforderlich
 def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
@@ -189,6 +198,7 @@ reversionieren = neue_fassung
 
 
 @login_required
+@_autorin_erforderlich
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die Inhaltsfelder eines eigenen Entwurfs."""
     vignette: Vignette = _sichtbare_fassung_laden(

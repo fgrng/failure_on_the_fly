@@ -69,12 +69,13 @@ class StartseiteTests(TestCase):
             (
                 "Administrator:in",
                 (
-                    "Simulationskern ansehen",
+                    "Simulationskern verwalten",
                     "Administration",
                     "Meine Trainings",
                     "Trainingskataloge ansehen",
+                    "Meine Erhebungen",
                 ),
-                ("Meine Erhebungen",),
+                (),
             ),
         ):
             with self.subTest(rolle=rolle):

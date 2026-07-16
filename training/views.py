@@ -12,12 +12,12 @@ from django.urls import reverse
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import DBSink
 from sitzungen.views import sitzungsnavigation
 
-from sitzungen.models import Sitzung
 from vignetten.models import Vignette, Vignettenhistorie
 
 from .models import Training, Trainingsbindung
@@ -110,9 +110,10 @@ def _veroeffentlichtes_training_mit_finaler_vignette(
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
     """Zeigt allen eingeloggten Konten veröffentlichte Trainings und ggf. eigene Entwürfe."""
+    ist_ausbilderin: bool = _ausbilderin_oder_administratorin(request.user)
     trainingsabfrage: QuerySet[Training] = Training.objects.veroeffentlicht()
     sichtbare_pks: set[int] = set()
-    if _ausbilderin_oder_administratorin(request.user):
+    if ist_ausbilderin:
         sichtbare_trainings: QuerySet[Training] = Training.objects.sichtbar_fuer(
             request.user
         )
@@ -141,7 +142,7 @@ def katalog(request: HttpRequest) -> HttpResponse:
         "training/katalog.html",
         {
             "trainings": trainings,
-            "ist_ausbilderin": _ausbilderin_oder_administratorin(request.user),
+            "ist_ausbilderin": ist_ausbilderin,
         },
     )
 
@@ -163,7 +164,6 @@ def historie(request: HttpRequest) -> HttpResponse:
             teilnahme=bindung.teilnahme,
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).values("vignette_id").distinct().count()
-
         trainings.append(
             {
                 "name": training.name,
