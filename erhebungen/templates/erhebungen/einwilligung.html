@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Einwilligung{% endblock %}
+
+{% block content %}
+    <h1>Einwilligung</h1>
+    <p>{{ erhebung.einwilligungstext }}</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" name="einwilligung" value="ja">Einwilligen</button>
+    </form>
+{% endblock %}

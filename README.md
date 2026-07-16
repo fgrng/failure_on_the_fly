@@ -36,7 +36,9 @@ die Aufnahme wiederholt werden.
 Ein Teilnahme-Link einer Stichprobe legt im Browser eine pseudonyme Teilnahme an
 oder setzt sie fort. Dafür ist kein Nutzerkonto erforderlich; die
 Forschungsdaten sind über ein ablesbares Teilnahme-Token von Trainingsaktivitäten
-getrennt.
+getrennt. Während das Teilnahmefenster läuft, führt der Link zuerst über die
+Einwilligung und die Instruktion; diese weist darauf hin, dass das
+Diagnosegespräch begrenzt ist.
 
 ## Lokale Entwicklungsumgebung
 

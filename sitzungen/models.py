@@ -7,6 +7,7 @@ from django.db.models import Q
 class Teilnahme(models.Model):
     """Die anonyme Klammer für Sitzungen eines Aufrufers."""
 
+    einwilligung_erteilt: models.BooleanField = models.BooleanField(default=False)
     audioverarbeitung_eingewilligt: models.BooleanField = models.BooleanField(
         null=True,
         default=None,
