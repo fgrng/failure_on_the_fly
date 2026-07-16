@@ -13,4 +13,14 @@ urlpatterns: list[URLPattern] = [
     path("eigene/<int:pk>/", views.detail, name="detail"),
     path("eigene/<int:pk>/loeschen/", views.loeschen, name="loeschen"),
     path("teilnahme/<uuid:teilnahme_link>/", views.teilnehmen, name="teilnehmen"),
+    path(
+        "teilnahme/<uuid:teilnahme_link>/einwilligung/",
+        views.einwilligung,
+        name="einwilligung",
+    ),
+    path(
+        "teilnahme/<uuid:teilnahme_link>/instruktion/",
+        views.instruktion,
+        name="instruktion",
+    ),
 ]

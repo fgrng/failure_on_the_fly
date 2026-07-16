@@ -11,10 +11,10 @@ from erhebungen.models import Erhebung
 from simulation.models import ModellKonfiguration
 
 
-class ErhebungenAutorenRollenTests(TestCase):
-    """Nur Forschende erreichen die Autoren-Nähte."""
+class ErhebungenForschendenRollenTests(TestCase):
+    """Nur Forschende erreichen die Forschenden-Views."""
 
-    def test_konto_ohne_forschendenrolle_erhaelt_auf_alle_autoren_views_403(
+    def test_konto_ohne_forschendenrolle_erhaelt_auf_alle_forschenden_views_403(
         self,
     ) -> None:
         """Die Erhebungs-UI ist von der öffentlichen Teilnahme getrennt geschützt."""
