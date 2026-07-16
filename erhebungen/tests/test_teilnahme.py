@@ -7,7 +7,13 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from erhebungen.models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe, Vignettenposition
+from erhebungen.models import (
+    Erhebung,
+    Erhebungsbindung,
+    Erhebungsvignette,
+    Stichprobe,
+    Vignettenposition,
+)
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Gespraechsschritt, Sitzung
@@ -153,8 +159,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotEqual(zweite_bindung.teilnahme_id, erster_browser.teilnahme_id)
         self.assertFalse(zweite_bindung.teilnahme.einwilligung_erteilt)
 
-    def test_token_spielt_eine_vignette_persistiert_bis_zum_abschluss(self) -> None:
-        """Der pseudonyme Ablauf nutzt den DB-Sink ohne die Denkspur zu zeigen."""
+    def test_token_spielt_eine_vignette_bis_zum_abschluss(self) -> None:
+        """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""
 
         kern: Simulationskern = Simulationskern.objects.anlegen(
             rahmenhandlung_gespraechseinleitung="$schuelerin_name rechnet vor."
@@ -182,19 +188,25 @@ class ErhebungsteilnahmeTests(TestCase):
             budget_wert=1,
             gepinnter_kern=kern,
         )
-        Erhebungsvignette.objects.create(erhebung=self.erhebung, vignette=vignette, position=1)
+        Erhebungsvignette.objects.create(
+            erhebung=self.erhebung,
+            vignette=vignette,
+            position=1,
+        )
 
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
             {"einwilligung": "ja"},
         )
-        start: HttpResponse = self.client.post(
+        start_antwort: HttpResponse = self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
-        gespraech_url: str = reverse("sitzungen:erhebung_gespraech", args=[bindung.token])
-        self.assertRedirects(start, gespraech_url)
+        gespraech_url: str = reverse(
+            "sitzungen:erhebung_gespraech", args=[bindung.token]
+        )
+        self.assertRedirects(start_antwort, gespraech_url)
         self.assertEqual(Vignettenposition.objects.get().position, 1)
         fortsetzung: HttpResponse = self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -202,18 +214,21 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertRedirects(fortsetzung, gespraech_url)
         self.assertEqual(Sitzung.objects.count(), 1)
 
-        debrief: HttpResponse = self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+        debrief: HttpResponse = self.client.post(
+            gespraech_url, {"eingabe": "Wie rechnest du?"}
+        )
 
         self.assertContains(debrief, "Debrief")
         self.assertNotContains(debrief, "Geheime Regel.")
         self.assertEqual(Gespraechsschritt.objects.get().denkspur, "Geheime Regel.")
         sitzung: Sitzung = Sitzung.objects.get()
-        ende: HttpResponse = self.client.post(
+        abschluss_antwort: HttpResponse = self.client.post(
             reverse("sitzungen:erhebung_debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler"},
         )
         self.assertRedirects(
-            ende, reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+            abschluss_antwort,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
         )
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
