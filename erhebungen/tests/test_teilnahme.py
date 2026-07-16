@@ -308,7 +308,10 @@ class ErhebungsteilnahmeTests(TestCase):
             Sitzung.objects.get(pk=erste_sitzung.pk).status,
             Sitzung.Status.ABGESCHLOSSEN,
         )
-        self.assertEqual(Sitzung.objects.exclude(pk=erste_sitzung.pk).get().status, Sitzung.Status.LAUFEND)
+        self.assertEqual(
+            Sitzung.objects.exclude(pk=erste_sitzung.pk).get().status,
+            Sitzung.Status.LAUFEND,
+        )
 
     def test_zeitbudget_ist_von_training_und_anderen_sitzungen_getrennt(self) -> None:
         """Fremder Zeitverbrauch beendet die Erhebungssitzung nicht."""
