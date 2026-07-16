@@ -17,9 +17,10 @@ from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import DBSink
 from sitzungen.views import sitzungsnavigation
 
-from .models import Training, Trainingsbindung
-from vignetten.models import Vignette, Vignettenhistorie
 from sitzungen.models import Sitzung
+from vignetten.models import Vignette, Vignettenhistorie
+
+from .models import Training, Trainingsbindung
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -67,10 +68,21 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
 
 def _zustand_badge(training: Training) -> str:
     """Ordnet Modellzustände den gemeinsamen Badge-Klassen zu."""
+
     return {
         Training.Zustand.ENTWURF: "draft",
         Training.Zustand.VEROEFFENTLICHT: "final",
     }[training.zustand]
+
+
+def _sitzung_status_badge(status: str) -> str:
+    """Ordnet Sitzungszustände den gemeinsamen Badge-Klassen zu."""
+
+    if status == Sitzung.Status.ABGESCHLOSSEN:
+        return "final"
+    if status == Sitzung.Status.LAUFEND:
+        return "draft"
+    return "archived"
 
 
 def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
@@ -98,24 +110,30 @@ def _veroeffentlichtes_training_mit_finaler_vignette(
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
     """Zeigt allen eingeloggten Konten veröffentlichte Trainings und ggf. eigene Entwürfe."""
-    qs = Training.objects.veroeffentlicht()
-    sichtbare_pks = set()
+    trainingsabfrage: QuerySet[Training] = Training.objects.veroeffentlicht()
+    sichtbare_pks: set[int] = set()
     if _ausbilderin_oder_administratorin(request.user):
-        sichtbare_trainings = Training.objects.sichtbar_fuer(request.user)
-        qs = qs | sichtbare_trainings
+        sichtbare_trainings: QuerySet[Training] = Training.objects.sichtbar_fuer(
+            request.user
+        )
+        trainingsabfrage = trainingsabfrage | sichtbare_trainings
         sichtbare_pks = set(sichtbare_trainings.values_list("pk", flat=True))
 
     trainings: list[dict[str, object]] = []
-    for training in qs.distinct():
-        is_curatable = training.pk in sichtbare_pks
+    for training in trainingsabfrage.distinct():
+        ist_kuratierbar: bool = training.pk in sichtbare_pks
+        url: str = reverse(
+            "training:kuratieren" if ist_kuratierbar else "training:detail",
+            args=[training.pk],
+        )
         trainings.append(
             {
                 "name": training.name,
                 "zustand": training.get_zustand_display(),
                 "zustand_badge": _zustand_badge(training),
                 "is_own": training.eigentuemerin_id == request.user.id,
-                "url": reverse("training:kuratieren", args=[training.pk]) if is_curatable else reverse("training:detail", args=[training.pk]),
-                "action_label": "Kuratieren" if is_curatable else "Öffnen",
+                "url": url,
+                "action_label": "Kuratieren" if ist_kuratierbar else "Öffnen",
             }
         )
     return render(
@@ -131,26 +149,31 @@ def katalog(request: HttpRequest) -> HttpResponse:
 @login_required
 def historie(request: HttpRequest) -> HttpResponse:
     """Zeigt die Historie der durchgeführten Trainings aus Teilnehmer:innen-Sicht."""
-    bindungen = Trainingsbindung.objects.filter(
+    bindungen: QuerySet[Trainingsbindung] = Trainingsbindung.objects.filter(
         konto=request.user
-    ).select_related('training', 'teilnahme')
-    
-    trainings = []
+    ).select_related("training", "teilnahme")
+
+    trainings: list[dict[str, object]] = []
     for bindung in bindungen:
-        training = bindung.training
-        vignetten_gesamt = training.vignetten.filter(zustand=Vignette.Zustand.FINAL).count()
-        abgeschlossene_vignetten = Sitzung.objects.filter(
+        training: Training = bindung.training
+        vignetten_gesamt: int = training.vignetten.filter(
+            zustand=Vignette.Zustand.FINAL
+        ).count()
+        abgeschlossene_vignetten: int = Sitzung.objects.filter(
             teilnahme=bindung.teilnahme,
-            status=Sitzung.Status.ABGESCHLOSSEN
-        ).values('vignette_id').distinct().count()
-        
-        trainings.append({
-            "name": training.name,
-            "url": reverse("training:detail", args=[training.pk]),
-            "fortschritt": f"{abgeschlossene_vignetten} / {vignetten_gesamt}",
-            "sort_progress": abgeschlossene_vignetten / (vignetten_gesamt if vignetten_gesamt else 1),
-        })
-    
+            status=Sitzung.Status.ABGESCHLOSSEN,
+        ).values("vignette_id").distinct().count()
+
+        trainings.append(
+            {
+                "name": training.name,
+                "url": reverse("training:detail", args=[training.pk]),
+                "fortschritt": f"{abgeschlossene_vignetten} / {vignetten_gesamt}",
+                "sort_progress": abgeschlossene_vignetten
+                / (vignetten_gesamt if vignetten_gesamt else 1),
+            }
+        )
+
     return render(
         request,
         "training/historie.html",
@@ -199,40 +222,48 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )
-    
-    sitzungen_nach_vignette = {}
-    if request.user.is_authenticated:
-        bindung = Trainingsbindung.objects.filter(training=training, konto=request.user).first()
-        if bindung:
-            for sitzung in Sitzung.objects.filter(teilnahme=bindung.teilnahme).order_by('-id'):
-                sitzungen_nach_vignette.setdefault(sitzung.vignette_id, []).append(sitzung)
-                
-    vignetten_daten = []
-    for v in vignetten:
-        sitzungen = sitzungen_nach_vignette.get(v.pk, [])
-        sitzungen_nach_status = {
-            "laufend": 0,
-            "abgeschlossen": 0,
-            "abgebrochen": 0,
-            "gescheitert": 0,
+    sitzungen_nach_vignette: dict[int, list[Sitzung]] = {}
+    bindung: Trainingsbindung | None = Trainingsbindung.objects.filter(
+        training=training, konto=request.user
+    ).first()
+    if bindung is not None:
+        sitzungen: QuerySet[Sitzung] = Sitzung.objects.filter(
+            teilnahme=bindung.teilnahme
+        ).order_by("-id")
+        for sitzung in sitzungen:
+            sitzungen_nach_vignette.setdefault(sitzung.vignette_id, []).append(sitzung)
+
+    vignetten_daten: list[dict[str, object]] = []
+    for vignette in vignetten:
+        sitzungen = sitzungen_nach_vignette.get(vignette.pk, [])
+        sitzungen_nach_status: dict[str, int] = {
+            Sitzung.Status.LAUFEND: 0,
+            Sitzung.Status.ABGESCHLOSSEN: 0,
+            Sitzung.Status.ABGEBROCHEN: 0,
+            Sitzung.Status.GESCHEITERT: 0,
         }
-        sitzungen_liste = []
-        for s in sitzungen:
-            status = s.status
-            sitzungen_nach_status[status] += 1
-            sitzungen_liste.append({
-                "id": s.pk,
-                "status": s.get_status_display(),
-                "status_badge": "final" if s.status == Sitzung.Status.ABGESCHLOSSEN else ("draft" if s.status == Sitzung.Status.LAUFEND else "archived"),
-                "url": reverse("sitzungen:training_sitzung_ansehen", args=[s.pk]),
-            })
-        
-        vignetten_daten.append({
-            "name": v.historie.name if v.historie.name else v.fach,
-            "sitzungen": sitzungen_liste,
-            "sitzungen_nach_status": sitzungen_nach_status,
-            "url": reverse("training:wahl", args=[training.pk, v.pk]),
-        })
+        sitzungen_liste: list[dict[str, object]] = []
+        for sitzung in sitzungen:
+            sitzungen_nach_status[sitzung.status] += 1
+            sitzungen_liste.append(
+                {
+                    "id": sitzung.pk,
+                    "status": sitzung.get_status_display(),
+                    "status_badge": _sitzung_status_badge(sitzung.status),
+                    "url": reverse(
+                        "sitzungen:training_sitzung_ansehen", args=[sitzung.pk]
+                    ),
+                }
+            )
+
+        vignetten_daten.append(
+            {
+                "name": vignette.historie.name or vignette.fach,
+                "sitzungen": sitzungen_liste,
+                "sitzungen_nach_status": sitzungen_nach_status,
+                "url": reverse("training:wahl", args=[training.pk, vignette.pk]),
+            }
+        )
 
     return render(
         request,

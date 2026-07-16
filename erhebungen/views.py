@@ -360,8 +360,6 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 
 
 def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> bool:
-    # Startet die nächste gezogene Vignette und hält ihre Position fest.
-
     vignette: Vignette | None = naechster_schritt(bindung.teilnahme)
     if vignette is None:
         return False

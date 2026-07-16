@@ -1,4 +1,8 @@
-{% include "sitzungen/includes/sitzung_gespraech.html" with gespraech_beendet=ist_lesend|default:zeigt_debrief %}
+{% if ist_lesend %}
+    {% include "sitzungen/includes/sitzung_gespraech.html" with gespraech_beendet=True %}
+{% else %}
+    {% include "sitzungen/includes/sitzung_gespraech.html" with gespraech_beendet=zeigt_debrief %}
+{% endif %}
 {% if zeigt_debrief %}
     {% include "sitzungen/includes/sitzung_debrief.html" %}
 {% endif %}
