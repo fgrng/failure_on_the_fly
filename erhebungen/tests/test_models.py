@@ -6,11 +6,13 @@ from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsvignette,
     Stichprobe,
     Vignettenposition,
 )
@@ -38,6 +40,28 @@ def _erhebungsbindung_anlegen(
     )
 
 
+def _finale_vignette_anlegen(konto: Konto) -> Vignette:
+    """Legt eine finalisierte Vignette über ihren öffentlichen Lebenszyklus an."""
+
+    vignette: Vignette = Vignette.objects.anlegen(konto)
+    vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
+    vignette.lernauftrag = "Addiere die Brüche."
+    vignette.arbeitsheft_beschreibung = "Falsche Bruchrechnung"
+    vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
+    vignette.schuelerin_name = "Lea"
+    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.lehrperson_name = "Ada"
+    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.fach = "Mathematik"
+    vignette.thema = "Bruchrechnung"
+    vignette.klassenstufe = "6"
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 3
+    vignette.save()
+    vignette.finalisieren()
+    return vignette
+
+
 @pytest.mark.django_db
 def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
     """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
@@ -48,6 +72,117 @@ def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
     Erhebung.objects.create(name="Addition", eigentuemerin=grace)
 
     assert list(Erhebung.objects.sichtbar_fuer(ada)) == [eigene]
+
+
+@pytest.mark.django_db
+def test_erhebung_haelt_finale_vignetten_in_fester_reihenfolge() -> None:
+    """Eine feste Erhebung bewahrt ihre finalen Vignetten eindeutig geordnet."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    erste: Vignette = _finale_vignette_anlegen(konto)
+    zweite: Vignette = _finale_vignette_anlegen(konto)
+
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+
+    assert list(
+        erhebung.vignettenzugehoerigkeiten.values_list("vignette_id", flat=True)
+    ) == [erste.pk, zweite.pk]
+
+
+@pytest.mark.django_db
+def test_erhebungsvignette_lehnt_entwurf_auch_per_bulk_insert_ab() -> None:
+    """Die Mitgliedschaft schützt die Finale-Invariante auch vor Bulk-Inserts."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    entwurf: Vignette = Vignette.objects.anlegen(ada)
+
+    with pytest.raises(IntegrityError, match="finale"), transaction.atomic():
+        Erhebungsvignette.objects.bulk_create(
+            [Erhebungsvignette(erhebung=erhebung, vignette=entwurf, position=1)]
+        )
+
+
+@pytest.mark.django_db
+def test_erhebungsvignette_lehnt_fremde_finale_fassung_ab() -> None:
+    """Die Mitgliedschaft beschränkt die Auswahl auf den eigenen Eigentümer-Kreis."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    fremde_finale: Vignette = _finale_vignette_anlegen(grace)
+
+    with pytest.raises(IntegrityError, match="eigene"), transaction.atomic():
+        Erhebungsvignette.objects.bulk_create(
+            [
+                Erhebungsvignette(
+                    erhebung=erhebung, vignette=fremde_finale, position=1
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
+def test_zufaellige_erhebung_hat_keine_vignettenpositionen() -> None:
+    """Eine zufällige Reihenfolge speichert an der Mitgliedschaft keine Position."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(
+        name="Brüche",
+        eigentuemerin=ada,
+        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    )
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    finale: Vignette = _finale_vignette_anlegen(ada)
+
+    with pytest.raises(ValidationError, match="keine Position"):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=finale, position=1
+        )
+
+
+@pytest.mark.django_db
+def test_erhebungsvignette_bewahrt_die_menge_je_erhebung_eindeutig() -> None:
+    """Eine finale Vignetten-Fassung ist nur einmal Mitglied derselben Erhebung."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    finale: Vignette = _finale_vignette_anlegen(ada)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale, position=1)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsvignette.objects.bulk_create(
+            [Erhebungsvignette(erhebung=erhebung, vignette=finale, position=2)]
+        )
+
+
+@pytest.mark.django_db
+def test_feste_reihenfolge_hat_keine_doppelte_position() -> None:
+    """Eine feste Reihenfolge ordnet jeder Position genau eine Vignette zu."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    erste: Vignette = _finale_vignette_anlegen(ada)
+    zweite: Vignette = _finale_vignette_anlegen(ada)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsvignette.objects.bulk_create(
+            [Erhebungsvignette(erhebung=erhebung, vignette=zweite, position=1)]
+        )
 
 
 @pytest.mark.django_db

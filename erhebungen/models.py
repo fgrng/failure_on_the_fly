@@ -72,6 +72,9 @@ class Erhebung(models.Model):
         blank=True,
         on_delete=models.PROTECT,
     )
+    vignetten: models.ManyToManyField = models.ManyToManyField(
+        "vignetten.Vignette", through="Erhebungsvignette"
+    )
 
     objects: models.Manager["Erhebung"] = ErhebungQuerySet.as_manager()
 
@@ -177,6 +180,64 @@ class Erhebung(models.Model):
             zielstatus=self.Status.FINAL,
             fehlermeldung="Nur archivierte Erhebungen können entarchiviert werden.",
         )
+
+
+class Erhebungsvignette(models.Model):
+    """Die finale Vignetten-Fassung einer Erhebung samt fester Position."""
+
+    erhebung: models.ForeignKey = models.ForeignKey(
+        Erhebung,
+        on_delete=models.CASCADE,
+        related_name="vignettenzugehoerigkeiten",
+    )
+    vignette: models.ForeignKey = models.ForeignKey(
+        "vignetten.Vignette", on_delete=models.PROTECT
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField(
+        null=True, blank=True
+    )
+
+    def clean(self) -> None:
+        """Erlaubt nur eigene finale Fassungen und passende Reihenfolgeangaben."""
+
+        from vignetten.models import Vignette
+
+        fehler: dict[str, str] = {}
+        if self.vignette.zustand != Vignette.Zustand.FINAL:
+            fehler["vignette"] = "Erhebungen können nur finale Vignetten einbinden."
+        elif not self.vignette.historie.eigentuemerinnen.filter(
+            pk=self.erhebung.eigentuemerin_id
+        ).exists():
+            fehler["vignette"] = "Erhebungen können nur eigene Vignetten einbinden."
+        if self.erhebung.randomisierung == Erhebung.Randomisierung.FEST:
+            if self.position is None:
+                fehler["position"] = "Feste Reihenfolgen brauchen eine Position."
+        elif self.position is not None:
+            fehler["position"] = "Zufällige Reihenfolgen haben keine Position."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur gültige Erhebungszugehörigkeiten."""
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        """Macht Mitgliedschaft und feste Position je Erhebung eindeutig."""
+
+        ordering: list[str] = ["position", "pk"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebung", "vignette"],
+                name="erhebungen_vignette_ist_je_erhebung_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["erhebung", "position"],
+                condition=models.Q(position__isnull=False),
+                name="erhebungen_feste_position_ist_eindeutig",
+            ),
+        ]
 
 
 class StichprobeQuerySet(models.QuerySet["Stichprobe"]):
