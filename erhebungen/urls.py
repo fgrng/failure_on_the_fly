@@ -33,10 +33,21 @@ urlpatterns: list[URLPattern] = [
     path(
         "eigene/<int:pk>/zurueckziehen/", views.zurueckziehen, name="zurueckziehen"
     ),
+    path("eigene/<int:pk>/archivieren/", views.archivieren, name="archivieren"),
+    path(
+        "eigene/<int:pk>/entarchivieren/",
+        views.entarchivieren,
+        name="entarchivieren",
+    ),
     path(
         "eigene/<int:pk>/stichproben/anlegen/",
         views.stichprobe_anlegen,
         name="stichprobe_anlegen",
+    ),
+    path(
+        "eigene/<int:pk>/stichproben/<int:stichprobe_pk>/archivieren/",
+        views.stichprobe_archivieren,
+        name="stichprobe_archivieren",
     ),
     path("teilnahme/<uuid:teilnahme_link>/", views.teilnehmen, name="teilnehmen"),
     path(

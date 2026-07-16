@@ -538,3 +538,147 @@ class StichprobenAnlegenTests(TestCase):
 
         self.assertEqual(antwort.status_code, 400)
         self.assertFalse(Stichprobe.objects.filter(erhebung=self.erhebung).exists())
+
+
+class ErhebungenArchivierenTests(TestCase):
+    """Forschende archivieren über die Detailseite nur erlaubte Objekte."""
+
+    def setUp(self) -> None:
+        """Richtet eine finale Erhebung einer eingeloggten Forschenden ein."""
+
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.erhebung: Erhebung = Erhebung.objects.create(
+            name="Brüche", eigentuemerin=self.ada
+        )
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung.finalisieren()
+        self.client.force_login(self.ada)
+
+    def test_archiviert_datenfreie_stichprobe_ueber_die_detailseite(self) -> None:
+        """Eine datenfreie Stichprobe zeigt die Aktion und wird darüber archiviert."""
+
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=2),
+            ende=timezone.now() - timedelta(days=1),
+        )
+        archivieren_url: str = reverse(
+            "erhebungen:stichprobe_archivieren", args=[self.erhebung.pk, stichprobe.pk]
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        archivieren: HttpResponse = self.client.post(archivieren_url)
+
+        self.assertContains(detail, archivieren_url)
+        self.assertRedirects(
+            archivieren, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        stichprobe.refresh_from_db()
+        self.assertTrue(stichprobe.archiviert)
+
+    def test_versteckt_datentragende_stichprobe_und_zeigt_guard_fehler(self) -> None:
+        """Datentragende Stichproben bieten keinen Übergang und weisen ihn ab."""
+
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=2),
+            ende=timezone.now() - timedelta(days=1),
+        )
+        Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+        archivieren_url: str = reverse(
+            "erhebungen:stichprobe_archivieren", args=[self.erhebung.pk, stichprobe.pk]
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        archivieren: HttpResponse = self.client.post(archivieren_url, follow=True)
+
+        self.assertNotContains(detail, archivieren_url)
+        self.assertContains(archivieren, "Datentragende Stichproben können nicht archiviert werden.")
+        stichprobe.refresh_from_db()
+        self.assertFalse(stichprobe.archiviert)
+
+    def test_archiviert_und_entarchiviert_finale_erhebung(self) -> None:
+        """Eine finale Erhebung wechselt über beide Detailseiten-Aktionen zurück."""
+
+        archivieren_url: str = reverse(
+            "erhebungen:archivieren", args=[self.erhebung.pk]
+        )
+        entarchivieren_url: str = reverse(
+            "erhebungen:entarchivieren", args=[self.erhebung.pk]
+        )
+
+        final_detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        archivieren: HttpResponse = self.client.post(archivieren_url, follow=True)
+        entarchivieren: HttpResponse = self.client.post(entarchivieren_url, follow=True)
+
+        self.assertContains(final_detail, archivieren_url)
+        self.assertContains(archivieren, "Archiviert")
+        self.assertContains(archivieren, entarchivieren_url)
+        self.assertContains(entarchivieren, "Final")
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
+
+    def test_versteckt_erhebung_archivieren_bei_laufender_stichprobe(self) -> None:
+        """Eine laufende Stichprobe sperrt Archivieren in UI und Domänen-Guard."""
+
+        Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        archivieren_url: str = reverse(
+            "erhebungen:archivieren", args=[self.erhebung.pk]
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        archivieren: HttpResponse = self.client.post(archivieren_url, follow=True)
+
+        self.assertNotContains(detail, archivieren_url)
+        self.assertContains(
+            archivieren,
+            "Erhebungen mit laufenden Stichproben können nicht archiviert werden.",
+        )
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
+
+    def test_versteckt_entarchivieren_bei_laufender_stichprobe(self) -> None:
+        """Eine laufende Stichprobe sperrt auch den Rückweg aus dem Archiv."""
+
+        self.erhebung.archivieren()
+        Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        entarchivieren_url: str = reverse(
+            "erhebungen:entarchivieren", args=[self.erhebung.pk]
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        entarchivieren: HttpResponse = self.client.post(entarchivieren_url, follow=True)
+
+        self.assertNotContains(detail, entarchivieren_url)
+        self.assertContains(
+            entarchivieren,
+            "Erhebungen mit laufenden Stichproben können nicht entarchiviert werden.",
+        )
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.status, Erhebung.Status.ARCHIVIERT)

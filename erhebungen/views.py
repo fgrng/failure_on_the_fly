@@ -131,6 +131,8 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 pk__in=erhebung.vignetten.values("pk")
             ),
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
+            "kann_archivieren": erhebung.kann_archiviert_werden,
+            "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
             "stichproben": stichproben,
         },
     )
@@ -157,6 +159,24 @@ def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     if ende < beginn:
         return HttpResponseBadRequest("Das Ende darf nicht vor dem Beginn liegen.")
     Stichprobe.objects.create(erhebung=erhebung, beginn=beginn, ende=ende)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def stichprobe_archivieren(request: HttpRequest, pk: int, stichprobe_pk: int) -> HttpResponse:
+    """Archiviert eine datenfreie Stichprobe über ihre Domänenmethode."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    stichprobe: Stichprobe = get_object_or_404(
+        erhebung.stichprobe_set, pk=stichprobe_pk
+    )
+    try:
+        stichprobe.archivieren()
+    except ValidationError as error:
+        messages.error(request, error.message)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -290,6 +310,36 @@ def zurueckziehen(request: HttpRequest, pk: int) -> HttpResponse:
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     try:
         erhebung.zurueckziehen()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Archiviert eine eigene finale Erhebung über deren Domänenmethode."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    try:
+        erhebung.archivieren()
+    except ValidationError as error:
+        messages.error(request, error.message)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Macht eine eigene archivierte Erhebung wieder final."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    try:
+        erhebung.entarchivieren()
     except ValidationError as error:
         messages.error(request, error.message)
     return redirect("erhebungen:detail", pk=erhebung.pk)

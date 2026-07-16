@@ -100,6 +100,17 @@
                         <button type="submit">Zurückziehen</button>
                     </form>
                 {% endif %}
+                {% if kann_archivieren %}
+                    <form method="post" action="{% url 'erhebungen:archivieren' erhebung.pk %}">
+                        {% csrf_token %}
+                        <button type="submit">Erhebung archivieren</button>
+                    </form>
+                {% elif kann_entarchivieren %}
+                    <form method="post" action="{% url 'erhebungen:entarchivieren' erhebung.pk %}">
+                        {% csrf_token %}
+                        <button type="submit">Erhebung entarchivieren</button>
+                    </form>
+                {% endif %}
             {% endif %}
             {% if erhebung.status == erhebung.Status.FINAL %}
                 <h2>Stichproben</h2>
@@ -152,6 +163,12 @@
                                     </dd>
                                 </div>
                             </dl>
+                            {% if not stichprobe.archiviert and not stichprobe.traegt_daten %}
+                                <form method="post" action="{% url 'erhebungen:stichprobe_archivieren' erhebung.pk stichprobe.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit">Stichprobe archivieren</button>
+                                </form>
+                            {% endif %}
                         </li>
                     {% empty %}
                         <li>Noch keine Stichproben angelegt.</li>

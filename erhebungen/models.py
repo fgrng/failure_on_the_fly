@@ -174,8 +174,7 @@ class Erhebung(models.Model):
     def archivieren(self) -> None:
         """Archiviert eine Erhebung ohne laufende Stichprobe."""
 
-        jetzt: datetime = timezone.now()
-        if self.stichprobe_set.filter(beginn__lte=jetzt, ende__gte=jetzt).exists():
+        if not self.kann_archiviert_werden:
             raise ValidationError(
                 "Erhebungen mit laufenden Stichproben können nicht archiviert werden."
             )
@@ -185,10 +184,33 @@ class Erhebung(models.Model):
             fehlermeldung="Nur finale Erhebungen können archiviert werden.",
         )
 
+    @property
+    def kann_archiviert_werden(self) -> bool:
+        """Prüft den Archivierungs-Guard für finale Erhebungen."""
+
+        return self.status == self.Status.FINAL and not self.hat_laufende_stichprobe
+
+    @property
+    def kann_entarchiviert_werden(self) -> bool:
+        """Prüft den Entarchivierungs-Guard für archivierte Erhebungen."""
+
+        return self.status == self.Status.ARCHIVIERT and not self.hat_laufende_stichprobe
+
+    @property
+    def hat_laufende_stichprobe(self) -> bool:
+        """Erkennt Stichproben innerhalb ihres Teilnahmefensters."""
+
+        jetzt: datetime = timezone.now()
+        return self.stichprobe_set.filter(beginn__lte=jetzt, ende__gte=jetzt).exists()
+
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Erhebung wieder final."""
 
+        if self.status == self.Status.ARCHIVIERT and self.hat_laufende_stichprobe:
+            raise ValidationError(
+                "Erhebungen mit laufenden Stichproben können nicht entarchiviert werden."
+            )
         self._status_wechseln(
             erwarteter_status=self.Status.ARCHIVIERT,
             zielstatus=self.Status.FINAL,
