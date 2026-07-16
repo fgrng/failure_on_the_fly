@@ -38,6 +38,12 @@ oder setzt sie fort. Dafür ist kein Nutzerkonto erforderlich; die
 Forschungsdaten sind über ein ablesbares Teilnahme-Token von Trainingsaktivitäten
 getrennt.
 
+## Erhebungen verwalten
+
+Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` ihre
+eigenen Erhebungen. Dort lassen sich neue Entwürfe anlegen und reine Entwürfe
+löschen; finale Erhebungen bleiben erhalten.
+
 ## Lokale Entwicklungsumgebung
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
