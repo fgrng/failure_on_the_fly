@@ -4,32 +4,36 @@
     </div>
 
     <nav class="sidebar-nav">
-        <section class="sidebar-nav__group sidebar-nav__group--development">
-            <h2>Entwicklung</h2>
-            <div>
-                <a href="{% url 'vignetten:liste' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name != "anlegen" %} aria-current="page"{% endif %}>Vignetten ansehen</a>
-                <a href="{% url 'vignetten:anlegen' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neue Vignette erstellen</a>
-                {% if user.is_superuser %}
-                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern verwalten</a>
-                {% else %}
-                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern ansehen</a>
-                {% endif %}
-            </div>
-        </section>
+        {% if zeige_entwicklung %}
+            <section class="sidebar-nav__group sidebar-nav__group--development">
+                <h2>Entwicklung</h2>
+                <div>
+                    <a href="{% url 'vignetten:liste' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name != "anlegen" %} aria-current="page"{% endif %}>Vignetten ansehen</a>
+                    <a href="{% url 'vignetten:anlegen' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neue Vignette erstellen</a>
+                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern {% if simulationskern_verwalten %}verwalten{% else %}ansehen{% endif %}</a>
+                </div>
+            </section>
+        {% endif %}
 
-        <section class="sidebar-nav__group sidebar-nav__group--education">
-            <h2>Ausbildung</h2>
-            <div>
+        {% if zeige_ausbildung_kuratieren or zeige_teilnahme %}
+            <section class="sidebar-nav__group sidebar-nav__group--education">
+                <h2>Ausbildung</h2>
+                <div>
+                {% if zeige_ausbildung_kuratieren %}
                 <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "katalog" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "kuratieren" %} aria-current="page"{% endif %}>Trainingskataloge ansehen</a>
                 <a href="{% url 'training:anlegen' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Trainingskatalog erstellen</a>
+                <span>Trainingsdaten <small>geplant</small></span>
+                {% endif %}
+                {% if zeige_teilnahme %}
                 <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>
                 <a href="{% url 'training:historie' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "historie" %} aria-current="page"{% endif %}>Meine Trainings</a>
-            </div>
-        </section>
+                {% endif %}
+                </div>
+            </section>
+        {% endif %}
 
-        {% for gruppe in user.groups.all %}
-            {% if gruppe.name == "Forschende:r" %}
-                <section class="sidebar-nav__group sidebar-nav__group--research">
+        {% if zeige_forschung %}
+            <section class="sidebar-nav__group sidebar-nav__group--research">
                     <h2>Forschung</h2>
                     <div>
                         <a
@@ -50,17 +54,18 @@
                         </a>
                         <span>Datenspuren <small>geplant</small></span>
                     </div>
-                </section>
-            {% endif %}
-        {% endfor %}
+            </section>
+        {% endif %}
 
-        <section class="sidebar-nav__group sidebar-nav__group--system">
+        {% if zeige_system %}
+            <section class="sidebar-nav__group sidebar-nav__group--system">
             <h2>System</h2>
             <div>
                 <span>Modell-Konfiguration <small>geplant</small></span>
                 <a href="{% url 'admin:index' %}"{% if request.resolver_match.namespace == "admin" %} aria-current="page"{% endif %}>Administration</a>
             </div>
-        </section>
+            </section>
+        {% endif %}
     </nav>
 
     {% if user.is_authenticated %}

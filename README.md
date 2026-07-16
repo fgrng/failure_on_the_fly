@@ -6,12 +6,14 @@ diagnostischer Gesprächsführung.
 ## Start und Anmeldung
 
 Die öffentliche Startseite unter `/` verlinkt auf den Vignetten-Editor und die
-Ansicht des Simulationskerns. Diese Bereiche erfordern ein Nutzerkonto; die
-Anmeldung erfolgt unter `/accounts/login/`.
+Ansicht des Simulationskerns. Beide Bereiche sind nach Anmeldung nur für
+Autor:innen und Administrator:innen erreichbar. Die Sidebar zeigt anschließend
+nur die Bereiche und Links der jeweiligen Gruppenrollen; die Anmeldung erfolgt
+unter `/accounts/login/`.
 
 ## Simulationskern
 
-Angemeldete Nutzer:innen können die aktuellste finale Kern-Fassung und die
+Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die
 aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
 hin.

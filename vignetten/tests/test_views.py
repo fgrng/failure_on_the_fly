@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -29,12 +30,19 @@ def _gif_upload() -> SimpleUploadedFile:
     return SimpleUploadedFile("arbeitsblatt.gif", _GIF_INHALT, content_type="image/gif")
 
 
+def _autorin(username: str) -> Konto:
+    """Legt ein Konto mit Zugriff auf den Vignetten-Editor an."""
+    konto: Konto = get_user_model().objects.create_user(username=username)
+    konto.groups.add(Group.objects.get(name="Autor:in"))
+    return konto
+
+
 class VignetteAnlegenViewTests(TestCase):
     """Das Anlegeformular ist die HTTP-Naht zum Vignetten-Manager."""
 
     def test_speichert_ueberschriebene_akteure_und_zeigt_gepinnten_kern(self) -> None:
         """Die Oberfläche legt einen Entwurf mit dem automatisch gepinnten Kern an."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         self.client.force_login(ada)
@@ -72,7 +80,7 @@ class VignetteAnlegenViewTests(TestCase):
 
     def test_formular_belegt_akteure_vor_und_bietet_keine_kernwahl(self) -> None:
         """Akteure sind als Komfort vorausgefüllt; der Kern bleibt nicht wählbar."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         self.client.force_login(ada)
 
         with patch(
@@ -96,7 +104,7 @@ class VignetteDetailViewTests(TestCase):
 
     def test_rendert_die_rohfelder_des_aufgabenkontexts(self) -> None:
         """Die Ansicht zeigt Lernauftrag und Arbeitsheft ohne Rahmen-Rendering."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(ada)
         vignette: Vignette = Vignette.objects._erstellen(
@@ -117,7 +125,7 @@ class VignetteDetailViewTests(TestCase):
 
     def test_versteckt_fremde_fassung(self) -> None:
         """Detail-URLs geben keine Fassungen anderer Eigentümerinnen preis."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(grace)
@@ -136,7 +144,7 @@ class VignetteBearbeitenViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt einen angemeldeten Eigentümer mit offenem Entwurf an."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         self.historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         self.historie.eigentuemerinnen.add(ada)
         self.vignette: Vignette = Vignette.objects._erstellen(historie=self.historie)
@@ -276,7 +284,7 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
         self,
     ) -> None:
         """Entwürfe und Archiviertes erweitern den globalen Vorschlagspool nicht."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         eigene_historie.eigentuemerinnen.add(ada)
         entwurf: Vignette = Vignette.objects._erstellen(historie=eigene_historie)
@@ -329,7 +337,7 @@ class VignetteFinalisierenViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt eine eingeloggte Autorin mit vollständigem Entwurf an."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         self.vignette: Vignette = Vignette.objects.anlegen(ada)
@@ -445,7 +453,7 @@ class VignetteNeueFassungViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt eine eingeloggte Autorin mit finaler Vignette an."""
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada: Konto = _autorin("ada")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         self.finale: Vignette = Vignette.objects.anlegen(self.ada)
@@ -539,7 +547,7 @@ class VignetteArchivierenViewTests(TestCase):
 
     def test_archiviert_eigene_finale_fassung_ueber_post(self) -> None:
         """Die Archivierungs-URL ruft den Lebenszyklus nur für Eigentümer:innen auf."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(ada)
         finale: Vignette = Vignette.objects._erstellen(
@@ -560,7 +568,7 @@ class VignetteArchivierenViewTests(TestCase):
 
     def test_entarchiviert_eigene_archivierte_fassung_ueber_post(self) -> None:
         """Eine archivierte Fassung wird über die Gegenaktion wieder final."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(ada)
         archivierte: Vignette = Vignette.objects._erstellen(
@@ -583,7 +591,7 @@ class VignetteArchivierenViewTests(TestCase):
 
     def test_aktionen_sind_post_only_und_fuer_fremde_historien_unsichtbar(self) -> None:
         """Jede Aktion schützt Methode und Eigentümer-Kreis an der HTTP-Naht."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada: Konto = _autorin("ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         eigene_historie.eigentuemerinnen.add(ada)
@@ -675,3 +683,36 @@ class VignettenLoginTests(TestCase):
             response: HttpResponse = self.client.get(url)
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response.url.startswith("/accounts/login/?next="))
+
+
+class VignettenRollenTests(TestCase):
+    """Der Editor schützt auch direkte URLs mit der Autorenrolle."""
+
+    def test_teilnehmerin_erhaelt_auf_alle_editor_urls_403(self) -> None:
+        """Das Verstecken in der Sidebar ist nicht die einzige Zugriffssperre."""
+        teilnehmerin: Konto = get_user_model().objects.create_user(username="studi")
+        self.client.force_login(teilnehmerin)
+
+        for name in (
+            "liste",
+            "anlegen",
+            "detail",
+            "bearbeiten",
+            "finalisieren",
+            "archivieren",
+            "entarchivieren",
+            "vorspulen",
+            "neue_fassung",
+            "reversionieren",
+        ):
+            args = [] if name in {"liste", "anlegen"} else [1]
+            self.assertEqual(self.client.get(reverse(f"vignetten:{name}", args=args)).status_code, 403)
+
+    def test_administratorin_erreicht_den_editor(self) -> None:
+        """Die Administratorinnen-Gruppe ist der serverseitige Override."""
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        self.client.force_login(administratorin)
+
+        self.assertEqual(self.client.get(reverse("vignetten:liste")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("vignetten:anlegen")).status_code, 200)

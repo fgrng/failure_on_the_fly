@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
+from konten.navigation import autorin_erforderlich
+
 from .models import (
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
@@ -14,6 +16,7 @@ from .models import (
 
 
 @login_required
+@autorin_erforderlich
 def kern(request: HttpRequest) -> HttpResponse:
     """Zeigt die jüngste finale Kern-Fassung und aktive Modell-Konfiguration."""
     simulationskern: Simulationskern | None = (
