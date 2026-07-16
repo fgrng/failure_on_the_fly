@@ -151,6 +151,25 @@ def test_zufaellige_erhebung_hat_keine_vignettenpositionen() -> None:
 
 
 @pytest.mark.django_db
+def test_zufaellige_erhebung_nimmt_finale_vignetten_ohne_position_auf() -> None:
+    """Eine zufällige Reihenfolge bindet finale Vignetten ohne Position ein."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(
+        name="Brüche",
+        eigentuemerin=ada,
+        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    )
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    finale: Vignette = _finale_vignette_anlegen(ada)
+
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale)
+
+    assert list(erhebung.vignetten.all()) == [finale]
+
+
+@pytest.mark.django_db
 def test_erhebungsvignette_bewahrt_die_menge_je_erhebung_eindeutig() -> None:
     """Eine finale Vignetten-Fassung ist nur einmal Mitglied derselben Erhebung."""
 

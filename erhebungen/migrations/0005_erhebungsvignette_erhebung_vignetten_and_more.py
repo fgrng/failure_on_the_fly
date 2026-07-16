@@ -4,6 +4,42 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+_VIGNETTENZUGEHOERIGKEIT_TRIGGER_SQL = """
+    CREATE TRIGGER {name}
+    {ereignis} ON erhebungen_erhebungsvignette
+    FOR EACH ROW
+    WHEN (
+        (SELECT zustand FROM vignetten_vignette WHERE id = NEW.vignette_id)
+        != 'final'
+        OR NOT EXISTS (
+            SELECT 1
+            FROM erhebungen_erhebung
+            JOIN vignetten_vignette
+                ON vignetten_vignette.id = NEW.vignette_id
+            JOIN vignetten_vignettenhistorie_eigentuemerinnen
+                ON vignetten_vignettenhistorie_eigentuemerinnen.vignettenhistorie_id
+                = vignetten_vignette.historie_id
+            WHERE erhebungen_erhebung.id = NEW.erhebung_id
+              AND vignetten_vignettenhistorie_eigentuemerinnen.konto_id
+                = erhebungen_erhebung.eigentuemerin_id
+        )
+        OR (
+            (SELECT randomisierung FROM erhebungen_erhebung
+             WHERE id = NEW.erhebung_id) = 'fest'
+            AND NEW.position IS NULL
+        )
+        OR (
+            (SELECT randomisierung FROM erhebungen_erhebung
+             WHERE id = NEW.erhebung_id) = 'zufällig'
+            AND NEW.position IS NOT NULL
+        )
+    )
+    BEGIN
+        SELECT RAISE(ABORT, 'Erhebungen brauchen eigene finale Vignetten mit passender Position.');
+    END;
+"""
+
+
 class Migration(migrations.Migration):
     """Erstellt Mitgliedschaft, Eindeutigkeiten und Datenbank-Guards."""
 
@@ -67,81 +103,20 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunSQL(
-            sql="""
-                CREATE TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen
-                BEFORE INSERT ON erhebungen_erhebungsvignette
-                FOR EACH ROW
-                WHEN (
-                    (SELECT zustand FROM vignetten_vignette WHERE id = NEW.vignette_id)
-                    != 'final'
-                    OR NOT EXISTS (
-                        SELECT 1
-                        FROM erhebungen_erhebung
-                        JOIN vignetten_vignette
-                            ON vignetten_vignette.id = NEW.vignette_id
-                        JOIN vignetten_vignettenhistorie_eigentuemerinnen
-                            ON vignetten_vignettenhistorie_eigentuemerinnen.vignettenhistorie_id
-                            = vignetten_vignette.historie_id
-                        WHERE erhebungen_erhebung.id = NEW.erhebung_id
-                          AND vignetten_vignettenhistorie_eigentuemerinnen.konto_id
-                            = erhebungen_erhebung.eigentuemerin_id
-                    )
-                    OR (
-                        (SELECT randomisierung FROM erhebungen_erhebung
-                         WHERE id = NEW.erhebung_id) = 'fest'
-                        AND NEW.position IS NULL
-                    )
-                    OR (
-                        (SELECT randomisierung FROM erhebungen_erhebung
-                         WHERE id = NEW.erhebung_id) = 'zufällig'
-                        AND NEW.position IS NOT NULL
-                    )
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, 'Erhebungen brauchen eigene finale Vignetten mit passender Position.');
-                END;
-            """,
+            sql=_VIGNETTENZUGEHOERIGKEIT_TRIGGER_SQL.format(
+                name="erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
+                ereignis="BEFORE INSERT",
+            ),
             reverse_sql=(
                 "DROP TRIGGER "
                 "erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen;"
             ),
         ),
         migrations.RunSQL(
-            sql="""
-                CREATE TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_aendern
-                BEFORE UPDATE OF erhebung_id, vignette_id, position
-                ON erhebungen_erhebungsvignette
-                FOR EACH ROW
-                WHEN (
-                    (SELECT zustand FROM vignetten_vignette WHERE id = NEW.vignette_id)
-                    != 'final'
-                    OR NOT EXISTS (
-                        SELECT 1
-                        FROM erhebungen_erhebung
-                        JOIN vignetten_vignette
-                            ON vignetten_vignette.id = NEW.vignette_id
-                        JOIN vignetten_vignettenhistorie_eigentuemerinnen
-                            ON vignetten_vignettenhistorie_eigentuemerinnen.vignettenhistorie_id
-                            = vignetten_vignette.historie_id
-                        WHERE erhebungen_erhebung.id = NEW.erhebung_id
-                          AND vignetten_vignettenhistorie_eigentuemerinnen.konto_id
-                            = erhebungen_erhebung.eigentuemerin_id
-                    )
-                    OR (
-                        (SELECT randomisierung FROM erhebungen_erhebung
-                         WHERE id = NEW.erhebung_id) = 'fest'
-                        AND NEW.position IS NULL
-                    )
-                    OR (
-                        (SELECT randomisierung FROM erhebungen_erhebung
-                         WHERE id = NEW.erhebung_id) = 'zufällig'
-                        AND NEW.position IS NOT NULL
-                    )
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, 'Erhebungen brauchen eigene finale Vignetten mit passender Position.');
-                END;
-            """,
+            sql=_VIGNETTENZUGEHOERIGKEIT_TRIGGER_SQL.format(
+                name="erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
+                ereignis="BEFORE UPDATE OF erhebung_id, vignette_id, position",
+            ),
             reverse_sql=(
                 "DROP TRIGGER "
                 "erhebungen_gueltige_vignettenzugehoerigkeit_aendern;"
