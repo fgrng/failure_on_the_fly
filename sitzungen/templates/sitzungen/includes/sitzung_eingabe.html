@@ -33,7 +33,7 @@
         {% if navigation.abbrechen_url %}
             <form method="post" action="{{ navigation.abbrechen_url }}">
                 {% csrf_token %}
-                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Training abbrechen</button>
+                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">{{ navigation.bezeichnung }} abbrechen</button>
             </form>
         {% endif %}
     </div>

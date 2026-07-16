@@ -17,7 +17,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Gespraechsschritt, Sitzung
+from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -96,6 +96,19 @@ class ErhebungsteilnahmeTests(TestCase):
             position=position,
         )
         return vignette
+
+    def _laufende_sitzung_starten(self) -> Erhebungsbindung:
+        """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
+
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        return Erhebungsbindung.objects.get()
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
@@ -184,6 +197,14 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         ):
             self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_archivierte_stichprobe_ist_fuer_teilnahmen_gesperrt(self) -> None:
+        """Eine archivierte Stichprobe sammelt auch im Zeitfenster keine Daten."""
+
+        self.stichprobe.archivieren()
+
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertFalse(Erhebungsbindung.objects.exists())
 
     def test_neuer_browser_erzeugt_eine_neue_leere_teilnahme(self) -> None:
         """Ohne gespeichertes Token wird keine bestehende Teilnahme wiederverwendet."""
@@ -342,3 +363,101 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertNotContains(antwort, "Debrief")
         self.assertContains(antwort, "Ich addiere.")
+
+    def test_aktiver_abbruch_setzt_die_sitzung_auf_abgebrochen(self) -> None:
+        """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:abbrechen", args=[bindung.token])
+        )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+        )
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_endgueltiger_fehlschlag_bewahrt_gespraechsschritt_ohne_antwort(
+        self,
+    ) -> None:
+        """Ein Modellfehler beendet die Erhebungssitzung lesbar und persistent."""
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung = Erhebung.objects.create(
+            name="Fehlschlag",
+            eigentuemerin=self.erhebung.eigentuemerin,
+        )
+        self.erhebung.finalisieren()
+        self.stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            {"eingabe": "Wie rechnest du?"},
+        )
+
+        self.assertContains(antwort, "Die Antwort konnte nicht erzeugt werden.")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
+        self.assertIsNone(schritt.aeusserung)
+        self.assertEqual(Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3)
+
+    def test_vorzeitiges_gespraechsende_zeigt_den_debrief(self) -> None:
+        """Ein freiwilliges Ende führt bei laufender Sitzung in den Debrief."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+        )
+
+        self.assertContains(antwort, "Debrief")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
+    def test_nach_fensterende_verfaellt_die_laufende_teilnahme(self) -> None:
+        """Ein abgelaufenes Fenster sperrt die laufende Sitzung ohne Kulanz."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+
+        self.assertTrue(bindung.verfallen)
+        self.assertEqual(
+            self.client.get(
+                reverse("erhebungen:gespraech", args=[bindung.token])
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+            ).status_code,
+            403,
+        )
+
+    def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
+        """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+
+        self.assertTrue(bindung.verfallen)

@@ -68,5 +68,10 @@ urlpatterns: list[URLPattern] = [
         views.gespraech_beenden,
         name="gespraech_beenden",
     ),
+    path(
+        "teilnahme/token/<str:token>/abbrechen/",
+        views.abbrechen,
+        name="abbrechen",
+    ),
     path("teilnahme/token/<str:token>/debrief/", views.debrief, name="debrief"),
 ]

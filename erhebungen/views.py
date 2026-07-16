@@ -434,7 +434,7 @@ def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
         gespraech_url=reverse("erhebungen:gespraech", args=[token]),
         beenden_url=reverse("erhebungen:gespraech_beenden", args=[token]),
         debrief_url=reverse("erhebungen:debrief", args=[token]),
-        abbrechen_url=None,
+        abbrechen_url=reverse("erhebungen:abbrechen", args=[token]),
     )
 
 
@@ -470,6 +470,19 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     zeitbudget_anhalten(request, sitzung)
     return persistierten_debrief_anzeigen(
         request, sitzung, _sitzungsnavigation(token)
+    )
+
+
+def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
+    """Bricht eine Erhebungssitzung ohne Diagnose ab."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung, bindung = _erhebungssitzung(token)
+    zeitbudget_anhalten(request, sitzung)
+    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    return redirect(
+        "erhebungen:instruktion", teilnahme_link=bindung.stichprobe.teilnahme_link
     )
 
 
@@ -529,7 +542,7 @@ def _bindung_anlegen_fuer_laufende_stichprobe(
             Stichprobe.objects.select_for_update(),
             pk=stichprobe.pk,
         )
-        if stichprobe.phase != Stichprobe.Phase.LAUFEND:
+        if stichprobe.archiviert or stichprobe.phase != Stichprobe.Phase.LAUFEND:
             raise PermissionDenied
         return Erhebungsbindung.objects.anlegen(stichprobe)
 
@@ -541,6 +554,6 @@ def _laufende_stichprobe(teilnahme_link: UUID) -> Stichprobe:
         Stichprobe,
         teilnahme_link=teilnahme_link,
     )
-    if stichprobe.phase != Stichprobe.Phase.LAUFEND:
+    if stichprobe.archiviert or stichprobe.phase != Stichprobe.Phase.LAUFEND:
         raise PermissionDenied
     return stichprobe

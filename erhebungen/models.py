@@ -416,13 +416,14 @@ class Erhebungsbindung(models.Model):
 
         if self.stichprobe.phase != Stichprobe.Phase.NACH:
             return False
-        return self.teilnahme.sitzung_set.exclude(
-            status__in=[
-                Sitzung.Status.ABGESCHLOSSEN,
-                Sitzung.Status.ABGEBROCHEN,
-                Sitzung.Status.GESCHEITERT,
-            ]
-        ).exists() or not self.teilnahme.sitzung_set.exists()
+        sitzungen = self.teilnahme.sitzung_set
+        return (
+            not self.vignettenziehungen.exists()
+            or sitzungen.filter(status=Sitzung.Status.LAUFEND).exists()
+            or self.vignettenziehungen.exclude(
+                vignette_id__in=sitzungen.values("vignette_id")
+            ).exists()
+        )
 
     @transaction.atomic
     def vignetten_ziehen(self) -> None:
