@@ -97,6 +97,19 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         return vignette
 
+    def _laufende_sitzung_starten(self) -> Erhebungsbindung:
+        """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
+
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        return Erhebungsbindung.objects.get()
+
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
     ) -> None:
@@ -347,15 +360,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""
 
         self._vignette_anlegen()
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
-        )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
-        )
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:abbrechen", args=[bindung.token])
@@ -387,15 +392,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
         self._vignette_anlegen()
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
-        )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
-        )
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:gespraech", args=[bindung.token]),
@@ -412,15 +409,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein freiwilliges Ende führt bei laufender Sitzung in den Debrief."""
 
         self._vignette_anlegen()
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
-        )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
-        )
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:gespraech_beenden", args=[bindung.token])
@@ -433,15 +422,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein abgelaufenes Fenster sperrt die laufende Sitzung ohne Kulanz."""
 
         self._vignette_anlegen()
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
-        )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
-        )
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
         self.stichprobe.save(update_fields=["ende"])
 
