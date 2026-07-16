@@ -145,7 +145,9 @@ class Erhebung(models.Model):
         """Macht eine datenfreie finale Erhebung wieder bearbeitbar."""
 
         if self.status != self.Status.FINAL:
-            raise ValidationError("Nur finale Erhebungen können zurückgezogen werden.")
+            raise ValidationError(
+                "Nur finale Erhebungen können zurückgezogen werden."
+            )
         if not self.kann_zurueckgezogen_werden:
             raise ValidationError(
                 "Erhebungen mit nicht archivierten Stichproben können nicht "
@@ -163,7 +165,9 @@ class Erhebung(models.Model):
 
         return self.status == self.Status.FINAL and not (
             self.stichprobe_set.filter(archiviert=False).exists()
-            or any(stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all())
+            or any(
+                stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all()
+            )
         )
 
     @transaction.atomic
