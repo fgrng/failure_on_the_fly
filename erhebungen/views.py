@@ -3,27 +3,24 @@
 from uuid import UUID
 
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Erhebungsbindung, Stichprobe
 
-_TEILNAHME_TOKENS_SESSION_KEY = "erhebung_teilnahme_tokens"
+_TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 
 
 def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     """Legt beim ersten Link-Aufruf eine pseudonyme Teilnahme an oder setzt sie fort."""
     stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
-    token: str | None = tokens.get(str(teilnahme_link))
-    bindung: Erhebungsbindung | None = None
-    if token is not None:
-        bindung = Erhebungsbindung.objects.filter(
-            stichprobe=stichprobe,
-            token=token,
-        ).first()
+    bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None:
-        bindung = Erhebungsbindung.objects.anlegen(stichprobe)
+        bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
+        tokens: dict[str, str] = request.session.get(
+            _TEILNAHME_TOKENS_SESSION_KEY, {}
+        )
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
@@ -70,6 +67,21 @@ def _bindung_aus_session(
         stichprobe=stichprobe,
         token=token,
     ).first()
+
+
+def _bindung_anlegen_fuer_laufende_stichprobe(
+    stichprobe: Stichprobe,
+) -> Erhebungsbindung:
+    """Prüft das Teilnahmefenster und legt die Bindung unter derselben Sperre an."""
+
+    with transaction.atomic():
+        stichprobe = get_object_or_404(
+            Stichprobe.objects.select_for_update(),
+            pk=stichprobe.pk,
+        )
+        if stichprobe.phase != Stichprobe.Phase.LAUFEND:
+            raise PermissionDenied
+        return Erhebungsbindung.objects.anlegen(stichprobe)
 
 
 def _laufende_stichprobe(teilnahme_link: UUID) -> Stichprobe:
