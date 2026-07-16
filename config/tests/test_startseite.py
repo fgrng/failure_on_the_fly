@@ -1,6 +1,7 @@
 """HTTP-Tests für den öffentlichen Einstieg."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -16,8 +17,11 @@ class StartseiteTests(TestCase):
         response: HttpResponse = self.client.get(reverse("start"))
 
         self.assertContains(response, f'href="{reverse("login")}"')
-        self.assertContains(response, f'href="{reverse("vignetten:liste")}"')
-        self.assertContains(response, f'href="{reverse("simulation:kern")}"')
+        sidebar: str = response.content.decode().partition("</aside>")[0]
+        self.assertNotIn("Entwicklung", sidebar)
+        self.assertNotIn("Ausbildung", sidebar)
+        self.assertNotIn("Forschung", sidebar)
+        self.assertNotIn("System", sidebar)
 
     def test_angemeldete_navigation_bietet_den_logout(self) -> None:
         """Angemeldete Konten können sich über die Navigation abmelden."""
@@ -27,6 +31,67 @@ class StartseiteTests(TestCase):
         response: HttpResponse = self.client.get(reverse("start"))
 
         self.assertContains(response, "Abmelden")
+
+    def test_teilnehmerin_sieht_nur_teilnahmenavigation(self) -> None:
+        """Ein Konto ohne Sonderrolle sieht keine fremden Bereiche."""
+        konto: Konto = get_user_model().objects.create_user(username="studi")
+        self.client.force_login(konto)
+
+        response: HttpResponse = self.client.get(reverse("start"))
+        sidebar: str = response.content.decode().partition("</aside>")[0]
+
+        self.assertIn("Training starten", sidebar)
+        self.assertIn("Meine Trainings", sidebar)
+        self.assertNotIn("Entwicklung", sidebar)
+        self.assertNotIn("Forschung", sidebar)
+        self.assertNotIn("System", sidebar)
+        self.assertNotIn("Trainingskataloge ansehen", sidebar)
+        self.assertNotIn("Trainingskatalog erstellen", sidebar)
+
+    def test_sonderrollen_sehen_ihre_bereiche(self) -> None:
+        """Jede Sonderrolle erhält nur die zugehörigen Navigationslinks."""
+        for rolle, sichtbare_links, verborgene_links in (
+            (
+                "Autor:in",
+                ("Vignetten ansehen", "Simulationskern ansehen"),
+                ("Trainingskataloge ansehen", "Meine Erhebungen", "Administration"),
+            ),
+            (
+                "Ausbilder:in",
+                ("Trainingskataloge ansehen", "Trainingskatalog erstellen"),
+                ("Vignetten ansehen", "Training starten", "Meine Erhebungen"),
+            ),
+            (
+                "Forschende:r",
+                ("Meine Erhebungen", "Neue Erhebung anlegen"),
+                ("Vignetten ansehen", "Trainingskataloge ansehen", "Administration"),
+            ),
+            (
+                "Administrator:in",
+                (
+                    "Simulationskern ansehen",
+                    "Administration",
+                    "Meine Trainings",
+                    "Trainingskataloge ansehen",
+                ),
+                ("Meine Erhebungen",),
+            ),
+        ):
+            with self.subTest(rolle=rolle):
+                konto: Konto = get_user_model().objects.create_user(
+                    username=rolle, is_staff=rolle == "Administrator:in"
+                )
+                konto.groups.add(Group.objects.get(name=rolle))
+                self.client.force_login(konto)
+
+                response: HttpResponse = self.client.get(reverse("start"))
+                sidebar: str = response.content.decode().partition("</aside>")[0]
+
+                for link in sichtbare_links:
+                    self.assertIn(link, sidebar)
+                for link in verborgene_links:
+                    self.assertNotIn(link, sidebar)
+                self.client.logout()
 
     def test_bereichskarten_folgen_der_farbcodierung(self) -> None:
         """Simulationskern und Vignetten teilen sich den Entwicklungsbereich."""
