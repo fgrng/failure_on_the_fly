@@ -66,7 +66,7 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
         "zeige_entwicklung": ist_administratorin or AUTORIN_GRUPPE in rollen,
         "zeige_ausbildung_kuratieren": ist_administratorin
         or AUSBILDERIN_GRUPPE in rollen,
-        "zeige_teilnahme": ist_administratorin or not rollen,
+        "zeige_teilnahme": not rollen,
         "zeige_forschung": ist_administratorin or FORSCHENDE_GRUPPE in rollen,
         "zeige_system": ist_administratorin,
         "simulationskern_verwalten": ist_administratorin,
