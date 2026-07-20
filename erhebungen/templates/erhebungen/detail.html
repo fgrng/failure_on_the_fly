@@ -121,8 +121,8 @@
             </header>
             <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
 
-                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="verfuegbare-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten ueberschrift="Finale Vignetten aufnehmen" suchfeld_label="Verfügbare Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Vignetten verfügbar." %}
-                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="aufgenommene-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten ueberschrift="Aufgenommene Vignetten" suchfeld_label="Aufgenommene Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Vignetten gefunden." %}
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="verfuegbare-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Finale Vignetten aufnehmen" suchfeld_label="Verfügbare Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Vignetten verfügbar." %}
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="aufgenommene-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Aufgenommene Vignetten" suchfeld_label="Aufgenommene Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Vignetten gefunden." %}
 
             </div>
         </section>

@@ -1,9 +1,15 @@
-function zuordnungstabelle({ datenId, positionsId, sortierschluessel }) {
+function zuordnungstabelle({
+    datenId,
+    positionsId,
+    sortierSchluessel,
+    suchSchluessel,
+}) {
     return {
         rows: JSON.parse(document.getElementById(datenId).textContent),
         suchbegriff: "",
-        sortierschluessel,
-        sortierrichtung: 1,
+        sortierSchluessel,
+        sortierRichtung: 1,
+        suchSchluessel,
 
         init() {
             document.addEventListener("zuordnung:aktualisiert", (event) => {
@@ -16,37 +22,37 @@ function zuordnungstabelle({ datenId, positionsId, sortierschluessel }) {
                 .filter(
                     (zeile) =>
                         !suche ||
-                        [zeile.label, zeile.fach, zeile.thema]
+                        this.suchSchluessel.map((schluessel) => zeile[schluessel])
                             .join(" ")
                             .toLowerCase()
                             .includes(suche)
                 )
                 .sort((a, b) => {
-                    const links = (a[this.sortierschluessel] ?? "")
+                    const links = (a[this.sortierSchluessel] ?? "")
                         .toString()
                         .toLowerCase();
-                    const rechts = (b[this.sortierschluessel] ?? "")
+                    const rechts = (b[this.sortierSchluessel] ?? "")
                         .toString()
                         .toLowerCase();
                     return (
                         links.localeCompare(rechts, "de", { numeric: true }) *
-                        this.sortierrichtung
+                        this.sortierRichtung
                     );
                 });
         },
         sortiere(schluessel) {
-            if (this.sortierschluessel === schluessel) {
-                this.sortierrichtung *= -1;
+            if (this.sortierSchluessel === schluessel) {
+                this.sortierRichtung *= -1;
             } else {
-                this.sortierschluessel = schluessel;
-                this.sortierrichtung = 1;
+                this.sortierSchluessel = schluessel;
+                this.sortierRichtung = 1;
             }
         },
         pfeilKlasse(schluessel) {
-            if (this.sortierschluessel !== schluessel) {
+            if (this.sortierSchluessel !== schluessel) {
                 return "";
             }
-            return this.sortierrichtung === 1
+            return this.sortierRichtung === 1
                 ? "table__sort-arrow--auf"
                 : "table__sort-arrow--ab";
         },

@@ -47,6 +47,7 @@ _FORSCHENDE_GRUPPE: str = "Forschende:r"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
+_VIGNETTEN_SUCHSCHLUESSEL: tuple[str, ...] = ("label", "fach", "thema")
 P = ParamSpec("P")
 
 
@@ -183,6 +184,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 verfuegbare_vignetten, erhebung, "erhebungen:vignette_hinzufuegen"
             ),
             "vignetten_spalten": _VIGNETTEN_SPALTEN,
+            "vignetten_suchschluessel": _VIGNETTEN_SUCHSCHLUESSEL,
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,

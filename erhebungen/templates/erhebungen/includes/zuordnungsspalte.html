@@ -1,4 +1,4 @@
-<div class="vignette-field" x-data="zuordnungstabelle({ datenId: '{{ daten_id }}', positionsId: '{{ positions_id }}', sortierschluessel: '{{ spalten.0.schluessel }}' })" x-init="init()">
+<div class="vignette-field" x-data="zuordnungstabelle({ datenId: '{{ daten_id|escapejs }}', positionsId: '{{ positions_id|escapejs }}', sortierSchluessel: '{{ spalten.0.schluessel|escapejs }}', suchSchluessel: '{{ suchschluessel|join:','|escapejs }}'.split(',') })">
     <p><strong>{{ ueberschrift }}</strong></p>
     <div class="table-toolbar">
         <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="{{ suchfeld_label }}" x-model="suchbegriff">
