@@ -102,6 +102,34 @@ class FragebogenItemConstraintTests(TestCase):
 class FragebogenItemLebenszyklusTests(TestCase):
     """Die öffentliche Modell-API bewahrt den Lebenszyklus einer Fassung."""
 
+    def test_reversionieren_erhaelt_finale_vorgaengerin_und_erweitert_die_kette(
+        self,
+    ) -> None:
+        """Die neue finale Fassung ergänzt die Historie, statt die alte zu ändern."""
+        konto = get_user_model().objects.create_user(username="ada")
+        alte_fassung = FragebogenItem.objects.anlegen(
+            konto,
+            typ=FragebogenItem.Typ.FREITEXT,
+            wortlaut="Was fiel Ihnen auf?",
+        )
+        alte_fassung.finalisieren()
+        alter_finalisierungszeitpunkt = alte_fassung.finalisiert_am
+
+        neue_fassung = alte_fassung.bearbeiten()
+        neue_fassung.typ = FragebogenItem.Typ.LIKERT
+        neue_fassung.wortlaut = "Ich fühlte mich sicher."
+        neue_fassung.save()
+        neue_fassung.finalisieren()
+
+        alte_fassung.refresh_from_db()
+        self.assertEqual(alte_fassung.zustand, FragebogenItem.Zustand.FINAL)
+        self.assertEqual(alte_fassung.wortlaut, "Was fiel Ihnen auf?")
+        self.assertEqual(alte_fassung.finalisiert_am, alter_finalisierungszeitpunkt)
+        self.assertEqual(neue_fassung.vorgaengerin, alte_fassung)
+        self.assertEqual(
+            FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
+        )
+
     def test_finalisieren_bearbeiten_und_archivieren(self) -> None:
         """Finale Fassungen bleiben unveränderlich und versionieren sich linear."""
         konto = get_user_model().objects.create_user(username="ada")

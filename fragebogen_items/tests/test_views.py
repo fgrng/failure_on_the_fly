@@ -137,6 +137,88 @@ class FragebogenItemFinalisierenViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class FragebogenItemReversionierenViewTests(TestCase):
+    """Finale Fassungen erhalten im Editor einen bearbeitbaren Folgeentwurf."""
+
+    def test_erstellt_aus_finaler_fassung_einen_entwurf(self) -> None:
+        """Die Aktion verknüpft den Entwurf mit der unveränderten Vorgängerin."""
+        ada: Konto = _forschende("ada")
+        finale: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Die Aufgaben waren verständlich.",
+        )
+        finale.finalisieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[finale.pk])
+        )
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[finale.pk])
+        )
+
+        self.assertContains(
+            detail, reverse("fragebogen_items:neue_fassung", args=[finale.pk])
+        )
+        entwurf: FragebogenItem = FragebogenItem.objects.get(vorgaengerin=finale)
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[entwurf.pk])
+        )
+        self.assertEqual(entwurf.zustand, FragebogenItem.Zustand.ENTWURF)
+        self.assertEqual(entwurf.historie, finale.historie)
+
+    def test_entwurf_ist_bearbeitbar_und_warnt_vor_typwechsel(self) -> None:
+        """Der Editor lässt den Wechsel zu Likert zu und weist auf ihn hin."""
+        ada: Konto = _forschende("ada")
+        finale: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Was fiel Ihnen auf?",
+        )
+        finale.finalisieren()
+        entwurf: FragebogenItem = finale.bearbeiten()
+        self.client.force_login(ada)
+
+        editor: HttpResponse = self.client.get(
+            reverse("fragebogen_items:bearbeiten", args=[entwurf.pk])
+        )
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:bearbeiten", args=[entwurf.pk]),
+            {
+                "typ": FragebogenItem.Typ.LIKERT,
+                "wortlaut": "Ich fühlte mich sicher.",
+            },
+        )
+
+        self.assertContains(editor, "Typwechsel")
+        self.assertRedirects(response, reverse("fragebogen_items:detail", args=[entwurf.pk]))
+        entwurf.refresh_from_db()
+        self.assertEqual(entwurf.typ, FragebogenItem.Typ.LIKERT)
+
+    def test_alte_finale_fassung_bietet_keine_weitere_reversionierung_an(
+        self,
+    ) -> None:
+        """Nur die neueste nichtarchivierte Fassung kann einen Entwurf erzeugen."""
+        ada: Konto = _forschende("ada")
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Erste Fassung",
+        )
+        alte_fassung.finalisieren()
+        neue_fassung = alte_fassung.bearbeiten()
+        neue_fassung.finalisieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[alte_fassung.pk])
+        )
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[alte_fassung.pk])
+        )
+
+        self.assertNotContains(detail, "Neue Fassung")
+        self.assertEqual(response.status_code, 404)
+
+
 class FragebogenItemSichtbarkeitViewTests(TestCase):
     """Die Bibliothek bleibt auf den Eigentümer-Kreis beschränkt."""
 

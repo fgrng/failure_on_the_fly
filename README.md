@@ -69,8 +69,9 @@ Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
 Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die
 private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst als
 Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
-sind unveränderlich und für Erhebungen einbindbar. Die Bibliothek zeigt nur Items
-aus dem eigenen Eigentümer-Kreis; Likert-Items verwenden die sechs global
+sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
+stattdessen einen bearbeitbaren Folgeentwurf. Die Bibliothek zeigt nur Items aus
+dem eigenen Eigentümer-Kreis; Likert-Items verwenden die sechs global
 festgelegten, nicht editierbaren Skalenstufen.
 
 ## Lokale Entwicklungsumgebung

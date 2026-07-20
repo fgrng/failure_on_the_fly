@@ -14,9 +14,15 @@
         </dl>
     </section>
     {% if item.zustand == item.Zustand.ENTWURF %}
+        <p><a class="button button--secondary" href="{% url 'fragebogen_items:bearbeiten' item.pk %}">Bearbeiten</a></p>
         <form method="post" action="{% url 'fragebogen_items:finalisieren' item.pk %}">
             {% csrf_token %}
             <button class="button" type="submit">Finalisieren</button>
+        </form>
+    {% elif item.zustand == item.Zustand.FINAL and ist_neueste_nichtarchivierte_fassung %}
+        <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
+            {% csrf_token %}
+            <button class="button button--secondary" type="submit">Neue Fassung</button>
         </form>
     {% endif %}
     {% if item.typ == item.Typ.LIKERT %}

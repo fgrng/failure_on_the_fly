@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Fragebogen-Item bearbeiten{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="area-band"><h1>Fragebogen-Item bearbeiten</h1></header>
+    <form method="post">
+        {% csrf_token %}
+        <section class="page-section">
+            <div class="page-section__head"><b>01</b><div><h2>Item</h2></div></div>
+            <div class="field-grid">
+                <p>{{ form.typ.label_tag }} {{ form.typ }}</p>
+                <p class="page-field--wide">{{ form.wortlaut.label_tag }} {{ form.wortlaut }}</p>
+            </div>
+            {% if item.vorgaengerin %}
+                <p id="typwechsel-warnung" hidden>Typwechsel: Antworten der Vorgängerin bleiben beim bisherigen Typ.</p>
+                <script>
+                    const typ = document.getElementById("id_typ");
+                    const warnung = document.getElementById("typwechsel-warnung");
+                    const aktualisiereWarnung = () => { warnung.hidden = typ.value === "{{ item.vorgaengerin.typ }}"; };
+                    typ.addEventListener("change", aktualisiereWarnung);
+                    aktualisiereWarnung();
+                </script>
+            {% endif %}
+        </section>
+        <p><button class="button" type="submit">Änderungen speichern</button></p>
+    </form>
+</section>
+{% endblock %}
