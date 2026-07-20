@@ -4,7 +4,7 @@ from functools import wraps
 from typing import Callable, Concatenate, ParamSpec, TypedDict
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import FragebogenItemForm
@@ -44,14 +44,16 @@ def _forschende_erforderlich(
     return geschuetzte_view
 
 
-def _sichtbares_item(request: HttpRequest, pk: int) -> FragebogenItem:
+def _sichtbares_item(
+    request: HttpRequest, pk: int, zustand: str | None = None
+) -> FragebogenItem:
     # Lädt eine Item-Fassung aus dem Eigentümer-Kreis der eingeloggten Person.
-    return get_object_or_404(
-        FragebogenItem.objects.filter(
-            historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
-        ),
-        pk=pk,
+    items = FragebogenItem.objects.filter(
+        historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
     )
+    if zustand is not None:
+        items = items.filter(zustand=zustand)
+    return get_object_or_404(items, pk=pk)
 
 
 def _zustand_badge(item: FragebogenItem) -> str:
@@ -106,3 +108,14 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "likert_skalenpole": LikertSkalenpol.choices,
         },
     )
+
+
+@login_required
+@_forschende_erforderlich
+def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert einen sichtbaren Entwurf über die Modell-Naht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item = _sichtbares_item(request, pk, FragebogenItem.Zustand.ENTWURF)
+    item.finalisieren()
+    return redirect("fragebogen_items:detail", pk=item.pk)

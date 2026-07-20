@@ -62,6 +62,51 @@ class FragebogenItemAnlegenViewTests(TestCase):
         self.assertEqual(item.typ, FragebogenItem.Typ.FREITEXT)
 
 
+class FragebogenItemFinalisierenViewTests(TestCase):
+    """Entwürfe werden im Editor zu einbindbaren finalen Fassungen."""
+
+    def test_finalisiert_eigenen_entwurf_und_zeigt_final_in_der_bibliothek(self) -> None:
+        """Die sichtbare Aktion friert das Item samt Finalisierungszeitpunkt ein."""
+        ada: Konto = _forschende("ada")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Die Aufgaben waren verständlich."
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[item.pk])
+        )
+
+        item.refresh_from_db()
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        self.assertEqual(item.zustand, FragebogenItem.Zustand.FINAL)
+        self.assertIsNotNone(item.finalisiert_am)
+        self.assertContains(
+            self.client.get(reverse("fragebogen_items:liste")), "Final"
+        )
+        self.assertNotContains(
+            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])),
+            "Bearbeiten",
+        )
+
+    def test_finalisieren_akzeptiert_keine_bereits_finale_fassung(self) -> None:
+        """Die zustandsgebundene Aktion ist nach dem Finalisieren nicht erneut nutzbar."""
+        ada: Konto = _forschende("ada")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Die Aufgaben waren verständlich."
+        )
+        item.finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[item.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class FragebogenItemSichtbarkeitViewTests(TestCase):
     """Die Bibliothek bleibt auf den Eigentümer-Kreis beschränkt."""
 

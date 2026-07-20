@@ -105,14 +105,21 @@ class FragebogenItemLebenszyklusTests(TestCase):
     def test_finalisieren_bearbeiten_und_archivieren(self) -> None:
         """Finale Fassungen bleiben unveränderlich und versionieren sich linear."""
         konto = get_user_model().objects.create_user(username="ada")
-        item = FragebogenItem.objects.anlegen(konto, wortlaut="Wie geht es dir?")
+        item = FragebogenItem.objects.anlegen(
+            konto,
+            typ=FragebogenItem.Typ.FREITEXT,
+            wortlaut="Wie geht es dir?",
+        )
 
         item.finalisieren()
         finalisiert_am = item.finalisiert_am
         item.wortlaut = "Geändert"
+        item.typ = FragebogenItem.Typ.LIKERT
         with self.assertRaises(ValidationError):
             item.save()
         item.refresh_from_db()
+        self.assertEqual(item.wortlaut, "Wie geht es dir?")
+        self.assertEqual(item.typ, FragebogenItem.Typ.FREITEXT)
 
         entwurf = item.bearbeiten()
         self.assertEqual(entwurf.vorgaengerin, item)

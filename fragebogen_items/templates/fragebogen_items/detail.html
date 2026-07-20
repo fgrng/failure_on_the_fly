@@ -13,6 +13,12 @@
             <div class="page-field--wide"><dt>Wortlaut</dt><dd>{{ item.wortlaut|default:"—" }}</dd></div>
         </dl>
     </section>
+    {% if item.zustand == item.Zustand.ENTWURF %}
+        <form method="post" action="{% url 'fragebogen_items:finalisieren' item.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Finalisieren</button>
+        </form>
+    {% endif %}
     {% if item.typ == item.Typ.LIKERT %}
         <section class="page-section">
             <div class="page-section__head"><b>02</b><div><h2>Likert-Skala</h2><small>Global festgelegt</small></div></div>
