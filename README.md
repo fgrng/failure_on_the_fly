@@ -72,7 +72,8 @@ Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
 Innerhalb jedes Andockpunkts lässt sich die Vorlage-Reihenfolge per Hoch und
 Runter festlegen; beim Entfernen eines Items schließt sich die Reihenfolge.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
-ZIP mit relationalen CSV-Dateien herunterladen.
+ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
+Vignettenziehungen und der tatsächlich gelaufenen Sitzungen.
 
 ## Fragebogen-Items verwalten
 

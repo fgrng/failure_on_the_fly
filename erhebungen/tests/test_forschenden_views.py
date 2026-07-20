@@ -19,10 +19,12 @@ from erhebungen.models import (
     Erhebungsitem,
     Erhebungsvignette,
     Stichprobe,
+    Vignettenposition,
+    Vignettenziehung,
 )
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Teilnahme
+from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -1092,7 +1094,13 @@ class ErhebungsExportTests(TestCase):
         with ZipFile(BytesIO(response.content)) as zip_datei:
             self.assertEqual(
                 sorted(zip_datei.namelist()),
-                ["erhebung.csv", "stichproben.csv", "teilnahmen.csv"],
+                [
+                    "erhebung.csv",
+                    "sitzungen.csv",
+                    "stichproben.csv",
+                    "teilnahmen.csv",
+                    "vignettenziehungen.csv",
+                ],
             )
             erhebungszeile = next(
                 csv.DictReader(
@@ -1120,6 +1128,110 @@ class ErhebungsExportTests(TestCase):
         self.assertRegex(
             teilnahmezeile["erstellt_am"],
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
+        )
+
+    def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
+        """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        bindungen: list[Erhebungsbindung] = [
+            Erhebungsbindung.objects.create(
+                stichprobe=stichprobe,
+                teilnahme=Teilnahme.objects.create(),
+                token=f"2345-678{nummer}",
+            )
+            for nummer in range(1, 6)
+        ]
+        for bindung in bindungen:
+            Vignettenziehung.objects.create(
+                erhebungsbindung=bindung, vignette=vignette, position=1
+            )
+        for bindung, status in zip(bindungen[:4], Sitzung.Status.values, strict=True):
+            sitzung: Sitzung = Sitzung.objects.create(
+                teilnahme=bindung.teilnahme,
+                vignette=vignette,
+                simulationskern=kern,
+                modell_konfiguration=konfiguration,
+                status=status,
+            )
+            Vignettenposition.objects.create(
+                erhebungsbindung=bindung,
+                sitzung=sitzung,
+                vignette=vignette,
+                position=1,
+            )
+        Sitzung.objects.create(
+            teilnahme=Teilnahme.objects.create(),
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            ziehungen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("vignettenziehungen.csv"), encoding="utf-8"
+                    )
+                )
+            )
+            sitzungen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("sitzungen.csv"), encoding="utf-8")
+                )
+            )
+
+        self.assertEqual(
+            {
+                "ziehungen": {
+                    (
+                        ziehung["token"],
+                        ziehung["vignette_id"],
+                        ziehung["position"],
+                    )
+                    for ziehung in ziehungen
+                },
+                "sitzungen": {
+                    (
+                        sitzung["token"],
+                        sitzung["vignette_id"],
+                        sitzung["position"],
+                        sitzung["status"],
+                    )
+                    for sitzung in sitzungen
+                },
+            },
+            {
+                "ziehungen": {
+                    (bindung.token, str(vignette.pk), "1") for bindung in bindungen
+                },
+                "sitzungen": {
+                    (bindung.token, str(vignette.pk), "1", status)
+                    for bindung, status in zip(
+                        bindungen[:4], Sitzung.Status.values, strict=True
+                    )
+                },
+            },
         )
 
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
@@ -1154,7 +1266,13 @@ class ErhebungsExportTests(TestCase):
             r'^attachment; filename="erhebung-\d+-leerer-entwurf-\d{8}T\d{6}Z.zip"$',
         )
         with ZipFile(BytesIO(export.content)) as zip_datei:
-            for dateiname in ("erhebung.csv", "stichproben.csv", "teilnahmen.csv"):
+            for dateiname in (
+                "erhebung.csv",
+                "stichproben.csv",
+                "teilnahmen.csv",
+                "vignettenziehungen.csv",
+                "sitzungen.csv",
+            ):
                 with TextIOWrapper(zip_datei.open(dateiname), encoding="utf-8") as csv_datei:
                     self.assertEqual(
                         len(list(csv.reader(csv_datei))),
