@@ -141,6 +141,7 @@ def _itemzeilen(
     aktion: str,
     zugehoerigkeiten: dict[int, Erhebungsitem] | None = None,
     badge_beschriftungen: dict[int, str] | None = None,
+    bearbeitbar: bool = True,
 ) -> list[dict[str, object]]:
     """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
 
@@ -160,6 +161,15 @@ def _itemzeilen(
     item_liste: list[FragebogenItem] = list(items)
     for index, item in enumerate(item_liste):
         zugehoerigkeit: Erhebungsitem = zugehoerigkeiten[item.pk]
+        if not bearbeitbar:
+            zeilen.append(
+                {
+                    "pk": item.pk,
+                    "label": item.wortlaut,
+                    "position": zugehoerigkeit.position,
+                }
+            )
+            continue
         aktionen: list[dict[str, str]] = []
         if index:
             aktionen.append(
@@ -280,6 +290,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                     zugehoerigkeit.item_id: zugehoerigkeit
                     for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
                 },
+                bearbeitbar=erhebung.status == Erhebung.Status.ENTWURF,
             ),
             "verfuegbare": _itemzeilen(
                 _eigene_finalen_items(request).exclude(

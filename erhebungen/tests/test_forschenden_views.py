@@ -641,6 +641,19 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             )
         )
         self.assertEqual(wieder_offen.status_code, 200)
+        self.assertContains(wieder_offen, "Finale Items aufnehmen")
+        zugehoerigkeit: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        self.assertContains(
+            wieder_offen,
+            reverse(
+                "erhebungen:item_entfernen",
+                args=[self.erhebung.pk, zugehoerigkeit.pk],
+            ),
+        )
 
     def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:
         """Beide Spalten tragen dieselbe Zeilenform mit passender Aktions-URL."""
@@ -1636,3 +1649,85 @@ class ErhebungsExportTests(TestCase):
 
         self.assertContains(detail, reverse("erhebungen:export", args=[erhebung.pk]))
         self.assertEqual(export.status_code, 200)
+
+
+class ErhebungenGesperrteItemzuordnungTests(TestCase):
+    """Finale Erhebungen zeigen ihre Itemzuordnung ohne Änderungswege."""
+
+    def test_finale_erhebung_zeigt_items_je_andockpunkt_ohne_bibliothek_oder_aktionen(
+        self,
+    ) -> None:
+        """Das eingefrorene Design bleibt in seiner Reihenfolge lesbar."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        nach_sitzung_zwei: FragebogenItem = _finales_item_anlegen(
+            ada, "Nach Sitzung zwei"
+        )
+        nach_sitzung_eins: FragebogenItem = _finales_item_anlegen(
+            ada, "Nach Sitzung eins"
+        )
+        am_ende: FragebogenItem = _finales_item_anlegen(ada, "Am Ende")
+        erste_bindung: Erhebungsitem = Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=nach_sitzung_eins,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=1,
+        )
+        zweite_bindung: Erhebungsitem = Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=nach_sitzung_zwei,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=2,
+        )
+        ende_bindung: Erhebungsitem = Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=am_ende,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            position=1,
+        )
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        erhebung.finalisieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+
+        inhalt: str = detail.content.decode()
+        self.assertContains(detail, "Nach jeder Vignettensitzung")
+        self.assertContains(detail, "Am Ende")
+        self.assertLess(inhalt.index("Nach Sitzung eins"), inhalt.index("Nach Sitzung zwei"))
+        self.assertNotContains(detail, "Finale Items aufnehmen")
+        for url in (
+            reverse("erhebungen:item_entfernen", args=[erhebung.pk, erste_bindung.pk]),
+            reverse("erhebungen:item_hoch", args=[erhebung.pk, zweite_bindung.pk]),
+            reverse("erhebungen:item_runter", args=[erhebung.pk, erste_bindung.pk]),
+            reverse("erhebungen:item_entfernen", args=[erhebung.pk, ende_bindung.pk]),
+        ):
+            self.assertNotContains(detail, url)
+
+    def test_archivierte_erhebung_zeigt_leere_andockpunktbereiche_gesperrt(self) -> None:
+        """Auch ohne Items bleibt die archivierte Zuordnung als leere Ansicht lesbar."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        erhebung.finalisieren()
+        erhebung.archivieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+
+        self.assertContains(detail, "Nach jeder Vignettensitzung")
+        self.assertContains(detail, "Am Ende")
+        self.assertContains(detail, "Keine Items aufgenommen.", count=2)
+        self.assertNotContains(detail, "Finale Items aufnehmen")

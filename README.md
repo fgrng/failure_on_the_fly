@@ -73,6 +73,8 @@ Ist eine Fassung bereits am anderen Andockpunkt gebunden, kennzeichnet die
 jeweilige Bibliothek dies, ohne ihre Aufnahme zu verhindern.
 Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items per
 Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
+Finale und archivierte Erhebungen zeigen diese Zuordnung weiterhin ohne Bibliothek
+und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
