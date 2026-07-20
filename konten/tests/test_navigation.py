@@ -130,6 +130,7 @@ class SidebarNavigationTests(TestCase):
 
         self.assertIn("Meine Erhebungen", sidebar)
         self.assertIn("Neue Erhebung anlegen", sidebar)
+        self.assertIn("Fragebogen-Items", sidebar)
 
     def test_administratorin_sieht_alle_bereiche_ausser_teilnahme(self) -> None:
         """Die Gruppenrolle der Administration überschreibt fast alle Sichtbarkeiten."""
@@ -140,6 +141,7 @@ class SidebarNavigationTests(TestCase):
             "Simulationskern verwalten",
             "Trainingskatalog erstellen",
             "Meine Erhebungen",
+            "Fragebogen-Items",
             "Administration",
         ):
             self.assertIn(text, sidebar)

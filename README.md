@@ -64,6 +64,14 @@ Erhebung lassen sich Stichproben mit Beginn und Ende anlegen; die Detailseite
 zeigt ihren kopierbaren Teilnahme-Link, die aktuelle Phase und die Zahl ihrer
 Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
 
+## Fragebogen-Items verwalten
+
+Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die
+private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst als
+Entwurf an. Die Bibliothek zeigt nur Items aus dem eigenen Eigentümer-Kreis;
+Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
+Skalenstufen.
+
 ## Lokale Entwicklungsumgebung
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.

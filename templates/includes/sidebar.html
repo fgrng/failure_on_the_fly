@@ -52,6 +52,14 @@
                         >
                             Neue Erhebung anlegen
                         </a>
+                        <a
+                            href="{% url 'fragebogen_items:liste' %}"
+                            {% if request.resolver_match.namespace == "fragebogen_items" %}
+                                aria-current="page"
+                            {% endif %}
+                        >
+                            Fragebogen-Items
+                        </a>
                         <span>Datenspuren <small>geplant</small></span>
                     </div>
             </section>

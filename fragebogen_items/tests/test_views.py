@@ -1,0 +1,163 @@
+"""HTTP-Tests für den Fragebogen-Item-Editor."""
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.http import HttpResponse
+from django.test import TestCase
+from django.urls import reverse
+
+from fragebogen_items.models import FragebogenItem
+from konten.models import Konto
+
+
+def _forschende(username: str) -> Konto:
+    """Legt ein Konto mit Zugriff auf den Fragebogen-Item-Editor an."""
+    konto: Konto = get_user_model().objects.create_user(username=username)
+    konto.groups.add(Group.objects.get(name="Forschende:r"))
+    return konto
+
+
+class FragebogenItemAnlegenViewTests(TestCase):
+    """Das Anlegeformular ist die HTTP-Naht zum Item-Manager."""
+
+    def test_legt_likert_entwurf_an_und_listet_ihn(self) -> None:
+        """Eine Forschende legt ein Likert-Item an und findet es in ihrer Bibliothek."""
+        ada: Konto = _forschende("ada")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:anlegen"),
+            {
+                "typ": FragebogenItem.Typ.LIKERT,
+                "wortlaut": "Die Aufgaben waren verständlich.",
+            },
+        )
+
+        item: FragebogenItem = FragebogenItem.objects.get()
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        self.assertEqual(item.zustand, FragebogenItem.Zustand.ENTWURF)
+        self.assertEqual(list(item.historie.eigentuemerinnen.all()), [ada])
+
+        liste: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        self.assertContains(liste, "Die Aufgaben waren verständlich.")
+        self.assertContains(liste, "Entwurf")
+
+    def test_legt_freitext_entwurf_an(self) -> None:
+        """Eine Forschende kann auch ein Freitext-Item über HTTP anlegen."""
+        ada: Konto = _forschende("ada")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:anlegen"),
+            {"typ": FragebogenItem.Typ.FREITEXT, "wortlaut": "Was fiel Ihnen auf?"},
+        )
+
+        item: FragebogenItem = FragebogenItem.objects.get()
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        self.assertEqual(item.typ, FragebogenItem.Typ.FREITEXT)
+
+
+class FragebogenItemSichtbarkeitViewTests(TestCase):
+    """Die Bibliothek bleibt auf den Eigentümer-Kreis beschränkt."""
+
+    def test_versteckt_fremde_items_in_liste_und_detail(self) -> None:
+        """Eine Forschende kann weder fremde Listenzeilen noch Detail-URLs sehen."""
+        ada: Konto = _forschende("ada")
+        grace: Konto = _forschende("grace")
+        eigenes_item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Mein Item"
+        )
+        fremdes_item: FragebogenItem = FragebogenItem.objects.anlegen(
+            grace, wortlaut="Fremdes Item"
+        )
+        self.client.force_login(ada)
+
+        liste: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+        detail: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[fremdes_item.pk])
+        )
+
+        self.assertContains(liste, eigenes_item.wortlaut)
+        self.assertNotContains(liste, fremdes_item.wortlaut)
+        self.assertEqual(detail.status_code, 404)
+
+    def test_konto_ohne_forschungsrolle_erhaelt_403(self) -> None:
+        """Die App hält ihre Forschenden-Rollenprüfung selbst."""
+        konto: Konto = get_user_model().objects.create_user(username="grace")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            konto, wortlaut="Geschütztes Item"
+        )
+        self.client.force_login(konto)
+
+        for url in (
+            reverse("fragebogen_items:liste"),
+            reverse("fragebogen_items:anlegen"),
+            reverse("fragebogen_items:detail", args=[item.pk]),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 403)
+
+
+class FragebogenItemLikertViewTests(TestCase):
+    """Likert-Items zeigen ihre global festgelegte Skala nur lesend."""
+
+    def test_detail_zeigt_alle_globalen_likert_stufen_ohne_eingabefelder(self) -> None:
+        """Die Skalenpole sind sichtbar, aber am Item nicht konfigurierbar."""
+        ada: Konto = _forschende("ada")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            typ=FragebogenItem.Typ.LIKERT,
+            wortlaut="Ich fühle mich sicher.",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[item.pk])
+        )
+
+        for skalenpol in (
+            "Stimme voll zu",
+            "Stimme zu",
+            "Stimme eher zu",
+            "Stimme eher nicht zu",
+            "Stimme nicht zu",
+            "Stimme gar nicht zu",
+        ):
+            self.assertContains(response, skalenpol)
+        self.assertNotContains(response, 'name="skalenpol"')
+
+
+class FragebogenItemListeViewTests(TestCase):
+    """Die Bibliothek verdichtet Fassungen zu einer Zeile je Historie."""
+
+    def test_zeigt_pro_historie_nur_die_neueste_fassung_mit_ihrem_zustand(
+        self,
+    ) -> None:
+        """Alte Fassungen bleiben aus der Bibliothek ausgeblendet."""
+        ada: Konto = _forschende("ada")
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Alte Fassung"
+        )
+        alte_fassung.finalisieren()
+        neue_fassung: FragebogenItem = alte_fassung.bearbeiten()
+        neue_fassung.wortlaut = "Neueste Fassung"
+        neue_fassung.save()
+        finale_historie: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Bereits final"
+        )
+        finale_historie.finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        self.assertContains(response, "Neueste Fassung")
+        self.assertNotContains(response, "Alte Fassung")
+        self.assertContains(response, "Entwurf")
+        self.assertContains(response, "Bereits final")
+        self.assertContains(response, "Final")
+        self.assertContains(response, 'badge--final')
+        self.assertContains(response, 'badge--research')

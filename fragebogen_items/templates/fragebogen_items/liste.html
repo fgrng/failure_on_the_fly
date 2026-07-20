@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Fragebogen-Items{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="area-band"><h1>Fragebogen-Items</h1></header>
+    <section class="page-section">
+        <div class="page-section__head"><b>01</b><div><h2>Item-Bibliothek</h2></div></div>
+        <div>
+            <p><a class="button" href="{% url 'fragebogen_items:anlegen' %}">Neues Item anlegen</a></p>
+            <ul>
+                {% for item in items %}
+                    <li><a href="{% url 'fragebogen_items:detail' item.item.pk %}">{{ item.name }}</a> <span class="badge badge--{{ item.zustand_badge }} badge--research">{{ item.item.get_zustand_display }}</span></li>
+                {% empty %}
+                    <li>Noch keine Fragebogen-Items vorhanden.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+</section>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Fragebogen-Item anlegen{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="area-band"><h1>Fragebogen-Item anlegen</h1></header>
+    <form method="post">
+        {% csrf_token %}
+        <section class="page-section">
+            <div class="page-section__head"><b>01</b><div><h2>Item</h2></div></div>
+            <div class="field-grid">
+                <p>{{ form.typ.label_tag }} {{ form.typ }}</p>
+                <p class="page-field--wide">{{ form.wortlaut.label_tag }} {{ form.wortlaut }}</p>
+            </div>
+        </section>
+        <p><button class="button" type="submit">Item anlegen</button></p>
+    </form>
+</section>
+{% endblock %}

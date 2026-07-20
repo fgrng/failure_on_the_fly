@@ -167,6 +167,10 @@ a:hover {
     background: var(--color-border);
     color: var(--color-text-muted);
 }
+.badge--research {
+    background: var(--color-area-research-tint);
+    color: var(--color-text);
+}
 
 /* ---- Formulare und Rückmeldungen ---- */
 .form label {

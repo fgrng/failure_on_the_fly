@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Fragebogen-Item{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="area-band"><h1>Fragebogen-Item</h1></header>
+    <section class="page-section">
+        <div class="page-section__head"><b>01</b><div><h2>Fassung</h2></div></div>
+        <dl class="field-grid">
+            <div><dt>Typ</dt><dd>{{ item.get_typ_display }}</dd></div>
+            <div><dt>Zustand</dt><dd>{{ item.get_zustand_display }}</dd></div>
+            <div class="page-field--wide"><dt>Wortlaut</dt><dd>{{ item.wortlaut|default:"—" }}</dd></div>
+        </dl>
+    </section>
+    {% if item.typ == item.Typ.LIKERT %}
+        <section class="page-section">
+            <div class="page-section__head"><b>02</b><div><h2>Likert-Skala</h2><small>Global festgelegt</small></div></div>
+            <ol>{% for pol in likert_skalenpole %}<li>{{ pol.1 }}</li>{% endfor %}</ol>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}
