@@ -72,8 +72,8 @@
     --color-area-participant-solid: var(--phsg-mint-dark);
     --color-area-participant-on-solid: var(--phsg-white);
     --color-area-participant-tint: var(--phsg-green-light);
-    --color-area-authoring-solid: var(--phsg-yellow-light);
-    --color-area-authoring-on-solid: var(--phsg-yellow-deep);
+    --color-area-authoring-solid: var(--phsg-yellow-dark);
+    --color-area-authoring-on-solid: var(--phsg-white);
     --color-area-authoring-tint: var(--phsg-yellow-light);
     --color-area-research-solid: var(--phsg-purple-dark);
     --color-area-research-on-solid: var(--phsg-white);

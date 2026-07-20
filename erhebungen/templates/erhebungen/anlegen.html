@@ -1,25 +1,38 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Erhebung anlegen{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
 {% block content %}
-    <div class="page area--research">
-        <header class="area-band"><h1>Erhebung anlegen</h1></header>
-        <section class="page-section">
-            <div class="page-section__head">
-                <b>01</b>
-                <div>
-                    <h2>Name</h2>
-                </div>
-            </div>
-            <form method="post">
-                {% csrf_token %}
-                <p>
+<section class="page area--research">
+    <header class="page-head">
+        <div>
+            <p>Forschung</p>
+            <h1>Neue Erhebung anlegen</h1>
+            <span>Legen Sie den Namen für die Datenerhebung fest.</span>
+        </div>
+    </header>
+    <form method="post">
+        {% csrf_token %}
+        <section class="page-section" aria-labelledby="section-name">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-name">Name</h2><small>Wie soll die Erhebung heißen?</small></span>
+            </header>
+            <div class="field-grid">
+                <div class="vignette-field">
                     <label for="id_name">Name</label>
                     <input id="id_name" name="name" required>
-                </p>
-                <button type="submit">Anlegen</button>
-            </form>
+                </div>
+            </div>
         </section>
-    </div>
+        <div class="vignette-form-actions">
+            <a href="{% url 'erhebungen:liste' %}">Abbrechen</a>
+            <button class="button" type="submit">Anlegen</button>
+        </div>
+    </form>
+</section>
 {% endblock %}

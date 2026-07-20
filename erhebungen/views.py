@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from functools import wraps
-from typing import Callable, Concatenate, ParamSpec
+from typing import Callable, Concatenate, Iterable, ParamSpec
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -80,6 +80,33 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     )
 
 
+def _status_badge(erhebung: Erhebung) -> str:
+    """Ordnet Erhebungsstatus den gemeinsamen Badge-Klassen zu."""
+
+    return {
+        Erhebung.Status.ENTWURF: "draft",
+        Erhebung.Status.FINAL: "final",
+        Erhebung.Status.ARCHIVIERT: "archived",
+    }[erhebung.status]
+
+
+def _vignettenzeilen(
+    vignetten: Iterable[Vignette], erhebung: Erhebung, aktion: str
+) -> list[dict[str, object]]:
+    """Baut die Tabellenzeilen einer Zuordnungsspalte samt ihrer Aktions-URL."""
+
+    return [
+        {
+            "pk": vignette.pk,
+            "label": vignette.historie.name or vignette.fach,
+            "fach": vignette.fach,
+            "thema": vignette.thema,
+            "aktion_url": reverse(aktion, args=[erhebung.pk, vignette.pk]),
+        }
+        for vignette in vignetten
+    ]
+
+
 def _validierte_aktion_ausfuehren(
     request: HttpRequest, aktion: Callable[[], None]
 ) -> None:
@@ -96,11 +123,10 @@ def _validierte_aktion_ausfuehren(
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die eigenen Erhebungen einer Forschenden."""
 
-    return render(
-        request,
-        "erhebungen/liste.html",
-        {"erhebungen": Erhebung.objects.sichtbar_fuer(request.user)},
-    )
+    erhebungen: QuerySet[Erhebung] = Erhebung.objects.sichtbar_fuer(request.user)
+    for erhebung in erhebungen:
+        erhebung.status_badge = _status_badge(erhebung)
+    return render(request, "erhebungen/liste.html", {"erhebungen": erhebungen})
 
 
 @login_required
@@ -130,16 +156,28 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         stichprobe.teilnahme_url = request.build_absolute_uri(
             reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
         )
+
+    vignettenzugehoerigkeiten: QuerySet[Erhebungsvignette] = (
+        erhebung.vignettenzugehoerigkeiten.select_related("vignette", "vignette__historie")
+    )
+    verfuegbare_vignetten: QuerySet[Vignette] = _eigene_finalen_vignetten(request).exclude(
+        pk__in=erhebung.vignetten.values("pk")
+    )
+
     return render(
         request,
         "erhebungen/detail.html",
         {
             "erhebung": erhebung,
-            "vignettenzugehoerigkeiten": erhebung.vignettenzugehoerigkeiten.select_related(
-                "vignette", "vignette__historie"
+            "status_badge": _status_badge(erhebung),
+            "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
+            "aufgenommene_daten": _vignettenzeilen(
+                [zugehoerigkeit.vignette for zugehoerigkeit in vignettenzugehoerigkeiten],
+                erhebung,
+                "erhebungen:vignette_entfernen",
             ),
-            "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
-                pk__in=erhebung.vignetten.values("pk")
+            "verfuegbare_daten": _vignettenzeilen(
+                verfuegbare_vignetten, erhebung, "erhebungen:vignette_hinzufuegen"
             ),
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
             "kann_archivieren": erhebung.kann_archiviert_werden,
