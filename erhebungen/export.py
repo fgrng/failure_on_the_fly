@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.utils import timezone
 
-from .models import Erhebung
+from .models import Erhebung, Erhebungsbindung
 
 
 def _zellenwert(wert: Any) -> str | int | bool:
@@ -25,17 +25,24 @@ def _zellenwert(wert: Any) -> str | int | bool:
 def _csv_inhalt(spalten: Sequence[str], zeilen: Iterable[Sequence[Any]]) -> str:
     """Erzeugt eine RFC-4180-CSV, auch wenn keine Datenzeilen vorliegen."""
 
-    ausgabe = StringIO(newline="")
-    schreiber = csv.writer(ausgabe)
+    ausgabe: StringIO = StringIO(newline="")
+    schreiber: Any = csv.writer(ausgabe)
     schreiber.writerow(spalten)
-    schreiber.writerows([[_zellenwert(wert) for wert in zeile] for zeile in zeilen])
+    schreiber.writerows(
+        [_zellenwert(wert) for wert in zeile] for zeile in zeilen
+    )
     return ausgabe.getvalue()
 
 
 def datenspur_zip(erhebung: Erhebung) -> bytes:
     """Liefert den ersten Export-Durchstich für eine Erhebung als ZIP-Archiv."""
 
-    ausgabe = BytesIO()
+    ausgabe: BytesIO = BytesIO()
+    bindungen: Iterable[Erhebungsbindung] = (
+        Erhebungsbindung.objects.filter(stichprobe__erhebung=erhebung)
+        .select_related("teilnahme")
+        .order_by("stichprobe_id", "pk")
+    )
     with ZipFile(ausgabe, "w", compression=ZIP_DEFLATED) as zip_datei:
         zip_datei.writestr(
             "erhebung.csv",
@@ -92,10 +99,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         bindung.randomisierungs_seed,
                         bindung.erstellt_am,
                     )
-                    for stichprobe in erhebung.stichprobe_set.order_by("pk").prefetch_related(
-                        "erhebungsbindung_set__teilnahme"
-                    )
-                    for bindung in stichprobe.erhebungsbindung_set.order_by("pk")
+                    for bindung in bindungen
                 ),
             ),
         )

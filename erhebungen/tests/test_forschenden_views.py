@@ -1,10 +1,9 @@
 """HTTP-Tests für die Forschenden-UI der Erhebungen."""
 
 import csv
+from datetime import datetime, timedelta
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
-
-from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group

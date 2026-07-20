@@ -196,9 +196,13 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    zeitstempel: str = timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
+    zeitstempel: str = timezone.now().astimezone(timezone.UTC).strftime(
+        "%Y%m%dT%H%M%SZ"
+    )
     dateiname: str = f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
-    response = HttpResponse(datenspur_zip(erhebung), content_type="application/zip")
+    response: HttpResponse = HttpResponse(
+        datenspur_zip(erhebung), content_type="application/zip"
+    )
     response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
     return response
 
