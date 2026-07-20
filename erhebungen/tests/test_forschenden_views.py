@@ -1883,5 +1883,5 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
 
         self.assertContains(detail, "Nach jeder Vignettensitzung")
         self.assertContains(detail, "Am Ende")
-        self.assertContains(detail, "Keine Items aufgenommen.", count=2)
+        self.assertContains(detail, "Keine Fragebogen-Items aufgenommen.", count=2)
         self.assertNotContains(detail, "Finale Items aufnehmen")
