@@ -135,7 +135,7 @@ _Avoid_: gelöscht, deaktiviert, zurückgezogen
 **Historie**:
 Das Objekt, das die sequenziell entstandenen Fassungen eines versionierten Artefakts zusammenfasst. Sie bleibt linear und trägt höchstens einen Entwurf. Entsteht automatisch und wird erst ab der zweiten Fassung sichtbar und benennbar.
 
-Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt eine oder mehrere gleichrangige Eigentümer:innen (Ko-Autorschaft) und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** kennt beides nicht. Die **Simulationskern-Historie** ist namenlos: Der Kern ist konzeptionell eine einzige Linie, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
+Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt eine oder mehrere gleichrangige Eigentümer:innen (Ko-Autorschaft) und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** kennt ebenfalls Ko-Autorschaft, ist aber nicht als Ganzes archivierbar. Die **Simulationskern-Historie** ist namenlos: Der Kern ist konzeptionell eine einzige Linie, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
 _Avoid_: Familie, Reihe, Strang, Lineage
 
 ## Anlässe für Sitzungen

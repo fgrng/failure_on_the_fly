@@ -4,13 +4,13 @@ Fragen, die in den Modellierungssitzungen aufgetaucht, aber **nicht entschieden*
 
 Begriffe folgen `CONTEXT.md`.
 
-## 1. Übertragung der Eigentümerschaft an Vignetten
+## 1. Übertragung der Eigentümerschaft an Vignetten und Fragebogen-Items
 
-Folgt zwingend aus `docs/adr/0015`: Weil Vignetten privat sind, sind sie beim Weggang einer Autor:in für niemanden erreichbar — auch nicht für laufende Erhebungen. Administrator:innen brauchen eine Übertragung der Eigentümerschaft.
+Folgt zwingend aus `docs/adr/0015` und ADR-0028: Weil Vignetten und Fragebogen-Items privat sind, sind sie beim Weggang einer Autor:in für niemanden erreichbar — auch nicht für laufende Erhebungen. Administrator:innen brauchen eine Übertragung der Eigentümerschaft.
 
-Entschieden ist inzwischen in `docs/adr/0019`: Die **Vignettenhistorie** trägt den Eigentümer, nicht die einzelne Fassung. Eine finale Fassung ist unveränderlich, ein Eigentümerwechsel an ihr wäre eine Mutation.
+Entschieden ist inzwischen in `docs/adr/0019`, fortgeführt durch ADR-0022 und ADR-0028: Die **Vignetten-** und **Fragebogen-Item-Historie** tragen die Eigentümer:innen, nicht die einzelne Fassung. Eine finale Fassung ist unveränderlich, ein Eigentümerwechsel an ihr wäre eine Mutation.
 
-Offen bleibt der **Wechsel** selbst: Was geschieht mit dem offenen Entwurf, und wandern Trainings und Erhebungen der weggegangenen Person mit? Zu bedenken ist dabei, dass `docs/adr/0015` die Privatheit ausdrücklich als **revidierbar** bezeichnet. Fällt sie, wird aus der Eigentümerschaft eine Zugriffsregel mit mehreren Beteiligten; der Fremdschlüssel an der Historie bliebe richtig, wäre aber nicht mehr die ganze Antwort.
+Offen bleibt der **Wechsel** selbst: Was geschieht mit dem offenen Entwurf, und wandern Trainings und Erhebungen der weggegangenen Person mit? Zu bedenken ist dabei, dass `docs/adr/0015` die Privatheit ausdrücklich als **revidierbar** bezeichnet. Fällt sie, wird aus der Eigentümerschaft eine Zugriffsregel mit mehreren Beteiligten; die Eigentümerschaft an der Historie bliebe richtig, wäre aber nicht mehr die ganze Antwort.
 
 ## 2. Export-Formate und Granularität
 
