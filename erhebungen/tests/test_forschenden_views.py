@@ -642,17 +642,9 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
         self.assertEqual(wieder_offen.status_code, 200)
         self.assertContains(wieder_offen, "Finale Items aufnehmen")
-        zugehoerigkeit: Erhebungsitem = Erhebungsitem.objects.get(
-            erhebung=self.erhebung,
-            item=item,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-        )
-        self.assertContains(
-            wieder_offen,
-            reverse(
-                "erhebungen:item_entfernen",
-                args=[self.erhebung.pk, zugehoerigkeit.pk],
-            ),
+        self.assertEqual(
+            wieder_offen.context["am_ende_aufgenommene_daten"][0]["label"],
+            item.wortlaut,
         )
 
     def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:

@@ -161,48 +161,41 @@ def _itemzeilen(
     item_liste: list[FragebogenItem] = list(items)
     for index, item in enumerate(item_liste):
         zugehoerigkeit: Erhebungsitem = zugehoerigkeiten[item.pk]
-        if not bearbeitbar:
-            zeilen.append(
-                {
-                    "pk": item.pk,
-                    "label": item.wortlaut,
-                    "position": zugehoerigkeit.position,
-                }
-            )
-            continue
-        aktionen: list[dict[str, str]] = []
-        if index:
+        zeile: dict[str, object] = {
+            "pk": item.pk,
+            "label": item.wortlaut,
+            "position": zugehoerigkeit.position,
+        }
+        if bearbeitbar:
+            aktionen: list[dict[str, str]] = []
+            if index:
+                aktionen.append(
+                    {
+                        "beschriftung": "Hoch",
+                        "aktion_url": reverse(
+                            "erhebungen:item_hoch",
+                            args=[erhebung.pk, zugehoerigkeit.pk],
+                        ),
+                    }
+                )
+            if index < len(item_liste) - 1:
+                aktionen.append(
+                    {
+                        "beschriftung": "Runter",
+                        "aktion_url": reverse(
+                            "erhebungen:item_runter",
+                            args=[erhebung.pk, zugehoerigkeit.pk],
+                        ),
+                    }
+                )
             aktionen.append(
                 {
-                    "beschriftung": "Hoch",
-                    "aktion_url": reverse(
-                        "erhebungen:item_hoch", args=[erhebung.pk, zugehoerigkeit.pk]
-                    ),
+                    "beschriftung": "Entfernen",
+                    "aktion_url": reverse(aktion, args=[erhebung.pk, zugehoerigkeit.pk]),
                 }
             )
-        if index < len(item_liste) - 1:
-            aktionen.append(
-                {
-                    "beschriftung": "Runter",
-                    "aktion_url": reverse(
-                        "erhebungen:item_runter", args=[erhebung.pk, zugehoerigkeit.pk]
-                    ),
-                }
-            )
-        aktionen.append(
-            {
-                "beschriftung": "Entfernen",
-                "aktion_url": reverse(aktion, args=[erhebung.pk, zugehoerigkeit.pk]),
-            }
-        )
-        zeilen.append(
-            {
-                "pk": item.pk,
-                "label": item.wortlaut,
-                "position": zugehoerigkeit.position,
-                "aktionen": aktionen,
-            }
-        )
+            zeile["aktionen"] = aktionen
+        zeilen.append(zeile)
     return zeilen
 
 
