@@ -145,16 +145,44 @@ def _itemzeilen(
             for item in items
         ]
 
-    return [
-        {
-            "pk": item.pk,
-            "label": item.wortlaut,
-            "aktion_url": reverse(
-                aktion, args=[erhebung.pk, zugehoerigkeiten[item.pk].pk]
-            ),
-        }
-        for item in items
-    ]
+    zeilen: list[dict[str, object]] = []
+    item_liste: list[FragebogenItem] = list(items)
+    for index, item in enumerate(item_liste):
+        zugehoerigkeit: Erhebungsitem = zugehoerigkeiten[item.pk]
+        aktionen: list[dict[str, str]] = []
+        if index:
+            aktionen.append(
+                {
+                    "beschriftung": "Hoch",
+                    "aktion_url": reverse(
+                        "erhebungen:item_hoch", args=[erhebung.pk, zugehoerigkeit.pk]
+                    ),
+                }
+            )
+        if index < len(item_liste) - 1:
+            aktionen.append(
+                {
+                    "beschriftung": "Runter",
+                    "aktion_url": reverse(
+                        "erhebungen:item_runter", args=[erhebung.pk, zugehoerigkeit.pk]
+                    ),
+                }
+            )
+        aktionen.append(
+            {
+                "beschriftung": "Entfernen",
+                "aktion_url": reverse(aktion, args=[erhebung.pk, zugehoerigkeit.pk]),
+            }
+        )
+        zeilen.append(
+            {
+                "pk": item.pk,
+                "label": item.wortlaut,
+                "position": zugehoerigkeit.position,
+                "aktionen": aktionen,
+            }
+        )
+    return zeilen
 
 
 def _validierte_aktion_ausfuehren(
@@ -413,7 +441,76 @@ def item_entfernen(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> Htt
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.ENTWURF:
         raise PermissionDenied
-    get_object_or_404(erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk).delete()
+    zugehoerigkeit: Erhebungsitem = get_object_or_404(
+        erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk
+    )
+    andockpunkt: str = zugehoerigkeit.andockpunkt
+    position: int = zugehoerigkeit.position
+    zugehoerigkeit.delete()
+    erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=andockpunkt, position__gt=position
+    ).update(position=F("position") - 1)
+    return detail(request, pk)
+
+
+def _item_verschieben(erhebung: Erhebung, zugehoerigkeit_pk: int, richtung: int) -> None:
+    """Vertauscht eine Item-Zuordnung mit ihrer Nachbarin am selben Andockpunkt."""
+
+    zugehoerigkeit: Erhebungsitem = get_object_or_404(
+        erhebung.itemzugehoerigkeiten.select_for_update(), pk=zugehoerigkeit_pk
+    )
+    nachbarin: Erhebungsitem | None = (
+        erhebung.itemzugehoerigkeiten.select_for_update()
+        .filter(
+            andockpunkt=zugehoerigkeit.andockpunkt,
+            position=zugehoerigkeit.position + richtung,
+        )
+        .first()
+    )
+    if nachbarin is None:
+        return
+    hoechste_position: int = (
+        erhebung.itemzugehoerigkeiten.filter(
+            andockpunkt=zugehoerigkeit.andockpunkt
+        ).aggregate(Max("position"))["position__max"]
+        or 0
+    )
+    bisherige_position: int = zugehoerigkeit.position
+    zugehoerigkeit.position = hoechste_position + 1
+    zugehoerigkeit.save(update_fields=["position"])
+    nachbarin.position = bisherige_position
+    nachbarin.save(update_fields=["position"])
+    zugehoerigkeit.position = bisherige_position + richtung
+    zugehoerigkeit.save(update_fields=["position"])
+
+
+@login_required
+@_forschende_erforderlich
+@transaction.atomic
+def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+    """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach oben."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    _item_verschieben(erhebung, zugehoerigkeit_pk, -1)
+    return detail(request, pk)
+
+
+@login_required
+@_forschende_erforderlich
+@transaction.atomic
+def item_runter(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+    """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach unten."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    _item_verschieben(erhebung, zugehoerigkeit_pk, 1)
     return detail(request, pk)
 
 

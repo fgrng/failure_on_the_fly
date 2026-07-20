@@ -33,6 +33,16 @@ urlpatterns: list[URLPattern] = [
         name="item_entfernen",
     ),
     path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/hoch/",
+        views.item_hoch,
+        name="item_hoch",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/runter/",
+        views.item_runter,
+        name="item_runter",
+    ),
+    path(
         "eigene/<int:pk>/konfiguration/",
         views.konfiguration_speichern,
         name="konfiguration_speichern",

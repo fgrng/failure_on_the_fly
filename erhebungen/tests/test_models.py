@@ -297,6 +297,43 @@ def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
 
 
 @pytest.mark.django_db
+def test_itemposition_ist_je_andockpunkt_eindeutig() -> None:
+    """Gleiche Positionen sind nur in unterschiedlichen Andockpunkten zulässig."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erstes_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Erstes")
+    zweites_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Zweites")
+    for item in (erstes_item, zweites_item):
+        item.finalisieren()
+
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=erstes_item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=zweites_item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsitem.objects.bulk_create(
+            [
+                Erhebungsitem(
+                    erhebung=erhebung,
+                    item=zweites_item,
+                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    position=1,
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
 def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
     """Auch Bulk-Inserts umgehen weder Bibliotheksgrenzen noch Löschschutz."""
 

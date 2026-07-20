@@ -343,8 +343,54 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         self.assertEqual(doppelte_aufnahme.status_code, 409)
 
-    def test_entfernte_itemposition_wird_nicht_wiederverwendet(self) -> None:
-        """Neue Items werden hinter der bisherigen höchsten Position angehängt."""
+    def test_verschiebt_item_innerhalb_seines_andockpunkts_ohne_seitenwechsel(self) -> None:
+        """Hoch verschiebt die Zuordnung und lässt den anderen Andockpunkt unverändert."""
+
+        erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
+        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
+        drittes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Am Ende")
+        for item, andockpunkt in (
+            (erstes_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG),
+            (zweites_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG),
+            (drittes_item, Erhebungsitem.Andockpunkt.AM_ENDE),
+        ):
+            self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[self.erhebung.pk, item.pk, andockpunkt],
+                )
+            )
+        zweite_zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung, item=zweites_item
+        )
+
+        verschieben: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hoch",
+                args=[self.erhebung.pk, zweite_zuordnung.pk],
+            )
+        )
+
+        self.assertEqual(verschieben.status_code, 200)
+        self.assertEqual(
+            [zeile["pk"] for zeile in verschieben.context["nach_sitzung_aufgenommene_daten"]],
+            [zweites_item.pk, erstes_item.pk],
+        )
+        self.assertEqual(
+            [zeile["pk"] for zeile in verschieben.context["am_ende_aufgenommene_daten"]],
+            [drittes_item.pk],
+        )
+        self.assertEqual(
+            [aktion["beschriftung"] for aktion in verschieben.context["nach_sitzung_aufgenommene_daten"][0]["aktionen"]],
+            ["Runter", "Entfernen"],
+        )
+        self.assertEqual(
+            [aktion["beschriftung"] for aktion in verschieben.context["nach_sitzung_aufgenommene_daten"][1]["aktionen"]],
+            ["Hoch", "Entfernen"],
+        )
+
+    def test_entfernen_schliesst_die_itemreihenfolge_lueckenlos(self) -> None:
+        """Das nächste Item ergänzt die nach dem Entfernen geschlossene Reihenfolge."""
 
         item: FragebogenItem = _finales_item_anlegen(
             self.ada, "Wie sicher fühlten Sie sich?"
@@ -400,7 +446,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 item=drittes_item,
                 andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
             ).position,
-            3,
+            2,
         )
 
     def test_itemverwaltung_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
@@ -420,6 +466,41 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             )
         )
         self.assertEqual(gesperrt.status_code, 403)
+
+    def test_itemreihenfolge_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
+        """Auch Hoch und Runter ändern eine finale Erhebung nicht."""
+
+        erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
+        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
+        for item in (erstes_item, zweites_item):
+            self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[
+                        self.erhebung.pk,
+                        item.pk,
+                        Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    ],
+                )
+            )
+        zweite_zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung, item=zweites_item
+        )
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        self.erhebung.finalisieren()
+
+        gesperrt: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hoch",
+                args=[self.erhebung.pk, zweite_zuordnung.pk],
+            )
+        )
+
+        self.assertEqual(gesperrt.status_code, 403)
+        zweite_zuordnung.refresh_from_db()
+        self.assertEqual(zweite_zuordnung.position, 2)
 
     def test_itemverwaltung_ist_nach_dem_zurueckziehen_wieder_offen(self) -> None:
         """Zurückgezogene Erhebungen erlauben wieder Item-Zuordnungen."""
