@@ -405,6 +405,108 @@ class FragebogenItemSichtbarkeitViewTests(TestCase):
             self.assertEqual(self.client.get(url).status_code, 403)
 
 
+class FragebogenItemKoautorschaftViewTests(TestCase):
+    """Der Editor teilt eine Item-Historie ausschließlich mit Ko-Autorinnen."""
+
+    ada: Konto
+    grace: Konto
+    linus: Konto
+    item: FragebogenItem
+
+    def setUp(self) -> None:
+        """Legt eine private Item-Historie und drei Forschende an."""
+        self.ada = _forschende("ada")
+        self.grace = _forschende("grace")
+        self.linus = _forschende("linus")
+        self.item = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Geteiltes Item"
+        )
+
+    def test_editor_zeigt_die_eigentuemerin(self) -> None:
+        """Die Eigentümerin erscheint in der Ko-Autorinnenliste des Editors."""
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, self.ada.username)
+
+    def test_hinzufuegen_gibt_koautorin_bibliothekszugriff(self) -> None:
+        """Eine hinzugefügte Ko-Autorin sieht die Item-Linie in ihrer Bibliothek."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        self.assertContains(response, self.item.wortlaut)
+
+    def test_koautorin_kann_item_finalisieren(self) -> None:
+        """Eine Ko-Autorin darf die sichtbare Item-Linie gleichrangig pflegen."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[self.item.pk])
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+    def test_fremde_kann_die_item_linie_nicht_aufrufen_oder_aendern(self) -> None:
+        """Eine Fremde erhält für Ansicht und Editor-Aktionen keine Berechtigung."""
+        self.client.force_login(self.linus)
+
+        responses: list[HttpResponse] = [
+            self.client.get(reverse("fragebogen_items:detail", args=[self.item.pk])),
+            self.client.post(
+                reverse("fragebogen_items:finalisieren", args=[self.item.pk])
+            ),
+            self.client.post(
+                reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+                {"konto": self.grace.pk},
+            ),
+            self.client.post(
+                reverse(
+                    "fragebogen_items:koautorin_entfernen",
+                    args=[self.item.pk, self.ada.pk],
+                )
+            ),
+        ]
+
+        self.assertEqual({response.status_code for response in responses}, {404})
+
+    def test_entfernen_entzieht_koautorin_den_bibliothekszugriff(self) -> None:
+        """Eine entfernte Ko-Autorin sieht die Item-Linie nicht mehr."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.post(
+            reverse(
+                "fragebogen_items:koautorin_entfernen",
+                args=[self.item.pk, self.grace.pk],
+            )
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class FragebogenItemLikertViewTests(TestCase):
     """Likert-Items zeigen ihre global festgelegte Skala nur lesend."""
 

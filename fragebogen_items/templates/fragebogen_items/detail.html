@@ -40,9 +40,33 @@
             <button class="button" type="submit">Entarchivieren</button>
         </form>
     {% endif %}
+    <section class="page-section">
+        <div class="page-section__head"><b>02</b><div><h2>Ko-Autor:innen</h2></div></div>
+        <ul>
+            {% for konto in eigentuemerinnen %}
+                <li>{{ konto.username }}
+                    {% if hat_mehrere_eigentuemerinnen %}
+                        <form method="post" action="{% url 'fragebogen_items:koautorin_entfernen' item.pk konto.pk %}">
+                            {% csrf_token %}
+                            <button type="submit">Entfernen</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        <form method="post" action="{% url 'fragebogen_items:koautorin_hinzufuegen' item.pk %}">
+            {% csrf_token %}
+            <label>Ko-Autor:in <select name="konto">
+                {% for konto in moegliche_koautorinnen %}
+                    <option value="{{ konto.pk }}">{{ konto.username }}</option>
+                {% endfor %}
+            </select></label>
+            <button class="button" type="submit">Ko-Autor:in hinzufügen</button>
+        </form>
+    </section>
     {% if item.typ == item.Typ.LIKERT %}
         <section class="page-section">
-            <div class="page-section__head"><b>02</b><div><h2>Likert-Skala</h2><small>Global festgelegt</small></div></div>
+            <div class="page-section__head"><b>03</b><div><h2>Likert-Skala</h2><small>Global festgelegt</small></div></div>
             <ol>{% for pol in likert_skalenpole %}<li>{{ pol.1 }}</li>{% endfor %}</ol>
         </section>
     {% endif %}

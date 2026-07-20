@@ -18,5 +18,15 @@ urlpatterns: list[URLPattern] = [
         "<int:pk>/entarchivieren/", views.entarchivieren, name="entarchivieren"
     ),
     path("<int:pk>/loeschen/", views.loeschen, name="loeschen"),
+    path(
+        "<int:pk>/koautorinnen/hinzufuegen/",
+        views.koautorin_hinzufuegen,
+        name="koautorin_hinzufuegen",
+    ),
+    path(
+        "<int:pk>/koautorinnen/<int:konto_pk>/entfernen/",
+        views.koautorin_entfernen,
+        name="koautorin_entfernen",
+    ),
     path("<int:pk>/", views.detail, name="detail"),
 ]

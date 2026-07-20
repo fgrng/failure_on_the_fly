@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
+from konten.models import Konto
+
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
 
@@ -117,6 +119,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Fragebogen-Item-Fassung."""
     item: FragebogenItem = _sichtbares_item(request, pk)
+    eigentuemerinnen: list[Konto] = list(item.historie.eigentuemerinnen.all())
     return render(
         request,
         "fragebogen_items/detail.html",
@@ -126,6 +129,13 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "ist_neueste_nichtarchivierte_fassung": (
                 _ist_neueste_nichtarchivierte_fassung(item)
             ),
+            "eigentuemerinnen": eigentuemerinnen,
+            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
+            "moegliche_koautorinnen": Konto.objects.filter(
+                groups__name__in=_BERECHTIGTE_GRUPPEN
+            )
+            .exclude(fragebogenitemhistorie=item.historie)
+            .distinct(),
         },
     )
 
@@ -204,6 +214,21 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_erforderlich
+def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Teilt eine sichtbare Item-Historie mit einer weiteren Forschenden."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item: FragebogenItem = _sichtbares_item(request, pk)
+    konto: Konto = get_object_or_404(
+        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN).distinct(),
+        pk=request.POST.get("konto"),
+    )
+    item.historie.eigentuemerinnen.add(konto)
+    return redirect("fragebogen_items:detail", pk=item.pk)
+
+
+@login_required
+@_forschende_erforderlich
 def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Macht eine sichtbare archivierte Fassung wieder final."""
     if request.method != "POST":
@@ -222,3 +247,15 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
     item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ENTWURF)
     item.delete()
     return redirect("fragebogen_items:liste")
+
+
+@login_required
+@_forschende_erforderlich
+def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
+    """Entzieht einer Ko-Autorin den Zugang zu einer sichtbaren Item-Historie."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item: FragebogenItem = _sichtbares_item(request, pk)
+    if item.historie.eigentuemerinnen.count() > 1:
+        item.historie.eigentuemerinnen.remove(konto_pk)
+    return redirect("fragebogen_items:detail", pk=item.pk)
