@@ -63,6 +63,18 @@ def _finale_vignette_anlegen(konto: Konto) -> Vignette:
 
 
 @pytest.mark.django_db
+def test_neue_erhebungsbindung_traegt_entstehungszeitpunkt() -> None:
+    """Eine neue Erhebungsbindung hält ihren Entstehungszeitpunkt fest."""
+
+    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(
+        Konto.objects.create_user(username="ada"),
+        Teilnahme.objects.create(),
+    )
+
+    assert bindung.erstellt_am is not None
+
+
+@pytest.mark.django_db
 def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
     """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
 

@@ -51,6 +51,10 @@ class Sitzung(models.Model):
         choices=Status,
         default=Status.LAUFEND,
     )
+    erstellt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+    )
 
 
 class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
@@ -94,6 +98,10 @@ class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
 class Gespraechsschritt(models.Model):
     """Eine Eingabe mit einer geglückten oder endgültig gescheiterten Antwort."""
 
+    erstellt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+    )
     sitzung: models.ForeignKey = models.ForeignKey(Sitzung, on_delete=models.CASCADE)
     eingabe: models.TextField = models.TextField()
     denkspur: models.TextField = models.TextField(null=True, blank=True)
@@ -135,6 +143,10 @@ class Fehlversuch(models.Model):
 class Diagnose(models.Model):
     """Die einmalige, freie Diagnose am Ende einer Sitzung."""
 
+    erstellt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+    )
     sitzung: models.OneToOneField = models.OneToOneField(
         Sitzung,
         on_delete=models.CASCADE,

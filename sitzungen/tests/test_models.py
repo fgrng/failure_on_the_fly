@@ -66,6 +66,21 @@ def test_sitzung_hat_die_vier_vorgegebenen_statuswerte() -> None:
 
 
 @pytest.mark.django_db
+def test_neuer_gespraechsschritt_traegt_entstehungszeitpunkt() -> None:
+    """Ein neuer Gesprächsschritt hält seinen Entstehungszeitpunkt fest."""
+
+    schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+        sitzung=_sitzung_anlegen(),
+        eingabe="Warum?",
+        denkspur="Ich folge meiner Regel.",
+        aeusserung="Weil das so ist.",
+        reihenfolge=1,
+    )
+
+    assert schritt.erstellt_am is not None
+
+
+@pytest.mark.django_db
 def test_gespraechsschritt_lehnt_aeusserung_ohne_denkspur_ab() -> None:
     """Die Datenbank akzeptiert sichtbare Antworten nur mit Denkspur."""
 
@@ -127,6 +142,7 @@ def test_answerless_gespraechsschritt_mit_fehlversuch_wird_gespeichert() -> None
 
     assert schritt.denkspur is None
     assert schritt.aeusserung is None
+    assert schritt.erstellt_am is not None
     assert Fehlversuch.objects.filter(gespraechsschritt=schritt).count() == 1
 
 
@@ -182,7 +198,25 @@ def test_diagnose_ist_je_sitzung_eindeutig() -> None:
     """Eine Sitzung kann genau eine freie Diagnose tragen."""
 
     sitzung: Sitzung = _sitzung_anlegen()
-    Diagnose.objects.create(sitzung=sitzung, text="Brüche werden addiert.")
+    diagnose: Diagnose = Diagnose.objects.create(
+        sitzung=sitzung,
+        text="Brüche werden addiert.",
+    )
+
+    assert sitzung.erstellt_am is not None
+    assert diagnose.erstellt_am is not None
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Diagnose.objects.create(sitzung=sitzung, text="Noch eine Diagnose.")
+
+
+@pytest.mark.django_db
+def test_bestandsdaten_duerfen_ohne_entstehungszeitpunkt_bestehen() -> None:
+    """Zeitstempellose Bestandszeilen bleiben nach der Migration lesbar."""
+
+    sitzung: Sitzung = _sitzung_anlegen()
+    sitzung.erstellt_am = None
+    sitzung.save(update_fields=["erstellt_am"])
+    sitzung.refresh_from_db()
+
+    assert sitzung.erstellt_am is None

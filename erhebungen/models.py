@@ -392,6 +392,10 @@ class ErhebungsbindungManager(models.Manager["Erhebungsbindung"]):
 class Erhebungsbindung(models.Model):
     """Verbindet eine pseudonyme Teilnahme mit ihrer Stichprobe."""
 
+    erstellt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+    )
     teilnahme: models.OneToOneField = models.OneToOneField(
         "sitzungen.Teilnahme",
         on_delete=models.CASCADE,
