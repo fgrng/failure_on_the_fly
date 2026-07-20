@@ -1107,23 +1107,51 @@ class ErhebungsExportTests(TestCase):
         )
 
         with ZipFile(BytesIO(response.content)) as zip_datei:
-            ziehungen = list(
+            ziehungen: list[dict[str, str]] = list(
                 csv.DictReader(
                     TextIOWrapper(
                         zip_datei.open("vignettenziehungen.csv"), encoding="utf-8"
                     )
                 )
             )
-            sitzungen = list(
+            sitzungen: list[dict[str, str]] = list(
                 csv.DictReader(
                     TextIOWrapper(zip_datei.open("sitzungen.csv"), encoding="utf-8")
                 )
             )
 
-        self.assertEqual({ziehung["token"] for ziehung in ziehungen}, {bindung.token for bindung in bindungen})
-        self.assertEqual({sitzung["token"] for sitzung in sitzungen}, {bindung.token for bindung in bindungen[:4]})
-        self.assertEqual({sitzung["status"] for sitzung in sitzungen}, set(Sitzung.Status.values))
-        self.assertTrue(all(sitzung["position"] == "1" for sitzung in sitzungen))
+        self.assertEqual(
+            {
+                "ziehungen": {
+                    (
+                        ziehung["token"],
+                        ziehung["vignette_id"],
+                        ziehung["position"],
+                    )
+                    for ziehung in ziehungen
+                },
+                "sitzungen": {
+                    (
+                        sitzung["token"],
+                        sitzung["vignette_id"],
+                        sitzung["position"],
+                        sitzung["status"],
+                    )
+                    for sitzung in sitzungen
+                },
+            },
+            {
+                "ziehungen": {
+                    (bindung.token, str(vignette.pk), "1") for bindung in bindungen
+                },
+                "sitzungen": {
+                    (bindung.token, str(vignette.pk), "1", status)
+                    for bindung, status in zip(
+                        bindungen[:4], Sitzung.Status.values, strict=True
+                    )
+                },
+            },
+        )
 
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""

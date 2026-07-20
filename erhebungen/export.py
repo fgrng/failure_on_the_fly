@@ -113,7 +113,11 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             _csv_inhalt(
                 ("token", "vignette_id", "position"),
                 (
-                    (ziehung.erhebungsbindung.token, ziehung.vignette_id, ziehung.position)
+                    (
+                        ziehung.erhebungsbindung.token,
+                        ziehung.vignette_id,
+                        ziehung.position,
+                    )
                     for ziehung in ziehungen.select_related("erhebungsbindung")
                 ),
             ),
