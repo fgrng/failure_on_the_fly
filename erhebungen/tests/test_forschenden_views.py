@@ -275,10 +275,8 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             ),
         )
 
-    def test_baut_getrennte_item_bibliotheken_und_sperrt_sie_ausserhalb_des_entwurfs(
-        self,
-    ) -> None:
-        """Ein finales eigenes Item bleibt am anderen Andockpunkt wählbar."""
+    def test_item_bleibt_am_anderen_andockpunkt_verfuegbar(self) -> None:
+        """Ein finales eigenes Item lässt sich an beide Andockpunkte aufnehmen."""
 
         item: FragebogenItem = _finales_item_anlegen(
             self.ada, "Wie sicher fühlten Sie sich?"
@@ -306,6 +304,32 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             [item.pk],
         )
 
+        andere_bindung: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            )
+        )
+        self.assertEqual(andere_bindung.status_code, 200)
+        self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2)
+
+    def test_doppelte_itemaufnahme_am_selben_andockpunkt_wird_abgelehnt(self) -> None:
+        """Eine Item-Fassung kann je Andockpunkt nur einmal vorkommen."""
+
+        item: FragebogenItem = _finales_item_anlegen(
+            self.ada, "Wie sicher fühlten Sie sich?"
+        )
+        self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[
+                    self.erhebung.pk,
+                    item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
+            )
+        )
+
         doppelte_aufnahme: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:item_hinzufuegen",
@@ -316,30 +340,31 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 ],
             )
         )
+
         self.assertEqual(doppelte_aufnahme.status_code, 409)
 
-        andere_bindung: HttpResponse = self.client.post(
+    def test_entfernte_itemposition_wird_nicht_wiederverwendet(self) -> None:
+        """Neue Items werden hinter der bisherigen höchsten Position angehängt."""
+
+        item: FragebogenItem = _finales_item_anlegen(
+            self.ada, "Wie sicher fühlten Sie sich?"
+        )
+        self.client.post(
             reverse(
                 "erhebungen:item_hinzufuegen",
-                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+                args=[
+                    self.erhebung.pk,
+                    item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
             )
         )
-        self.assertEqual(andere_bindung.status_code, 200)
-        self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2)
 
-        entfernte_bindung: Erhebungsitem = Erhebungsitem.objects.get(
+        erste_bindung: Erhebungsitem = Erhebungsitem.objects.get(
             erhebung=self.erhebung,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
         )
-        entfernen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_entfernen",
-                args=[self.erhebung.pk, entfernte_bindung.pk],
-            )
-        )
-        self.assertEqual(entfernen.status_code, 200)
-        self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 1)
-
         zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was fiel auf?")
         drittes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was bleibt?")
         self.client.post(
@@ -351,11 +376,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     Erhebungsitem.Andockpunkt.NACH_SITZUNG,
                 ],
             )
-        )
-        erste_bindung: Erhebungsitem = Erhebungsitem.objects.get(
-            erhebung=self.erhebung,
-            item=item,
-            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
         )
         self.client.post(
             reverse(
@@ -383,6 +403,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             3,
         )
 
+    def test_itemverwaltung_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
+        """Finale Erhebungen verweigern die Änderung ihrer Item-Zuordnungen."""
+
+        item: FragebogenItem = _finales_item_anlegen(
+            self.ada, "Wie sicher fühlten Sie sich?"
+        )
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(sprachmodell="fake")
         )
@@ -395,6 +421,16 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
         self.assertEqual(gesperrt.status_code, 403)
 
+    def test_itemverwaltung_ist_nach_dem_zurueckziehen_wieder_offen(self) -> None:
+        """Zurückgezogene Erhebungen erlauben wieder Item-Zuordnungen."""
+
+        item: FragebogenItem = _finales_item_anlegen(
+            self.ada, "Wie sicher fühlten Sie sich?"
+        )
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        self.erhebung.finalisieren()
         self.erhebung.zurueckziehen()
         wieder_offen: HttpResponse = self.client.post(
             reverse(

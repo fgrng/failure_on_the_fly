@@ -133,17 +133,24 @@ def _itemzeilen(
 ) -> list[dict[str, object]]:
     """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
 
+    if zugehoerigkeiten is None:
+        return [
+            {
+                "pk": item.pk,
+                "label": item.wortlaut,
+                "aktion_url": reverse(
+                    aktion, args=[erhebung.pk, item.pk, andockpunkt]
+                ),
+            }
+            for item in items
+        ]
+
     return [
         {
             "pk": item.pk,
             "label": item.wortlaut,
             "aktion_url": reverse(
-                aktion,
-                args=(
-                    [erhebung.pk, zugehoerigkeiten[item.pk].pk]
-                    if zugehoerigkeiten is not None
-                    else [erhebung.pk, item.pk, andockpunkt]
-                ),
+                aktion, args=[erhebung.pk, zugehoerigkeiten[item.pk].pk]
             ),
         }
         for item in items
