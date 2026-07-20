@@ -1,6 +1,7 @@
 """HTTP-Tests für die Forschenden-UI der Erhebungen."""
 
 import csv
+import json
 import re
 from datetime import datetime, timedelta
 from io import BytesIO, TextIOWrapper
@@ -1235,9 +1236,12 @@ class ErhebungsExportTests(TestCase):
                     "erhebung.csv",
                     "fehlversuche.csv",
                     "gespraechsschritte.csv",
+                    "modellkonfigurationen.csv",
+                    "simulationskerne.csv",
                     "sitzungen.csv",
                     "stichproben.csv",
                     "teilnahmen.csv",
+                    "vignettenfassungen.csv",
                     "vignettenziehungen.csv",
                 ],
             )
@@ -1269,6 +1273,161 @@ class ErhebungsExportTests(TestCase):
         self.assertRegex(
             teilnahmezeile["erstellt_am"],
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
+        )
+
+    def test_exportiert_nur_referenzierte_fassungen_mit_vollem_inhalt(self) -> None:
+        """Fassungstabellen machen die exportierte Datenspur selbsttragend."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erste_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-erstes-modell", parameter={"temperatur": 0.2}
+        )
+        ModellKonfiguration.objects.aktivieren(erste_konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Brüche", eigentuemerin=ada
+        )
+        erhebung.finalisieren()
+        zweite_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-zweites-modell", parameter={"temperatur": 0.7}
+        )
+        ungenutzte_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="nicht-exportieren"
+        )
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+        erster_kern: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="System Zeile eins\nSystem Zeile zwei",
+            user_prompt_vorlage="User $lernauftrag",
+            rahmenhandlung_einleitung="Einleitung\nmehrzeilig",
+            rahmenhandlung_gespraechseinleitung="Gespräch",
+            rahmenhandlung_debrief="Debrief",
+        )
+        erster_kern.finalisieren()
+        zweiter_kern: Simulationskern = erster_kern.bearbeiten()
+        zweiter_kern.system_prompt_vorlage = "Verwendeter System-Prompt\nZeile zwei"
+        zweiter_kern.save()
+        zweiter_kern.finalisieren()
+        erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        zweite_vignette: Vignette = erste_vignette.bearbeiten()
+        zweite_vignette.arbeitsheft_bild = "arbeitshefte/bruchbild.png"
+        zweite_vignette.referenzdiagnose = "Mehrzeilige\nReferenzdiagnose"
+        zweite_vignette.save()
+        zweite_vignette.finalisieren()
+        ungenutzte_vignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
+        Vignettenziehung.objects.create(
+            erhebungsbindung=bindung, vignette=erste_vignette, position=1
+        )
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=zweite_vignette,
+            simulationskern=zweiter_kern,
+            modell_konfiguration=zweite_konfiguration,
+        )
+        Vignettenposition.objects.create(
+            erhebungsbindung=bindung,
+            sitzung=sitzung,
+            vignette=zweite_vignette,
+            position=2,
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            vignetten: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("vignettenfassungen.csv"), encoding="utf-8"
+                    )
+                )
+            )
+            kerne: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("simulationskerne.csv"), encoding="utf-8"
+                    )
+                )
+            )
+            konfigurationen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("modellkonfigurationen.csv"), encoding="utf-8"
+                    )
+                )
+            )
+
+        vignetten_nach_id: dict[str, dict[str, str]] = {
+            vignette["id"]: vignette for vignette in vignetten
+        }
+        self.assertEqual(
+            set(vignetten_nach_id),
+            {str(erste_vignette.pk), str(zweite_vignette.pk)},
+        )
+        self.assertEqual(
+            {vignette["historie_id"] for vignette in vignetten},
+            {str(zweite_vignette.historie_id)},
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(zweite_vignette.pk)]["referenzdiagnose"],
+            "Mehrzeilige\nReferenzdiagnose",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["arbeitsheft_bild"],
+            "",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bild"],
+            "arbeitshefte/bruchbild.png",
+        )
+        self.assertNotIn(
+            str(ungenutzte_vignette.pk),
+            vignetten_nach_id,
+        )
+        self.assertEqual(
+            kerne,
+            [
+                {
+                    "id": str(zweiter_kern.pk),
+                    "historie_id": str(zweiter_kern.historie_id),
+                    "finalisiert_am": zweiter_kern.finalisiert_am.isoformat(
+                        timespec="seconds"
+                    ),
+                    "system_prompt_vorlage": "Verwendeter System-Prompt\nZeile zwei",
+                    "user_prompt_vorlage": "User $lernauftrag",
+                    "rahmenhandlung_einleitung": "Einleitung\nmehrzeilig",
+                    "rahmenhandlung_gespraechseinleitung": "Gespräch",
+                    "rahmenhandlung_debrief": "Debrief",
+                }
+            ],
+        )
+        self.assertEqual(
+            {konfiguration["id"] for konfiguration in konfigurationen},
+            {str(erste_konfiguration.pk), str(zweite_konfiguration.pk)},
+        )
+        self.assertNotIn(
+            str(ungenutzte_konfiguration.pk),
+            {konfiguration["id"] for konfiguration in konfigurationen},
+        )
+        self.assertEqual(
+            {
+                konfiguration["id"]: json.loads(konfiguration["parameter"])
+                for konfiguration in konfigurationen
+            },
+            {
+                str(erste_konfiguration.pk): {"temperatur": 0.2},
+                str(zweite_konfiguration.pk): {"temperatur": 0.7},
+            },
         )
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
@@ -1604,6 +1763,9 @@ class ErhebungsExportTests(TestCase):
                 "gespraechsschritte.csv",
                 "fehlversuche.csv",
                 "diagnosen.csv",
+                "vignettenfassungen.csv",
+                "simulationskerne.csv",
+                "modellkonfigurationen.csv",
             ):
                 with TextIOWrapper(
                     zip_datei.open(dateiname), encoding="utf-8"
