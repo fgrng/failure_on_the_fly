@@ -93,6 +93,33 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(liste, reverse("erhebungen:loeschen", args=[erhebung.pk]))
         self.assertContains(liste, 'aria-current="page"')
 
+    def test_liste_traegt_bereichsfarbe_und_bekannte_badge_klassen(self) -> None:
+        """Jeder Status bildet auf eine im Stylesheet definierte Badge-Klasse ab."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="gpt-forschung")
+        )
+        Erhebung.objects.create(name="Noch Entwurf", eigentuemerin=ada)
+        finale: Erhebung = Erhebung.objects.create(name="Schon final", eigentuemerin=ada)
+        finale.finalisieren()
+        abgelegte: Erhebung = Erhebung.objects.create(
+            name="Längst abgelegt", eigentuemerin=ada
+        )
+        abgelegte.finalisieren()
+        abgelegte.archivieren()
+        self.client.force_login(ada)
+
+        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
+
+        self.assertContains(liste, "area--research")
+        self.assertContains(liste, "badge--draft")
+        self.assertContains(liste, "badge--final")
+        self.assertContains(liste, "badge--archived")
+        self.assertNotContains(liste, "badge--entwurf")
+        self.assertNotContains(liste, "badge--archiviert")
+
 
 class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
     """Die Detail- und Lösch-URLs folgen der Eigentümersicht."""
@@ -234,6 +261,79 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, self.eigene_finale.pk],
             ),
         )
+
+    def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:
+        """Beide Spalten tragen dieselbe Zeilenform mit passender Aktions-URL."""
+
+        verfuegbar: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertEqual(verfuegbar.context["aufgenommene_daten"], [])
+        self.assertEqual(
+            verfuegbar.context["verfuegbare_daten"],
+            [
+                {
+                    "pk": self.eigene_finale.pk,
+                    "label": "Mathematik",
+                    "fach": "Mathematik",
+                    "thema": self.eigene_finale.thema,
+                    "aktion_url": reverse(
+                        "erhebungen:vignette_hinzufuegen",
+                        args=[self.erhebung.pk, self.eigene_finale.pk],
+                    ),
+                }
+            ],
+        )
+
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_hinzufuegen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            )
+        )
+
+        aufgenommen: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertEqual(aufgenommen.context["verfuegbare_daten"], [])
+        self.assertEqual(
+            [zeile["aktion_url"] for zeile in aufgenommen.context["aufgenommene_daten"]],
+            [
+                reverse(
+                    "erhebungen:vignette_entfernen",
+                    args=[self.erhebung.pk, self.eigene_finale.pk],
+                )
+            ],
+        )
+
+    def test_haelt_fremde_und_unfertige_fassungen_aus_den_zeilen_heraus(self) -> None:
+        """Die anbietende Spalte zeigt weder fremde noch nicht-finale Fassungen."""
+
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        fremde_finale: Vignette = _finale_vignette_anlegen(grace, "Physik")
+        eigener_entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        angebotene_ids: list[int] = [
+            zeile["pk"] for zeile in detail.context["verfuegbare_daten"]
+        ]
+        self.assertEqual(angebotene_ids, [self.eigene_finale.pk])
+        self.assertNotIn(fremde_finale.pk, angebotene_ids)
+        self.assertNotIn(eigener_entwurf.pk, angebotene_ids)
+
+    def test_detailseite_traegt_bereichsfarbe_und_bekannte_badge_klasse(self) -> None:
+        """Die Detailseite färbt den Forschungsbereich und nutzt echte Badge-Klassen."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "area--research")
+        self.assertContains(detail, "badge--draft")
+        self.assertNotContains(detail, "badge--entwurf")
 
     def test_speichert_texte_und_feste_reihenfolge(self) -> None:
         """Ein Entwurf zeigt die gespeicherten Texte und Reihenfolge wieder an."""
@@ -495,10 +595,10 @@ class StichprobenAnlegenTests(TestCase):
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
 
-        self.assertContains(detail, "<dt>Phase</dt>")
-        self.assertContains(detail, "<dd>laufend</dd>")
-        self.assertContains(detail, "<dt>Teilnahmen</dt>")
-        self.assertContains(detail, "<dd>1</dd>")
+        self.assertContains(detail, '<th scope="col">Phase</th>')
+        self.assertContains(detail, "<td>laufend</td>")
+        self.assertContains(detail, '<th scope="col">Teilnahmen</th>')
+        self.assertContains(detail, "<td>1</td>")
 
     def test_laesst_stichproben_nur_auf_eigenen_finalen_erhebungen_an(self) -> None:
         """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""
