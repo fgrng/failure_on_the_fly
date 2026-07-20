@@ -1362,8 +1362,11 @@ class ErhebungsExportTests(TestCase):
                 )
             )
 
+        vignetten_nach_id: dict[str, dict[str, str]] = {
+            vignette["id"]: vignette for vignette in vignetten
+        }
         self.assertEqual(
-            {vignette["id"] for vignette in vignetten},
+            set(vignetten_nach_id),
             {str(erste_vignette.pk), str(zweite_vignette.pk)},
         )
         self.assertEqual(
@@ -1371,32 +1374,20 @@ class ErhebungsExportTests(TestCase):
             {str(zweite_vignette.historie_id)},
         )
         self.assertEqual(
-            next(
-                vignette
-                for vignette in vignetten
-                if vignette["id"] == str(zweite_vignette.pk)
-            )["referenzdiagnose"],
+            vignetten_nach_id[str(zweite_vignette.pk)]["referenzdiagnose"],
             "Mehrzeilige\nReferenzdiagnose",
         )
         self.assertEqual(
-            next(
-                vignette
-                for vignette in vignetten
-                if vignette["id"] == str(erste_vignette.pk)
-            )["arbeitsheft_bild"],
+            vignetten_nach_id[str(erste_vignette.pk)]["arbeitsheft_bild"],
             "",
         )
         self.assertEqual(
-            next(
-                vignette
-                for vignette in vignetten
-                if vignette["id"] == str(zweite_vignette.pk)
-            )["arbeitsheft_bild"],
+            vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bild"],
             "arbeitshefte/bruchbild.png",
         )
         self.assertNotIn(
             str(ungenutzte_vignette.pk),
-            {vignette["id"] for vignette in vignetten},
+            vignetten_nach_id,
         )
         self.assertEqual(
             kerne,
