@@ -218,6 +218,23 @@ class FragebogenItemReversionierenViewTests(TestCase):
         self.assertNotContains(detail, "Neue Fassung")
         self.assertEqual(response.status_code, 404)
 
+    def test_zeigt_archivierte_fassung(self) -> None:
+        """Die Detailansicht einer vollständig archivierten Historie bleibt erreichbar."""
+        ada: Konto = _forschende("ada")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Archivierte Fassung",
+        )
+        item.finalisieren()
+        item.archivieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[item.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
 
 class FragebogenItemSichtbarkeitViewTests(TestCase):
     """Die Bibliothek bleibt auf den Eigentümer-Kreis beschränkt."""

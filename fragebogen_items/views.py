@@ -69,13 +69,12 @@ def _zustand_badge(item: FragebogenItem) -> str:
 
 
 def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
-    """Prüft, ob eine Fassung die aktuelle Spitze ihrer Historie ist."""
-    neueste = (
-        FragebogenItem.objects.filter(historie=item.historie)
+    # Prüft, ob eine Fassung die aktuelle Spitze ihrer Historie ist.
+    return item.zustand != FragebogenItem.Zustand.ARCHIVIERT and not (
+        FragebogenItem.objects.filter(historie=item.historie, pk__gt=item.pk)
         .exclude(zustand=FragebogenItem.Zustand.ARCHIVIERT)
-        .latest("pk")
+        .exists()
     )
-    return item.pk == neueste.pk
 
 
 @login_required
@@ -113,14 +112,16 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 @_forschende_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Fragebogen-Item-Fassung."""
-    item = _sichtbares_item(request, pk)
+    item: FragebogenItem = _sichtbares_item(request, pk)
     return render(
         request,
         "fragebogen_items/detail.html",
         {
             "item": item,
             "likert_skalenpole": LikertSkalenpol.choices,
-            "ist_neueste_nichtarchivierte_fassung": _ist_neueste_nichtarchivierte_fassung(item),
+            "ist_neueste_nichtarchivierte_fassung": (
+                _ist_neueste_nichtarchivierte_fassung(item)
+            ),
         },
     )
 
@@ -129,17 +130,26 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 @_forschende_erforderlich
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert Typ und Wortlaut eines sichtbaren Entwurfs."""
-    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ENTWURF)
-    form = FragebogenItemForm(request.POST or None, initial={
-        "typ": item.typ,
-        "wortlaut": item.wortlaut,
-    })
+    item: FragebogenItem = _sichtbares_item(
+        request, pk, zustand=FragebogenItem.Zustand.ENTWURF
+    )
+    form: FragebogenItemForm = FragebogenItemForm(
+        request.POST or None,
+        initial={
+            "typ": item.typ,
+            "wortlaut": item.wortlaut,
+        },
+    )
     if request.method == "POST" and form.is_valid():
         item.typ = form.cleaned_data["typ"]
         item.wortlaut = form.cleaned_data["wortlaut"]
         item.save()
         return redirect("fragebogen_items:detail", pk=item.pk)
-    return render(request, "fragebogen_items/bearbeiten.html", {"form": form, "item": item})
+    return render(
+        request,
+        "fragebogen_items/bearbeiten.html",
+        {"form": form, "item": item},
+    )
 
 
 @login_required
@@ -148,10 +158,12 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    finale = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.FINAL)
+    finale: FragebogenItem = _sichtbares_item(
+        request, pk, zustand=FragebogenItem.Zustand.FINAL
+    )
     if not _ist_neueste_nichtarchivierte_fassung(finale):
         raise Http404
-    entwurf = FragebogenItem.objects.filter(
+    entwurf: FragebogenItem | None = FragebogenItem.objects.filter(
         historie=finale.historie,
         zustand=FragebogenItem.Zustand.ENTWURF,
     ).first()
