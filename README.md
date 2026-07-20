@@ -70,8 +70,9 @@ Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die
 private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst als
 Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar. Die Bibliothek zeigt nur Items
-aus dem eigenen Eigentümer-Kreis; Likert-Items verwenden die sechs global
-festgelegten, nicht editierbaren Skalenstufen.
+aus dem eigenen Eigentümer-Kreis; dessen Ko-Autor:innen lassen sich direkt an
+der Item-Historie hinzufügen oder entfernen. Likert-Items verwenden die sechs
+global festgelegten, nicht editierbaren Skalenstufen.
 
 ## Lokale Entwicklungsumgebung
 

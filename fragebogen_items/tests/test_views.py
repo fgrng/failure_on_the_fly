@@ -177,6 +177,70 @@ class FragebogenItemSichtbarkeitViewTests(TestCase):
             self.assertEqual(self.client.get(url).status_code, 403)
 
 
+class FragebogenItemKoautorschaftViewTests(TestCase):
+    """Der Editor teilt eine Item-Historie ausschließlich mit Ko-Autorinnen."""
+
+    def test_koautorin_kann_historie_ueber_editor_teilen_und_wird_wieder_entfernt(
+        self,
+    ) -> None:
+        """Autorin, Ko-Autorin und Fremde erhalten genau ihren Eigentümer-Zugang."""
+        ada: Konto = _forschende("ada")
+        grace: Konto = _forschende("grace")
+        linus: Konto = _forschende("linus")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Geteiltes Item"
+        )
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        hinzufuegen: HttpResponse = self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[item.pk]),
+            {"konto": grace.pk},
+        )
+
+        self.assertContains(detail, "ada")
+        self.assertRedirects(
+            hinzufuegen, reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        self.assertEqual(
+            set(item.historie.eigentuemerinnen.values_list("username", flat=True)),
+            {"ada", "grace"},
+        )
+
+        self.client.force_login(grace)
+        self.assertContains(
+            self.client.get(reverse("fragebogen_items:liste")), item.wortlaut
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("fragebogen_items:finalisieren", args=[item.pk])
+            ).status_code,
+            302,
+        )
+
+        self.client.force_login(linus)
+        self.assertEqual(
+            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])).status_code,
+            404,
+        )
+
+        self.client.force_login(ada)
+        entfernen: HttpResponse = self.client.post(
+            reverse("fragebogen_items:koautorin_entfernen", args=[item.pk, grace.pk])
+        )
+
+        self.assertRedirects(
+            entfernen, reverse("fragebogen_items:detail", args=[item.pk])
+        )
+        self.client.force_login(grace)
+        self.assertEqual(
+            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])).status_code,
+            404,
+        )
+
+
 class FragebogenItemLikertViewTests(TestCase):
     """Likert-Items zeigen ihre global festgelegte Skala nur lesend."""
 
