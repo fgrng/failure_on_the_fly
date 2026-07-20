@@ -19,10 +19,25 @@
             {% csrf_token %}
             <button class="button" type="submit">Finalisieren</button>
         </form>
-    {% elif item.zustand == item.Zustand.FINAL and ist_neueste_nichtarchivierte_fassung %}
-        <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
+        <form method="post" action="{% url 'fragebogen_items:loeschen' item.pk %}">
             {% csrf_token %}
-            <button class="button button--secondary" type="submit">Neue Fassung</button>
+            <button class="button button--danger" type="submit">Entwurf löschen</button>
+        </form>
+    {% elif item.zustand == item.Zustand.FINAL %}
+        {% if ist_neueste_nichtarchivierte_fassung %}
+            <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
+                {% csrf_token %}
+                <button class="button button--secondary" type="submit">Neue Fassung</button>
+            </form>
+        {% endif %}
+        <form method="post" action="{% url 'fragebogen_items:archivieren' item.pk %}">
+            {% csrf_token %}
+            <button class="button button--danger" type="submit">Archivieren</button>
+        </form>
+    {% elif item.zustand == item.Zustand.ARCHIVIERT %}
+        <form method="post" action="{% url 'fragebogen_items:entarchivieren' item.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Entarchivieren</button>
         </form>
     {% endif %}
     {% if item.typ == item.Typ.LIKERT %}

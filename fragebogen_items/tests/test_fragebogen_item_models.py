@@ -98,6 +98,30 @@ class FragebogenItemConstraintTests(TestCase):
                 zustand=FragebogenItem.Zustand.FINAL,
             )
 
+    def test_archivierte_schwester_gibt_vorgaengerin_fuer_neue_fassung_frei(
+        self,
+    ) -> None:
+        """Archivierung nimmt eine Fassung aus dem partiellen Schwester-Index."""
+        konto = get_user_model().objects.create_user(username="ada")
+        vorgaengerin = FragebogenItem.objects.anlegen(konto, wortlaut="Erste Fassung")
+        vorgaengerin.finalisieren()
+        archivierte_schwester = self._direkt_speichern(
+            historie=vorgaengerin.historie,
+            vorgaengerin=vorgaengerin,
+            zustand=FragebogenItem.Zustand.FINAL,
+            finalisiert_am=vorgaengerin.finalisiert_am,
+        )
+
+        archivierte_schwester.archivieren()
+        neue_schwester = self._direkt_speichern(
+            historie=vorgaengerin.historie,
+            vorgaengerin=vorgaengerin,
+            zustand=FragebogenItem.Zustand.FINAL,
+            finalisiert_am=vorgaengerin.finalisiert_am,
+        )
+
+        self.assertEqual(neue_schwester.vorgaengerin, vorgaengerin)
+
 
 class FragebogenItemLebenszyklusTests(TestCase):
     """Die öffentliche Modell-API bewahrt den Lebenszyklus einer Fassung."""
