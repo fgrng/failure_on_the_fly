@@ -7,10 +7,9 @@ from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, F, QuerySet
+from django.db.models import Count, F, Max, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -28,11 +27,13 @@ from .export import datenspur_zip
 from .models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
     Erhebungsvignette,
     Stichprobe,
     Vignettenposition,
 )
 from simulation.models import ModellKonfiguration, Simulationskern
+from fragebogen_items.models import FragebogenItem, FragebogenItemHistorie
 from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.sink import DBSink
@@ -50,6 +51,8 @@ _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
 _VIGNETTEN_SUCHSCHLUESSEL: tuple[str, ...] = ("label", "fach", "thema")
+_ITEM_SPALTEN: list[dict[str, str]] = [{"schluessel": "label", "beschriftung": "Wortlaut"}]
+_ITEM_SUCHSCHLUESSEL: tuple[str, ...] = ("label",)
 P = ParamSpec("P")
 
 
@@ -86,6 +89,14 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     )
 
 
+def _eigene_finalen_items(request: HttpRequest) -> QuerySet[FragebogenItem]:
+    """Liefert einbindbare Item-Fassungen aus dem Eigentümer-Kreis der Forschenden."""
+
+    return FragebogenItem.objects.einbindbar().filter(
+        historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
+    )
+
+
 def _status_badge(erhebung: Erhebung) -> str:
     """Ordnet Erhebungsstatus den gemeinsamen Badge-Klassen zu."""
 
@@ -110,6 +121,32 @@ def _vignettenzeilen(
             "aktion_url": reverse(aktion, args=[erhebung.pk, vignette.pk]),
         }
         for vignette in vignetten
+    ]
+
+
+def _itemzeilen(
+    items: Iterable[FragebogenItem],
+    erhebung: Erhebung,
+    andockpunkt: str,
+    aktion: str,
+    zugehoerigkeiten: dict[int, Erhebungsitem] | None = None,
+) -> list[dict[str, object]]:
+    """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
+
+    return [
+        {
+            "pk": item.pk,
+            "label": item.wortlaut,
+            "aktion_url": reverse(
+                aktion,
+                args=(
+                    [erhebung.pk, zugehoerigkeiten[item.pk].pk]
+                    if zugehoerigkeiten is not None
+                    else [erhebung.pk, item.pk, andockpunkt]
+                ),
+            ),
+        }
+        for item in items
     ]
 
 
@@ -170,6 +207,36 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     verfuegbare_vignetten: QuerySet[Vignette] = _eigene_finalen_vignetten(request).exclude(
         pk__in=erhebung.vignetten.values("pk")
     )
+    itemzugehoerigkeiten: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.select_related(
+        "item"
+    )
+    itemdaten: dict[str, dict[str, object]] = {}
+    for andockpunkt in Erhebungsitem.Andockpunkt.values:
+        zugehoerigkeiten_am_andockpunkt: list[Erhebungsitem] = [
+            zugehoerigkeit
+            for zugehoerigkeit in itemzugehoerigkeiten
+            if zugehoerigkeit.andockpunkt == andockpunkt
+        ]
+        aufgenommene_items: list[FragebogenItem] = [
+            zugehoerigkeit.item for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
+        ]
+        itemdaten[andockpunkt] = {
+            "aufgenommene": _itemzeilen(
+                aufgenommene_items,
+                erhebung,
+                andockpunkt,
+                "erhebungen:item_entfernen",
+                {zugehoerigkeit.item_id: zugehoerigkeit for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt},
+            ),
+            "verfuegbare": _itemzeilen(
+                _eigene_finalen_items(request).exclude(
+                    pk__in=[item.pk for item in aufgenommene_items]
+                ),
+                erhebung,
+                andockpunkt,
+                "erhebungen:item_hinzufuegen",
+            ),
+        }
 
     return render(
         request,
@@ -188,6 +255,20 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             ),
             "vignetten_spalten": _VIGNETTEN_SPALTEN,
             "vignetten_suchschluessel": _VIGNETTEN_SUCHSCHLUESSEL,
+            "item_spalten": _ITEM_SPALTEN,
+            "item_suchschluessel": _ITEM_SUCHSCHLUESSEL,
+            "nach_sitzung_aufgenommene_daten": itemdaten[
+                Erhebungsitem.Andockpunkt.NACH_SITZUNG
+            ]["aufgenommene"],
+            "nach_sitzung_verfuegbare_daten": itemdaten[
+                Erhebungsitem.Andockpunkt.NACH_SITZUNG
+            ]["verfuegbare"],
+            "am_ende_aufgenommene_daten": itemdaten[Erhebungsitem.Andockpunkt.AM_ENDE][
+                "aufgenommene"
+            ],
+            "am_ende_verfuegbare_daten": itemdaten[Erhebungsitem.Andockpunkt.AM_ENDE][
+                "verfuegbare"
+            ],
             "kann_zurueckziehen": erhebung.kann_zurueckgezogen_werden,
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
@@ -283,6 +364,50 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
     if erhebung.status == Erhebung.Status.ENTWURF:
         get_object_or_404(erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk).delete()
     return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def item_hinzufuegen(
+    request: HttpRequest, pk: int, item_pk: int, andockpunkt: str
+) -> HttpResponse:
+    """Nimmt eine eigene finale Item-Fassung an einem Andockpunkt auf."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    if andockpunkt not in Erhebungsitem.Andockpunkt.values:
+        raise PermissionDenied
+    item: FragebogenItem = get_object_or_404(_eigene_finalen_items(request), pk=item_pk)
+    zugehoerigkeiten: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=andockpunkt
+    )
+    if zugehoerigkeiten.filter(item=item).exists():
+        return HttpResponse(status=409)
+    position: int = (zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0) + 1
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=andockpunkt,
+        position=position,
+    )
+    return detail(request, pk)
+
+
+@login_required
+@_forschende_erforderlich
+def item_entfernen(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+    """Entfernt eine Item-Zuordnung aus einem eigenen Entwurf."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    get_object_or_404(erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk).delete()
+    return detail(request, pk)
 
 
 def _feste_reihenfolge_setzen(erhebung: Erhebung, zugehoerigkeit_ids: list[str]) -> None:

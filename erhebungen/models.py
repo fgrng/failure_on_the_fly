@@ -276,6 +276,65 @@ class Erhebungsvignette(models.Model):
         ]
 
 
+class Erhebungsitem(models.Model):
+    """Eine finale Item-Fassung einer Erhebung an einem Andockpunkt."""
+
+    class Andockpunkt(models.TextChoices):
+        """Die zwei Stellen, an denen Fragebogen-Items erhoben werden."""
+
+        NACH_SITZUNG = "nach_sitzung", "Nach jeder Vignettensitzung"
+        AM_ENDE = "am_ende", "Am Ende"
+
+    erhebung: models.ForeignKey = models.ForeignKey(
+        Erhebung,
+        on_delete=models.CASCADE,
+        related_name="itemzugehoerigkeiten",
+    )
+    item: models.ForeignKey = models.ForeignKey(
+        "fragebogen_items.FragebogenItem", on_delete=models.PROTECT
+    )
+    andockpunkt: models.CharField = models.CharField(
+        max_length=13, choices=Andockpunkt
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+
+    def clean(self) -> None:
+        """Erlaubt nur finale Fassungen aus dem Eigentümer-Kreis der Erhebung."""
+
+        from fragebogen_items.models import FragebogenItem
+
+        fehler: dict[str, str] = {}
+        if self.item.zustand != FragebogenItem.Zustand.FINAL:
+            fehler["item"] = "Erhebungen können nur finale Items einbinden."
+        elif not self.item.historie.eigentuemerinnen.filter(
+            pk=self.erhebung.eigentuemerin_id
+        ).exists():
+            fehler["item"] = "Erhebungen können nur eigene Items einbinden."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur gültige Erhebungszugehörigkeiten."""
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        """Ordnet Items je Andockpunkt eindeutig und stabil."""
+
+        ordering: list[str] = ["andockpunkt", "position", "pk"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebung", "item", "andockpunkt"],
+                name="erhebungen_item_ist_je_andockpunkt_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["erhebung", "andockpunkt", "position"],
+                name="erhebungen_item_position_ist_je_andockpunkt_eindeutig",
+            ),
+        ]
+
+
 class StichprobeQuerySet(models.QuerySet["Stichprobe"]):
     """Abfragen über Stichproben."""
 

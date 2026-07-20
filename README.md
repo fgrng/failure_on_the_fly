@@ -66,6 +66,9 @@ wieder entarchivieren, sofern keine Stichprobe läuft. Unter einer finalen
 Erhebung lassen sich Stichproben mit Beginn und Ende anlegen; die Detailseite
 zeigt ihren kopierbaren Teilnahme-Link, die aktuelle Phase und die Zahl ihrer
 Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
+Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
+zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
+Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen.
 

@@ -23,6 +23,16 @@ urlpatterns: list[URLPattern] = [
         name="vignette_entfernen",
     ),
     path(
+        "eigene/<int:pk>/items/<int:item_pk>/<str:andockpunkt>/hinzufuegen/",
+        views.item_hinzufuegen,
+        name="item_hinzufuegen",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/entfernen/",
+        views.item_entfernen,
+        name="item_entfernen",
+    ),
+    path(
         "eigene/<int:pk>/konfiguration/",
         views.konfiguration_speichern,
         name="konfiguration_speichern",

@@ -56,6 +56,10 @@
         <div id="erhebung-entwurf-editor" x-data="{ randomisierung: '{{ erhebung.randomisierung }}' }">
         <div data-zuordnung-daten>{{ aufgenommene_daten|json_script:"aufgenommene-daten" }}</div>
         <div data-zuordnung-daten>{{ verfuegbare_daten|json_script:"verfuegbare-daten" }}</div>
+        <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ nach_sitzung_verfuegbare_daten|json_script:"nach-sitzung-verfuegbare-daten" }}</div>
+        <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ am_ende_verfuegbare_daten|json_script:"am-ende-verfuegbare-daten" }}</div>
 
         <form method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
             {% csrf_token %}
@@ -131,6 +135,30 @@
                 {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="aufgenommene-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Aufgenommene Vignetten" suchfeld_label="Aufgenommene Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Vignetten gefunden." %}
 
             </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-fragebogen">
+            <header class="page-section__head">
+                <b>04</b><span><h2 id="section-fragebogen">Fragebogen verwalten</h2><small>Fügen Sie finale Items an den jeweiligen Andockpunkt hinzu oder entfernen Sie diese.</small></span>
+            </header>
+            <section class="page-section" aria-labelledby="section-nach-sitzung">
+                <header class="page-section__head">
+                    <b>01</b><span><h3 id="section-nach-sitzung">Nach jeder Vignettensitzung</h3></span>
+                </header>
+                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Items aufgenommen." %}
+                </div>
+            </section>
+            <section class="page-section" aria-labelledby="section-am-ende">
+                <header class="page-section__head">
+                    <b>02</b><span><h3 id="section-am-ende">Am Ende</h3></span>
+                </header>
+                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Items aufgenommen." %}
+                </div>
+            </section>
         </section>
         </div>
 

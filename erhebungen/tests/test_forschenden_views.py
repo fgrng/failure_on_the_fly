@@ -16,9 +16,11 @@ from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
     Erhebungsvignette,
     Stichprobe,
 )
+from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Teilnahme
 from vignetten.models import Vignette
@@ -44,6 +46,14 @@ def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     vignette.save()
     vignette.finalisieren()
     return vignette
+
+
+def _finales_item_anlegen(konto: Konto, wortlaut: str) -> FragebogenItem:
+    """Legt eine einbindbare finale Item-Fassung an."""
+
+    item: FragebogenItem = FragebogenItem.objects.anlegen(konto, wortlaut=wortlaut)
+    item.finalisieren()
+    return item
 
 
 class ErhebungenForschendenRollenTests(TestCase):
@@ -264,6 +274,135 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, self.eigene_finale.pk],
             ),
         )
+
+    def test_baut_getrennte_item_bibliotheken_und_sperrt_sie_ausserhalb_des_entwurfs(
+        self,
+    ) -> None:
+        """Ein finales eigenes Item bleibt am anderen Andockpunkt wählbar."""
+
+        item: FragebogenItem = _finales_item_anlegen(
+            self.ada, "Wie sicher fühlten Sie sich?"
+        )
+
+        aufnehmen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[
+                    self.erhebung.pk,
+                    item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
+            )
+        )
+
+        self.assertEqual(aufnehmen.status_code, 200)
+        self.assertEqual(
+            [zeile["pk"] for zeile in aufnehmen.context["nach_sitzung_aufgenommene_daten"]],
+            [item.pk],
+        )
+        self.assertEqual(aufnehmen.context["nach_sitzung_verfuegbare_daten"], [])
+        self.assertEqual(
+            [zeile["pk"] for zeile in aufnehmen.context["am_ende_verfuegbare_daten"]],
+            [item.pk],
+        )
+
+        doppelte_aufnahme: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[
+                    self.erhebung.pk,
+                    item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
+            )
+        )
+        self.assertEqual(doppelte_aufnahme.status_code, 409)
+
+        andere_bindung: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            )
+        )
+        self.assertEqual(andere_bindung.status_code, 200)
+        self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2)
+
+        entfernte_bindung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        entfernen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_entfernen",
+                args=[self.erhebung.pk, entfernte_bindung.pk],
+            )
+        )
+        self.assertEqual(entfernen.status_code, 200)
+        self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 1)
+
+        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was fiel auf?")
+        drittes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was bleibt?")
+        self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[
+                    self.erhebung.pk,
+                    zweites_item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
+            )
+        )
+        erste_bindung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        )
+        self.client.post(
+            reverse(
+                "erhebungen:item_entfernen",
+                args=[self.erhebung.pk, erste_bindung.pk],
+            )
+        )
+        anhaengen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[
+                    self.erhebung.pk,
+                    drittes_item.pk,
+                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                ],
+            )
+        )
+        self.assertEqual(anhaengen.status_code, 200)
+        self.assertEqual(
+            Erhebungsitem.objects.get(
+                erhebung=self.erhebung,
+                item=drittes_item,
+                andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            ).position,
+            3,
+        )
+
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        self.erhebung.finalisieren()
+        gesperrt: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.NACH_SITZUNG],
+            )
+        )
+        self.assertEqual(gesperrt.status_code, 403)
+
+        self.erhebung.zurueckziehen()
+        wieder_offen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            )
+        )
+        self.assertEqual(wieder_offen.status_code, 200)
 
     def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:
         """Beide Spalten tragen dieselbe Zeilenform mit passender Aktions-URL."""
