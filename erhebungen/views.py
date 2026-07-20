@@ -51,8 +51,18 @@ _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
 _VIGNETTEN_SUCHSCHLUESSEL: tuple[str, ...] = ("label", "fach", "thema")
-_ITEM_SPALTEN: list[dict[str, str]] = [{"schluessel": "label", "beschriftung": "Wortlaut"}]
+_ITEM_SPALTEN: list[dict[str, str]] = [
+    {"schluessel": "label", "beschriftung": "Wortlaut"}
+]
 _ITEM_SUCHSCHLUESSEL: tuple[str, ...] = ("label",)
+_ANDERE_ANDOCKPUNKTE: dict[str, str] = {
+    Erhebungsitem.Andockpunkt.NACH_SITZUNG: Erhebungsitem.Andockpunkt.AM_ENDE,
+    Erhebungsitem.Andockpunkt.AM_ENDE: Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+}
+_BADGE_BESCHRIFTUNGEN: dict[str, str] = {
+    Erhebungsitem.Andockpunkt.NACH_SITZUNG: "schon nach jeder Sitzung",
+    Erhebungsitem.Andockpunkt.AM_ENDE: "schon am Ende",
+}
 P = ParamSpec("P")
 
 
@@ -130,19 +140,18 @@ def _itemzeilen(
     andockpunkt: str,
     aktion: str,
     zugehoerigkeiten: dict[int, Erhebungsitem] | None = None,
-    badges: dict[int, str] | None = None,
+    badge_beschriftungen: dict[int, str] | None = None,
 ) -> list[dict[str, object]]:
     """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
 
     if zugehoerigkeiten is None:
+        badge_beschriftungen = badge_beschriftungen or {}
         return [
             {
                 "pk": item.pk,
                 "label": item.wortlaut,
-                "aktion_url": reverse(
-                    aktion, args=[erhebung.pk, item.pk, andockpunkt]
-                ),
-                "badge": (badges or {}).get(item.pk),
+                "aktion_url": reverse(aktion, args=[erhebung.pk, item.pk, andockpunkt]),
+                "badge": badge_beschriftungen.get(item.pk),
             }
             for item in items
         ]
@@ -239,13 +248,15 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         )
 
     vignettenzugehoerigkeiten: QuerySet[Erhebungsvignette] = (
-        erhebung.vignettenzugehoerigkeiten.select_related("vignette", "vignette__historie")
+        erhebung.vignettenzugehoerigkeiten.select_related(
+            "vignette", "vignette__historie"
+        )
     )
-    verfuegbare_vignetten: QuerySet[Vignette] = _eigene_finalen_vignetten(request).exclude(
-        pk__in=erhebung.vignetten.values("pk")
-    )
-    itemzugehoerigkeiten: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.select_related(
-        "item"
+    verfuegbare_vignetten: QuerySet[Vignette] = _eigene_finalen_vignetten(
+        request
+    ).exclude(pk__in=erhebung.vignetten.values("pk"))
+    itemzugehoerigkeiten: QuerySet[Erhebungsitem] = (
+        erhebung.itemzugehoerigkeiten.select_related("item")
     )
     itemdaten: dict[str, dict[str, object]] = {}
     for andockpunkt in Erhebungsitem.Andockpunkt.values:
@@ -257,21 +268,18 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         aufgenommene_items: list[FragebogenItem] = [
             zugehoerigkeit.item for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
         ]
-        anderer_andockpunkt: str = next(
-            wert for wert in Erhebungsitem.Andockpunkt.values if wert != andockpunkt
-        )
-        badge: str = (
-            "schon am Ende"
-            if anderer_andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
-            else "schon nach jeder Sitzung"
-        )
+        anderer_andockpunkt: str = _ANDERE_ANDOCKPUNKTE[andockpunkt]
+        badge_beschriftung: str = _BADGE_BESCHRIFTUNGEN[anderer_andockpunkt]
         itemdaten[andockpunkt] = {
             "aufgenommene": _itemzeilen(
                 aufgenommene_items,
                 erhebung,
                 andockpunkt,
                 "erhebungen:item_entfernen",
-                {zugehoerigkeit.item_id: zugehoerigkeit for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt},
+                {
+                    zugehoerigkeit.item_id: zugehoerigkeit
+                    for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
+                },
             ),
             "verfuegbare": _itemzeilen(
                 _eigene_finalen_items(request).exclude(
@@ -280,8 +288,8 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 erhebung,
                 andockpunkt,
                 "erhebungen:item_hinzufuegen",
-                badges={
-                    zugehoerigkeit.item_id: badge
+                badge_beschriftungen={
+                    zugehoerigkeit.item_id: badge_beschriftung
                     for zugehoerigkeit in itemzugehoerigkeiten
                     if zugehoerigkeit.andockpunkt == anderer_andockpunkt
                 },
@@ -296,7 +304,10 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "status_badge": _status_badge(erhebung),
             "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
-                [zugehoerigkeit.vignette for zugehoerigkeit in vignettenzugehoerigkeiten],
+                [
+                    zugehoerigkeit.vignette
+                    for zugehoerigkeit in vignettenzugehoerigkeiten
+                ],
                 erhebung,
                 "erhebungen:vignette_entfernen",
             ),
@@ -333,10 +344,12 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    zeitstempel: str = timezone.now().astimezone(timezone.UTC).strftime(
-        "%Y%m%dT%H%M%SZ"
+    zeitstempel: str = (
+        timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
     )
-    dateiname: str = f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
+    dateiname: str = (
+        f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
+    )
     response: HttpResponse = HttpResponse(
         datenspur_zip(erhebung), content_type="application/zip"
     )
@@ -370,7 +383,9 @@ def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_erforderlich
-def stichprobe_archivieren(request: HttpRequest, pk: int, stichprobe_pk: int) -> HttpResponse:
+def stichprobe_archivieren(
+    request: HttpRequest, pk: int, stichprobe_pk: int
+) -> HttpResponse:
     """Archiviert eine datenfreie Stichprobe über ihre Domänenmethode."""
 
     if request.method != "POST":
@@ -385,7 +400,9 @@ def stichprobe_archivieren(request: HttpRequest, pk: int, stichprobe_pk: int) ->
 
 @login_required
 @_forschende_erforderlich
-def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
+def vignette_hinzufuegen(
+    request: HttpRequest, pk: int, vignette_pk: int
+) -> HttpResponse:
     """Nimmt eine eigene finale Fassung in einen eigenen Entwurf auf."""
 
     if request.method != "POST":
@@ -393,7 +410,9 @@ def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> Htt
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.ENTWURF:
         return redirect("erhebungen:detail", pk=erhebung.pk)
-    vignette: Vignette = get_object_or_404(_eigene_finalen_vignetten(request), pk=vignette_pk)
+    vignette: Vignette = get_object_or_404(
+        _eigene_finalen_vignetten(request), pk=vignette_pk
+    )
     position: int | None = None
     if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
         position = erhebung.vignettenzugehoerigkeiten.count() + 1
@@ -412,7 +431,9 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status == Erhebung.Status.ENTWURF:
-        get_object_or_404(erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk).delete()
+        get_object_or_404(
+            erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk
+        ).delete()
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
@@ -436,7 +457,9 @@ def item_hinzufuegen(
     )
     if zugehoerigkeiten.filter(item=item).exists():
         return HttpResponse(status=409)
-    position: int = (zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0) + 1
+    position: int = (
+        zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
+    ) + 1
     Erhebungsitem.objects.create(
         erhebung=erhebung,
         item=item,
@@ -448,7 +471,9 @@ def item_hinzufuegen(
 
 @login_required
 @_forschende_erforderlich
-def item_entfernen(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+def item_entfernen(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
+) -> HttpResponse:
     """Entfernt eine Item-Zuordnung aus einem eigenen Entwurf."""
 
     if request.method != "POST":
@@ -518,9 +543,7 @@ def _itemreihenfolge_aendern(
 @login_required
 @_forschende_erforderlich
 @transaction.atomic
-def item_hoch(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
-) -> HttpResponse:
+def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach oben."""
 
     return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, -1)
@@ -529,15 +552,15 @@ def item_hoch(
 @login_required
 @_forschende_erforderlich
 @transaction.atomic
-def item_runter(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
-) -> HttpResponse:
+def item_runter(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach unten."""
 
     return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, 1)
 
 
-def _feste_reihenfolge_setzen(erhebung: Erhebung, zugehoerigkeit_ids: list[str]) -> None:
+def _feste_reihenfolge_setzen(
+    erhebung: Erhebung, zugehoerigkeit_ids: list[str]
+) -> None:
     """Schreibt eine vollständige Reihenfolge ohne die eindeutigen Positionen zu kreuzen."""
 
     zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
@@ -553,7 +576,9 @@ def _feste_reihenfolge_setzen(erhebung: Erhebung, zugehoerigkeit_ids: list[str])
     bisherige_positionen: list[int] = list(
         zugehoerigkeiten.values_list("position", flat=True)
     )
-    zugehoerigkeiten.update(position=F("position") + max(bisherige_positionen, default=0))
+    zugehoerigkeiten.update(
+        position=F("position") + max(bisherige_positionen, default=0)
+    )
     for position, zugehoerigkeit_id in enumerate(neue_ids, start=1):
         zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
 
@@ -588,10 +613,7 @@ def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
             "randomisierung",
         ]
     )
-    if (
-        randomisierung == Erhebung.Randomisierung.FEST
-        and "vignetten" in request.POST
-    ):
+    if randomisierung == Erhebung.Randomisierung.FEST and "vignetten" in request.POST:
         _feste_reihenfolge_setzen(erhebung, request.POST.getlist("vignetten"))
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
@@ -663,9 +685,7 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None:
         bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
-        tokens: dict[str, str] = request.session.get(
-            _TEILNAHME_TOKENS_SESSION_KEY, {}
-        )
+        tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
@@ -700,7 +720,9 @@ def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             update_fields=["einwilligung_erteilt", "audioverarbeitung_eingewilligt"]
         )
         return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
-    return render(request, "erhebungen/einwilligung.html", {"erhebung": stichprobe.erhebung})
+    return render(
+        request, "erhebungen/einwilligung.html", {"erhebung": stichprobe.erhebung}
+    )
 
 
 def instruktion(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
@@ -819,9 +841,7 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung, _bindung = _erhebungssitzung(token)
     zeitbudget_anhalten(request, sitzung)
-    return persistierten_debrief_anzeigen(
-        request, sitzung, _sitzungsnavigation(token)
-    )
+    return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
 
 def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
@@ -865,7 +885,9 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
         return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
-    return render(request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung})
+    return render(
+        request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung}
+    )
 
 
 def _bindung_aus_session(
@@ -877,10 +899,14 @@ def _bindung_aus_session(
     token: str | None = tokens.get(str(stichprobe.teilnahme_link))
     if token is None:
         return None
-    return Erhebungsbindung.objects.select_related("teilnahme").filter(
-        stichprobe=stichprobe,
-        token=token,
-    ).first()
+    return (
+        Erhebungsbindung.objects.select_related("teilnahme")
+        .filter(
+            stichprobe=stichprobe,
+            token=token,
+        )
+        .first()
+    )
 
 
 def _bindung_anlegen_fuer_laufende_stichprobe(

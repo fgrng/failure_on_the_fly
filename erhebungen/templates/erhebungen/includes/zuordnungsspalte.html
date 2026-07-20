@@ -26,7 +26,9 @@
                         {% for spalte in spalten %}
                             <td>
                                 <span x-text="zeile['{{ spalte.schluessel }}']"></span>
-                                {% if zeige_badges %}<span x-show="zeile.badge" class="badge badge--research" x-text="zeile.badge"></span>{% endif %}
+                                {% if zeige_badges and forloop.first %}
+                                    <span x-show="zeile.badge" class="badge badge--research" x-text="zeile.badge"></span>
+                                {% endif %}
                             </td>
                         {% endfor %}
                         <td>
