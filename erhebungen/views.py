@@ -453,7 +453,9 @@ def item_entfernen(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> Htt
     return detail(request, pk)
 
 
-def _item_verschieben(erhebung: Erhebung, zugehoerigkeit_pk: int, richtung: int) -> None:
+def _item_verschieben(
+    erhebung: Erhebung, zugehoerigkeit_pk: int, richtung: int
+) -> None:
     """Vertauscht eine Item-Zuordnung mit ihrer Nachbarin am selben Andockpunkt."""
 
     zugehoerigkeit: Erhebungsitem = get_object_or_404(
@@ -484,34 +486,40 @@ def _item_verschieben(erhebung: Erhebung, zugehoerigkeit_pk: int, richtung: int)
     zugehoerigkeit.save(update_fields=["position"])
 
 
+def _itemreihenfolge_aendern(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int, richtung: int
+) -> HttpResponse:
+    """Verschiebt eine Item-Zuordnung und aktualisiert die Detailansicht."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    _item_verschieben(erhebung, zugehoerigkeit_pk, richtung)
+    return detail(request, pk)
+
+
 @login_required
 @_forschende_erforderlich
 @transaction.atomic
-def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+def item_hoch(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
+) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach oben."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
-    _item_verschieben(erhebung, zugehoerigkeit_pk, -1)
-    return detail(request, pk)
+    return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, -1)
 
 
 @login_required
 @_forschende_erforderlich
 @transaction.atomic
-def item_runter(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
+def item_runter(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
+) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach unten."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
-    _item_verschieben(erhebung, zugehoerigkeit_pk, 1)
-    return detail(request, pk)
+    return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, 1)
 
 
 def _feste_reihenfolge_setzen(erhebung: Erhebung, zugehoerigkeit_ids: list[str]) -> None:

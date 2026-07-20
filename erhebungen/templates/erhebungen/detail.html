@@ -147,7 +147,7 @@
                 </header>
                 <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
                     {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." %}
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True leertext="Keine Items aufgenommen." %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
                 </div>
             </section>
             <section class="page-section" aria-labelledby="section-am-ende">
@@ -156,7 +156,7 @@
                 </header>
                 <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
                     {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." %}
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True leertext="Keine Items aufgenommen." %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
                 </div>
             </section>
         </section>

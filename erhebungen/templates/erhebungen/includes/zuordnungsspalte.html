@@ -5,11 +5,17 @@
         <span class="table-toolbar__count" x-text="sichtbareZeilen.length + ' von ' + rows.length"></span>
     </div>
     <div class="table-wrap vignette-index-table">
-        <table class="table table--sortable">
+        <table class="table{% if not nicht_sortierbar %} table--sortable{% endif %}">
             <thead>
                 <tr>
                     {% for spalte in spalten %}
-                        <th scope="col"><button type="button" class="table__sort" @click="sortiere('{{ spalte.schluessel }}')">{{ spalte.beschriftung }}<span class="table__sort-arrow" :class="pfeilKlasse('{{ spalte.schluessel }}')"></span></button></th>
+                        <th scope="col">
+                            {% if nicht_sortierbar %}
+                                {{ spalte.beschriftung }}
+                            {% else %}
+                                <button type="button" class="table__sort" @click="sortiere('{{ spalte.schluessel }}')">{{ spalte.beschriftung }}<span class="table__sort-arrow" :class="pfeilKlasse('{{ spalte.schluessel }}')"></span></button>
+                            {% endif %}
+                        </th>
                     {% endfor %}
                     <th scope="col">{{ aktion_spalte }}</th>
                 </tr>
