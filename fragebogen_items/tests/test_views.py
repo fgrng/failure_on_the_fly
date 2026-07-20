@@ -264,6 +264,14 @@ class FragebogenItemArchivierenViewTests(TestCase):
 
         self.assertContains(response, "button--danger")
 
+    def test_editor_bietet_keine_historien_archivierung(self) -> None:
+        """Nur einzelne Fassungen erhalten eine Archivierungsaktion."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertNotContains(response, "Historie archivieren")
+
     def test_archivieren_leitet_zur_detailansicht_weiter(self) -> None:
         """Nach dem Archivieren bleibt die Fassung geöffnet."""
         response: HttpResponse = self.client.post(
@@ -321,6 +329,30 @@ class FragebogenItemArchivierenViewTests(TestCase):
         self.item.refresh_from_db()
 
         self.assertEqual(self.item.finalisiert_am, finalisiert_am)
+
+    def test_archivierte_schwester_mit_aktiver_nachfolgerin_bleibt_archiviert(
+        self,
+    ) -> None:
+        """Eine belegte Vorgängerin verhindert eine kollidierende Entarchivierung."""
+        archivierte_schwester = self.item.bearbeiten()
+        archivierte_schwester.finalisieren()
+        archivierte_schwester.archivieren()
+        aktive_schwester = self.item.bearbeiten()
+        aktive_schwester.finalisieren()
+
+        detail: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[archivierte_schwester.pk])
+        )
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:entarchivieren", args=[archivierte_schwester.pk])
+        )
+
+        self.assertNotContains(detail, "Entarchivieren")
+        self.assertEqual(response.status_code, 404)
+        archivierte_schwester.refresh_from_db()
+        self.assertEqual(
+            archivierte_schwester.zustand, FragebogenItem.Zustand.ARCHIVIERT
+        )
 
 
 class FragebogenItemLoeschenViewTests(TestCase):

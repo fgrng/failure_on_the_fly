@@ -34,7 +34,7 @@
             {% csrf_token %}
             <button class="button button--danger" type="submit">Archivieren</button>
         </form>
-    {% elif item.zustand == item.Zustand.ARCHIVIERT %}
+    {% elif item.zustand == item.Zustand.ARCHIVIERT and kann_entarchiviert_werden %}
         <form method="post" action="{% url 'fragebogen_items:entarchivieren' item.pk %}">
             {% csrf_token %}
             <button class="button" type="submit">Entarchivieren</button>

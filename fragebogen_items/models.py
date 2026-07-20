@@ -216,11 +216,24 @@ class FragebogenItem(models.Model):
             raise ValidationError("Nur finale Fassungen können archiviert werden.")
         self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
 
+    def kann_entarchiviert_werden(self) -> bool:
+        """Prüft, ob keine aktive Schwester dieselbe Vorgängerin belegt."""
+        return self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT) and not (
+            self.vorgaengerin_id is not None
+            and type(self)
+            .objects.filter(vorgaengerin_id=self.vorgaengerin_id)
+            .exclude(pk=self.pk)
+            .exclude(zustand=self.Zustand.ARCHIVIERT)
+            .exists()
+        )
+
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
         if not self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT):
             raise ValidationError("Nur archivierte Fassungen können entarchiviert werden.")
+        if not self.kann_entarchiviert_werden():
+            raise ValidationError("Die Vorgängerin hat bereits eine aktive Nachfolgerin.")
         self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
 
     class Meta:

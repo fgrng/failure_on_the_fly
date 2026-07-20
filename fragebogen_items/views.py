@@ -129,6 +129,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "ist_neueste_nichtarchivierte_fassung": (
                 _ist_neueste_nichtarchivierte_fassung(item)
             ),
+            "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
             "moegliche_koautorinnen": Konto.objects.filter(
@@ -234,6 +235,8 @@ def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ARCHIVIERT)
+    if not item.kann_entarchiviert_werden():
+        raise Http404
     item.entarchivieren()
     return redirect("fragebogen_items:detail", pk=item.pk)
 
