@@ -17,7 +17,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
+from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -182,7 +182,7 @@ class ErhebungsteilnahmeTests(TestCase):
             antwort,
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
-        teilnahme = Erhebungsbindung.objects.get().teilnahme
+        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
         self.assertTrue(teilnahme.einwilligung_erteilt)
         self.assertFalse(teilnahme.audioverarbeitung_eingewilligt)
 

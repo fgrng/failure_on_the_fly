@@ -513,24 +513,18 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
     if sitzung_pk is None:
         return None
     tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
-    bindungen: QuerySet[Erhebungsbindung] = Erhebungsbindung.objects.select_related(
-        "stichprobe", "teilnahme"
-    ).filter(token__in=tokens.values())
-    for bindung in bindungen:
-        if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
-            continue
-        sitzung: Sitzung | None = (
-            Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
-            .filter(
-                pk=sitzung_pk,
-                teilnahme=bindung.teilnahme,
-                status=Sitzung.Status.LAUFEND,
-            )
-            .first()
+    jetzt: datetime = timezone.now()
+    return (
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
+        .filter(
+            pk=sitzung_pk,
+            status=Sitzung.Status.LAUFEND,
+            teilnahme__erhebungsbindung__token__in=tokens.values(),
+            teilnahme__erhebungsbindung__stichprobe__beginn__lte=jetzt,
+            teilnahme__erhebungsbindung__stichprobe__ende__gte=jetzt,
         )
-        if sitzung is not None:
-            return sitzung
-    return None
+        .first()
+    )
 
 
 def gespraech(request: HttpRequest, token: str) -> HttpResponse:
