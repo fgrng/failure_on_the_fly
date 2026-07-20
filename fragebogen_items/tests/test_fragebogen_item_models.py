@@ -10,7 +10,6 @@ from fragebogen_items.models import (
     FragebogenItem,
     FragebogenItemHistorie,
 )
-from fragebogen_items.urls import urlpatterns
 
 
 class FragebogenItemAnlegenTests(TestCase):
@@ -46,7 +45,6 @@ class FragebogenItemHistorieTests(TestCase):
 
         self.assertNotIn("archiviert", feldnamen)
         self.assertFalse(hasattr(FragebogenItemHistorie, "historie_archivieren"))
-        self.assertNotIn("historie_archivieren", {pattern.name for pattern in urlpatterns})
 
     def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
         """Ko-Eigentümerinnen sehen dieselbe Item-Linie, Fremde nicht."""

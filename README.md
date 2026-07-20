@@ -71,8 +71,9 @@ private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst al
 Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 lassen sich archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen
 sich physisch löschen. Finale Fassungen sind unveränderlich und für Erhebungen
-einbindbar. Die Bibliothek zeigt nur Items aus dem eigenen Eigentümer-Kreis; Likert-Items verwenden die sechs global
-festgelegten, nicht editierbaren Skalenstufen.
+einbindbar. Die Bibliothek zeigt nur Items aus dem eigenen Eigentümer-Kreis;
+Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
+Skalenstufen.
 
 ## Lokale Entwicklungsumgebung
 

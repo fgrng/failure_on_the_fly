@@ -140,73 +140,130 @@ class FragebogenItemFinalisierenViewTests(TestCase):
 class FragebogenItemArchivierenViewTests(TestCase):
     """Finale Fassungen lassen sich im Editor archivieren."""
 
-    def test_finale_fassung_bietet_archivieren_und_archiviert_sie_ueber_post(
-        self,
-    ) -> None:
-        """Die rote Editor-Aktion zieht eine finale Fassung aus dem Umlauf."""
+    item: FragebogenItem
+
+    def setUp(self) -> None:
+        """Legt eine sichtbare finale Fassung für jeden Test an."""
         ada = _forschende("ada")
-        item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war die Sitzung?")
-        item.finalisieren()
+        self.item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war die Sitzung?")
+        self.item.finalisieren()
         self.client.force_login(ada)
 
-        detail = self.client.get(reverse("fragebogen_items:detail", args=[item.pk]))
+    def test_finale_fassung_bietet_archivieren(self) -> None:
+        """Finale Fassungen zeigen die Archivierungsaktion."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, "Archivieren")
+
+    def test_archivieren_ist_destruktiv_gekennzeichnet(self) -> None:
+        """Die Archivierungsaktion ist als destruktiv erkennbar."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, "button--danger")
+
+    def test_archivieren_leitet_zur_detailansicht_weiter(self) -> None:
+        """Nach dem Archivieren bleibt die Fassung geöffnet."""
         response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:archivieren", args=[item.pk])
+            reverse("fragebogen_items:archivieren", args=[self.item.pk])
         )
 
-        self.assertContains(detail, "Archivieren")
-        self.assertContains(detail, "button--danger")
         self.assertRedirects(
-            response, reverse("fragebogen_items:detail", args=[item.pk])
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
         )
-        item.refresh_from_db()
-        self.assertEqual(item.zustand, FragebogenItem.Zustand.ARCHIVIERT)
 
-    def test_archivierte_fassung_bietet_entarchivieren_und_macht_sie_wieder_final(
-        self,
-    ) -> None:
-        """Die Gegenaktion bringt die archivierte Fassung zurück in den Umlauf."""
-        ada = _forschende("ada")
-        item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war die Sitzung?")
-        item.finalisieren()
-        finalisiert_am = item.finalisiert_am
-        item.archivieren()
-        self.client.force_login(ada)
+    def test_archivieren_setzt_den_archivierten_zustand(self) -> None:
+        """Archivieren nimmt die finale Fassung aus dem Umlauf."""
+        self.client.post(reverse("fragebogen_items:archivieren", args=[self.item.pk]))
+        self.item.refresh_from_db()
 
-        detail = self.client.get(reverse("fragebogen_items:detail", args=[item.pk]))
+        self.assertEqual(self.item.zustand, FragebogenItem.Zustand.ARCHIVIERT)
+
+    def test_archivierte_fassung_bietet_entarchivieren(self) -> None:
+        """Archivierte Fassungen zeigen die Gegenaktion."""
+        self.item.archivieren()
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, "Entarchivieren")
+
+    def test_entarchivieren_leitet_zur_detailansicht_weiter(self) -> None:
+        """Nach dem Entarchivieren bleibt die Fassung geöffnet."""
+        self.item.archivieren()
         response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:entarchivieren", args=[item.pk])
+            reverse("fragebogen_items:entarchivieren", args=[self.item.pk])
         )
 
-        self.assertContains(detail, "Entarchivieren")
         self.assertRedirects(
-            response, reverse("fragebogen_items:detail", args=[item.pk])
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
         )
-        item.refresh_from_db()
-        self.assertEqual(item.zustand, FragebogenItem.Zustand.FINAL)
-        self.assertEqual(item.finalisiert_am, finalisiert_am)
+
+    def test_entarchivieren_setzt_den_finalen_zustand(self) -> None:
+        """Entarchivieren bringt die Fassung zurück in den Umlauf."""
+        self.item.archivieren()
+        self.client.post(
+            reverse("fragebogen_items:entarchivieren", args=[self.item.pk])
+        )
+        self.item.refresh_from_db()
+
+        self.assertEqual(self.item.zustand, FragebogenItem.Zustand.FINAL)
+
+    def test_entarchivieren_erhaelt_den_finalisierungszeitpunkt(self) -> None:
+        """Entarchivieren verändert den Zeitpunkt der ersten Finalisierung nicht."""
+        finalisiert_am = self.item.finalisiert_am
+        self.item.archivieren()
+        self.client.post(
+            reverse("fragebogen_items:entarchivieren", args=[self.item.pk])
+        )
+        self.item.refresh_from_db()
+
+        self.assertEqual(self.item.finalisiert_am, finalisiert_am)
 
 
 class FragebogenItemLoeschenViewTests(TestCase):
     """Entwürfe werden im Editor physisch gelöscht."""
 
-    def test_entwurf_bietet_rot_gekennzeichnetes_loeschen_und_entfernt_ihn(
-        self,
-    ) -> None:
-        """Die destruktive Aktion löscht den Entwurf statt seinen Zustand zu ändern."""
+    item: FragebogenItem
+
+    def setUp(self) -> None:
+        """Legt einen sichtbaren Entwurf für jeden Test an."""
         ada = _forschende("ada")
-        item = FragebogenItem.objects.anlegen(ada, wortlaut="Noch nicht fertig")
+        self.item = FragebogenItem.objects.anlegen(ada, wortlaut="Noch nicht fertig")
         self.client.force_login(ada)
 
-        detail = self.client.get(reverse("fragebogen_items:detail", args=[item.pk]))
-        response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:loeschen", args=[item.pk])
+    def test_entwurf_bietet_loeschen(self) -> None:
+        """Entwürfe zeigen die Löschaktion."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
         )
 
-        self.assertContains(detail, "Entwurf löschen")
-        self.assertContains(detail, "button--danger")
+        self.assertContains(response, "Entwurf löschen")
+
+    def test_loeschen_ist_destruktiv_gekennzeichnet(self) -> None:
+        """Die Löschaktion ist als destruktiv erkennbar."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, "button--danger")
+
+    def test_loeschen_leitet_zur_bibliothek_weiter(self) -> None:
+        """Nach dem Löschen kehrt der Editor zur Bibliothek zurück."""
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:loeschen", args=[self.item.pk])
+        )
+
         self.assertRedirects(response, reverse("fragebogen_items:liste"))
-        self.assertFalse(FragebogenItem.objects.filter(pk=item.pk).exists())
+
+    def test_loeschen_entfernt_den_entwurf(self) -> None:
+        """Die Löschaktion entfernt den Entwurf physisch."""
+        self.client.post(reverse("fragebogen_items:loeschen", args=[self.item.pk]))
+
+        self.assertFalse(FragebogenItem.objects.filter(pk=self.item.pk).exists())
 
 
 class FragebogenItemSichtbarkeitViewTests(TestCase):
