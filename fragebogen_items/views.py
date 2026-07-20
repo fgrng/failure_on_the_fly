@@ -72,7 +72,11 @@ def _zustand_badge(item: FragebogenItem) -> str:
 @_forschende_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Zeigt pro sichtbarer Historie ihre neueste Fassung."""
-    sichtbare_historien = FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
+    sichtbare_historien = (
+        FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
+        .filter(fragebogenitem__isnull=False)
+        .distinct()
+    )
     item_zeilen: list[ItemZeile] = []
     for historie in sichtbare_historien:
         item: FragebogenItem = historie.fragebogenitem_set.latest("pk")
@@ -126,3 +130,36 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     )
     item.finalisieren()
     return redirect("fragebogen_items:detail", pk=item.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Archiviert eine sichtbare finale Fassung über die Modell-Naht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.FINAL)
+    item.archivieren()
+    return redirect("fragebogen_items:detail", pk=item.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Macht eine sichtbare archivierte Fassung wieder final."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ARCHIVIERT)
+    item.entarchivieren()
+    return redirect("fragebogen_items:detail", pk=item.pk)
+
+
+@login_required
+@_forschende_erforderlich
+def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Löscht einen sichtbaren Entwurf physisch über die Modell-Naht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ENTWURF)
+    item.delete()
+    return redirect("fragebogen_items:liste")

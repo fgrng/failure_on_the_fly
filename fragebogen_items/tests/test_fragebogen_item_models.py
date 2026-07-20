@@ -10,6 +10,7 @@ from fragebogen_items.models import (
     FragebogenItem,
     FragebogenItemHistorie,
 )
+from fragebogen_items.urls import urlpatterns
 
 
 class FragebogenItemAnlegenTests(TestCase):
@@ -45,6 +46,7 @@ class FragebogenItemHistorieTests(TestCase):
 
         self.assertNotIn("archiviert", feldnamen)
         self.assertFalse(hasattr(FragebogenItemHistorie, "historie_archivieren"))
+        self.assertNotIn("historie_archivieren", {pattern.name for pattern in urlpatterns})
 
     def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
         """Ko-Eigentümerinnen sehen dieselbe Item-Linie, Fremde nicht."""
@@ -97,6 +99,30 @@ class FragebogenItemConstraintTests(TestCase):
                 historie=FragebogenItemHistorie.objects.create(),
                 zustand=FragebogenItem.Zustand.FINAL,
             )
+
+    def test_archivierte_schwester_gibt_vorgaengerin_fuer_neue_fassung_frei(
+        self,
+    ) -> None:
+        """Archivierung nimmt eine Fassung aus dem partiellen Schwester-Index."""
+        konto = get_user_model().objects.create_user(username="ada")
+        vorgaengerin = FragebogenItem.objects.anlegen(konto, wortlaut="Erste Fassung")
+        vorgaengerin.finalisieren()
+        archivierte_schwester = self._direkt_speichern(
+            historie=vorgaengerin.historie,
+            vorgaengerin=vorgaengerin,
+            zustand=FragebogenItem.Zustand.FINAL,
+            finalisiert_am=vorgaengerin.finalisiert_am,
+        )
+
+        archivierte_schwester.archivieren()
+        neue_schwester = self._direkt_speichern(
+            historie=vorgaengerin.historie,
+            vorgaengerin=vorgaengerin,
+            zustand=FragebogenItem.Zustand.FINAL,
+            finalisiert_am=vorgaengerin.finalisiert_am,
+        )
+
+        self.assertEqual(neue_schwester.vorgaengerin, vorgaengerin)
 
 
 class FragebogenItemLebenszyklusTests(TestCase):

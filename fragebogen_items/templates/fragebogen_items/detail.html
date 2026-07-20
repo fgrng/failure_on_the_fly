@@ -18,6 +18,20 @@
             {% csrf_token %}
             <button class="button" type="submit">Finalisieren</button>
         </form>
+        <form method="post" action="{% url 'fragebogen_items:loeschen' item.pk %}">
+            {% csrf_token %}
+            <button class="button button--danger" type="submit">Entwurf löschen</button>
+        </form>
+    {% elif item.zustand == item.Zustand.FINAL %}
+        <form method="post" action="{% url 'fragebogen_items:archivieren' item.pk %}">
+            {% csrf_token %}
+            <button class="button button--danger" type="submit">Archivieren</button>
+        </form>
+    {% elif item.zustand == item.Zustand.ARCHIVIERT %}
+        <form method="post" action="{% url 'fragebogen_items:entarchivieren' item.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Entarchivieren</button>
+        </form>
     {% endif %}
     {% if item.typ == item.Typ.LIKERT %}
         <section class="page-section">
