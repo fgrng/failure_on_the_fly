@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_htmx",
     "erhebungen",
+    "fragebogen_items",
     "konten",
     "seeds",
     "simulation",
