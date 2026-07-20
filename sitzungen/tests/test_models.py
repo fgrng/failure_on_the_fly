@@ -140,10 +140,27 @@ def test_answerless_gespraechsschritt_mit_fehlversuch_wird_gespeichert() -> None
         ],
     )
 
-    assert schritt.denkspur is None
-    assert schritt.aeusserung is None
-    assert schritt.erstellt_am is not None
+    assert (schritt.denkspur, schritt.aeusserung) == (None, None)
     assert Fehlversuch.objects.filter(gespraechsschritt=schritt).count() == 1
+
+
+@pytest.mark.django_db
+def test_answerless_gespraechsschritt_traegt_entstehungszeitpunkt() -> None:
+    """Ein Abbruchschritt hält seinen Entstehungszeitpunkt ebenfalls fest."""
+
+    schritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
+        sitzung=_sitzung_anlegen(),
+        eingabe="Warum?",
+        reihenfolge=1,
+        fehlversuche=[
+            Fehlversuch(
+                grund="Formatbruch",
+                rohantwort="Keine gültige Antwort",
+            )
+        ],
+    )
+
+    assert schritt.erstellt_am is not None
 
 
 @pytest.mark.django_db
@@ -198,16 +215,31 @@ def test_diagnose_ist_je_sitzung_eindeutig() -> None:
     """Eine Sitzung kann genau eine freie Diagnose tragen."""
 
     sitzung: Sitzung = _sitzung_anlegen()
-    diagnose: Diagnose = Diagnose.objects.create(
-        sitzung=sitzung,
-        text="Brüche werden addiert.",
-    )
-
-    assert sitzung.erstellt_am is not None
-    assert diagnose.erstellt_am is not None
+    Diagnose.objects.create(sitzung=sitzung, text="Brüche werden addiert.")
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Diagnose.objects.create(sitzung=sitzung, text="Noch eine Diagnose.")
+
+
+@pytest.mark.django_db
+def test_neue_sitzung_traegt_entstehungszeitpunkt() -> None:
+    """Eine neue Sitzung hält ihren Entstehungszeitpunkt fest."""
+
+    sitzung: Sitzung = _sitzung_anlegen()
+
+    assert sitzung.erstellt_am is not None
+
+
+@pytest.mark.django_db
+def test_neue_diagnose_traegt_entstehungszeitpunkt() -> None:
+    """Eine neue Diagnose hält ihren Entstehungszeitpunkt fest."""
+
+    diagnose: Diagnose = Diagnose.objects.create(
+        sitzung=_sitzung_anlegen(),
+        text="Brüche werden addiert.",
+    )
+
+    assert diagnose.erstellt_am is not None
 
 
 @pytest.mark.django_db
