@@ -1,0 +1,34 @@
+<div class="vignette-field" x-data="zuordnungstabelle({ datenId: '{{ daten_id }}', positionsId: '{{ positions_id }}', sortierschluessel: '{{ spalten.0.schluessel }}' })" x-init="init()">
+    <p><strong>{{ ueberschrift }}</strong></p>
+    <div class="table-toolbar">
+        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="{{ suchfeld_label }}" x-model="suchbegriff">
+        <span class="table-toolbar__count" x-text="sichtbareZeilen.length + ' von ' + rows.length"></span>
+    </div>
+    <div class="table-wrap vignette-index-table">
+        <table class="table table--sortable">
+            <thead>
+                <tr>
+                    {% for spalte in spalten %}
+                        <th scope="col"><button type="button" class="table__sort" @click="sortiere('{{ spalte.schluessel }}')">{{ spalte.beschriftung }}<span class="table__sort-arrow" :class="pfeilKlasse('{{ spalte.schluessel }}')"></span></button></th>
+                    {% endfor %}
+                    <th scope="col">{{ aktion_spalte }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="zeile in sichtbareZeilen" :key="zeile.pk">
+                    <tr>
+                        {% for spalte in spalten %}
+                            <td x-text="zeile['{{ spalte.schluessel }}']"></td>
+                        {% endfor %}
+                        <td>
+                            <button class="button {{ aktionsklasse }} button--small" type="button" @click="umschalten(zeile.aktion_url)">{{ aktionsbeschriftung }}</button>
+                        </td>
+                    </tr>
+                </template>
+                <tr x-show="sichtbareZeilen.length === 0">
+                    <td colspan="{{ spalten|length|add:1 }}" class="table__empty">{{ leertext }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

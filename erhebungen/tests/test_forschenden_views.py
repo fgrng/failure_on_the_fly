@@ -306,6 +306,15 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             ],
         )
 
+    def test_detailseite_rendert_zuordnungsspalten_ueber_include(self) -> None:
+        """Bibliothek und Aufnahme verwenden denselben Zuordnungsspalten-Baustein."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertTemplateUsed(detail, "erhebungen/includes/zuordnungsspalte.html")
+
     def test_haelt_fremde_und_unfertige_fassungen_aus_den_zeilen_heraus(self) -> None:
         """Die anbietende Spalte zeigt weder fremde noch nicht-finale Fassungen."""
 
