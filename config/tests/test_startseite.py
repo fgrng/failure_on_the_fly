@@ -71,11 +71,10 @@ class StartseiteTests(TestCase):
                 (
                     "Simulationskern verwalten",
                     "Administration",
-                    "Meine Trainings",
                     "Trainingskataloge ansehen",
                     "Meine Erhebungen",
                 ),
-                (),
+                ("Training starten", "Meine Trainings"),
             ),
         ):
             with self.subTest(rolle=rolle):
