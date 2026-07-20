@@ -21,8 +21,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.text import slugify
 
 from .ablauf import naechster_schritt
+from .export import datenspur_zip
 from .models import (
     Erhebung,
     Erhebungsbindung,
@@ -156,6 +158,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     stichproben: QuerySet[Stichprobe] = erhebung.stichprobe_set.annotate(
         teilnahmezahl=Count("erhebungsbindung")
     )
+
     for stichprobe in stichproben:
         stichprobe.teilnahme_url = request.build_absolute_uri(
             reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
@@ -191,6 +194,23 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "stichproben": stichproben,
         },
     )
+
+
+@login_required
+@_forschende_erforderlich
+def export(request: HttpRequest, pk: int) -> HttpResponse:
+    """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
+
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    zeitstempel: str = timezone.now().astimezone(timezone.UTC).strftime(
+        "%Y%m%dT%H%M%SZ"
+    )
+    dateiname: str = f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
+    response: HttpResponse = HttpResponse(
+        datenspur_zip(erhebung), content_type="application/zip"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
+    return response
 
 
 @login_required
