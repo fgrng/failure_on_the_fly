@@ -315,6 +315,64 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertEqual(andere_bindung.status_code, 200)
         self.assertEqual(Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2)
 
+    def test_bibliothek_kennzeichnet_item_am_anderen_andockpunkt(self) -> None:
+        """Die Bibliothek informiert über die erlaubte Bindung am anderen Andockpunkt."""
+
+        item: FragebogenItem = _finales_item_anlegen(self.ada, "Wie sicher fühlten Sie sich?")
+        self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            )
+        )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "schon am Ende")
+        self.assertContains(detail, "badge--research")
+        self.assertContains(
+            detail,
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.NACH_SITZUNG],
+            ),
+        )
+
+        zugehoerigkeit: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        self.client.post(
+            reverse("erhebungen:item_entfernen", args=[self.erhebung.pk, zugehoerigkeit.pk])
+        )
+
+        self.assertNotContains(
+            self.client.get(reverse("erhebungen:detail", args=[self.erhebung.pk])),
+            "schon am Ende",
+        )
+
+        self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.NACH_SITZUNG],
+            )
+        )
+        gegenrichtung: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(gegenrichtung, "schon nach jeder Sitzung")
+        self.assertContains(
+            gegenrichtung,
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            ),
+        )
+
     def test_doppelte_itemaufnahme_am_selben_andockpunkt_wird_abgelehnt(self) -> None:
         """Eine Item-Fassung kann je Andockpunkt nur einmal vorkommen."""
 

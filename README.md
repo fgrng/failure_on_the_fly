@@ -69,6 +69,8 @@ Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
 Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
 zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
 Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
+Ist eine Fassung bereits am anderen Andockpunkt gebunden, kennzeichnet die
+jeweilige Bibliothek dies, ohne ihre Aufnahme zu verhindern.
 Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items per
 Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als

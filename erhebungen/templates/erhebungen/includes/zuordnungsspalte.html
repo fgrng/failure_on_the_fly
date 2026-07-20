@@ -24,7 +24,10 @@
                 <template x-for="zeile in sichtbareZeilen" :key="zeile.pk">
                     <tr>
                         {% for spalte in spalten %}
-                            <td x-text="zeile['{{ spalte.schluessel }}']"></td>
+                            <td>
+                                <span x-text="zeile['{{ spalte.schluessel }}']"></span>
+                                {% if zeige_badges %}<span x-show="zeile.badge" class="badge badge--research" x-text="zeile.badge"></span>{% endif %}
+                            </td>
                         {% endfor %}
                         <td>
                             {% if mehrere_aktionen %}

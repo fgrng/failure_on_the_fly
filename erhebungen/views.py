@@ -130,6 +130,7 @@ def _itemzeilen(
     andockpunkt: str,
     aktion: str,
     zugehoerigkeiten: dict[int, Erhebungsitem] | None = None,
+    badges: dict[int, str] | None = None,
 ) -> list[dict[str, object]]:
     """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
 
@@ -141,6 +142,7 @@ def _itemzeilen(
                 "aktion_url": reverse(
                     aktion, args=[erhebung.pk, item.pk, andockpunkt]
                 ),
+                "badge": (badges or {}).get(item.pk),
             }
             for item in items
         ]
@@ -255,6 +257,14 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         aufgenommene_items: list[FragebogenItem] = [
             zugehoerigkeit.item for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
         ]
+        anderer_andockpunkt: str = next(
+            wert for wert in Erhebungsitem.Andockpunkt.values if wert != andockpunkt
+        )
+        badge: str = (
+            "schon am Ende"
+            if anderer_andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
+            else "schon nach jeder Sitzung"
+        )
         itemdaten[andockpunkt] = {
             "aufgenommene": _itemzeilen(
                 aufgenommene_items,
@@ -270,6 +280,11 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 erhebung,
                 andockpunkt,
                 "erhebungen:item_hinzufuegen",
+                badges={
+                    zugehoerigkeit.item_id: badge
+                    for zugehoerigkeit in itemzugehoerigkeiten
+                    if zugehoerigkeit.andockpunkt == anderer_andockpunkt
+                },
             ),
         }
 
