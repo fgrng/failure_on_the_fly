@@ -25,7 +25,8 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung, Teilnahme
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
 
@@ -1225,7 +1226,10 @@ class ErhebungsExportTests(TestCase):
             self.assertEqual(
                 sorted(zip_datei.namelist()),
                 [
+                    "diagnosen.csv",
                     "erhebung.csv",
+                    "fehlversuche.csv",
+                    "gespraechsschritte.csv",
                     "sitzungen.csv",
                     "stichproben.csv",
                     "teilnahmen.csv",
@@ -1366,6 +1370,192 @@ class ErhebungsExportTests(TestCase):
             },
         )
 
+    def test_exportiert_gespraechsschritte_fehlversuche_und_diagnosen(self) -> None:
+        """Der Export bewahrt die vollständige Datenspur einschließlich Abbrüchen."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        Vignettenposition.objects.create(
+            erhebungsbindung=bindung, sitzung=sitzung, vignette=vignette, position=1
+        )
+        erfolgreicher_schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=sitzung,
+            reihenfolge=1,
+            eingabe="Warum?",
+            denkspur="Zeile eins\nZeile zwei",
+            aeusserung="Antwort eins\nAntwort zwei",
+            native_reasoning_spur=None,
+        )
+        Fehlversuch.objects.create(
+            gespraechsschritt=erfolgreicher_schritt,
+            grund="Formatbruch",
+            rohantwort="nicht parsebar",
+        )
+        leerer_schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=sitzung,
+            reihenfolge=2,
+            eingabe="Bitte knapp.",
+            denkspur="",
+            aeusserung="",
+        )
+        abbruchschritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
+            sitzung=sitzung,
+            reihenfolge=3,
+            eingabe="Noch einmal?",
+            fehlversuche=[Fehlversuch(grund="Anbieterfehler", rohantwort="timeout")],
+        )
+        Diagnose.objects.create(sitzung=sitzung, text="Bruchfehler")
+        training: Training = Training.objects.create(
+            name="Nicht exportieren", eigentuemerin=ada
+        )
+        training.vignetten.add(vignette)
+        trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
+        Trainingsbindung.objects.create(
+            training=training,
+            teilnahme=trainingsteilnahme,
+            konto=ada,
+        )
+        trainingssitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=trainingsteilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        trainingsschritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=trainingssitzung,
+            reihenfolge=1,
+            eingabe="Nicht exportieren.",
+            denkspur="Nicht exportieren.",
+            aeusserung="Nicht exportieren.",
+        )
+        Fehlversuch.objects.create(
+            gespraechsschritt=trainingsschritt,
+            grund="Nicht exportieren.",
+            rohantwort="Nicht exportieren.",
+        )
+        Diagnose.objects.create(sitzung=trainingssitzung, text="Nicht exportieren.")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            self.assertTrue(
+                {
+                    "gespraechsschritte.csv",
+                    "fehlversuche.csv",
+                    "diagnosen.csv",
+                }.issubset(zip_datei.namelist())
+            )
+            schritte: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("gespraechsschritte.csv"), encoding="utf-8"
+                    )
+                )
+            )
+            fehlversuche: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("fehlversuche.csv"), encoding="utf-8")
+                )
+            )
+            diagnosen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("diagnosen.csv"), encoding="utf-8")
+                )
+            )
+
+        self.assertEqual(
+            [{name: wert for name, wert in schritt.items() if name != "erstellt_am"} for schritt in schritte],
+            [
+                {
+                    "id": str(erfolgreicher_schritt.pk),
+                    "sitzung_id": str(sitzung.pk),
+                    "reihenfolge": "1",
+                    "eingabe": "Warum?",
+                    "denkspur": "Zeile eins\nZeile zwei",
+                    "aeusserung": "Antwort eins\nAntwort zwei",
+                    "native_reasoning_spur": "NA",
+                },
+                {
+                    "id": str(leerer_schritt.pk),
+                    "sitzung_id": str(sitzung.pk),
+                    "reihenfolge": "2",
+                    "eingabe": "Bitte knapp.",
+                    "denkspur": "",
+                    "aeusserung": "",
+                    "native_reasoning_spur": "NA",
+                },
+                {
+                    "id": str(abbruchschritt.pk),
+                    "sitzung_id": str(sitzung.pk),
+                    "reihenfolge": "3",
+                    "eingabe": "Noch einmal?",
+                    "denkspur": "NA",
+                    "aeusserung": "NA",
+                    "native_reasoning_spur": "NA",
+                },
+            ],
+        )
+        for schritt in schritte:
+            self.assertRegex(
+                schritt["erstellt_am"],
+                r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
+            )
+        self.assertEqual(
+            {
+                (
+                    fehlversuch["gespraechsschritt_id"],
+                    fehlversuch["grund"],
+                    fehlversuch["rohantwort"],
+                )
+                for fehlversuch in fehlversuche
+            },
+            {
+                (str(erfolgreicher_schritt.pk), "Formatbruch", "nicht parsebar"),
+                (str(abbruchschritt.pk), "Anbieterfehler", "timeout"),
+            },
+        )
+        self.assertEqual(
+            [{name: wert for name, wert in diagnose.items() if name != "erstellt_am"} for diagnose in diagnosen],
+            [
+                {
+                    "sitzung_id": str(sitzung.pk),
+                    "text": "Bruchfehler",
+                }
+            ],
+        )
+        self.assertRegex(
+            diagnosen[0]["erstellt_am"],
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
+        )
+
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
 
@@ -1406,6 +1596,9 @@ class ErhebungsExportTests(TestCase):
                 "teilnahmen.csv",
                 "vignettenziehungen.csv",
                 "sitzungen.csv",
+                "gespraechsschritte.csv",
+                "fehlversuche.csv",
+                "diagnosen.csv",
             ):
                 with TextIOWrapper(
                     zip_datei.open(dateiname), encoding="utf-8"

@@ -75,7 +75,8 @@ Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items pe
 Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
-Vignettenziehungen und der tatsächlich gelaufenen Sitzungen.
+Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
+Fehlversuche und Diagnosen.
 
 ## Fragebogen-Items verwalten
 

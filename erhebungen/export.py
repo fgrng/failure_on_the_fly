@@ -7,7 +7,10 @@ from io import BytesIO, StringIO
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from django.db.models import QuerySet
 from django.utils import timezone
+
+from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
 
 from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
 
@@ -122,7 +125,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        positionen: Iterable[Vignettenposition] = (
+        positionen: QuerySet[Vignettenposition] = (
             Vignettenposition.objects.filter(
                 erhebungsbindung__stichprobe__erhebung=erhebung
             ).order_by("erhebungsbindung_id", "position")
@@ -154,6 +157,68 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     for position in positionen.select_related(
                         "erhebungsbindung", "sitzung"
                     )
+                ),
+            ),
+        )
+        sitzung_ids = positionen.values("sitzung_id")
+        gespraechsschritte: Iterable[Gespraechsschritt] = (
+            Gespraechsschritt.objects.filter(sitzung_id__in=sitzung_ids).order_by(
+                "sitzung_id", "reihenfolge"
+            )
+        )
+        zip_datei.writestr(
+            "gespraechsschritte.csv",
+            _csv_inhalt(
+                (
+                    "id",
+                    "sitzung_id",
+                    "reihenfolge",
+                    "eingabe",
+                    "denkspur",
+                    "aeusserung",
+                    "native_reasoning_spur",
+                    "erstellt_am",
+                ),
+                (
+                    (
+                        schritt.pk,
+                        schritt.sitzung_id,
+                        schritt.reihenfolge,
+                        schritt.eingabe,
+                        schritt.denkspur,
+                        schritt.aeusserung,
+                        schritt.native_reasoning_spur,
+                        schritt.erstellt_am,
+                    )
+                    for schritt in gespraechsschritte
+                ),
+            ),
+        )
+        zip_datei.writestr(
+            "fehlversuche.csv",
+            _csv_inhalt(
+                ("gespraechsschritt_id", "grund", "rohantwort"),
+                (
+                    (
+                        fehlversuch.gespraechsschritt_id,
+                        fehlversuch.grund,
+                        fehlversuch.rohantwort,
+                    )
+                    for fehlversuch in Fehlversuch.objects.filter(
+                        gespraechsschritt__sitzung_id__in=sitzung_ids
+                    ).order_by("gespraechsschritt_id", "pk")
+                ),
+            ),
+        )
+        zip_datei.writestr(
+            "diagnosen.csv",
+            _csv_inhalt(
+                ("sitzung_id", "text", "erstellt_am"),
+                (
+                    (diagnose.sitzung_id, diagnose.text, diagnose.erstellt_am)
+                    for diagnose in Diagnose.objects.filter(
+                        sitzung_id__in=sitzung_ids
+                    ).order_by("sitzung_id")
                 ),
             ),
         )
