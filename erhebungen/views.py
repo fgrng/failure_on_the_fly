@@ -405,8 +405,22 @@ def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if request.method == "POST":
         if request.POST.get("einwilligung") != "ja":
             return HttpResponseBadRequest("Bitte willigen Sie in die Teilnahme ein.")
+        audioentscheidung: str | None = request.POST.get(
+            "audioverarbeitung_eingewilligt"
+        )
+        if audioentscheidung not in {"ja", "nein"}:
+            return HttpResponseBadRequest(
+                "Bitte stimmen Sie der Audioverarbeitung zu oder lehnen Sie sie ab."
+            )
+        if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
+            return HttpResponseBadRequest(
+                "Die Einwilligung zur Audioverarbeitung wurde bereits festgehalten."
+            )
         bindung.teilnahme.einwilligung_erteilt = True
-        bindung.teilnahme.save(update_fields=["einwilligung_erteilt"])
+        bindung.teilnahme.audioverarbeitung_eingewilligt = audioentscheidung == "ja"
+        bindung.teilnahme.save(
+            update_fields=["einwilligung_erteilt", "audioverarbeitung_eingewilligt"]
+        )
         return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
     return render(request, "erhebungen/einwilligung.html", {"erhebung": stichprobe.erhebung})
 
@@ -490,6 +504,33 @@ def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
         status=Sitzung.Status.LAUFEND,
     )
     return sitzung, bindung
+
+
+def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
+    """Löst eine laufende Erhebungssitzung ausschließlich aus Browser-Tokens auf."""
+
+    sitzung_pk: str | None = request.POST.get("sitzung_pk")
+    if sitzung_pk is None:
+        return None
+    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+    bindungen: QuerySet[Erhebungsbindung] = Erhebungsbindung.objects.select_related(
+        "stichprobe", "teilnahme"
+    ).filter(token__in=tokens.values())
+    for bindung in bindungen:
+        if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+            continue
+        sitzung: Sitzung | None = (
+            Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
+            .filter(
+                pk=sitzung_pk,
+                teilnahme=bindung.teilnahme,
+                status=Sitzung.Status.LAUFEND,
+            )
+            .first()
+        )
+        if sitzung is not None:
+            return sitzung
+    return None
 
 
 def gespraech(request: HttpRequest, token: str) -> HttpResponse:

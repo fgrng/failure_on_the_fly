@@ -1,15 +1,19 @@
 """HTTP-Vertrag des Transkriptions-Endpunkts."""
 
+from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.backends.base import SessionBase
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
+from erhebungen.models import Erhebung, Erhebungsbindung, Stichprobe
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.transkription import (
@@ -126,6 +130,108 @@ class TranskriptionsEndpointTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertJSONEqual(response.content, {"status": "einwilligung_verweigert"})
         self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_pseudonyme_erhebungssitzung_darf_eingewilligt_transkribieren(self) -> None:
+        """Eine Erhebungsteilnahme autorisiert Audio ohne ein Nutzerkonto."""
+
+        trainingssitzung: Sitzung = self._sitzung_starten()
+        konfiguration: ModellKonfiguration = trainingssitzung.modell_konfiguration
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Audioerhebung",
+            eigentuemerin=get_user_model().objects.get(username="ada"),
+        )
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(minutes=1),
+            ende=timezone.now() + timedelta(minutes=1),
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
+        bindung.teilnahme.audioverarbeitung_eingewilligt = True
+        bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=trainingssitzung.vignette,
+            simulationskern=trainingssitzung.simulationskern,
+            modell_konfiguration=konfiguration,
+        )
+        self.client.logout()
+        session: SessionBase = self.client.session
+        session["erhebung_teilnahme_tokens"] = {
+            str(stichprobe.teilnahme_link): bindung.token
+        }
+        session.save()
+        request: HttpRequest = RequestFactory().post(
+            "/sitzungen/transkription/",
+            {"audio": self._aufnahme(), "sitzung_pk": sitzung.pk},
+        )
+        request.user = AnonymousUser()
+        request.session = self.client.session
+        try:
+            response: HttpResponse = transkriptions_endpunkt(
+                FakeTranskription(["Wie rechnest du?"])
+            )(request)
+        finally:
+            request.close()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"text": "Wie rechnest du?"})
+
+        angemeldete_anfrage: HttpRequest = RequestFactory().post(
+            "/sitzungen/transkription/",
+            {"audio": self._aufnahme(), "sitzung_pk": sitzung.pk},
+        )
+        angemeldete_anfrage.user = get_user_model().objects.get(username="grace")
+        angemeldete_anfrage.session = self.client.session
+        try:
+            angemeldete_antwort: HttpResponse = transkriptions_endpunkt(
+                FakeTranskription(["Noch eine Frage"])
+            )(angemeldete_anfrage)
+        finally:
+            angemeldete_anfrage.close()
+
+        self.assertEqual(angemeldete_antwort.status_code, 200)
+        self.assertJSONEqual(angemeldete_antwort.content, {"text": "Noch eine Frage"})
+
+        bindung.teilnahme.audioverarbeitung_eingewilligt = False
+        bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
+        abgelehnte_anfrage: HttpRequest = RequestFactory().post(
+            "/sitzungen/transkription/",
+            {"audio": self._aufnahme(), "sitzung_pk": sitzung.pk},
+        )
+        abgelehnte_anfrage.user = AnonymousUser()
+        abgelehnte_anfrage.session = self.client.session
+        try:
+            abgelehnte_antwort: HttpResponse = transkriptions_endpunkt(
+                FakeTranskription(["Text"])
+            )(abgelehnte_anfrage)
+        finally:
+            abgelehnte_anfrage.close()
+
+        self.assertEqual(abgelehnte_antwort.status_code, 403)
+        self.assertJSONEqual(
+            abgelehnte_antwort.content, {"status": "einwilligung_verweigert"}
+        )
+
+        fremdebindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
+        fremde_sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=fremdebindung.teilnahme,
+            vignette=trainingssitzung.vignette,
+            simulationskern=trainingssitzung.simulationskern,
+            modell_konfiguration=konfiguration,
+        )
+        fremde_anfrage: HttpRequest = RequestFactory().post(
+            "/sitzungen/transkription/",
+            {"audio": self._aufnahme(), "sitzung_pk": fremde_sitzung.pk},
+        )
+        fremde_anfrage.user = AnonymousUser()
+        fremde_anfrage.session = self.client.session
+        try:
+            with self.assertRaises(PermissionDenied):
+                transkriptions_endpunkt(FakeTranskription(["Text"]))(fremde_anfrage)
+        finally:
+            fremde_anfrage.close()
 
     @override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
     def test_ohne_zero_retention_verweigert_externe_transkription(self) -> None:

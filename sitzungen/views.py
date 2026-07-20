@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
@@ -403,12 +404,17 @@ def transkriptions_endpunkt(
 ) -> Callable[[HttpRequest], HttpResponse]:
     """Erzeugt den geschützten Endpunkt für einen Transkriptions-Anbieter."""
 
-    @login_required
     def endpunkt(request: HttpRequest) -> HttpResponse:
         # Prüft die Vorbedingungen, bevor Audio den Anbieter erreichen kann.
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
-        sitzung: Sitzung = _training_sitzung(request)
+        from erhebungen.views import sitzung_fuer_transkription
+
+        sitzung: Sitzung | None = sitzung_fuer_transkription(request)
+        if sitzung is None and request.user.is_authenticated:
+            sitzung = _training_sitzung(request)
+        if sitzung is None:
+            raise PermissionDenied
         if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
             return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
@@ -534,6 +540,7 @@ def _persistiertes_gespraech_anzeigen(
         ist_gescheitert=ist_gescheitert,
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        sitzung_pk=sitzung.pk,
     )
 
 
