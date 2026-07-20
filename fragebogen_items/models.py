@@ -85,7 +85,7 @@ class FragebogenItemManager(models.Manager.from_queryset(FragebogenItemQuerySet)
         raise RuntimeError("Fragebogen-Items werden über die Anlege-Naht erzeugt.")
 
     def _erstellen(self, **werte: object) -> "FragebogenItem":
-        """Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt."""
+        # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
         item: FragebogenItem = self.model(**werte)
         item._wird_angelegt = True
         item.save(using=self.db)
@@ -141,7 +141,11 @@ class FragebogenItem(models.Model):
     objects: FragebogenItemManager = FragebogenItemManager()
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Verhindert Inhaltsänderungen außerhalb des Entwurfs."""
+        """Speichert nur Entwürfe oder kontrollierte Zustandsübergänge.
+
+        Beispiel: ``item.finalisieren()`` friert einen Entwurf ein; ein
+        anschließendes ``item.save()`` kann dessen Inhalt nicht mehr ändern.
+        """
         if self._state.adding:
             if not getattr(self, "_wird_angelegt", False):
                 raise RuntimeError("Fragebogen-Items werden über die Anlege-Naht erzeugt.")
@@ -163,8 +167,12 @@ class FragebogenItem(models.Model):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)
 
+    def _hat_gespeicherten_zustand(self, zustand: str) -> bool:
+        # Prüft den Zustand der aktuell gespeicherten Fassung.
+        return type(self).objects.filter(pk=self.pk, zustand=zustand).exists()
+
     def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
-        """Speichert einen ausschließlich intern ausgelösten Zustandsübergang."""
+        # Speichert einen ausschließlich intern ausgelösten Zustandsübergang.
         self._wechselt_zustand = True
         try:
             self.zustand = zustand
@@ -174,10 +182,7 @@ class FragebogenItem(models.Model):
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ENTWURF,
-        ).exists():
+        if not self._hat_gespeicherten_zustand(self.Zustand.ENTWURF):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete(*args, **kwargs)
 
@@ -207,20 +212,14 @@ class FragebogenItem(models.Model):
     @transaction.atomic
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.FINAL,
-        ).exists():
+        if not self._hat_gespeicherten_zustand(self.Zustand.FINAL):
             raise ValidationError("Nur finale Fassungen können archiviert werden.")
         self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
 
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ARCHIVIERT,
-        ).exists():
+        if not self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT):
             raise ValidationError("Nur archivierte Fassungen können entarchiviert werden.")
         self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
 

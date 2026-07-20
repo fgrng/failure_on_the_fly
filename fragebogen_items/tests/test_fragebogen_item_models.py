@@ -139,12 +139,22 @@ class FragebogenItemLebenszyklusTests(TestCase):
 class FragebogenItemSchreibnahtTests(TestCase):
     """Massenschreibwege umgehen die Modell-Naht nicht."""
 
-    def test_bulk_create_und_bulk_update_sind_blockiert(self) -> None:
-        """Items entstehen und ändern sich nicht außerhalb ihrer Naht."""
+    def test_create_ist_blockiert(self) -> None:
+        """Items entstehen ausschließlich über die Anlege-Naht."""
+        historie = FragebogenItemHistorie.objects.create()
+
+        with self.assertRaises(RuntimeError):
+            FragebogenItem.objects.create(historie=historie)
+
+    def test_bulk_create_ist_blockiert(self) -> None:
+        """Masseneinfügen umgeht die Anlege-Naht nicht."""
         historie = FragebogenItemHistorie.objects.create()
 
         with self.assertRaises(RuntimeError):
             FragebogenItem.objects.bulk_create([FragebogenItem(historie=historie)])
+
+    def test_bulk_update_ist_blockiert(self) -> None:
+        """Massenupdates umgehen die Lebenszyklus-Methoden nicht."""
         with self.assertRaises(RuntimeError):
             FragebogenItem.objects.bulk_update([], ["wortlaut"])
 
