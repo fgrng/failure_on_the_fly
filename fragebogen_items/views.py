@@ -7,9 +7,10 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
+from konten.models import Konto
+
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
-from konten.models import Konto
 
 _BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
     {
@@ -104,8 +105,8 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 @_forschende_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Fragebogen-Item-Fassung."""
-    item = _sichtbares_item(request, pk)
-    eigentuemerinnen = list(item.historie.eigentuemerinnen.all())
+    item: FragebogenItem = _sichtbares_item(request, pk)
+    eigentuemerinnen: list[Konto] = list(item.historie.eigentuemerinnen.all())
     return render(
         request,
         "fragebogen_items/detail.html",
@@ -144,8 +145,8 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Teilt eine sichtbare Item-Historie mit einer weiteren Forschenden."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(request, pk)
-    konto = get_object_or_404(
+    item: FragebogenItem = _sichtbares_item(request, pk)
+    konto: Konto = get_object_or_404(
         Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN).distinct(),
         pk=request.POST.get("konto"),
     )
@@ -159,7 +160,7 @@ def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpRes
     """Entzieht einer Ko-Autorin den Zugang zu einer sichtbaren Item-Historie."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(request, pk)
+    item: FragebogenItem = _sichtbares_item(request, pk)
     if item.historie.eigentuemerinnen.count() > 1:
         item.historie.eigentuemerinnen.remove(konto_pk)
     return redirect("fragebogen_items:detail", pk=item.pk)

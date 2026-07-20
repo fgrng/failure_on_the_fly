@@ -180,65 +180,103 @@ class FragebogenItemSichtbarkeitViewTests(TestCase):
 class FragebogenItemKoautorschaftViewTests(TestCase):
     """Der Editor teilt eine Item-Historie ausschließlich mit Ko-Autorinnen."""
 
-    def test_koautorin_kann_historie_ueber_editor_teilen_und_wird_wieder_entfernt(
-        self,
-    ) -> None:
-        """Autorin, Ko-Autorin und Fremde erhalten genau ihren Eigentümer-Zugang."""
-        ada: Konto = _forschende("ada")
-        grace: Konto = _forschende("grace")
-        linus: Konto = _forschende("linus")
-        item: FragebogenItem = FragebogenItem.objects.anlegen(
-            ada, wortlaut="Geteiltes Item"
-        )
-        self.client.force_login(ada)
+    ada: Konto
+    grace: Konto
+    linus: Konto
+    item: FragebogenItem
 
-        detail: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[item.pk])
-        )
-        hinzufuegen: HttpResponse = self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[item.pk]),
-            {"konto": grace.pk},
+    def setUp(self) -> None:
+        """Legt eine private Item-Historie und drei Forschende an."""
+        self.ada = _forschende("ada")
+        self.grace = _forschende("grace")
+        self.linus = _forschende("linus")
+        self.item = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Geteiltes Item"
         )
 
-        self.assertContains(detail, "ada")
+    def test_editor_zeigt_die_eigentuemerin(self) -> None:
+        """Die Eigentümerin erscheint in der Ko-Autorinnenliste des Editors."""
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, self.ada.username)
+
+    def test_hinzufuegen_gibt_koautorin_bibliothekszugriff(self) -> None:
+        """Eine hinzugefügte Ko-Autorin sieht die Item-Linie in ihrer Bibliothek."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        self.assertContains(response, self.item.wortlaut)
+
+    def test_koautorin_kann_item_finalisieren(self) -> None:
+        """Eine Ko-Autorin darf die sichtbare Item-Linie gleichrangig pflegen."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[self.item.pk])
+        )
+
         self.assertRedirects(
-            hinzufuegen, reverse("fragebogen_items:detail", args=[item.pk])
-        )
-        self.assertEqual(
-            set(item.historie.eigentuemerinnen.values_list("username", flat=True)),
-            {"ada", "grace"},
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
         )
 
-        self.client.force_login(grace)
-        self.assertContains(
-            self.client.get(reverse("fragebogen_items:liste")), item.wortlaut
-        )
-        self.assertEqual(
+    def test_fremde_kann_die_item_linie_nicht_aufrufen_oder_aendern(self) -> None:
+        """Eine Fremde erhält für Ansicht und Editor-Aktionen keine Berechtigung."""
+        self.client.force_login(self.linus)
+
+        responses: list[HttpResponse] = [
+            self.client.get(reverse("fragebogen_items:detail", args=[self.item.pk])),
             self.client.post(
-                reverse("fragebogen_items:finalisieren", args=[item.pk])
-            ).status_code,
-            302,
+                reverse("fragebogen_items:finalisieren", args=[self.item.pk])
+            ),
+            self.client.post(
+                reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+                {"konto": self.grace.pk},
+            ),
+            self.client.post(
+                reverse(
+                    "fragebogen_items:koautorin_entfernen",
+                    args=[self.item.pk, self.ada.pk],
+                )
+            ),
+        ]
+
+        self.assertEqual({response.status_code for response in responses}, {404})
+
+    def test_entfernen_entzieht_koautorin_den_bibliothekszugriff(self) -> None:
+        """Eine entfernte Ko-Autorin sieht die Item-Linie nicht mehr."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.post(
+            reverse(
+                "fragebogen_items:koautorin_entfernen",
+                args=[self.item.pk, self.grace.pk],
+            )
+        )
+        self.client.force_login(self.grace)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
         )
 
-        self.client.force_login(linus)
-        self.assertEqual(
-            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])).status_code,
-            404,
-        )
-
-        self.client.force_login(ada)
-        entfernen: HttpResponse = self.client.post(
-            reverse("fragebogen_items:koautorin_entfernen", args=[item.pk, grace.pk])
-        )
-
-        self.assertRedirects(
-            entfernen, reverse("fragebogen_items:detail", args=[item.pk])
-        )
-        self.client.force_login(grace)
-        self.assertEqual(
-            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])).status_code,
-            404,
-        )
+        self.assertEqual(response.status_code, 404)
 
 
 class FragebogenItemLikertViewTests(TestCase):
