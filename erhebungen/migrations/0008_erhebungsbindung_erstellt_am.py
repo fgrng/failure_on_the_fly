@@ -14,6 +14,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="erhebungsbindung",
             name="erstellt_am",
+            field=models.DateTimeField(null=True),
+        ),
+        migrations.AlterField(
+            model_name="erhebungsbindung",
+            name="erstellt_am",
             field=models.DateTimeField(auto_now_add=True, null=True),
         ),
     ]

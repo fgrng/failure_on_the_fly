@@ -6,7 +6,8 @@ from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from erhebungen.models import (
@@ -18,7 +19,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung, Teilnahme
+from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -72,6 +73,63 @@ def test_neue_erhebungsbindung_traegt_entstehungszeitpunkt() -> None:
     )
 
     assert bindung.erstellt_am is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
+    """Die Zeitstempel-Migration erfindet keine Zeitpunkte für Bestandsdaten."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=teilnahme,
+        vignette=_finale_vignette_anlegen(konto),
+        simulationskern=kern,
+        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+    )
+    schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+        sitzung=sitzung,
+        eingabe="Warum?",
+        denkspur="Ich folge meiner Regel.",
+        aeusserung="Weil das so ist.",
+        reihenfolge=1,
+    )
+    diagnose: Diagnose = Diagnose.objects.create(
+        sitzung=sitzung,
+        text="Brüche werden addiert.",
+    )
+
+    vorher = [
+        ("erhebungen", "0007_merge_issue_83_issue_84"),
+        ("sitzungen", "0006_teilnahme_einwilligung_erteilt"),
+    ]
+    nachher = [
+        ("erhebungen", "0008_erhebungsbindung_erstellt_am"),
+        ("sitzungen", "0007_gespraechsschritt_erstellt_am"),
+    ]
+    MigrationExecutor(connection).migrate(vorher)
+    try:
+        MigrationExecutor(connection).migrate(nachher)
+        with connection.cursor() as cursor:
+            werte = []
+            for tabelle, pk in [
+                ("erhebungen_erhebungsbindung", bindung.pk),
+                ("sitzungen_sitzung", sitzung.pk),
+                ("sitzungen_gespraechsschritt", schritt.pk),
+                ("sitzungen_diagnose", diagnose.pk),
+            ]:
+                cursor.execute(
+                    f'SELECT erstellt_am FROM "{tabelle}" WHERE id = %s',
+                    [pk],
+                )
+                werte.append(cursor.fetchone()[0])
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
+
+    assert werte == [None, None, None, None]
 
 
 @pytest.mark.django_db

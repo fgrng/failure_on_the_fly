@@ -73,14 +73,29 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="sitzung",
             name="erstellt_am",
-            field=models.DateTimeField(auto_now_add=True, null=True),
+            field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
             model_name="gespraechsschritt",
             name="erstellt_am",
-            field=models.DateTimeField(auto_now_add=True, null=True),
+            field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
+            model_name="diagnose",
+            name="erstellt_am",
+            field=models.DateTimeField(null=True),
+        ),
+        migrations.AlterField(
+            model_name="sitzung",
+            name="erstellt_am",
+            field=models.DateTimeField(auto_now_add=True, null=True),
+        ),
+        migrations.AlterField(
+            model_name="gespraechsschritt",
+            name="erstellt_am",
+            field=models.DateTimeField(auto_now_add=True, null=True),
+        ),
+        migrations.AlterField(
             model_name="diagnose",
             name="erstellt_am",
             field=models.DateTimeField(auto_now_add=True, null=True),

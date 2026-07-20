@@ -145,7 +145,7 @@ def test_answerless_gespraechsschritt_mit_fehlversuch_wird_gespeichert() -> None
 
 
 @pytest.mark.django_db
-def test_answerless_gespraechsschritt_traegt_entstehungszeitpunkt() -> None:
+def test_gespraechsschritt_ohne_antwort_traegt_entstehungszeitpunkt() -> None:
     """Ein Abbruchschritt hält seinen Entstehungszeitpunkt ebenfalls fest."""
 
     schritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
