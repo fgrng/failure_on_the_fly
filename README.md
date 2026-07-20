@@ -43,8 +43,9 @@ Teilnahme- und die getrennte Audio-Einwilligung sowie die Instruktion; diese
 weist darauf hin, dass das Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
 persistierte Sitzungen gespielt; Gespräch, Diagnose und interne Denkspur bleiben
 Teil der Datenspur, wobei die Denkspur nie in der Teilnehmer:innenansicht erscheint.
-Wer der Audioverarbeitung zustimmt, kann Gespräch und Diagnose per Mikrofon
-eingeben; ohne Zustimmung bleibt die Tastatureingabe vollständig nutzbar.
+Wer der Audioverarbeitung zustimmt, kann Eingaben im Diagnosegespräch und die
+Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
+vollständig nutzbar.
 Nach jeder Diagnose beginnt unmittelbar die nächste gezogene Vignette; nach der
 letzten endet die Teilnahme mit dem Abschlusstext ohne Fragebogen oder Wiederholung.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
