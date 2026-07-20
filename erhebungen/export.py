@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.utils import timezone
 
-from .models import Erhebung, Erhebungsbindung
+from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
 
 
 def _zellenwert(wert: Any) -> str | int | bool:
@@ -100,6 +100,56 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         bindung.erstellt_am,
                     )
                     for bindung in bindungen
+                ),
+            ),
+        )
+        ziehungen: Iterable[Vignettenziehung] = (
+            Vignettenziehung.objects.filter(
+                erhebungsbindung__stichprobe__erhebung=erhebung
+            ).order_by("erhebungsbindung_id", "position")
+        )
+        zip_datei.writestr(
+            "vignettenziehungen.csv",
+            _csv_inhalt(
+                ("token", "vignette_id", "position"),
+                (
+                    (ziehung.erhebungsbindung.token, ziehung.vignette_id, ziehung.position)
+                    for ziehung in ziehungen.select_related("erhebungsbindung")
+                ),
+            ),
+        )
+        positionen: Iterable[Vignettenposition] = (
+            Vignettenposition.objects.filter(
+                erhebungsbindung__stichprobe__erhebung=erhebung
+            ).order_by("erhebungsbindung_id", "position")
+        )
+        zip_datei.writestr(
+            "sitzungen.csv",
+            _csv_inhalt(
+                (
+                    "id",
+                    "token",
+                    "position",
+                    "status",
+                    "vignette_id",
+                    "simulationskern_id",
+                    "modell_konfiguration_id",
+                    "erstellt_am",
+                ),
+                (
+                    (
+                        position.sitzung_id,
+                        position.erhebungsbindung.token,
+                        position.position,
+                        position.sitzung.status,
+                        position.sitzung.vignette_id,
+                        position.sitzung.simulationskern_id,
+                        position.sitzung.modell_konfiguration_id,
+                        position.sitzung.erstellt_am,
+                    )
+                    for position in positionen.select_related(
+                        "erhebungsbindung", "sitzung"
+                    )
                 ),
             ),
         )
