@@ -10,8 +10,8 @@
         <div>
             <p><a class="button" href="{% url 'fragebogen_items:anlegen' %}">Neues Item anlegen</a></p>
             <ul>
-                {% for item in items %}
-                    <li><a href="{% url 'fragebogen_items:detail' item.item.pk %}">{{ item.name }}</a> <span class="badge badge--{{ item.zustand_badge }} badge--research">{{ item.item.get_zustand_display }}</span></li>
+                {% for zeile in item_zeilen %}
+                    <li><a href="{% url 'fragebogen_items:detail' zeile.item.pk %}">{{ zeile.bezeichnung }}</a> <span class="badge badge--{{ zeile.zustand_badge }} badge--research">{{ zeile.item.get_zustand_display }}</span></li>
                 {% empty %}
                     <li>Noch keine Fragebogen-Items vorhanden.</li>
                 {% endfor %}
