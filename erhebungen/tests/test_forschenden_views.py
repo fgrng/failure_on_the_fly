@@ -1,5 +1,9 @@
 """HTTP-Tests für die Forschenden-UI der Erhebungen."""
 
+import csv
+from io import BytesIO, TextIOWrapper
+from zipfile import ZipFile
+
 from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
@@ -782,3 +786,142 @@ class ErhebungenArchivierenTests(TestCase):
         )
         self.erhebung.refresh_from_db()
         self.assertEqual(self.erhebung.status, Erhebung.Status.ARCHIVIERT)
+
+
+class ErhebungsExportTests(TestCase):
+    """Forschende laden die minimale relationale Datenspur als ZIP herunter."""
+
+    def test_exportiert_erhebung_stichprobe_und_teilnahme_als_csvs(self) -> None:
+        """Das ZIP bewahrt Freitext, NULL und Zeitstempel im festgelegten Format."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Brüche & Zahlen",
+            eigentuemerin=ada,
+            instruktionstext="Zeile eins\nZeile zwei",
+            einwilligungstext="",
+        )
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=datetime(2026, 7, 1, 8, tzinfo=timezone.UTC),
+            ende=datetime(2026, 7, 31, 17, tzinfo=timezone.UTC),
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+            stichprobe=stichprobe,
+            teilnahme=Teilnahme.objects.create(),
+            token="2345-6789",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            self.assertEqual(
+                sorted(zip_datei.namelist()),
+                ["erhebung.csv", "stichproben.csv", "teilnahmen.csv"],
+            )
+            erhebungszeile = next(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("erhebung.csv"), encoding="utf-8")
+                )
+            )
+            stichprobenzeile = next(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("stichproben.csv"), encoding="utf-8")
+                )
+            )
+            teilnahmezeile = next(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("teilnahmen.csv"), encoding="utf-8")
+                )
+            )
+
+        self.assertEqual(erhebungszeile["instruktionstext"], "Zeile eins\nZeile zwei")
+        self.assertEqual(erhebungszeile["einwilligungstext"], "")
+        self.assertEqual(erhebungszeile["modell_konfiguration_id"], str(konfiguration.pk))
+        self.assertEqual(stichprobenzeile["id"], str(stichprobe.pk))
+        self.assertEqual(stichprobenzeile["beginn"], "2026-07-01T08:00:00+00:00")
+        self.assertEqual(teilnahmezeile["token"], bindung.token)
+        self.assertEqual(teilnahmezeile["audioverarbeitung_eingewilligt"], "NA")
+        self.assertRegex(
+            teilnahmezeile["erstellt_am"],
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
+        )
+
+    def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
+        """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        entwurf: Erhebung = Erhebung.objects.create(name="Leerer Entwurf", eigentuemerin=ada)
+        fremde_erhebung: Erhebung = Erhebung.objects.create(
+            name="Fremde Erhebung", eigentuemerin=grace
+        )
+        self.client.force_login(ada)
+
+        detail_ohne_stichprobe: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[entwurf.pk])
+        )
+        export: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[entwurf.pk])
+        )
+        fremder_export: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[fremde_erhebung.pk])
+        )
+
+        self.assertNotContains(
+            detail_ohne_stichprobe, reverse("erhebungen:export", args=[entwurf.pk])
+        )
+        self.assertEqual(fremder_export.status_code, 404)
+        self.assertRegex(
+            export["Content-Disposition"],
+            r'^attachment; filename="erhebung-\d+-leerer-entwurf-\d{8}T\d{6}Z.zip"$',
+        )
+        with ZipFile(BytesIO(export.content)) as zip_datei:
+            for dateiname in ("erhebung.csv", "stichproben.csv", "teilnahmen.csv"):
+                with TextIOWrapper(zip_datei.open(dateiname), encoding="utf-8") as csv_datei:
+                    self.assertEqual(
+                        len(list(csv.reader(csv_datei))),
+                        2 if dateiname == "erhebung.csv" else 1,
+                    )
+
+    def test_detail_zeigt_export_mit_stichprobe_auch_nach_archivierung(self) -> None:
+        """Der Daten-Download folgt dem Datenbestand statt dem Erhebungsstatus."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="gpt-forschung"
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(name="Archiv", eigentuemerin=ada)
+        erhebung.finalisieren()
+        Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=2),
+            ende=timezone.now() - timedelta(days=1),
+        )
+        erhebung.archivieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        export: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        self.assertContains(detail, reverse("erhebungen:export", args=[erhebung.pk]))
+        self.assertEqual(export.status_code, 200)

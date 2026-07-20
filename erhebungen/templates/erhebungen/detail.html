@@ -45,6 +45,12 @@
         {% endif %}
     </div>
 
+    {% if stichproben %}
+        <div class="vignette-detail-actions">
+            <a class="button" href="{% url 'erhebungen:export' erhebung.pk %}">Datenspur herunterladen</a>
+        </div>
+    {% endif %}
+
     {% if erhebung.status == erhebung.Status.ENTWURF %}
         <div id="erhebung-entwurf-editor" x-data="{
                 randomisierung: '{{ erhebung.randomisierung }}',
