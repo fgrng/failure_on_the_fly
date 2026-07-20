@@ -1,16 +1,19 @@
 """Schreibt die relationale Datenspur einer Erhebung als CSV-Dateien."""
 
 import csv
+import json
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 from io import BytesIO, StringIO
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 
+from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
+from vignetten.models import Vignette
 
 from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
 
@@ -219,6 +222,113 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     for diagnose in Diagnose.objects.filter(
                         sitzung_id__in=sitzung_ids
                     ).order_by("sitzung_id")
+                ),
+            ),
+        )
+        vignetten: QuerySet[Vignette] = Vignette.objects.filter(
+            Q(
+                pk__in=Vignettenziehung.objects.filter(
+                    erhebungsbindung__stichprobe__erhebung=erhebung
+                ).values("vignette_id")
+            )
+            | Q(pk__in=positionen.values("vignette_id"))
+        ).order_by("pk")
+        zip_datei.writestr(
+            "vignettenfassungen.csv",
+            _csv_inhalt(
+                (
+                    "id",
+                    "historie_id",
+                    "finalisiert_am",
+                    "fehlermuster_beschreibung",
+                    "lernauftrag",
+                    "arbeitsheft_beschreibung",
+                    "arbeitsheft_text",
+                    "arbeitsheft_bild",
+                    "schuelerin_name",
+                    "schuelerin_geschlecht",
+                    "lehrperson_name",
+                    "lehrperson_geschlecht",
+                    "fach",
+                    "thema",
+                    "klassenstufe",
+                    "referenzdiagnose",
+                    "budget_typ",
+                    "budget_wert",
+                ),
+                (
+                    (
+                        vignette.pk,
+                        vignette.historie_id,
+                        vignette.finalisiert_am,
+                        vignette.fehlermuster_beschreibung,
+                        vignette.lernauftrag,
+                        vignette.arbeitsheft_beschreibung,
+                        vignette.arbeitsheft_text,
+                        vignette.arbeitsheft_bild.name,
+                        vignette.schuelerin_name,
+                        vignette.schuelerin_geschlecht,
+                        vignette.lehrperson_name,
+                        vignette.lehrperson_geschlecht,
+                        vignette.fach,
+                        vignette.thema,
+                        vignette.klassenstufe,
+                        vignette.referenzdiagnose,
+                        vignette.budget_typ,
+                        vignette.budget_wert,
+                    )
+                    for vignette in vignetten
+                ),
+            ),
+        )
+        kerne: QuerySet[Simulationskern] = Simulationskern.objects.filter(
+            pk__in=positionen.values("sitzung__simulationskern_id")
+        ).order_by("pk")
+        zip_datei.writestr(
+            "simulationskerne.csv",
+            _csv_inhalt(
+                (
+                    "id",
+                    "historie_id",
+                    "finalisiert_am",
+                    "system_prompt_vorlage",
+                    "user_prompt_vorlage",
+                    "rahmenhandlung_einleitung",
+                    "rahmenhandlung_gespraechseinleitung",
+                    "rahmenhandlung_debrief",
+                ),
+                (
+                    (
+                        kern.pk,
+                        kern.historie_id,
+                        kern.finalisiert_am,
+                        kern.system_prompt_vorlage,
+                        kern.user_prompt_vorlage,
+                        kern.rahmenhandlung_einleitung,
+                        kern.rahmenhandlung_gespraechseinleitung,
+                        kern.rahmenhandlung_debrief,
+                    )
+                    for kern in kerne
+                ),
+            ),
+        )
+        konfigurationen: QuerySet[ModellKonfiguration] = (
+            ModellKonfiguration.objects.filter(
+                Q(pk=erhebung.modell_konfiguration_id)
+                | Q(pk__in=positionen.values("sitzung__modell_konfiguration_id"))
+            ).order_by("pk")
+        )
+        zip_datei.writestr(
+            "modellkonfigurationen.csv",
+            _csv_inhalt(
+                ("id", "sprachmodell", "parameter"),
+                (
+                    (
+                        konfiguration.pk,
+                        konfiguration.sprachmodell,
+                        json.dumps(konfiguration.parameter, ensure_ascii=False),
+                    )
+                    for konfiguration in konfigurationen
                 ),
             ),
         )

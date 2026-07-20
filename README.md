@@ -76,7 +76,10 @@ Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie s
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen.
+Fehlversuche und Diagnosen. Die verwendeten Vignettenfassungen,
+Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
+Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
+interpretierbar bleibt.
 
 ## Fragebogen-Items verwalten
 
