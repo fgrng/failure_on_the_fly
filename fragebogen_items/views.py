@@ -45,7 +45,10 @@ def _forschende_erforderlich(
 
 
 def _sichtbares_item(
-    request: HttpRequest, pk: int, zustand: str | None = None
+    request: HttpRequest,
+    pk: int,
+    *,
+    zustand: FragebogenItem.Zustand | None = None,
 ) -> FragebogenItem:
     # Lädt eine Item-Fassung aus dem Eigentümer-Kreis der eingeloggten Person.
     items = FragebogenItem.objects.filter(
@@ -116,6 +119,10 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen sichtbaren Entwurf über die Modell-Naht."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(request, pk, FragebogenItem.Zustand.ENTWURF)
+    item = _sichtbares_item(
+        request,
+        pk,
+        zustand=FragebogenItem.Zustand.ENTWURF,
+    )
     item.finalisieren()
     return redirect("fragebogen_items:detail", pk=item.pk)

@@ -65,43 +65,73 @@ class FragebogenItemAnlegenViewTests(TestCase):
 class FragebogenItemFinalisierenViewTests(TestCase):
     """Entwürfe werden im Editor zu einbindbaren finalen Fassungen."""
 
-    def test_finalisiert_eigenen_entwurf_und_zeigt_final_in_der_bibliothek(self) -> None:
-        """Die sichtbare Aktion friert das Item samt Finalisierungszeitpunkt ein."""
-        ada: Konto = _forschende("ada")
-        item: FragebogenItem = FragebogenItem.objects.anlegen(
-            ada, wortlaut="Die Aufgaben waren verständlich."
-        )
-        self.client.force_login(ada)
+    ada: Konto
+    item: FragebogenItem
 
+    def setUp(self) -> None:
+        """Legt einen sichtbaren Entwurf für jeden Test an."""
+        self.ada = _forschende("ada")
+        self.item = FragebogenItem.objects.anlegen(
+            self.ada,
+            wortlaut="Die Aufgaben waren verständlich.",
+        )
+        self.client.force_login(self.ada)
+
+    def test_zeigt_finalisieren_bei_entwurf(self) -> None:
+        """Der Editor bietet die Aktion nur für einen Entwurf an."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(response, "Finalisieren")
+
+    def test_finalisieren_leitet_zur_detailansicht_weiter(self) -> None:
+        """Die Aktion führt nach ihrer Ausführung zur finalisierten Fassung."""
         response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:finalisieren", args=[item.pk])
+            reverse("fragebogen_items:finalisieren", args=[self.item.pk])
         )
 
-        item.refresh_from_db()
         self.assertRedirects(
-            response, reverse("fragebogen_items:detail", args=[item.pk])
+            response,
+            reverse("fragebogen_items:detail", args=[self.item.pk]),
         )
-        self.assertEqual(item.zustand, FragebogenItem.Zustand.FINAL)
-        self.assertIsNotNone(item.finalisiert_am)
-        self.assertContains(
-            self.client.get(reverse("fragebogen_items:liste")), "Final"
+
+    def test_finalisieren_setzt_den_finalen_zustand(self) -> None:
+        """Die Aktion macht den Entwurf zu einer finalen Fassung."""
+        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
+        self.item.refresh_from_db()
+
+        self.assertEqual(self.item.zustand, FragebogenItem.Zustand.FINAL)
+
+    def test_finalisieren_setzt_den_zeitpunkt(self) -> None:
+        """Die Aktion hält den Finalisierungszeitpunkt fest."""
+        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
+        self.item.refresh_from_db()
+
+        self.assertIsNotNone(self.item.finalisiert_am)
+
+    def test_finalisierte_fassung_zeigt_keine_finalisieren_aktion(self) -> None:
+        """Nach dem Zustandswechsel ist die Aktion im Editor nicht mehr sichtbar."""
+        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
         )
-        self.assertNotContains(
-            self.client.get(reverse("fragebogen_items:detail", args=[item.pk])),
-            "Bearbeiten",
-        )
+
+        self.assertNotContains(response, "Finalisieren")
+
+    def test_finalisierte_fassung_zeigt_final_in_der_bibliothek(self) -> None:
+        """Die Bibliothek zeigt den Zustand der finalisierten Fassung an."""
+        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
+        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        self.assertContains(response, "Final")
 
     def test_finalisieren_akzeptiert_keine_bereits_finale_fassung(self) -> None:
         """Die zustandsgebundene Aktion ist nach dem Finalisieren nicht erneut nutzbar."""
-        ada: Konto = _forschende("ada")
-        item: FragebogenItem = FragebogenItem.objects.anlegen(
-            ada, wortlaut="Die Aufgaben waren verständlich."
-        )
-        item.finalisieren()
-        self.client.force_login(ada)
+        self.item.finalisieren()
 
         response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:finalisieren", args=[item.pk])
+            reverse("fragebogen_items:finalisieren", args=[self.item.pk])
         )
 
         self.assertEqual(response.status_code, 404)
