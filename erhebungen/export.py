@@ -7,6 +7,7 @@ from io import BytesIO, StringIO
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
@@ -124,7 +125,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        positionen: Iterable[Vignettenposition] = (
+        positionen: QuerySet[Vignettenposition] = (
             Vignettenposition.objects.filter(
                 erhebungsbindung__stichprobe__erhebung=erhebung
             ).order_by("erhebungsbindung_id", "position")
@@ -159,9 +160,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        sitzung_ids = Vignettenposition.objects.filter(
-            erhebungsbindung__stichprobe__erhebung=erhebung
-        ).values("sitzung_id")
+        sitzung_ids = positionen.values("sitzung_id")
         gespraechsschritte: Iterable[Gespraechsschritt] = (
             Gespraechsschritt.objects.filter(sitzung_id__in=sitzung_ids).order_by(
                 "sitzung_id", "reihenfolge"

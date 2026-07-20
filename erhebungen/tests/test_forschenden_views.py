@@ -25,6 +25,7 @@ from erhebungen.models import (
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
 
@@ -1275,7 +1276,7 @@ class ErhebungsExportTests(TestCase):
             reihenfolge=1,
             eingabe="Warum?",
             denkspur="Zeile eins\nZeile zwei",
-            aeusserung="",
+            aeusserung="Antwort eins\nAntwort zwei",
             native_reasoning_spur=None,
         )
         Fehlversuch.objects.create(
@@ -1283,13 +1284,49 @@ class ErhebungsExportTests(TestCase):
             grund="Formatbruch",
             rohantwort="nicht parsebar",
         )
-        abbruchschritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
+        leerer_schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
             sitzung=sitzung,
             reihenfolge=2,
+            eingabe="Bitte knapp.",
+            denkspur="",
+            aeusserung="",
+        )
+        abbruchschritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
+            sitzung=sitzung,
+            reihenfolge=3,
             eingabe="Noch einmal?",
             fehlversuche=[Fehlversuch(grund="Anbieterfehler", rohantwort="timeout")],
         )
         Diagnose.objects.create(sitzung=sitzung, text="Bruchfehler")
+        training: Training = Training.objects.create(
+            name="Nicht exportieren", eigentuemerin=ada
+        )
+        training.vignetten.add(vignette)
+        trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
+        Trainingsbindung.objects.create(
+            training=training,
+            teilnahme=trainingsteilnahme,
+            konto=ada,
+        )
+        trainingssitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=trainingsteilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        trainingsschritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=trainingssitzung,
+            reihenfolge=1,
+            eingabe="Nicht exportieren.",
+            denkspur="Nicht exportieren.",
+            aeusserung="Nicht exportieren.",
+        )
+        Fehlversuch.objects.create(
+            gespraechsschritt=trainingsschritt,
+            grund="Nicht exportieren.",
+            rohantwort="Nicht exportieren.",
+        )
+        Diagnose.objects.create(sitzung=trainingssitzung, text="Nicht exportieren.")
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -1331,13 +1368,22 @@ class ErhebungsExportTests(TestCase):
                     "reihenfolge": "1",
                     "eingabe": "Warum?",
                     "denkspur": "Zeile eins\nZeile zwei",
+                    "aeusserung": "Antwort eins\nAntwort zwei",
+                    "native_reasoning_spur": "NA",
+                },
+                {
+                    "id": str(leerer_schritt.pk),
+                    "sitzung_id": str(sitzung.pk),
+                    "reihenfolge": "2",
+                    "eingabe": "Bitte knapp.",
+                    "denkspur": "",
                     "aeusserung": "",
                     "native_reasoning_spur": "NA",
                 },
                 {
                     "id": str(abbruchschritt.pk),
                     "sitzung_id": str(sitzung.pk),
-                    "reihenfolge": "2",
+                    "reihenfolge": "3",
                     "eingabe": "Noch einmal?",
                     "denkspur": "NA",
                     "aeusserung": "NA",
