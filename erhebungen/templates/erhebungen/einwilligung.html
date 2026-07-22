@@ -7,6 +7,20 @@
     <p>{{ erhebung.einwilligungstext }}</p>
     <form method="post">
         {% csrf_token %}
+        <p>
+            Audio zur Transkription wird an einen externen Auftragsverarbeiter
+            übermittelt und danach nicht gespeichert.
+        </p>
+        <p>
+            <label>
+                <input type="radio" name="audioverarbeitung_eingewilligt" value="ja" required>
+                Mit Audio fortfahren
+            </label>
+            <label>
+                <input type="radio" name="audioverarbeitung_eingewilligt" value="nein">
+                Ohne Audio fortfahren
+            </label>
+        </p>
         <button type="submit" name="einwilligung" value="ja">Einwilligen</button>
     </form>
 {% endblock %}

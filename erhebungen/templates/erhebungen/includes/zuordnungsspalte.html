@@ -1,0 +1,55 @@
+<div class="vignette-field" x-data="zuordnungstabelle({ datenId: '{{ daten_id|escapejs }}', positionsId: '{{ positions_id|escapejs }}', sortierSchluessel: '{{ standard_schluessel|default:spalten.0.schluessel|escapejs }}', suchSchluessel: '{{ suchschluessel|join:','|escapejs }}'.split(',') })">
+    <p><strong>{{ ueberschrift }}</strong></p>
+    <div class="table-toolbar">
+        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="{{ suchfeld_label }}" x-model="suchbegriff">
+        <span class="table-toolbar__count" x-text="sichtbareZeilen.length + ' von ' + rows.length"></span>
+    </div>
+    <div class="table-wrap vignette-index-table">
+        <table class="table{% if not nicht_sortierbar %} table--sortable{% endif %}">
+            <thead>
+                <tr>
+                    {% for spalte in spalten %}
+                        <th scope="col">
+                            {% if nicht_sortierbar or nur_lesen %}
+                                {{ spalte.beschriftung }}
+                            {% else %}
+                                <button type="button" class="table__sort" @click="sortiere('{{ spalte.schluessel }}')">{{ spalte.beschriftung }}<span class="table__sort-arrow" :class="pfeilKlasse('{{ spalte.schluessel }}')"></span></button>
+                            {% endif %}
+                        </th>
+                    {% endfor %}
+                    {% if not nur_lesen %}
+                        <th scope="col">{{ aktion_spalte }}</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="zeile in sichtbareZeilen" :key="zeile.pk">
+                    <tr>
+                        {% for spalte in spalten %}
+                            <td>
+                                <span x-text="zeile['{{ spalte.schluessel }}']"></span>
+                                {% if zeige_badges and forloop.first %}
+                                    <span x-show="zeile.badge" class="badge badge--research" x-text="zeile.badge"></span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        {% if not nur_lesen %}
+                            <td>
+                                {% if mehrere_aktionen %}
+                                    <template x-for="aktion in zeile.aktionen" :key="aktion.aktion_url">
+                                        <button class="button button--small" type="button" @click="umschalten(aktion.aktion_url)" x-text="aktion.beschriftung"></button>
+                                    </template>
+                                {% else %}
+                                    <button class="button {{ aktionsklasse }} button--small" type="button" @click="umschalten(zeile.aktion_url)">{{ aktionsbeschriftung }}</button>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                </template>
+                <tr x-show="sichtbareZeilen.length === 0">
+                    <td colspan="{% if nur_lesen %}{{ spalten|length }}{% else %}{{ spalten|length|add:1 }}{% endif %}" class="table__empty">{{ leertext }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

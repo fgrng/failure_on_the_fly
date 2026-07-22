@@ -6,6 +6,7 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+    <script src="{% static 'js/zuordnungstabelle.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -45,60 +46,20 @@
         {% endif %}
     </div>
 
+    {% if stichproben %}
+        <div class="vignette-detail-actions">
+            <a class="button" href="{% url 'erhebungen:export' erhebung.pk %}">Datenspur herunterladen</a>
+        </div>
+    {% endif %}
+
     {% if erhebung.status == erhebung.Status.ENTWURF %}
-        <div id="erhebung-entwurf-editor" x-data="{
-                randomisierung: '{{ erhebung.randomisierung }}',
-                aufgenommeneRows: JSON.parse(document.getElementById('aufgenommene-daten').textContent),
-                verfuegbareRows: JSON.parse(document.getElementById('verfuegbare-daten').textContent),
-                qAufg: '', sortKeyAufg: 'label', sortDirAufg: 1,
-                qVerf: '', sortKeyVerf: 'label', sortDirVerf: 1,
-
-                get sichtbarAufg() {
-                    const q = this.qAufg.trim().toLowerCase();
-                    return this.aufgenommeneRows
-                        .filter(r => !q || [r.label, r.fach, r.thema].join(' ').toLowerCase().includes(q))
-                        .sort((a, b) => {
-                            const x = (a[this.sortKeyAufg] ?? '').toString().toLowerCase();
-                            const y = (b[this.sortKeyAufg] ?? '').toString().toLowerCase();
-                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDirAufg;
-                        });
-                },
-                get sichtbarVerf() {
-                    const q = this.qVerf.trim().toLowerCase();
-                    return this.verfuegbareRows
-                        .filter(r => !q || [r.label, r.fach, r.thema].join(' ').toLowerCase().includes(q))
-                        .sort((a, b) => {
-                            const x = (a[this.sortKeyVerf] ?? '').toString().toLowerCase();
-                            const y = (b[this.sortKeyVerf] ?? '').toString().toLowerCase();
-                            return x.localeCompare(y, 'de', { numeric: true }) * this.sortDirVerf;
-                        });
-                },
-                sortiereAufg(key) { if (this.sortKeyAufg === key) this.sortDirAufg *= -1; else { this.sortKeyAufg = key; this.sortDirAufg = 1; } },
-                sortiereVerf(key) { if (this.sortKeyVerf === key) this.sortDirVerf *= -1; else { this.sortKeyVerf = key; this.sortDirVerf = 1; } },
-                pfeilKlasseAufg(key) { return this.sortKeyAufg !== key ? '' : (this.sortDirAufg === 1 ? 'table__sort-arrow--auf' : 'table__sort-arrow--ab'); },
-                pfeilKlasseVerf(key) { return this.sortKeyVerf !== key ? '' : (this.sortDirVerf === 1 ? 'table__sort-arrow--auf' : 'table__sort-arrow--ab'); },
-
-                async toggleVignette(url) {
-                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                    const formData = new FormData();
-                    formData.append('csrfmiddlewaretoken', csrfToken);
-                    const response = await fetch(url, { method: 'POST', body: formData });
-                    const html = await response.text();
-
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    this.aufgenommeneRows = JSON.parse(doc.getElementById('aufgenommene-daten').textContent);
-                    this.verfuegbareRows = JSON.parse(doc.getElementById('verfuegbare-daten').textContent);
-
-                    const newPositions = doc.getElementById('vignetten-positionen-inhalt');
-                    const currentPositions = document.getElementById('vignetten-positionen-inhalt');
-                    if (newPositions && currentPositions) {
-                        currentPositions.innerHTML = newPositions.innerHTML;
-                    }
-                }
-            }"
-        >
-        {{ aufgenommene_daten|json_script:"aufgenommene-daten" }}
-        {{ verfuegbare_daten|json_script:"verfuegbare-daten" }}
+        <div id="erhebung-entwurf-editor" x-data="{ randomisierung: '{{ erhebung.randomisierung }}' }">
+        <div data-zuordnung-daten>{{ aufgenommene_daten|json_script:"aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ verfuegbare_daten|json_script:"verfuegbare-daten" }}</div>
+        <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ nach_sitzung_verfuegbare_daten|json_script:"nach-sitzung-verfuegbare-daten" }}</div>
+        <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ am_ende_verfuegbare_daten|json_script:"am-ende-verfuegbare-daten" }}</div>
 
         <form method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
             {% csrf_token %}
@@ -170,71 +131,34 @@
             </header>
             <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
 
-                <!-- Verfügbare Vignetten Table (LEFT) -->
-                <div class="vignette-field">
-                    <p><strong>Finale Vignetten aufnehmen</strong></p>
-                    <div class="table-toolbar">
-                        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="Verfügbare Vignetten durchsuchen" x-model="qVerf">
-                        <span class="table-toolbar__count" x-text="sichtbarVerf.length + ' von ' + verfuegbareRows.length"></span>
-                    </div>
-                    <div class="table-wrap vignette-index-table">
-                        <table class="table table--sortable">
-                            <thead>
-                                <tr>
-                                    <th scope="col"><button type="button" class="table__sort" @click="sortiereVerf('label')">Name<span class="table__sort-arrow" :class="pfeilKlasseVerf('label')"></span></button></th>
-                                    <th scope="col">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="r in sichtbarVerf" :key="r.pk">
-                                    <tr>
-                                        <td x-text="r.label"></td>
-                                        <td>
-                                            <button class="button button--secondary button--small" type="button" @click="toggleVignette(r.aktion_url)">Aufnehmen</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <tr x-show="sichtbarVerf.length === 0">
-                                    <td colspan="2" class="table__empty">Keine weiteren finalen Vignetten verfügbar.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Aufgenommene Vignetten Table (RIGHT) -->
-                <div class="vignette-field">
-                    <p><strong>Aufgenommene Vignetten</strong></p>
-                    <div class="table-toolbar">
-                        <input type="search" class="table-toolbar__search" placeholder="Suchen…" aria-label="Aufgenommene Vignetten durchsuchen" x-model="qAufg">
-                        <span class="table-toolbar__count" x-text="sichtbarAufg.length + ' von ' + aufgenommeneRows.length"></span>
-                    </div>
-                    <div class="table-wrap vignette-index-table">
-                        <table class="table table--sortable">
-                            <thead>
-                                <tr>
-                                    <th scope="col"><button type="button" class="table__sort" @click="sortiereAufg('label')">Name<span class="table__sort-arrow" :class="pfeilKlasseAufg('label')"></span></button></th>
-                                    <th scope="col">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="r in sichtbarAufg" :key="r.pk">
-                                    <tr>
-                                        <td x-text="r.label"></td>
-                                        <td>
-                                            <button class="button button--danger button--small" type="button" @click="toggleVignette(r.aktion_url)">Entfernen</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <tr x-show="sichtbarAufg.length === 0">
-                                    <td colspan="2" class="table__empty">Keine Vignetten gefunden.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="verfuegbare-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Finale Vignetten aufnehmen" suchfeld_label="Verfügbare Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Vignetten verfügbar." %}
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="aufgenommene-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Aufgenommene Vignetten" suchfeld_label="Aufgenommene Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Vignetten gefunden." %}
 
             </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-fragebogen">
+            <header class="page-section__head">
+                <b>04</b><span><h2 id="section-fragebogen">Fragebogen verwalten</h2><small>Fügen Sie finale Items an den jeweiligen Andockpunkt hinzu oder entfernen Sie diese.</small></span>
+            </header>
+            <section class="page-section" aria-labelledby="section-nach-sitzung">
+                <header class="page-section__head">
+                    <b>01</b><span><h3 id="section-nach-sitzung">Nach jeder Vignettensitzung</h3></span>
+                </header>
+                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." zeige_badges=True %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
+                </div>
+            </section>
+            <section class="page-section" aria-labelledby="section-am-ende">
+                <header class="page-section__head">
+                    <b>02</b><span><h3 id="section-am-ende">Am Ende</h3></span>
+                </header>
+                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." zeige_badges=True %}
+                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
+                </div>
+            </section>
         </section>
         </div>
 
@@ -250,10 +174,30 @@
             </dl>
         </section>
 
+        <section class="page-section" aria-labelledby="section-fragebogen">
+            <header class="page-section__head">
+                <b>02</b><span><h2 id="section-fragebogen">Fragebogen</h2></span>
+            </header>
+            <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
+            <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
+            <section class="page-section" aria-labelledby="section-nach-sitzung">
+                <header class="page-section__head">
+                    <b>01</b><span><h3 id="section-nach-sitzung">Nach jeder Vignettensitzung</h3></span>
+                </header>
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Fragebogen-Items" suchfeld_label="Aufgenommene Fragebogen-Items durchsuchen" nicht_sortierbar=True nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
+            </section>
+            <section class="page-section" aria-labelledby="section-am-ende">
+                <header class="page-section__head">
+                    <b>02</b><span><h3 id="section-am-ende">Am Ende</h3></span>
+                </header>
+                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Fragebogen-Items" suchfeld_label="Aufgenommene Fragebogen-Items durchsuchen" nicht_sortierbar=True nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
+            </section>
+        </section>
+
         {% if erhebung.status == erhebung.Status.FINAL %}
             <section class="page-section" aria-labelledby="section-stichproben">
                 <header class="page-section__head">
-                    <b>02</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
+                    <b>03</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
                 </header>
                 <div class="field-grid page-field--wide">
                     <form method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}" style="margin-bottom: 2rem;">

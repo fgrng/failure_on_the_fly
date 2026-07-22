@@ -44,6 +44,7 @@
             zustand("Ihre Aufnahme wird transkribiert.");
             const daten = new FormData();
             daten.append("audio", new Blob(audioTeile, { type: recorder.mimeType || "audio/webm" }), "aufnahme.webm");
+            if (bereich.dataset.sitzungPk) daten.append("sitzung_pk", bereich.dataset.sitzungPk);
             try {
                 const antwort = await fetch(bereich.dataset.transkriptionUrl, {
                     method: "POST",

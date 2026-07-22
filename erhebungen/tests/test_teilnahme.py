@@ -17,7 +17,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
+from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -97,13 +97,18 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         return vignette
 
-    def _laufende_sitzung_starten(self) -> Erhebungsbindung:
+    def _laufende_sitzung_starten(
+        self, *, audioverarbeitung_eingewilligt: str = "nein"
+    ) -> Erhebungsbindung:
         """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
 
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {
+                "einwilligung": "ja",
+                "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
+            },
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -138,7 +143,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
 
         self.assertRedirects(
@@ -155,6 +160,71 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Erhebungsbindung.objects.count(), 1)
         self.assertEqual(Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id)
 
+    def test_einwilligung_holt_die_getrennte_audioentscheidung_ein(self) -> None:
+        """Teilnahme und Audioverarbeitung bleiben zwei unabhängige Zustimmungen."""
+
+        self.client.get(self.url)
+        einwilligung_url: str = reverse(
+            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
+        )
+        formular: HttpResponse = self.client.get(einwilligung_url)
+
+        self.assertContains(
+            formular,
+            "Audio zur Transkription wird an einen externen Auftragsverarbeiter",
+        )
+        antwort: HttpResponse = self.client.post(
+            einwilligung_url,
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+        )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+        )
+        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
+        self.assertTrue(teilnahme.einwilligung_erteilt)
+        self.assertFalse(teilnahme.audioverarbeitung_eingewilligt)
+
+    def test_audioeinwilligung_aktiviert_spracheingabe_in_gespraech_und_debrief(
+        self,
+    ) -> None:
+        """Eine Audiozusage schaltet die Aufnahme in beiden Eingabephasen frei."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            audioverarbeitung_eingewilligt="ja"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        gespraech: HttpResponse = self.client.get(gespraech_url)
+        debrief: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+        )
+
+        self.assertContains(gespraech, "Aufnahme starten")
+        self.assertContains(debrief, "Aufnahme starten")
+
+    def test_audioentscheidung_laesst_sich_nicht_ueberschreiben(self) -> None:
+        """Eine einmal erfasste Audioentscheidung bleibt Teil der Datenspur."""
+
+        self.client.get(self.url)
+        einwilligung_url: str = reverse(
+            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
+        )
+        self.client.post(
+            einwilligung_url,
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+        )
+
+        antwort: HttpResponse = self.client.post(
+            einwilligung_url,
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "ja"},
+        )
+
+        self.assertEqual(antwort.status_code, 400)
+        self.assertFalse(Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt)
+
     def test_einwilligung_und_instruktion_zeigen_die_erhebungstexte(self) -> None:
         """Die Teilnahme informiert vor dem Spiel über Zustimmung und Begrenzung."""
 
@@ -165,7 +235,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
         instruktion: HttpResponse = self.client.get(
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link])
@@ -234,7 +304,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
         start_antwort: HttpResponse = self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -278,7 +348,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -308,7 +378,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -344,7 +414,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja"},
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])

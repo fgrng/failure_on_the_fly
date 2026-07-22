@@ -11,6 +11,7 @@ urlpatterns: list[URLPattern] = [
     path("eigene/", views.liste, name="liste"),
     path("eigene/anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.detail, name="detail"),
+    path("eigene/<int:pk>/export/", views.export, name="export"),
     path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,
@@ -20,6 +21,26 @@ urlpatterns: list[URLPattern] = [
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/entfernen/",
         views.vignette_entfernen,
         name="vignette_entfernen",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:item_pk>/<str:andockpunkt>/hinzufuegen/",
+        views.item_hinzufuegen,
+        name="item_hinzufuegen",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/entfernen/",
+        views.item_entfernen,
+        name="item_entfernen",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/hoch/",
+        views.item_hoch,
+        name="item_hoch",
+    ),
+    path(
+        "eigene/<int:pk>/items/<int:zugehoerigkeit_pk>/runter/",
+        views.item_runter,
+        name="item_runter",
     ),
     path(
         "eigene/<int:pk>/konfiguration/",

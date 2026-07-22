@@ -39,10 +39,13 @@ Ein Teilnahme-Link einer Stichprobe legt im Browser eine pseudonyme Teilnahme an
 oder setzt sie fort. Dafür ist kein Nutzerkonto erforderlich; die
 Forschungsdaten sind über ein ablesbares Teilnahme-Token von Trainingsaktivitäten
 getrennt. Während das Teilnahmefenster läuft, führt der Link zuerst über die
-Einwilligung und die Instruktion; diese weist darauf hin, dass das
-Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
+Teilnahme- und die getrennte Audio-Einwilligung sowie die Instruktion; diese
+weist darauf hin, dass das Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
 persistierte Sitzungen gespielt; Gespräch, Diagnose und interne Denkspur bleiben
 Teil der Datenspur, wobei die Denkspur nie in der Teilnehmer:innenansicht erscheint.
+Wer der Audioverarbeitung zustimmt, kann Eingaben im Diagnosegespräch und die
+Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
+vollständig nutzbar.
 Nach jeder Diagnose beginnt unmittelbar die nächste gezogene Vignette; nach der
 letzten endet die Teilnahme mit dem Abschlusstext ohne Fragebogen oder Wiederholung.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
@@ -63,6 +66,22 @@ wieder entarchivieren, sofern keine Stichprobe läuft. Unter einer finalen
 Erhebung lassen sich Stichproben mit Beginn und Ende anlegen; die Detailseite
 zeigt ihren kopierbaren Teilnahme-Link, die aktuelle Phase und die Zahl ihrer
 Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
+Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
+zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
+Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
+Ist eine Fassung bereits am anderen Andockpunkt gebunden, kennzeichnet die
+jeweilige Bibliothek dies, ohne ihre Aufnahme zu verhindern.
+Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items per
+Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
+Finale und archivierte Erhebungen zeigen diese Zuordnung weiterhin ohne Bibliothek
+und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
+Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
+ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
+Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
+Fehlversuche und Diagnosen. Die verwendeten Vignettenfassungen,
+Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
+Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
+interpretierbar bleibt.
 
 ## Fragebogen-Items verwalten
 

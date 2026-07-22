@@ -6,18 +6,21 @@ from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, connection, models, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
     Erhebungsvignette,
     Stichprobe,
     Vignettenposition,
 )
 from konten.models import Konto
+from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
@@ -254,6 +257,123 @@ def test_erhebungsvignette_bewahrt_die_menge_je_erhebung_eindeutig() -> None:
         Erhebungsvignette.objects.bulk_create(
             [Erhebungsvignette(erhebung=erhebung, vignette=finale, position=2)]
         )
+
+
+@pytest.mark.django_db
+def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
+    """Die Zuordnung, nicht die Fassung, ist je Andockpunkt eindeutig."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    item: FragebogenItem = FragebogenItem.objects.anlegen(
+        ada, wortlaut="Wie sicher fühlten Sie sich?"
+    )
+    item.finalisieren()
+
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsitem.objects.bulk_create(
+            [
+                Erhebungsitem(
+                    erhebung=erhebung,
+                    item=item,
+                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    position=2,
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
+def test_itemposition_ist_je_andockpunkt_eindeutig() -> None:
+    """Gleiche Positionen sind nur in unterschiedlichen Andockpunkten zulässig."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erstes_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Erstes")
+    zweites_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Zweites")
+    for item in (erstes_item, zweites_item):
+        item.finalisieren()
+
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=erstes_item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=zweites_item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsitem.objects.bulk_create(
+            [
+                Erhebungsitem(
+                    erhebung=erhebung,
+                    item=zweites_item,
+                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    position=1,
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
+def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
+    """Auch Bulk-Inserts umgehen weder Bibliotheksgrenzen noch Löschschutz."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    entwurf: FragebogenItem = FragebogenItem.objects.anlegen(
+        ada, wortlaut="Entwurf"
+    )
+    fremdes_item: FragebogenItem = FragebogenItem.objects.anlegen(
+        grace, wortlaut="Fremd"
+    )
+    fremdes_item.finalisieren()
+
+    for item in (entwurf, fremdes_item):
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Erhebungsitem.objects.bulk_create(
+                [
+                    Erhebungsitem(
+                        erhebung=erhebung,
+                        item=item,
+                        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                        position=1,
+                    )
+                ]
+            )
+
+    eigenes_item: FragebogenItem = FragebogenItem.objects.anlegen(
+        ada, wortlaut="Eigen"
+    )
+    eigenes_item.finalisieren()
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=eigenes_item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+
+    with pytest.raises(ProtectedError):
+        models.Model.delete(eigenes_item)
 
 
 @pytest.mark.django_db

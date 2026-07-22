@@ -8,6 +8,8 @@ Fragebögen werden nicht als Container modelliert. Die echte, wiederverwendbare 
 
 Es gibt genau **zwei Andockpunkte**: *nach jeder Vignettensitzung* oder *am Ende nach allen Vignettensitzungen*. Item-Typen sind vorerst nur **Freitext** und eine **sechsstufige Likert-Skala** („Stimme voll zu" … „Stimme gar nicht zu") — also ohne neutrale Mitte, mit erzwungener Tendenz.
 
+Dieselbe Item-Fassung darf an beide Andockpunkte gebunden sein, je Andockpunkt aber höchstens einmal; die Zuordnung ist ihre Identität.
+
 ## Consequences
 
 - Der „Fragebogen-Editor" aus der Vision pflegt die Item-Bibliothek und deren Zuordnung zu Erhebungen, kein Fragebogen-Objekt.
