@@ -8,6 +8,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -118,18 +119,26 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         return Erhebungsbindung.objects.get()
 
-    def _abschluss_item_anlegen(self, *, typ: str = FragebogenItem.Typ.FREITEXT) -> Erhebungsitem:
+    def _abschluss_item_anlegen(
+        self,
+        *,
+        typ: str = FragebogenItem.Typ.FREITEXT,
+        wortlaut: str = "Wie war die Sitzung?",
+        position: int = 1,
+    ) -> Erhebungsitem:
         """Ordnet ein finales Item am Ende der Erhebung ein."""
 
         item = FragebogenItem.objects.anlegen(
-            self.erhebung.eigentuemerin, typ=typ, wortlaut="Wie war die Sitzung?"
+            self.erhebung.eigentuemerin,
+            typ=typ,
+            wortlaut=wortlaut,
         )
         item.finalisieren()
         return Erhebungsitem.objects.create(
             erhebung=self.erhebung,
             item=item,
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-            position=1,
+            position=position,
         )
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
@@ -354,6 +363,11 @@ class ErhebungsteilnahmeTests(TestCase):
             abschluss_antwort,
             reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
         )
+        self.client.get(
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung.refresh_from_db()
+        self.assertIsNotNone(bindung.abgeschlossen_am)
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
 
@@ -397,23 +411,202 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
         )
-        block_url = reverse("erhebungen:itemblock", args=[self.stichprobe.teilnahme_link])
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
 
         self.assertRedirects(antwort, block_url)
         block = self.client.get(block_url)
         self.assertContains(block, "Wie war die Sitzung?")
         self.assertEqual(ItemAntwort.objects.count(), 1)
+        itemantwort = ItemAntwort.objects.get(erhebungsitem=zugehoerigkeit)
         gespeicherte_antwort = self.client.post(
-            block_url, {f"item_{zugehoerigkeit.pk}": "Hilfreich"}
+            block_url,
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Hilfreich",
+            },
         )
         self.assertContains(gespeicherte_antwort, "Hilfreich")
-        self.assertEqual(ItemAntwort.objects.get().freitext, "Hilfreich")
-        weiter = self.client.post(block_url, {"weiter": "ja"})
-        self.assertRedirects(
-            weiter, reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        self.assertEqual(itemantwort.erhebungsbindung.itemantworten.get().freitext, "Hilfreich")
+        weiter = self.client.post(
+            block_url, {"antwort": itemantwort.pk, "weiter": "ja"}
         )
-        self.client.get(reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]))
+        self.assertIsNone(Erhebungsbindung.objects.get().abgeschlossen_am)
+        self.assertRedirects(
+            weiter,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+        self.client.get(
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
         self.assertIsNotNone(Erhebungsbindung.objects.get().abgeschlossen_am)
+
+    def test_abschluss_block_wird_mit_demselben_token_wiederaufgenommen(self) -> None:
+        """Das Teilnahme-Token stellt vorgelegte Item-Antworten wieder her."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.client.get(block_url)
+        itemantwort = ItemAntwort.objects.get()
+        self.client.post(
+            block_url,
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Hilfreich",
+            },
+        )
+
+        anderer_browser = Client()
+        fortsetzung = anderer_browser.get(block_url)
+
+        self.assertContains(fortsetzung, "Hilfreich")
+        self.assertEqual(
+            anderer_browser.session["erhebung_teilnahme_tokens"][
+                str(self.stichprobe.teilnahme_link)
+            ],
+            bindung.token,
+        )
+        self.assertEqual(ItemAntwort.objects.count(), 1)
+
+    def test_htmx_interaktion_speichert_nur_eine_itemantwort(self) -> None:
+        """Eine Interaktion übernimmt keine noch unfertige Nachbarantwort."""
+
+        self._vignette_anlegen()
+        erstes_item = self._abschluss_item_anlegen(wortlaut="Erstes Item")
+        self._abschluss_item_anlegen(wortlaut="Zweites Item", position=2)
+        bindung = self._laufende_sitzung_starten()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        block = self.client.get(block_url)
+        erste_antwort = ItemAntwort.objects.get(erhebungsitem=erstes_item)
+
+        self.assertContains(
+            block,
+            f'hx-params="csrfmiddlewaretoken, item_{erste_antwort.pk}"',
+        )
+        fragment = self.client.post(
+            block_url,
+            {f"item_{erste_antwort.pk}": "Fertig"},
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertContains(fragment, "Erstes Item")
+        self.assertContains(fragment, "Zweites Item")
+        self.assertEqual(
+            list(
+                ItemAntwort.objects.order_by("erhebungsitem__position").values_list(
+                    "freitext", flat=True
+                )
+            ),
+            ["Fertig", None],
+        )
+
+    def test_token_endpunkt_speichert_auch_sitzungsbezogene_itemantwort(self) -> None:
+        """Derselbe Endpunkt schreibt über die Antwortzeile ohne Sitzungsparameter."""
+
+        self._vignette_anlegen()
+        item = FragebogenItem.objects.anlegen(
+            self.erhebung.eigentuemerin,
+            wortlaut="Wie war die Sitzung?",
+        )
+        item.finalisieren()
+        Erhebungsitem.objects.create(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=1,
+        )
+        bindung = self._laufende_sitzung_starten()
+        itemantwort = block_vorlegen(
+            bindung,
+            Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            Sitzung.objects.get(),
+        )[0]
+
+        antwort = self.client.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Hilfreich",
+            },
+        )
+
+        self.assertEqual(antwort.status_code, 200)
+        itemantwort.refresh_from_db()
+        self.assertEqual(itemantwort.freitext, "Hilfreich")
+
+    def test_itemantwort_bleibt_nach_zeitraumende_unangetastet(self) -> None:
+        """Nach dem harten Zeitfenster schreibt auch der Token-Endpunkt nichts."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.client.get(block_url)
+        itemantwort = ItemAntwort.objects.get()
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+
+        antwort = self.client.post(
+            block_url,
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Zu spät",
+            },
+        )
+
+        self.assertEqual(antwort.status_code, 403)
+        itemantwort.refresh_from_db()
+        self.assertIsNone(itemantwort.freitext)
+
+    def test_abschluss_url_ueberspringt_keine_offene_vignette(self) -> None:
+        """Die Abschlussseite beendet keine Teilnahme vor ihrer letzten Vignette."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+
+        itemblock = self.client.get(
+            reverse("erhebungen:itemblock", args=[bindung.token])
+        )
+        antwort = self.client.get(
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
+
+        self.assertRedirects(
+            itemblock,
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(ItemAntwort.objects.count(), 0)
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            fetch_redirect_response=False,
+        )
+        bindung.refresh_from_db()
+        self.assertIsNone(bindung.abgeschlossen_am)
+
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        antwort = self.client.get(
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+        bindung.refresh_from_db()
+        self.assertIsNone(bindung.abgeschlossen_am)
 
     def test_staler_debrief_beendet_die_folgesitzung_nicht(self) -> None:
         """Ein zweiter Debrief-POST bleibt an seiner abgeschlossenen Sitzung gebunden."""

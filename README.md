@@ -47,9 +47,9 @@ Wer der Audioverarbeitung zustimmt, kann Eingaben im Diagnosegespräch und die
 Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
 vollständig nutzbar.
 Nach jeder Diagnose beginnt unmittelbar die nächste gezogene Vignette. Nach der
-letzten folgen freiwillige Abschluss-Items; jede Antwort wird sofort gespeichert,
-und auch übersprungene Items bleiben als vorgelegt dokumentiert. Anschließend endet
-die Teilnahme mit dem Abschlusstext.
+letzten folgen freiwillige Fragebogen-Items zum Abschluss; jede Item-Antwort wird
+sofort gespeichert, und auch übersprungene Fragebogen-Items bleiben als vorgelegt
+dokumentiert. Anschließend endet die Teilnahme mit dem Abschlusstext.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
 kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,
 bleibt der Gesprächsschritt ohne Antwort erhalten.

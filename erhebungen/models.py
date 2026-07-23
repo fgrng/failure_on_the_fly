@@ -606,17 +606,21 @@ class ItemAntwort(models.Model):
     def clean(self) -> None:
         """Hält Teilnahme, Andockpunkt und Antworttyp konsistent."""
 
+        from fragebogen_items.models import FragebogenItem
+
         fehler: dict[str, str] = {}
         if self.sitzung_id and self.sitzung.teilnahme_id != self.erhebungsbindung.teilnahme_id:
             fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
         ist_am_ende = self.erhebungsitem.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
         if (self.sitzung_id is None) != ist_am_ende:
-            fehler["sitzung"] = "Sitzungen gehören nur zu nach_sitzung-Items."
+            fehler["sitzung"] = (
+                "Sitzungen gehören nur zu Fragebogen-Items am Andockpunkt nach_sitzung."
+            )
         typ = self.erhebungsitem.item.typ
-        if self.likert_stufe is not None and typ != "likert":
-            fehler["likert_stufe"] = "Likert-Stufen gehören zu Likert-Items."
-        if self.freitext is not None and typ != "freitext":
-            fehler["freitext"] = "Freitext gehört zu Freitext-Items."
+        if self.likert_stufe is not None and typ != FragebogenItem.Typ.LIKERT:
+            fehler["likert_stufe"] = "Likert-Stufen gehören zu Likert-Fragebogen-Items."
+        if self.freitext is not None and typ != FragebogenItem.Typ.FREITEXT:
+            fehler["freitext"] = "Freitext gehört zu Freitext-Fragebogen-Items."
         if self.likert_stufe is not None and not 1 <= self.likert_stufe <= 6:
             fehler["likert_stufe"] = "Likert-Stufen liegen zwischen 1 und 6."
         if fehler:

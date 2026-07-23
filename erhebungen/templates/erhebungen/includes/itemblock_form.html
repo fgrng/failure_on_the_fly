@@ -1,6 +1,11 @@
-<form method="post" id="itemblock-formular">
+<form
+    method="post"
+    action="{% url 'erhebungen:itemblock' token %}"
+    id="itemblock-formular"
+>
     {% csrf_token %}
     {% for antwort in antworten %}
+        <input type="hidden" name="antwort" value="{{ antwort.pk }}">
         <fieldset>
             <legend>{{ antwort.erhebungsitem.item.wortlaut }}</legend>
             {% if antwort.erhebungsitem.item.typ == "likert" %}
@@ -8,12 +13,13 @@
                     <label>
                         <input
                             type="radio"
-                            name="item_{{ antwort.erhebungsitem_id }}"
+                            name="item_{{ antwort.pk }}"
                             value="{{ stufe }}"
-                            hx-post="{{ request.path }}"
+                            hx-post="{% url 'erhebungen:itemblock' token %}"
                             hx-trigger="change"
                             hx-target="#itemblock-formular"
                             hx-swap="outerHTML"
+                            hx-params="csrfmiddlewaretoken, item_{{ antwort.pk }}"
                             {% if antwort.likert_stufe|stringformat:"s" == stufe %}checked{% endif %}
                         >
                         {{ stufe }}
@@ -21,11 +27,12 @@
                 {% endfor %}
             {% else %}
                 <textarea
-                    name="item_{{ antwort.erhebungsitem_id }}"
-                    hx-post="{{ request.path }}"
+                    name="item_{{ antwort.pk }}"
+                    hx-post="{% url 'erhebungen:itemblock' token %}"
                     hx-trigger="change"
                     hx-target="#itemblock-formular"
                     hx-swap="outerHTML"
+                    hx-params="csrfmiddlewaretoken, item_{{ antwort.pk }}"
                 >{{ antwort.freitext|default:"" }}</textarea>
             {% endif %}
         </fieldset>

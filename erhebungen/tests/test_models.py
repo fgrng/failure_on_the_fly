@@ -321,6 +321,102 @@ def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig
 
 
 @pytest.mark.django_db
+def test_itemantwort_erlaubt_hoechstens_eine_wertspalte() -> None:
+    """Freitext und Likert-Stufe können nicht zugleich persistiert werden."""
+
+    ada = Konto.objects.create_user(username="ada")
+    bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
+    item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war es?")
+    item.finalisieren()
+    erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=bindung.stichprobe.erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ItemAntwort.objects.bulk_create(
+            [
+                ItemAntwort(
+                    erhebungsbindung=bindung,
+                    erhebungsitem=erhebungsitem,
+                    freitext="Hilfreich",
+                    likert_stufe=6,
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("typ", "werte"),
+    [
+        (FragebogenItem.Typ.FREITEXT, {"likert_stufe": 6}),
+        (FragebogenItem.Typ.LIKERT, {"freitext": "Hilfreich"}),
+    ],
+)
+def test_itemantwort_wert_passt_zum_itemtyp(
+    typ: str, werte: dict[str, object]
+) -> None:
+    """Die Antwortspalte folgt dem Typ der gepinnten Item-Fassung."""
+
+    ada = Konto.objects.create_user(username=f"ada-{typ}")
+    bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
+    item = FragebogenItem.objects.anlegen(ada, typ=typ, wortlaut="Wie war es?")
+    item.finalisieren()
+    erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=bindung.stichprobe.erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    with pytest.raises(ValidationError):
+        ItemAntwort.objects.create(
+            erhebungsbindung=bindung,
+            erhebungsitem=erhebungsitem,
+            **werte,
+        )
+
+
+@pytest.mark.django_db
+def test_itemantwort_sitzung_und_andockpunkt_passen_zur_teilnahme() -> None:
+    """Ein Sitzungs-Item braucht die Sitzung derselben Teilnahme."""
+
+    ada = Konto.objects.create_user(username="ada")
+    bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
+    item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war es?")
+    item.finalisieren()
+    erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=bindung.stichprobe.erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    kern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    fremde_sitzung = Sitzung.objects.create(
+        teilnahme=Teilnahme.objects.create(),
+        vignette=_finale_vignette_anlegen(ada),
+        simulationskern=kern,
+        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+    )
+
+    with pytest.raises(ValidationError, match="anderen Teilnahme"):
+        ItemAntwort.objects.create(
+            erhebungsbindung=bindung,
+            erhebungsitem=erhebungsitem,
+            sitzung=fremde_sitzung,
+        )
+    with pytest.raises(ValidationError, match="nach_sitzung"):
+        ItemAntwort.objects.create(
+            erhebungsbindung=bindung,
+            erhebungsitem=erhebungsitem,
+        )
+
+
+@pytest.mark.django_db
 def test_itemposition_ist_je_andockpunkt_eindeutig() -> None:
     """Gleiche Positionen sind nur in unterschiedlichen Andockpunkten zulässig."""
 

@@ -29,6 +29,7 @@ from .models import (
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Stichprobe,
     Vignettenposition,
 )
@@ -46,6 +47,7 @@ from sitzungen.views import (
 from vignetten.models import Vignette, Vignettenhistorie
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
+_ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
 _FORSCHENDE_GRUPPE: str = "Forschende:r"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
@@ -693,8 +695,10 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
+        if bindung.abgeschlossen_am is not None:
+            return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
         if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
-            return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
+            return redirect("erhebungen:itemblock", token=bindung.token)
         return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
 
@@ -790,7 +794,7 @@ def _weiter_nach_der_letzten_vignette(binding: Erhebungsbindung) -> HttpResponse
 
     teilnahme_link: UUID = binding.stichprobe.teilnahme_link
     if isinstance(naechster_schritt(binding.teilnahme), Itemblock):
-        return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
+        return redirect("erhebungen:itemblock", token=binding.token)
     return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
 
 
@@ -809,11 +813,7 @@ def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
 def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
     # Löst die laufende Sitzung in ihrer besitzenden Erhebungs-App auf.
 
-    bindung: Erhebungsbindung = get_object_or_404(
-        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"), token=token
-    )
-    if bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
-        raise PermissionDenied
+    bindung = _laufende_bindung(token)
     sitzung: Sitzung = get_object_or_404(
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
         teilnahme=bindung.teilnahme,
@@ -892,20 +892,56 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
     return _weiter_nach_der_letzten_vignette(bindung)
 
 
-def itemblock(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
-    """Zeigt und schreibt die freiwilligen Abschluss-Items einer Teilnahme."""
+def itemblock(request: HttpRequest, token: str) -> HttpResponse:
+    """Zeigt und schreibt die freiwilligen Fragebogen-Items am Ende."""
 
-    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
-    bindung = _bindung_aus_session(request, stichprobe)
-    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
+    ist_htmx = bool(request.headers.get("HX-Request"))
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    bindung = _laufende_bindung(token)
+    teilnahme_link = bindung.stichprobe.teilnahme_link
+    _bindung_in_session_speichern(request, bindung)
+    if not bindung.teilnahme.einwilligung_erteilt:
         return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
-    schritt = naechster_schritt(bindung.teilnahme)
-    if not isinstance(schritt, Itemblock):
-        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
-    antworten = block_vorlegen(bindung=bindung, andockpunkt=schritt.andockpunkt)
-    if request.method == "POST":
+    if request.method == "GET":
+        if Sitzung.objects.filter(
+            teilnahme=bindung.teilnahme,
+            status=Sitzung.Status.LAUFEND,
+        ).exists():
+            return redirect("erhebungen:gespraech", token=bindung.token)
+        schritt = naechster_schritt(bindung.teilnahme)
+        if not isinstance(schritt, Itemblock):
+            return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+        antworten = block_vorlegen(
+            bindung=bindung,
+            andockpunkt=schritt.andockpunkt,
+            sitzung=schritt.sitzung,
+        )
+    else:
+        try:
+            antwort_ids = {
+                int(wert)
+                for wert in request.POST.getlist("antwort")
+                + [
+                    feld.removeprefix("item_")
+                    for feld in request.POST
+                    if feld.startswith("item_")
+                ]
+            }
+        except ValueError:
+            return HttpResponseBadRequest("Unbekannte Item-Antwort.")
+        antworten = list(
+            ItemAntwort.objects.filter(
+                erhebungsbindung=bindung,
+                pk__in=antwort_ids,
+            )
+            .select_related("erhebungsitem__item")
+            .order_by("erhebungsitem__position")
+        )
+        if len(antworten) != len(antwort_ids):
+            return HttpResponseBadRequest("Unbekannte Item-Antwort.")
         for antwort in antworten:
-            feld = f"item_{antwort.erhebungsitem_id}"
+            feld = f"item_{antwort.pk}"
             if feld not in request.POST:
                 continue
             wert = request.POST[feld]
@@ -917,17 +953,41 @@ def itemblock(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             else:
                 antwort.freitext = wert or None
                 antwort.likert_stufe = None
-            antwort.save()
+            antwort.clean()
+        with transaction.atomic():
+            for antwort in antworten:
+                if f"item_{antwort.pk}" in request.POST:
+                    antwort.save()
         if "weiter" in request.POST:
-            bindung.abgeschlossen_am = timezone.now()
-            bindung.save(update_fields=["abgeschlossen_am"])
+            if not antwort_ids:
+                return HttpResponseBadRequest("Unbekannter Itemblock.")
+            if any(
+                antwort.sitzung_id is not None
+                or antwort.erhebungsitem.andockpunkt
+                != Erhebungsitem.Andockpunkt.AM_ENDE
+                for antwort in antworten
+            ):
+                return HttpResponseBadRequest("Unbekannter Abschluss-Block.")
+            freigaben: list[str] = request.session.get(
+                _ABSCHLUSS_FREIGABEN_SESSION_KEY, []
+            )
+            if token not in freigaben:
+                freigaben.append(token)
+                request.session[_ABSCHLUSS_FREIGABEN_SESSION_KEY] = freigaben
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+        if ist_htmx and antworten:
+            bezugsantwort = antworten[0]
+            antworten = block_vorlegen(
+                bindung,
+                bezugsantwort.erhebungsitem.andockpunkt,
+                bezugsantwort.sitzung,
+            )
     template = (
         "erhebungen/includes/itemblock_form.html"
-        if request.headers.get("HX-Request")
+        if ist_htmx
         else "erhebungen/itemblock.html"
     )
-    return render(request, template, {"antworten": antworten})
+    return render(request, template, {"antworten": antworten, "token": token})
 
 
 def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
@@ -937,11 +997,23 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
         return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
-    if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
-        return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
+    if Sitzung.objects.filter(
+        teilnahme=bindung.teilnahme,
+        status=Sitzung.Status.LAUFEND,
+    ).exists():
+        return redirect("erhebungen:gespraech", token=bindung.token)
+    schritt = naechster_schritt(bindung.teilnahme)
+    freigaben: list[str] = request.session.get(_ABSCHLUSS_FREIGABEN_SESSION_KEY, [])
+    if isinstance(schritt, Vignette):
+        return redirect("erhebungen:spielen", teilnahme_link=teilnahme_link)
+    if isinstance(schritt, Itemblock) and bindung.token not in freigaben:
+        return redirect("erhebungen:itemblock", token=bindung.token)
     if bindung.abgeschlossen_am is None:
         bindung.abgeschlossen_am = timezone.now()
         bindung.save(update_fields=["abgeschlossen_am"])
+    if bindung.token in freigaben:
+        freigaben.remove(bindung.token)
+        request.session[_ABSCHLUSS_FREIGABEN_SESSION_KEY] = freigaben
     return render(
         request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung}
     )
@@ -964,6 +1036,30 @@ def _bindung_aus_session(
         )
         .first()
     )
+
+
+def _bindung_in_session_speichern(
+    request: HttpRequest, bindung: Erhebungsbindung
+) -> None:
+    """Bindet einen tokenbasierten Wiedereinstieg an den aktuellen Browser."""
+
+    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+    teilnahme_link = str(bindung.stichprobe.teilnahme_link)
+    if tokens.get(teilnahme_link) != bindung.token:
+        tokens[teilnahme_link] = bindung.token
+        request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
+
+
+def _laufende_bindung(token: str) -> Erhebungsbindung:
+    """Löst eine Teilnahme über ihr Token innerhalb des laufenden Fensters auf."""
+
+    bindung: Erhebungsbindung = get_object_or_404(
+        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"),
+        token=token,
+    )
+    if bindung.stichprobe.archiviert or bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+        raise PermissionDenied
+    return bindung
 
 
 def _bindung_anlegen_fuer_laufende_stichprobe(

@@ -14,13 +14,14 @@ from .models import Erhebungsbindung, Erhebungsitem, ItemAntwort
 class Itemblock:
     """Die berechneten Items eines Andockpunkts."""
 
-    andockpunkt: str
+    andockpunkt: Erhebungsitem.Andockpunkt
     items: list[Erhebungsitem]
+    sitzung: Sitzung | None = None
 
 
 def block_vorlegen(
     bindung: Erhebungsbindung,
-    andockpunkt: str,
+    andockpunkt: Erhebungsitem.Andockpunkt,
     sitzung: Sitzung | None = None,
 ) -> list[ItemAntwort]:
     """Legt die Antwortzeilen eines Blocks einmalig an."""
@@ -63,7 +64,7 @@ def naechster_schritt(teilnahme: Teilnahme) -> Vignette | Itemblock | None:
         ).select_related("item")
     )
     return (
-        Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items)
+        Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items, None)
         if items and bindung.abgeschlossen_am is None
         else None
     )

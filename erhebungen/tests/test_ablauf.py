@@ -3,12 +3,13 @@
 import pytest
 from django.utils import timezone
 
-from erhebungen.ablauf import naechster_schritt
+from erhebungen.ablauf import block_vorlegen, naechster_schritt
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Stichprobe,
     Vignettenziehung,
 )
@@ -125,6 +126,13 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
 
     assert block.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
     assert list(block.items) == [zugehoerigkeit]
+    assert block.sitzung is None
+
+    erste_vorlage = block_vorlegen(bindung, block.andockpunkt, block.sitzung)
+    zweite_vorlage = block_vorlegen(bindung, block.andockpunkt, block.sitzung)
+
+    assert zweite_vorlage == erste_vorlage
+    assert ItemAntwort.objects.count() == 1
 
 
 @pytest.mark.django_db
