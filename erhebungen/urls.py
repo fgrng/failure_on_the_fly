@@ -82,6 +82,7 @@ urlpatterns: list[URLPattern] = [
         name="instruktion",
     ),
     path("teilnahme/<uuid:teilnahme_link>/spielen/", views.spielen, name="spielen"),
+    path("teilnahme/<uuid:teilnahme_link>/items/", views.itemblock, name="itemblock"),
     path("teilnahme/<uuid:teilnahme_link>/abschluss/", views.abschluss, name="abschluss"),
     path("teilnahme/token/<str:token>/gespraech/", views.gespraech, name="gespraech"),
     path(

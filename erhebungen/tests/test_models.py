@@ -16,6 +16,7 @@ from erhebungen.models import (
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Stichprobe,
     Vignettenposition,
 )
@@ -293,6 +294,29 @@ def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
                     position=2,
                 )
             ]
+        )
+
+
+@pytest.mark.django_db
+def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig() -> None:
+    """Die partielle Eindeutigkeit schützt auch die NULL-Sitzung."""
+
+    ada = Konto.objects.create_user(username="ada")
+    bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
+    item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war es?")
+    item.finalisieren()
+    erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=bindung.stichprobe.erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+
+    ItemAntwort.objects.create(erhebungsbindung=bindung, erhebungsitem=erhebungsitem)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ItemAntwort.objects.bulk_create(
+            [ItemAntwort(erhebungsbindung=bindung, erhebungsitem=erhebungsitem)]
         )
 
 

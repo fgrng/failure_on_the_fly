@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
@@ -469,24 +470,16 @@ class Erhebungsbindung(models.Model):
         blank=True,
         editable=False,
     )
+    abgeschlossen_am: models.DateTimeField = models.DateTimeField(null=True, blank=True)
 
     objects: ErhebungsbindungManager = ErhebungsbindungManager()
 
     @property
     def verfallen(self) -> bool:
         """Zeigt den Ablauf unvollständiger Teilnahmen nach dem Erhebungsfenster an."""
-        from sitzungen.models import Sitzung
-
         if self.stichprobe.phase != Stichprobe.Phase.NACH:
             return False
-        sitzungen = self.teilnahme.sitzung_set
-        return (
-            not self.vignettenziehungen.exists()
-            or sitzungen.filter(status=Sitzung.Status.LAUFEND).exists()
-            or self.vignettenziehungen.exclude(
-                vignette_id__in=sitzungen.values("vignette_id")
-            ).exists()
-        )
+        return self.abgeschlossen_am is None
 
     @transaction.atomic
     def vignetten_ziehen(self) -> None:
@@ -588,5 +581,70 @@ class Vignettenposition(models.Model):
             models.UniqueConstraint(
                 fields=["erhebungsbindung", "position"],
                 name="erhebungen_position_ist_je_teilnahme_eindeutig",
+            ),
+        ]
+
+
+class ItemAntwort(models.Model):
+    """Eine freiwillige Antwort auf ein vorgelegtes Erhebungsitem."""
+
+    erhebungsbindung: models.ForeignKey = models.ForeignKey(
+        Erhebungsbindung, on_delete=models.CASCADE, related_name="itemantworten"
+    )
+    erhebungsitem: models.ForeignKey = models.ForeignKey(
+        Erhebungsitem, on_delete=models.PROTECT, related_name="antworten"
+    )
+    sitzung: models.ForeignKey = models.ForeignKey(
+        "sitzungen.Sitzung", null=True, blank=True, on_delete=models.CASCADE
+    )
+    freitext: models.TextField = models.TextField(null=True, blank=True)
+    likert_stufe: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=[MaxValueValidator(6)]
+    )
+    vorgelegt_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+
+    def clean(self) -> None:
+        """Hält Teilnahme, Andockpunkt und Antworttyp konsistent."""
+
+        fehler: dict[str, str] = {}
+        if self.sitzung_id and self.sitzung.teilnahme_id != self.erhebungsbindung.teilnahme_id:
+            fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
+        ist_am_ende = self.erhebungsitem.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
+        if (self.sitzung_id is None) != ist_am_ende:
+            fehler["sitzung"] = "Sitzungen gehören nur zu nach_sitzung-Items."
+        typ = self.erhebungsitem.item.typ
+        if self.likert_stufe is not None and typ != "likert":
+            fehler["likert_stufe"] = "Likert-Stufen gehören zu Likert-Items."
+        if self.freitext is not None and typ != "freitext":
+            fehler["freitext"] = "Freitext gehört zu Freitext-Items."
+        if self.likert_stufe is not None and not 1 <= self.likert_stufe <= 6:
+            fehler["likert_stufe"] = "Likert-Stufen liegen zwischen 1 und 6."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        self.clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "erhebungsitem", "sitzung"],
+                condition=models.Q(sitzung__isnull=False),
+                name="erhebungen_antwort_je_sitzung_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "erhebungsitem"],
+                condition=models.Q(sitzung__isnull=True),
+                name="erhebungen_antwort_am_ende_eindeutig",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(freitext__isnull=True) | models.Q(likert_stufe__isnull=True),
+                name="erhebungen_antwort_hoechstens_ein_wert",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(likert_stufe__isnull=True)
+                | models.Q(likert_stufe__gte=1, likert_stufe__lte=6),
+                name="erhebungen_antwort_likert_gueltig",
             ),
         ]

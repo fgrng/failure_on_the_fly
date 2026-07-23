@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
-from .ablauf import naechster_schritt
+from .ablauf import Itemblock, block_vorlegen, naechster_schritt
 from .export import datenspur_zip
 from .models import (
     Erhebung,
@@ -693,6 +693,8 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
+        if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
+            return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
         return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
 
@@ -757,14 +759,17 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
     if not _naechste_sitzung_starten(bindung, stichprobe.erhebung):
+        if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
+            return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
         return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
     return redirect("erhebungen:gespraech", token=bindung.token)
 
 
 def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> bool:
-    vignette: Vignette | None = naechster_schritt(bindung.teilnahme)
-    if vignette is None:
+    schritt = naechster_schritt(bindung.teilnahme)
+    if not isinstance(schritt, Vignette):
         return False
+    vignette: Vignette = schritt
     kern: Simulationskern | None = vignette.gepinnter_kern
     modell_konfiguration: ModellKonfiguration | None = erhebung.modell_konfiguration
     if kern is None or modell_konfiguration is None:
@@ -877,9 +882,49 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
         return redirect("erhebungen:gespraech", token=bindung.token)
-    return redirect(
-        "erhebungen:abschluss", teilnahme_link=bindung.stichprobe.teilnahme_link
+    if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
+        return redirect(
+            "erhebungen:itemblock", teilnahme_link=bindung.stichprobe.teilnahme_link
+        )
+    return redirect("erhebungen:abschluss", teilnahme_link=bindung.stichprobe.teilnahme_link)
+
+
+def itemblock(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
+    """Zeigt und schreibt die freiwilligen Abschluss-Items einer Teilnahme."""
+
+    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
+    bindung = _bindung_aus_session(request, stichprobe)
+    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
+        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    schritt = naechster_schritt(bindung.teilnahme)
+    if not isinstance(schritt, Itemblock):
+        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+    antworten = block_vorlegen(bindung=bindung, andockpunkt=schritt.andockpunkt)
+    if request.method == "POST":
+        for antwort in antworten:
+            feld = f"item_{antwort.erhebungsitem_id}"
+            if feld not in request.POST:
+                continue
+            wert = request.POST[feld]
+            if antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT:
+                if wert and wert not in {"1", "2", "3", "4", "5", "6"}:
+                    return HttpResponseBadRequest("Likert-Stufen liegen zwischen 1 und 6.")
+                antwort.likert_stufe = int(wert) if wert else None
+                antwort.freitext = None
+            else:
+                antwort.freitext = wert or None
+                antwort.likert_stufe = None
+            antwort.save()
+        if "weiter" in request.POST:
+            bindung.abgeschlossen_am = timezone.now()
+            bindung.save(update_fields=["abgeschlossen_am"])
+            return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+    template = (
+        "erhebungen/includes/itemblock_form.html"
+        if request.headers.get("HX-Request")
+        else "erhebungen/itemblock.html"
     )
+    return render(request, template, {"antworten": antworten})
 
 
 def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
@@ -889,6 +934,11 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
         return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
+        return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
+    if bindung.abgeschlossen_am is None:
+        bindung.abgeschlossen_am = timezone.now()
+        bindung.save(update_fields=["abgeschlossen_am"])
     return render(
         request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung}
     )

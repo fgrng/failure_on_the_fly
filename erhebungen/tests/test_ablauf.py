@@ -7,11 +7,13 @@ from erhebungen.ablauf import naechster_schritt
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
     Erhebungsvignette,
     Stichprobe,
     Vignettenziehung,
 )
 from konten.models import Konto
+from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
@@ -37,6 +39,14 @@ def _finale_vignette_anlegen(konto: Konto) -> Vignette:
     vignette.save()
     vignette.finalisieren()
     return vignette
+
+
+def _finales_item_anlegen(konto: Konto) -> FragebogenItem:
+    """Legt eine einbindbare Freitext-Item-Fassung an."""
+
+    item = FragebogenItem.objects.anlegen(konto, wortlaut="Wie war die Sitzung?")
+    item.finalisieren()
+    return item
 
 
 @pytest.mark.django_db
@@ -78,6 +88,43 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     )
 
     assert naechster_schritt(bindung.teilnahme) is None
+
+
+@pytest.mark.django_db
+def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> None:
+    """Am Ende folgt ein Block aus den zugeordneten Abschluss-Items."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    vignette: Vignette = _finale_vignette_anlegen(konto)
+    item: FragebogenItem = _finales_item_anlegen(konto)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
+    zugehoerigkeit: Erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+        stichprobe=Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        ),
+        teilnahme=Teilnahme.objects.create(),
+        token="2345-6789",
+    )
+    Sitzung.objects.create(
+        teilnahme=bindung.teilnahme,
+        vignette=vignette,
+        simulationskern=kern,
+        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+    )
+
+    block = naechster_schritt(bindung.teilnahme)
+
+    assert block.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
+    assert list(block.items) == [zugehoerigkeit]
 
 
 @pytest.mark.django_db

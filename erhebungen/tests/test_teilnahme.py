@@ -11,11 +11,14 @@ from django.utils import timezone
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Stichprobe,
     Vignettenposition,
 )
 from konten.models import Konto
+from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette, Vignettenhistorie
@@ -114,6 +117,20 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
         return Erhebungsbindung.objects.get()
+
+    def _abschluss_item_anlegen(self, *, typ: str = FragebogenItem.Typ.FREITEXT) -> Erhebungsitem:
+        """Ordnet ein finales Item am Ende der Erhebung ein."""
+
+        item = FragebogenItem.objects.anlegen(
+            self.erhebung.eigentuemerin, typ=typ, wortlaut="Wie war die Sitzung?"
+        )
+        item.finalisieren()
+        return Erhebungsitem.objects.create(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            position=1,
+        )
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
@@ -369,6 +386,34 @@ class ErhebungsteilnahmeTests(TestCase):
             ),
             [(erste.pk, 1), (zweite.pk, 2)],
         )
+
+    def test_abschluss_block_speichert_antworten_und_darf_uebersprungen_werden(self) -> None:
+        """Der Abschluss-Block legt Nonresponse an und speichert sofort pro Feld."""
+
+        self._vignette_anlegen()
+        zugehoerigkeit = self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        antwort = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        block_url = reverse("erhebungen:itemblock", args=[self.stichprobe.teilnahme_link])
+
+        self.assertRedirects(antwort, block_url)
+        block = self.client.get(block_url)
+        self.assertContains(block, "Wie war die Sitzung?")
+        self.assertEqual(ItemAntwort.objects.count(), 1)
+        gespeicherte_antwort = self.client.post(
+            block_url, {f"item_{zugehoerigkeit.pk}": "Hilfreich"}
+        )
+        self.assertContains(gespeicherte_antwort, "Hilfreich")
+        self.assertEqual(ItemAntwort.objects.get().freitext, "Hilfreich")
+        weiter = self.client.post(block_url, {"weiter": "ja"})
+        self.assertRedirects(
+            weiter, reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
+        self.client.get(reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]))
+        self.assertIsNotNone(Erhebungsbindung.objects.get().abgeschlossen_am)
 
     def test_staler_debrief_beendet_die_folgesitzung_nicht(self) -> None:
         """Ein zweiter Debrief-POST bleibt an seiner abgeschlossenen Sitzung gebunden."""

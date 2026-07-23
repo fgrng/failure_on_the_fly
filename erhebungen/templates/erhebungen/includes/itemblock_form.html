@@ -1,0 +1,16 @@
+<form method="post" id="itemblock-formular">
+    {% csrf_token %}
+    {% for antwort in antworten %}
+        <fieldset>
+            <legend>{{ antwort.erhebungsitem.item.wortlaut }}</legend>
+            {% if antwort.erhebungsitem.item.typ == "likert" %}
+                {% for stufe in "123456" %}
+                    <label><input type="radio" name="item_{{ antwort.erhebungsitem_id }}" value="{{ stufe }}" hx-post="{{ request.path }}" hx-trigger="change" hx-target="#itemblock-formular" hx-swap="outerHTML"{% if antwort.likert_stufe|stringformat:"s" == stufe %} checked{% endif %}> {{ stufe }}</label>
+                {% endfor %}
+            {% else %}
+                <textarea name="item_{{ antwort.erhebungsitem_id }}" hx-post="{{ request.path }}" hx-trigger="change" hx-target="#itemblock-formular" hx-swap="outerHTML">{{ antwort.freitext|default:"" }}</textarea>
+            {% endif %}
+        </fieldset>
+    {% endfor %}
+    <button type="submit" name="weiter" value="ja">Weiter</button>
+</form>
