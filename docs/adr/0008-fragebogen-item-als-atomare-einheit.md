@@ -6,7 +6,7 @@ status: accepted
 
 Fragebögen werden nicht als Container modelliert. Die echte, wiederverwendbare und versionierte Einheit ist das **Fragebogen-Item**. Es wird über eine Zuordnung an eine Erhebung gebunden, die **Andockpunkt** und Reihenfolge trägt; diese Zuordnung gehört der Erhebung, nicht dem Item. Ein „Fragebogen" ist damit lediglich der informelle Sammelbegriff für die Items einer Erhebung samt ihren Andockpunkten.
 
-Es gibt genau **zwei Andockpunkte**: *nach jeder Vignettensitzung* oder *am Ende nach allen Vignettensitzungen*. Item-Typen sind vorerst nur **Freitext** und eine **sechsstufige Likert-Skala** („Stimme voll zu" … „Stimme gar nicht zu") — also ohne neutrale Mitte, mit erzwungener Tendenz.
+Es gibt genau **zwei Andockpunkte**: *nach jeder Vignettensitzung* oder *am Ende nach allen Vignettensitzungen*. Item-Typen sind vorerst nur **Freitext** und eine **sechsstufige Likert-Skala** — also ohne neutrale Mitte, mit erzwungener Tendenz. Ihre global festgelegte Kodierung steigt mit der Zustimmung: 1 = „Stimme gar nicht zu" bis 6 = „Stimme voll zu".
 
 Dieselbe Item-Fassung darf an beide Andockpunkte gebunden sein, je Andockpunkt aber höchstens einmal; die Zuordnung ist ihre Identität.
 
@@ -15,4 +15,4 @@ Dieselbe Item-Fassung darf an beide Andockpunkte gebunden sein, je Andockpunkt a
 - Der „Fragebogen-Editor" aus der Vision pflegt die Item-Bibliothek und deren Zuordnung zu Erhebungen, kein Fragebogen-Objekt.
 - Items sind versionierte Artefakte (ADR-0003): Der Wortlaut eines einmal eingesetzten Items kann nicht nachträglich mutieren.
 - Weitere Item-Typen (Single/Multiple Choice, Zahleneingabe) werden erst gebaut, wenn sie gebraucht werden.
-- Die sechsstufige Skala ohne Mitte ist eine methodische Festlegung, keine UI-Frage. Sie zu ändern, entwertet bereits erhobene Daten.
+- Die sechsstufige Skala ohne Mitte und ihre aufsteigende Kodierung sind methodische Festlegungen, keine UI-Frage. Sie zu ändern, entwertet bereits erhobene Daten.

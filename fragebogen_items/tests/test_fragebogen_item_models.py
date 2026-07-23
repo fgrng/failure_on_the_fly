@@ -221,11 +221,14 @@ class FragebogenItemSchreibnahtTests(TestCase):
 def test_likert_skalenpole_sind_global_und_nicht_pro_item_konfigurierbar() -> None:
     """Die sechs methodisch festgelegten Pole leben nicht an der Fassung."""
     assert list(LikertSkalenpol.values) == [
-        "Stimme voll zu",
-        "Stimme zu",
-        "Stimme eher zu",
-        "Stimme eher nicht zu",
-        "Stimme nicht zu",
         "Stimme gar nicht zu",
+        "Stimme nicht zu",
+        "Stimme eher nicht zu",
+        "Stimme eher zu",
+        "Stimme zu",
+        "Stimme voll zu",
     ]
+    for stufe, pol in enumerate(LikertSkalenpol, start=1):
+        assert LikertSkalenpol.fuer_stufe(stufe) == pol
+        assert LikertSkalenpol.stufe_fuer(pol) == stufe
     assert "skalenpole" not in {feld.name for feld in FragebogenItem._meta.fields}

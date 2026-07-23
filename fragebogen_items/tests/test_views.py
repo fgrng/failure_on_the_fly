@@ -556,15 +556,21 @@ class FragebogenItemLikertViewTests(TestCase):
             reverse("fragebogen_items:detail", args=[item.pk])
         )
 
-        for skalenpol in (
-            "Stimme voll zu",
-            "Stimme zu",
-            "Stimme eher zu",
-            "Stimme eher nicht zu",
-            "Stimme nicht zu",
+        skalenpole: tuple[str, ...] = (
             "Stimme gar nicht zu",
-        ):
+            "Stimme nicht zu",
+            "Stimme eher nicht zu",
+            "Stimme eher zu",
+            "Stimme zu",
+            "Stimme voll zu",
+        )
+        for skalenpol in skalenpole:
             self.assertContains(response, skalenpol)
+        inhalt: str = response.content.decode()
+        self.assertEqual(
+            [inhalt.index(skalenpol) for skalenpol in skalenpole],
+            sorted(inhalt.index(skalenpol) for skalenpol in skalenpole),
+        )
         self.assertNotContains(response, 'name="skalenpol"')
 
 

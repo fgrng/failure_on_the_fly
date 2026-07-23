@@ -94,7 +94,7 @@ archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
 löschen. Die Bibliothek zeigt nur Items aus dem eigenen Eigentümer-Kreis; dessen
 Ko-Autor:innen lassen sich direkt an der Item-Historie hinzufügen oder entfernen.
 Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
-Skalenstufen.
+Skalenstufen von 1 = „Stimme gar nicht zu" bis 6 = „Stimme voll zu".
 
 ## Lokale Entwicklungsumgebung
 

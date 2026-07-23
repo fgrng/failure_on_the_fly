@@ -14,12 +14,24 @@ if TYPE_CHECKING:
 class LikertSkalenpol(models.TextChoices):
     """Die global festgelegten sechs Pole der Likert-Skala."""
 
-    STIMME_VOLL_ZU = "Stimme voll zu", "Stimme voll zu"
-    STIMME_ZU = "Stimme zu", "Stimme zu"
-    STIMME_EHER_ZU = "Stimme eher zu", "Stimme eher zu"
-    STIMME_EHER_NICHT_ZU = "Stimme eher nicht zu", "Stimme eher nicht zu"
-    STIMME_NICHT_ZU = "Stimme nicht zu", "Stimme nicht zu"
     STIMME_GAR_NICHT_ZU = "Stimme gar nicht zu", "Stimme gar nicht zu"
+    STIMME_NICHT_ZU = "Stimme nicht zu", "Stimme nicht zu"
+    STIMME_EHER_NICHT_ZU = "Stimme eher nicht zu", "Stimme eher nicht zu"
+    STIMME_EHER_ZU = "Stimme eher zu", "Stimme eher zu"
+    STIMME_ZU = "Stimme zu", "Stimme zu"
+    STIMME_VOLL_ZU = "Stimme voll zu", "Stimme voll zu"
+
+    @classmethod
+    def fuer_stufe(cls, stufe: int) -> "LikertSkalenpol":
+        """Liefert den globalen Skalenpol einer Stufe von 1 bis 6."""
+        if not 1 <= stufe <= len(cls):
+            raise ValueError("Eine Likert-Stufe liegt zwischen 1 und 6.")
+        return list(cls)[stufe - 1]
+
+    @classmethod
+    def stufe_fuer(cls, pol: "LikertSkalenpol") -> int:
+        """Liefert die globale Stufe eines Skalenpols."""
+        return list(cls).index(pol) + 1
 
 
 class FragebogenItemHistorieQuerySet(models.QuerySet["FragebogenItemHistorie"]):
