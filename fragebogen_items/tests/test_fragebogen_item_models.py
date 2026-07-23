@@ -218,8 +218,8 @@ class FragebogenItemSchreibnahtTests(TestCase):
             FragebogenItem.objects.bulk_update([], ["wortlaut"])
 
 
-def test_likert_skalenpole_sind_global_und_nicht_pro_item_konfigurierbar() -> None:
-    """Die sechs methodisch festgelegten Pole leben nicht an der Fassung."""
+def test_likert_skalenpole_sind_aufsteigend_deklariert() -> None:
+    """Die sechs global festgelegten Pole steigen mit der Zustimmung."""
     assert list(LikertSkalenpol.values) == [
         "Stimme gar nicht zu",
         "Stimme nicht zu",
@@ -228,7 +228,20 @@ def test_likert_skalenpole_sind_global_und_nicht_pro_item_konfigurierbar() -> No
         "Stimme zu",
         "Stimme voll zu",
     ]
+
+
+def test_likert_skalenpol_wird_aus_seiner_stufe_abgeleitet() -> None:
+    """Jede Likert-Stufe verweist auf ihren globalen Skalenpol."""
     for stufe, pol in enumerate(LikertSkalenpol, start=1):
         assert LikertSkalenpol.fuer_stufe(stufe) == pol
+
+
+def test_likert_stufe_wird_aus_ihrem_skalenpol_abgeleitet() -> None:
+    """Jeder globale Likert-Skalenpol verweist auf seine Stufe."""
+    for stufe, pol in enumerate(LikertSkalenpol, start=1):
         assert LikertSkalenpol.stufe_fuer(pol) == stufe
+
+
+def test_likert_skalenpole_sind_nicht_pro_item_konfigurierbar() -> None:
+    """Die sechs methodisch festgelegten Pole leben nicht an der Fassung."""
     assert "skalenpole" not in {feld.name for feld in FragebogenItem._meta.fields}

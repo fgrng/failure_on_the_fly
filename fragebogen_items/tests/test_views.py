@@ -542,18 +542,20 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 class FragebogenItemLikertViewTests(TestCase):
     """Likert-Items zeigen ihre global festgelegte Skala nur lesend."""
 
-    def test_detail_zeigt_alle_globalen_likert_stufen_ohne_eingabefelder(self) -> None:
-        """Die Skalenpole sind sichtbar, aber am Item nicht konfigurierbar."""
+    def setUp(self) -> None:
+        """Meldet eine Forschende mit einem Likert-Item an."""
         ada: Konto = _forschende("ada")
-        item: FragebogenItem = FragebogenItem.objects.anlegen(
+        self.item: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             typ=FragebogenItem.Typ.LIKERT,
             wortlaut="Ich fühle mich sicher.",
         )
         self.client.force_login(ada)
 
+    def test_detail_zeigt_die_likert_stufen_aufsteigend(self) -> None:
+        """Die sichtbare Reihenfolge entspricht den globalen Stufennummern."""
         response: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[item.pk])
+            reverse("fragebogen_items:detail", args=[self.item.pk])
         )
 
         skalenpole: tuple[str, ...] = (
@@ -564,13 +566,16 @@ class FragebogenItemLikertViewTests(TestCase):
             "Stimme zu",
             "Stimme voll zu",
         )
-        for skalenpol in skalenpole:
-            self.assertContains(response, skalenpol)
         inhalt: str = response.content.decode()
-        self.assertEqual(
-            [inhalt.index(skalenpol) for skalenpol in skalenpole],
-            sorted(inhalt.index(skalenpol) for skalenpol in skalenpole),
+        positionen: list[int] = [inhalt.index(skalenpol) for skalenpol in skalenpole]
+        self.assertEqual(positionen, sorted(positionen))
+
+    def test_detail_enthaelt_keine_eingabefelder_fuer_skalenpole(self) -> None:
+        """Die globalen Skalenpole sind am Item nicht konfigurierbar."""
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
         )
+
         self.assertNotContains(response, 'name="skalenpol"')
 
 
