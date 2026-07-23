@@ -49,7 +49,8 @@ vollständig nutzbar.
 Nach jeder beendeten Sitzung erscheinen ihre freiwilligen Fragebogen-Items direkt
 unter dem Verlauf; sie können beantwortet oder übersprungen werden, bevor die
 nächste Vignette beginnt. Nach der letzten Sitzung folgen zusätzlich die
-freiwilligen Abschluss-Items als eigene Seite. Jede Item-Antwort wird sofort
+freiwilligen Fragebogen-Items am Andockpunkt `am Ende` als eigene Seite. Jede
+Item-Antwort wird sofort
 gespeichert, und auch übersprungene Fragebogen-Items bleiben als vorgelegt
 dokumentiert. Anschließend endet die Teilnahme mit dem Abschlusstext.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung

@@ -527,20 +527,6 @@ def _persistierten_fehler_anzeigen(
     )
 
 
-def _gescheitertes_gespraech_anzeigen(
-    request: HttpRequest,
-    sitzung: Sitzung,
-    navigation: Sitzungsnavigation | None,
-    anhang: str | None,
-    anhang_bei_scheitern: Callable[[], str] | None,
-) -> HttpResponse:
-    # Rendert eine gescheiterte Sitzung mit ihrem gegebenenfalls erzeugten Anhang.
-
-    if anhang_bei_scheitern is not None:
-        anhang = anhang_bei_scheitern()
-    return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
-
-
 def _persistiertes_gespraech_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
@@ -586,7 +572,6 @@ def persistiertes_gespraech(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation | None = None,
-    anhang_bei_scheitern: Callable[[], str] | None = None,
     anhang: str | None = None,
 ) -> HttpResponse:
     """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus."""
@@ -597,9 +582,7 @@ def persistiertes_gespraech(
         return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
     schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _gescheitertes_gespraech_anzeigen(
-            request, sitzung, navigation, anhang, anhang_bei_scheitern
-        )
+        return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _persistiertes_gespraech_anzeigen(
             request, sitzung, schritte, ist_lesend=True, navigation=navigation, anhang=anhang
@@ -620,9 +603,7 @@ def persistiertes_gespraech(
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
-        return _gescheitertes_gespraech_anzeigen(
-            request, sitzung, navigation, anhang, anhang_bei_scheitern
-        )
+        return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if _budget_erschoepft(request, sitzung):
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     _zeitbudget_fortsetzen(request, sitzung)

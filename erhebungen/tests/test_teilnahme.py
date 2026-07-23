@@ -126,7 +126,7 @@ class ErhebungsteilnahmeTests(TestCase):
         wortlaut: str = "Wie war die Sitzung?",
         position: int = 1,
     ) -> Erhebungsitem:
-        """Ordnet ein finales Item am Ende der Erhebung ein."""
+        """Ordnet ein finales Fragebogen-Item am Ende der Erhebung ein."""
 
         item = FragebogenItem.objects.anlegen(
             self.erhebung.eigentuemerin,
@@ -141,8 +141,10 @@ class ErhebungsteilnahmeTests(TestCase):
             position=position,
         )
 
-    def _sitzungs_item_anlegen(self, wortlaut: str = "Wie war die Sitzung?") -> None:
-        # Ordnet ein finales Item nach jeder Vignettensitzung ein.
+    def _fragebogen_item_nach_sitzung_anlegen(
+        self, wortlaut: str = "Wie war die Sitzung?"
+    ) -> None:
+        # Ordnet ein finales Fragebogen-Item nach jeder Vignettensitzung ein.
 
         item: FragebogenItem = FragebogenItem.objects.anlegen(
             self.erhebung.eigentuemerin,
@@ -522,8 +524,10 @@ class ErhebungsteilnahmeTests(TestCase):
             ["Fertig", None],
         )
 
-    def test_token_endpunkt_speichert_auch_sitzungsbezogene_itemantwort(self) -> None:
-        """Derselbe Endpunkt schreibt über die Antwortzeile ohne Sitzungsparameter."""
+    def test_token_endpunkt_sperrt_sitzungsblock_ausserhalb_seines_besuchs(
+        self,
+    ) -> None:
+        """Eine Sitzungsblock-Antwort ist ohne den beendenden Besuch gesperrt."""
 
         self._vignette_anlegen()
         item = FragebogenItem.objects.anlegen(
@@ -552,9 +556,9 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
 
-        self.assertEqual(antwort.status_code, 200)
+        self.assertEqual(antwort.status_code, 400)
         itemantwort.refresh_from_db()
-        self.assertEqual(itemantwort.freitext, "Hilfreich")
+        self.assertIsNone(itemantwort.freitext)
 
     def test_itemantwort_bleibt_nach_zeitraumende_unangetastet(self) -> None:
         """Nach dem harten Zeitfenster schreibt auch der Token-Endpunkt nichts."""
@@ -703,11 +707,13 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
 
-    def test_debrief_zeigt_sitzungs_items_unter_dem_verlauf(self) -> None:
+    def test_debrief_zeigt_fragebogen_items_unter_dem_verlauf(self) -> None:
         """Die Diagnose schließt die Sitzung und ergänzt ihren Itemblock in-place."""
 
         self._vignette_anlegen()
-        self._sitzungs_item_anlegen("Wie hilfreich war das Gespräch?")
+        self._fragebogen_item_nach_sitzung_anlegen(
+            "Wie hilfreich war das Gespräch?"
+        )
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -723,12 +729,13 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(itemantwort.sitzung_id, Sitzung.objects.get().pk)
         self.assertIsNone(itemantwort.freitext)
 
-    def test_sitzungsblock_weiter_startet_die_naechste_vignette(self) -> None:
-        """Ein übersprungener Sitzungsblock setzt die Erhebung sofort fort."""
+    def test_zwei_vignetten_fuehren_ueber_ihre_bloecke_zum_abschluss(self) -> None:
+        """Die Blockfolge reicht über zwei Sitzungen bis zum Abschluss."""
 
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
-        self._sitzungs_item_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
+        self._abschluss_item_anlegen(wortlaut="Wie war die Erhebung?")
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -748,18 +755,47 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.assertEqual(Sitzung.objects.count(), 2)
         zweite_sitzung: Sitzung = Sitzung.objects.get(status=Sitzung.Status.LAUFEND)
-        self.client.post(
+        zweiter_block: HttpResponse = self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler", "sitzung_pk": zweite_sitzung.pk},
         )
 
-        antworten: list[ItemAntwort] = list(ItemAntwort.objects.order_by("sitzung"))
-
-        self.assertEqual(len(antworten), 2)
+        sitzungsantworten: list[ItemAntwort] = list(
+            ItemAntwort.objects.exclude(sitzung=None).order_by("sitzung")
+        )
+        self.assertContains(zweiter_block, "Wie war die Sitzung?")
+        self.assertEqual(len(sitzungsantworten), 2)
         self.assertEqual(
-            {antwort.sitzung_id for antwort in antworten},
+            {antwort.sitzung_id for antwort in sitzungsantworten},
             set(Sitzung.objects.values_list("pk", flat=True)),
         )
+        zum_abschlussblock = self.client.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {
+                "antwort": ItemAntwort.objects.get(sitzung=zweite_sitzung).pk,
+                "weiter": "ja",
+            },
+        )
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.assertRedirects(
+            zum_abschlussblock, block_url, fetch_redirect_response=False
+        )
+        abschlussblock = self.client.get(block_url)
+        self.assertContains(abschlussblock, "Wie war die Erhebung?")
+        abschlussantwort = ItemAntwort.objects.get(sitzung=None)
+        zum_abschluss = self.client.post(
+            block_url, {"antwort": abschlussantwort.pk, "weiter": "ja"}
+        )
+        abschluss_url = reverse(
+            "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
+        )
+        self.assertRedirects(
+            zum_abschluss, abschluss_url, fetch_redirect_response=False
+        )
+        self.assertEqual(self.client.get(abschluss_url).status_code, 200)
+        bindung.refresh_from_db()
+        self.assertIsNotNone(bindung.abgeschlossen_am)
+        self.assertEqual(ItemAntwort.objects.count(), 3)
 
     def test_htmx_debrief_fuegt_den_sitzungsblock_ins_fortsetzungsfragment_ein(
         self,
@@ -767,7 +803,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Der Itemblock reist mit dem HTMX-Swap der Sitzungsfortsetzung mit."""
 
         self._vignette_anlegen()
-        self._sitzungs_item_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -784,7 +820,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
-        self._sitzungs_item_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -797,17 +833,21 @@ class ErhebungsteilnahmeTests(TestCase):
         )
 
         wiedereinstieg: HttpResponse = self.client.get(self.url)
-        weiter: HttpResponse = self.client.post(
+        spaete_antwort: HttpResponse = self.client.post(
             reverse("erhebungen:itemblock", args=[bindung.token]),
-            {"antwort": itemantwort.pk, "weiter": "ja"},
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Zu spät",
+            },
         )
 
         self.assertRedirects(
             wiedereinstieg,
-            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+            reverse("erhebungen:gespraech", args=[bindung.token]),
             fetch_redirect_response=False,
         )
-        self.assertEqual(weiter.status_code, 400)
+        self.assertEqual(Sitzung.objects.count(), 2)
+        self.assertEqual(spaete_antwort.status_code, 400)
         itemantwort.refresh_from_db()
         self.assertEqual(itemantwort.freitext, "Hilfreich")
 
@@ -815,7 +855,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Der aktive Abbruch bleibt bei der beendeten Sitzung mit ihren Items."""
 
         self._vignette_anlegen()
-        self._sitzungs_item_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -845,7 +885,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
         self._vignette_anlegen()
-        self._sitzungs_item_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(

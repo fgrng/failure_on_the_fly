@@ -700,9 +700,14 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         _sitzungsblock_besuch_vergessen(request, bindung.token)
         if bindung.abgeschlossen_am is not None:
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
-        if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
-            return redirect("erhebungen:itemblock", token=bindung.token)
-        return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
+        sitzungen = Sitzung.objects.filter(teilnahme=bindung.teilnahme)
+        if sitzungen.filter(status=Sitzung.Status.LAUFEND).exists():
+            return redirect("erhebungen:gespraech", token=bindung.token)
+        if not sitzungen.exists():
+            return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
+        if _naechste_sitzung_starten(bindung, stichprobe.erhebung):
+            return redirect("erhebungen:gespraech", token=bindung.token)
+        return _weiter_nach_der_letzten_vignette(bindung)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
 
 
@@ -850,11 +855,15 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
 
     sitzung, bindung = _erhebungssitzung(token)
+    antwort = persistiertes_gespraech(request, sitzung, _sitzungsnavigation(token))
+    sitzung.refresh_from_db(fields=["status"])
+    if sitzung.status != Sitzung.Status.GESCHEITERT:
+        return antwort
     return persistiertes_gespraech(
         request,
         sitzung,
         _sitzungsnavigation(token),
-        anhang_bei_scheitern=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
+        anhang=_sitzungsblock_rendern(request, bindung, sitzung),
     )
 
 
@@ -943,10 +952,15 @@ def _sitzungsblock_besuch_vergessen(request: HttpRequest, token: str) -> None:
         request.session[_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY] = sitzungen
 
 
-def _sitzungsblock_ist_im_besuch(request: HttpRequest, token: str, pk: int) -> bool:
+def _sitzungsblock_ist_im_besuch(
+    request: HttpRequest, token: str, sitzung_pk: int
+) -> bool:
     # Prüft, ob der Block in diesem Browserbesuch unter der Sitzung erschien.
 
-    return request.session.get(_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}).get(token) == pk
+    return (
+        request.session.get(_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}).get(token)
+        == sitzung_pk
+    )
 
 
 def itemblock(request: HttpRequest, token: str) -> HttpResponse:
@@ -997,6 +1011,14 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         )
         if len(antworten) != len(antwort_ids):
             return HttpResponseBadRequest("Unbekannte Item-Antwort.")
+        sitzung_ids = {antwort.sitzung_id for antwort in antworten}
+        sitzung_pk: int | None = None
+        if any(pk is not None for pk in sitzung_ids):
+            if len(sitzung_ids) != 1 or None in sitzung_ids:
+                return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
+            sitzung_pk = sitzung_ids.pop()
+            if not _sitzungsblock_ist_im_besuch(request, token, sitzung_pk):
+                return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
         for antwort in antworten:
             feld = f"item_{antwort.pk}"
             if feld not in request.POST:
@@ -1018,13 +1040,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         if "weiter" in request.POST:
             if not antwort_ids:
                 return HttpResponseBadRequest("Unbekannter Itemblock.")
-            if any(antwort.sitzung_id is not None for antwort in antworten):
-                sitzung_ids = {antwort.sitzung_id for antwort in antworten}
-                if len(sitzung_ids) != 1 or None in sitzung_ids:
-                    return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
-                sitzung_pk = sitzung_ids.pop()
-                if not _sitzungsblock_ist_im_besuch(request, token, sitzung_pk):
-                    return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
+            if sitzung_pk is not None:
                 _sitzungsblock_besuch_vergessen(request, token)
                 if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
                     return redirect("erhebungen:gespraech", token=bindung.token)
