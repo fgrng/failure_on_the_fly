@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sitzungen.models import Teilnahme
+from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 from .models import Erhebungsbindung, Erhebungsitem, ItemAntwort
@@ -19,7 +19,9 @@ class Itemblock:
 
 
 def block_vorlegen(
-    bindung: Erhebungsbindung, andockpunkt: str, sitzung: object | None = None
+    bindung: Erhebungsbindung,
+    andockpunkt: str,
+    sitzung: Sitzung | None = None,
 ) -> list[ItemAntwort]:
     """Legt die Antwortzeilen eines Blocks einmalig an."""
 

@@ -759,9 +759,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
     if not _naechste_sitzung_starten(bindung, stichprobe.erhebung):
-        if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
-            return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
-        return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+        return _weiter_nach_der_letzten_vignette(bindung)
     return redirect("erhebungen:gespraech", token=bindung.token)
 
 
@@ -785,6 +783,15 @@ def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> 
             position=position,
         )
     return True
+
+
+def _weiter_nach_der_letzten_vignette(binding: Erhebungsbindung) -> HttpResponse:
+    """Leitet zum Abschluss-Block oder zum Abschluss der Erhebung weiter."""
+
+    teilnahme_link: UUID = binding.stichprobe.teilnahme_link
+    if isinstance(naechster_schritt(binding.teilnahme), Itemblock):
+        return redirect("erhebungen:itemblock", teilnahme_link=teilnahme_link)
+    return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
 
 
 def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
@@ -882,11 +889,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
     if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
         return redirect("erhebungen:gespraech", token=bindung.token)
-    if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
-        return redirect(
-            "erhebungen:itemblock", teilnahme_link=bindung.stichprobe.teilnahme_link
-        )
-    return redirect("erhebungen:abschluss", teilnahme_link=bindung.stichprobe.teilnahme_link)
+    return _weiter_nach_der_letzten_vignette(bindung)
 
 
 def itemblock(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:

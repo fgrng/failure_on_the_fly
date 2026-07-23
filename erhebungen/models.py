@@ -623,10 +623,14 @@ class ItemAntwort(models.Model):
             raise ValidationError(fehler)
 
     def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur Antworten mit konsistenten Bezügen und Werten."""
+
         self.clean()
         super().save(*args, **kwargs)
 
     class Meta:
+        """Schützt Antwortzeilen und ihre optionalen Werte auf Datenbankebene."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["erhebungsbindung", "erhebungsitem", "sitzung"],
