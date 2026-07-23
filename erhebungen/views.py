@@ -913,15 +913,13 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
 def _sitzungsblock_rendern(
     request: HttpRequest, bindung: Erhebungsbindung, sitzung: Sitzung
 ) -> str:
-    """Rendert die Item-Antwortzeilen unter einer beendeten Sitzung."""
+    # Rendert die Item-Antwortzeilen unter einer beendeten Sitzung.
 
-    if not bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
-        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG
-    ).exists():
-        return ""
-    antworten = block_vorlegen(
+    antworten: list[ItemAntwort] = block_vorlegen(
         bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
     )
+    if not antworten:
+        return ""
     sitzungen: dict[str, int] = request.session.get(
         _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
     )
@@ -935,7 +933,7 @@ def _sitzungsblock_rendern(
 
 
 def _sitzungsblock_besuch_vergessen(request: HttpRequest, token: str) -> None:
-    """Verwirft den nur für den gerenderten Sitzungs-Block gültigen Besuch."""
+    # Verwirft den nur für den gerenderten Sitzungs-Block gültigen Besuch.
 
     sitzungen: dict[str, int] = request.session.get(
         _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
@@ -946,7 +944,7 @@ def _sitzungsblock_besuch_vergessen(request: HttpRequest, token: str) -> None:
 
 
 def _sitzungsblock_ist_im_besuch(request: HttpRequest, token: str, pk: int) -> bool:
-    """Prüft, ob der Block in diesem Browserbesuch unter der Sitzung erschien."""
+    # Prüft, ob der Block in diesem Browserbesuch unter der Sitzung erschien.
 
     return request.session.get(_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}).get(token) == pk
 
