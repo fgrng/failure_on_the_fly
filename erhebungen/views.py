@@ -67,6 +67,12 @@ _BADGE_BESCHRIFTUNGEN: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: "schon nach jeder Sitzung",
     Erhebungsitem.Andockpunkt.AM_ENDE: "schon am Ende",
 }
+_ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, str] = {
+    "a": "A · Skalenband",
+    "b": "B · Entscheidungsleiter",
+    "c": "C · Antwortkarten",
+    "vergleich": "Vergleich · alle Varianten",
+}
 P = ParamSpec("P")
 
 
@@ -87,6 +93,31 @@ def _forschende_erforderlich(
         return view(request, *args, **kwargs)
 
     return geschuetzte_view
+
+
+def itemseite_prototype(request: HttpRequest) -> HttpResponse:
+    """Zeigt drei rein statische Varianten der Teilnehmer:innen-Itemseite.
+
+    Prototype #135: Drei Varianten der Itemseite, schaltbar via ?variant=a|b|c.
+    """
+
+    variante: str = request.GET.get("variant", "a")
+    if variante not in _ITEMSEITEN_PROTOTYP_VARIANTEN:
+        variante = "a"
+    return render(
+        request,
+        "erhebungen/prototype_itemseite.html",
+        {
+            "variante": variante,
+            "variantenbezeichnung": _ITEMSEITEN_PROTOTYP_VARIANTEN[variante],
+            "vorherige_variante": {"a": "c", "b": "a", "c": "b"}.get(
+                variante, "c"
+            ),
+            "naechste_variante": {"a": "b", "b": "c", "c": "a"}.get(
+                variante, "a"
+            ),
+        },
+    )
 
 
 def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:

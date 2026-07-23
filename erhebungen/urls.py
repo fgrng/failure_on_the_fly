@@ -8,6 +8,11 @@ from . import views
 app_name: str = "erhebungen"
 
 urlpatterns: list[URLPattern] = [
+    path(
+        "prototype/itemseite/",
+        views.itemseite_prototype,
+        name="itemseite_prototype",
+    ),
     path("eigene/", views.liste, name="liste"),
     path("eigene/anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.detail, name="detail"),

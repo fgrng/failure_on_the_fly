@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Prototyp · Itemseite{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/itemseite-prototype.css' %}">
+    <script src="{% static 'js/itemseite-prototype.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+{# Prototype #135: Drei Varianten der Itemseite, schaltbar via ?variant=a|b|c. #}
+<article class="item-prototype" data-variant="{{ variante }}">
+    <header class="item-prototype__kopf">
+        <p>Prototype · keine Speicherung</p>
+        <h1>Fragen nach einer Sitzung</h1>
+        <span>Alle Beispiele zeigen freiwillige Fragebogen-Items.</span>
+    </header>
+
+    <div class="item-prototype__variantenvergleich">
+    {% if variante == "a" or variante == "vergleich" %}
+    <div class="item-prototype__variante">
+        <section class="item-prototype__sitzung" aria-labelledby="sitzung-a">
+            <p class="item-prototype__kontext">Nach der Vignettensitzung · unter dem Debrief</p>
+            <h2 id="sitzung-a">Die erfahrene Lehrperson fragt nach Ihrer Diagnose.</h2>
+            <p class="item-prototype__debrief">Vielen Dank. Bevor Sie fortfahren, können Sie noch zwei kurze Fragen beantworten.</p>
+            <div class="skalenband">
+                <section class="prototype-item prototype-item--offen">
+                    <header><span>Likert</span><small>Noch nicht beantwortet · optional</small></header>
+                    <h3>Das Gespräch hat mir geholfen, das Fehlermuster zu verstehen.</h3>
+                    <div class="skalenband__pole"><span>Stimme gar nicht zu</span><span>Stimme voll zu</span></div>
+                    <div class="skalenband__stufen" aria-label="Likert-Skala, nicht beantwortet">
+                        {% for stufe in "123456" %}<span>{{ stufe }}</span>{% endfor %}
+                    </div>
+                </section>
+                <section class="prototype-item prototype-item--gerade">
+                    <header><span>Freitext</span><small>Gerade beantwortet · wird gespeichert …</small></header>
+                    <h3>Was war für Sie im Gespräch besonders aufschlussreich?</h3>
+                    <p class="prototype-item__eingabe">Mias Begründung für die Rechnung.</p>
+                </section>
+            </div>
+        </section>
+        <section class="item-prototype__abschluss" aria-labelledby="ende-a">
+            <p class="item-prototype__kontext">Am Ende der Erhebung · eigene Seite</p>
+            <h2 id="ende-a">Zum Abschluss</h2>
+            <section class="prototype-item prototype-item--gespeichert">
+                <header><span>Likert</span><small>Gespeichert</small></header>
+                <h3>Ich würde die Erhebung weiterempfehlen.</h3>
+                <div class="skalenband__pole"><span>Stimme gar nicht zu</span><span>Stimme voll zu</span></div>
+                <div class="skalenband__stufen skalenband__stufen--antwort"><span>1</span><span>2</span><span>3</span><span>4</span><strong>5</strong><span>6</span></div>
+                <button type="button" class="prototype-item__aktion">Antwort zurücknehmen</button>
+            </section>
+            <section class="prototype-item prototype-item--zurueckgenommen">
+                <header><span>Freitext</span><small>Antwort zurückgenommen · optional</small></header>
+                <h3>Gibt es noch etwas, das Sie uns mitteilen möchten?</h3>
+                <p class="prototype-item__leer">Keine Antwort</p>
+            </section>
+        </section>
+    </div>
+    {% endif %}
+    {% if variante == "b" or variante == "vergleich" %}
+    <div class="item-prototype__variante">
+        <section class="leiter-layout" aria-labelledby="sitzung-b">
+            <div class="leiter-layout__verlauf">
+                <p class="item-prototype__kontext">Nach der Vignettensitzung · unter dem Debrief</p>
+                <h2 id="sitzung-b">Ihre Sitzung ist abgeschlossen.</h2>
+                <p class="item-prototype__debrief">Die Diagnose wurde festgehalten.</p>
+            </div>
+            <div class="leiter-layout__items">
+                <section class="prototype-item prototype-item--offen">
+                    <header><span>Likert</span><small>Noch nicht beantwortet · optional</small></header>
+                    <h3>Das Gespräch hat mir geholfen, das Fehlermuster zu verstehen.</h3>
+                    <ol class="entscheidungsleiter"><li>1 · Stimme gar nicht zu</li><li>2</li><li>3</li><li>4</li><li>5</li><li>6 · Stimme voll zu</li></ol>
+                </section>
+                <section class="prototype-item prototype-item--gerade">
+                    <header><span>Freitext</span><small>Gerade beantwortet · wird gespeichert …</small></header>
+                    <h3>Was war für Sie im Gespräch besonders aufschlussreich?</h3>
+                    <p class="prototype-item__eingabe">Mias Begründung für die Rechnung.</p>
+                </section>
+            </div>
+        </section>
+        <section class="leiter-abschluss" aria-labelledby="ende-b">
+            <p class="item-prototype__kontext">Am Ende der Erhebung · eigene Seite</p>
+            <h2 id="ende-b">Ihre Rückmeldung</h2>
+            <section class="prototype-item prototype-item--gespeichert">
+                <header><span>Likert</span><small>Gespeichert</small></header>
+                <h3>Ich würde die Erhebung weiterempfehlen.</h3>
+                <ol class="entscheidungsleiter"><li>1 · Stimme gar nicht zu</li><li>2</li><li>3</li><li>4</li><li class="entscheidungsleiter__aktiv">5</li><li>6 · Stimme voll zu</li></ol>
+                <button type="button" class="prototype-item__aktion">Antwort zurücknehmen</button>
+            </section>
+            <section class="prototype-item prototype-item--zurueckgenommen">
+                <header><span>Freitext</span><small>Antwort zurückgenommen · optional</small></header>
+                <h3>Gibt es noch etwas, das Sie uns mitteilen möchten?</h3>
+                <p class="prototype-item__leer">Keine Antwort</p>
+            </section>
+        </section>
+    </div>
+    {% endif %}
+    {% if variante == "c" or variante == "vergleich" %}
+    <div class="item-prototype__variante">
+        <section class="karten-layout" aria-labelledby="sitzung-c">
+            <div class="karten-layout__kopf">
+                <p class="item-prototype__kontext">Nach der Vignettensitzung · unter dem Debrief</p>
+                <h2 id="sitzung-c">Ein kurzer Moment für Ihre Rückmeldung</h2>
+                <p>Sie können alle Fragen auslassen und direkt fortfahren.</p>
+            </div>
+            <section class="prototype-item prototype-item--offen">
+                <header><span>Likert</span><small>Noch nicht beantwortet · optional</small></header>
+                <h3>Das Gespräch hat mir geholfen, das Fehlermuster zu verstehen.</h3>
+                <div class="antwortkarten" aria-label="Likert-Skala, nicht beantwortet"><span>1<small>gar nicht</small></span><span>2</span><span>3</span><span>4</span><span>5</span><span>6<small>voll</small></span></div>
+            </section>
+            <section class="prototype-item prototype-item--gerade">
+                <header><span>Freitext</span><small>Gerade beantwortet · wird gespeichert …</small></header>
+                <h3>Was war für Sie im Gespräch besonders aufschlussreich?</h3>
+                <p class="prototype-item__eingabe">Mias Begründung für die Rechnung.</p>
+            </section>
+        </section>
+        <section class="karten-abschluss" aria-labelledby="ende-c">
+            <p class="item-prototype__kontext">Am Ende der Erhebung · eigene Seite</p>
+            <h2 id="ende-c">Fast geschafft</h2>
+            <div class="karten-abschluss__grid">
+                <section class="prototype-item prototype-item--gespeichert">
+                    <header><span>Likert</span><small>Gespeichert</small></header>
+                    <h3>Ich würde die Erhebung weiterempfehlen.</h3>
+                    <div class="antwortkarten"><span>1<small>gar nicht</small></span><span>2</span><span>3</span><span>4</span><strong>5</strong><span>6<small>voll</small></span></div>
+                    <button type="button" class="prototype-item__aktion">Antwort zurücknehmen</button>
+                </section>
+                <section class="prototype-item prototype-item--zurueckgenommen">
+                    <header><span>Freitext</span><small>Antwort zurückgenommen · optional</small></header>
+                    <h3>Gibt es noch etwas, das Sie uns mitteilen möchten?</h3>
+                    <p class="prototype-item__leer">Keine Antwort</p>
+                </section>
+            </div>
+        </section>
+    </div>
+    {% endif %}
+    </div>
+</article>
+
+<nav class="prototype-switcher" aria-label="Prototyp-Variante wechseln" data-current="{{ variante }}" data-vorherige="{{ vorherige_variante }}" data-naechste="{{ naechste_variante }}">
+    <a class="prototype-switcher__pfeil prototype-switcher__zurueck" href="?variant={{ vorherige_variante }}" aria-label="Vorherige Variante">←</a>
+    <span>{{ variantenbezeichnung }}</span>
+    <a class="prototype-switcher__pfeil prototype-switcher__vor" href="?variant={{ naechste_variante }}" aria-label="Nächste Variante">→</a>
+</nav>
+{% endblock %}
