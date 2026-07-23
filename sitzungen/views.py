@@ -85,6 +85,7 @@ def _sitzung_anzeigen(
     spracheingabe_verfuegbar: bool = False,
     navigation: Sitzungsnavigation | None = None,
     sitzung_pk: int | None = None,
+    anhang: str | None = None,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -104,6 +105,7 @@ def _sitzung_anzeigen(
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
         "navigation": navigation or sitzungsnavigation(ist_probelauf),
         "sitzung_pk": sitzung_pk,
+        "anhang": anhang,
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
@@ -489,6 +491,7 @@ def persistierten_debrief_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation | None = None,
+    anhang: str | None = None,
 ) -> HttpResponse:
     # Rendert den Debrief einer persistierten Sitzung.
 
@@ -502,6 +505,7 @@ def persistierten_debrief_anzeigen(
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sitzung.pk,
+        anhang=anhang,
     )
 
 
@@ -509,6 +513,7 @@ def _persistierten_fehler_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation | None = None,
+    anhang: str | None = None,
 ) -> HttpResponse:
     # Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung.
 
@@ -518,6 +523,7 @@ def _persistierten_fehler_anzeigen(
         _persistierte_schritte(sitzung),
         ist_gescheitert=True,
         navigation=navigation,
+        anhang=anhang,
     )
 
 
@@ -527,7 +533,9 @@ def _persistiertes_gespraech_anzeigen(
     schritte: QuerySet[Gespraechsschritt],
     *,
     ist_gescheitert: bool = False,
+    ist_lesend: bool = False,
     navigation: Sitzungsnavigation | None = None,
+    anhang: str | None = None,
 ) -> HttpResponse:
     # Rendert eine persistierte Sitzung in der gemeinsamen Sitzungsansicht.
 
@@ -538,9 +546,11 @@ def _persistiertes_gespraech_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=False,
         ist_gescheitert=ist_gescheitert,
+        ist_lesend=ist_lesend,
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sitzung.pk,
+        anhang=anhang,
     )
 
 
@@ -562,16 +572,24 @@ def persistiertes_gespraech(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation | None = None,
+    anhang_bei_scheitern: Callable[[], str] | None = None,
+    anhang: str | None = None,
 ) -> HttpResponse:
     """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus."""
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
-        return persistierten_debrief_anzeigen(request, sitzung, navigation)
+        return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
     schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return _persistierten_fehler_anzeigen(request, sitzung, navigation)
+        if anhang_bei_scheitern is not None:
+            anhang = anhang_bei_scheitern()
+        return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
+    if sitzung.status == Sitzung.Status.ABGEBROCHEN:
+        return _persistiertes_gespraech_anzeigen(
+            request, sitzung, schritte, ist_lesend=True, navigation=navigation, anhang=anhang
+        )
     if request.method == "GET":
         _zeitbudget_fortsetzen(request, sitzung)
         return _persistiertes_gespraech_anzeigen(
@@ -588,7 +606,9 @@ def persistiertes_gespraech(
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
-        return _persistierten_fehler_anzeigen(request, sitzung, navigation)
+        if anhang_bei_scheitern is not None:
+            anhang = anhang_bei_scheitern()
+        return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if _budget_erschoepft(request, sitzung):
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     _zeitbudget_fortsetzen(request, sitzung)

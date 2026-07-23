@@ -17,6 +17,7 @@ from django.http import (
     HttpResponseNotAllowed,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -48,6 +49,7 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
+_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
 _FORSCHENDE_GRUPPE: str = "Forschende:r"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
@@ -695,6 +697,7 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
+        _sitzungsblock_besuch_vergessen(request, bindung.token)
         if bindung.abgeschlossen_am is not None:
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
         if isinstance(naechster_schritt(bindung.teilnahme), Itemblock):
@@ -846,8 +849,13 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
 def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
 
-    sitzung, _bindung = _erhebungssitzung(token)
-    return persistiertes_gespraech(request, sitzung, _sitzungsnavigation(token))
+    sitzung, bindung = _erhebungssitzung(token)
+    return persistiertes_gespraech(
+        request,
+        sitzung,
+        _sitzungsnavigation(token),
+        anhang_bei_scheitern=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
+    )
 
 
 def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
@@ -868,6 +876,11 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     sitzung, bindung = _erhebungssitzung(token)
     zeitbudget_anhalten(request, sitzung)
     DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    anhang = _sitzungsblock_rendern(request, bindung, sitzung)
+    if anhang:
+        return persistiertes_gespraech(
+            request, sitzung, _sitzungsnavigation(token), anhang=anhang
+        )
     return redirect(
         "erhebungen:instruktion", teilnahme_link=bindung.stichprobe.teilnahme_link
     )
@@ -887,9 +900,55 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         if sitzung.status != Sitzung.Status.LAUFEND:
             return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    anhang = _sitzungsblock_rendern(request, bindung, sitzung)
+    if anhang:
+        return persistierten_debrief_anzeigen(
+            request, sitzung, _sitzungsnavigation(token), anhang
+        )
     if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
         return redirect("erhebungen:gespraech", token=bindung.token)
     return _weiter_nach_der_letzten_vignette(bindung)
+
+
+def _sitzungsblock_rendern(
+    request: HttpRequest, bindung: Erhebungsbindung, sitzung: Sitzung
+) -> str:
+    """Rendert die Item-Antwortzeilen unter einer beendeten Sitzung."""
+
+    if not bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG
+    ).exists():
+        return ""
+    antworten = block_vorlegen(
+        bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
+    )
+    sitzungen: dict[str, int] = request.session.get(
+        _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
+    )
+    sitzungen[bindung.token] = sitzung.pk
+    request.session[_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY] = sitzungen
+    return render_to_string(
+        "erhebungen/includes/itemblock_form.html",
+        {"antworten": antworten, "token": bindung.token},
+        request=request,
+    )
+
+
+def _sitzungsblock_besuch_vergessen(request: HttpRequest, token: str) -> None:
+    """Verwirft den nur für den gerenderten Sitzungs-Block gültigen Besuch."""
+
+    sitzungen: dict[str, int] = request.session.get(
+        _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
+    )
+    if token in sitzungen:
+        del sitzungen[token]
+        request.session[_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY] = sitzungen
+
+
+def _sitzungsblock_ist_im_besuch(request: HttpRequest, token: str, pk: int) -> bool:
+    """Prüft, ob der Block in diesem Browserbesuch unter der Sitzung erschien."""
+
+    return request.session.get(_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}).get(token) == pk
 
 
 def itemblock(request: HttpRequest, token: str) -> HttpResponse:
@@ -961,9 +1020,19 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         if "weiter" in request.POST:
             if not antwort_ids:
                 return HttpResponseBadRequest("Unbekannter Itemblock.")
+            if any(antwort.sitzung_id is not None for antwort in antworten):
+                sitzung_ids = {antwort.sitzung_id for antwort in antworten}
+                if len(sitzung_ids) != 1 or None in sitzung_ids:
+                    return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
+                sitzung_pk = sitzung_ids.pop()
+                if not _sitzungsblock_ist_im_besuch(request, token, sitzung_pk):
+                    return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
+                _sitzungsblock_besuch_vergessen(request, token)
+                if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
+                    return redirect("erhebungen:gespraech", token=bindung.token)
+                return _weiter_nach_der_letzten_vignette(bindung)
             if any(
-                antwort.sitzung_id is not None
-                or antwort.erhebungsitem.andockpunkt
+                antwort.erhebungsitem.andockpunkt
                 != Erhebungsitem.Andockpunkt.AM_ENDE
                 for antwort in antworten
             ):

@@ -6,3 +6,6 @@
 {% if zeigt_debrief %}
     {% include "sitzungen/includes/sitzung_debrief.html" %}
 {% endif %}
+{% if anhang %}
+    {{ anhang|safe }}
+{% endif %}

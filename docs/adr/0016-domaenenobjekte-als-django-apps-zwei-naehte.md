@@ -38,7 +38,7 @@ Die eine Methode nimmt System-Prompt, User-Prompt und das Ausgabeschema und lief
 
 Der **Sink** (`sitzungen/sink.py`): das Ziel einer Spielorchestrierung, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Die Orchestrierung kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.
 
-Der Ablauf ist keine Naht: `erhebungen/ablauf.py` sequenziert ausschließlich Erhebungsbindungen, und Training hat keinen entsprechenden Ablauf. `naechster_schritt(teilnahme)` liefert eine Vignetten-Fassung, einen berechneten `am_ende`-Itemblock oder das Ende direkt aus dem Erhebungsmodell. Nur der Abschluss-Block ist ein Ablauf-Schritt, weil er aus der Datenbank rekonstruierbar ist; der Sitzungs-Block hängt am Ausgang einer Sitzung und wird dort gerendert.
+Der Ablauf ist keine Naht: `erhebungen/ablauf.py` sequenziert ausschließlich Erhebungsbindungen, und Training hat keinen entsprechenden Ablauf. `naechster_schritt(teilnahme)` liefert eine Vignetten-Fassung, einen berechneten `am_ende`-Itemblock oder das Ende direkt aus dem Erhebungsmodell. Nur der Abschluss-Block ist ein Ablauf-Schritt, weil er aus der Datenbank rekonstruierbar ist; der Sitzungs-Block hängt am Ausgang einer Sitzung und wird durch den generischen Anhang-Slot der Sitzungsdarstellung gerendert.
 
 Sonst keine. Kein Repository-Interface, kein Service-Layer, kein framework-freier Domänenkern. Die Datenbank wird nicht hinter einem Interface versteckt, HTTP wird nicht ausgetauscht; Interfaces an Stellen, an denen nichts variiert, kosten Lesbarkeit ohne Gegenwert.
 

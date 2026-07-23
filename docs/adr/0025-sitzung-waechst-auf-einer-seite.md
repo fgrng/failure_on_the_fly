@@ -17,6 +17,11 @@ ergänzt anschließend das bestehende Transkript, ohne die vorherigen Abschnitte
 zu entfernen. Formulare und Views bleiben auch ohne HTMX als normale
 HTTP-Endpunkte nutzbar.
 
+Die Fortsetzung hat einen generischen Anhang-Slot für bereits gerendertes HTML.
+Erhebungen nutzen ihn nach jeder beendeten Sitzung für ihren Itemblock; der
+Block bleibt damit Teil des ersetzten Fragments. Der Abschluss-Block hat dagegen
+keine Sitzungsseite und bleibt eine eigene Seite.
+
 Probelauf und persistierte Trainingssitzung verwenden dieselbe Darstellung. Der
 Probelauf ergänzt darin lediglich die live sichtbare Denkspur; Persistierung und
 Ablauforchestrierung bleiben getrennt.

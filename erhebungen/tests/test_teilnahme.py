@@ -141,6 +141,21 @@ class ErhebungsteilnahmeTests(TestCase):
             position=position,
         )
 
+    def _sitzungs_item_anlegen(self, wortlaut: str = "Wie war die Sitzung?") -> None:
+        """Ordnet ein finales Item nach jeder Vignettensitzung ein."""
+
+        item = FragebogenItem.objects.anlegen(
+            self.erhebung.eigentuemerin,
+            wortlaut=wortlaut,
+        )
+        item.finalisieren()
+        Erhebungsitem.objects.create(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=1,
+        )
+
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
     ) -> None:
@@ -687,6 +702,145 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_debrief_zeigt_sitzungs_items_unter_dem_verlauf(self) -> None:
+        """Die Diagnose schließt die Sitzung und ergänzt ihren Itemblock in-place."""
+
+        self._vignette_anlegen()
+        self._sitzungs_item_anlegen("Wie hilfreich war das Gespräch?")
+        bindung = self._laufende_sitzung_starten()
+
+        antwort = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, "Wie hilfreich war das Gespräch?")
+        self.assertContains(antwort, "Debrief")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+        itemantwort = ItemAntwort.objects.get()
+        self.assertEqual(itemantwort.sitzung_id, Sitzung.objects.get().pk)
+
+    def test_sitzungsblock_weiter_startet_die_naechste_vignette(self) -> None:
+        """Ein übersprungener Sitzungsblock setzt die Erhebung sofort fort."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        self._sitzungs_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        itemantwort = ItemAntwort.objects.get()
+
+        antwort = self.client.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {"antwort": itemantwort.pk, "weiter": "ja"},
+        )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(Sitzung.objects.count(), 2)
+
+    def test_htmx_debrief_fuegt_den_sitzungsblock_ins_fortsetzungsfragment_ein(
+        self,
+    ) -> None:
+        """Der Itemblock reist mit dem HTMX-Swap der Sitzungsfortsetzung mit."""
+
+        self._vignette_anlegen()
+        self._sitzungs_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+
+        antwort = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertContains(antwort, "Wie war die Sitzung?")
+        self.assertContains(antwort, 'id="itemblock-formular"')
+
+    def test_wiedereinstieg_ueberspringt_den_offenen_sitzungsblock(self) -> None:
+        """Ein späterer Link-Aufruf kann keinen alten Sitzungsblock weiterführen."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        self._sitzungs_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        itemantwort = ItemAntwort.objects.get()
+        self.client.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {"antwort": itemantwort.pk, f"item_{itemantwort.pk}": "Hilfreich"},
+        )
+
+        wiedereinstieg = self.client.get(self.url)
+        weiter = self.client.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {"antwort": itemantwort.pk, "weiter": "ja"},
+        )
+
+        self.assertRedirects(
+            wiedereinstieg,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(weiter.status_code, 400)
+        itemantwort.refresh_from_db()
+        self.assertEqual(itemantwort.freitext, "Hilfreich")
+
+    def test_abbruch_zeigt_den_sitzungsblock_statt_der_instruktion(self) -> None:
+        """Der aktive Abbruch bleibt bei der beendeten Sitzung mit ihren Items."""
+
+        self._vignette_anlegen()
+        self._sitzungs_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+
+        antwort = self.client.post(
+            reverse("erhebungen:abbrechen", args=[bindung.token])
+        )
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(antwort, "Wie war die Sitzung?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_modellversagen_zeigt_den_sitzungsblock(self) -> None:
+        """Ein gescheitertes Diagnosegespräch trägt ebenfalls seine Itemzeilen."""
+
+        konfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung = Erhebung.objects.create(
+            name="Fehlschlag", eigentuemerin=self.erhebung.eigentuemerin
+        )
+        self.erhebung.finalisieren()
+        self.stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
+        self._vignette_anlegen()
+        self._sitzungs_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+
+        antwort = self.client.post(
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            {"eingabe": "Wie rechnest du?"},
+        )
+
+        self.assertContains(antwort, "Wie war die Sitzung?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
 
     def test_endgueltiger_fehlschlag_bewahrt_gespraechsschritt_ohne_antwort(
         self,
