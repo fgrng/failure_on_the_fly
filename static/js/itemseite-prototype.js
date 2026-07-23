@@ -1,4 +1,3 @@
-/* Prototype #135: Die Leiste macht Varianten über die URL teilbar. */
 function wechseln(richtung) {
     const switcher = document.querySelector(".prototype-switcher");
     window.location.search = `?variant=${switcher.dataset[richtung]}`;

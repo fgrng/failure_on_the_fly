@@ -67,11 +67,11 @@ _BADGE_BESCHRIFTUNGEN: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: "schon nach jeder Sitzung",
     Erhebungsitem.Andockpunkt.AM_ENDE: "schon am Ende",
 }
-_ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, str] = {
-    "a": "A · Skalenband",
-    "b": "B · Entscheidungsleiter",
-    "c": "C · Antwortkarten",
-    "vergleich": "Vergleich · alle Varianten",
+_ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
+    "a": ("A · Skalenband", "c", "b"),
+    "b": ("B · Entscheidungsleiter", "a", "c"),
+    "c": ("C · Antwortkarten", "b", "a"),
+    "vergleich": ("Vergleich · alle Varianten", "c", "a"),
 }
 P = ParamSpec("P")
 
@@ -96,26 +96,23 @@ def _forschende_erforderlich(
 
 
 def itemseite_prototype(request: HttpRequest) -> HttpResponse:
-    """Zeigt drei rein statische Varianten der Teilnehmer:innen-Itemseite.
-
-    Prototype #135: Drei Varianten der Itemseite, schaltbar via ?variant=a|b|c.
-    """
+    """Zeigt drei rein statische Varianten der Teilnehmer:innen-Itemseite."""
 
     variante: str = request.GET.get("variant", "a")
     if variante not in _ITEMSEITEN_PROTOTYP_VARIANTEN:
         variante = "a"
+    bezeichnung, vorherige_variante, naechste_variante = (
+        _ITEMSEITEN_PROTOTYP_VARIANTEN[variante]
+    )
+
     return render(
         request,
         "erhebungen/prototype_itemseite.html",
         {
             "variante": variante,
-            "variantenbezeichnung": _ITEMSEITEN_PROTOTYP_VARIANTEN[variante],
-            "vorherige_variante": {"a": "c", "b": "a", "c": "b"}.get(
-                variante, "c"
-            ),
-            "naechste_variante": {"a": "b", "b": "c", "c": "a"}.get(
-                variante, "a"
-            ),
+            "variantenbezeichnung": bezeichnung,
+            "vorherige_variante": vorherige_variante,
+            "naechste_variante": naechste_variante,
         },
     )
 
