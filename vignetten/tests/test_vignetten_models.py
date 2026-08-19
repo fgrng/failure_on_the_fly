@@ -496,6 +496,40 @@ class VignetteBearbeitenTests(TestCase):
         with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
             finale.bearbeiten()
 
+    def test_bearbeiten_lehnt_fassung_mit_aktiver_spaeterer_fassung_ab(
+        self,
+    ) -> None:
+        """Eine archivierte Zwischenspitze gibt ältere Fassungen nicht frei."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        erste: Vignette = Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+            gepinnter_kern=kern,
+        )
+        zweite: Vignette = Vignette.objects._erstellen(
+            historie=erste.historie,
+            vorgaengerin=erste,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+            gepinnter_kern=kern,
+        )
+        Vignette.objects._erstellen(
+            historie=erste.historie,
+            vorgaengerin=zweite,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+            gepinnter_kern=kern,
+        )
+        zweite.archivieren()
+
+        with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
+            erste.bearbeiten()
+
     def test_vorspulen_aktualisiert_nur_den_pin_eines_entwurfs(self) -> None:
         """Der Kern-Pin wechselt ausschließlich auf ausdrücklichen Aufruf im Entwurf."""
         erster_kern: Simulationskern = Simulationskern.objects.anlegen()
