@@ -471,6 +471,31 @@ class VignetteBearbeitenTests(TestCase):
         finale.refresh_from_db()
         self.assertEqual(finale.zustand, Vignette.Zustand.FINAL)
 
+    def test_bearbeiten_lehnt_finale_fassung_mit_nicht_archivierter_nachfolgerin_ab(
+        self,
+    ) -> None:
+        """Eine Historie bleibt linear, statt den Datenbank-Constraint auszulösen."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        finale: Vignette = Vignette.objects._erstellen(
+            historie=Vignettenhistorie.objects.create(),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+            gepinnter_kern=kern,
+        )
+        Vignette.objects._erstellen(
+            historie=finale.historie,
+            vorgaengerin=finale,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="Bearbeitung",
+            gepinnter_kern=kern,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
+            finale.bearbeiten()
+
     def test_vorspulen_aktualisiert_nur_den_pin_eines_entwurfs(self) -> None:
         """Der Kern-Pin wechselt ausschließlich auf ausdrücklichen Aufruf im Entwurf."""
         erster_kern: Simulationskern = Simulationskern.objects.anlegen()

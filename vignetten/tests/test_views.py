@@ -542,6 +542,44 @@ class VignetteNeueFassungViewTests(TestCase):
             Vignette.objects.filter(historie=self.finale.historie).count(), 2
         )
 
+    def test_nachfolgerin_verhindert_neue_fassung_mit_fehlermeldung(self) -> None:
+        """Eine ältere finale Fassung führt nicht auf eine Fehlerseite."""
+        nachfolgerin: Vignette = self.finale.bearbeiten()
+        nachfolgerin.finalisieren()
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:neue_fassung", args=[self.finale.pk]), follow=True
+        )
+
+        self.assertEqual(
+            response.redirect_chain,
+            [(reverse("vignetten:detail", args=[self.finale.pk]), 302)],
+        )
+        self.assertContains(response, "Nachfolgerin")
+
+    def test_detail_verbirgt_neue_fassung_bei_nicht_archivierter_nachfolgerin(
+        self,
+    ) -> None:
+        """Nur die jüngste finale Fassung bietet eine neue Fassung an."""
+        nachfolgerin: Vignette = self.finale.bearbeiten()
+        nachfolgerin.finalisieren()
+
+        alte_fassung: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[self.finale.pk])
+        )
+        juengste_fassung: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[nachfolgerin.pk])
+        )
+
+        self.assertNotContains(
+            alte_fassung,
+            reverse("vignetten:neue_fassung", args=[self.finale.pk]),
+        )
+        self.assertContains(
+            juengste_fassung,
+            reverse("vignetten:neue_fassung", args=[nachfolgerin.pk]),
+        )
+
 class VignetteArchivierenViewTests(TestCase):
     """Finale Fassungen lassen sich im Editor archivieren."""
 

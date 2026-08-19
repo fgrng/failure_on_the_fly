@@ -38,10 +38,12 @@
                 {% csrf_token %}
                 <button class="button" type="submit">Probelauf starten</button>
             </form>
-            <form method="post" action="{% url 'vignetten:neue_fassung' vignette.pk %}">
-                {% csrf_token %}
-                <button class="button button--secondary" type="submit">Neue Fassung</button>
-            </form>
+            {% if not vignette.hat_nicht_archivierte_nachfolgerin %}
+                <form method="post" action="{% url 'vignetten:neue_fassung' vignette.pk %}">
+                    {% csrf_token %}
+                    <button class="button button--secondary" type="submit">Neue Fassung</button>
+                </form>
+            {% endif %}
             <form method="post" action="{% url 'vignetten:archivieren' vignette.pk %}">
                 {% csrf_token %}
                 <button class="button button--danger" type="submit">Archivieren</button>

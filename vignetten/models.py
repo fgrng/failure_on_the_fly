@@ -196,6 +196,11 @@ class Vignette(models.Model):
         """Kürzel für die geschlechtsabhängige Gesprächsanlass-Illustration."""
         return "m" if self.schuelerin_geschlecht == self.Geschlecht.MAENNLICH else "w"
 
+    @property
+    def hat_nicht_archivierte_nachfolgerin(self) -> bool:
+        """Prüft, ob diese Fassung schon in die nächste Fassung übergeht."""
+        return self.vignette_set.exclude(zustand=self.Zustand.ARCHIVIERT).exists()
+
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
         if self._state.adding:
@@ -245,6 +250,10 @@ class Vignette(models.Model):
         quelle: Vignette = type(self).objects.select_for_update().get(pk=self.pk)
         if quelle.zustand != self.Zustand.FINAL:
             raise ValidationError("Nur finale Fassungen können bearbeitet werden.")
+        if quelle.hat_nicht_archivierte_nachfolgerin:
+            raise ValidationError(
+                "Diese Fassung hat bereits eine nicht archivierte Nachfolgerin."
+            )
         return type(self).objects._erstellen(
             historie=quelle.historie,
             vorgaengerin=quelle,
