@@ -198,7 +198,7 @@ class Vignette(models.Model):
 
     @property
     def hat_nicht_archivierte_nachfolgerin(self) -> bool:
-        """Prüft, ob diese Fassung schon in die nächste Fassung übergeht."""
+        """Gibt zurück, ob diese Fassung eine nicht archivierte Nachfolgerin hat."""
         return self.vignette_set.exclude(zustand=self.Zustand.ARCHIVIERT).exists()
 
     def save(self, *args: object, **kwargs: object) -> None:

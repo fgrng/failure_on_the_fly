@@ -580,6 +580,7 @@ class VignetteNeueFassungViewTests(TestCase):
             reverse("vignetten:neue_fassung", args=[nachfolgerin.pk]),
         )
 
+
 class VignetteArchivierenViewTests(TestCase):
     """Finale Fassungen lassen sich im Editor archivieren."""
 
