@@ -247,6 +247,7 @@ def _probelauf_starten(
         kern=kern,
         gespraechsschritte=sink.gespraechsschritte,
         ist_probelauf=True,
+        spracheingabe_verfuegbar=True,
     )
 
 

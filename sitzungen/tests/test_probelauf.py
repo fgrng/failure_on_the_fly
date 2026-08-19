@@ -231,6 +231,16 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
         )
 
+    def test_spracheingabe_steht_schon_beim_ersten_schritt_bereit(self) -> None:
+        """Auch das erste Eingabefeld trägt bereits den Aufnahme-Knopf."""
+
+        einstieg: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einstieg, "data-spracheingabe")
+        self.assertContains(einstieg, "Frage aufnehmen")
+
     def test_spracheingabe_steht_im_gespraech_und_im_debrief_bereit(self) -> None:
         """Der Probelauf bietet das Mikrofon ohne Einwilligungsschritt an."""
 
