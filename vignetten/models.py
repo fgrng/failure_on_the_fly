@@ -149,36 +149,94 @@ class Vignette(models.Model):
     vorgaengerin: models.ForeignKey = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.PROTECT
     )
-    fehlermuster_beschreibung: models.TextField = models.TextField(blank=True)
-    lernauftrag: models.TextField = models.TextField(blank=True)
+    fehlermuster_beschreibung: models.TextField = models.TextField(
+        blank=True, help_text="Ausführliche Beschreibung des Fehlermusters; bestenfalls mit Beispielen für fehlerbezogenes Verhalten. Wird für die Simulation einbezogen."
+    )
+    lernauftrag: models.TextField = models.TextField(
+        blank=True, help_text="Beschreibung des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar."
+    )
     arbeitsheft_beschreibung: models.TextField = models.TextField(
-        blank=True, help_text="Prompt-Quelle für das Modell."
+        blank=True, help_text="Ausführliche Beschreibung des Arbeitshefts von der zu simulierenden Schüler:in. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar."
     )
     arbeitsheft_text: models.TextField = models.TextField(
-        blank=True, help_text="Was die Teilnehmer:in sieht."
+        blank=True, help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar."
     )
     arbeitsheft_bild: models.ImageField = models.ImageField(
         upload_to=arbeitsheft_bild_pfad,
         blank=True,
-        help_text="Was die Teilnehmer:in sieht.",
+        help_text="Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.",
     )
-    schuelerin_name: models.CharField = models.CharField(max_length=255, blank=True)
+    schuelerin_name: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Vorname der zu simulierenden Schüler:in. Wird für die "
+        "Simulation einbezogen. Für Teilnehmer:in sichtbar.",
+    )
     schuelerin_geschlecht: models.CharField = models.CharField(
-        max_length=9, choices=Geschlecht, blank=True
+        max_length=9,
+        choices=Geschlecht,
+        blank=True,
+        help_text="Geschlecht der zu simulierenden Schüler:in; steuert die "
+        "Grammatik der Rahmenhandlung und die Illustration des "
+        "Gesprächsanlasses. Wird für die Simulation einbezogen. "
+        "Für Teilnehmer:in sichtbar.",
     )
-    lehrperson_name: models.CharField = models.CharField(max_length=255, blank=True)
+    lehrperson_name: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Nachname der erfahrenen Lehrperson, die durch die "
+        "Hospitation führt und im Debrief nach der Diagnose fragt. Wird für "
+        "die Simulation nicht einbezogen — die Lehrperson ist der "
+        "simulierten Schüler:in unbekannt. Für Teilnehmer:in sichtbar.",
+    )
     lehrperson_geschlecht: models.CharField = models.CharField(
-        max_length=9, choices=Geschlecht, blank=True
+        max_length=9,
+        choices=Geschlecht,
+        blank=True,
+        help_text="Geschlecht der erfahrenen Lehrperson; steuert Anrede "
+        "(Frau/Herr), Pronomen und die Illustrationen der Rahmenhandlung. "
+        "Wird für die Simulation nicht einbezogen. "
+        "Für Teilnehmer:in sichtbar.",
     )
-    fach: models.CharField = models.CharField(max_length=255, blank=True)
-    thema: models.CharField = models.CharField(max_length=255, blank=True)
-    klassenstufe: models.CharField = models.CharField(max_length=255, blank=True)
-    referenzdiagnose: models.TextField = models.TextField(blank=True)
+    fach: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Unterrichtsfach, in dem die Vignette spielt. Wird für die "
+        "Simulation einbezogen. Für Teilnehmer:in sichtbar.",
+    )
+    thema: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Unterrichtsthema, an dem das Fehlermuster auftritt. Wird "
+        "für die Simulation einbezogen. Für Teilnehmer:in sichtbar.",
+    )
+    klassenstufe: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Klassenstufe der zu simulierenden Schüler:in. Wird für "
+        "die Simulation einbezogen. Für Teilnehmer:in sichtbar.",
+    )
+    referenzdiagnose: models.TextField = models.TextField(
+        blank=True,
+        help_text="Optionale fachdidaktische Notiz der Autor:in zum "
+        "Fehlermuster. Ohne jede Wirkung auf Simulation und Ablauf; sie "
+        "erscheint nur in der Vignettenansicht und im Datenexport. "
+        "Für Teilnehmer:in nicht sichtbar.",
+    )
     budget_typ: models.CharField = models.CharField(
-        max_length=8, choices=BudgetTyp, blank=True
+        max_length=8,
+        choices=BudgetTyp,
+        blank=True,
+        help_text="Maß des Gesprächsbudgets, an dem das Diagnosegespräch "
+        "endet und der Debrief folgt: Gesprächsschritte oder Zeit. Pro "
+        "Vignette ist genau ein Maß aktiv. Für Teilnehmer:in nicht sichtbar.",
     )
     budget_wert: models.PositiveIntegerField = models.PositiveIntegerField(
-        null=True, blank=True
+        null=True,
+        blank=True,
+        help_text="Grenze des Gesprächsbudgets, größer als 0: Anzahl der "
+        "Gesprächsschritte bzw. Sekunden — je nach gewähltem Budget-Typ. "
+        "Für Teilnehmer:in nicht sichtbar.",
     )
     gepinnter_kern: models.ForeignKey = models.ForeignKey(
         "simulation.Simulationskern", null=True, blank=True, on_delete=models.PROTECT

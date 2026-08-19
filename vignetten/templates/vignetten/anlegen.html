@@ -16,9 +16,11 @@
             <span>Die Angaben sind nach ihrem fachlichen Zusammenhang geordnet.</span>
         </div>
     </header>
-    {# autocomplete=off: sonst stellt der Browser beim Neuladen die alten Select-Werte
-       wieder her, während die Namensfelder frisch vom Server kommen – Name und
-       Geschlecht der Akteure passen dann nicht mehr zueinander. #}
+    {% comment %}
+        autocomplete=off: sonst stellt der Browser beim Neuladen die alten Select-Werte
+        wieder her, während die Namensfelder frisch vom Server kommen – Name und
+        Geschlecht der Akteure passen dann nicht mehr zueinander.
+    {% endcomment %}
     <form method="post" enctype="multipart/form-data" autocomplete="off">
         {% csrf_token %}
         {{ form.non_field_errors }}
