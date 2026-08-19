@@ -176,6 +176,12 @@ class DBSink:
         return self._sitzung.gespraechsschritt_set.count() + 1
 
 
+def probelauf_laeuft(session: MutableMapping[str, Any]) -> bool:
+    """Meldet, ob die Session einen laufenden Probelauf trägt."""
+
+    return _PROBELAUF_SESSION_SCHLUESSEL in session
+
+
 class ScratchSink:
     """Hält einen Probelauf ausschließlich in der Django-Session."""
 

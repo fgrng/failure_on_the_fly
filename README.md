@@ -33,6 +33,12 @@ in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie b
 und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann
 die Aufnahme wiederholt werden.
 
+Im **Probelauf** der Autor:innen gibt es keinen Einwilligungsschritt: Dort
+spricht die angemeldete Autor:in über ihr eigenes Material, nicht eine
+pseudonyme Teilnehmer:in. Das Mikrofon steht im Diagnosegespräch und im
+Debrief unmittelbar bereit und hängt allein an
+`TRANSKRIPTION_ZERO_RETENTION`.
+
 ## Erhebungsteilnahme
 
 Ein Teilnahme-Link einer Stichprobe legt im Browser eine pseudonyme Teilnahme an

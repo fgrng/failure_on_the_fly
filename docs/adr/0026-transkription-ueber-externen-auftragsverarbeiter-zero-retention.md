@@ -10,9 +10,12 @@ Damit erhält ein Dritter das biometrische Datum — auch wenn wir es nicht spei
 
 Die Teilnehmer:in **willigt im Teilnahmefluss ein**, dass ihr Audio zur Transkription an diesen Auftragsverarbeiter geht. Ohne Einwilligung steht ausschließlich die Tastatureingabe zur Verfügung. Der Transport ist verschlüsselt; serverseitig wird das Audio nicht über den Transkriptions-Request hinaus gehalten (ADR-0007).
 
+Der **Probelauf** ist von der Einwilligungsstufe ausgenommen. Dort spricht die angemeldete Autor:in über ihr eigenes Material — nicht die pseudonyme Teilnehmer:in, deren Schutz aus ADR-0006 diese Stufe überhaupt trägt. Ein Probelauf ist schreibfrei und hat weder Teilnahme noch Sitzung, die einwilligen könnten; die Spracheingabe steht deshalb ohne vorgeschalteten Einwilligungsschritt bereit. Das Zero-Retention-Tor gilt unverändert auch hier: Ohne die vertragliche Zusicherung transkribiert auch der Probelauf nicht.
+
 ## Consequences
 
 - Die Pseudonymität aus ADR-0006 hält **vertraglich**, nicht mehr **technisch**: Sie ruht auf dem AVV und der Zero-Retention-Zusage des Auftragsverarbeiters statt darauf, dass das biometrische Datum den kontrollierten Raum nie verlässt. Das ist eine bewusste Absenkung des Schutzniveaus zugunsten von Qualität und Umsetzbarkeit.
 - Wechselt der Anbieter oder fällt die Zero-Retention-Zusage weg, ist diese Entscheidung neu zu prüfen. Clientseitige (WASM) oder selbst gehostete Transkription bleiben die Rückfalloptionen und würden den Schutz wieder technisch verankern.
 - Der Teilnahmefluss braucht einen zusätzlichen Einwilligungsschritt für die Audioverarbeitung, getrennt von einer etwaigen Audio-Auswertungs-Erweiterung aus ADR-0007.
+- Die Berechtigung zur Transkription hat zwei Quellen: die Audio-Einwilligung einer Teilnahme oder einen laufenden Probelauf einer angemeldeten Autor:in. Beide münden in dasselbe Zero-Retention-Tor.
 - Für Erhebungen ist die Wahl des Auftragsverarbeiters Teil der datenschutzrechtlichen Dokumentation, nicht der Datenspur.

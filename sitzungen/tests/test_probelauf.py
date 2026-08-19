@@ -231,6 +231,26 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
         )
 
+    def test_spracheingabe_steht_im_gespraech_und_im_debrief_bereit(self) -> None:
+        """Der Probelauf bietet das Mikrofon ohne Einwilligungsschritt an."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        gespraech: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertContains(gespraech, "data-spracheingabe")
+        self.assertContains(gespraech, "Frage aufnehmen")
+
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden")
+        )
+
+        self.assertContains(debrief, "data-spracheingabe")
+        self.assertContains(debrief, "Diagnose aufnehmen")
+
     def test_antwort_und_denkspur_werden_live_angezeigt_und_in_session_behalten(
         self,
     ) -> None:

@@ -24,7 +24,12 @@ from simulation.transkription import (
 from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
 from sitzungen.rahmen import rahmen_rendern
-from sitzungen.sink import DBSink, GespraechsschrittDaten, ScratchSink
+from sitzungen.sink import (
+    DBSink,
+    GespraechsschrittDaten,
+    ScratchSink,
+    probelauf_laeuft,
+)
 from vignetten.models import Vignette, Vignettenhistorie
 
 if TYPE_CHECKING:
@@ -190,6 +195,7 @@ def _gespraech_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=True,
         erneute_eingabe=erneute_eingabe,
+        spracheingabe_verfuegbar=True,
     )
 
 
@@ -208,6 +214,7 @@ def _debrief_anzeigen(
         gespraechsschritte=schritte,
         ist_probelauf=True,
         zeigt_debrief=True,
+        spracheingabe_verfuegbar=True,
     )
 
 
@@ -391,9 +398,12 @@ def _training_sitzung(request: HttpRequest) -> Sitzung:
 
     from training.models import Trainingsbindung
 
+    sitzung_pk: int | None = request.session.get("training_sitzung_pk")
+    if sitzung_pk is None:
+        raise PermissionDenied
     sitzung: Sitzung = get_object_or_404(
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
-        pk=request.session["training_sitzung_pk"],
+        pk=sitzung_pk,
     )
     get_object_or_404(
         Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
@@ -412,13 +422,18 @@ def transkriptions_endpunkt(
             return HttpResponseNotAllowed(["POST"])
         from erhebungen.views import sitzung_fuer_transkription
 
-        sitzung: Sitzung | None = sitzung_fuer_transkription(request)
-        if sitzung is None and request.user.is_authenticated:
-            sitzung = _training_sitzung(request)
-        if sitzung is None:
-            raise PermissionDenied
-        if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
-            return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
+        # Im Probelauf spricht die angemeldete Autor:in über eigenes Material;
+        # es gibt keine Teilnahme, die einwilligen könnte (ADR-0026).
+        if not (request.user.is_authenticated and probelauf_laeuft(request.session)):
+            sitzung: Sitzung | None = sitzung_fuer_transkription(request)
+            if sitzung is None and request.user.is_authenticated:
+                sitzung = _training_sitzung(request)
+            if sitzung is None:
+                raise PermissionDenied
+            if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
+                return JsonResponse(
+                    {"status": "einwilligung_verweigert"}, status=403
+                )
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         audio: bytes = request.FILES["audio"].read()
