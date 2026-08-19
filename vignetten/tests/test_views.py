@@ -98,6 +98,15 @@ class VignetteAnlegenViewTests(TestCase):
         self.assertContains(response, '<option value="männlich" selected>')
         self.assertNotContains(response, 'name="gepinnter_kern"')
 
+    def test_formular_unterbindet_die_browserseitige_wiederherstellung(self) -> None:
+        """Beim Neuladen darf der Browser die vorbelegten Akteure nicht entkoppeln."""
+        ada: Konto = _autorin("ada")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("vignetten:anlegen"))
+
+        self.assertContains(response, 'autocomplete="off"')
+
 
 class VignetteDetailViewTests(TestCase):
     """Die Detailansicht zeigt den Aufgabenkontext einer sichtbaren Fassung."""
