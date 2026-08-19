@@ -36,6 +36,23 @@ ALLOWED_HOSTS = (
     else []
 )
 
+# Hinter dem Uberspace-Frontend spricht gunicorn HTTP; das Schema steht im Header.
+CSRF_TRUSTED_ORIGINS = (
+    os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if os.environ.get("CSRF_TRUSTED_ORIGINS")
+    else []
+)
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER: tuple[str, str] = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Abschaltbar, falls das Frontend kein X-Forwarded-Proto setzt und Django
+    # sonst in eine Weiterleitungsschleife läuft.
+    SECURE_SSL_REDIRECT: bool = os.environ.get("SECURE_SSL_REDIRECT", "True") == "True"
+    SESSION_COOKIE_SECURE: bool = True
+    CSRF_COOKIE_SECURE: bool = True
+    SECURE_HSTS_SECONDS: int = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS: bool = True
+
 
 # Application definition
 
@@ -95,10 +112,17 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# WAL und ein wartender Writer: Sitzungen mehrerer gleichzeitig angemeldeter
+# Browser schreiben parallel in dieselbe SQLite-Datei.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": os.environ.get("DATABASE_PFAD", BASE_DIR / "db.sqlite3"),
+        "OPTIONS": {
+            "init_command": "PRAGMA journal_mode=WAL;",
+            "transaction_mode": "IMMEDIATE",
+            "timeout": 20,
+        },
     }
 }
 
@@ -141,7 +165,11 @@ STATIC_URL = "static/"
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-MEDIA_ROOT: Path = BASE_DIR / "media"
+# Im Deployment liefert der Webserver STATIC_ROOT und MEDIA_ROOT selbst aus;
+# beide Pfade zeigen dort in sein Docroot (siehe README).
+STATIC_ROOT: Path = Path(os.environ.get("STATIC_ROOT", BASE_DIR / "staticfiles"))
+
+MEDIA_ROOT: Path = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 MEDIA_URL: str = "/media/"
 
 # Default primary key field type

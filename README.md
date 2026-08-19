@@ -161,3 +161,101 @@ Die Testsuite läuft mit `uv run python manage.py test`.
 > Der Entwicklungs-Seed aktiviert das Fake-Sprachmodell, damit sich
 > Diagnosegespräche ohne API-Schlüssel durchklicken lassen. Für echte Antworten
 > muss die OpenAI-Konfiguration mit gesetztem `OPENAI_API_KEY` aktiviert werden.
+
+## Deployment auf Uberspace
+
+Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_django/);
+`isabell` steht für den eigenen Uberspace-Benutzernamen.
+
+1. **Projekt und Abhängigkeiten installieren.** Uberspace bringt Python 3.14
+   mit; `uv` wird ins Home installiert:
+
+   ```
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   git clone <repo-url> ~/failure_on_the_fly
+   cd ~/failure_on_the_fly
+   uv sync --frozen --no-dev --group deploy --python python3.14
+   ```
+
+2. **Konfiguration anlegen.** `.env` im Projektverzeichnis:
+
+   ```
+   SECRET_KEY=<lange Zufallszeichenkette>
+   DEBUG=False
+   ALLOWED_HOSTS=isabell.uber.space
+   CSRF_TRUSTED_ORIGINS=https://isabell.uber.space
+   STATIC_ROOT=/home/isabell/html/static
+   MEDIA_ROOT=/home/isabell/html/media
+   OPENAI_API_KEY=<Schlüssel>
+   TRANSKRIPTION_ZERO_RETENTION=True
+   ```
+
+   `DEBUG=False` schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf.
+   Leitet die Anwendung danach endlos weiter, setzt das Frontend kein
+   `X-Forwarded-Proto`; dann hilft `SECURE_SSL_REDIRECT=False`.
+
+3. **Datenbank und statische Dateien vorbereiten:**
+
+   ```
+   uv run python manage.py migrate
+   uv run python manage.py collectstatic --noinput
+   ```
+
+4. **Dienst einrichten** in `~/etc/services.d/failure-on-the-fly.ini`. Das
+   großzügige Timeout ist nötig, weil ein Gesprächsschritt synchron auf das
+   Sprachmodell wartet:
+
+   ```
+   [program:failure-on-the-fly]
+   directory=%(ENV_HOME)s/failure_on_the_fly
+   command=%(ENV_HOME)s/failure_on_the_fly/.venv/bin/gunicorn --error-logfile - --bind 0.0.0.0:8000 --workers 3 --timeout 180 config.wsgi:application
+   startsecs=30
+   autostart=yes
+   autorestart=yes
+   ```
+
+   ```
+   supervisorctl reread
+   supervisorctl update
+   supervisorctl status
+   ```
+
+5. **Web-Backends verbinden.** Apache liefert die hochgeladenen
+   Arbeitsheft-Bilder und die statischen Dateien direkt aus, alles Übrige geht
+   an gunicorn:
+
+   ```
+   uberspace web backend set /static --apache
+   uberspace web backend set /media --apache
+   uberspace web backend set / --http --port 8000
+   ```
+
+> Unter `/media/` liegende Arbeitsheft-Bilder sind ohne Anmeldung abrufbar, wer
+> ihre URL kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber
+> ungeschützt.
+
+## Workshop-Instanz für Autor:innen
+
+Für einen Workshop, in dem ausschließlich Vignetten angelegt, bearbeitet und im
+Probelauf erprobt werden, richtet ein eigener Seed die Instanz ein. Er läuft
+bewusst auch mit `DEBUG=False`, ist idempotent und legt Konten, einen finalen
+Simulationskern und die aktive Modell-Konfiguration `openai/gpt-4o` an:
+
+```
+uv run python manage.py workshopdaten_anlegen
+```
+
+Er gibt die Anmeldedaten genau einmal aus — danach sind die Passwörter nur noch
+als Hash gespeichert. Vorhandene Konten behalten bei einem erneuten Lauf ihr
+Passwort; `--passwoerter-neu` setzt es zurück. Weitere Optionen sind `--anzahl`
+(Standard: 10), `--praefix` (Standard: `workshop`) und `--passwort` für ein
+gemeinsames Passwort aller Konten.
+
+Jedes Konto trägt ausschließlich die Rolle `Autor:in` und erreicht damit den
+Vignetten-Editor, den Probelauf und die Kern-Ansicht — Ausbildung, Forschung und
+der administrative Probelauf bleiben gesperrt.
+
+Ein Konto lässt sich gleichzeitig in beliebig vielen Browsern anmelden. Alle
+Anmeldungen eines Kontos teilen sich dessen Vignetten und sehen einander bei der
+Arbeit zu; der Probelauf dagegen lebt in der Browser-Sitzung und läuft für jede
+Anmeldung getrennt.

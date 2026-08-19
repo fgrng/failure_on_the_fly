@@ -3,7 +3,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from unittest.mock import patch
 
@@ -683,3 +683,52 @@ class AdministratorinProbelaufTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+
+class GeteiltesKontoTests(ProbelaufStartTests):
+    """Ein Konto trägt mehrere gleichzeitige Probeläufe in getrennten Browsern."""
+
+    def test_zwei_anmeldungen_desselben_kontos_proben_unabhaengig(self) -> None:
+        """Der Probelauf lebt in der Session, also je Browser statt je Konto."""
+
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(
+                sprachmodell="fake",
+                parameter={
+                    "skript": [
+                        {"denkspur": "Mia rechnet ihre Regel.", "aeusserung": "So."}
+                    ]
+                },
+            )
+        )
+        zweiter_entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        zweiter_entwurf.historie.name = "Zweiter Entwurf"
+        zweiter_entwurf.historie.save()
+        zweiter_entwurf.schuelerin_name = "Nora"
+        zweiter_entwurf.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+        zweiter_entwurf.lehrperson_name = "Weber"
+        zweiter_entwurf.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+        zweiter_entwurf.fach = "Mathematik"
+        zweiter_entwurf.thema = "Dezimalzahlen"
+        zweiter_entwurf.klassenstufe = "6"
+        zweiter_entwurf.save()
+        eins: Client = Client()
+        zwei: Client = Client()
+        eins.force_login(self.ada)
+        zwei.force_login(self.ada)
+
+        eins.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        zwei.post(reverse("sitzungen:probelauf_starten", args=[zweiter_entwurf.pk]))
+        antwort_eins: HttpResponse = eins.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Frage aus Browser 1"}
+        )
+        antwort_zwei: HttpResponse = zwei.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Frage aus Browser 2"}
+        )
+
+        self.assertEqual(eins.session["probelauf"]["vignette_pk"], self.entwurf.pk)
+        self.assertEqual(zwei.session["probelauf"]["vignette_pk"], zweiter_entwurf.pk)
+        self.assertContains(antwort_eins, "Frage aus Browser 1")
+        self.assertNotContains(antwort_eins, "Frage aus Browser 2")
+        self.assertContains(antwort_zwei, "Frage aus Browser 2")
+        self.assertNotContains(antwort_zwei, "Frage aus Browser 1")
