@@ -108,6 +108,54 @@ class VignetteAnlegenViewTests(TestCase):
         self.assertContains(response, 'autocomplete="off"')
 
 
+class VignetteListeViewTests(TestCase):
+    """Die Liste bleibt lesbar, auch wenn eine Historie ihre Fassungen verloren hat."""
+
+    def test_fassungslose_historie_legt_die_liste_nicht_lahm(self) -> None:
+        """Eine Historie ohne Fassung wird übersprungen statt die Seite zu sprengen."""
+        ada: Konto = _autorin("ada")
+        belegte: Vignettenhistorie = Vignettenhistorie.objects.create(
+            name="Bruchrechnung"
+        )
+        belegte.eigentuemerinnen.add(ada)
+        Vignette.objects._erstellen(historie=belegte)
+        fassungslose: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fassungslose.eigentuemerinnen.add(ada)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("vignetten:liste"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bruchrechnung")
+
+    def test_jede_historie_erscheint_trotz_mehrerer_fassungen_einmal(self) -> None:
+        """Der Join auf die Fassungen darf die Historie nicht vervielfachen."""
+        ada: Konto = _autorin("ada")
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+            name="Bruchrechnung"
+        )
+        historie.eigentuemerinnen.add(ada)
+        erste: Vignette = Vignette.objects._erstellen(
+            historie=historie, gepinnter_kern=kern
+        )
+        Vignette.objects._erstellen(
+            historie=historie,
+            vorgaengerin=erste,
+            zustand=Vignette.Zustand.ARCHIVIERT,
+            finalisiert_am=timezone.now(),
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            gepinnter_kern=kern,
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("vignetten:liste"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode().count("Bruchrechnung"), 1)
+
+
 class VignetteDetailViewTests(TestCase):
     """Die Detailansicht zeigt den Aufgabenkontext einer sichtbaren Fassung."""
 

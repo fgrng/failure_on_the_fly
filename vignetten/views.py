@@ -74,7 +74,11 @@ def _lebenszyklus_aktion_ausfuehren(
 def liste(request: HttpRequest) -> HttpResponse:
     """Zeigt die privaten Vignettenhistorien der eingeloggten Person."""
     historien: list[dict[str, object]] = []
-    for historie in Vignettenhistorie.objects.sichtbar_fuer(request.user):
+    for historie in (
+        Vignettenhistorie.objects.sichtbar_fuer(request.user)
+        .filter(vignette__isnull=False)
+        .distinct()
+    ):
         neueste_fassung: Vignette = historie.vignette_set.latest("pk")
         historien.append(
             {

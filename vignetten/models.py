@@ -1,5 +1,6 @@
 """Datenmodelle für Vignetten und ihre Historien."""
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -33,6 +34,14 @@ if TYPE_CHECKING:
 def arbeitsheft_bild_pfad(_: "Vignette", dateiname: str) -> str:
     """Vergibt jeder hochgeladenen Arbeitsheft-Datei einen neuen Pfad."""
     return f"arbeitshefte/{uuid4().hex}{Path(dateiname).suffix.lower()}"
+
+
+def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
+    # Eine Historie ohne Fassung trägt weder Namen noch Eigentümerschaft und
+    # blockiert sonst unsichtbar das Löschen ihres Kontos (konten.Konto.delete).
+    Vignettenhistorie.objects.filter(
+        pk__in=set(historie_ids), vignette__isnull=True
+    ).delete()
 
 
 class VignettenhistorieQuerySet(models.QuerySet["Vignettenhistorie"]):
@@ -79,11 +88,17 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
         """Verhindert das Umgehen der Unveränderlichkeit per Massenupdate."""
         raise RuntimeError("Vignetten dürfen nicht per Massenupdate geändert werden.")
 
+    @transaction.atomic
     def delete(self) -> tuple[int, dict[str, int]]:
         """Löscht gesammelt ausschließlich Entwürfe."""
         if self.exclude(zustand=Vignette.Zustand.ENTWURF).exists():
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete()
+        betroffene_historien: list[int] = list(
+            self.values_list("historie_id", flat=True)
+        )
+        ergebnis: tuple[int, dict[str, int]] = super().delete()
+        _fassungslose_historien_entfernen(betroffene_historien)
+        return ergebnis
 
     def einbindbar(self) -> models.QuerySet["Vignette"]:
         """Liefert die finalen Fassungen, die eingebunden werden dürfen."""
@@ -294,7 +309,10 @@ class Vignette(models.Model):
             zustand=self.Zustand.ENTWURF,
         ).exists():
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete(*args, **kwargs)
+        historie_id: int = self.historie_id
+        ergebnis: tuple[int, dict[str, int]] = super().delete(*args, **kwargs)
+        _fassungslose_historien_entfernen([historie_id])
+        return ergebnis
 
     def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
         """Speichert einen ausschließlich intern ausgelösten Zustandsübergang."""

@@ -613,6 +613,60 @@ class VignetteBearbeitenTests(TestCase):
         with self.assertRaises(ValidationError):
             Vignette.objects.filter(pk=finale.pk).delete()
 
+    def test_letzte_fassung_nimmt_ihre_historie_mit(self) -> None:
+        """Eine Historie ohne Fassung trägt nichts mehr und bleibt nicht zurück."""
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        entwurf: Vignette = Vignette.objects._erstellen(historie=historie)
+
+        entwurf.delete()
+
+        self.assertFalse(Vignettenhistorie.objects.filter(pk=historie.pk).exists())
+
+    def test_historie_mit_weiterer_fassung_bleibt_bestehen(self) -> None:
+        """Nur die leer gewordene Historie wird abgeräumt, keine belegte."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        finale: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
+            lernauftrag="Addiere 27 und 15.",
+            arbeitsheft_beschreibung="27 + 15 = 312",
+            arbeitsheft_text="27 + 15 = 312",
+            schuelerin_name="Mia",
+            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+            lehrperson_name="Herr Koch",
+            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+            fach="Mathematik",
+            thema="Addition",
+            klassenstufe="5",
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=5,
+            gepinnter_kern=kern,
+        )
+        finale.finalisieren()
+        entwurf: Vignette = finale.bearbeiten()
+
+        entwurf.delete()
+
+        self.assertTrue(Vignettenhistorie.objects.filter(pk=historie.pk).exists())
+
+    def test_massenloeschung_raeumt_leer_gewordene_historien_ab(self) -> None:
+        """Auch der QuerySet-Weg hinterlässt keine fassungslose Historie."""
+        historien: list[Vignettenhistorie] = [
+            Vignettenhistorie.objects.create() for _ in range(2)
+        ]
+        for historie in historien:
+            Vignette.objects._erstellen(historie=historie)
+
+        Vignette.objects.filter(zustand=Vignette.Zustand.ENTWURF).delete()
+
+        self.assertFalse(
+            Vignettenhistorie.objects.filter(
+                pk__in=[historie.pk for historie in historien]
+            ).exists()
+        )
+
     def test_zustandswechsel_sind_auf_lebenszyklus_methoden_beschraenkt(self) -> None:
         """Direkte ORM-Saves dürfen keine Kante des Automaten umgehen."""
         entwurf: Vignette = Vignette.objects._erstellen(
