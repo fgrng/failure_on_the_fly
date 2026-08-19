@@ -16,7 +16,10 @@
             <span>Die Angaben sind nach ihrem fachlichen Zusammenhang geordnet.</span>
         </div>
     </header>
-    <form method="post" enctype="multipart/form-data">
+    {# autocomplete=off: sonst stellt der Browser beim Neuladen die alten Select-Werte
+       wieder her, während die Namensfelder frisch vom Server kommen – Name und
+       Geschlecht der Akteure passen dann nicht mehr zueinander. #}
+    <form method="post" enctype="multipart/form-data" autocomplete="off">
         {% csrf_token %}
         {{ form.non_field_errors }}
         {{ fach_werte|json_script:"fach-werte" }}
