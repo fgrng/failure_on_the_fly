@@ -24,7 +24,7 @@ def gespraechsschritt_ausfuehren(
     vignette: Vignette,
     simulationskern: Simulationskern,
     modell_konfiguration: ModellKonfiguration,
-    verlauf: Sequence[str],
+    verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> Antwortversuch:
     """Versucht eine Antwort und übergibt ihren Schritt ausschließlich dem Sink."""

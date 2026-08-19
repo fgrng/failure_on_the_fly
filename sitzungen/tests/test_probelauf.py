@@ -460,6 +460,26 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(response, "Denkspur ansehen")
         self.assertNotContains(response, "Native Reasoning-Spur:")
 
+    def test_modellverlauf_traegt_beide_gespraechsseiten(self) -> None:
+        """Ohne die vorherige Frage könnte die Antwort nicht auf sie eingehen."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
+        )
+
+        self.assertIn(
+            "Verlauf:\nFrage: Wie rechnest du?\n"
+            "Deine Antwort: Ich addiere einfach alles.\n\n"
+            "Eingabe:\nUnd warum so?",
+            FakeSprachmodell.letzte_anfragen[-1][1],
+        )
+
     def test_leere_aeusserung_bleibt_im_modellverlauf(self) -> None:
         """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
 
@@ -478,7 +498,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertIn(
-            "Verlauf:\n\n\nEingabe:\nZweiter Schritt",
+            "Verlauf:\nFrage: Erster Schritt\nDeine Antwort: \n\n"
+            "Eingabe:\nZweiter Schritt",
             FakeSprachmodell.letzte_anfragen[-1][1],
         )
 

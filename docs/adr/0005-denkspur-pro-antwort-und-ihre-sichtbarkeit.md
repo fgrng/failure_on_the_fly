@@ -16,7 +16,7 @@ Drei Gründe: Native Reasoning-Spuren sind bei mehreren Anbietern nur zusammenge
 
 ## Die Denkspur fließt nicht in den Kontext zurück
 
-Der Gesprächsverlauf, der bei jedem Zug an das Modell zurückgeht, enthält ausschließlich die sichtbaren Äußerungen. Jeder Zug leitet das Verhalten neu aus dem Fehlermuster im System-Prompt ab. Anderenfalls würde eine frühe Fehlanwendung im Kontext zum Präzedenzfall, und die Simulation bliebe konsistent mit *sich selbst* statt mit der Vignette — womit das Instrument genau die Frage nicht mehr beantwortet, für die es gebaut wird.
+Der Gesprächsverlauf, der bei jedem Zug an das Modell zurückgeht, enthält die Eingaben der Teilnehmer:in und die sichtbaren Äußerungen der simulierten Schüler:in — beide Gesprächsseiten, aber keine Denkspur. Jeder Zug leitet das Verhalten neu aus dem Fehlermuster im System-Prompt ab. Anderenfalls würde eine frühe Fehlanwendung im Kontext zum Präzedenzfall, und die Simulation bliebe konsistent mit *sich selbst* statt mit der Vignette — womit das Instrument genau die Frage nicht mehr beantwortet, für die es gebaut wird.
 
 ## Sichtbarkeit
 

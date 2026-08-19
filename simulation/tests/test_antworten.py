@@ -165,7 +165,7 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
             sprachmodell="fake",
             parameter={"skript": [{"denkspur": "x", "aeusserung": "2/5."}]},
         ),
-        verlauf=[vorheriger_versuch.antwort.aeusserung],
+        verlauf=[("Wie hast du gerechnet?", vorheriger_versuch.antwort.aeusserung)],
         eingabe="Wie hast du gerechnet?",
     )
 

@@ -66,7 +66,7 @@ def antwort_versuchen(
     vignette: "Vignette",
     kern: "Simulationskern",
     modell_konfiguration: "ModellKonfiguration",
-    verlauf: Sequence[str],
+    verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> Antwortversuch:
     """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in."""
@@ -76,7 +76,13 @@ def antwort_versuchen(
     platzhalter: dict[str, str] = prompt_platzhalter(vignette)
     system_prompt: str = _prompt_rendern(kern.system_prompt_vorlage, platzhalter)
     user_prompt: str = _prompt_rendern(kern.user_prompt_vorlage, platzhalter)
-    user_prompt = f"{user_prompt}\n\nVerlauf:\n{'\n'.join(verlauf)}\n\nEingabe:\n{eingabe}"
+    gespraechsschritte: str = "\n".join(
+        f"Frage: {frage}\nDeine Antwort: {aeusserung}"
+        for frage, aeusserung in verlauf
+    )
+    user_prompt = (
+        f"{user_prompt}\n\nVerlauf:\n{gespraechsschritte}\n\nEingabe:\n{eingabe}"
+    )
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)
     fehlversuche: list[Fehlversuch] = []
 
