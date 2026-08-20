@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import Simulationskern
+from vignetten.forms import VignetteForm
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -241,6 +242,26 @@ class VignetteBearbeitenViewTests(TestCase):
 
         self.assertContains(response, 'enctype="multipart/form-data"')
 
+    def test_formular_unterbindet_die_browserseitige_wiederherstellung(self) -> None:
+        """Beim Neuladen sind die Serverwerte des Entwurfs maßgeblich, nicht die alten."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, 'autocomplete="off"')
+
+    def test_formular_zeigt_dieselbe_gliederung_wie_das_anlegeformular(self) -> None:
+        """Editor und Anlegeformular teilen sich Sektionen und Abbrechen-Weg."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, "Fehlermuster")
+        self.assertContains(response, "Gesprächsbudget")
+        self.assertContains(
+            response, reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+
     def test_lagert_hochgeladenes_bild_unter_media_root_ab(self) -> None:
         """Ein Bild aus dem Entwurf wird dauerhaft unter MEDIA_ROOT gespeichert."""
         with (
@@ -387,6 +408,27 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
             self.assertCountEqual(
                 response.context["thema_werte"], ["Bruchrechnung", "Addition"]
             )
+
+
+class VignetteFormularSeiteTests(TestCase):
+    """Anlegen und Bearbeiten teilen sich ein Formular-Template."""
+
+    def test_beide_editoren_rendern_alle_formularfelder(self) -> None:
+        """Das gemeinsame Template darf beim Erweitern kein Feld unterschlagen."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        entwurf: Vignette = Vignette.objects._erstellen(historie=historie)
+        self.client.force_login(ada)
+
+        responses: tuple[HttpResponse, ...] = (
+            self.client.get(reverse("vignetten:anlegen")),
+            self.client.get(reverse("vignetten:bearbeiten", args=[entwurf.pk])),
+        )
+
+        for response in responses:
+            for feldname in VignetteForm().fields:
+                self.assertContains(response, f'name="{feldname}"')
 
 
 class VignetteFinalisierenViewTests(TestCase):

@@ -220,5 +220,5 @@ def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "vignetten/bearbeiten.html",
-        {"form": form, **_unterrichtskontext_werte()},
+        {"form": form, "vignette": vignette, **_unterrichtskontext_werte()},
     )
