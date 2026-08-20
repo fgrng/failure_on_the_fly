@@ -321,9 +321,20 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 "fehlversuche": [],
             },
         ])
-        zweiter_prompt: str = FakeSprachmodell.letzte_anfragen[-1][1]
-        self.assertIn("Ich rechne eins plus eins und zwei plus drei.", zweiter_prompt)
-        self.assertNotIn("Mia addiert Zähler und Nenner.", zweiter_prompt)
+        zweite_nachrichten: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
+        self.assertIn(
+            {
+                "role": "assistant",
+                "content": "Ich rechne eins plus eins und zwei plus drei.",
+            },
+            zweite_nachrichten,
+        )
+        self.assertTrue(
+            all(
+                "Mia addiert Zähler und Nenner." not in nachricht["content"]
+                for nachricht in zweite_nachrichten
+            )
+        )
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
@@ -471,7 +482,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertNotContains(response, "Native Reasoning-Spur:")
 
     def test_modellverlauf_traegt_beide_gespraechsseiten(self) -> None:
-        """Ohne die vorherige Frage könnte die Antwort nicht auf sie eingehen."""
+        """Beide Gesprächsseiten reisen als native Rollen zum Modell."""
 
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
@@ -483,11 +494,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
         )
 
-        self.assertIn(
-            "Verlauf:\nFrage: Wie rechnest du?\n"
-            "Deine Antwort: Ich addiere einfach alles.\n\n"
-            "Eingabe:\nUnd warum so?",
-            FakeSprachmodell.letzte_anfragen[-1][1],
+        self.assertEqual(
+            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
+            [
+                {"role": "user", "content": "Wie rechnest du?"},
+                {"role": "assistant", "content": "Ich addiere einfach alles."},
+                {"role": "user", "content": "Und warum so?"},
+            ],
         )
 
     def test_leere_aeusserung_bleibt_im_modellverlauf(self) -> None:
@@ -507,10 +520,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
         )
 
-        self.assertIn(
-            "Verlauf:\nFrage: Erster Schritt\nDeine Antwort: \n\n"
-            "Eingabe:\nZweiter Schritt",
-            FakeSprachmodell.letzte_anfragen[-1][1],
+        self.assertEqual(
+            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
+            [
+                {"role": "user", "content": "Erster Schritt"},
+                {"role": "assistant", "content": ""},
+                {"role": "user", "content": "Zweiter Schritt"},
+            ],
         )
 
     def test_endgueltiger_fehlschlag_zeigt_fehlermeldung(self) -> None:

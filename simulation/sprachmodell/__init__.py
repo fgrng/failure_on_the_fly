@@ -19,6 +19,30 @@ AUSGABE_SCHEMA: dict[str, object] = {
 }
 
 
+def nachrichten_bauen(
+    system_prompt: str,
+    user_prompt: str,
+    verlauf: Sequence[tuple[str, str]],
+    eingabe: str,
+) -> list[dict[str, str]]:
+    """Baut den Gesprächsverlauf als native Konversationsnachrichten.
+
+    Die Rolle und der Arbeitskontext stehen einmal am Anfang; danach wechseln
+    sich Eingaben der Teilnehmer:in und sichtbare Äußerungen der simulierten
+    Schüler:in ab. Die Denkspur erreicht keinen Eintrag (ADR-0005).
+    """
+
+    nachrichten: list[dict[str, str]] = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    for frage, aeusserung in verlauf:
+        nachrichten.append({"role": "user", "content": frage})
+        nachrichten.append({"role": "assistant", "content": aeusserung})
+    nachrichten.append({"role": "user", "content": eingabe})
+    return nachrichten
+
+
 @dataclass(frozen=True)
 class Antwort:
     """Das strukturierte Ergebnis eines geglückten Modellaufrufs."""
@@ -53,6 +77,8 @@ class Sprachmodell(Protocol):
         self,
         system_prompt: str,
         user_prompt: str,
+        verlauf: Sequence[tuple[str, str]],
+        eingabe: str,
         ausgabe_schema: Mapping[str, object],
     ) -> tuple[Antwort, str | None]:
         """Liefert eine strukturierte Antwort und optionale native Reasoning-Spur."""
@@ -61,7 +87,7 @@ class Sprachmodell(Protocol):
 class FakeSprachmodell:
     """Spielt konfigurierte Antworten und maschinelle Fehler deterministisch ab."""
 
-    letzte_anfragen: list[tuple[str, str, Mapping[str, object]]] = []
+    letzte_anfragen: list[tuple[list[dict[str, str]], Mapping[str, object]]] = []
 
     def __init__(self, skript: Sequence[Mapping[str, Any]]) -> None:
         self.skript: list[Mapping[str, Any]] = list(skript)
@@ -70,11 +96,18 @@ class FakeSprachmodell:
         self,
         system_prompt: str,
         user_prompt: str,
+        verlauf: Sequence[tuple[str, str]],
+        eingabe: str,
         ausgabe_schema: Mapping[str, object],
     ) -> tuple[Antwort, str | None]:
         """Verbraucht genau einen Eintrag des Fake-Skripts."""
 
-        type(self).letzte_anfragen.append((system_prompt, user_prompt, ausgabe_schema))
+        type(self).letzte_anfragen.append(
+            (
+                nachrichten_bauen(system_prompt, user_prompt, verlauf, eingabe),
+                ausgabe_schema,
+            )
+        )
         eintrag: Mapping[str, Any] = self.skript.pop(0)
         if (fehler := eintrag.get("fehler")) == "formatbruch":
             raise Formatbruch(str(eintrag.get("rohantwort", "")))
@@ -116,6 +149,8 @@ class LiteLLMSprachmodell:
         self,
         system_prompt: str,
         user_prompt: str,
+        verlauf: Sequence[tuple[str, str]],
+        eingabe: str,
         ausgabe_schema: Mapping[str, object],
     ) -> tuple[Antwort, str | None]:
         """Fordert eine JSON-Ausgabe an und trennt die native Reasoning-Spur ab."""
@@ -123,10 +158,9 @@ class LiteLLMSprachmodell:
         try:
             modellantwort = self.completion(
                 model=self.modell,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                messages=nachrichten_bauen(
+                    system_prompt, user_prompt, verlauf, eingabe
+                ),
                 response_format={
                     "type": "json_schema",
                     "json_schema": {

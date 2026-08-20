@@ -36,7 +36,7 @@ def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_d
 
     antwort, native_reasoning_spur = LiteLLMSprachmodell(
         "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
-    ).antworten("System", "Eingabe", AUSGABE_SCHEMA)
+    ).antworten("System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA)
 
     assert antwort.denkspur == "Ich addiere."
     assert antwort.aeusserung == "2/5."
@@ -45,6 +45,7 @@ def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_d
         model="anthropic/claude-opus-4-8",
         messages=[
             {"role": "system", "content": "System"},
+            {"role": "user", "content": "Kontext"},
             {"role": "user", "content": "Eingabe"},
         ],
         response_format={
@@ -57,6 +58,43 @@ def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_d
         },
         temperature=0.2,
     )
+
+
+def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() -> None:
+    """Beide Gesprächsseiten reisen als native Rollen, nicht als Prompt-Anhang."""
+
+    completion = Mock(
+        return_value=SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}'
+                    )
+                )
+            ]
+        )
+    )
+
+    LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
+        "System",
+        "Kontext",
+        [
+            ("Wie rechnest du?", "Ich addiere alles."),
+            ("Und warum so?", "Weil es so passt."),
+        ],
+        "Stimmt das denn?",
+        AUSGABE_SCHEMA,
+    )
+
+    assert completion.call_args.kwargs["messages"] == [
+        {"role": "system", "content": "System"},
+        {"role": "user", "content": "Kontext"},
+        {"role": "user", "content": "Wie rechnest du?"},
+        {"role": "assistant", "content": "Ich addiere alles."},
+        {"role": "user", "content": "Und warum so?"},
+        {"role": "assistant", "content": "Weil es so passt."},
+        {"role": "user", "content": "Stimmt das denn?"},
+    ]
 
 
 def test_litellm_adapter_zieht_native_reasoning_spur_aus_thinking() -> None:
@@ -78,7 +116,7 @@ def test_litellm_adapter_zieht_native_reasoning_spur_aus_thinking() -> None:
 
     _, native_reasoning_spur = LiteLLMSprachmodell(
         "openai/gpt-test", {}, completion
-    ).antworten("System", "Eingabe", AUSGABE_SCHEMA)
+    ).antworten("System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA)
 
     assert native_reasoning_spur == "native Reasoning-Spur"
 
@@ -132,7 +170,7 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
 
     with pytest.raises(ContentFilter) as exc_info:
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Eingabe", AUSGABE_SCHEMA
+            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
         )
 
     assert exc_info.value.rohantwort == "Gefilterte Rohantwort"
@@ -149,7 +187,7 @@ def test_litellm_adapter_kennzeichnet_content_policy_exception_als_filter() -> N
 
     with pytest.raises(ContentFilter):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Eingabe", AUSGABE_SCHEMA
+            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
         )
 
 
@@ -160,7 +198,7 @@ def test_litellm_adapter_kennzeichnet_fehlende_antworthuelle_als_formatbruch() -
 
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Eingabe", AUSGABE_SCHEMA
+            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
         )
 
 
@@ -184,5 +222,5 @@ def test_litellm_adapter_kennzeichnet_zusaetzliches_feld_als_formatbruch() -> No
 
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Eingabe", AUSGABE_SCHEMA
+            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
         )

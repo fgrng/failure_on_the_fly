@@ -76,13 +76,6 @@ def antwort_versuchen(
     platzhalter: dict[str, str] = prompt_platzhalter(vignette)
     system_prompt: str = _prompt_rendern(kern.system_prompt_vorlage, platzhalter)
     user_prompt: str = _prompt_rendern(kern.user_prompt_vorlage, platzhalter)
-    gespraechsschritte: str = "\n".join(
-        f"Frage: {frage}\nDeine Antwort: {aeusserung}"
-        for frage, aeusserung in verlauf
-    )
-    user_prompt = (
-        f"{user_prompt}\n\nVerlauf:\n{gespraechsschritte}\n\nEingabe:\n{eingabe}"
-    )
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)
     fehlversuche: list[Fehlversuch] = []
 
@@ -91,6 +84,8 @@ def antwort_versuchen(
             antwort, native_reasoning_spur = sprachmodell.antworten(
                 system_prompt,
                 user_prompt,
+                verlauf,
+                eingabe,
                 AUSGABE_SCHEMA,
             )
         except Formatbruch as exc:

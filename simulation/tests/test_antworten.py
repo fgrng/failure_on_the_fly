@@ -169,8 +169,11 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
         eingabe="Wie hast du gerechnet?",
     )
 
-    assert "Sichtbare Äußerung" in FakeSprachmodell.letzte_anfragen[1][1]
-    assert "Die geheime Denkspur." not in FakeSprachmodell.letzte_anfragen[1][1]
+    nachrichten = FakeSprachmodell.letzte_anfragen[1][0]
+    assert {"role": "assistant", "content": "Sichtbare Äußerung"} in nachrichten
+    assert all(
+        "Die geheime Denkspur." not in nachricht["content"] for nachricht in nachrichten
+    )
 
 
 def test_ausgabe_schema_fuehrt_denkspur_vor_aeusserung() -> None:
