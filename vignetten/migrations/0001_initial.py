@@ -35,9 +35,22 @@ class Migration(migrations.Migration):
                 ('finalisiert_am', models.DateTimeField(blank=True, null=True)),
                 ('fehlermuster_beschreibung', models.TextField(blank=True)),
                 ('lernauftrag_text', models.TextField(blank=True)),
-                ('arbeitsheft_bildbeschreibung', models.TextField(blank=True, help_text='Prompt-Quelle für das Modell.')),
+                (
+                    'arbeitsheft_bildbeschreibung',
+                    models.TextField(
+                        blank=True,
+                        help_text='Prompt-Quelle für das Modell.',
+                    ),
+                ),
                 ('arbeitsheft_text', models.TextField(blank=True, help_text='Was die Teilnehmer:in sieht.')),
-                ('arbeitsheft_bild', models.ImageField(blank=True, help_text='Was die Teilnehmer:in sieht.', upload_to='vignettenbilder/')),
+                (
+                    'arbeitsheft_bild',
+                    models.ImageField(
+                        blank=True,
+                        help_text='Was die Teilnehmer:in sieht.',
+                        upload_to='vignettenbilder/',
+                    ),
+                ),
                 ('schuelerin_name', models.CharField(blank=True, max_length=255)),
                 ('schuelerin_geschlecht', models.CharField(blank=True, choices=[('männlich', 'Männlich'), ('weiblich', 'Weiblich')], max_length=9)),
                 ('lehrperson_name', models.CharField(blank=True, max_length=255)),
