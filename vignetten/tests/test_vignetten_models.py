@@ -25,7 +25,7 @@ def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
     vignette: Vignette = Vignette(
         zustand=Vignette.Zustand.FINAL,
         fehlermuster_beschreibung="Brüche <werden> addiert.",
-        lernauftrag_text="",
+        lernauftrag_text="Addiere zwei Brüche.",
         arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
         schuelerin_name="Mia",
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -39,7 +39,9 @@ def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
             "<fehlermuster_beschreibung>Brüche <werden> addiert."
             "</fehlermuster_beschreibung>"
         ),
-        "lernauftrag_text": "",
+        "lernauftrag_text": (
+            "<lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text>"
+        ),
         "arbeitsheft_bildbeschreibung": (
             "<arbeitsheft_bildbeschreibung>1/2 + 1/3 = 2/5"
             "</arbeitsheft_bildbeschreibung>"
@@ -50,6 +52,18 @@ def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
         "thema": "Brüche",
         "klassenstufe": "5",
     }
+
+
+def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
+    """Leere lange Prompt-Inhalte werden nicht mit einer Umgebung versehen."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(Vignette())
+
+    assert (
+        platzhalter["fehlermuster_beschreibung"],
+        platzhalter["lernauftrag_text"],
+        platzhalter["arbeitsheft_bildbeschreibung"],
+    ) == ("", "", "")
 
 
 def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:
