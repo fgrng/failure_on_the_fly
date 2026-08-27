@@ -14,27 +14,26 @@ Autor:innen beschreiben **wer** und **was falsch läuft**. Dass die simulierte S
 |---|---|---|
 | Fehlermuster-Beschreibung | ja | nein |
 | Lernauftrag-Text | ja | ja |
-| Arbeitsheft-Bildbeschreibung | ja | nein |
-| Arbeitsheft-Inhalt | nein | ja |
+| Arbeitsheft (Text und Bildbeschreibung) | ja | ja |
 | Simulierte Schüler:in (Name, Geschlecht) | ja | ja |
 | Erfahrene Lehrperson (Name, Geschlecht) | nein | ja |
 | Unterrichtskontext (Fach, Thema, Klassenstufe) | ja | ja |
 | Referenzdiagnose | nein | nein |
 
-Der Arbeitsheft-Inhalt bleibt aus dem Prompt heraus, weil er ein Bild sein kann; dafür existiert die Arbeitsheft-Bildbeschreibung (ADR-0005). Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
+Der zusammengesetzte Arbeitsheft-Wert gibt der Simulation Text und Bildbeschreibung in derselben Reihenfolge wie der Nutzeransicht; das Bild selbst erreicht den Prompt nicht. Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
 
 **Beide Akteure sind Vignettenfelder**, nicht Kernfelder: Dieselbe Schüler:in dürfte sonst in jeder Klassenstufe und jedem Fach dieselbe sein, und dasselbe gilt eine Rolle weiter für die Lehrperson. Namen und Geschlechter werden im Anlegen-Formular zufällig vorbelegt und sind überschreibbar — der Zufall ist eine Freundlichkeit der Oberfläche, keine Eigenschaft der Domäne. Sie werden mit der Vignette versioniert und beim Finalisieren eingefroren; ein Entwurf aus einer finalen Fassung erbt sie.
 
 Die **Rahmenhandlung ist ebenfalls eine Vorlage**, schöpft aber nicht aus demselben Vertrag: Prompt-Vorlagen und Rahmenhandlung berühren sich nie (ADR-0004) und ziehen aus verschiedenen Spalten obiger Tabelle. Der Vertrag ist deshalb **zwei benannte Mengen, nicht eine**:
 
-- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht. Die kurzen Skalare bleiben bei der Ersetzung roh. Die langen Inhalte `$fehlermuster_beschreibung`, `$lernauftrag_text` und `$arbeitsheft_bildbeschreibung` werden dagegen, wenn sie nicht leer sind, von der Platzhalter-Funktion der Vignette in eine gleichnamige XML-artige Umgebung gefasst. Die Vorlage enthält dafür nur den nackten Platzhalter; Nutzereingaben werden nicht escaped.
+- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht. Die kurzen Skalare bleiben bei der Ersetzung roh. Die langen Inhalte `$fehlermuster_beschreibung` und `$lernauftrag_text` werden, wenn sie nicht leer sind, von der Platzhalter-Funktion der Vignette in eine gleichnamige XML-artige Umgebung gefasst. `$arbeitsheft` ist ein komponierter Wert: Seine äußere Umgebung enthält die nichtleeren, einzeln gefassten Stücke `arbeitsheft_text` und `arbeitsheft_bildbeschreibung` in der Marker-Reihenfolge. Die Vorlage enthält dafür nur den nackten Platzhalter; Nutzereingaben werden nicht escaped.
 - `VERTRAG_RAHMEN` — die Felder der Nutzeransicht-Spalte, plus abgeleitete grammatische Formen (siehe unten). Aus ihr schöpfen Hospitationseinleitung, Gesprächseinleitung und Debrief.
 
 Eine einzige Menge wäre falsch: Sie erlaubte die Fehlermuster-Beschreibung in der Einleitung, die sie nie sehen darf, und den Namen der erfahrenen Lehrperson im System-Prompt, wo er eine Störvariable wäre.
 
 ## Die Nutzeransicht-Spalte ist keine reine Platzhalterliste
 
-Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituiert. Der **Lernauftrag** und der **Arbeitsheft-Inhalt** sind **Ansichtsbausteine**, die die View neben der Rahmenhandlung rendert — der Arbeitsheft-Inhalt kann ein Bild sein und lässt sich nicht in einen `string.Template`-Platzhalter füllen. Substituiert werden nur die kurzen, satzfähigen Werte: die Namen und Geschlechter der Akteure und der Unterrichtskontext.
+Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituiert. Der **Lernauftrag** und das **Arbeitsheft** sind **Ansichtsbausteine**, die die View neben der Rahmenhandlung rendert. Im Prompt steht das Arbeitsheft als komponierter Wert, der die Bildbeschreibung statt des Bildes trägt. Substituiert werden nur die kurzen, satzfähigen Werte: die Namen und Geschlechter der Akteure und der Unterrichtskontext.
 
 Weil die Rahmenhandlung Fließtext für Menschen ist, braucht sie Grammatik, die rohe Feldwerte nicht liefern. Der Code berechnet aus dem Geschlecht **abgeleitete grammatische Formen** und stellt sie als eigene Platzhalter in `VERTRAG_RAHMEN` bereit (Anrede, Pronomen, Possessiv). `VERTRAG_RAHMEN` hat damit mehr Einträge als die Nutzeransicht-Spalte Zeilen. Jede neue grammatische Form ist eine Code-Änderung — dieselbe Aussage wie unten über neue Leerstellen, nur über Ableitungen statt über Felder.
 

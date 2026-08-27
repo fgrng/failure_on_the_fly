@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -13,10 +14,11 @@ from django.utils import timezone
 from simulation.models import PROMPT_PLATZHALTER_MIT_UMGEBUNG, Simulationskern
 
 
+_BILDMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
+
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
     "lernauftrag_text",
-    "arbeitsheft_bildbeschreibung",
     "schuelerin_name",
     "schuelerin_geschlecht",
     "lehrperson_name",
@@ -173,10 +175,11 @@ class Vignette(models.Model):
     )
     arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
         blank=True,
-        help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar.",
+        help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
     )
     arbeitsheft_text: models.TextField = models.TextField(
-        blank=True, help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar."
+        blank=True,
+        help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Mit [bild] steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
     )
     arbeitsheft_bild: models.ImageField = models.ImageField(
         upload_to=vignetten_bild_pfad,
@@ -280,6 +283,24 @@ class Vignette(models.Model):
             .exclude(zustand=self.Zustand.ARCHIVIERT)
             .exists()
         )
+
+    def arbeitsheft_zerlegen(self) -> tuple[str, str]:
+        """Teilt den Arbeitsheft-Text am ersten Bildmarker und entfernt alle."""
+        vor_bild, *nach_bild = _BILDMARKER.split(self.arbeitsheft_text)
+        nach_bild_text: str = "".join(nach_bild)
+        if not self.arbeitsheft_bild:
+            return vor_bild + nach_bild_text, ""
+        return vor_bild, nach_bild_text
+
+    @property
+    def arbeitsheft_text_vor_bild(self) -> str:
+        """Liefert den sichtbaren Arbeitsheft-Text vor dem Bild."""
+        return self.arbeitsheft_zerlegen()[0]
+
+    @property
+    def arbeitsheft_text_nach_bild(self) -> str:
+        """Liefert den sichtbaren Arbeitsheft-Text nach dem Bild."""
+        return self.arbeitsheft_zerlegen()[1]
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
@@ -409,6 +430,10 @@ class Vignette(models.Model):
             raise ValidationError(
                 "Zum Finalisieren braucht das Arbeitsheft Text oder ein Bild."
             )
+        if self.arbeitsheft_bild and not self.arbeitsheft_bildbeschreibung:
+            raise ValidationError(
+                "Zum Finalisieren braucht ein Arbeitsheft-Bild eine Bildbeschreibung."
+            )
         if self.budget_wert is None or self.budget_wert <= 0:
             raise ValidationError("Zum Finalisieren muss das Budget größer als 0 sein.")
         if self.gepinnter_kern is None:
@@ -463,7 +488,7 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
     platzhalter: dict[str, str] = {
         "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
         "lernauftrag_text": vignette.lernauftrag_text,
-        "arbeitsheft_bildbeschreibung": vignette.arbeitsheft_bildbeschreibung,
+        "arbeitsheft": _arbeitsheft_prompt(vignette),
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
         "fach": vignette.fach,
@@ -471,9 +496,26 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
         "klassenstufe": vignette.klassenstufe,
     }
     for name in PROMPT_PLATZHALTER_MIT_UMGEBUNG:
-        if wert := platzhalter[name]:
+        if name != "arbeitsheft" and (wert := platzhalter[name]):
             platzhalter[name] = f"<{name}>{wert}</{name}>"
     return platzhalter
+
+
+def _arbeitsheft_prompt(vignette: Vignette) -> str:
+    """Fasst Text und Bildbeschreibung in ihrer sichtbaren Reihenfolge zusammen."""
+    vor_bild, nach_bild = vignette.arbeitsheft_zerlegen()
+    if vignette.arbeitsheft_bild:
+        stuecke: tuple[tuple[str, str], ...] = (
+            ("arbeitsheft_text", vor_bild),
+            ("arbeitsheft_bildbeschreibung", vignette.arbeitsheft_bildbeschreibung),
+            ("arbeitsheft_text", nach_bild),
+        )
+    else:
+        stuecke = (("arbeitsheft_text", vor_bild + nach_bild),)
+    inhalt: str = "".join(
+        f"<{name}>{wert}</{name}>" for name, wert in stuecke if wert
+    )
+    return f"<arbeitsheft>{inhalt}</arbeitsheft>" if inhalt else ""
 
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:

@@ -89,10 +89,9 @@
         </header>
         <div class="field-grid">
             <section class="page-field page-field--wide"><h3>Lernauftrag</h3><p class="prose">{{ vignette.lernauftrag_text|default:"—" }}</p></section>
-            <section class="page-field"><h3>Arbeitsheft Text</h3><p class="prose">{{ vignette.arbeitsheft_text|default:"—" }}</p></section>
-            <section class="page-field">
-                <h3>Arbeitsheft Bild</h3>
-                {% if vignette.arbeitsheft_bild %}<img class="vignette-detail-image" src="{{ vignette.arbeitsheft_bild.url }}" alt="Arbeitsheft-Inhalt">{% else %}<p>—</p>{% endif %}
+            <section class="page-field page-field--wide">
+                <h3>Arbeitsheft</h3>
+                {% include "vignetten/includes/arbeitsheft_inhalt.html" %}
             </section>
             <section class="page-field page-field--wide"><h3>Arbeitsheft Bildbeschreibung</h3><p class="prose">{{ vignette.arbeitsheft_bildbeschreibung|default:"—" }}</p></section>
         </div>

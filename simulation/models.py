@@ -16,7 +16,7 @@ VERTRAG_PROMPT: frozenset[str] = frozenset(
     {
         "fehlermuster_beschreibung",
         "lernauftrag_text",
-        "arbeitsheft_bildbeschreibung",
+        "arbeitsheft",
         "schuelerin_name",
         "schuelerin_geschlecht",
         "fach",
@@ -28,7 +28,7 @@ PROMPT_PLATZHALTER_MIT_UMGEBUNG: frozenset[str] = frozenset(
     {
         "fehlermuster_beschreibung",
         "lernauftrag_text",
-        "arbeitsheft_bildbeschreibung",
+        "arbeitsheft",
     }
 )
 VERTRAG_RAHMEN: frozenset[str] = frozenset(

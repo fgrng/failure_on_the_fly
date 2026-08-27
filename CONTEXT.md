@@ -40,8 +40,8 @@ Die sichtbare, fehlerhafte Bearbeitung der simulierten Schüler:in, wie sie der 
 _Avoid_: Schülerlösung, Lösung, Heft
 
 **Arbeitsheft-Bildbeschreibung**:
-Die textuelle Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie existiert für die Simulation, während der Arbeitsheft-Inhalt für den Menschen existiert.
-_Avoid_: Alt-Text, Bearbeitungsbeschreibung
+Die textuelle Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation.
+_Avoid_: Bearbeitungsbeschreibung
 
 ## Sitzung einer Vignette
 

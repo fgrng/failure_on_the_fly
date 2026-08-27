@@ -1,0 +1,9 @@
+{% if vignette.arbeitsheft_text_vor_bild %}
+    <p class="arbeitsheft-inhalt">{{ vignette.arbeitsheft_text_vor_bild }}</p>
+{% endif %}
+{% if vignette.arbeitsheft_bild %}
+    <img class="arbeitsheft-bild" src="{{ vignette.arbeitsheft_bild.url }}" alt="{{ vignette.arbeitsheft_bildbeschreibung }}">
+{% endif %}
+{% if vignette.arbeitsheft_text_nach_bild %}
+    <p class="arbeitsheft-inhalt">{{ vignette.arbeitsheft_text_nach_bild }}</p>
+{% endif %}

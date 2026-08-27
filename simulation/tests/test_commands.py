@@ -17,9 +17,9 @@ def test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an() -> None:
     assert "innerhalb des kurzen Gesprächs nicht plötzlich" in kern.system_prompt_vorlage
     assert "$fehlermuster_beschreibung" in kern.system_prompt_vorlage
     assert "<fehlermuster_beschreibung>" not in kern.system_prompt_vorlage
-    assert "$arbeitsheft_bildbeschreibung" in kern.user_prompt_vorlage
+    assert "$arbeitsheft" in kern.user_prompt_vorlage
     assert "<lernauftrag_text>" not in kern.user_prompt_vorlage
-    assert "<arbeitsheft_bildbeschreibung>" not in kern.user_prompt_vorlage
+    assert "<arbeitsheft>" not in kern.user_prompt_vorlage
     assert "Arbeitsphase" in kern.rahmenhandlung_einleitung
     assert "$schuelerin_name" in kern.rahmenhandlung_gespraechseinleitung
 

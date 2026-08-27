@@ -34,6 +34,18 @@
     border-radius: var(--radius);
 }
 
+.page-field .arbeitsheft-inhalt {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.page-field .arbeitsheft-bild {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+}
+
 .vignette-detail-kern {
     margin: var(--space-3) 0 0;
     color: var(--color-text-muted);

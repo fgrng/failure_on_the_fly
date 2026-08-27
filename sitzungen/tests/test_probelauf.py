@@ -122,6 +122,23 @@ class ProbelaufStartTests(TestCase):
         self.assertContains(debrief, "rahmenhandlung-debrief-w.webp")
         self.assertNotContains(debrief, "<!DOCTYPE html>")
 
+    def test_arbeitsheft_ordnet_text_und_bild_am_marker(self) -> None:
+        """Das Gespräch zeigt den Arbeitshefttext um das Bild herum."""
+
+        self.entwurf.arbeitsheft_text = "Rechnung oben [BILD] Rechnung unten [bild]"
+        self.entwurf.arbeitsheft_bild = "vignettenbilder/heft.gif"
+        self.entwurf.arbeitsheft_bildbeschreibung = "Durchgestrichene Rechnung"
+        self.entwurf.save()
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        response: HttpResponse = self.client.get(reverse("sitzungen:probelauf_gespraech"))
+
+        inhalt: str = response.content.decode()
+        self.assertLess(inhalt.index("Rechnung oben "), inhalt.index("heft.gif"))
+        self.assertLess(inhalt.index("heft.gif"), inhalt.index(" Rechnung unten "))
+        self.assertContains(response, 'alt="Durchgestrichene Rechnung"')
+        self.assertNotContains(response, "[BILD]")
+
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,
     ) -> None:

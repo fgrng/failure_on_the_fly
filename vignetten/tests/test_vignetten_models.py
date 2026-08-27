@@ -19,14 +19,16 @@ from vignetten.models import (
 )
 
 
-def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
-    """Lange Prompt-Inhalte bleiben unverändert und sind nur bei Inhalt gefasst."""
+def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> None:
+    """Der zusammengesetzte Arbeitsheftwert folgt dem ersten Bildmarker."""
 
     vignette: Vignette = Vignette(
         zustand=Vignette.Zustand.FINAL,
         fehlermuster_beschreibung="Brüche <werden> addiert.",
         lernauftrag_text="Addiere zwei Brüche.",
-        arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
+        arbeitsheft_text="8 + 4 = 12 [BILD] Also ist die Lösung 7. [bild]",
+        arbeitsheft_bild="vignettenbilder/heft.gif",
+        arbeitsheft_bildbeschreibung="Heftseite mit durchgestrichener 12.",
         schuelerin_name="Mia",
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
         fach="Mathematik",
@@ -39,12 +41,14 @@ def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
             "<fehlermuster_beschreibung>Brüche <werden> addiert."
             "</fehlermuster_beschreibung>"
         ),
-        "lernauftrag_text": (
-            "<lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text>"
-        ),
-        "arbeitsheft_bildbeschreibung": (
-            "<arbeitsheft_bildbeschreibung>1/2 + 1/3 = 2/5"
+        "lernauftrag_text": "<lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text>",
+        "arbeitsheft": (
+            "<arbeitsheft>"
+            "<arbeitsheft_text>8 + 4 = 12 </arbeitsheft_text>"
+            "<arbeitsheft_bildbeschreibung>Heftseite mit durchgestrichener 12."
             "</arbeitsheft_bildbeschreibung>"
+            "<arbeitsheft_text> Also ist die Lösung 7. </arbeitsheft_text>"
+            "</arbeitsheft>"
         ),
         "schuelerin_name": "Mia",
         "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
@@ -61,9 +65,21 @@ def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
 
     assert (
         platzhalter["fehlermuster_beschreibung"],
-        platzhalter["lernauftrag_text"],
-        platzhalter["arbeitsheft_bildbeschreibung"],
-    ) == ("", "", "")
+        platzhalter["arbeitsheft"],
+    ) == ("", "")
+
+
+def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
+    """Ein unvollständiger Entwurf gibt den Marker nie an das Modell weiter."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(arbeitsheft_text="Oben [BILD] unten [bild]")
+    )
+
+    assert platzhalter["arbeitsheft"] == (
+        "<arbeitsheft><arbeitsheft_text>Oben  unten </arbeitsheft_text>"
+        "</arbeitsheft>"
+    )
 
 
 def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:
@@ -419,6 +435,24 @@ class VignetteFinalisierenTests(TestCase):
         vignette.finalisieren()
 
         self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+
+    def test_finalisieren_erlaubt_leere_bildbeschreibung_ohne_bild(self) -> None:
+        """Eine Beschreibung ist nur zusammen mit einem Bild erforderlich."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.arbeitsheft_bildbeschreibung = ""
+
+        vignette.finalisieren()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+
+    def test_finalisieren_braucht_bildbeschreibung_mit_bild(self) -> None:
+        """Ein sichtbares Bild ist ohne seinen Alt-Text nicht finalisierbar."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.arbeitsheft_bild = "vignettenbilder/heft.gif"
+        vignette.arbeitsheft_bildbeschreibung = ""
+
+        with self.assertRaisesMessage(ValidationError, "Bildbeschreibung"):
+            vignette.finalisieren()
 
     def test_finalisieren_lehnt_nichtpositives_budget_ab(self) -> None:
         """Ein Gesprächsbudget muss mindestens einen Schritt oder eine Zeit tragen."""
