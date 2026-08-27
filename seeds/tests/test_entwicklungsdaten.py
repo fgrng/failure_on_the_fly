@@ -25,9 +25,9 @@ class EntwicklungsdatenTests(TestCase):
 
         # Mindestens eine Beispielvignette trägt einen Marker mitten im Text
         marker_mitten_im_text: bool = any(
-            vignette.lernauftrag_text_vor_bild and vignette.lernauftrag_text_nach_bild
-            or vignette.arbeitsheft_text_vor_bild and vignette.arbeitsheft_text_nach_bild
+            teil.text_vor_bild and teil.text_nach_bild
             for vignette in vignetten
+            for teil in (vignette.lernauftrag, vignette.arbeitsheft)
         )
         self.assertTrue(
             marker_mitten_im_text,

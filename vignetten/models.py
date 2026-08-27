@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from pathlib import Path
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -14,7 +15,37 @@ from django.utils import timezone
 from simulation.models import Simulationskern
 
 
-_BILDMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
+_POSITIONSMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
+
+
+def _am_positionsmarker_zerlegen(text: str, bild: object) -> tuple[str, str]:
+    # Teilt einen Aufgabenkontext am ersten Positionsmarker und entfernt alle.
+
+    textteile: list[str] = _POSITIONSMARKER.split(text)
+    vor_bild: str = textteile[0]
+    nach_bild: str = "".join(textteile[1:])
+    if not bild:
+        return vor_bild + nach_bild, ""
+    return vor_bild, nach_bild
+
+
+@dataclass(frozen=True)
+class Aufgabenkontextteil:
+    """Ein Teil des Aufgabenkontexts — Lernauftrag oder Arbeitsheft."""
+
+    name: str
+    label: str
+    artikel: str
+    text_vor_bild: str
+    bild: object
+    bildbeschreibung: str
+    text_nach_bild: str
+    simulationshinweise: str
+
+    @property
+    def text(self) -> str:
+        """Liefert den Text des Teils ohne Positionsmarker."""
+        return self.text_vor_bild + self.text_nach_bild
 
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
@@ -300,46 +331,35 @@ class Vignette(models.Model):
             .exists()
         )
 
-    def aufgabenkontext_zerlegen(self, text: str, bild: object) -> tuple[str, str]:
-        """Teilt einen Aufgabenkontext am ersten Bildmarker und entfernt alle."""
-        textteile: list[str] = _BILDMARKER.split(text)
-        vor_bild: str = textteile[0]
-        nach_bild: str = "".join(textteile[1:])
-        if not bild:
-            return vor_bild + nach_bild, ""
-        return vor_bild, nach_bild
+    def _aufgabenkontextteil(
+        self, name: str, label: str, artikel: str
+    ) -> Aufgabenkontextteil:
+        # Baut einen Teil des Aufgabenkontexts aus den gleichnamigen Feldern.
 
-    def lernauftrag_zerlegen(self) -> tuple[str, str]:
-        """Teilt den Lernauftrag-Text am ersten Bildmarker und entfernt alle."""
-        return self.aufgabenkontext_zerlegen(
-            self.lernauftrag_text, self.lernauftrag_bild
+        bild: object = getattr(self, f"{name}_bild")
+        vor_bild, nach_bild = _am_positionsmarker_zerlegen(
+            getattr(self, f"{name}_text"), bild
+        )
+        return Aufgabenkontextteil(
+            name=name,
+            label=label,
+            artikel=artikel,
+            text_vor_bild=vor_bild,
+            bild=bild,
+            bildbeschreibung=getattr(self, f"{name}_bildbeschreibung"),
+            text_nach_bild=nach_bild,
+            simulationshinweise=getattr(self, f"{name}_simulationshinweise"),
         )
 
     @property
-    def lernauftrag_text_vor_bild(self) -> str:
-        """Liefert den sichtbaren Lernauftrag-Text vor dem Bild."""
-        return self.lernauftrag_zerlegen()[0]
+    def lernauftrag(self) -> Aufgabenkontextteil:
+        """Liefert den Lernauftrag als Teil des Aufgabenkontexts."""
+        return self._aufgabenkontextteil("lernauftrag", "Lernauftrag", "der")
 
     @property
-    def lernauftrag_text_nach_bild(self) -> str:
-        """Liefert den sichtbaren Lernauftrag-Text nach dem Bild."""
-        return self.lernauftrag_zerlegen()[1]
-
-    def arbeitsheft_zerlegen(self) -> tuple[str, str]:
-        """Teilt den Arbeitsheft-Text am ersten Bildmarker und entfernt alle."""
-        return self.aufgabenkontext_zerlegen(
-            self.arbeitsheft_text, self.arbeitsheft_bild
-        )
-
-    @property
-    def arbeitsheft_text_vor_bild(self) -> str:
-        """Liefert den sichtbaren Arbeitsheft-Text vor dem Bild."""
-        return self.arbeitsheft_zerlegen()[0]
-
-    @property
-    def arbeitsheft_text_nach_bild(self) -> str:
-        """Liefert den sichtbaren Arbeitsheft-Text nach dem Bild."""
-        return self.arbeitsheft_zerlegen()[1]
+    def arbeitsheft(self) -> Aufgabenkontextteil:
+        """Liefert das Arbeitsheft als Teil des Aufgabenkontexts."""
+        return self._aufgabenkontextteil("arbeitsheft", "Arbeitsheft", "das")
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert inhaltliche Änderungen an nicht mehr entworfenen Fassungen."""
@@ -469,19 +489,15 @@ class Vignette(models.Model):
             raise ValidationError(
                 f"Zum Finalisieren fehlen: {', '.join(fehlende_felder)}."
             )
-        for name in ("lernauftrag", "arbeitsheft"):
-            if not getattr(self, f"{name}_text") and not getattr(self, f"{name}_bild"):
+        for teil in (self.lernauftrag, self.arbeitsheft):
+            if not teil.text and not teil.bild:
                 raise ValidationError(
-                    "Zum Finalisieren braucht "
-                    f"{'der Lernauftrag' if name == 'lernauftrag' else 'das Arbeitsheft'} "
+                    f"Zum Finalisieren braucht {teil.artikel} {teil.label} "
                     "Text oder ein Bild."
                 )
-            if getattr(self, f"{name}_bild") and not getattr(
-                self, f"{name}_bildbeschreibung"
-            ):
+            if teil.bild and not teil.bildbeschreibung:
                 raise ValidationError(
-                    "Zum Finalisieren braucht ein "
-                    f"{'Lernauftrag' if name == 'lernauftrag' else 'Arbeitsheft'}-Bild "
+                    f"Zum Finalisieren braucht ein {teil.label}-Bild "
                     "eine Bildbeschreibung."
                 )
         if self.budget_wert is None or self.budget_wert <= 0:
@@ -538,25 +554,31 @@ class Vignette(models.Model):
 
 
 def _umgebung(tag: str, inhalt: str) -> str:
-    # Fasst einen nichtleeren Wert in eine XML-artige Umgebung ein.
+    # Fasst einen nichtleeren Wert in eine einzeilige XML-artige Umgebung ein.
 
     return f"<{tag}>{inhalt}</{tag}>" if inhalt else ""
+
+
+def _huelle(tag: str, inhalt: str) -> str:
+    # Fasst einen nichtleeren Wert in eine mehrzeilige XML-artige Umgebung ein.
+
+    return f"<{tag}>\n{inhalt}\n</{tag}>" if inhalt else ""
 
 
 def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
     """Liefert die Vignettenwerte für Prompt-Vorlagen."""
 
     return {
-        "fehlermuster_beschreibung": _umgebung(
+        "fehlermuster_beschreibung": _huelle(
             "fehlermuster_beschreibung", vignette.fehlermuster_beschreibung
         ),
-        "lernauftrag": _aufgabenkontext_prompt(vignette, "lernauftrag"),
-        "arbeitsheft": _aufgabenkontext_prompt(vignette, "arbeitsheft"),
-        "lernauftrag_simulationshinweise": _umgebung(
+        "lernauftrag": _aufgabenkontext_prompt(vignette.lernauftrag),
+        "arbeitsheft": _aufgabenkontext_prompt(vignette.arbeitsheft),
+        "lernauftrag_simulationshinweise": _huelle(
             "lernauftrag_simulationshinweise",
             vignette.lernauftrag_simulationshinweise,
         ),
-        "arbeitsheft_simulationshinweise": _umgebung(
+        "arbeitsheft_simulationshinweise": _huelle(
             "arbeitsheft_simulationshinweise",
             vignette.arbeitsheft_simulationshinweise,
         ),
@@ -568,23 +590,24 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
     }
 
 
-def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
+def _aufgabenkontext_prompt(teil: Aufgabenkontextteil) -> str:
     # Fasst Text und Bildbeschreibung eines Teils in sichtbarer Reihenfolge zusammen.
 
-    text: str = getattr(vignette, f"{name}_text")
-    bild: object = getattr(vignette, f"{name}_bild")
-    bildbeschreibung: str = getattr(vignette, f"{name}_bildbeschreibung")
-    vor_bild, nach_bild = vignette.aufgabenkontext_zerlegen(text, bild)
-    if bild:
+    name: str = teil.name
+    if teil.bild and teil.bildbeschreibung:
         stuecke: tuple[tuple[str, str], ...] = (
-            (f"{name}_text", vor_bild),
-            (f"{name}_bildbeschreibung", bildbeschreibung),
-            (f"{name}_text", nach_bild),
+            (f"{name}_text", teil.text_vor_bild),
+            (f"{name}_bildbeschreibung", teil.bildbeschreibung),
+            (f"{name}_text", teil.text_nach_bild),
         )
     else:
-        stuecke = ((f"{name}_text", vor_bild + nach_bild),)
-    inhalt: str = "".join(_umgebung(tag, wert) for tag, wert in stuecke)
-    return _umgebung(name, inhalt)
+        stuecke = ((f"{name}_text", teil.text),)
+    inhalt: str = "\n".join(
+        umgebung
+        for tag, wert in stuecke
+        if (umgebung := _umgebung(tag, wert))
+    )
+    return _huelle(name, inhalt)
 
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:

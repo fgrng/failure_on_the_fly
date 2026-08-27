@@ -34,7 +34,6 @@ $lernauftrag
 Du hast bereits in deinem Arbeitsheft die folgende Bearbeitung zu der Aufgabe angelegt:
 $arbeitsheft
 
-Zusätzliche Hinweise für die Simulation:
 $lernauftrag_simulationshinweise
 $arbeitsheft_simulationshinweise
 

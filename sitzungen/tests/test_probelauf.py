@@ -306,11 +306,15 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
         prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
         self.assertIn(
-            "<lernauftrag_simulationshinweise>Geheimer Hinweis zum Lernauftrag</lernauftrag_simulationshinweise>",
+            "<lernauftrag_simulationshinweise>\n"
+            "Geheimer Hinweis zum Lernauftrag\n"
+            "</lernauftrag_simulationshinweise>",
             prompt_inhalt,
         )
         self.assertIn(
-            "<arbeitsheft_simulationshinweise>Geheimer Hinweis zum Arbeitsheft</arbeitsheft_simulationshinweise>",
+            "<arbeitsheft_simulationshinweise>\n"
+            "Geheimer Hinweis zum Arbeitsheft\n"
+            "</arbeitsheft_simulationshinweise>",
             prompt_inhalt,
         )
 

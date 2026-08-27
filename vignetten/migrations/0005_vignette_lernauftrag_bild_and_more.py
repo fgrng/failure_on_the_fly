@@ -31,12 +31,29 @@ _VIGNETTENZUGEHOERIGKEIT_TRIGGER_SQL = """
     END;
 """
 
+_TRAININGSVIGNETTEN_TRIGGER_SQL = """
+    CREATE TRIGGER training_nur_finale_vignetten_einbinden
+    BEFORE INSERT ON training_training_vignetten
+    FOR EACH ROW
+    WHEN (
+        SELECT zustand FROM vignetten_vignette
+        WHERE id = NEW.vignette_id
+    ) != 'final'
+    BEGIN
+        SELECT RAISE(
+            ABORT,
+            'Trainings können nur finale Vignetten einbinden.'
+        );
+    END;
+"""
+
 
 class Migration(migrations.Migration):
 
     dependencies = [
         ('erhebungen', '0011_likert_gueltig'),
         ('simulation', '0003_simulationskern_rahmenhandlung_gespraechseinleitung'),
+        ('training', '0001_initial'),
         ('vignetten', '0004_alter_vignette_arbeitsheft_bildbeschreibung_and_more'),
     ]
 
@@ -45,6 +62,7 @@ class Migration(migrations.Migration):
             sql=(
                 "DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen;"
                 "DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_aendern;"
+                "DROP TRIGGER training_nur_finale_vignetten_einbinden;"
             ),
             reverse_sql=(
                 _VIGNETTENZUGEHOERIGKEIT_TRIGGER_SQL.format(
@@ -55,6 +73,7 @@ class Migration(migrations.Migration):
                     name="erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
                     ereignis="BEFORE UPDATE OF erhebung_id, vignette_id, position",
                 )
+                + _TRAININGSVIGNETTEN_TRIGGER_SQL
             ),
         ),
         migrations.AddField(
@@ -86,10 +105,12 @@ class Migration(migrations.Migration):
                     name="erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
                     ereignis="BEFORE UPDATE OF erhebung_id, vignette_id, position",
                 )
+                + _TRAININGSVIGNETTEN_TRIGGER_SQL
             ),
             reverse_sql=(
                 "DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen;"
                 "DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_aendern;"
+                "DROP TRIGGER training_nur_finale_vignetten_einbinden;"
             ),
         ),
     ]

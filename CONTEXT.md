@@ -31,6 +31,10 @@ _Avoid_: Mentorin, Lehrkraft, Betreuerin
 **Aufgabenkontext**:
 Der Teil der Vignette, der den Gesprächsanlass liefert. Er gliedert sich in zwei gleich gebaute Teile: Lernauftrag und Arbeitsheft, jeweils bestehend aus Text, optionalem Bild, Bildbeschreibung und Simulationshinweisen.
 
+**Aufgabenkontextteil**:
+Einer der beiden gleich gebauten Teile des Aufgabenkontexts — der Lernauftrag oder das Arbeitsheft. Er trägt Text (zerlegt am Positionsmarker), Bild, Bildbeschreibung und Simulationshinweise und ist die Einheit, über die Anzeige, Vollständigkeitsprüfung und Prompt-Komposition arbeiten.
+_Avoid_: Kontextteil, Abschnitt, Block
+
 **Lernauftrag-Text**:
 Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat. Mit dem Positionsmarker `[bild]` wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
 _Avoid_: Aufgabe, Auftrag, Übung

@@ -20,7 +20,7 @@ from vignetten.models import (
 
 
 def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> None:
-    """Der zusammengesetzte Arbeitsheftwert folgt dem ersten Bildmarker."""
+    """Der zusammengesetzte Arbeitsheftwert folgt dem ersten Positionsmarker."""
 
     vignette: Vignette = Vignette(
         zustand=Vignette.Zustand.FINAL,
@@ -38,16 +38,21 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
 
     assert prompt_platzhalter(vignette) == {
         "fehlermuster_beschreibung": (
-            "<fehlermuster_beschreibung>Brüche <werden> addiert."
+            "<fehlermuster_beschreibung>\n"
+            "Brüche <werden> addiert.\n"
             "</fehlermuster_beschreibung>"
         ),
-        "lernauftrag": "<lernauftrag><lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text></lernauftrag>",
+        "lernauftrag": (
+            "<lernauftrag>\n"
+            "<lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text>\n"
+            "</lernauftrag>"
+        ),
         "arbeitsheft": (
-            "<arbeitsheft>"
-            "<arbeitsheft_text>8 + 4 = 12 </arbeitsheft_text>"
+            "<arbeitsheft>\n"
+            "<arbeitsheft_text>8 + 4 = 12 </arbeitsheft_text>\n"
             "<arbeitsheft_bildbeschreibung>Heftseite mit durchgestrichener 12."
-            "</arbeitsheft_bildbeschreibung>"
-            "<arbeitsheft_text> Also ist die Lösung 7. </arbeitsheft_text>"
+            "</arbeitsheft_bildbeschreibung>\n"
+            "<arbeitsheft_text> Also ist die Lösung 7. </arbeitsheft_text>\n"
             "</arbeitsheft>"
         ),
         "lernauftrag_simulationshinweise": "",
@@ -61,7 +66,7 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
 
 
 def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> None:
-    """Der komponierte Lernauftrag folgt dem ersten Bildmarker."""
+    """Der komponierte Lernauftrag folgt dem ersten Positionsmarker."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
         Vignette(
@@ -72,11 +77,11 @@ def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> No
     )
 
     assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>"
-        "<lernauftrag_text>Rechne zuerst. </lernauftrag_text>"
+        "<lernauftrag>\n"
+        "<lernauftrag_text>Rechne zuerst. </lernauftrag_text>\n"
         "<lernauftrag_bildbeschreibung>Arbeitsblatt mit einer Zahlenreihe."
-        "</lernauftrag_bildbeschreibung>"
-        "<lernauftrag_text> Begründe danach. </lernauftrag_text>"
+        "</lernauftrag_bildbeschreibung>\n"
+        "<lernauftrag_text> Begründe danach. </lernauftrag_text>\n"
         "</lernauftrag>"
     )
 
@@ -92,15 +97,43 @@ def test_prompt_platzhalter_fasst_simulationshinweise_in_umgebungen() -> None:
     )
 
     assert platzhalter["lernauftrag_simulationshinweise"] == (
-        "<lernauftrag_simulationshinweise>"
-        "Klasse hat Brüche mit Pizza geübt."
+        "<lernauftrag_simulationshinweise>\n"
+        "Klasse hat Brüche mit Pizza geübt.\n"
         "</lernauftrag_simulationshinweise>"
     )
     assert platzhalter["arbeitsheft_simulationshinweise"] == (
-        "<arbeitsheft_simulationshinweise>"
-        "Mia hat zuvor mit Plättchen probiert."
+        "<arbeitsheft_simulationshinweise>\n"
+        "Mia hat zuvor mit Plättchen probiert.\n"
         "</arbeitsheft_simulationshinweise>"
     )
+
+
+def test_prompt_platzhalter_reicht_spitze_klammern_unveraendert_durch() -> None:
+    """Nutzereingaben gehen roh in den Prompt — kein HTML-Escaping."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            fehlermuster_beschreibung="a < b & b > c",
+            lernauftrag_text="Vergleiche <a> mit &amp;.",
+            arbeitsheft_simulationshinweise="Mia schreibt \"5 < 7\".",
+            schuelerin_name="Mia & Tom",
+        )
+    )
+
+    assert platzhalter["fehlermuster_beschreibung"] == (
+        "<fehlermuster_beschreibung>\na < b & b > c\n</fehlermuster_beschreibung>"
+    )
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag>\n"
+        "<lernauftrag_text>Vergleiche <a> mit &amp;.</lernauftrag_text>\n"
+        "</lernauftrag>"
+    )
+    assert platzhalter["arbeitsheft_simulationshinweise"] == (
+        "<arbeitsheft_simulationshinweise>\n"
+        'Mia schreibt "5 < 7".\n'
+        "</arbeitsheft_simulationshinweise>"
+    )
+    assert platzhalter["schuelerin_name"] == "Mia & Tom"
 
 
 def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
@@ -125,7 +158,8 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
     )
 
     assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft><arbeitsheft_text>Oben  unten </arbeitsheft_text>"
+        "<arbeitsheft>\n"
+        "<arbeitsheft_text>Oben  unten </arbeitsheft_text>\n"
         "</arbeitsheft>"
     )
 
@@ -138,7 +172,8 @@ def test_prompt_platzhalter_entfernt_lernauftrag_marker_ohne_bild() -> None:
     )
 
     assert platzhalter["lernauftrag"] == (
-        "<lernauftrag><lernauftrag_text>Oben  unten </lernauftrag_text>"
+        "<lernauftrag>\n"
+        "<lernauftrag_text>Oben  unten </lernauftrag_text>\n"
         "</lernauftrag>"
     )
 
@@ -155,10 +190,10 @@ def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text() -> None:
     )
 
     assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft>"
-        "<arbeitsheft_text>Rechnung oben</arbeitsheft_text>"
+        "<arbeitsheft>\n"
+        "<arbeitsheft_text>Rechnung oben</arbeitsheft_text>\n"
         "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
-        "</arbeitsheft_bildbeschreibung>"
+        "</arbeitsheft_bildbeschreibung>\n"
         "</arbeitsheft>"
     )
 
@@ -175,10 +210,10 @@ def test_prompt_platzhalter_ordnet_lernauftrag_bild_ohne_marker_nach_dem_text() 
     )
 
     assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>"
-        "<lernauftrag_text>Aufgabe oben</lernauftrag_text>"
+        "<lernauftrag>\n"
+        "<lernauftrag_text>Aufgabe oben</lernauftrag_text>\n"
         "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
-        "</lernauftrag_bildbeschreibung>"
+        "</lernauftrag_bildbeschreibung>\n"
         "</lernauftrag>"
     )
 
@@ -194,9 +229,9 @@ def test_prompt_platzhalter_laesst_leere_textstuecke_weg() -> None:
     )
 
     assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft>"
+        "<arbeitsheft>\n"
         "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
-        "</arbeitsheft_bildbeschreibung>"
+        "</arbeitsheft_bildbeschreibung>\n"
         "</arbeitsheft>"
     )
 
@@ -212,9 +247,9 @@ def test_prompt_platzhalter_laesst_leere_lernauftrag_textstuecke_weg() -> None:
     )
 
     assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>"
+        "<lernauftrag>\n"
         "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
-        "</lernauftrag_bildbeschreibung>"
+        "</lernauftrag_bildbeschreibung>\n"
         "</lernauftrag>"
     )
 

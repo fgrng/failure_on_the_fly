@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("erhebungen", "0004_vignettenposition"),
-        ("vignetten", "0004_alter_vignette_arbeitsheft_bildbeschreibung_and_more"),
+        ("vignetten", "0002_alter_vignette_arbeitsheft_bild"),
     ]
 
     operations = [

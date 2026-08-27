@@ -12,9 +12,12 @@ Best-Practice-Hinweise für dieses Command:
   Testkonten in eine Produktivdatenbank geraten.
 """
 
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -28,6 +31,11 @@ from vignetten.models import Vignette
 
 # Ein bewusst schwaches, dokumentiertes Entwicklungspasswort für alle Testkonten.
 ENTWICKLUNGSPASSWORT: str = "entwicklung"
+# Eingecheckte Beispielabbildungen. Sie liegen ausserhalb von ``media/`` und
+# werden beim Anlegen in das ``ImageField`` kopiert, damit die Demovignetten
+# echte Bilder zeigen.
+BEISPIELBILDER: Path = Path(__file__).resolve().parents[2] / "beispielbilder"
+BILDFELDER: tuple[str, ...] = ("lernauftrag_bild", "arbeitsheft_bild")
 
 # Die Testkonten. Der Schlüssel ist der Anmeldename, der Wert die Liste der
 # zugewiesenen Rollen (Gruppennamen aus konten.apps.KONTOROLLEN). "autor" trägt
@@ -63,7 +71,7 @@ VIGNETTEN: list[dict[str, object]] = [
             "Term rechts von der Lücke nicht weiter."
         ),
         "lernauftrag_text": "Setze die passende Zahl ein:\n[bild]\nBegründe deine Lösung.",
-        "lernauftrag_bild": "vignettenbilder/gleichung.png",
+        "lernauftrag_bild": "lernauftrag.png",
         "lernauftrag_bildbeschreibung": (
             "Arbeitsblatt mit der Platzhalteraufgabe 8 + 4 = ___ + 5."
         ),
@@ -112,7 +120,7 @@ VIGNETTEN: list[dict[str, object]] = [
             "als 'Professoren' auf."
         ),
         "arbeitsheft_text": "",
-        "arbeitsheft_bild": "vignettenbilder/variablen.png",
+        "arbeitsheft_bild": "arbeitsheft.png",
         "arbeitsheft_bildbeschreibung": (
             "Handschriftlicher Eintrag im Arbeitsheft mit der Gleichung 6S = P."
         ),
@@ -263,6 +271,12 @@ class Command(BaseCommand):
             historie.save(update_fields=["name"])
             for feld, wert in beschreibung.items():
                 if feld == "historienname":
+                    continue
+                if feld in BILDFELDER and wert:
+                    with (BEISPIELBILDER / str(wert)).open("rb") as quelle:
+                        getattr(vignette, feld).save(
+                            str(wert), File(quelle), save=False
+                        )
                     continue
                 setattr(vignette, feld, wert)
             vignette.save()
