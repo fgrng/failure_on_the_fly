@@ -181,6 +181,10 @@ class Vignette(models.Model):
         blank=True,
         help_text="Beschreibung dessen, was auf dem Lernauftrag-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
     )
+    lernauftrag_simulationshinweise: models.TextField = models.TextField(
+        blank=True,
+        help_text="Hinweise zum Lernauftrag ausschließlich für die Simulation. Für Teilnehmer:in nicht sichtbar.",
+    )
     arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
         blank=True,
         help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
@@ -193,6 +197,10 @@ class Vignette(models.Model):
         upload_to=vignetten_bild_pfad,
         blank=True,
         help_text="Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.",
+    )
+    arbeitsheft_simulationshinweise: models.TextField = models.TextField(
+        blank=True,
+        help_text="Hinweise zum Arbeitsheft ausschließlich für die Simulation. Für Teilnehmer:in nicht sichtbar.",
     )
     schuelerin_name: models.CharField = models.CharField(
         max_length=255,
@@ -397,9 +405,11 @@ class Vignette(models.Model):
             lernauftrag_text=quelle.lernauftrag_text,
             lernauftrag_bild=quelle.lernauftrag_bild.name,
             lernauftrag_bildbeschreibung=quelle.lernauftrag_bildbeschreibung,
+            lernauftrag_simulationshinweise=quelle.lernauftrag_simulationshinweise,
             arbeitsheft_text=quelle.arbeitsheft_text,
             arbeitsheft_bild=quelle.arbeitsheft_bild.name,
             arbeitsheft_bildbeschreibung=quelle.arbeitsheft_bildbeschreibung,
+            arbeitsheft_simulationshinweise=quelle.arbeitsheft_simulationshinweise,
             schuelerin_name=quelle.schuelerin_name,
             schuelerin_geschlecht=quelle.schuelerin_geschlecht,
             lehrperson_name=quelle.lehrperson_name,
@@ -535,10 +545,22 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
         if vignette.fehlermuster_beschreibung
         else ""
     )
+    lernauftrag_hinweise: str = (
+        f"<lernauftrag_simulationshinweise>{vignette.lernauftrag_simulationshinweise}</lernauftrag_simulationshinweise>"
+        if vignette.lernauftrag_simulationshinweise
+        else ""
+    )
+    arbeitsheft_hinweise: str = (
+        f"<arbeitsheft_simulationshinweise>{vignette.arbeitsheft_simulationshinweise}</arbeitsheft_simulationshinweise>"
+        if vignette.arbeitsheft_simulationshinweise
+        else ""
+    )
     return {
         "fehlermuster_beschreibung": fehlermuster,
         "lernauftrag": _aufgabenkontext_prompt(vignette, "lernauftrag"),
         "arbeitsheft": _aufgabenkontext_prompt(vignette, "arbeitsheft"),
+        "lernauftrag_simulationshinweise": lernauftrag_hinweise,
+        "arbeitsheft_simulationshinweise": arbeitsheft_hinweise,
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
         "fach": vignette.fach,

@@ -182,6 +182,25 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "27 + 15 = 312")
         self.assertContains(response, "Die Zahlen stehen untereinander.")
 
+    def test_rendert_simulationshinweise(self) -> None:
+        """Die Ansicht zeigt beide Simulationshinweise in ihren Abschnitten."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            lernauftrag_simulationshinweise="Hinweis Lernauftrag",
+            arbeitsheft_simulationshinweise="Hinweis Arbeitsheft",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
+        self.assertContains(response, "Hinweis Lernauftrag")
+        self.assertContains(response, "Hinweis Arbeitsheft")
+
     def test_versteckt_fremde_fassung(self) -> None:
         """Detail-URLs geben keine Fassungen anderer Eigentümerinnen preis."""
         ada: Konto = _autorin("ada")
@@ -564,6 +583,21 @@ class VignetteFinalisierenViewTests(TestCase):
         )
         self.assertContains(response, 'badge--final')
 
+    def test_finalisieren_ist_ohne_simulationshinweise_moeglich(self) -> None:
+        """Simulationshinweise sind optional und blockieren das Finalisieren nicht."""
+        self.vignette.lernauftrag_simulationshinweise = ""
+        self.vignette.arbeitsheft_simulationshinweise = ""
+        self.vignette.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:finalisieren", args=[self.vignette.pk]), follow=True
+        )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+        self.assertContains(response, "badge--final")
+
     def test_zeigt_fehler_fuer_leeren_lernauftrag(self) -> None:
         """Ein Lernauftrag ohne Text oder Bild wird verständlich abgelehnt."""
         self._assert_finalisieren_zeigt_fehler("lernauftrag_text", "", "Lernauftrag")
@@ -621,9 +655,11 @@ class VignetteNeueFassungViewTests(TestCase):
         "lernauftrag_text",
         "lernauftrag_bild",
         "lernauftrag_bildbeschreibung",
+        "lernauftrag_simulationshinweise",
         "arbeitsheft_text",
         "arbeitsheft_bild",
         "arbeitsheft_bildbeschreibung",
+        "arbeitsheft_simulationshinweise",
         "schuelerin_name",
         "schuelerin_geschlecht",
         "lehrperson_name",
@@ -647,9 +683,11 @@ class VignetteNeueFassungViewTests(TestCase):
         self.finale.lernauftrag_text = "Addiere 27 und 15."
         self.finale.lernauftrag_bild = "vignettenbilder/lernauftrag-datei.gif"
         self.finale.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Addition"
+        self.finale.lernauftrag_simulationshinweise = "Hinweis Lernauftrag"
         self.finale.arbeitsheft_bildbeschreibung = "27 + 15 = 312"
         self.finale.arbeitsheft_text = "27 + 15 = 312"
         self.finale.arbeitsheft_bild = "vignettenbilder/finale-datei.gif"
+        self.finale.arbeitsheft_simulationshinweise = "Hinweis Arbeitsheft"
         self.finale.schuelerin_name = "Mia"
         self.finale.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
         self.finale.lehrperson_name = "Frau Weber"

@@ -272,6 +272,7 @@ def test_vertragstreue_teilmengen_und_leere_vorlagen_werden_akzeptiert() -> None
 
     kern: Simulationskern = Simulationskern(
         system_prompt_vorlage="$fehlermuster_beschreibung",
+        user_prompt_vorlage="$lernauftrag_simulationshinweise $arbeitsheft_simulationshinweise",
         rahmenhandlung_einleitung="$lehrperson_anrede $lehrperson_name",
     )
 

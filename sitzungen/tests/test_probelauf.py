@@ -11,7 +11,7 @@ from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
-from vignetten.models import Vignette
+from vignetten.models import Vignette, prompt_platzhalter
 
 
 _ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
@@ -156,6 +156,56 @@ class ProbelaufStartTests(TestCase):
         self.assertLess(inhalt.index("auftrag.gif"), inhalt.index(" unten "))
         self.assertContains(response, 'alt="Arbeitsblatt mit Zahlenreihe"')
         self.assertNotContains(response, "[BILD]")
+
+    def test_simulationshinweise_erscheinen_nicht_auf_sitzungsseite_aber_im_prompt(
+        self,
+    ) -> None:
+        """Simulationshinweise erreichen das Sprachmodell, aber keine Stelle der Sitzungsseite."""
+
+        self.entwurf.lernauftrag_text = "Löse die Aufgabe."
+        self.entwurf.lernauftrag_simulationshinweise = "Geheimer Hinweis zum Lernauftrag"
+        self.entwurf.arbeitsheft_text = "Meine Rechnung."
+        self.entwurf.arbeitsheft_simulationshinweise = "Geheimer Hinweis zum Arbeitsheft"
+        self.entwurf.save()
+
+        # 1. Startseite des Probelaufs prüfen
+        response_start: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        self.assertNotContains(response_start, "Geheimer Hinweis zum Lernauftrag")
+        self.assertNotContains(response_start, "Geheimer Hinweis zum Arbeitsheft")
+
+        # 2. Gesprächsseite des Probelaufs prüfen
+        response_gespraech: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech")
+        )
+        self.assertNotContains(response_gespraech, "Geheimer Hinweis zum Lernauftrag")
+        self.assertNotContains(response_gespraech, "Geheimer Hinweis zum Arbeitsheft")
+
+        # 3. Prompt-Erzeugung beim Gesprächsschritt prüfen
+        with patch("sitzungen.orchestrierung.antwort_versuchen") as mock_antwort:
+            mock_antwort.return_value.antwort.denkspur = "Denkspur"
+            mock_antwort.return_value.antwort.aeusserung = "Äußerung"
+            mock_antwort.return_value.native_reasoning_spur = None
+            mock_antwort.return_value.fehlversuche = []
+            mock_antwort.return_value.endgueltig_gescheitert = False
+
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie hast du gerechnet?"},
+            )
+
+            mock_antwort.assert_called_once()
+            aufgerufene_vignette: Vignette = mock_antwort.call_args[0][0]
+            platzhalter: dict[str, str] = prompt_platzhalter(aufgerufene_vignette)
+            self.assertIn(
+                "<lernauftrag_simulationshinweise>Geheimer Hinweis zum Lernauftrag</lernauftrag_simulationshinweise>",
+                platzhalter["lernauftrag_simulationshinweise"],
+            )
+            self.assertIn(
+                "<arbeitsheft_simulationshinweise>Geheimer Hinweis zum Arbeitsheft</arbeitsheft_simulationshinweise>",
+                platzhalter["arbeitsheft_simulationshinweise"],
+            )
 
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,

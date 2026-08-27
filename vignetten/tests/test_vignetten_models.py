@@ -50,6 +50,8 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
             "<arbeitsheft_text> Also ist die Lösung 7. </arbeitsheft_text>"
             "</arbeitsheft>"
         ),
+        "lernauftrag_simulationshinweise": "",
+        "arbeitsheft_simulationshinweise": "",
         "schuelerin_name": "Mia",
         "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
         "fach": "Mathematik",
@@ -79,6 +81,28 @@ def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> No
     )
 
 
+def test_prompt_platzhalter_fasst_simulationshinweise_in_umgebungen() -> None:
+    """Simulationshinweise werden in benannte Umgebungen gefasst."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            lernauftrag_simulationshinweise="Klasse hat Brüche mit Pizza geübt.",
+            arbeitsheft_simulationshinweise="Mia hat zuvor mit Plättchen probiert.",
+        )
+    )
+
+    assert platzhalter["lernauftrag_simulationshinweise"] == (
+        "<lernauftrag_simulationshinweise>"
+        "Klasse hat Brüche mit Pizza geübt."
+        "</lernauftrag_simulationshinweise>"
+    )
+    assert platzhalter["arbeitsheft_simulationshinweise"] == (
+        "<arbeitsheft_simulationshinweise>"
+        "Mia hat zuvor mit Plättchen probiert."
+        "</arbeitsheft_simulationshinweise>"
+    )
+
+
 def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
     """Leere lange Prompt-Inhalte werden nicht mit einer Umgebung versehen."""
 
@@ -88,7 +112,9 @@ def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
         platzhalter["fehlermuster_beschreibung"],
         platzhalter["lernauftrag"],
         platzhalter["arbeitsheft"],
-    ) == ("", "", "")
+        platzhalter["lernauftrag_simulationshinweise"],
+        platzhalter["arbeitsheft_simulationshinweise"],
+    ) == ("", "", "", "", "")
 
 
 def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
@@ -644,9 +670,11 @@ class VignetteBearbeitenTests(TestCase):
             lernauftrag_text="Addiere 27 und 15.",
             lernauftrag_bild="vignettenbilder/auftrag.gif",
             lernauftrag_bildbeschreibung="Arbeitsblatt mit Addition",
+            lernauftrag_simulationshinweise="Zusatzhinweis zum Lernauftrag",
             arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             arbeitsheft_bild="vignettenbilder/heft.gif",
+            arbeitsheft_simulationshinweise="Zusatzhinweis zum Arbeitsheft",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             lehrperson_name="Herr Koch",
@@ -671,9 +699,15 @@ class VignetteBearbeitenTests(TestCase):
         self.assertEqual(
             entwurf.lernauftrag_bildbeschreibung, "Arbeitsblatt mit Addition"
         )
+        self.assertEqual(
+            entwurf.lernauftrag_simulationshinweise, "Zusatzhinweis zum Lernauftrag"
+        )
         self.assertEqual(entwurf.arbeitsheft_bild.name, "vignettenbilder/heft.gif")
         self.assertEqual(
             entwurf.arbeitsheft_bildbeschreibung, "27 + 15 = 312"
+        )
+        self.assertEqual(
+            entwurf.arbeitsheft_simulationshinweise, "Zusatzhinweis zum Arbeitsheft"
         )
         self.assertEqual(entwurf.schuelerin_name, "Mia")
         self.assertEqual(entwurf.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)

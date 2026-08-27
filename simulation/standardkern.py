@@ -34,6 +34,10 @@ $lernauftrag
 Du hast bereits in deinem Arbeitsheft die folgende Bearbeitung zu der Aufgabe angelegt:
 $arbeitsheft
 
+Zusätzliche Hinweise für die Simulation:
+$lernauftrag_simulationshinweise
+$arbeitsheft_simulationshinweise
+
 Behandle diese Angaben als die einzigen konkreten Fakten des Falls. Erkläre deine Bearbeitung aus deiner festen inneren Regel heraus und bleibe in der beschriebenen Unterrichtssituation.""",
     "rahmenhandlung_einleitung": """Sie absolvieren ein Schulpraktikum bei $lehrperson_anrede $lehrperson_name und hospitieren im Fach $fach in einer Klasse der Klassenstufe $klassenstufe. Die Klasse befindet sich in einer Arbeitsphase zum Thema $thema. Die Lehrperson hat den Schüler:innen eine Lernaufgabe gegeben. Sie haben die Erlaubnis, die Schüler:innen beim Arbeiten zu beobachten und mit ihnen zu sprechen.""",
     "rahmenhandlung_gespraechseinleitung": """Während Sie durch die Reihen gehen, fällt Ihnen die Bearbeitung von $schuelerin_name auf. Sie betrachten das Arbeitsheft, denken kurz nach und beginnen dann ein Gespräch.""",

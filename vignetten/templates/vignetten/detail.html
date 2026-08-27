@@ -92,6 +92,7 @@
                 {% include "vignetten/includes/aufgabenkontext_inhalt.html" with text_vor_bild=vignette.lernauftrag_text_vor_bild bild=vignette.lernauftrag_bild bildbeschreibung=vignette.lernauftrag_bildbeschreibung text_nach_bild=vignette.lernauftrag_text_nach_bild %}
             </section>
             <section class="page-field page-field--wide"><h3>Lernauftrag Bildbeschreibung</h3><p class="prose">{{ vignette.lernauftrag_bildbeschreibung|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Lernauftrag Simulationshinweise (optional)</h3><p class="prose">{{ vignette.lernauftrag_simulationshinweise|default:"—" }}</p></section>
         </div>
     </section>
 
@@ -104,6 +105,7 @@
                 {% include "vignetten/includes/aufgabenkontext_inhalt.html" with text_vor_bild=vignette.arbeitsheft_text_vor_bild bild=vignette.arbeitsheft_bild bildbeschreibung=vignette.arbeitsheft_bildbeschreibung text_nach_bild=vignette.arbeitsheft_text_nach_bild %}
             </section>
             <section class="page-field page-field--wide"><h3>Arbeitsheft Bildbeschreibung</h3><p class="prose">{{ vignette.arbeitsheft_bildbeschreibung|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Arbeitsheft Simulationshinweise (optional)</h3><p class="prose">{{ vignette.arbeitsheft_simulationshinweise|default:"—" }}</p></section>
         </div>
     </section>
 

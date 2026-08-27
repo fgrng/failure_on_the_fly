@@ -15,6 +15,8 @@ Autor:innen beschreiben **wer** und **was falsch läuft**. Dass die simulierte S
 | Fehlermuster-Beschreibung | ja | nein |
 | Lernauftrag (Text und Bildbeschreibung) | ja | ja |
 | Arbeitsheft (Text und Bildbeschreibung) | ja | ja |
+| Lernauftrag-Simulationshinweise | ja | nein |
+| Arbeitsheft-Simulationshinweise | ja | nein |
 | Simulierte Schüler:in (Name, Geschlecht) | ja | ja |
 | Erfahrene Lehrperson (Name, Geschlecht) | nein | ja |
 | Unterrichtskontext (Fach, Thema, Klassenstufe) | ja | ja |
@@ -26,7 +28,7 @@ Die zusammengesetzten Werte für Lernauftrag und Arbeitsheft geben der Simulatio
 
 Die **Rahmenhandlung ist ebenfalls eine Vorlage**, schöpft aber nicht aus demselben Vertrag: Prompt-Vorlagen und Rahmenhandlung berühren sich nie (ADR-0004) und ziehen aus verschiedenen Spalten obiger Tabelle. Der Vertrag ist deshalb **zwei benannte Mengen, nicht eine**:
 
-- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht. Die kurzen Skalare bleiben bei der Ersetzung roh. Die langen Inhalte `$fehlermuster_beschreibung`, `$lernauftrag` und `$arbeitsheft` werden, wenn sie nicht leer sind, von der Platzhalter-Funktion der Vignette in gleichnamige XML-artige Umgebungen gefasst. Die beiden Aufgabenkontextwerte enthalten die nichtleeren, einzeln gefassten Stücke `*_text` und `*_bildbeschreibung` in der Marker-Reihenfolge. Die Vorlage enthält dafür nur den nackten Platzhalter; Nutzereingaben werden nicht escaped.
+- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht. Die kurzen Skalare bleiben bei der Ersetzung roh. Die langen Inhalte `$fehlermuster_beschreibung`, `$lernauftrag`, `$arbeitsheft`, `$lernauftrag_simulationshinweise` und `$arbeitsheft_simulationshinweise` werden, wenn sie nicht leer sind, von der Platzhalter-Funktion der Vignette in gleichnamige XML-artige Umgebungen gefasst. Die beiden Aufgabenkontextwerte enthalten die nichtleeren, einzeln gefassten Stücke `*_text` und `*_bildbeschreibung` in der Marker-Reihenfolge. Die Vorlage enthält dafür nur den nackten Platzhalter; Nutzereingaben werden nicht escaped.
 - `VERTRAG_RAHMEN` — die Felder der Nutzeransicht-Spalte, plus abgeleitete grammatische Formen (siehe unten). Aus ihr schöpfen Hospitationseinleitung, Gesprächseinleitung und Debrief.
 
 Eine einzige Menge wäre falsch: Sie erlaubte die Fehlermuster-Beschreibung in der Einleitung, die sie nie sehen darf, und den Namen der erfahrenen Lehrperson im System-Prompt, wo er eine Störvariable wäre.

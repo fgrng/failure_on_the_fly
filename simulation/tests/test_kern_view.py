@@ -91,8 +91,10 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         self.assertContains(response, "$lehrperson_anrede")
         for platzhalter in (
             "arbeitsheft",
+            "arbeitsheft_simulationshinweise",
             "fehlermuster_beschreibung",
             "lernauftrag",
+            "lernauftrag_simulationshinweise",
         ):
             self.assertContains(
                 response,
