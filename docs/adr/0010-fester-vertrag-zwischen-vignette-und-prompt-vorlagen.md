@@ -13,14 +13,14 @@ Autor:innen beschreiben **wer** und **was falsch läuft**. Dass die simulierte S
 | Vignettenfeld | Prompt | Nutzeransicht |
 |---|---|---|
 | Fehlermuster-Beschreibung | ja | nein |
-| Lernauftrag-Text | ja | ja |
+| Lernauftrag (Text und Bildbeschreibung) | ja | ja |
 | Arbeitsheft (Text und Bildbeschreibung) | ja | ja |
 | Simulierte Schüler:in (Name, Geschlecht) | ja | ja |
 | Erfahrene Lehrperson (Name, Geschlecht) | nein | ja |
 | Unterrichtskontext (Fach, Thema, Klassenstufe) | ja | ja |
 | Referenzdiagnose | nein | nein |
 
-Der zusammengesetzte Arbeitsheft-Wert gibt der Simulation Text und Bildbeschreibung in derselben Reihenfolge wie der Nutzeransicht; das Bild selbst erreicht den Prompt nicht. Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
+Die zusammengesetzten Werte für Lernauftrag und Arbeitsheft geben der Simulation Text und Bildbeschreibung in derselben Reihenfolge wie der Nutzeransicht; die Bilder selbst erreichen den Prompt nicht. Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
 
 **Beide Akteure sind Vignettenfelder**, nicht Kernfelder: Dieselbe Schüler:in dürfte sonst in jeder Klassenstufe und jedem Fach dieselbe sein, und dasselbe gilt eine Rolle weiter für die Lehrperson. Namen und Geschlechter werden im Anlegen-Formular zufällig vorbelegt und sind überschreibbar — der Zufall ist eine Freundlichkeit der Oberfläche, keine Eigenschaft der Domäne. Sie werden mit der Vignette versioniert und beim Finalisieren eingefroren; ein Entwurf aus einer finalen Fassung erbt sie.
 
@@ -33,7 +33,7 @@ Eine einzige Menge wäre falsch: Sie erlaubte die Fehlermuster-Beschreibung in d
 
 ## Die Nutzeransicht-Spalte ist keine reine Platzhalterliste
 
-Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituiert. Der **Lernauftrag** und das **Arbeitsheft** sind **Ansichtsbausteine**, die die View neben der Rahmenhandlung rendert. Im Prompt steht das Arbeitsheft als komponierter Wert, der die Bildbeschreibung statt des Bildes trägt. Substituiert werden nur die kurzen, satzfähigen Werte: die Namen und Geschlechter der Akteure und der Unterrichtskontext.
+Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituiert. Der **Lernauftrag** und das **Arbeitsheft** sind **Ansichtsbausteine**, die die View neben der Rahmenhandlung rendert. Im Prompt stehen Lernauftrag und Arbeitsheft als komponierte Werte, die die Bildbeschreibung statt des Bildes tragen. Substituiert werden nur die kurzen, satzfähigen Werte: die Namen und Geschlechter der Akteure und der Unterrichtskontext.
 
 Weil die Rahmenhandlung Fließtext für Menschen ist, braucht sie Grammatik, die rohe Feldwerte nicht liefern. Der Code berechnet aus dem Geschlecht **abgeleitete grammatische Formen** und stellt sie als eigene Platzhalter in `VERTRAG_RAHMEN` bereit (Anrede, Pronomen, Possessiv). `VERTRAG_RAHMEN` hat damit mehr Einträge als die Nutzeransicht-Spalte Zeilen. Jede neue grammatische Form ist eine Code-Änderung — dieselbe Aussage wie unten über neue Leerstellen, nur über Ableitungen statt über Felder.
 

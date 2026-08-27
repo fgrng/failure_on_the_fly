@@ -11,7 +11,7 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from simulation.models import PROMPT_PLATZHALTER_MIT_UMGEBUNG, Simulationskern
+from simulation.models import Simulationskern
 
 
 _BILDMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
@@ -397,9 +397,9 @@ class Vignette(models.Model):
             lernauftrag_text=quelle.lernauftrag_text,
             lernauftrag_bild=quelle.lernauftrag_bild.name,
             lernauftrag_bildbeschreibung=quelle.lernauftrag_bildbeschreibung,
-            arbeitsheft_bildbeschreibung=quelle.arbeitsheft_bildbeschreibung,
             arbeitsheft_text=quelle.arbeitsheft_text,
             arbeitsheft_bild=quelle.arbeitsheft_bild.name,
+            arbeitsheft_bildbeschreibung=quelle.arbeitsheft_bildbeschreibung,
             schuelerin_name=quelle.schuelerin_name,
             schuelerin_geschlecht=quelle.schuelerin_geschlecht,
             lehrperson_name=quelle.lehrperson_name,
@@ -530,8 +530,13 @@ class Vignette(models.Model):
 def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
     """Liefert die Vignettenwerte für Prompt-Vorlagen."""
 
-    platzhalter: dict[str, str] = {
-        "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
+    fehlermuster: str = (
+        f"<fehlermuster_beschreibung>{vignette.fehlermuster_beschreibung}</fehlermuster_beschreibung>"
+        if vignette.fehlermuster_beschreibung
+        else ""
+    )
+    return {
+        "fehlermuster_beschreibung": fehlermuster,
         "lernauftrag": _aufgabenkontext_prompt(vignette, "lernauftrag"),
         "arbeitsheft": _aufgabenkontext_prompt(vignette, "arbeitsheft"),
         "schuelerin_name": vignette.schuelerin_name,
@@ -540,10 +545,6 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
         "thema": vignette.thema,
         "klassenstufe": vignette.klassenstufe,
     }
-    for name in PROMPT_PLATZHALTER_MIT_UMGEBUNG:
-        if name not in {"lernauftrag", "arbeitsheft"} and (wert := platzhalter[name]):
-            platzhalter[name] = f"<{name}>{wert}</{name}>"
-    return platzhalter
 
 
 def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
@@ -561,7 +562,7 @@ def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
     else:
         stuecke = ((f"{name}_text", vor_bild + nach_bild),)
     inhalt: str = "".join(
-        f"<{name}>{wert}</{name}>" for name, wert in stuecke if wert
+        f"<{tag}>{wert}</{tag}>" for tag, wert in stuecke if wert
     )
     return f"<{name}>{inhalt}</{name}>" if inhalt else ""
 
