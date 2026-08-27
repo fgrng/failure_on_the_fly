@@ -286,11 +286,12 @@ class Vignette(models.Model):
 
     def arbeitsheft_zerlegen(self) -> tuple[str, str]:
         """Teilt den Arbeitsheft-Text am ersten Bildmarker und entfernt alle."""
-        vor_bild, *nach_bild = _BILDMARKER.split(self.arbeitsheft_text)
-        nach_bild_text: str = "".join(nach_bild)
+        textteile: list[str] = _BILDMARKER.split(self.arbeitsheft_text)
+        vor_bild: str = textteile[0]
+        nach_bild: str = "".join(textteile[1:])
         if not self.arbeitsheft_bild:
-            return vor_bild + nach_bild_text, ""
-        return vor_bild, nach_bild_text
+            return vor_bild + nach_bild, ""
+        return vor_bild, nach_bild
 
     @property
     def arbeitsheft_text_vor_bild(self) -> str:
@@ -502,7 +503,7 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
 
 
 def _arbeitsheft_prompt(vignette: Vignette) -> str:
-    """Fasst Text und Bildbeschreibung in ihrer sichtbaren Reihenfolge zusammen."""
+    # Fasst Text und Bildbeschreibung in ihrer sichtbaren Reihenfolge zusammen.
     vor_bild, nach_bild = vignette.arbeitsheft_zerlegen()
     if vignette.arbeitsheft_bild:
         stuecke: tuple[tuple[str, str], ...] = (

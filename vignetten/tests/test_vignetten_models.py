@@ -82,6 +82,44 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
     )
 
 
+def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text() -> None:
+    """Ohne Marker steht die Bildbeschreibung im Prompt nach dem Text."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            arbeitsheft_text="Rechnung oben",
+            arbeitsheft_bild="vignettenbilder/heft.gif",
+            arbeitsheft_bildbeschreibung="Durchgestrichene Rechnung",
+        )
+    )
+
+    assert platzhalter["arbeitsheft"] == (
+        "<arbeitsheft>"
+        "<arbeitsheft_text>Rechnung oben</arbeitsheft_text>"
+        "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
+        "</arbeitsheft_bildbeschreibung>"
+        "</arbeitsheft>"
+    )
+
+
+def test_prompt_platzhalter_laesst_leere_textstuecke_weg() -> None:
+    """Ein Arbeitsheft nur mit Bild erzeugt keine leere Textumgebung."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            arbeitsheft_bild="vignettenbilder/heft.gif",
+            arbeitsheft_bildbeschreibung="Durchgestrichene Rechnung",
+        )
+    )
+
+    assert platzhalter["arbeitsheft"] == (
+        "<arbeitsheft>"
+        "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
+        "</arbeitsheft_bildbeschreibung>"
+        "</arbeitsheft>"
+    )
+
+
 def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:
     """Die Rahmenhandlung erhält rohe und abgeleitete Werte der Vignette."""
     vignette: Vignette = Vignette(
