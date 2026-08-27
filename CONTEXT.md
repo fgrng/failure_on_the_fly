@@ -29,9 +29,9 @@ _Avoid_: Mentorin, Lehrkraft, Betreuerin
 ## Aufgabenkontext
 
 **Aufgabenkontext**:
-Der Teil der Vignette, der den Gesprächsanlass liefert. Besteht aus Lernauftrag, Arbeitsheft-Inhalt und Arbeitsheft-Beschreibung.
+Der Teil der Vignette, der den Gesprächsanlass liefert. Besteht aus Lernauftrag-Text, Arbeitsheft-Inhalt und Arbeitsheft-Bildbeschreibung.
 
-**Lernauftrag**:
+**Lernauftrag-Text**:
 Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat.
 _Avoid_: Aufgabe, Auftrag, Übung
 
@@ -39,9 +39,9 @@ _Avoid_: Aufgabe, Auftrag, Übung
 Die sichtbare, fehlerhafte Bearbeitung der simulierten Schüler:in, wie sie der Teilnehmer:in angezeigt wird. Auch als Bild. Ausgangspunkt für das Diagnosegespräch.
 _Avoid_: Schülerlösung, Lösung, Heft
 
-**Arbeitsheft-Beschreibung**:
-Die textuelle Beschreibung dessen, was im Arbeitsheft-Inhalt zu sehen ist. Sie existiert für die Simulation, während der Arbeitsheft-Inhalt für den Menschen existiert.
-_Avoid_: Bildbeschreibung, Alt-Text, Bearbeitungsbeschreibung
+**Arbeitsheft-Bildbeschreibung**:
+Die textuelle Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie existiert für die Simulation, während der Arbeitsheft-Inhalt für den Menschen existiert.
+_Avoid_: Alt-Text, Bearbeitungsbeschreibung
 
 ## Sitzung einer Vignette
 

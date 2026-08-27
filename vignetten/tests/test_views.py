@@ -52,8 +52,8 @@ class VignetteAnlegenViewTests(TestCase):
             reverse("vignetten:anlegen"),
             {
                 "fehlermuster_beschreibung": "Zählt Stellenwerte einzeln.",
-                "lernauftrag": "Addiere 27 und 15.",
-                "arbeitsheft_beschreibung": "27 + 15 = 312",
+                "lernauftrag_text": "Addiere 27 und 15.",
+                "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
                 "arbeitsheft_text": "27 + 15 = 312",
                 "schuelerin_name": "Mia",
                 "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
@@ -167,9 +167,9 @@ class VignetteDetailViewTests(TestCase):
         historie.eigentuemerinnen.add(ada)
         vignette: Vignette = Vignette.objects._erstellen(
             historie=historie,
-            lernauftrag="Addiere 27 und 15.",
+            lernauftrag_text="Addiere 27 und 15.",
             arbeitsheft_text="27 + 15 = 312",
-            arbeitsheft_beschreibung="Die Zahlen stehen untereinander.",
+            arbeitsheft_bildbeschreibung="Die Zahlen stehen untereinander.",
         )
         self.client.force_login(ada)
 
@@ -210,7 +210,7 @@ class VignetteBearbeitenViewTests(TestCase):
 
     def test_speichert_entwurf_mit_leeren_inhaltsfeldern(self) -> None:
         """Entwürfe bleiben beim Bearbeiten bewusst lückentolerant."""
-        self.vignette.lernauftrag = "Wird gelöscht."
+        self.vignette.lernauftrag_text = "Wird gelöscht."
         self.vignette.save()
 
         response: HttpResponse = self.client.post(
@@ -222,7 +222,7 @@ class VignetteBearbeitenViewTests(TestCase):
             response, reverse("vignetten:detail", args=[self.vignette.pk])
         )
         self.vignette.refresh_from_db()
-        self.assertEqual(self.vignette.lernauftrag, "")
+        self.assertEqual(self.vignette.lernauftrag_text, "")
 
     def test_detail_verlinkt_editor_fuer_entwurf(self) -> None:
         """Die Detailansicht bietet für einen Entwurf den Editor an."""
@@ -441,8 +441,8 @@ class VignetteFinalisierenViewTests(TestCase):
         kern.finalisieren()
         self.vignette: Vignette = Vignette.objects.anlegen(ada)
         self.vignette.fehlermuster_beschreibung = "Zählt Stellenwerte einzeln."
-        self.vignette.lernauftrag = "Addiere 27 und 15."
-        self.vignette.arbeitsheft_beschreibung = "27 + 15 = 312"
+        self.vignette.lernauftrag_text = "Addiere 27 und 15."
+        self.vignette.arbeitsheft_bildbeschreibung = "27 + 15 = 312"
         self.vignette.arbeitsheft_text = "27 + 15 = 312"
         self.vignette.schuelerin_name = "Mia"
         self.vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
@@ -497,7 +497,7 @@ class VignetteFinalisierenViewTests(TestCase):
 
     def test_zeigt_fehler_fuer_fehlendes_pflichtfeld(self) -> None:
         """Ein fehlendes Pflichtfeld wird verständlich benannt."""
-        self._assert_finalisieren_zeigt_fehler("lernauftrag", "", "lernauftrag")
+        self._assert_finalisieren_zeigt_fehler("lernauftrag_text", "", "lernauftrag_text")
 
     def test_zeigt_fehler_fuer_leeres_arbeitsheft(self) -> None:
         """Ein leeres Arbeitsheft wird verständlich benannt."""
@@ -533,8 +533,8 @@ class VignetteNeueFassungViewTests(TestCase):
     _GEERBTE_FELDER: tuple[str, ...] = (
         "historie",
         "fehlermuster_beschreibung",
-        "lernauftrag",
-        "arbeitsheft_beschreibung",
+        "lernauftrag_text",
+        "arbeitsheft_bildbeschreibung",
         "arbeitsheft_text",
         "arbeitsheft_bild",
         "schuelerin_name",
@@ -557,10 +557,10 @@ class VignetteNeueFassungViewTests(TestCase):
         kern.finalisieren()
         self.finale: Vignette = Vignette.objects.anlegen(self.ada)
         self.finale.fehlermuster_beschreibung = "Zählt Stellenwerte einzeln."
-        self.finale.lernauftrag = "Addiere 27 und 15."
-        self.finale.arbeitsheft_beschreibung = "27 + 15 = 312"
+        self.finale.lernauftrag_text = "Addiere 27 und 15."
+        self.finale.arbeitsheft_bildbeschreibung = "27 + 15 = 312"
         self.finale.arbeitsheft_text = "27 + 15 = 312"
-        self.finale.arbeitsheft_bild = "arbeitshefte/finale-datei.gif"
+        self.finale.arbeitsheft_bild = "vignettenbilder/finale-datei.gif"
         self.finale.schuelerin_name = "Mia"
         self.finale.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
         self.finale.lehrperson_name = "Frau Weber"
@@ -604,7 +604,7 @@ class VignetteNeueFassungViewTests(TestCase):
         self.finale.refresh_from_db()
         self.assertEqual(
             (self.finale.zustand, self.finale.arbeitsheft_bild.name),
-            (Vignette.Zustand.FINAL, "arbeitshefte/finale-datei.gif"),
+            (Vignette.Zustand.FINAL, "vignettenbilder/finale-datei.gif"),
         )
 
     def test_detail_bietet_die_neue_fassung_aktion_nur_fuer_finale_fassungen(

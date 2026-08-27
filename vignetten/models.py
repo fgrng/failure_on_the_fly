@@ -15,8 +15,8 @@ from simulation.models import Simulationskern
 
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
-    "lernauftrag",
-    "arbeitsheft_beschreibung",
+    "lernauftrag_text",
+    "arbeitsheft_bildbeschreibung",
     "schuelerin_name",
     "schuelerin_geschlecht",
     "lehrperson_name",
@@ -31,9 +31,9 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-def arbeitsheft_bild_pfad(_: "Vignette", dateiname: str) -> str:
-    """Vergibt jeder hochgeladenen Arbeitsheft-Datei einen neuen Pfad."""
-    return f"arbeitshefte/{uuid4().hex}{Path(dateiname).suffix.lower()}"
+def vignetten_bild_pfad(_: "Vignette", dateiname: str) -> str:
+    """Vergibt jeder hochgeladenen Vignettenbild-Datei einen neuen Pfad."""
+    return f"vignettenbilder/{uuid4().hex}{Path(dateiname).suffix.lower()}"
 
 
 def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
@@ -167,17 +167,19 @@ class Vignette(models.Model):
     fehlermuster_beschreibung: models.TextField = models.TextField(
         blank=True, help_text="Ausführliche Beschreibung des Fehlermusters; bestenfalls mit Beispielen für fehlerbezogenes Verhalten. Wird für die Simulation einbezogen."
     )
-    lernauftrag: models.TextField = models.TextField(
-        blank=True, help_text="Beschreibung des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar."
+    lernauftrag_text: models.TextField = models.TextField(
+        blank=True,
+        help_text="Text des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar.",
     )
-    arbeitsheft_beschreibung: models.TextField = models.TextField(
-        blank=True, help_text="Ausführliche Beschreibung des Arbeitshefts von der zu simulierenden Schüler:in. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar."
+    arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
+        blank=True,
+        help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar.",
     )
     arbeitsheft_text: models.TextField = models.TextField(
         blank=True, help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar."
     )
     arbeitsheft_bild: models.ImageField = models.ImageField(
-        upload_to=arbeitsheft_bild_pfad,
+        upload_to=vignetten_bild_pfad,
         blank=True,
         help_text="Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.",
     )
@@ -340,8 +342,8 @@ class Vignette(models.Model):
             vorgaengerin=quelle,
             gepinnter_kern=quelle.gepinnter_kern,
             fehlermuster_beschreibung=quelle.fehlermuster_beschreibung,
-            lernauftrag=quelle.lernauftrag,
-            arbeitsheft_beschreibung=quelle.arbeitsheft_beschreibung,
+            lernauftrag_text=quelle.lernauftrag_text,
+            arbeitsheft_bildbeschreibung=quelle.arbeitsheft_bildbeschreibung,
             arbeitsheft_text=quelle.arbeitsheft_text,
             arbeitsheft_bild=quelle.arbeitsheft_bild.name,
             schuelerin_name=quelle.schuelerin_name,
@@ -460,8 +462,8 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
 
     return {
         "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
-        "lernauftrag": vignette.lernauftrag,
-        "arbeitsheft_beschreibung": vignette.arbeitsheft_beschreibung,
+        "lernauftrag_text": vignette.lernauftrag_text,
+        "arbeitsheft_bildbeschreibung": vignette.arbeitsheft_bildbeschreibung,
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
         "fach": vignette.fach,

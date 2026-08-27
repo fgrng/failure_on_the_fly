@@ -13,7 +13,7 @@
     <section class="aufgabenkontext aufgabenkontext--arbeitsheft">
         <h2>Arbeitsheft von {{ vignette.schuelerin_name }}</h2>
         {% if vignette.arbeitsheft_bild %}
-            <img src="{{ vignette.arbeitsheft_bild.url }}" alt="{{ vignette.arbeitsheft_beschreibung }}">
+            <img src="{{ vignette.arbeitsheft_bild.url }}" alt="{{ vignette.arbeitsheft_bildbeschreibung }}">
         {% else %}
             <p class="arbeitsheft-inhalt">{{ vignette.arbeitsheft_text }}</p>
         {% endif %}

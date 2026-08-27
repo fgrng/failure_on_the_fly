@@ -13,15 +13,15 @@ Autor:innen beschreiben **wer** und **was falsch läuft**. Dass die simulierte S
 | Vignettenfeld | Prompt | Nutzeransicht |
 |---|---|---|
 | Fehlermuster-Beschreibung | ja | nein |
-| Lernauftrag | ja | ja |
-| Arbeitsheft-Beschreibung | ja | nein |
+| Lernauftrag-Text | ja | ja |
+| Arbeitsheft-Bildbeschreibung | ja | nein |
 | Arbeitsheft-Inhalt | nein | ja |
 | Simulierte Schüler:in (Name, Geschlecht) | ja | ja |
 | Erfahrene Lehrperson (Name, Geschlecht) | nein | ja |
 | Unterrichtskontext (Fach, Thema, Klassenstufe) | ja | ja |
 | Referenzdiagnose | nein | nein |
 
-Der Arbeitsheft-Inhalt bleibt aus dem Prompt heraus, weil er ein Bild sein kann; dafür existiert die Arbeitsheft-Beschreibung (ADR-0005). Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
+Der Arbeitsheft-Inhalt bleibt aus dem Prompt heraus, weil er ein Bild sein kann; dafür existiert die Arbeitsheft-Bildbeschreibung (ADR-0005). Die erfahrene Lehrperson bleibt heraus, weil eine simulierte Schüler:in, die weiß, dass ihre Lehrerin zuhört, einen Grund hat, weniger freimütig über ihren Rechenweg zu sprechen — eine Störvariable, die niemand kontrolliert und die pro Vignette anders ausfällt. Die Referenzdiagnose bleibt heraus, weil sie eine Notiz ist (ADR-0009).
 
 **Beide Akteure sind Vignettenfelder**, nicht Kernfelder: Dieselbe Schüler:in dürfte sonst in jeder Klassenstufe und jedem Fach dieselbe sein, und dasselbe gilt eine Rolle weiter für die Lehrperson. Namen und Geschlechter werden im Anlegen-Formular zufällig vorbelegt und sind überschreibbar — der Zufall ist eine Freundlichkeit der Oberfläche, keine Eigenschaft der Domäne. Sie werden mit der Vignette versioniert und beim Finalisieren eingefroren; ein Entwurf aus einer finalen Fassung erbt sie.
 
@@ -57,6 +57,6 @@ Drei Präzisierungen, die die abgeleiteten Formen und die Akteure konkretisieren
   - `$..._possessiv` — **unflektierte Grundform** (`ihr`/`sein`); die Deklination nach dem Bezugswort trägt der Vorlagentext,
   - `$..._anrede` — **nur für die Lehrperson** (`Frau`/`Herr`); eine Schüler:in wird beim Vornamen genannt. „Frau Müller" schreibt die Vorlage als `$lehrperson_anrede $lehrperson_name`.
 
-  `VERTRAG_RAHMEN` ist damit: die rohen Nutzeransicht-Werte (`$schuelerin_name`, `$schuelerin_geschlecht`, `$lehrperson_name`, `$lehrperson_geschlecht`, `$fach`, `$thema`, `$klassenstufe`) **plus** `$schuelerin_pronomen`, `$schuelerin_possessiv`, `$lehrperson_pronomen`, `$lehrperson_possessiv`, `$lehrperson_anrede`. `$lernauftrag` und `$arbeitsheft_*` sind **nicht** enthalten (Ansichtsbausteine).
+  `VERTRAG_RAHMEN` ist damit: die rohen Nutzeransicht-Werte (`$schuelerin_name`, `$schuelerin_geschlecht`, `$lehrperson_name`, `$lehrperson_geschlecht`, `$fach`, `$thema`, `$klassenstufe`) **plus** `$schuelerin_pronomen`, `$schuelerin_possessiv`, `$lehrperson_pronomen`, `$lehrperson_possessiv`, `$lehrperson_anrede`. `$lernauftrag_text` und `$arbeitsheft_*` sind **nicht** enthalten (Ansichtsbausteine).
 
 - **Beide Akteure sind Pflicht zum Finalisieren.** Weil eine Rahmenhandlung `$lehrperson_*` verwenden darf, hielte eine leere Lehrperson stille Leerstellen im Fließtext offen; deshalb werden Name und Geschlecht beider Akteure beim Finalisieren verlangt (die Pflichtprüfung selbst lebt in `finalisieren()`, ADR-0021-Nachführung).

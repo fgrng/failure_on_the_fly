@@ -36,8 +36,8 @@ def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
 
     vignette: Vignette = Vignette.objects.anlegen(konto)
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag = "Addiere die Brüche."
-    vignette.arbeitsheft_beschreibung = "Falsche Bruchrechnung"
+    vignette.lernauftrag_text = "Addiere die Brüche."
+    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
     vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
     vignette.schuelerin_name = "Lea"
     vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
@@ -1306,7 +1306,7 @@ class ErhebungsExportTests(TestCase):
         )
         erster_kern: Simulationskern = Simulationskern.objects.anlegen(
             system_prompt_vorlage="System Zeile eins\nSystem Zeile zwei",
-            user_prompt_vorlage="User $lernauftrag",
+            user_prompt_vorlage="User $lernauftrag_text",
             rahmenhandlung_einleitung="Einleitung\nmehrzeilig",
             rahmenhandlung_gespraechseinleitung="Gespräch",
             rahmenhandlung_debrief="Debrief",
@@ -1318,7 +1318,7 @@ class ErhebungsExportTests(TestCase):
         zweiter_kern.finalisieren()
         erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
         zweite_vignette: Vignette = erste_vignette.bearbeiten()
-        zweite_vignette.arbeitsheft_bild = "arbeitshefte/bruchbild.png"
+        zweite_vignette.arbeitsheft_bild = "vignettenbilder/bruchbild.png"
         zweite_vignette.referenzdiagnose = "Mehrzeilige\nReferenzdiagnose"
         zweite_vignette.save()
         zweite_vignette.finalisieren()
@@ -1388,7 +1388,7 @@ class ErhebungsExportTests(TestCase):
         )
         self.assertEqual(
             vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bild"],
-            "arbeitshefte/bruchbild.png",
+            "vignettenbilder/bruchbild.png",
         )
         self.assertNotIn(
             str(ungenutzte_vignette.pk),
@@ -1404,7 +1404,7 @@ class ErhebungsExportTests(TestCase):
                         timespec="seconds"
                     ),
                     "system_prompt_vorlage": "Verwendeter System-Prompt\nZeile zwei",
-                    "user_prompt_vorlage": "User $lernauftrag",
+                    "user_prompt_vorlage": "User $lernauftrag_text",
                     "rahmenhandlung_einleitung": "Einleitung\nmehrzeilig",
                     "rahmenhandlung_gespraechseinleitung": "Gespräch",
                     "rahmenhandlung_debrief": "Debrief",

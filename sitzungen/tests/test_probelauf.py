@@ -660,8 +660,8 @@ class AdministratorinProbelaufTests(TestCase):
         self.vignette: Vignette = Vignette.objects.anlegen(autorin)
         for feld, wert in {
             "fehlermuster_beschreibung": "Zähler und Nenner addieren",
-            "lernauftrag": "Addiere Brüche.",
-            "arbeitsheft_beschreibung": "Eine Rechnung.",
+            "lernauftrag_text": "Addiere Brüche.",
+            "arbeitsheft_bildbeschreibung": "Eine Rechnung.",
             "arbeitsheft_text": "1/2 + 1/3 = 2/5",
             "schuelerin_name": "Mia",
             "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,

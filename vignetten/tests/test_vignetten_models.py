@@ -25,8 +25,8 @@ def test_prompt_platzhalter_enthaelt_alle_rohen_prompt_werte() -> None:
     vignette: Vignette = Vignette(
         zustand=Vignette.Zustand.FINAL,
         fehlermuster_beschreibung="Brüche werden addiert.",
-        lernauftrag="Addiere zwei Brüche.",
-        arbeitsheft_beschreibung="1/2 + 1/3 = 2/5",
+        lernauftrag_text="Addiere zwei Brüche.",
+        arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
         schuelerin_name="Mia",
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
         fach="Mathematik",
@@ -36,8 +36,8 @@ def test_prompt_platzhalter_enthaelt_alle_rohen_prompt_werte() -> None:
 
     assert prompt_platzhalter(vignette) == {
         "fehlermuster_beschreibung": "Brüche werden addiert.",
-        "lernauftrag": "Addiere zwei Brüche.",
-        "arbeitsheft_beschreibung": "1/2 + 1/3 = 2/5",
+        "lernauftrag_text": "Addiere zwei Brüche.",
+        "arbeitsheft_bildbeschreibung": "1/2 + 1/3 = 2/5",
         "schuelerin_name": "Mia",
         "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
         "fach": "Mathematik",
@@ -290,8 +290,8 @@ class VignetteFinalisierenTests(TestCase):
         return Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -319,7 +319,7 @@ class VignetteFinalisierenTests(TestCase):
         """Inhalte einer finalen Fassung lassen sich nicht mehr überschreiben."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
         vignette.finalisieren()
-        vignette.lernauftrag = "Addiere 28 und 15."
+        vignette.lernauftrag_text = "Addiere 28 und 15."
 
         with self.assertRaises(ValidationError):
             vignette.save()
@@ -339,7 +339,7 @@ class VignetteFinalisierenTests(TestCase):
         vignette.finalisieren()
 
         with self.assertRaises(RuntimeError):
-            Vignette.objects.filter(pk=vignette.pk).update(lernauftrag="Verändert")
+            Vignette.objects.filter(pk=vignette.pk).update(lernauftrag_text="Verändert")
 
     def test_finalisieren_lehnt_nichtentwuerfe_ab(self) -> None:
         """Finalisieren ist ausschließlich die Kante vom Entwurf nach final."""
@@ -350,8 +350,8 @@ class VignetteFinalisierenTests(TestCase):
         archivierte: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -375,9 +375,9 @@ class VignetteFinalisierenTests(TestCase):
     def test_finalisieren_nennt_fehlendes_pflichtfeld(self) -> None:
         """Unvollständige Entwürfe erklären, welches Feld ergänzt werden muss."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.lernauftrag = ""
+        vignette.lernauftrag_text = ""
 
-        with self.assertRaisesMessage(ValidationError, "lernauftrag"):
+        with self.assertRaisesMessage(ValidationError, "lernauftrag_text"):
             vignette.finalisieren()
 
     def test_finalisieren_lehnt_leeres_arbeitsheft_ab(self) -> None:
@@ -441,8 +441,8 @@ class VignetteBearbeitenTests(TestCase):
         finale: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -553,8 +553,8 @@ class VignetteBearbeitenTests(TestCase):
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -587,8 +587,8 @@ class VignetteBearbeitenTests(TestCase):
         finale: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -630,8 +630,8 @@ class VignetteBearbeitenTests(TestCase):
         finale: Vignette = Vignette.objects._erstellen(
             historie=historie,
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag="Addiere 27 und 15.",
-            arbeitsheft_beschreibung="27 + 15 = 312",
+            lernauftrag_text="Addiere 27 und 15.",
+            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,

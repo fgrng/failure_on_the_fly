@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             field=models.ImageField(
                 blank=True,
                 help_text="Was die Teilnehmer:in sieht.",
-                upload_to=vignetten.models.arbeitsheft_bild_pfad,
+                upload_to=vignetten.models.vignetten_bild_pfad,
             ),
         ),
     ]

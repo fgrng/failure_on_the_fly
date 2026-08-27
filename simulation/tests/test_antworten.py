@@ -14,8 +14,8 @@ def test_antwort_versuchen_liefert_denkspur_und_aeusserung_des_fakes() -> None:
     antwortversuch = antwort_versuchen(
         Vignette(
             fehlermuster_beschreibung="Brüche werden addiert.",
-            lernauftrag="Addiere zwei Brüche.",
-            arbeitsheft_beschreibung="1/2 + 1/3 = 2/5",
+            lernauftrag_text="Addiere zwei Brüche.",
+            arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             fach="Mathematik",
@@ -24,7 +24,7 @@ def test_antwort_versuchen_liefert_denkspur_und_aeusserung_des_fakes() -> None:
         ),
         Simulationskern(
             system_prompt_vorlage="$fehlermuster_beschreibung",
-            user_prompt_vorlage="$lernauftrag",
+            user_prompt_vorlage="$lernauftrag_text",
         ),
         ModellKonfiguration(
             sprachmodell="fake",
@@ -48,8 +48,8 @@ def test_antwort_versuchen_haelt_formatbruch_neben_der_antwort_fest() -> None:
     """Ein Formatbruch wird verworfen und der nächste Versuch wird genutzt."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={
@@ -72,8 +72,8 @@ def test_antwort_versuchen_haelt_anbieterfehler_neben_der_antwort_fest() -> None
     """Ein Anbieterfehler wird verworfen und der nächste Versuch wird genutzt."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={
@@ -95,8 +95,8 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     """Nach dem begrenzten Wiederholen bleibt kein halber Gesprächsschritt zurück."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={"skript": [{"fehler": "anbieterfehler"}] * MAX_VERSUCHE},
@@ -116,8 +116,8 @@ def test_antwort_versuchen_gibt_native_reasoning_spur_durch() -> None:
     """Native Anbieter-Spuren bleiben von der Denkspur getrennt."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={
@@ -142,8 +142,8 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
 
     FakeSprachmodell.letzte_anfragen.clear()
     vorheriger_versuch = antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={
@@ -159,8 +159,8 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
         eingabe="Wie hast du gerechnet?",
     )
     antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         ModellKonfiguration(
             sprachmodell="fake",
             parameter={"skript": [{"denkspur": "x", "aeusserung": "2/5."}]},
@@ -192,8 +192,8 @@ def test_antwort_versuchen_persistiert_nichts() -> None:
     )
 
     antwort_versuchen(
-        Vignette(lernauftrag="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
         konfiguration,
         verlauf=[],
         eingabe="Wie hast du gerechnet?",

@@ -15,8 +15,8 @@ _KERN_UNVERAENDERLICH_FEHLERMELDUNG: str = "Finale Kern-Fassungen sind unveränd
 VERTRAG_PROMPT: frozenset[str] = frozenset(
     {
         "fehlermuster_beschreibung",
-        "lernauftrag",
-        "arbeitsheft_beschreibung",
+        "lernauftrag_text",
+        "arbeitsheft_bildbeschreibung",
         "schuelerin_name",
         "schuelerin_geschlecht",
         "fach",

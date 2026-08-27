@@ -26,8 +26,8 @@ class VignetteForm(ModelForm):
         model: type[Vignette] = Vignette
         fields: list[str] = [
             "fehlermuster_beschreibung",
-            "lernauftrag",
-            "arbeitsheft_beschreibung",
+            "lernauftrag_text",
+            "arbeitsheft_bildbeschreibung",
             "arbeitsheft_text",
             "arbeitsheft_bild",
             "schuelerin_name",
@@ -43,7 +43,8 @@ class VignetteForm(ModelForm):
         ]
         labels: dict[str, str] = {
             "fehlermuster_beschreibung": "Fehlermuster Beschreibung",
-            "arbeitsheft_beschreibung": "Arbeitsheft Beschreibung",
+            "lernauftrag_text": "Lernauftrag Text",
+            "arbeitsheft_bildbeschreibung": "Arbeitsheft Bildbeschreibung",
             "arbeitsheft_text": "Arbeitsheft Text",
             "arbeitsheft_bild": "Arbeitsheft Bild",
             "schuelerin_name": "Schüler:in Vorname",

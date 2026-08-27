@@ -62,8 +62,8 @@ VIGNETTEN: list[dict[str, object]] = [
             "das Ergebnis der linken Rechnung in die Lücke ein und beachtest den "
             "Term rechts von der Lücke nicht weiter."
         ),
-        "lernauftrag": "Setze die passende Zahl ein: 8 + 4 = ___ + 5.",
-        "arbeitsheft_beschreibung": (
+        "lernauftrag_text": "Setze die passende Zahl ein: 8 + 4 = ___ + 5.",
+        "arbeitsheft_bildbeschreibung": (
             "Auf dem Arbeitsblatt steht die Platzhalteraufgabe 8 + 4 = ___ + 5. "
             "Lukas hat 12 in die Lücke eingetragen."
         ),
@@ -91,12 +91,12 @@ VIGNETTEN: list[dict[str, object]] = [
             "Studierende und P als einen Professor und schreibst 6S = P. Auch bei "
             "Nachfragen hältst du an dieser Abkürzungslogik fest."
         ),
-        "lernauftrag": (
+        "lernauftrag_text": (
             "An einer Universität gibt es sechsmal so viele Studierende wie "
             "Professoren. Schreibe eine Gleichung mit S für die Anzahl der "
             "Studierenden und P für die Anzahl der Professoren."
         ),
-        "arbeitsheft_beschreibung": (
+        "arbeitsheft_bildbeschreibung": (
             "Julia hat zur beschriebenen Beziehung die Gleichung 6S = P "
             "aufgeschrieben."
         ),

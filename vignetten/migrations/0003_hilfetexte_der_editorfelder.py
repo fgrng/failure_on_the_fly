@@ -13,13 +13,13 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterField(
             model_name='vignette',
-            name='arbeitsheft_beschreibung',
-            field=models.TextField(blank=True, help_text='Ausführliche Beschreibung des Arbeitshefts von der zu simulierenden Schüler:in. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar.'),
+            name='arbeitsheft_bildbeschreibung',
+            field=models.TextField(blank=True, help_text='Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Wird für die Simulation einbezogen. Für Teilnehmer:in nicht sichtbar.'),
         ),
         migrations.AlterField(
             model_name='vignette',
             name='arbeitsheft_bild',
-            field=models.ImageField(blank=True, help_text='Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.', upload_to=vignetten.models.arbeitsheft_bild_pfad),
+            field=models.ImageField(blank=True, help_text='Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.', upload_to=vignetten.models.vignetten_bild_pfad),
         ),
         migrations.AlterField(
             model_name='vignette',
@@ -63,8 +63,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterField(
             model_name='vignette',
-            name='lernauftrag',
-            field=models.TextField(blank=True, help_text='Beschreibung des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar.'),
+            name='lernauftrag_text',
+            field=models.TextField(blank=True, help_text='Text des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar.'),
         ),
         migrations.AlterField(
             model_name='vignette',

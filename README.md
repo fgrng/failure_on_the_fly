@@ -221,7 +221,7 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
    ```
 
 5. **Web-Backends verbinden.** Apache liefert die hochgeladenen
-   Arbeitsheft-Bilder und die statischen Dateien direkt aus, alles Übrige geht
+   Vignettenbilder und die statischen Dateien direkt aus, alles Übrige geht
    an gunicorn:
 
    ```
@@ -230,7 +230,7 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
    uberspace web backend set / --http --port 8000
    ```
 
-> Unter `/media/` liegende Arbeitsheft-Bilder sind ohne Anmeldung abrufbar, wer
+> Unter `/media/` liegende Vignettenbilder sind ohne Anmeldung abrufbar, wer
 > ihre URL kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber
 > ungeschützt.
 

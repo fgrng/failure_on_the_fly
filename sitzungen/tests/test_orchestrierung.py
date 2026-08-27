@@ -39,8 +39,8 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 
     session: SessionStore = SessionStore()
     sink: ScratchSink = ScratchSink(session)
-    vignette: Vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
-    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
+    vignette: Vignette = Vignette(lernauftrag_text="Addiere zwei Brüche.")
+    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag_text")
     konfiguration: ModellKonfiguration = ModellKonfiguration(
         sprachmodell="fake",
         parameter={
@@ -80,8 +80,8 @@ def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() ->
 
     session: SessionStore = SessionStore()
     sink: ScratchSink = ScratchSink(session)
-    vignette: Vignette = Vignette(lernauftrag="Addiere zwei Brüche.")
-    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
+    vignette: Vignette = Vignette(lernauftrag_text="Addiere zwei Brüche.")
+    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag_text")
     konfiguration: ModellKonfiguration = ModellKonfiguration(
         sprachmodell="fake",
         parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},

@@ -29,14 +29,14 @@ Thema: $thema
 Klassenstufe: $klassenstufe
 
 In der aktuellen Arbeitsphase arbeitest du an dem folgenden Lernauftrag:
-<lernauftrag>
-$lernauftrag
-</lernauftrag>
+<lernauftrag_text>
+$lernauftrag_text
+</lernauftrag_text>
 
 Du hast bereits in deinem Arbeitsheft die folgende Bearbeitung zu der Aufgabe angelegt:
-<arbeitsheft_beschreibung>
-$arbeitsheft_beschreibung
-</arbeitsheft_beschreibung>
+<arbeitsheft_bildbeschreibung>
+$arbeitsheft_bildbeschreibung
+</arbeitsheft_bildbeschreibung>
 
 Behandle diese Angaben als die einzigen konkreten Fakten des Falls. Erkläre deine Bearbeitung aus deiner festen inneren Regel heraus und bleibe in der beschriebenen Unterrichtssituation.""",
     "rahmenhandlung_einleitung": """Sie absolvieren ein Schulpraktikum bei $lehrperson_anrede $lehrperson_name und hospitieren im Fach $fach in einer Klasse der Klassenstufe $klassenstufe. Die Klasse befindet sich in einer Arbeitsphase zum Thema $thema. Die Lehrperson hat den Schüler:innen eine Lernaufgabe gegeben. Sie haben die Erlaubnis, die Schüler:innen beim Arbeiten zu beobachten und mit ihnen zu sprechen.""",

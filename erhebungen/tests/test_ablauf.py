@@ -25,8 +25,8 @@ def _finale_vignette_anlegen(konto: Konto) -> Vignette:
 
     vignette: Vignette = Vignette.objects.anlegen(konto)
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag = "Addiere die Brüche."
-    vignette.arbeitsheft_beschreibung = "Falsche Bruchrechnung"
+    vignette.lernauftrag_text = "Addiere die Brüche."
+    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
     vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
     vignette.schuelerin_name = "Lea"
     vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
