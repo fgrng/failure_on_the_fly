@@ -65,6 +65,7 @@ class TrainingskatalogTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Vergleiche Brüche.",
             arbeitsheft_text="3/4 ist größer als 2/3.",
         )
         training.vignetten.add(vignette)
@@ -105,6 +106,7 @@ class TrainingskatalogTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Vergleiche Brüche.",
             arbeitsheft_text="3/4 ist größer als 2/3.",
         )
         training.vignetten.add(vignette)
@@ -232,6 +234,7 @@ class TrainingskatalogTests(TestCase):
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Addiere zwei Brüche.",
             arbeitsheft_text="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -305,6 +308,7 @@ class TrainingsabbruchTests(TestCase):
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Addiere zwei Brüche.",
             arbeitsheft_text="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,

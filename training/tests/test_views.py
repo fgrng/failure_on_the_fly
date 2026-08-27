@@ -93,6 +93,7 @@ class TrainingKuratierenTests(TestCase):
             historie=eigene_historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Vergleiche Brüche.",
             fach="Brüche",
             arbeitsheft_text="1/2",
         )
@@ -105,6 +106,7 @@ class TrainingKuratierenTests(TestCase):
             historie=fremde_historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Vergleiche Brüche.",
             fach="Fremd",
             arbeitsheft_text="1/2",
         )
@@ -113,6 +115,7 @@ class TrainingKuratierenTests(TestCase):
             vorgaengerin=finale,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Vergleiche Brüche.",
             fach="Dezimalzahlen",
             arbeitsheft_text="0,5",
         )

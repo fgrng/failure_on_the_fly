@@ -92,7 +92,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         for platzhalter in (
             "arbeitsheft",
             "fehlermuster_beschreibung",
-            "lernauftrag_text",
+            "lernauftrag",
         ):
             self.assertContains(
                 response,

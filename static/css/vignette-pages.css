@@ -34,12 +34,12 @@
     border-radius: var(--radius);
 }
 
-.page-field .arbeitsheft-inhalt {
+.page-field .aufgabenkontext-inhalt {
     margin: 0;
     white-space: pre-wrap;
 }
 
-.page-field .arbeitsheft-bild {
+.page-field .aufgabenkontext-bild {
     display: block;
     width: 100%;
     height: auto;

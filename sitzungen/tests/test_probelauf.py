@@ -139,6 +139,24 @@ class ProbelaufStartTests(TestCase):
         self.assertContains(response, 'alt="Durchgestrichene Rechnung"')
         self.assertNotContains(response, "[BILD]")
 
+    def test_lernauftrag_ordnet_text_und_bild_am_marker(self) -> None:
+        """Die Sitzungsseite zeigt den Lernauftrag um sein Bild herum."""
+
+        self.entwurf.lernauftrag_text = "Oben [BILD] unten [bild]"
+        self.entwurf.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+        self.entwurf.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
+        self.entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        inhalt: str = response.content.decode()
+        self.assertLess(inhalt.index("Oben "), inhalt.index("auftrag.gif"))
+        self.assertLess(inhalt.index("auftrag.gif"), inhalt.index(" unten "))
+        self.assertContains(response, 'alt="Arbeitsblatt mit Zahlenreihe"')
+        self.assertNotContains(response, "[BILD]")
+
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,
     ) -> None:

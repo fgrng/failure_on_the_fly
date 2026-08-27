@@ -29,7 +29,7 @@ Thema: $thema
 Klassenstufe: $klassenstufe
 
 In der aktuellen Arbeitsphase arbeitest du an dem folgenden Lernauftrag:
-$lernauftrag_text
+$lernauftrag
 
 Du hast bereits in deinem Arbeitsheft die folgende Bearbeitung zu der Aufgabe angelegt:
 $arbeitsheft

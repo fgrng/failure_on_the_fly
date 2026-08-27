@@ -140,7 +140,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwortversuch = antwort_versuchen(
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
-            Simulationskern(user_prompt_vorlage="$lernauftrag_text"),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 sprachmodell="openai/gpt-test", parameter={"max_tokens": 100}
             ),

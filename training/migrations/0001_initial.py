@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("sitzungen", "0004_fehlversuch_bewahren"),
-        ("vignetten", "0002_alter_vignette_arbeitsheft_bild"),
+        ("vignetten", "0005_vignette_lernauftrag_bild_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

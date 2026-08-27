@@ -68,9 +68,9 @@
 }
 
 .aufgabenkontext p { margin: 0; }
-.arbeitsheft-inhalt { margin: 0; white-space: pre-wrap; }
+.aufgabenkontext-inhalt { margin: 0; white-space: pre-wrap; }
 .aufgabenkontext img { display: block; max-width: 100%; height: auto; }
-.aufgabenkontext .arbeitsheft-bild { width: 100%; }
+.aufgabenkontext .aufgabenkontext-bild { width: 100%; }
 .aufgabenkontext--arbeitsheft { margin-top: var(--space-3); }
 
 .diagnosegespraech-verlauf {

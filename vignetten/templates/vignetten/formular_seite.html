@@ -48,12 +48,22 @@
             </div>
         </section>
 
-        <section class="page-section" aria-labelledby="section-task">
+        <section class="page-section" aria-labelledby="section-lernauftrag">
             <header class="page-section__head">
-                <b>03</b><span><h2 id="section-task">Aufgabenkontext</h2><small>Was sieht und bearbeitet die simulierte Schüler:in?</small></span>
+                <b>03</b><span><h2 id="section-lernauftrag">Lernauftrag</h2><small>Was hat die Lehrperson der Schüler:in aufgegeben?</small></span>
             </header>
             <div class="field-grid">
                 {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_text wide=True %}
+                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bild %}
+                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bildbeschreibung wide=True %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-arbeitsheft">
+            <header class="page-section__head">
+                <b>04</b><span><h2 id="section-arbeitsheft">Arbeitsheft</h2><small>Was hat die Schüler:in bereits bearbeitet?</small></span>
+            </header>
+            <div class="field-grid">
                 {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_text %}
                 {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bild %}
                 {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bildbeschreibung wide=True %}
@@ -62,7 +72,7 @@
 
         <section class="page-section" aria-labelledby="section-pattern">
             <header class="page-section__head">
-                <b>04</b><span><h2 id="section-pattern">Fehlermuster</h2><small>Wie denkt die simulierte Schüler:in?</small></span>
+                <b>05</b><span><h2 id="section-pattern">Fehlermuster</h2><small>Wie denkt die simulierte Schüler:in?</small></span>
             </header>
             <div class="field-grid">
                 {% include "vignetten/includes/form_field.html" with field=form.fehlermuster_beschreibung %}
@@ -72,7 +82,7 @@
 
         <section class="page-section" aria-labelledby="section-budget">
             <header class="page-section__head">
-                <b>05</b><span><h2 id="section-budget">Gesprächsbudget</h2><small>Wann endet das Diagnosegespräch?</small></span>
+                <b>06</b><span><h2 id="section-budget">Gesprächsbudget</h2><small>Wann endet das Diagnosegespräch?</small></span>
             </header>
             <div class="field-grid">
                 {% include "vignetten/includes/form_field.html" with field=form.budget_typ %}

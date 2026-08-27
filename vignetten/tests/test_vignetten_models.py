@@ -41,7 +41,7 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
             "<fehlermuster_beschreibung>Brüche <werden> addiert."
             "</fehlermuster_beschreibung>"
         ),
-        "lernauftrag_text": "<lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text>",
+        "lernauftrag": "<lernauftrag><lernauftrag_text>Addiere zwei Brüche.</lernauftrag_text></lernauftrag>",
         "arbeitsheft": (
             "<arbeitsheft>"
             "<arbeitsheft_text>8 + 4 = 12 </arbeitsheft_text>"
@@ -58,6 +58,27 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
     }
 
 
+def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> None:
+    """Der komponierte Lernauftrag folgt dem ersten Bildmarker."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            lernauftrag_text="Rechne zuerst. [BILD] Begründe danach. [bild]",
+            lernauftrag_bild="vignettenbilder/auftrag.gif",
+            lernauftrag_bildbeschreibung="Arbeitsblatt mit einer Zahlenreihe.",
+        )
+    )
+
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag>"
+        "<lernauftrag_text>Rechne zuerst. </lernauftrag_text>"
+        "<lernauftrag_bildbeschreibung>Arbeitsblatt mit einer Zahlenreihe."
+        "</lernauftrag_bildbeschreibung>"
+        "<lernauftrag_text> Begründe danach. </lernauftrag_text>"
+        "</lernauftrag>"
+    )
+
+
 def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
     """Leere lange Prompt-Inhalte werden nicht mit einer Umgebung versehen."""
 
@@ -65,8 +86,9 @@ def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
 
     assert (
         platzhalter["fehlermuster_beschreibung"],
+        platzhalter["lernauftrag"],
         platzhalter["arbeitsheft"],
-    ) == ("", "")
+    ) == ("", "", "")
 
 
 def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
@@ -79,6 +101,19 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
     assert platzhalter["arbeitsheft"] == (
         "<arbeitsheft><arbeitsheft_text>Oben  unten </arbeitsheft_text>"
         "</arbeitsheft>"
+    )
+
+
+def test_prompt_platzhalter_entfernt_lernauftrag_marker_ohne_bild() -> None:
+    """Ein Lernauftrag ohne Bild gibt den Marker nie an das Modell weiter."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(lernauftrag_text="Oben [BILD] unten [bild]")
+    )
+
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag><lernauftrag_text>Oben  unten </lernauftrag_text>"
+        "</lernauftrag>"
     )
 
 
@@ -102,6 +137,26 @@ def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text() -> None:
     )
 
 
+def test_prompt_platzhalter_ordnet_lernauftrag_bild_ohne_marker_nach_dem_text() -> None:
+    """Ohne Marker steht die Lernauftrag-Bildbeschreibung im Prompt nach dem Text."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            lernauftrag_text="Aufgabe oben",
+            lernauftrag_bild="vignettenbilder/auftrag.gif",
+            lernauftrag_bildbeschreibung="Arbeitsblatt mit Skizze",
+        )
+    )
+
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag>"
+        "<lernauftrag_text>Aufgabe oben</lernauftrag_text>"
+        "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
+        "</lernauftrag_bildbeschreibung>"
+        "</lernauftrag>"
+    )
+
+
 def test_prompt_platzhalter_laesst_leere_textstuecke_weg() -> None:
     """Ein Arbeitsheft nur mit Bild erzeugt keine leere Textumgebung."""
 
@@ -117,6 +172,24 @@ def test_prompt_platzhalter_laesst_leere_textstuecke_weg() -> None:
         "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
         "</arbeitsheft_bildbeschreibung>"
         "</arbeitsheft>"
+    )
+
+
+def test_prompt_platzhalter_laesst_leere_lernauftrag_textstuecke_weg() -> None:
+    """Ein Lernauftrag nur mit Bild erzeugt keine leere Textumgebung."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(
+            lernauftrag_bild="vignettenbilder/auftrag.gif",
+            lernauftrag_bildbeschreibung="Arbeitsblatt mit Skizze",
+        )
+    )
+
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag>"
+        "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
+        "</lernauftrag_bildbeschreibung>"
+        "</lernauftrag>"
     )
 
 
@@ -271,6 +344,7 @@ class VignetteConstraintTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
         Vignette.objects._erstellen(
@@ -278,6 +352,7 @@ class VignetteConstraintTests(TestCase):
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
         archivierte_schwester: Vignette = Vignette.objects._erstellen(
@@ -285,6 +360,7 @@ class VignetteConstraintTests(TestCase):
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=finalisiert_am,
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -324,12 +400,14 @@ class VignetteQuerySetTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
         Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
 
@@ -446,12 +524,42 @@ class VignetteFinalisierenTests(TestCase):
                 with self.assertRaisesMessage(ValidationError, "Entwürfe"):
                     vignette.finalisieren()
 
-    def test_finalisieren_nennt_fehlendes_pflichtfeld(self) -> None:
-        """Unvollständige Entwürfe erklären, welches Feld ergänzt werden muss."""
+    def test_finalisieren_lehnt_leeren_lernauftrag_ab(self) -> None:
+        """Der Lernauftrag braucht sichtbar Text oder ein Bild."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
         vignette.lernauftrag_text = ""
 
-        with self.assertRaisesMessage(ValidationError, "lernauftrag_text"):
+        with self.assertRaisesMessage(ValidationError, "Lernauftrag"):
+            vignette.finalisieren()
+
+    def test_finalisieren_nimmt_lernauftrag_nur_mit_bild_an(self) -> None:
+        """Ein Bild allein erfüllt die Lernauftrag-Alternative."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.lernauftrag_text = ""
+        vignette.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+        vignette.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
+
+        vignette.finalisieren()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+
+    def test_finalisieren_erlaubt_leere_lernauftrag_bildbeschreibung_ohne_bild(
+        self,
+    ) -> None:
+        """Eine Lernauftrag-Bildbeschreibung ist ohne Bild nicht erforderlich."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.lernauftrag_bildbeschreibung = ""
+
+        vignette.finalisieren()
+
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+
+    def test_finalisieren_braucht_lernauftrag_bildbeschreibung_mit_bild(self) -> None:
+        """Ein Lernauftrag-Bild braucht beim Finalisieren seinen Alt-Text."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+
+        with self.assertRaisesMessage(ValidationError, "Lernauftrag-Bild"):
             vignette.finalisieren()
 
     def test_finalisieren_lehnt_leeres_arbeitsheft_ab(self) -> None:
@@ -534,8 +642,11 @@ class VignetteBearbeitenTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag_text="Addiere 27 und 15.",
+            lernauftrag_bild="vignettenbilder/auftrag.gif",
+            lernauftrag_bildbeschreibung="Arbeitsblatt mit Addition",
             arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
+            arbeitsheft_bild="vignettenbilder/heft.gif",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             lehrperson_name="Herr Koch",
@@ -556,6 +667,14 @@ class VignetteBearbeitenTests(TestCase):
         self.assertEqual(entwurf.historie, finale.historie)
         self.assertEqual(entwurf.vorgaengerin, finale)
         self.assertEqual(entwurf.gepinnter_kern, kern)
+        self.assertEqual(entwurf.lernauftrag_bild.name, "vignettenbilder/auftrag.gif")
+        self.assertEqual(
+            entwurf.lernauftrag_bildbeschreibung, "Arbeitsblatt mit Addition"
+        )
+        self.assertEqual(entwurf.arbeitsheft_bild.name, "vignettenbilder/heft.gif")
+        self.assertEqual(
+            entwurf.arbeitsheft_bildbeschreibung, "27 + 15 = 312"
+        )
         self.assertEqual(entwurf.schuelerin_name, "Mia")
         self.assertEqual(entwurf.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)
         self.assertEqual(entwurf.lehrperson_name, "Herr Koch")
@@ -573,6 +692,7 @@ class VignetteBearbeitenTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
             gepinnter_kern=kern,
         )
@@ -581,6 +701,7 @@ class VignetteBearbeitenTests(TestCase):
             vorgaengerin=finale,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
             gepinnter_kern=kern,
         )
@@ -598,6 +719,7 @@ class VignetteBearbeitenTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
             gepinnter_kern=kern,
         )
@@ -606,6 +728,7 @@ class VignetteBearbeitenTests(TestCase):
             vorgaengerin=erste,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
             gepinnter_kern=kern,
         )
@@ -614,6 +737,7 @@ class VignetteBearbeitenTests(TestCase):
             vorgaengerin=zweite,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
             gepinnter_kern=kern,
         )

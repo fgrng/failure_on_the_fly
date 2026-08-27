@@ -18,7 +18,6 @@ _BILDMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
 
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
-    "lernauftrag_text",
     "schuelerin_name",
     "schuelerin_geschlecht",
     "lehrperson_name",
@@ -171,7 +170,16 @@ class Vignette(models.Model):
     )
     lernauftrag_text: models.TextField = models.TextField(
         blank=True,
-        help_text="Text des Lern- oder Arbeitsauftrags, den die Schüler:innen im Unterricht erhalten haben. Für Teilnehmer:in sichtbar.",
+        help_text="Text des Lernauftrags. Mit [bild] steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
+    )
+    lernauftrag_bild: models.ImageField = models.ImageField(
+        upload_to=vignetten_bild_pfad,
+        blank=True,
+        help_text="Abbildung zum Lernauftrag. Für Teilnehmer:in sichtbar.",
+    )
+    lernauftrag_bildbeschreibung: models.TextField = models.TextField(
+        blank=True,
+        help_text="Beschreibung dessen, was auf dem Lernauftrag-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
     )
     arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
         blank=True,
@@ -284,14 +292,36 @@ class Vignette(models.Model):
             .exists()
         )
 
-    def arbeitsheft_zerlegen(self) -> tuple[str, str]:
-        """Teilt den Arbeitsheft-Text am ersten Bildmarker und entfernt alle."""
-        textteile: list[str] = _BILDMARKER.split(self.arbeitsheft_text)
+    def aufgabenkontext_zerlegen(self, text: str, bild: object) -> tuple[str, str]:
+        """Teilt einen Aufgabenkontext am ersten Bildmarker und entfernt alle."""
+        textteile: list[str] = _BILDMARKER.split(text)
         vor_bild: str = textteile[0]
         nach_bild: str = "".join(textteile[1:])
-        if not self.arbeitsheft_bild:
+        if not bild:
             return vor_bild + nach_bild, ""
         return vor_bild, nach_bild
+
+    def lernauftrag_zerlegen(self) -> tuple[str, str]:
+        """Teilt den Lernauftrag-Text am ersten Bildmarker und entfernt alle."""
+        return self.aufgabenkontext_zerlegen(
+            self.lernauftrag_text, self.lernauftrag_bild
+        )
+
+    @property
+    def lernauftrag_text_vor_bild(self) -> str:
+        """Liefert den sichtbaren Lernauftrag-Text vor dem Bild."""
+        return self.lernauftrag_zerlegen()[0]
+
+    @property
+    def lernauftrag_text_nach_bild(self) -> str:
+        """Liefert den sichtbaren Lernauftrag-Text nach dem Bild."""
+        return self.lernauftrag_zerlegen()[1]
+
+    def arbeitsheft_zerlegen(self) -> tuple[str, str]:
+        """Teilt den Arbeitsheft-Text am ersten Bildmarker und entfernt alle."""
+        return self.aufgabenkontext_zerlegen(
+            self.arbeitsheft_text, self.arbeitsheft_bild
+        )
 
     @property
     def arbeitsheft_text_vor_bild(self) -> str:
@@ -365,6 +395,8 @@ class Vignette(models.Model):
             gepinnter_kern=quelle.gepinnter_kern,
             fehlermuster_beschreibung=quelle.fehlermuster_beschreibung,
             lernauftrag_text=quelle.lernauftrag_text,
+            lernauftrag_bild=quelle.lernauftrag_bild.name,
+            lernauftrag_bildbeschreibung=quelle.lernauftrag_bildbeschreibung,
             arbeitsheft_bildbeschreibung=quelle.arbeitsheft_bildbeschreibung,
             arbeitsheft_text=quelle.arbeitsheft_text,
             arbeitsheft_bild=quelle.arbeitsheft_bild.name,
@@ -427,14 +459,21 @@ class Vignette(models.Model):
             raise ValidationError(
                 f"Zum Finalisieren fehlen: {', '.join(fehlende_felder)}."
             )
-        if not self.arbeitsheft_text and not self.arbeitsheft_bild:
-            raise ValidationError(
-                "Zum Finalisieren braucht das Arbeitsheft Text oder ein Bild."
-            )
-        if self.arbeitsheft_bild and not self.arbeitsheft_bildbeschreibung:
-            raise ValidationError(
-                "Zum Finalisieren braucht ein Arbeitsheft-Bild eine Bildbeschreibung."
-            )
+        for name in ("lernauftrag", "arbeitsheft"):
+            if not getattr(self, f"{name}_text") and not getattr(self, f"{name}_bild"):
+                raise ValidationError(
+                    "Zum Finalisieren braucht "
+                    f"{'der Lernauftrag' if name == 'lernauftrag' else 'das Arbeitsheft'} "
+                    "Text oder ein Bild."
+                )
+            if getattr(self, f"{name}_bild") and not getattr(
+                self, f"{name}_bildbeschreibung"
+            ):
+                raise ValidationError(
+                    "Zum Finalisieren braucht ein "
+                    f"{'Lernauftrag' if name == 'lernauftrag' else 'Arbeitsheft'}-Bild "
+                    "eine Bildbeschreibung."
+                )
         if self.budget_wert is None or self.budget_wert <= 0:
             raise ValidationError("Zum Finalisieren muss das Budget größer als 0 sein.")
         if self.gepinnter_kern is None:
@@ -480,6 +519,11 @@ class Vignette(models.Model):
                 | ~(Q(arbeitsheft_text="") & Q(arbeitsheft_bild="")),
                 name="vignetten_arbeitsheft_text_oder_bild",
             ),
+            models.CheckConstraint(
+                condition=Q(zustand="entwurf")
+                | ~(Q(lernauftrag_text="") & Q(lernauftrag_bild="")),
+                name="vignetten_lernauftrag_text_oder_bild",
+            ),
         ]
 
 
@@ -488,8 +532,8 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
 
     platzhalter: dict[str, str] = {
         "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
-        "lernauftrag_text": vignette.lernauftrag_text,
-        "arbeitsheft": _arbeitsheft_prompt(vignette),
+        "lernauftrag": _aufgabenkontext_prompt(vignette, "lernauftrag"),
+        "arbeitsheft": _aufgabenkontext_prompt(vignette, "arbeitsheft"),
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
         "fach": vignette.fach,
@@ -497,26 +541,29 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
         "klassenstufe": vignette.klassenstufe,
     }
     for name in PROMPT_PLATZHALTER_MIT_UMGEBUNG:
-        if name != "arbeitsheft" and (wert := platzhalter[name]):
+        if name not in {"lernauftrag", "arbeitsheft"} and (wert := platzhalter[name]):
             platzhalter[name] = f"<{name}>{wert}</{name}>"
     return platzhalter
 
 
-def _arbeitsheft_prompt(vignette: Vignette) -> str:
-    # Fasst Text und Bildbeschreibung in ihrer sichtbaren Reihenfolge zusammen.
-    vor_bild, nach_bild = vignette.arbeitsheft_zerlegen()
-    if vignette.arbeitsheft_bild:
+def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
+    """Fasst Text und Bildbeschreibung eines Teils in sichtbarer Reihenfolge zusammen."""
+    text: str = getattr(vignette, f"{name}_text")
+    bild: object = getattr(vignette, f"{name}_bild")
+    bildbeschreibung: str = getattr(vignette, f"{name}_bildbeschreibung")
+    vor_bild, nach_bild = vignette.aufgabenkontext_zerlegen(text, bild)
+    if bild:
         stuecke: tuple[tuple[str, str], ...] = (
-            ("arbeitsheft_text", vor_bild),
-            ("arbeitsheft_bildbeschreibung", vignette.arbeitsheft_bildbeschreibung),
-            ("arbeitsheft_text", nach_bild),
+            (f"{name}_text", vor_bild),
+            (f"{name}_bildbeschreibung", bildbeschreibung),
+            (f"{name}_text", nach_bild),
         )
     else:
-        stuecke = (("arbeitsheft_text", vor_bild + nach_bild),)
+        stuecke = ((f"{name}_text", vor_bild + nach_bild),)
     inhalt: str = "".join(
         f"<{name}>{wert}</{name}>" for name, wert in stuecke if wert
     )
-    return f"<arbeitsheft>{inhalt}</arbeitsheft>" if inhalt else ""
+    return f"<{name}>{inhalt}</{name}>" if inhalt else ""
 
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:

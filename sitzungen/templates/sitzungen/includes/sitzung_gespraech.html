@@ -12,7 +12,7 @@
 
     <section class="aufgabenkontext aufgabenkontext--arbeitsheft">
         <h2>Arbeitsheft von {{ vignette.schuelerin_name }}</h2>
-        {% include "vignetten/includes/arbeitsheft_inhalt.html" %}
+        {% include "vignetten/includes/aufgabenkontext_inhalt.html" with text_vor_bild=vignette.arbeitsheft_text_vor_bild bild=vignette.arbeitsheft_bild bildbeschreibung=vignette.arbeitsheft_bildbeschreibung text_nach_bild=vignette.arbeitsheft_text_nach_bild %}
     </section>
 
     {% if gespraechsschritte %}

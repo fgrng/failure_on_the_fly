@@ -112,6 +112,7 @@ def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
         historie=Vignettenhistorie.objects.create(),
         zustand=Vignette.Zustand.FINAL,
         finalisiert_am=timezone.now(),
+        lernauftrag_text="Lernauftrag",
         arbeitsheft_text="Bearbeitung",
     )
 
@@ -143,6 +144,7 @@ def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() ->
         historie=Vignettenhistorie.objects.create(),
         zustand=Vignette.Zustand.FINAL,
         finalisiert_am=timezone.now(),
+        lernauftrag_text="Lernauftrag",
         arbeitsheft_text="Bearbeitung",
     )
 

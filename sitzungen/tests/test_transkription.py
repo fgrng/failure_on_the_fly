@@ -51,6 +51,7 @@ class TranskriptionsEndpointTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Addiere zwei Brüche.",
             arbeitsheft_text="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,

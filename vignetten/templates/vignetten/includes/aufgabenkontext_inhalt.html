@@ -1,0 +1,9 @@
+{% if text_vor_bild %}
+    <p class="aufgabenkontext-inhalt">{{ text_vor_bild }}</p>
+{% endif %}
+{% if bild %}
+    <img class="aufgabenkontext-bild" src="{{ bild.url }}" alt="{{ bildbeschreibung }}">
+{% endif %}
+{% if text_nach_bild %}
+    <p class="aufgabenkontext-inhalt">{{ text_nach_bild }}</p>
+{% endif %}

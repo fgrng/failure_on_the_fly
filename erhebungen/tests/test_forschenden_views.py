@@ -1306,7 +1306,7 @@ class ErhebungsExportTests(TestCase):
         )
         erster_kern: Simulationskern = Simulationskern.objects.anlegen(
             system_prompt_vorlage="System Zeile eins\nSystem Zeile zwei",
-            user_prompt_vorlage="User $lernauftrag_text",
+            user_prompt_vorlage="User $lernauftrag",
             rahmenhandlung_einleitung="Einleitung\nmehrzeilig",
             rahmenhandlung_gespraechseinleitung="Gespräch",
             rahmenhandlung_debrief="Debrief",
@@ -1404,7 +1404,7 @@ class ErhebungsExportTests(TestCase):
                         timespec="seconds"
                     ),
                     "system_prompt_vorlage": "Verwendeter System-Prompt\nZeile zwei",
-                    "user_prompt_vorlage": "User $lernauftrag_text",
+                    "user_prompt_vorlage": "User $lernauftrag",
                     "rahmenhandlung_einleitung": "Einleitung\nmehrzeilig",
                     "rahmenhandlung_gespraechseinleitung": "Gespräch",
                     "rahmenhandlung_debrief": "Debrief",

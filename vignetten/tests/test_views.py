@@ -146,6 +146,7 @@ class VignetteListeViewTests(TestCase):
             vorgaengerin=erste,
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="1/2 + 1/3 = 2/5",
             gepinnter_kern=kern,
         )
@@ -278,6 +279,22 @@ class VignetteBearbeitenViewTests(TestCase):
                 Path(media_root, self.vignette.arbeitsheft_bild.name).is_file()
             )
 
+    def test_lagert_hochgeladenes_lernauftrag_bild_unter_media_root_ab(self) -> None:
+        """Ein Lernauftrag-Bild wird dauerhaft unter MEDIA_ROOT gespeichert."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(bearbeiten_url, {"lernauftrag_bild": _gif_upload()})
+
+            self.vignette.refresh_from_db()
+            self.assertTrue(
+                Path(media_root, self.vignette.lernauftrag_bild.name).is_file()
+            )
+
     def test_zeigt_hochgeladenes_bild_im_detail(self) -> None:
         """Die Detailansicht referenziert das hochgeladene Arbeitsheft-Bild."""
         with (
@@ -295,6 +312,24 @@ class VignetteBearbeitenViewTests(TestCase):
             )
 
             self.assertContains(response, self.vignette.arbeitsheft_bild.url)
+
+    def test_zeigt_hochgeladenes_lernauftrag_bild_im_detail(self) -> None:
+        """Die Detailansicht referenziert das hochgeladene Lernauftrag-Bild."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root, MEDIA_URL="/media/"),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(bearbeiten_url, {"lernauftrag_bild": _gif_upload()})
+            self.vignette.refresh_from_db()
+
+            response: HttpResponse = self.client.get(
+                reverse("vignetten:detail", args=[self.vignette.pk])
+            )
+
+            self.assertContains(response, self.vignette.lernauftrag_bild.url)
 
     def test_bildwechsel_erstellt_neue_datei_und_erhaelt_die_alte(self) -> None:
         """Die nur ergänzende Ablage überschreibt oder löscht kein Bild."""
@@ -324,6 +359,36 @@ class VignetteBearbeitenViewTests(TestCase):
                 Path(media_root, self.vignette.arbeitsheft_bild.name).is_file()
             )
 
+    def test_lernauftrag_bildwechsel_erstellt_neue_datei_und_erhaelt_die_alte(
+        self,
+    ) -> None:
+        """Ein Wechsel des Lernauftrag-Bildes erzeugt eine neue Datei."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(
+                bearbeiten_url,
+                {"lernauftrag_bild": _gif_upload()},
+            )
+            self.vignette.refresh_from_db()
+            erster_pfad: str = self.vignette.lernauftrag_bild.name
+
+            self.client.post(
+                bearbeiten_url,
+                {"lernauftrag_bild": _gif_upload()},
+            )
+            self.vignette.refresh_from_db()
+
+            self.assertNotEqual(self.vignette.lernauftrag_bild.name, erster_pfad)
+            self.assertTrue(Path(media_root, erster_pfad).is_file())
+            self.assertTrue(
+                Path(media_root, self.vignette.lernauftrag_bild.name).is_file()
+            )
+
     def test_versteckt_fremden_entwurf(self) -> None:
         """Entwürfe anderer Eigentümerinnen bleiben über den Editor unsichtbar."""
         grace: Konto = get_user_model().objects.create_user(username="grace")
@@ -345,6 +410,7 @@ class VignetteBearbeitenViewTests(TestCase):
             historie=self.historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
 
@@ -371,6 +437,7 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
             historie=fremde_historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Finaler Inhalt",
             fach="Mathematik",
             thema="Bruchrechnung",
@@ -379,6 +446,7 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Weiterer finaler Inhalt",
             fach="Mathematik",
             thema="Addition",
@@ -392,6 +460,7 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
             historie=Vignettenhistorie.objects.create(),
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Archivierter Inhalt",
             fach="Archiv-Fach",
             thema="Archiv-Thema",
@@ -495,14 +564,30 @@ class VignetteFinalisierenViewTests(TestCase):
         )
         self.assertContains(response, 'badge--final')
 
-    def test_zeigt_fehler_fuer_fehlendes_pflichtfeld(self) -> None:
-        """Ein fehlendes Pflichtfeld wird verständlich benannt."""
-        self._assert_finalisieren_zeigt_fehler("lernauftrag_text", "", "lernauftrag_text")
+    def test_zeigt_fehler_fuer_leeren_lernauftrag(self) -> None:
+        """Ein Lernauftrag ohne Text oder Bild wird verständlich abgelehnt."""
+        self._assert_finalisieren_zeigt_fehler("lernauftrag_text", "", "Lernauftrag")
+
+    def test_zeigt_fehler_fuer_lernauftrag_bild_ohne_bildbeschreibung(self) -> None:
+        """Ein Lernauftrag-Bild ohne Bildbeschreibung wird beim Finalisieren abgelehnt."""
+        self.vignette.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+        self.vignette.lernauftrag_bildbeschreibung = ""
+        self._assert_finalisieren_zeigt_fehler(
+            "lernauftrag_bildbeschreibung", "", "Lernauftrag-Bild"
+        )
 
     def test_zeigt_fehler_fuer_leeres_arbeitsheft(self) -> None:
         """Ein leeres Arbeitsheft wird verständlich benannt."""
         self._assert_finalisieren_zeigt_fehler(
             "arbeitsheft_text", "", "Arbeitsheft"
+        )
+
+    def test_zeigt_fehler_fuer_arbeitsheft_bild_ohne_bildbeschreibung(self) -> None:
+        """Ein Arbeitsheft-Bild ohne Bildbeschreibung wird beim Finalisieren abgelehnt."""
+        self.vignette.arbeitsheft_bild = "vignettenbilder/heft.gif"
+        self.vignette.arbeitsheft_bildbeschreibung = ""
+        self._assert_finalisieren_zeigt_fehler(
+            "arbeitsheft_bildbeschreibung", "", "Arbeitsheft-Bild"
         )
 
     def test_zeigt_fehler_fuer_budget_null(self) -> None:
@@ -534,6 +619,8 @@ class VignetteNeueFassungViewTests(TestCase):
         "historie",
         "fehlermuster_beschreibung",
         "lernauftrag_text",
+        "lernauftrag_bild",
+        "lernauftrag_bildbeschreibung",
         "arbeitsheft_bildbeschreibung",
         "arbeitsheft_text",
         "arbeitsheft_bild",
@@ -558,6 +645,8 @@ class VignetteNeueFassungViewTests(TestCase):
         self.finale: Vignette = Vignette.objects.anlegen(self.ada)
         self.finale.fehlermuster_beschreibung = "Zählt Stellenwerte einzeln."
         self.finale.lernauftrag_text = "Addiere 27 und 15."
+        self.finale.lernauftrag_bild = "vignettenbilder/lernauftrag-datei.gif"
+        self.finale.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Addition"
         self.finale.arbeitsheft_bildbeschreibung = "27 + 15 = 312"
         self.finale.arbeitsheft_text = "27 + 15 = 312"
         self.finale.arbeitsheft_bild = "vignettenbilder/finale-datei.gif"
@@ -582,6 +671,7 @@ class VignetteNeueFassungViewTests(TestCase):
             for feldname in self._GEERBTE_FELDER
         }
         werte["arbeitsheft_bild"] = vignette.arbeitsheft_bild.name
+        werte["lernauftrag_bild"] = vignette.lernauftrag_bild.name
         return werte
 
     def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(self) -> None:
@@ -692,6 +782,7 @@ class VignetteArchivierenViewTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="27 + 15 = 312",
         )
         self.client.force_login(ada)
@@ -713,6 +804,7 @@ class VignetteArchivierenViewTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.ARCHIVIERT,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="27 + 15 = 312",
         )
         self.client.force_login(ada)
@@ -752,6 +844,7 @@ class VignetteArchivierenViewTests(TestCase):
                     historie=Vignettenhistorie.objects.create(),
                     zustand=Vignette.Zustand.FINAL,
                     finalisiert_am=timezone.now(),
+                    lernauftrag_text="Lernauftrag",
                     arbeitsheft_text="Inhalt",
                 ),
             ),
@@ -761,6 +854,7 @@ class VignetteArchivierenViewTests(TestCase):
                     historie=Vignettenhistorie.objects.create(),
                     zustand=Vignette.Zustand.ARCHIVIERT,
                     finalisiert_am=timezone.now(),
+                    lernauftrag_text="Lernauftrag",
                     arbeitsheft_text="Inhalt",
                 ),
             ),
@@ -770,6 +864,7 @@ class VignetteArchivierenViewTests(TestCase):
                     historie=Vignettenhistorie.objects.create(),
                     zustand=Vignette.Zustand.FINAL,
                     finalisiert_am=timezone.now(),
+                    lernauftrag_text="Lernauftrag",
                     arbeitsheft_text="Inhalt",
                 ),
             ),
@@ -780,6 +875,7 @@ class VignetteArchivierenViewTests(TestCase):
             historie=fremde_historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Inhalt",
         )
         self.client.force_login(ada)
