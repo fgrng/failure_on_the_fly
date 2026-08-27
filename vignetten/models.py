@@ -185,10 +185,6 @@ class Vignette(models.Model):
         blank=True,
         help_text="Hinweise zum Lernauftrag ausschließlich für die Simulation. Für Teilnehmer:in nicht sichtbar.",
     )
-    arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
-        blank=True,
-        help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
-    )
     arbeitsheft_text: models.TextField = models.TextField(
         blank=True,
         help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Mit [bild] steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
@@ -197,6 +193,10 @@ class Vignette(models.Model):
         upload_to=vignetten_bild_pfad,
         blank=True,
         help_text="Abbildung des Arbeitshefts von der zu simulierenden Schüler:in. Für Teilnehmer:in sichtbar.",
+    )
+    arbeitsheft_bildbeschreibung: models.TextField = models.TextField(
+        blank=True,
+        help_text="Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und wird für die Simulation einbezogen.",
     )
     arbeitsheft_simulationshinweise: models.TextField = models.TextField(
         blank=True,
@@ -537,30 +537,29 @@ class Vignette(models.Model):
         ]
 
 
+def _umgebung(tag: str, inhalt: str) -> str:
+    # Fasst einen nichtleeren Wert in eine XML-artige Umgebung ein.
+
+    return f"<{tag}>{inhalt}</{tag}>" if inhalt else ""
+
+
 def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
     """Liefert die Vignettenwerte für Prompt-Vorlagen."""
 
-    fehlermuster: str = (
-        f"<fehlermuster_beschreibung>{vignette.fehlermuster_beschreibung}</fehlermuster_beschreibung>"
-        if vignette.fehlermuster_beschreibung
-        else ""
-    )
-    lernauftrag_hinweise: str = (
-        f"<lernauftrag_simulationshinweise>{vignette.lernauftrag_simulationshinweise}</lernauftrag_simulationshinweise>"
-        if vignette.lernauftrag_simulationshinweise
-        else ""
-    )
-    arbeitsheft_hinweise: str = (
-        f"<arbeitsheft_simulationshinweise>{vignette.arbeitsheft_simulationshinweise}</arbeitsheft_simulationshinweise>"
-        if vignette.arbeitsheft_simulationshinweise
-        else ""
-    )
     return {
-        "fehlermuster_beschreibung": fehlermuster,
+        "fehlermuster_beschreibung": _umgebung(
+            "fehlermuster_beschreibung", vignette.fehlermuster_beschreibung
+        ),
         "lernauftrag": _aufgabenkontext_prompt(vignette, "lernauftrag"),
         "arbeitsheft": _aufgabenkontext_prompt(vignette, "arbeitsheft"),
-        "lernauftrag_simulationshinweise": lernauftrag_hinweise,
-        "arbeitsheft_simulationshinweise": arbeitsheft_hinweise,
+        "lernauftrag_simulationshinweise": _umgebung(
+            "lernauftrag_simulationshinweise",
+            vignette.lernauftrag_simulationshinweise,
+        ),
+        "arbeitsheft_simulationshinweise": _umgebung(
+            "arbeitsheft_simulationshinweise",
+            vignette.arbeitsheft_simulationshinweise,
+        ),
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
         "fach": vignette.fach,
@@ -570,7 +569,8 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
 
 
 def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
-    """Fasst Text und Bildbeschreibung eines Teils in sichtbarer Reihenfolge zusammen."""
+    # Fasst Text und Bildbeschreibung eines Teils in sichtbarer Reihenfolge zusammen.
+
     text: str = getattr(vignette, f"{name}_text")
     bild: object = getattr(vignette, f"{name}_bild")
     bildbeschreibung: str = getattr(vignette, f"{name}_bildbeschreibung")
@@ -583,10 +583,8 @@ def _aufgabenkontext_prompt(vignette: Vignette, name: str) -> str:
         )
     else:
         stuecke = ((f"{name}_text", vor_bild + nach_bild),)
-    inhalt: str = "".join(
-        f"<{tag}>{wert}</{tag}>" for tag, wert in stuecke if wert
-    )
-    return f"<{name}>{inhalt}</{name}>" if inhalt else ""
+    inhalt: str = "".join(_umgebung(tag, wert) for tag, wert in stuecke)
+    return _umgebung(name, inhalt)
 
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:
