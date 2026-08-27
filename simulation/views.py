@@ -7,6 +7,7 @@ from django.shortcuts import render
 from konten.navigation import autorin_erforderlich
 
 from .models import (
+    PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
     AktiveModellKonfiguration,
@@ -37,6 +38,7 @@ def kern(request: HttpRequest) -> HttpResponse:
             "simulationskern": simulationskern,
             "modell_konfiguration": modell_konfiguration,
             "prompt_platzhalter": sorted(VERTRAG_PROMPT),
+            "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
             "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
         },
     )

@@ -10,7 +10,7 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from simulation.models import Simulationskern
+from simulation.models import PROMPT_PLATZHALTER_MIT_UMGEBUNG, Simulationskern
 
 
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
@@ -458,9 +458,9 @@ class Vignette(models.Model):
 
 
 def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
-    """Liefert die Rohwerte der Vignette für Prompt-Vorlagen."""
+    """Liefert die Vignettenwerte für Prompt-Vorlagen."""
 
-    return {
+    platzhalter: dict[str, str] = {
         "fehlermuster_beschreibung": vignette.fehlermuster_beschreibung,
         "lernauftrag_text": vignette.lernauftrag_text,
         "arbeitsheft_bildbeschreibung": vignette.arbeitsheft_bildbeschreibung,
@@ -470,6 +470,10 @@ def prompt_platzhalter(vignette: Vignette) -> dict[str, str]:
         "thema": vignette.thema,
         "klassenstufe": vignette.klassenstufe,
     }
+    for name in PROMPT_PLATZHALTER_MIT_UMGEBUNG:
+        if wert := platzhalter[name]:
+            platzhalter[name] = f"<{name}>{wert}</{name}>"
+    return platzhalter
 
 
 def rahmen_platzhalter(vignette: Vignette) -> dict[str, str]:

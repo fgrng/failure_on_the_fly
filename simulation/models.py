@@ -24,6 +24,13 @@ VERTRAG_PROMPT: frozenset[str] = frozenset(
         "klassenstufe",
     }
 )
+PROMPT_PLATZHALTER_MIT_UMGEBUNG: frozenset[str] = frozenset(
+    {
+        "fehlermuster_beschreibung",
+        "lernauftrag_text",
+        "arbeitsheft_bildbeschreibung",
+    }
+)
 VERTRAG_RAHMEN: frozenset[str] = frozenset(
     {
         "schuelerin_name",

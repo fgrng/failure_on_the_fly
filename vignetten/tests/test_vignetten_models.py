@@ -19,13 +19,13 @@ from vignetten.models import (
 )
 
 
-def test_prompt_platzhalter_enthaelt_alle_rohen_prompt_werte() -> None:
-    """Der Prompt erhält genau die vorgesehenen Vignettenfelder ohne Ableitungen."""
+def test_prompt_platzhalter_fasst_lange_werte_in_benannte_umgebungen() -> None:
+    """Lange Prompt-Inhalte bleiben unverändert und sind nur bei Inhalt gefasst."""
 
     vignette: Vignette = Vignette(
         zustand=Vignette.Zustand.FINAL,
-        fehlermuster_beschreibung="Brüche werden addiert.",
-        lernauftrag_text="Addiere zwei Brüche.",
+        fehlermuster_beschreibung="Brüche <werden> addiert.",
+        lernauftrag_text="",
         arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
         schuelerin_name="Mia",
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -35,9 +35,15 @@ def test_prompt_platzhalter_enthaelt_alle_rohen_prompt_werte() -> None:
     )
 
     assert prompt_platzhalter(vignette) == {
-        "fehlermuster_beschreibung": "Brüche werden addiert.",
-        "lernauftrag_text": "Addiere zwei Brüche.",
-        "arbeitsheft_bildbeschreibung": "1/2 + 1/3 = 2/5",
+        "fehlermuster_beschreibung": (
+            "<fehlermuster_beschreibung>Brüche <werden> addiert."
+            "</fehlermuster_beschreibung>"
+        ),
+        "lernauftrag_text": "",
+        "arbeitsheft_bildbeschreibung": (
+            "<arbeitsheft_bildbeschreibung>1/2 + 1/3 = 2/5"
+            "</arbeitsheft_bildbeschreibung>"
+        ),
         "schuelerin_name": "Mia",
         "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
         "fach": "Mathematik",

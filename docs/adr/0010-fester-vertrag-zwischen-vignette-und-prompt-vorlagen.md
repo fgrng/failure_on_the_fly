@@ -27,7 +27,7 @@ Der Arbeitsheft-Inhalt bleibt aus dem Prompt heraus, weil er ein Bild sein kann;
 
 Die **Rahmenhandlung ist ebenfalls eine Vorlage**, schöpft aber nicht aus demselben Vertrag: Prompt-Vorlagen und Rahmenhandlung berühren sich nie (ADR-0004) und ziehen aus verschiedenen Spalten obiger Tabelle. Der Vertrag ist deshalb **zwei benannte Mengen, nicht eine**:
 
-- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte, als rohe Werte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht.
+- `VERTRAG_PROMPT` — die Felder der Prompt-Spalte. System-Prompt- und User-Prompt-Vorlage teilen sich diese Menge; die Tabelle unterscheidet die beiden nicht. Die kurzen Skalare bleiben bei der Ersetzung roh. Die langen Inhalte `$fehlermuster_beschreibung`, `$lernauftrag_text` und `$arbeitsheft_bildbeschreibung` werden dagegen, wenn sie nicht leer sind, von der Platzhalter-Funktion der Vignette in eine gleichnamige XML-artige Umgebung gefasst. Die Vorlage enthält dafür nur den nackten Platzhalter; Nutzereingaben werden nicht escaped.
 - `VERTRAG_RAHMEN` — die Felder der Nutzeransicht-Spalte, plus abgeleitete grammatische Formen (siehe unten). Aus ihr schöpfen Hospitationseinleitung, Gesprächseinleitung und Debrief.
 
 Eine einzige Menge wäre falsch: Sie erlaubte die Fehlermuster-Beschreibung in der Einleitung, die sie nie sehen darf, und den Namen der erfahrenen Lehrperson im System-Prompt, wo er eine Störvariable wäre.

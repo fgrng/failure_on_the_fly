@@ -89,6 +89,24 @@ class SimulationskernAnsichtMitKernTests(TestCase):
 
         self.assertContains(response, "$fehlermuster_beschreibung")
         self.assertContains(response, "$lehrperson_anrede")
+        self.assertContains(response, "erzeugt eine benannte Umgebung", count=3)
+        for platzhalter in (
+            "arbeitsheft_bildbeschreibung",
+            "fehlermuster_beschreibung",
+            "lernauftrag_text",
+        ):
+            self.assertContains(
+                response,
+                f"<li><code>${platzhalter}</code> — erzeugt eine benannte Umgebung</li>",
+            )
+        for platzhalter in (
+            "fach",
+            "klassenstufe",
+            "schuelerin_geschlecht",
+            "schuelerin_name",
+            "thema",
+        ):
+            self.assertContains(response, f"<li><code>${platzhalter}</code></li>")
 
 
 class SimulationskernLeereAnsichtTests(TestCase):
