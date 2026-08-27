@@ -18,13 +18,13 @@ class EntwicklungsdatenTests(TestCase):
         ausgabe: StringIO = StringIO()
         call_command("entwicklungsdaten_anlegen", stdout=ausgabe)
 
-        vignetten = list(
+        vignetten: list[Vignette] = list(
             Vignette.objects.filter(zustand=Vignette.Zustand.FINAL)
         )
         self.assertGreaterEqual(len(vignetten), 2)
 
         # Mindestens eine Beispielvignette trägt einen Marker mitten im Text
-        marker_mitten_im_text = any(
+        marker_mitten_im_text: bool = any(
             vignette.lernauftrag_text_vor_bild and vignette.lernauftrag_text_nach_bild
             or vignette.arbeitsheft_text_vor_bild and vignette.arbeitsheft_text_nach_bild
             for vignette in vignetten
@@ -35,7 +35,7 @@ class EntwicklungsdatenTests(TestCase):
         )
 
         # Mindestens eine Beispielvignette trägt ein Arbeitsheft, das nur aus einem Bild besteht
-        reines_bild_arbeitsheft = any(
+        reines_bild_arbeitsheft: bool = any(
             not vignette.arbeitsheft_text and bool(vignette.arbeitsheft_bild)
             for vignette in vignetten
         )
