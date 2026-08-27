@@ -1317,8 +1317,18 @@ class ErhebungsExportTests(TestCase):
         zweiter_kern.save()
         zweiter_kern.finalisieren()
         erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        erste_vignette = erste_vignette.bearbeiten()
+        erste_vignette.lernauftrag_text = "Addiere [bild] die Brüche."
+        erste_vignette.lernauftrag_bild = "vignettenbilder/lernauftrag.png"
+        erste_vignette.lernauftrag_bildbeschreibung = "Ein Bruch-Arbeitsblatt"
+        erste_vignette.lernauftrag_simulationshinweise = "Hinweis zum Lernauftrag"
+        erste_vignette.arbeitsheft_simulationshinweise = "Hinweis zum Arbeitsheft"
+        erste_vignette.save()
+        erste_vignette.finalisieren()
         zweite_vignette: Vignette = erste_vignette.bearbeiten()
+        zweite_vignette.arbeitsheft_text = "1/2 + [bild] 1/3 = 2/5"
         zweite_vignette.arbeitsheft_bild = "vignettenbilder/bruchbild.png"
+        zweite_vignette.arbeitsheft_bildbeschreibung = "Bildbeschreibung des Arbeitshefts"
         zweite_vignette.referenzdiagnose = "Mehrzeilige\nReferenzdiagnose"
         zweite_vignette.save()
         zweite_vignette.finalisieren()
@@ -1371,12 +1381,63 @@ class ErhebungsExportTests(TestCase):
             vignette["id"]: vignette for vignette in vignetten
         }
         self.assertEqual(
+            list(vignetten[0].keys()),
+            [
+                "id",
+                "historie_id",
+                "finalisiert_am",
+                "fehlermuster_beschreibung",
+                "lernauftrag_text",
+                "lernauftrag_bild",
+                "lernauftrag_bildbeschreibung",
+                "lernauftrag_simulationshinweise",
+                "arbeitsheft_text",
+                "arbeitsheft_bild",
+                "arbeitsheft_bildbeschreibung",
+                "arbeitsheft_simulationshinweise",
+                "schuelerin_name",
+                "schuelerin_geschlecht",
+                "lehrperson_name",
+                "lehrperson_geschlecht",
+                "fach",
+                "thema",
+                "klassenstufe",
+                "referenzdiagnose",
+                "budget_typ",
+                "budget_wert",
+            ],
+        )
+        self.assertEqual(
             set(vignetten_nach_id),
             {str(erste_vignette.pk), str(zweite_vignette.pk)},
         )
         self.assertEqual(
             {vignette["historie_id"] for vignette in vignetten},
             {str(zweite_vignette.historie_id)},
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_text"],
+            "Addiere [bild] die Brüche.",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_bild"],
+            "vignettenbilder/lernauftrag.png",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_bildbeschreibung"],
+            "Ein Bruch-Arbeitsblatt",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_simulationshinweise"],
+            "Hinweis zum Lernauftrag",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(erste_vignette.pk)]["arbeitsheft_simulationshinweise"],
+            "Hinweis zum Arbeitsheft",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_text"],
+            "1/2 + [bild] 1/3 = 2/5",
         )
         self.assertEqual(
             vignetten_nach_id[str(zweite_vignette.pk)]["referenzdiagnose"],
@@ -1389,6 +1450,10 @@ class ErhebungsExportTests(TestCase):
         self.assertEqual(
             vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bild"],
             "vignettenbilder/bruchbild.png",
+        )
+        self.assertEqual(
+            vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bildbeschreibung"],
+            "Bildbeschreibung des Arbeitshefts",
         )
         self.assertNotIn(
             str(ungenutzte_vignette.pk),

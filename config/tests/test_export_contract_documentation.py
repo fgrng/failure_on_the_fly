@@ -9,6 +9,10 @@ OPEN_QUESTIONS_PATH: Path = REPO_ROOT / "docs/open-questions.md"
 DOMAIN_ADR_PATH: Path = (
     REPO_ROOT / "docs/adr/0016-domaenenobjekte-als-django-apps-zwei-naehte.md"
 )
+ADR_0030_PATH: Path = (
+    REPO_ROOT
+    / "docs/adr/0030-positionsmarker-umhuellung-im-platzhalterwert-und-harte-umstellung-des-platzhaltervertrags.md"
+)
 
 
 def test_adr_0029_documents_the_self_contained_long_relational_export() -> None:
@@ -48,3 +52,17 @@ def test_adr_0016_references_the_renumbered_model_question() -> None:
 
     assert "Frage 3" in domain_adr
     assert "Frage 7" not in domain_adr
+
+
+def test_adr_0030_documents_positionsmarker_umhuellung_and_contract_break() -> None:
+    """ADR 0030 hält Positionsmarker, Umhüllung und den harten Schnitt fest."""
+    adr: str = ADR_0030_PATH.read_text()
+
+    assert adr.startswith("---\nstatus: accepted\n---")
+    for clause in (
+        "Positionsmarker im Text anstelle eines separaten Layout-Feldes",
+        "Umhüllung als Eigenschaft des Platzhalterwerts anstelle der Kern-Vorlage",
+        "Harter Schnitt am Platzhaltervertrag",
+        "keine Produktivdaten",
+    ):
+        assert clause in adr

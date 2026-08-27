@@ -62,12 +62,21 @@ VIGNETTEN: list[dict[str, object]] = [
             "das Ergebnis der linken Rechnung in die Lücke ein und beachtest den "
             "Term rechts von der Lücke nicht weiter."
         ),
-        "lernauftrag_text": "Setze die passende Zahl ein: 8 + 4 = ___ + 5.",
-        "arbeitsheft_bildbeschreibung": (
-            "Auf dem Arbeitsblatt steht die Platzhalteraufgabe 8 + 4 = ___ + 5. "
-            "Lukas hat 12 in die Lücke eingetragen."
+        "lernauftrag_text": "Setze die passende Zahl ein:\n[bild]\nBegründe deine Lösung.",
+        "lernauftrag_bild": "vignettenbilder/gleichung.png",
+        "lernauftrag_bildbeschreibung": (
+            "Arbeitsblatt mit der Platzhalteraufgabe 8 + 4 = ___ + 5."
+        ),
+        "lernauftrag_simulationshinweise": (
+            "Lukas rechnet 8 + 4 = 12 und trägt 12 in die Lücke ein. Die + 5 "
+            "rechts der Lücke ignoriert er vollständig."
         ),
         "arbeitsheft_text": "8 + 4 = 12 + 5",
+        "arbeitsheft_bild": "",
+        "arbeitsheft_bildbeschreibung": "",
+        "arbeitsheft_simulationshinweise": (
+            "Wenn nach der 12 gefragt wird, erklärt Lukas, dass 8 plus 4 eben 12 ergibt."
+        ),
         "schuelerin_name": "Lukas",
         "schuelerin_geschlecht": Vignette.Geschlecht.MAENNLICH,
         "lehrperson_name": "Berger",
@@ -96,11 +105,21 @@ VIGNETTEN: list[dict[str, object]] = [
             "Professoren. Schreibe eine Gleichung mit S für die Anzahl der "
             "Studierenden und P für die Anzahl der Professoren."
         ),
-        "arbeitsheft_bildbeschreibung": (
-            "Julia hat zur beschriebenen Beziehung die Gleichung 6S = P "
-            "aufgeschrieben."
+        "lernauftrag_bild": "",
+        "lernauftrag_bildbeschreibung": "",
+        "lernauftrag_simulationshinweise": (
+            "Julia vertauscht die Zuordnung und fasst S als 'Studierende' und P "
+            "als 'Professoren' auf."
         ),
-        "arbeitsheft_text": "6S = P",
+        "arbeitsheft_text": "",
+        "arbeitsheft_bild": "vignettenbilder/variablen.png",
+        "arbeitsheft_bildbeschreibung": (
+            "Handschriftlicher Eintrag im Arbeitsheft mit der Gleichung 6S = P."
+        ),
+        "arbeitsheft_simulationshinweise": (
+            "Auf Nachfragen beharrt Julia darauf, dass 6S für 'sechs Studierende' "
+            "steht und P für 'ein Professor'."
+        ),
         "schuelerin_name": "Julia",
         "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
         "lehrperson_name": "Kant",

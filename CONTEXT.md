@@ -29,19 +29,39 @@ _Avoid_: Mentorin, Lehrkraft, Betreuerin
 ## Aufgabenkontext
 
 **Aufgabenkontext**:
-Der Teil der Vignette, der den Gesprächsanlass liefert. Besteht aus Lernauftrag-Text, Arbeitsheft-Inhalt und Arbeitsheft-Bildbeschreibung.
+Der Teil der Vignette, der den Gesprächsanlass liefert. Er gliedert sich in zwei gleich gebaute Teile: Lernauftrag und Arbeitsheft, jeweils bestehend aus Text, optionalem Bild, Bildbeschreibung und Simulationshinweisen.
 
 **Lernauftrag-Text**:
-Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat.
+Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat. Mit dem Positionsmarker `[bild]` wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
 _Avoid_: Aufgabe, Auftrag, Übung
 
-**Arbeitsheft-Inhalt**:
-Die sichtbare, fehlerhafte Bearbeitung der simulierten Schüler:in, wie sie der Teilnehmer:in angezeigt wird. Auch als Bild. Ausgangspunkt für das Diagnosegespräch.
-_Avoid_: Schülerlösung, Lösung, Heft
+**Lernauftrag-Bild**:
+Die optionale Abbildung zum Lernauftrag. Für Teilnehmer:in sichtbar.
+_Avoid_: Abbildung, Grafik, Lernauftragsbild
+
+**Lernauftrag-Bildbeschreibung**:
+Die textuelle Beschreibung dessen, was auf dem Lernauftrag-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation.
+_Avoid_: Bildtext, Bearbeitungsbeschreibung
+
+**Arbeitsheft-Text**:
+Der Textinhalt des Arbeitshefts der simulierten Schüler:in (die abgetippte Bearbeitung). Mit dem Positionsmarker `[bild]` wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
+_Avoid_: Schülerlösung, Lösung, Heft, Arbeitsheft-Inhalt
+
+**Arbeitsheft-Bild**:
+Die optionale Abbildung des Arbeitshefts der simulierten Schüler:in. Für Teilnehmer:in sichtbar.
+_Avoid_: Schülerarbeit, Heftseite, Abbildung
 
 **Arbeitsheft-Bildbeschreibung**:
 Die textuelle Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation.
 _Avoid_: Bearbeitungsbeschreibung
+
+**Simulationshinweise**:
+Zusätzliche fachdidaktische oder verhaltensbezogene Hinweise zum Lernauftrag oder Arbeitsheft ausschließlich für die Simulation. Sie erreichen keinen Prompt der Teilnehmer:in und sind für diese nicht sichtbar.
+_Avoid_: Systemhinweise, Prompthinweise, Regieanweisungen
+
+**Positionsmarker**:
+Die Kennzeichnung `[bild]` im Lernauftrag- oder Arbeitsheft-Text, die festlegt, an welcher Stelle das jeweilige Bild bzw. im Prompt die Bildbeschreibung erscheint. Der erste Marker gewinnt; ohne Bild oder ohne Marker greift das Standardverhalten.
+_Avoid_: Platzhalter, Bildplatzhalter, Marker
 
 ## Sitzung einer Vignette
 
