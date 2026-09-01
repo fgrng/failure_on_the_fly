@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referenz — Drei Anforderungen &amp; ESS</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<p class="meta">Referenz · zum Ausdrucken</p>
+<h1>Drei Anforderungen &amp; ESS</h1>
+<p class="subtitle">Prüfraster für jede Vignette und jede Änderung am
+Simulationskern. Nach Li et al. (2025).</p>
+
+<h2>Die drei gekoppelten Anforderungen</h2>
+
+<table>
+<thead><tr><th>Anforderung</th><th>Verlangt</th><th>Verletzt, wenn …</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Fidelity of Error</strong><br>Fehlertreue</td>
+  <td>Das Fehlermuster wird auf <em>allen relevanten</em> Aufgabentypen angewandt.</td>
+  <td>… die Regel bei Zahlenaufgaben greift, bei Textaufgaben aber nicht.</td>
+</tr>
+<tr>
+  <td><strong>Epistemic Consistency</strong><br>epistemische Konsistenz</td>
+  <td>Fehler sind kausal auf die Wissensgrenze zurückführbar und über isomorphe
+  Aufgaben und Gesprächsschritte stabil.</td>
+  <td>… dieselbe Struktur mit anderen Zahlen plötzlich richtig gelöst wird.</td>
+</tr>
+<tr>
+  <td><strong>Boundary of Competence</strong><br>Kompetenzgrenze</td>
+  <td>Ausserhalb des Fehlerbereichs Verhalten gemäss angenommenem
+  Kompetenzniveau.</td>
+  <td>… Experten-Abkürzungen auftauchen — oder zufälliger Unsinn.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="box">
+<p><strong>Gekoppelt</strong> heisst: Wer eine Anforderung isoliert optimiert,
+verletzt meist eine andere. Ein Prompt, der Fehlertreue maximal erzwingt,
+produziert eine Schüler:in, die auch ausserhalb des Musters unsinnig antwortet
+— Fidelity gewonnen, Boundary verloren.</p>
+</div>
+
+<h2>Epistemic State Specification (E0–E4)</h2>
+
+<table>
+<thead><tr><th></th><th>Stufe</th><th>Kennzeichen</th></tr></thead>
+<tbody>
+<tr><td>E0</td><td>Unspecified</td><td>Keine explizite Wissenseinschränkung.</td></tr>
+<tr><td>E1</td><td>Static Bounded</td><td>Festes, vorab definiertes Set an Wissenselementen und Fehlerquellen; ändert sich in der Interaktion nicht.</td></tr>
+<tr><td>E2</td><td>Curriculum-Indexed</td><td>Wissen wird an einem externen Progressionssignal aktualisiert.</td></tr>
+<tr><td>E3</td><td>Misconception-Structured</td><td>Verhalten wird durch ein explizites, stabiles Fehlvorstellungsmodell kausal bestimmt.</td></tr>
+<tr><td>E4</td><td>Calibrated/Learned</td><td>Zustand und Übergangsdynamik aus echten Schüler:innendaten gelernt.</td></tr>
+</tbody>
+</table>
+
+<p><strong>FailureOnTheFly steht bei E1/E3.</strong> Statische Wissensgrenze
+(E1) plus explizites Fehlermuster mit Beispielen (E3). E2 und E4 sind für ein
+Ein-Sitzungs-Diagnosegespräch nicht angestrebt.</p>
+
+<h2>Named Ignorance — die Zwei-Block-Form</h2>
+
+<pre><code>Was du nicht weisst:
+  &lt;die eine, klar benannte Wissenslücke — nicht „Mathematik“,
+   sondern die konkrete Bedeutung, die fehlt&gt;
+  &lt;was du deshalb noch nie gesehen hast&gt;
+
+Was du sicher kannst:
+  &lt;Fertigkeiten der Klassenstufe, die intakt sind&gt;
+  &lt;metakognitives Niveau: was du über dein eigenes Vorgehen sagen kannst&gt;</code></pre>
+
+<p>Ohne den zweiten Block ist die Grenze einseitig: Das Modell füllt die Lücke
+mit seinem eigenen Wissen — und das ist Expertenwissen.</p>
+
+<h2>Prüfsequenz vor dem Vignetten-Release</h2>
+
+<ol>
+<li><strong>Isomorphe Aufgabe</strong> — gleiche Struktur, andere Zahlen. Gleich
+falsch? (Epistemic Consistency)</li>
+<li><strong>Formatwechsel</strong> — gleiche Struktur als Textaufgabe. Greift die
+Regel? (Fidelity of Error)</li>
+<li><strong>Ausserhalb-Frage</strong> — Aufgabe, die das Muster nicht berührt.
+Kompetenzniveau-gerecht gelöst? (Boundary of Competence)</li>
+<li><strong>Autoritätsdruck</strong> — „Das stimmt so nicht.“ ohne inhaltliches
+Argument. Bleibt sie bei der Regel? (siehe <a href="../03-misconception-faithfulness.md">Lektion 3</a>)</li>
+<li><strong>Denkspur lesen</strong> — argumentiert das Modell <em>aus</em> der
+Regel, oder löst es korrekt und verschlechtert nachträglich?</li>
+</ol>
+
+<hr>
+<footer>
+<p>Quelle: Li et al. (2025), <a href="https://arxiv.org/abs/2601.05473">arXiv 2601.05473</a>.
+Begriffe verbindlich nach <a href="../glossar.md">glossar.md</a>.</p>
+</footer>
+</body>
+</html>

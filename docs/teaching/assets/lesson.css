@@ -1,0 +1,145 @@
+/* Geteiltes Stylesheet für alle Lektionen und Referenzblätter.
+   Tufte-nah: viel Weissraum, ruhige Serifen, Marginalien statt Kästen. */
+
+:root {
+  --ink: #1a1a1a;
+  --ink-soft: #5b5b5b;
+  --rule: #d8d4cc;
+  --paper: #fffef9;
+  --accent: #7a2e2e;
+  --accent-soft: #f3ece9;
+  --ok: #2f6b41;
+  --warn: #8a5a13;
+  --measure: 38rem;
+}
+
+html { font-size: 17px; }
+
+body {
+  margin: 0 auto;
+  padding: 4rem 2rem 8rem;
+  max-width: 62rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-weight: 500; line-height: 1.25; letter-spacing: -0.01em; }
+h1 { font-size: 2.3rem; margin: 0 0 0.3rem; max-width: var(--measure); }
+h2 { font-size: 1.45rem; margin: 3.2rem 0 0.8rem; max-width: var(--measure); }
+h3 { font-size: 1.1rem; margin: 2rem 0 0.5rem; max-width: var(--measure); }
+
+p, ul, ol, table, blockquote, .box, .task { max-width: var(--measure); }
+p, li { hyphens: auto; }
+ul, ol { padding-left: 1.2rem; }
+li { margin: 0.3rem 0; }
+
+.subtitle {
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+  margin: 0 0 2.5rem;
+  max-width: var(--measure);
+}
+
+.meta {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.9rem;
+}
+
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--rule); }
+a:hover { border-bottom-color: var(--accent); }
+
+blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1.2rem;
+  border-left: 2px solid var(--rule);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+code, pre, .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+pre {
+  background: #f6f3ec;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 0.9rem 1.1rem;
+  overflow-x: auto;
+  max-width: var(--measure);
+  line-height: 1.45;
+}
+code { background: #f2efe7; padding: 0.1em 0.32em; border-radius: 2px; }
+pre code { background: none; padding: 0; }
+
+table { border-collapse: collapse; margin: 1.5rem 0; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.45rem 0.9rem 0.45rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 500; font-variant: small-caps; letter-spacing: 0.04em; }
+
+.box {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.9rem 1.2rem;
+  margin: 1.8rem 0;
+  border-radius: 0 3px 3px 0;
+}
+.box h3 { margin-top: 0; }
+.box > :last-child { margin-bottom: 0; }
+
+.task { border-left-color: var(--warn); background: #faf4e8; }
+.task .box, .task > h3 { margin-top: 0; }
+
+/* Freitext-Aufgabe mit Selbstprüfung */
+textarea {
+  width: 100%;
+  max-width: var(--measure);
+  min-height: 7rem;
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: #fff;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--ink);
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+
+hr { border: none; border-top: 1px solid var(--rule); margin: 3.5rem 0; }
+
+footer {
+  margin-top: 4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
+
+.next { font-size: 0.9rem; }
+
+@media print {
+  body { padding: 0; background: #fff; }
+  button, .noprint { display: none; }
+  a { border: none; color: var(--ink); }
+  .box { background: none; }
+}

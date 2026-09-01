@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lektion 1 — Die drei Anforderungen am eigenen Simulationskern</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<p class="meta">Lektion 0001 · Skill · ca. 15 Minuten</p>
+<h1>Die drei Anforderungen am eigenen Simulationskern</h1>
+<p class="subtitle">Du kennst das Kompetenzparadox aus der Theorie. In dieser
+Lektion benutzt du es als Werkzeug: Du prüfst den Prompt in
+<code>simulation/standardkern.py</code> Satz für Satz gegen die drei
+gekoppelten Anforderungen — und schreibst die Lücke zu, die dabei sichtbar
+wird.</p>
+
+<div class="box">
+<h3>Der eine Gewinn dieser Lektion</h3>
+<p>Am Ende hast du eine <strong>Named-Ignorance-Passage</strong> formuliert, die
+du direkt in den Simulationskern oder in die Simulationshinweise einer Vignette
+übernehmen kannst.</p>
+</div>
+
+<h2>Zuerst abrufen, nicht nachlesen</h2>
+
+<p>Schliesse <a href="../01-kompetenzparadox.md">01-kompetenzparadox.md</a>.
+Der Abruf aus dem Gedächtnis ist der Lerneffekt — Nachschlagen fühlt sich
+besser an und bringt weniger.<sup><a href="#q1">1</a></sup></p>
+
+<div class="quiz" data-answer="c" data-why="Epistemic Consistency verlangt, dass der Fehler kausal auf die beschriebene Wissensgrenze zurückführbar ist und über isomorphe Aufgaben stabil bleibt. Fidelity of Error betrifft die konsistente Anwendung auf allen relevanten Aufgabentypen; Boundary of Competence das Verhalten ausserhalb des Fehlerbereichs.">
+  <p class="q">Lukas rechnet bei <code>3 + 4 = 7 + 2</code> falsch, bei der
+  strukturgleichen Aufgabe <code>5 + 2 = 7 + 1</code> aber plötzlich richtig.
+  Welche der drei Anforderungen ist verletzt?</p>
+  <button data-opt="a">Fidelity of Error ist hier verletzt</button>
+  <button data-opt="b">Boundary of Competence ist verletzt</button>
+  <button data-opt="c">Epistemic Consistency ist hier verletzt</button>
+  <button data-opt="d">Dual Fidelity ist hier verletzt</button>
+</div>
+
+<div class="quiz" data-answer="b" data-why="Das ist Boundary of Competence: ausserhalb des Fehlermusters soll sich die Schüler:in gemäss ihrem angenommenen Kompetenzniveau verhalten — weder mit Experten-Abkürzungen noch mit zufälligem Unsinn.">
+  <p class="q">Dieselbe simulierte Viertklässlerin erklärt nebenbei den
+  Distributivgesetz-Beweis in korrekter Fachsprache. Welche der drei
+  Anforderungen ist verletzt?</p>
+  <button data-opt="a">Fidelity of Error ist hier verletzt</button>
+  <button data-opt="b">Boundary of Competence ist verletzt</button>
+  <button data-opt="c">Epistemic Consistency ist hier verletzt</button>
+  <button data-opt="d">Cycle Consistency ist hier verletzt</button>
+</div>
+
+<div class="quiz" data-answer="a" data-why="Die Regel wird nur auf manchen Aufgabentypen angewandt — das ist genau Fidelity of Error: konsistente Anwendung des Fehlermusters auf allen relevanten Aufgabentypen.">
+  <p class="q">Das Fehlermuster greift zuverlässig bei Zahlenaufgaben, aber nie,
+  wenn dieselbe Struktur als Textaufgabe auftaucht. Welche der drei
+  Anforderungen ist verletzt?</p>
+  <button data-opt="a">Fidelity of Error ist hier verletzt</button>
+  <button data-opt="b">Boundary of Competence ist verletzt</button>
+  <button data-opt="c">Epistemic Consistency ist hier verletzt</button>
+  <button data-opt="d">Persona Adherence ist hier verletzt</button>
+</div>
+
+<h2>Die Anforderungen am eigenen Code</h2>
+
+<p>Jetzt der eigentliche Teil. Der System-Prompt in
+<code>simulation/standardkern.py</code> enthält diese Passage:</p>
+
+<pre><code>Diese Regel ist für dich keine Fehlermeldung und kein Wissen über eine
+Rolle, sondern deine eigene, plausible Denkweise. Du bist von ihr überzeugt
+und wendest sie konsequent an. Auch bei neuen Beispielen und kritischen
+Nachfragen bleibst du bei dieser Regel. Du kennst den fachlich richtigen
+Lösungsweg nicht und wechselst innerhalb des kurzen Gesprächs nicht
+plötzlich zu ihm.</code></pre>
+
+<p>Ordne die Sätze zu — welcher Satz zahlt auf welche Anforderung ein?</p>
+
+<table>
+<thead><tr><th>Satz im Kern</th><th>Anforderung</th><th>Stärke</th></tr></thead>
+<tbody>
+<tr><td>„wendest sie konsequent an“</td><td>Fidelity of Error</td><td>gut adressiert</td></tr>
+<tr><td>„Auch bei neuen Beispielen … bleibst du bei dieser Regel“</td><td>Epistemic Consistency</td><td>gut adressiert</td></tr>
+<tr><td>„Du kennst den fachlich richtigen Lösungsweg nicht“</td><td>Boundary of Competence</td><td>nur die <em>negative</em> Hälfte</td></tr>
+<tr><td>— fehlt —</td><td>Boundary of Competence</td><td>die positive Hälfte fehlt</td></tr>
+</tbody>
+</table>
+
+<div class="box">
+<h3>Der Befund</h3>
+<p>Der Kern sagt, was die Schüler:in <em>nicht</em> kann. Er sagt nirgends,
+was sie <strong>schon</strong> kann. Genau in diese Leerstelle fällt das Modell
+auf sein eigenes Wissen zurück — und das ist Expertenwissen. Die
+<em>Boundary of Competence</em> ist bei uns einseitig gezogen.</p>
+</div>
+
+<p>Deshalb ist <em>Named Ignorance</em> zweiteilig: eine benannte Wissensgrenze
+braucht beide Seiten, sonst ist sie keine Grenze, sondern ein Loch.</p>
+
+<h2>Aufgabe: Named Ignorance für Lukas</h2>
+
+<div class="box task">
+<h3>Schreib die fehlende Passage</h3>
+<p>Vignette: Lukas, Klasse 3, Mathematik, Thema Gleichungen. Sein Fehlermuster:
+Er liest das Gleichheitszeichen als Handlungsaufforderung („und jetzt rechne
+aus“) statt als Ausdruck von Gleichwertigkeit. Bei <code>3 + 4 = ? + 2</code>
+schreibt er <code>7</code>.</p>
+<p>Formuliere zwei bis vier Sätze in der Du-Form des Kerns — je einen Block
+für <em>was Lukas nicht weiss</em> und <em>was Lukas schon sicher kann</em>.</p>
+<p><textarea placeholder="Du weisst nicht, … · Du kannst aber sicher …"></textarea></p>
+<p class="noprint"><button data-reveal="loesung1">Musterlösung ansehen</button></p>
+<div id="loesung1" class="reveal">
+<pre><code>Was du nicht weisst: Dass das Gleichheitszeichen bedeutet, dass links und
+rechts gleich viel steht. Für dich kündigt es das Ergebnis an. Aufgaben mit
+einer Lücke rechts vom Gleichheitszeichen hast du noch nie gesehen.
+
+Was du sicher kannst: Im Zahlenraum bis 100 sicher addieren und
+subtrahieren, auch mit Zehnerübergang. Du kannst erklären, wie du gerechnet
+hast, und du merkst, wenn eine Zahl nicht zu deiner Rechnung passt.</code></pre>
+<p style="font-size:0.9rem">Beachte: Der zweite Block ist der wichtigere. Er
+verhindert, dass das Modell die Kompetenzlücke mit Zufall füllt — und er gibt
+der Teilnehmer:in überhaupt etwas, woran sie diagnostisch andocken kann.</p>
+</div>
+</div>
+
+<div class="box task">
+<h3>Und dann: einmal wirklich ausprobieren</h3>
+<p>Hänge deine Passage an die <code>fehlermuster_beschreibung</code> einer
+Testvignette und führe zwei Gesprächsschritte: einmal eine Frage <em>im</em>
+Fehlerbereich, einmal eine klar <em>ausserhalb</em> („Was ist 47 + 28?“).
+Lies die Denkspur. Argumentiert das Modell aus der Regel — oder rechnet es
+korrekt und verschlechtert das Ergebnis nachträglich?</p>
+</div>
+
+<h2>Primärquelle für diese Lektion</h2>
+
+<p id="q1"><strong>Li et al. (2025): <em>Towards Valid Student Simulation with
+Large Language Models.</em></strong> Lies Abschnitt 3 (die drei gekoppelten
+Anforderungen) und die ESS-Tabelle E0–E4.
+<a href="https://arxiv.org/abs/2601.05473">arxiv.org/abs/2601.05473</a></p>
+
+<div class="box">
+<h3>Frag nach</h3>
+<p>Ich bin deine Lehrkraft in diesem Workspace. Wenn eine Zuordnung oben nicht
+einleuchtet, wenn du unsicher bist, ob deine Passage den Prompt-Vertrag aus
+ADR-0010 verletzt, oder wenn du das Ergebnis deines Testlaufs besprechen
+willst — frag mich direkt.</p>
+</div>
+
+<hr>
+
+<footer>
+<p><strong>Weiter:</strong> <a href="../reference/drei-anforderungen.html">Referenzblatt:
+Die drei Anforderungen &amp; ESS</a> · <a href="../glossar.md">Glossar</a> ·
+<a href="../MISSION.md">Mission</a></p>
+<p class="next">Nächste Lektion (Vorschlag): <em>Sycophancy erkennen — den
+Selective Flip Score an einem eigenen Transkript rechnen.</em></p>
+</footer>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
