@@ -289,9 +289,14 @@ class Command(BaseCommand):
         self, ausbilderin: object, vignetten: list[Vignette]
     ) -> None:
         """Legt ein veröffentlichtes und ein Entwurfs-Training an."""
-        veroeffentlicht, neu = Training.objects.get_or_create(
-            name="Diagnose-Grundlagen", eigentuemerin=ausbilderin
-        )
+        veroeffentlicht: Training | None = Training.objects.filter(
+            name="Diagnose-Grundlagen", eigentuemerinnen=ausbilderin
+        ).first()
+        neu: bool = veroeffentlicht is None
+        if veroeffentlicht is None:
+            veroeffentlicht = Training.objects.anlegen(
+                ausbilderin, name="Diagnose-Grundlagen"
+            )
         veroeffentlicht.vignetten.set(vignetten)
         if neu:
             veroeffentlicht.veroeffentlichen()
@@ -304,13 +309,13 @@ class Command(BaseCommand):
                 "Entwurf: Gleichheitszeichen diagnostizieren",
                 "Entwurf: Bruchrechnung vertiefen",
             ),
-            eigentuemerin=ausbilderin,
+            eigentuemerinnen=ausbilderin,
         ).first()
         neu = entwurf is None
         if entwurf is None:
-            entwurf = Training.objects.create(
+            entwurf = Training.objects.anlegen(
+                ausbilderin,
                 name="Entwurf: Gleichheitszeichen diagnostizieren",
-                eigentuemerin=ausbilderin,
             )
         elif entwurf.name != "Entwurf: Gleichheitszeichen diagnostizieren":
             entwurf.name = "Entwurf: Gleichheitszeichen diagnostizieren"

@@ -62,9 +62,7 @@ class TranskriptionsEndpointTests(TestCase):
         teilnahme: Teilnahme = Teilnahme.objects.create(
             audioverarbeitung_eingewilligt=True
         )
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         Trainingsbindung.objects.create(
             training=training, teilnahme=teilnahme, konto=teilnehmerin
         )

@@ -22,9 +22,7 @@ class TrainingskatalogTests(TestCase):
         """Jedes eingeloggte Konto findet alle veröffentlichten Trainings."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         training.veroeffentlichen()
         self.client.force_login(studierende)
 
@@ -38,9 +36,7 @@ class TrainingskatalogTests(TestCase):
         """Entwürfe erscheinen weder im Katalog noch über ihre Detail-URL."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
-        entwurf: Training = Training.objects.create(
-            name="Versteckte Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        entwurf: Training = Training.objects.anlegen(ausbilderin, name="Versteckte Bruchrechnung")
         self.client.force_login(studierende)
 
         katalog: HttpResponse = self.client.get(reverse("training:katalog"))
@@ -55,9 +51,7 @@ class TrainingskatalogTests(TestCase):
         """Eine veröffentlichte Sammlung verlinkt jede eingebundene Vignette."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Brüche vergleichen"
         )
@@ -96,9 +90,7 @@ class TrainingskatalogTests(TestCase):
         """Archivierte Fassungen bleiben trotz bestehender Bindung unspielbar."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Archivierte Brüche"
         )
@@ -148,9 +140,7 @@ class TrainingskatalogTests(TestCase):
             },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Brüche vergleichen"
         )
@@ -227,9 +217,7 @@ class TrainingskatalogTests(TestCase):
             sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,
@@ -301,9 +289,7 @@ class TrainingsabbruchTests(TestCase):
             sprachmodell="fake", parameter={"skript": skript or []}
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,

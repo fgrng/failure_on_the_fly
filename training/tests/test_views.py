@@ -20,14 +20,14 @@ class TrainingAnlegenTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        Training.objects.create(name="Fremdes Training", eigentuemerin=grace)
+        Training.objects.anlegen(grace, name="Fremdes Training")
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
             reverse("training:anlegen"), {"name": "Gleichungen"}
         )
 
-        training: Training = Training.objects.get(eigentuemerin=ada)
+        training: Training = Training.objects.get(eigentuemerinnen=ada)
         self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
         liste: HttpResponse = self.client.get(reverse("training:liste"))
         self.assertContains(liste, "Gleichungen")
@@ -59,8 +59,8 @@ class TrainingAnlegenTests(TestCase):
         administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        eigenes: Training = Training.objects.create(name="Bruchrechnung", eigentuemerin=ada)
-        fremdes: Training = Training.objects.create(name="Prozente", eigentuemerin=grace)
+        eigenes: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+        fremdes: Training = Training.objects.anlegen(grace, name="Prozente")
         self.client.force_login(administratorin)
 
         liste: HttpResponse = self.client.get(reverse("training:liste"))
@@ -75,6 +75,31 @@ class TrainingAnlegenTests(TestCase):
         self.assertContains(liste, fremdes.name)
         self.assertEqual(angelegt.status_code, 302)
         self.assertEqual(veroeffentlicht.status_code, 302)
+
+    def test_koeigentuemerin_kann_training_kuratieren_und_veroeffentlichen(
+        self,
+    ) -> None:
+        """Eine Ko-Eigentümerin hat in der Ausbilder-UI dieselben Rechte."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+        training.eigentuemerinnen.add(grace)
+        self.client.force_login(grace)
+
+        kuratieren: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[training.pk])
+        )
+        veroeffentlichen: HttpResponse = self.client.post(
+            reverse("training:veroeffentlichen", args=[training.pk])
+        )
+
+        self.assertContains(kuratieren, training.name)
+        self.assertRedirects(
+            veroeffentlichen, reverse("training:kuratieren", args=[training.pk])
+        )
+        training.refresh_from_db()
+        self.assertEqual(training.zustand, Training.Zustand.VEROEFFENTLICHT)
 
 
 class TrainingKuratierenTests(TestCase):
@@ -119,7 +144,7 @@ class TrainingKuratierenTests(TestCase):
             fach="Dezimalzahlen",
             arbeitsheft_text="0,5",
         )
-        training: Training = Training.objects.create(name="Brüche", eigentuemerin=ada)
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
         self.client.force_login(ada)
 
         detail: HttpResponse = self.client.get(
@@ -175,9 +200,7 @@ class TrainingSichtbarkeitTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremdes: Training = Training.objects.create(
-            name="Fremdes Training", eigentuemerin=grace
-        )
+        fremdes: Training = Training.objects.anlegen(grace, name="Fremdes Training")
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -193,6 +216,6 @@ class VeroeffentlichteTrainingsTests(TestCase):
     def test_entwurf_erscheint_nicht_im_veroeffentlichten_queryset(self) -> None:
         """Ein frisch angelegtes Training bleibt bis zum Übergang unsichtbar."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
-        entwurf: Training = Training.objects.create(name="Brüche", eigentuemerin=ada)
+        entwurf: Training = Training.objects.anlegen(ada, name="Brüche")
 
         self.assertNotIn(entwurf, Training.objects.veroeffentlicht())

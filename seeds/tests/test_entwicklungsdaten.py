@@ -5,6 +5,8 @@ from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
+from konten.models import Konto
+from training.models import Training
 from vignetten.models import Vignette
 
 
@@ -61,3 +63,14 @@ class EntwicklungsdatenTests(TestCase):
 
         call_command("entwicklungsdaten_anlegen", stdout=ausgabe)
         self.assertEqual(Vignette.objects.count(), anzahl_vorher)
+
+    def test_trainings_werden_fuer_die_ausbilderin_im_eigentuemerinnenkreis_angelegt(
+        self,
+    ) -> None:
+        """Der Seed legt Trainings mit der Ausbilderin im Eigentümer-Kreis an."""
+        call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+        ausbilderin: Konto = Konto.objects.get(username="autor")
+
+        self.assertTrue(
+            Training.objects.filter(eigentuemerinnen=ausbilderin).exists()
+        )

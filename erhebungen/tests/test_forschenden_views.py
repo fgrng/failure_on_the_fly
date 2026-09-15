@@ -1659,9 +1659,7 @@ class ErhebungsExportTests(TestCase):
             fehlversuche=[Fehlversuch(grund="Anbieterfehler", rohantwort="timeout")],
         )
         Diagnose.objects.create(sitzung=sitzung, text="Bruchfehler")
-        training: Training = Training.objects.create(
-            name="Nicht exportieren", eigentuemerin=ada
-        )
+        training: Training = Training.objects.anlegen(ada, name="Nicht exportieren")
         training.vignetten.add(vignette)
         trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
         Trainingsbindung.objects.create(

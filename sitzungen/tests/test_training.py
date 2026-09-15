@@ -38,9 +38,7 @@ class TrainingssitzungTests(TestCase):
             parameter={"skript": skript},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,

@@ -133,7 +133,7 @@ def katalog(request: HttpRequest) -> HttpResponse:
                 "name": training.name,
                 "zustand": training.get_zustand_display(),
                 "zustand_badge": _zustand_badge(training),
-                "is_own": training.eigentuemerin_id == request.user.id,
+                "is_own": training.eigentuemerinnen.filter(pk=request.user.pk).exists(),
                 "url": url,
                 "action_label": "Kuratieren" if ist_kuratierbar else "Öffnen",
             }
@@ -223,9 +223,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt ein Training für die eingeloggte Person an."""
     form: TrainingForm = TrainingForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        training: Training = form.save(commit=False)
-        training.eigentuemerin = request.user
-        training.save()
+        training: Training = Training.objects.anlegen(request.user, **form.cleaned_data)
         return redirect("training:kuratieren", pk=training.pk)
     return render(request, "training/anlegen.html", {"form": form})
 
