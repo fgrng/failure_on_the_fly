@@ -12,6 +12,7 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from konten.navigation import ist_administratorin
 from simulation.models import Simulationskern
 
 
@@ -80,7 +81,9 @@ class VignettenhistorieQuerySet(models.QuerySet["Vignettenhistorie"]):
     """Abfragen über Vignettenhistorien."""
 
     def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Vignettenhistorie"]:
-        """Liefert die Historien aus dem Eigentümer-Kreis eines Kontos."""
+        """Liefert eigene Historien oder alle für die Administration."""
+        if ist_administratorin(konto):
+            return self
         return self.filter(eigentuemerinnen=konto)
 
 

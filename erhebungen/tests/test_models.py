@@ -5,6 +5,7 @@ import re
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
 from django.db.models.deletion import ProtectedError
@@ -137,15 +138,18 @@ def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
 
 
 @pytest.mark.django_db
-def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
-    """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
+def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
+    """Forschende sehen eigene Erhebungen, die Administration alle."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
+    administratorin: Konto = Konto.objects.create_user(username="admin")
+    administratorin.groups.add(Group.objects.get(name="Administrator:in"))
     eigene: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
-    Erhebung.objects.create(name="Addition", eigentuemerin=grace)
+    fremde: Erhebung = Erhebung.objects.create(name="Addition", eigentuemerin=grace)
 
     assert list(Erhebung.objects.sichtbar_fuer(ada)) == [eigene]
+    assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [eigene, fremde]
 
 
 @pytest.mark.django_db

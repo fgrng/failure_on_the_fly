@@ -11,6 +11,8 @@ from django.core.validators import MaxValueValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
+from konten.navigation import ist_administratorin
+
 if TYPE_CHECKING:
     from konten.models import Konto
 
@@ -35,7 +37,9 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
         return super().delete()
 
     def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Erhebung"]:
-        """Liefert ausschließlich Erhebungen der Eigentümerin."""
+        """Liefert eigene Erhebungen oder alle für die Administration."""
+        if ist_administratorin(konto):
+            return self
         return self.filter(eigentuemerin=konto)
 
 

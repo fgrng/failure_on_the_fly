@@ -1,6 +1,7 @@
 """ORM-Tests für Fragebogen-Items und ihre Historien."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -46,11 +47,13 @@ class FragebogenItemHistorieTests(TestCase):
         self.assertNotIn("archiviert", feldnamen)
         self.assertFalse(hasattr(FragebogenItemHistorie, "historie_archivieren"))
 
-    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
-        """Ko-Eigentümerinnen sehen dieselbe Item-Linie, Fremde nicht."""
+    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
+        """Ko-Eigentümerinnen sehen ihre Item-Linie, die Administration alle."""
         ada = get_user_model().objects.create_user(username="ada")
         grace = get_user_model().objects.create_user(username="grace")
         linus = get_user_model().objects.create_user(username="linus")
+        administratorin = get_user_model().objects.create_user(username="admin")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         geteilte_historie = FragebogenItemHistorie.objects.create()
         geteilte_historie.eigentuemerinnen.add(ada, grace)
         fremde_historie = FragebogenItemHistorie.objects.create()
@@ -59,6 +62,10 @@ class FragebogenItemHistorieTests(TestCase):
         self.assertEqual(
             list(FragebogenItemHistorie.objects.sichtbar_fuer(grace)),
             [geteilte_historie],
+        )
+        self.assertEqual(
+            list(FragebogenItemHistorie.objects.sichtbar_fuer(administratorin)),
+            [geteilte_historie, fremde_historie],
         )
 
 

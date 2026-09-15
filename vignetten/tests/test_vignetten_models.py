@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
@@ -440,11 +441,13 @@ class VignetteConstraintTests(TestCase):
 class VignetteQuerySetTests(TestCase):
     """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
 
-    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
-        """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
+    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
+        """Ko-Eigentümerinnen sehen ihre Linie, die Administration alle."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         linus: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         geteilte_historie.eigentuemerinnen.add(ada, grace)
         fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
@@ -452,6 +455,10 @@ class VignetteQuerySetTests(TestCase):
 
         self.assertEqual(
             list(Vignettenhistorie.objects.sichtbar_fuer(grace)), [geteilte_historie]
+        )
+        self.assertEqual(
+            list(Vignettenhistorie.objects.sichtbar_fuer(administratorin)),
+            [geteilte_historie, fremde_historie],
         )
 
     def test_einbindbar_liefert_nur_finale_fassungen(self) -> None:

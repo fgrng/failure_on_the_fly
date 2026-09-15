@@ -67,7 +67,8 @@ Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetz
 ## Erhebungen verwalten
 
 Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` ihre
-eigenen Erhebungen. In einem Entwurf wählen sie eigene finale Vignetten,
+eigenen Erhebungen; Administrator:innen sehen dort alle Erhebungen. In einem
+Entwurf wählen sie eigene finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
 Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
 Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive
@@ -102,8 +103,9 @@ Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
 stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
-löschen. Die Bibliothek zeigt nur Items aus dem eigenen Eigentümer-Kreis; dessen
-Ko-Autor:innen lassen sich direkt an der Item-Historie hinzufügen oder entfernen.
+löschen. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
+Administrator:innen sehen alle Items. Ko-Autor:innen lassen sich direkt an der
+Item-Historie hinzufügen oder entfernen.
 Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
 Skalenstufen von 1 = „Stimme gar nicht zu" bis 6 = „Stimme voll zu".
 

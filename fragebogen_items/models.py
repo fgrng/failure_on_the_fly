@@ -7,6 +7,8 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from konten.navigation import ist_administratorin
+
 if TYPE_CHECKING:
     from konten.models import Konto
 
@@ -40,7 +42,9 @@ class FragebogenItemHistorieQuerySet(models.QuerySet["FragebogenItemHistorie"]):
     def sichtbar_fuer(
         self, konto: "Konto"
     ) -> models.QuerySet["FragebogenItemHistorie"]:
-        """Liefert die Historien aus dem Eigentümer-Kreis eines Kontos."""
+        """Liefert eigene Historien oder alle für die Administration."""
+        if ist_administratorin(konto):
+            return self
         return self.filter(eigentuemerinnen=konto)
 
 
