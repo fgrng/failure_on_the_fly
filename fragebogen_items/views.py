@@ -145,6 +145,11 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             )
             .exclude(fragebogenitemhistorie=item.historie)
             .distinct(),
+            "koautorinnen_abschnitt_id": "detail-koautorinnen",
+            "koautorinnen_abschnitt_nummer": "02",
+            "koautorin_hinzufuegen_url": "fragebogen_items:koautorin_hinzufuegen",
+            "koautorin_entfernen_url": "fragebogen_items:koautorin_entfernen",
+            "objekt_pk": item.pk,
         },
     )
 

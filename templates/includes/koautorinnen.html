@@ -1,0 +1,26 @@
+<section class="page-section" aria-labelledby="{{ koautorinnen_abschnitt_id }}">
+    <header class="page-section__head">
+        <b>{{ koautorinnen_abschnitt_nummer }}</b><span><h2 id="{{ koautorinnen_abschnitt_id }}">Ko-Autor:innen</h2></span>
+    </header>
+    <ul>
+        {% for konto in eigentuemerinnen %}
+            <li>{{ konto.username }}
+                {% if hat_mehrere_eigentuemerinnen %}
+                    <form method="post" action="{% url koautorin_entfernen_url objekt_pk konto.pk %}">
+                        {% csrf_token %}
+                        <button type="submit">Entfernen</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="{% url koautorin_hinzufuegen_url objekt_pk %}">
+        {% csrf_token %}
+        <label>Ko-Autor:in <select name="konto">
+            {% for konto in moegliche_koautorinnen %}
+                <option value="{{ konto.pk }}">{{ konto.username }}</option>
+            {% endfor %}
+        </select></label>
+        <button class="button" type="submit">Ko-Autor:in hinzufügen</button>
+    </form>
+</section>

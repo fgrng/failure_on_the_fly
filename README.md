@@ -11,6 +11,14 @@ Autor:innen und Administrator:innen erreichbar. Die Sidebar zeigt anschließend
 nur die Bereiche und Links der jeweiligen Gruppenrollen; die Anmeldung erfolgt
 unter `/accounts/login/`.
 
+## Vignetten verwalten
+
+Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen
+sehen alle. In der Detailansicht lässt sich eine weitere Autorin oder
+Administratorin als Ko-Autorin hinzufügen oder eine vorhandene entfernen. Der
+Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
+die verbleibenden Ko-Autor:innen.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die

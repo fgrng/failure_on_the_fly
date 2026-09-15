@@ -5,11 +5,17 @@ from typing import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.navigation import autorin_erforderlich as _autorin_erforderlich
+from konten.models import Konto
+from konten.navigation import (
+    ADMINISTRATORIN_GRUPPE,
+    AUTORIN_GRUPPE,
+    autorin_erforderlich as _autorin_erforderlich,
+)
 
 from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
@@ -48,6 +54,25 @@ def _sichtbare_fassung_laden(
             zustand=zustand,
         ),
         pk=pk,
+    )
+
+
+def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
+    """Lädt eine Vignettenfassung aus dem sichtbaren Eigentümer-Kreis."""
+    return get_object_or_404(
+        Vignette.objects.filter(
+            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
+        ),
+        pk=pk,
+    )
+
+
+def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Konto]:
+    """Liefert Autorinnen und Administratorinnen außerhalb des Eigentümer-Kreises."""
+    return (
+        Konto.objects.filter(groups__name__in={AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE})
+        .exclude(vignettenhistorie=historie)
+        .distinct()
     )
 
 
@@ -115,17 +140,55 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 @_autorin_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
-    vignette: Vignette = get_object_or_404(
-        Vignette.objects.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
-        ),
-        pk=pk,
-    )
+    vignette: Vignette = _sichtbare_vignette_laden(request, pk)
     return render(
         request,
         "vignetten/detail.html",
-        {"vignette": vignette, "zustand_badge": _zustand_badge(vignette)},
+        {
+            "vignette": vignette,
+            "zustand_badge": _zustand_badge(vignette),
+            "eigentuemerinnen": vignette.historie.eigentuemerinnen.all(),
+            "hat_mehrere_eigentuemerinnen": (
+                vignette.historie.eigentuemerinnen.count() > 1
+            ),
+            "moegliche_koautorinnen": _moegliche_koautorinnen(vignette.historie),
+            "koautorinnen_abschnitt_id": "detail-koautorinnen",
+            "koautorinnen_abschnitt_nummer": "07",
+            "koautorin_hinzufuegen_url": "vignetten:koautorin_hinzufuegen",
+            "koautorin_entfernen_url": "vignetten:koautorin_entfernen",
+            "objekt_pk": vignette.pk,
+        },
     )
+
+
+@login_required
+@_autorin_erforderlich
+def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbare_vignette_laden(request, pk)
+    konto: Konto = get_object_or_404(
+        _moegliche_koautorinnen(vignette.historie), pk=request.POST.get("konto")
+    )
+    vignette.historie.eigentuemerinnen.add(konto)
+    return redirect("vignetten:detail", pk=vignette.pk)
+
+
+@login_required
+@_autorin_erforderlich
+def koautorin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
+    """Entfernt eine Ko-Autorin, ohne die aktive Historie eigentümerlos zu lassen."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    vignette: Vignette = _sichtbare_vignette_laden(request, pk)
+    if vignette.historie.eigentuemerinnen.count() > 1:
+        vignette.historie.eigentuemerinnen.remove(konto_pk)
+        if konto_pk == request.user.pk:
+            return redirect("vignetten:liste")
+    return redirect("vignetten:detail", pk=vignette.pk)
 
 
 @login_required
