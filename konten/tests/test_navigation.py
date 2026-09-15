@@ -8,7 +8,7 @@ from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
 
-from konten.navigation import navigation
+from konten.navigation import ist_administratorin, navigation
 from konten.models import Konto
 
 
@@ -83,6 +83,21 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
     request.user = konto
 
     assert navigation(request) == erwartet
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("rollen", "erwartet"),
+    [([], False), (["Administrator:in"], True)],
+)
+def test_ist_administratorin_prueft_die_administrationsrolle(
+    rollen: list[str], erwartet: bool
+) -> None:
+    """Die Rollenprüfung ist die gemeinsame Administrations-Naht."""
+    konto: Konto = get_user_model().objects.create_user(username="ada")
+    konto.groups.add(*Group.objects.filter(name__in=rollen))
+
+    assert ist_administratorin(konto) is erwartet
 
 
 class SidebarNavigationTests(TestCase):

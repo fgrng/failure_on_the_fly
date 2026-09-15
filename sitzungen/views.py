@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonR
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from konten.navigation import ist_administratorin
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.transkription import (
     AnbieterNichtErreichbar,
@@ -34,9 +35,6 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 if TYPE_CHECKING:
     from konten.models import Konto
-
-
-_ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
 
 
 @dataclass(frozen=True)
@@ -141,16 +139,10 @@ def _eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
     )
 
 
-def _ist_administratorin(konto: "Konto") -> bool:
-    # Prüft die administrative Rolle über ihre Django-Group.
-
-    return konto.groups.filter(name=_ADMINISTRATORIN_GRUPPE).exists()
-
-
 def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
     # Schützt den freien Auswähler vor Konten ohne Administratorinnen-Rolle.
 
-    if not _ist_administratorin(request.user):
+    if not ist_administratorin(request.user):
         return HttpResponse(status=403)
     return None
 

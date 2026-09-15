@@ -10,6 +10,8 @@ from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpR
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from konten.navigation import ist_administratorin
+
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Sitzung
@@ -27,15 +29,14 @@ if TYPE_CHECKING:
 
 
 _AUSBILDERIN_GRUPPE: str = "Ausbilder:in"
-_ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
 P = ParamSpec("P")
 
 
 def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
     """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
 
-    return konto.groups.filter(
-        name__in=[_AUSBILDERIN_GRUPPE, _ADMINISTRATORIN_GRUPPE]
+    return ist_administratorin(konto) or konto.groups.filter(
+        name=_AUSBILDERIN_GRUPPE
     ).exists()
 
 

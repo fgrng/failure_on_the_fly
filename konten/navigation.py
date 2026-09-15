@@ -32,6 +32,11 @@ def ist_autorin(konto: "Konto") -> bool:
     return bool(_rollen(konto) & {AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE})
 
 
+def ist_administratorin(konto: "Konto") -> bool:
+    """Prüft die Administrationsrolle."""
+    return ADMINISTRATORIN_GRUPPE in _rollen(konto)
+
+
 def autorin_erforderlich(
     view: Callable[Concatenate[HttpRequest, P], HttpResponse],
 ) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:

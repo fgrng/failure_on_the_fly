@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import m2m_changed, post_save
 
+from konten.navigation import ist_administratorin
+
 if TYPE_CHECKING:
     from konten.models import Konto
 
@@ -24,7 +26,7 @@ class TrainingQuerySet(models.QuerySet["Training"]):
 
     def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
         """Liefert eigene Trainings oder alle für die Administration."""
-        if konto.groups.filter(name="Administrator:in").exists():
+        if ist_administratorin(konto):
             return self
         return self.filter(eigentuemerin=konto)
 
