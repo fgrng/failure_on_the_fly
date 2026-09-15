@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
+from konten.models import Konto
+from konten.navigation import ADMINISTRATORIN_GRUPPE
 from fragebogen_items.models import (
     LikertSkalenpol,
     FragebogenItem,
@@ -47,13 +49,11 @@ class FragebogenItemHistorieTests(TestCase):
         self.assertNotIn("archiviert", feldnamen)
         self.assertFalse(hasattr(FragebogenItemHistorie, "historie_archivieren"))
 
-    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
-        """Ko-Eigentümerinnen sehen ihre Item-Linie, die Administration alle."""
-        ada = get_user_model().objects.create_user(username="ada")
-        grace = get_user_model().objects.create_user(username="grace")
-        linus = get_user_model().objects.create_user(username="linus")
-        administratorin = get_user_model().objects.create_user(username="admin")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
+        """Ko-Eigentümerinnen sehen dieselbe Item-Linie, Fremde nicht."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        linus: Konto = get_user_model().objects.create_user(username="linus")
         geteilte_historie = FragebogenItemHistorie.objects.create()
         geteilte_historie.eigentuemerinnen.add(ada, grace)
         fremde_historie = FragebogenItemHistorie.objects.create()
@@ -63,9 +63,19 @@ class FragebogenItemHistorieTests(TestCase):
             list(FragebogenItemHistorie.objects.sichtbar_fuer(grace)),
             [geteilte_historie],
         )
+
+    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
+        """Die Administration sieht auch fremde Item-Historien."""
+        administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+        fremde_historie: FragebogenItemHistorie = FragebogenItemHistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(
+            get_user_model().objects.create_user(username="linus")
+        )
+
         self.assertEqual(
             list(FragebogenItemHistorie.objects.sichtbar_fuer(administratorin)),
-            [geteilte_historie, fremde_historie],
+            [fremde_historie],
         )
 
 

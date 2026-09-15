@@ -11,6 +11,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from konten.models import Konto
+from konten.navigation import ADMINISTRATORIN_GRUPPE
 from simulation.models import Simulationskern
 from vignetten.models import (
     Vignette,
@@ -441,13 +442,11 @@ class VignetteConstraintTests(TestCase):
 class VignetteQuerySetTests(TestCase):
     """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
 
-    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
-        """Ko-Eigentümerinnen sehen ihre Linie, die Administration alle."""
+    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
+        """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         linus: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin: Konto = get_user_model().objects.create_user(username="admin")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
         geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         geteilte_historie.eigentuemerinnen.add(ada, grace)
         fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
@@ -456,9 +455,19 @@ class VignetteQuerySetTests(TestCase):
         self.assertEqual(
             list(Vignettenhistorie.objects.sichtbar_fuer(grace)), [geteilte_historie]
         )
+
+    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
+        """Die Administration sieht auch fremde Vignettenhistorien."""
+        administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(
+            get_user_model().objects.create_user(username="linus")
+        )
+
         self.assertEqual(
             list(Vignettenhistorie.objects.sichtbar_fuer(administratorin)),
-            [geteilte_historie, fremde_historie],
+            [fremde_historie],
         )
 
     def test_einbindbar_liefert_nur_finale_fassungen(self) -> None:

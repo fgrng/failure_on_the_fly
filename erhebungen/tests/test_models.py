@@ -12,6 +12,7 @@ from django.db.models.deletion import ProtectedError
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
+from konten.navigation import ADMINISTRATORIN_GRUPPE
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -138,18 +139,29 @@ def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
 
 
 @pytest.mark.django_db
-def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
-    """Forschende sehen eigene Erhebungen, die Administration alle."""
+def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
+    """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
-    administratorin: Konto = Konto.objects.create_user(username="admin")
-    administratorin.groups.add(Group.objects.get(name="Administrator:in"))
     eigene: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
-    fremde: Erhebung = Erhebung.objects.create(name="Addition", eigentuemerin=grace)
+    Erhebung.objects.create(name="Addition", eigentuemerin=grace)
 
     assert list(Erhebung.objects.sichtbar_fuer(ada)) == [eigene]
-    assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [eigene, fremde]
+
+
+@pytest.mark.django_db
+def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
+    """Die Administration sieht auch fremde Erhebungen."""
+
+    administratorin: Konto = Konto.objects.create_user(username="admin")
+    administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+    fremde: Erhebung = Erhebung.objects.create(
+        name="Addition",
+        eigentuemerin=Konto.objects.create_user(username="grace"),
+    )
+
+    assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [fremde]
 
 
 @pytest.mark.django_db
