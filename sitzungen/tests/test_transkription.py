@@ -62,9 +62,7 @@ class TranskriptionsEndpointTests(TestCase):
         teilnahme: Teilnahme = Teilnahme.objects.create(
             audioverarbeitung_eingewilligt=True
         )
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         Trainingsbindung.objects.create(
             training=training, teilnahme=teilnahme, konto=teilnehmerin
         )
@@ -252,7 +250,10 @@ class TranskriptionsEndpointTests(TestCase):
         self._sitzung_starten()
         media_root: str
         upload_temp_dir: str
-        with TemporaryDirectory() as media_root, TemporaryDirectory() as upload_temp_dir:
+        with (
+            TemporaryDirectory() as media_root,
+            TemporaryDirectory() as upload_temp_dir,
+        ):
             with self.settings(
                 MEDIA_ROOT=media_root,
                 FILE_UPLOAD_MAX_MEMORY_SIZE=0,
@@ -293,9 +294,7 @@ class ProbelaufTranskriptionTests(TestCase):
 
     def _probelauf_starten(self) -> None:
         # Legt den Probelaufzustand über die echte HTTP-Naht in der Session ab.
-        self.client.post(
-            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
-        )
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
     def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.

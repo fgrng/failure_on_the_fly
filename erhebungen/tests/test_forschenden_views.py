@@ -26,7 +26,13 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
@@ -1284,15 +1290,13 @@ class ErhebungsExportTests(TestCase):
             sprachmodell="gpt-erstes-modell", parameter={"temperatur": 0.2}
         )
         ModellKonfiguration.objects.aktivieren(erste_konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=ada
-        )
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
         erhebung.finalisieren()
         zweite_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="gpt-zweites-modell", parameter={"temperatur": 0.7}
         )
-        ungenutzte_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="nicht-exportieren"
+        ungenutzte_konfiguration: ModellKonfiguration = (
+            ModellKonfiguration.objects.create(sprachmodell="nicht-exportieren")
         )
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
@@ -1328,7 +1332,9 @@ class ErhebungsExportTests(TestCase):
         zweite_vignette: Vignette = erste_vignette.bearbeiten()
         zweite_vignette.arbeitsheft_text = "1/2 + [bild] 1/3 = 2/5"
         zweite_vignette.arbeitsheft_bild = "vignettenbilder/bruchbild.png"
-        zweite_vignette.arbeitsheft_bildbeschreibung = "Bildbeschreibung des Arbeitshefts"
+        zweite_vignette.arbeitsheft_bildbeschreibung = (
+            "Bildbeschreibung des Arbeitshefts"
+        )
         zweite_vignette.referenzdiagnose = "Mehrzeilige\nReferenzdiagnose"
         zweite_vignette.save()
         zweite_vignette.finalisieren()
@@ -1428,11 +1434,15 @@ class ErhebungsExportTests(TestCase):
             "Ein Bruch-Arbeitsblatt",
         )
         self.assertEqual(
-            vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_simulationshinweise"],
+            vignetten_nach_id[str(erste_vignette.pk)][
+                "lernauftrag_simulationshinweise"
+            ],
             "Hinweis zum Lernauftrag",
         )
         self.assertEqual(
-            vignetten_nach_id[str(erste_vignette.pk)]["arbeitsheft_simulationshinweise"],
+            vignetten_nach_id[str(erste_vignette.pk)][
+                "arbeitsheft_simulationshinweise"
+            ],
             "Hinweis zum Arbeitsheft",
         )
         self.assertEqual(
@@ -1652,16 +1662,18 @@ class ErhebungsExportTests(TestCase):
             denkspur="",
             aeusserung="",
         )
-        abbruchschritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
-            sitzung=sitzung,
-            reihenfolge=3,
-            eingabe="Noch einmal?",
-            fehlversuche=[Fehlversuch(grund="Anbieterfehler", rohantwort="timeout")],
+        abbruchschritt: Gespraechsschritt = (
+            Gespraechsschritt.objects.answerless_anlegen(
+                sitzung=sitzung,
+                reihenfolge=3,
+                eingabe="Noch einmal?",
+                fehlversuche=[
+                    Fehlversuch(grund="Anbieterfehler", rohantwort="timeout")
+                ],
+            )
         )
         Diagnose.objects.create(sitzung=sitzung, text="Bruchfehler")
-        training: Training = Training.objects.create(
-            name="Nicht exportieren", eigentuemerin=ada
-        )
+        training: Training = Training.objects.anlegen(ada, name="Nicht exportieren")
         training.vignetten.add(vignette)
         trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
         Trainingsbindung.objects.create(
@@ -1721,7 +1733,10 @@ class ErhebungsExportTests(TestCase):
             )
 
         self.assertEqual(
-            [{name: wert for name, wert in schritt.items() if name != "erstellt_am"} for schritt in schritte],
+            [
+                {name: wert for name, wert in schritt.items() if name != "erstellt_am"}
+                for schritt in schritte
+            ],
             [
                 {
                     "id": str(erfolgreicher_schritt.pk),
@@ -1772,7 +1787,10 @@ class ErhebungsExportTests(TestCase):
             },
         )
         self.assertEqual(
-            [{name: wert for name, wert in diagnose.items() if name != "erstellt_am"} for diagnose in diagnosen],
+            [
+                {name: wert for name, wert in diagnose.items() if name != "erstellt_am"}
+                for diagnose in diagnosen
+            ],
             [
                 {
                     "sitzung_id": str(sitzung.pk),
@@ -1919,7 +1937,9 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         inhalt: str = detail.content.decode()
         self.assertContains(detail, "Nach jeder Vignettensitzung")
         self.assertContains(detail, "Am Ende")
-        self.assertLess(inhalt.index("Nach Sitzung eins"), inhalt.index("Nach Sitzung zwei"))
+        self.assertLess(
+            inhalt.index("Nach Sitzung eins"), inhalt.index("Nach Sitzung zwei")
+        )
         self.assertNotContains(detail, "Finale Items aufnehmen")
         for url in (
             reverse("erhebungen:item_entfernen", args=[erhebung.pk, erste_bindung.pk]),
@@ -1929,7 +1949,9 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         ):
             self.assertNotContains(detail, url)
 
-    def test_archivierte_erhebung_zeigt_leere_andockpunktbereiche_gesperrt(self) -> None:
+    def test_archivierte_erhebung_zeigt_leere_andockpunktbereiche_gesperrt(
+        self,
+    ) -> None:
         """Auch ohne Items bleibt die archivierte Zuordnung als leere Ansicht lesbar."""
 
         ada: Konto = get_user_model().objects.create_user(username="ada")

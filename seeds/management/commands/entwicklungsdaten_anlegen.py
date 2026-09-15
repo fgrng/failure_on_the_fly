@@ -149,7 +149,9 @@ VIGNETTEN: list[dict[str, object]] = [
 class Command(BaseCommand):
     """Legt idempotent Konten, Kern, Modell-Konfiguration, Vignetten und Trainings an."""
 
-    help = "Befüllt eine Entwicklungsinstanz mit Testdaten für einen manuellen Testlauf."
+    help = (
+        "Befüllt eine Entwicklungsinstanz mit Testdaten für einen manuellen Testlauf."
+    )
 
     def handle(self, *args: object, **options: object) -> None:
         """Führt den Seed in einer Transaktion aus; nur bei DEBUG=True."""
@@ -191,12 +193,13 @@ class Command(BaseCommand):
 
     def _kern_sicherstellen(self) -> Simulationskern:
         """Stellt die aktuelle Standardkern-Fassung bereit."""
-        final: Simulationskern | None = Simulationskern.objects.filter(
-            zustand=Simulationskern.Zustand.FINAL
-        ).order_by("-finalisiert_am", "-pk").first()
+        final: Simulationskern | None = (
+            Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL)
+            .order_by("-finalisiert_am", "-pk")
+            .first()
+        )
         if final is not None and all(
-            getattr(final, feld) == wert
-            for feld, wert in STANDARDKERN_VORLAGEN.items()
+            getattr(final, feld) == wert for feld, wert in STANDARDKERN_VORLAGEN.items()
         ):
             self.stdout.write("  Simulationskern vorhanden.")
             return final
@@ -248,9 +251,13 @@ class Command(BaseCommand):
         finale: list[Vignette] = []
         for beschreibung in VIGNETTEN:
             historienname: str = str(beschreibung["historienname"])
-            vorhandene: Vignette | None = Vignette.objects.filter(
-                historie__name=historienname, zustand=Vignette.Zustand.FINAL
-            ).order_by("-finalisiert_am", "-pk").first()
+            vorhandene: Vignette | None = (
+                Vignette.objects.filter(
+                    historie__name=historienname, zustand=Vignette.Zustand.FINAL
+                )
+                .order_by("-finalisiert_am", "-pk")
+                .first()
+            )
             if vorhandene is not None:
                 if vorhandene.gepinnter_kern_id == kern.pk:
                     finale.append(vorhandene)
@@ -285,17 +292,22 @@ class Command(BaseCommand):
             self.stdout.write(f"  Vignette '{historienname}' angelegt und finalisiert.")
         return finale
 
-    def _trainings_anlegen(
-        self, ausbilderin: object, vignetten: list[Vignette]
-    ) -> None:
+    def _trainings_anlegen(self, ausbilderin: Konto, vignetten: list[Vignette]) -> None:
         """Legt ein veröffentlichtes und ein Entwurfs-Training an."""
-        veroeffentlicht, neu = Training.objects.get_or_create(
-            name="Diagnose-Grundlagen", eigentuemerin=ausbilderin
-        )
+        veroeffentlicht: Training | None = Training.objects.filter(
+            name="Diagnose-Grundlagen", eigentuemerinnen=ausbilderin
+        ).first()
+        ist_neu: bool = veroeffentlicht is None
+        if veroeffentlicht is None:
+            veroeffentlicht = Training.objects.anlegen(
+                ausbilderin, name="Diagnose-Grundlagen"
+            )
         veroeffentlicht.vignetten.set(vignetten)
-        if neu:
+        if ist_neu:
             veroeffentlicht.veroeffentlichen()
-            self.stdout.write("  Training 'Diagnose-Grundlagen' angelegt und veröffentlicht.")
+            self.stdout.write(
+                "  Training 'Diagnose-Grundlagen' angelegt und veröffentlicht."
+            )
         else:
             self.stdout.write("  Training 'Diagnose-Grundlagen' vorhanden.")
 
@@ -304,24 +316,24 @@ class Command(BaseCommand):
                 "Entwurf: Gleichheitszeichen diagnostizieren",
                 "Entwurf: Bruchrechnung vertiefen",
             ),
-            eigentuemerin=ausbilderin,
+            eigentuemerinnen=ausbilderin,
         ).first()
-        neu = entwurf is None
+        ist_neu = entwurf is None
         if entwurf is None:
-            entwurf = Training.objects.create(
+            entwurf = Training.objects.anlegen(
+                ausbilderin,
                 name="Entwurf: Gleichheitszeichen diagnostizieren",
-                eigentuemerin=ausbilderin,
             )
         elif entwurf.name != "Entwurf: Gleichheitszeichen diagnostizieren":
             entwurf.name = "Entwurf: Gleichheitszeichen diagnostizieren"
             entwurf.save(update_fields=["name"])
         entwurf.vignetten.set(vignetten[:1])
-        if neu and vignetten:
+        if ist_neu and vignetten:
             self.stdout.write(
                 "  Training 'Entwurf: Gleichheitszeichen diagnostizieren' "
                 "als Entwurf angelegt."
             )
-        elif not neu:
+        elif not ist_neu:
             self.stdout.write(
                 "  Training 'Entwurf: Gleichheitszeichen diagnostizieren' vorhanden."
             )

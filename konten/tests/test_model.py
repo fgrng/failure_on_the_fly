@@ -7,6 +7,7 @@ from django.core.management import call_command
 from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
+from training.models import Training
 from vignetten.models import Vignettenhistorie
 
 
@@ -90,7 +91,9 @@ def test_konto_behaelt_django_standardfelder() -> None:
 
 
 @pytest.mark.django_db
-def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert() -> None:
+def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert() -> (
+    None
+):
     """Eine aktive Vignettenhistorie darf nicht eigentümerlos werden."""
     konto: Konto = get_user_model().objects.create_user(username="ada")
     historie: Vignettenhistorie = Vignettenhistorie.objects.create()
@@ -109,7 +112,9 @@ def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
 ) -> None:
     """Archivierte oder geteilte Historien blockieren keine Kontolöschung."""
     konto: Konto = get_user_model().objects.create_user(username="ada")
-    historie: Vignettenhistorie = Vignettenhistorie.objects.create(archiviert=archiviert)
+    historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+        archiviert=archiviert
+    )
     historie.eigentuemerinnen.add(konto)
     if mit_koeigentuemerin:
         historie.eigentuemerinnen.add(
@@ -117,6 +122,34 @@ def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
         )
 
     konto.delete()
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_alleinige_eigentuemerin_eines_trainings_wird_blockiert() -> (
+    None
+):
+    """Ein Training braucht vor dem Löschen seiner Eigentümerin eine Nachfolgerin."""
+    konto: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(konto, name="Brüche")
+
+    with pytest.raises(ProtectedError, match="übertragen"):
+        konto.delete()
+
+    assert Training.objects.filter(pk=training.pk).exists()
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_geteiltes_training_ueberlebt() -> None:
+    """Eine Ko-Eigentümerin ermöglicht die Kontolöschung ohne Trainingsverlust."""
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    training: Training = Training.objects.anlegen(ada, name="Brüche")
+    training.eigentuemerinnen.add(grace)
+
+    ada.delete()
+
+    training.refresh_from_db()
+    assert list(training.eigentuemerinnen.all()) == [grace]
 
 
 @pytest.mark.django_db

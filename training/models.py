@@ -12,11 +12,19 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-_ZUSTANDSWECHSEL_FEHLERMELDUNG = "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+_ZUSTANDSWECHSEL_FEHLERMELDUNG = (
+    "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+)
 
 
 class TrainingQuerySet(models.QuerySet["Training"]):
     """Abfragen über Trainings."""
+
+    def anlegen(self, konto: "Konto", **kwargs: object) -> "Training":
+        """Legt ein Training an und trägt dessen erste Eigentümerin ein."""
+        training: Training = self.create(**kwargs)
+        training.eigentuemerinnen.add(konto)
+        return training
 
     def update(self, **kwargs: object) -> int:
         """Hält Zustandswechsel an der Lebenszyklus-Naht."""
@@ -28,7 +36,7 @@ class TrainingQuerySet(models.QuerySet["Training"]):
         """Liefert eigene Trainings oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
-        return self.filter(eigentuemerin=konto)
+        return self.filter(eigentuemerinnen=konto)
 
     def veroeffentlicht(self) -> models.QuerySet["Training"]:
         """Liefert die für Teilnehmende sichtbaren Trainings."""
@@ -36,7 +44,7 @@ class TrainingQuerySet(models.QuerySet["Training"]):
 
 
 class Training(models.Model):
-    """Ein von einer Ausbilderin kuratierter Satz finaler Vignetten."""
+    """Ein von einem Eigentümerinnen-Kreis kuratierter Satz finaler Vignetten."""
 
     class Zustand(models.TextChoices):
         """Die Zustände eines Trainings."""
@@ -45,9 +53,7 @@ class Training(models.Model):
         VEROEFFENTLICHT: tuple[str, str] = "veröffentlicht", "Veröffentlicht"
 
     name: models.CharField = models.CharField(max_length=255)
-    eigentuemerin: models.ForeignKey = models.ForeignKey(
-        "konten.Konto", on_delete=models.PROTECT
-    )
+    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
     zustand: models.CharField = models.CharField(
         max_length=14,
         choices=Zustand,
@@ -72,8 +78,8 @@ class Training(models.Model):
     @transaction.atomic
     def veroeffentlichen(self) -> None:
         """Veröffentlicht genau einen Entwurf."""
-        gespeichertes_training: Training = type(self).objects.select_for_update().get(
-            pk=self.pk
+        gespeichertes_training: Training = (
+            type(self).objects.select_for_update().get(pk=self.pk)
         )
         if gespeichertes_training.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können veröffentlicht werden.")

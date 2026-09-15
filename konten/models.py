@@ -12,7 +12,8 @@ class Konto(AbstractUser):
         using: str | None = None,
         keep_parents: bool = False,
     ) -> tuple[int, dict[str, int]]:
-        """Verhindert eigentümerlose aktive Vignettenhistorien."""
+        """Verhindert eigentümerlose aktive Historien und Trainings."""
+        from training.models import Training
         from vignetten.models import Vignettenhistorie
 
         for historie in Vignettenhistorie.objects.filter(
@@ -22,6 +23,14 @@ class Konto(AbstractUser):
                 raise ProtectedError(
                     "Aktive Vignettenhistorien brauchen mindestens eine Eigentümerin.",
                     [historie],
+                )
+
+        for training in Training.objects.filter(eigentuemerinnen=self):
+            if training.eigentuemerinnen.count() == 1:
+                raise ProtectedError(
+                    "Trainings brauchen mindestens eine Eigentümerin; bitte "
+                    "übertragen Sie das Training vorher.",
+                    [training],
                 )
 
         return super().delete(using=using, keep_parents=keep_parents)

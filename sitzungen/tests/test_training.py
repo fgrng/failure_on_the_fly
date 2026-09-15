@@ -38,9 +38,7 @@ class TrainingssitzungTests(TestCase):
             parameter={"skript": skript},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        training: Training = Training.objects.create(
-            name="Bruchrechnung", eigentuemerin=ausbilderin
-        )
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,
@@ -62,9 +60,7 @@ class TrainingssitzungTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
-        self.client.post(
-            reverse("training:wahl", args=[training.pk, vignette.pk])
-        )
+        self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
         self.start_response: HttpResponse = self.client.post(
             reverse("training:einwilligung", args=[training.pk, vignette.pk]),
             {
@@ -126,7 +122,9 @@ class TrainingssitzungTests(TestCase):
         training: Training = self._sitzung_starten([])
         self.client.post(reverse("sitzungen:training_beenden"))
 
-        response: HttpResponse = self.client.post(reverse("sitzungen:training_abbrechen"))
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_abbrechen")
+        )
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
@@ -140,7 +138,9 @@ class TrainingssitzungTests(TestCase):
             reverse("sitzungen:training_debrief"), {"diagnose": "Bruchfehler"}
         )
 
-        self.assertRedirects(stale_diagnose, reverse("training:detail", args=[training.pk]))
+        self.assertRedirects(
+            stale_diagnose, reverse("training:detail", args=[training.pk])
+        )
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())

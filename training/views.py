@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import Count, QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotAllowed,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -35,9 +40,10 @@ P = ParamSpec("P")
 def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
     """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
 
-    return ist_administratorin(konto) or konto.groups.filter(
-        name=_AUSBILDERIN_GRUPPE
-    ).exists()
+    return (
+        ist_administratorin(konto)
+        or konto.groups.filter(name=_AUSBILDERIN_GRUPPE).exists()
+    )
 
 
 def _ausbilderin_erforderlich(
@@ -114,6 +120,11 @@ def katalog(request: HttpRequest) -> HttpResponse:
     ist_ausbilderin: bool = _ausbilderin_oder_administratorin(request.user)
     trainingsabfrage: QuerySet[Training] = Training.objects.veroeffentlicht()
     sichtbare_pks: set[int] = set()
+    eigene_trainings_pks: set[int] = set(
+        Training.objects.filter(eigentuemerinnen=request.user).values_list(
+            "pk", flat=True
+        )
+    )
     if ist_ausbilderin:
         sichtbare_trainings: QuerySet[Training] = Training.objects.sichtbar_fuer(
             request.user
@@ -133,7 +144,7 @@ def katalog(request: HttpRequest) -> HttpResponse:
                 "name": training.name,
                 "zustand": training.get_zustand_display(),
                 "zustand_badge": _zustand_badge(training),
-                "is_own": training.eigentuemerin_id == request.user.id,
+                "is_own": training.pk in eigene_trainings_pks,
                 "url": url,
                 "action_label": "Kuratieren" if ist_kuratierbar else "Öffnen",
             }
@@ -161,14 +172,21 @@ def historie(request: HttpRequest) -> HttpResponse:
         vignetten_gesamt: int = training.vignetten.filter(
             zustand=Vignette.Zustand.FINAL
         ).count()
-        abgeschlossene_vignetten: int = Sitzung.objects.filter(
-            teilnahme=bindung.teilnahme,
-            status=Sitzung.Status.ABGESCHLOSSEN,
-        ).values("vignette_id").distinct().count()
-        
-        sitzungen_counts = Sitzung.objects.filter(
-            teilnahme=bindung.teilnahme
-        ).values("status").annotate(count=Count("id"))
+        abgeschlossene_vignetten: int = (
+            Sitzung.objects.filter(
+                teilnahme=bindung.teilnahme,
+                status=Sitzung.Status.ABGESCHLOSSEN,
+            )
+            .values("vignette_id")
+            .distinct()
+            .count()
+        )
+
+        sitzungen_counts = (
+            Sitzung.objects.filter(teilnahme=bindung.teilnahme)
+            .values("status")
+            .annotate(count=Count("id"))
+        )
         sitzungen_nach_status = {
             "laufend": 0,
             "abgeschlossen": 0,
@@ -223,9 +241,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt ein Training für die eingeloggte Person an."""
     form: TrainingForm = TrainingForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        training: Training = form.save(commit=False)
-        training.eigentuemerin = request.user
-        training.save()
+        training: Training = Training.objects.anlegen(request.user, **form.cleaned_data)
         return redirect("training:kuratieren", pk=training.pk)
     return render(request, "training/anlegen.html", {"form": form})
 
@@ -304,7 +320,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_ausbilderin_erforderlich
-def vignette_hinzufuegen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
+def vignette_hinzufuegen(
+    request: HttpRequest, pk: int, vignette_pk: int
+) -> HttpResponse:
     """Nimmt eine eigene finale Vignette in ein sichtbares Training auf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -389,9 +407,11 @@ def _trainingsbindung_laden_oder_anlegen(
 ) -> Trainingsbindung:
     """Lädt oder erzeugt die eine Trainingsbindung der teilnehmenden Person."""
     with transaction.atomic():
-        bindung: Trainingsbindung | None = Trainingsbindung.objects.filter(
-            training=training, konto=request.user
-        ).select_related("teilnahme").first()
+        bindung: Trainingsbindung | None = (
+            Trainingsbindung.objects.filter(training=training, konto=request.user)
+            .select_related("teilnahme")
+            .first()
+        )
         if bindung is None:
             from sitzungen.models import Teilnahme
 
@@ -417,7 +437,9 @@ def _sitzung_starten(
     with transaction.atomic():
         kern: Simulationskern | None = vignette.gepinnter_kern
         if kern is None:
-            raise RuntimeError("Trainingsvignetten brauchen einen gepinnten Simulationskern.")
+            raise RuntimeError(
+                "Trainingsvignetten brauchen einen gepinnten Simulationskern."
+            )
         sink: DBSink = DBSink(bindung.teilnahme)
         sitzung_starten(
             sink,
