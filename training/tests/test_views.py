@@ -28,7 +28,9 @@ class TrainingAnlegenTests(TestCase):
         )
 
         training: Training = Training.objects.get(eigentuemerinnen=ada)
-        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.assertRedirects(
+            response, reverse("training:kuratieren", args=[training.pk])
+        )
         liste: HttpResponse = self.client.get(reverse("training:liste"))
         self.assertContains(liste, "Gleichungen")
         self.assertNotContains(liste, "Fremdes Training")

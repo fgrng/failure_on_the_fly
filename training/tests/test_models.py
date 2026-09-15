@@ -16,7 +16,9 @@ from vignetten.models import Vignette, Vignettenhistorie
 def test_veroeffentlichen_ueberfuehrt_einen_entwurf() -> None:
     """Ein Training kann genau einmal vom Entwurf veröffentlicht werden."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
 
     training.veroeffentlichen()
 
@@ -28,7 +30,9 @@ def test_veroeffentlichen_ueberfuehrt_einen_entwurf() -> None:
 def test_veroeffentlichen_lehnt_wiederholung_ab() -> None:
     """Ein veröffentlichtes Training kann nicht erneut veröffentlicht werden."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     training.veroeffentlichen()
 
     with pytest.raises(ValidationError, match="Nur Entwürfe"):
@@ -39,7 +43,9 @@ def test_veroeffentlichen_lehnt_wiederholung_ab() -> None:
 def test_veroeffentlichen_lehnt_veralteten_entwurf_ab() -> None:
     """Auch eine veraltete Instanz kann ein Training nicht erneut veröffentlichen."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     veralteter_entwurf: Training = Training.objects.get(pk=training.pk)
     training.veroeffentlichen()
 
@@ -61,7 +67,9 @@ def test_training_muss_als_entwurf_angelegt_werden() -> None:
 def test_training_verhindert_direkte_zustandswechsel_beim_speichern() -> None:
     """Der Zustand eines gespeicherten Trainings wechselt nur im Lebenszyklus."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     training.veroeffentlichen()
     training.zustand = Training.Zustand.ENTWURF
 
@@ -73,7 +81,9 @@ def test_training_verhindert_direkte_zustandswechsel_beim_speichern() -> None:
 def test_training_verhindert_massenhafte_zustandswechsel() -> None:
     """Der QuerySet-Weg umgeht die Lebenszyklus-Naht nicht."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     training.veroeffentlichen()
 
     with pytest.raises(RuntimeError, match="Lebenszyklus"):
@@ -84,7 +94,9 @@ def test_training_verhindert_massenhafte_zustandswechsel() -> None:
 def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
     """Finale Fassungen lassen sich auch nach der Veröffentlichung austauschen."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     entwurf: Vignette = Vignette.objects._erstellen(
         historie=Vignettenhistorie.objects.create()
     )
@@ -115,7 +127,9 @@ def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
 def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() -> None:
     """Die Rückwärtsrelation akzeptiert finale Fassungen und Archivieren entfernt sie."""
 
-    training: Training = Training.objects.anlegen(Konto.objects.create_user(username="ada"), name="Bruchrechnung")
+    training: Training = Training.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
+    )
     Vignette.objects._erstellen(historie=Vignettenhistorie.objects.create())
     finale: Vignette = Vignette.objects._erstellen(
         historie=Vignettenhistorie.objects.create(),
@@ -181,8 +195,8 @@ def test_geteiltes_training_ist_fuer_alle_eigentuemerinnen_sichtbar() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
-    training: Training = Training.objects.create(name="Brüche")
-    training.eigentuemerinnen.add(ada, grace)
+    training: Training = Training.objects.anlegen(ada, name="Brüche")
+    training.eigentuemerinnen.add(grace)
 
     assert list(Training.objects.sichtbar_fuer(ada)) == [training]
     assert list(Training.objects.sichtbar_fuer(grace)) == [training]

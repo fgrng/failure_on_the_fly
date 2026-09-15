@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-_ZUSTANDSWECHSEL_FEHLERMELDUNG = "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+_ZUSTANDSWECHSEL_FEHLERMELDUNG = (
+    "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+)
 
 
 class TrainingQuerySet(models.QuerySet["Training"]):
@@ -51,9 +53,7 @@ class Training(models.Model):
         VEROEFFENTLICHT: tuple[str, str] = "veröffentlicht", "Veröffentlicht"
 
     name: models.CharField = models.CharField(max_length=255)
-    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField(
-        "konten.Konto"
-    )
+    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
     zustand: models.CharField = models.CharField(
         max_length=14,
         choices=Zustand,
@@ -78,8 +78,8 @@ class Training(models.Model):
     @transaction.atomic
     def veroeffentlichen(self) -> None:
         """Veröffentlicht genau einen Entwurf."""
-        gespeichertes_training: Training = type(self).objects.select_for_update().get(
-            pk=self.pk
+        gespeichertes_training: Training = (
+            type(self).objects.select_for_update().get(pk=self.pk)
         )
         if gespeichertes_training.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können veröffentlicht werden.")

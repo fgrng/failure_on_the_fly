@@ -91,7 +91,9 @@ def test_konto_behaelt_django_standardfelder() -> None:
 
 
 @pytest.mark.django_db
-def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert() -> None:
+def test_konto_loeschen_alleinige_eigentuemerin_aktiver_historie_wird_blockiert() -> (
+    None
+):
     """Eine aktive Vignettenhistorie darf nicht eigentümerlos werden."""
     konto: Konto = get_user_model().objects.create_user(username="ada")
     historie: Vignettenhistorie = Vignettenhistorie.objects.create()
@@ -110,7 +112,9 @@ def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
 ) -> None:
     """Archivierte oder geteilte Historien blockieren keine Kontolöschung."""
     konto: Konto = get_user_model().objects.create_user(username="ada")
-    historie: Vignettenhistorie = Vignettenhistorie.objects.create(archiviert=archiviert)
+    historie: Vignettenhistorie = Vignettenhistorie.objects.create(
+        archiviert=archiviert
+    )
     historie.eigentuemerinnen.add(konto)
     if mit_koeigentuemerin:
         historie.eigentuemerinnen.add(
@@ -121,7 +125,9 @@ def test_konto_loeschen_archivierte_oder_geteilte_historie_ist_erlaubt(
 
 
 @pytest.mark.django_db
-def test_konto_loeschen_alleinige_eigentuemerin_eines_trainings_wird_blockiert() -> None:
+def test_konto_loeschen_alleinige_eigentuemerin_eines_trainings_wird_blockiert() -> (
+    None
+):
     """Ein Training braucht vor dem Löschen seiner Eigentümerin eine Nachfolgerin."""
     konto: Konto = Konto.objects.create_user(username="ada")
     training: Training = Training.objects.anlegen(konto, name="Brüche")

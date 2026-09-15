@@ -71,6 +71,4 @@ class EntwicklungsdatenTests(TestCase):
         call_command("entwicklungsdaten_anlegen", stdout=StringIO())
         ausbilderin: Konto = Konto.objects.get(username="autor")
 
-        self.assertTrue(
-            Training.objects.filter(eigentuemerinnen=ausbilderin).exists()
-        )
+        self.assertTrue(Training.objects.filter(eigentuemerinnen=ausbilderin).exists())

@@ -8,7 +8,13 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -36,7 +42,9 @@ class TrainingskatalogTests(TestCase):
         """Entwürfe erscheinen weder im Katalog noch über ihre Detail-URL."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
-        entwurf: Training = Training.objects.anlegen(ausbilderin, name="Versteckte Bruchrechnung")
+        entwurf: Training = Training.objects.anlegen(
+            ausbilderin, name="Versteckte Bruchrechnung"
+        )
         self.client.force_login(studierende)
 
         katalog: HttpResponse = self.client.get(reverse("training:katalog"))
@@ -197,13 +205,17 @@ class TrainingskatalogTests(TestCase):
         self.assertRedirects(fertig, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
-        self.assertEqual(Diagnose.objects.get(sitzung=sitzung).text, "Mia addiert Zähler und Nenner.")
+        self.assertEqual(
+            Diagnose.objects.get(sitzung=sitzung).text, "Mia addiert Zähler und Nenner."
+        )
 
         self.client.post(wahl_url)
 
         self.assertEqual(Sitzung.objects.count(), 2)
         self.assertEqual(Teilnahme.objects.count(), 1)
-        self.assertEqual(Trainingsbindung.objects.get().teilnahme_id, sitzung.teilnahme_id)
+        self.assertEqual(
+            Trainingsbindung.objects.get().teilnahme_id, sitzung.teilnahme_id
+        )
 
     def test_einwilligung_wird_an_der_teilnahme_gespeichert_bevor_die_sitzung_startet(
         self,
@@ -328,15 +340,15 @@ class TrainingsabbruchTests(TestCase):
         )
 
         self.assertContains(response, "Ich addiere alles.")
-        self.assertFalse(
-            Teilnahme.objects.get().hat_in_audioverarbeitung_eingewilligt
-        )
+        self.assertFalse(Teilnahme.objects.get().hat_in_audioverarbeitung_eingewilligt)
 
     def test_abbrechen_beendet_die_sitzung_ohne_diagnose(self) -> None:
         """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""
         training: Training = self._sitzung_starten()
 
-        response: HttpResponse = self.client.post(reverse("sitzungen:training_abbrechen"))
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:training_abbrechen")
+        )
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
@@ -356,5 +368,7 @@ class TrainingsabbruchTests(TestCase):
         self.assertEqual(sitzung.status, Sitzung.Status.GESCHEITERT)
         schritt: Gespraechsschritt = Gespraechsschritt.objects.get(sitzung=sitzung)
         self.assertIsNone(schritt.aeusserung)
-        self.assertEqual(Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3)
+        self.assertEqual(
+            Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3
+        )
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
