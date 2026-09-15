@@ -103,7 +103,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
             reverse("erhebungen:anlegen"), {"name": "Brüche erforschen"}
         )
 
-        erhebung: Erhebung = Erhebung.objects.get(eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.get(eigentuemerinnen=ada)
         self.assertRedirects(angelegt, reverse("erhebungen:detail", args=[erhebung.pk]))
         self.assertEqual(erhebung.status, Erhebung.Status.ENTWURF)
         liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))

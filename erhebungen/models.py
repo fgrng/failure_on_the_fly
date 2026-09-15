@@ -20,6 +20,20 @@ if TYPE_CHECKING:
 class ErhebungQuerySet(models.QuerySet["Erhebung"]):
     """Abfragen über Erhebungen."""
 
+    def anlegen(self, konto: "Konto", **kwargs: object) -> "Erhebung":
+        """Legt eine Erhebung an und trägt ihre erste Eigentümerin ein."""
+        erhebung: Erhebung = self.create(**kwargs)
+        erhebung.eigentuemerinnen.add(konto)
+        return erhebung
+
+    def create(self, **kwargs: object) -> "Erhebung":
+        """Übernimmt die frühere Anlegeform in bestehende Testdaten."""
+        eigentuemerin: object | None = kwargs.pop("eigentuemerin", None)
+        erhebung: Erhebung = super().create(**kwargs)
+        if eigentuemerin is not None:
+            erhebung.eigentuemerinnen.add(eigentuemerin)
+        return erhebung
+
     def update(self, **kwargs: object) -> int:
         """Hält finale Designs und Statuswechsel an den Lebenszyklus-Methoden."""
 
@@ -40,11 +54,11 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
         """Liefert eigene Erhebungen oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
-        return self.filter(eigentuemerin=konto)
+        return self.filter(eigentuemerinnen=konto)
 
 
 class Erhebung(models.Model):
-    """Ein Untersuchungsdesign mit konfigurierbaren Texten und Reihenfolgeregel."""
+    """Ein Untersuchungsdesign eines Eigentümerinnen-Kreises."""
 
     class Status(models.TextChoices):
         """Die Zustände einer Erhebung."""
@@ -60,9 +74,7 @@ class Erhebung(models.Model):
         ZUFAELLIG: tuple[str, str] = "zufällig", "Zufällige Reihenfolge"
 
     name: models.CharField = models.CharField(max_length=255)
-    eigentuemerin: models.ForeignKey = models.ForeignKey(
-        "konten.Konto", on_delete=models.PROTECT
-    )
+    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
     status: models.CharField = models.CharField(
         max_length=10, choices=Status, default=Status.ENTWURF
     )
@@ -247,7 +259,7 @@ class Erhebungsvignette(models.Model):
         if self.vignette.zustand != Vignette.Zustand.FINAL:
             fehler["vignette"] = "Erhebungen können nur finale Vignetten einbinden."
         elif not self.vignette.historie.eigentuemerinnen.filter(
-            pk=self.erhebung.eigentuemerin_id
+            pk__in=self.erhebung.eigentuemerinnen.all()
         ).exists():
             fehler["vignette"] = "Erhebungen können nur eigene Vignetten einbinden."
         if self.erhebung.randomisierung == Erhebung.Randomisierung.FEST:
@@ -312,7 +324,7 @@ class Erhebungsitem(models.Model):
         if self.item.zustand != FragebogenItem.Zustand.FINAL:
             fehler["item"] = "Erhebungen können nur finale Items einbinden."
         elif not self.item.historie.eigentuemerinnen.filter(
-            pk=self.erhebung.eigentuemerin_id
+            pk__in=self.erhebung.eigentuemerinnen.all()
         ).exists():
             fehler["item"] = "Erhebungen können nur eigene Items einbinden."
         if fehler:

@@ -7,6 +7,7 @@ from django.core.management import call_command
 from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
+from erhebungen.models import Erhebung
 from training.models import Training
 from vignetten.models import Vignettenhistorie
 
@@ -150,6 +151,50 @@ def test_konto_loeschen_geteiltes_training_ueberlebt() -> None:
 
     training.refresh_from_db()
     assert list(training.eigentuemerinnen.all()) == [grace]
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_aktive_alleinige_erhebung_wird_blockiert() -> None:
+    """Aktive Erhebungen brauchen vor der Kontolöschung eine Nachfolgerin."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+
+    with pytest.raises(ProtectedError, match="Erhebungen"):
+        ada.delete()
+
+    assert Erhebung.objects.filter(pk=erhebung.pk).exists()
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_geteilte_oder_archivierte_erhebung_ueberlebt() -> None:
+    """Geteilte und archivierte Erhebungen dürfen den Eigentümer-Kreis verlieren."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    linus: Konto = Konto.objects.create_user(username="linus")
+    administratorin: Konto = Konto.objects.create_user(username="admin")
+    administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+    geteilt: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilt")
+    geteilt.eigentuemerinnen.add(grace, linus)
+    ada.delete()
+    geteilt.refresh_from_db()
+    assert set(geteilt.eigentuemerinnen.all()) == {grace, linus}
+
+    archiviert: Erhebung = Erhebung.objects.anlegen(grace, name="Archiv")
+    archiviert.status = Erhebung.Status.ARCHIVIERT
+    archiviert._schreibqueryset().filter(pk=archiviert.pk).update(
+        status=Erhebung.Status.ARCHIVIERT
+    )
+    grace.delete()
+    archiviert.refresh_from_db()
+    assert not archiviert.eigentuemerinnen.exists()
+    assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [
+        geteilt,
+        archiviert,
+    ]
+    geteilt.refresh_from_db()
+    assert list(geteilt.eigentuemerinnen.all()) == [linus]
 
 
 @pytest.mark.django_db

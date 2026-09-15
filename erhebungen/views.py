@@ -259,9 +259,9 @@ def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine neue Erhebung als Entwurf an."""
 
     if request.method == "POST":
-        erhebung: Erhebung = Erhebung.objects.create(
+        erhebung: Erhebung = Erhebung.objects.anlegen(
+            request.user,
             name=request.POST.get("name", "Neue Erhebung"),
-            eigentuemerin=request.user,
         )
         return redirect("erhebungen:detail", pk=erhebung.pk)
     return render(request, "erhebungen/anlegen.html")

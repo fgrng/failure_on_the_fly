@@ -75,7 +75,7 @@ class ErhebungsteilnahmeTests(TestCase):
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Brüche vergleichen"
         )
-        historie.eigentuemerinnen.add(self.erhebung.eigentuemerin)
+        historie.eigentuemerinnen.add(self.erhebung.eigentuemerinnen.get())
         vignette: Vignette = Vignette.objects._erstellen(
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
@@ -129,7 +129,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ordnet ein finales Fragebogen-Item am Ende der Erhebung ein."""
 
         item = FragebogenItem.objects.anlegen(
-            self.erhebung.eigentuemerin,
+            self.erhebung.eigentuemerinnen.get(),
             typ=typ,
             wortlaut=wortlaut,
         )
@@ -147,7 +147,7 @@ class ErhebungsteilnahmeTests(TestCase):
         # Ordnet ein finales Fragebogen-Item nach jeder Vignettensitzung ein.
 
         item: FragebogenItem = FragebogenItem.objects.anlegen(
-            self.erhebung.eigentuemerin,
+            self.erhebung.eigentuemerinnen.get(),
             wortlaut=wortlaut,
         )
         item.finalisieren()
@@ -531,7 +531,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         item = FragebogenItem.objects.anlegen(
-            self.erhebung.eigentuemerin,
+            self.erhebung.eigentuemerinnen.get(),
             wortlaut="Wie war die Sitzung?",
         )
         item.finalisieren()
@@ -875,7 +875,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung = Erhebung.objects.create(
-            name="Fehlschlag", eigentuemerin=self.erhebung.eigentuemerin
+            name="Fehlschlag", eigentuemerin=self.erhebung.eigentuemerinnen.get()
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(
@@ -908,7 +908,7 @@ class ErhebungsteilnahmeTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung = Erhebung.objects.create(
             name="Fehlschlag",
-            eigentuemerin=self.erhebung.eigentuemerin,
+            eigentuemerin=self.erhebung.eigentuemerinnen.get(),
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(
@@ -985,7 +985,7 @@ class ErhebungsteilnahmeTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung = Erhebung.objects.create(
             name="Datenspur",
-            eigentuemerin=self.erhebung.eigentuemerin,
+            eigentuemerin=self.erhebung.eigentuemerinnen.get(),
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(

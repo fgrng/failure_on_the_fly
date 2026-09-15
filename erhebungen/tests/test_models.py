@@ -151,6 +151,19 @@ def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
 
 
 @pytest.mark.django_db
+def test_geteilte_erhebung_ist_fuer_alle_eigentuemerinnen_sichtbar() -> None:
+    """Die Anlege-Naht setzt die erste Eigentümerin und teilt über den Kreis."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    erhebung.eigentuemerinnen.add(grace)
+
+    assert list(Erhebung.objects.sichtbar_fuer(ada)) == [erhebung]
+    assert list(Erhebung.objects.sichtbar_fuer(grace)) == [erhebung]
+
+
+@pytest.mark.django_db
 def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
     """Die Administration sieht auch fremde Erhebungen."""
 
@@ -218,6 +231,38 @@ def test_erhebungsvignette_lehnt_fremde_finale_fassung_ab() -> None:
                 )
             ]
         )
+
+
+@pytest.mark.django_db
+def test_erhebung_bindet_material_ueber_eine_kreis_schnittmenge_ein() -> None:
+    """Eine Ko-Forschende genügt für Vignetten und Items der gemeinsamen Erhebung."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    linus: Konto = Konto.objects.create_user(username="linus")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    erhebung.eigentuemerinnen.add(grace)
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    vignette: Vignette = _finale_vignette_anlegen(grace)
+    item: FragebogenItem = FragebogenItem.objects.anlegen(
+        grace, wortlaut="Wie sicher fühlten Sie sich?"
+    )
+    item.finalisieren()
+
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    erhebung.eigentuemerinnen.add(linus)
+
+    assert list(erhebung.vignetten.all()) == [vignette]
+    assert list(erhebung.itemzugehoerigkeiten.values_list("item", flat=True)) == [
+        item.pk
+    ]
 
 
 @pytest.mark.django_db
@@ -769,6 +814,30 @@ def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
         erhebung.save()
     with pytest.raises(ValidationError, match="Nur Entwürfe"):
         erhebung.delete()
+
+
+@pytest.mark.django_db
+def test_finale_und_laufende_erhebung_behalten_aenderbaren_eigentuemerinnenkreis() -> None:
+    """Das Einfrieren betrifft das Design, nicht die Verantwortung."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="fake"
+    )
+    ModellKonfiguration.objects.aktivieren(konfiguration)
+    erhebung.finalisieren()
+    erhebung.eigentuemerinnen.add(grace)
+    Stichprobe.objects.create(
+        erhebung=erhebung,
+        beginn=timezone.now() - timedelta(minutes=1),
+        ende=timezone.now() + timedelta(minutes=1),
+    )
+    erhebung.eigentuemerinnen.remove(ada)
+
+    assert list(erhebung.eigentuemerinnen.all()) == [grace]
+    assert erhebung.hat_laufende_stichprobe
 
 
 @pytest.mark.django_db

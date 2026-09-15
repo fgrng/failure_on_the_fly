@@ -12,7 +12,8 @@ class Konto(AbstractUser):
         using: str | None = None,
         keep_parents: bool = False,
     ) -> tuple[int, dict[str, int]]:
-        """Verhindert eigentümerlose aktive Historien und Trainings."""
+        """Verhindert eigentümerlose aktive Objekte."""
+        from erhebungen.models import Erhebung
         from training.models import Training
         from vignetten.models import Vignettenhistorie
 
@@ -31,6 +32,16 @@ class Konto(AbstractUser):
                     "Trainings brauchen mindestens eine Eigentümerin; bitte "
                     "übertragen Sie das Training vorher.",
                     [training],
+                )
+
+        for erhebung in Erhebung.objects.exclude(
+            status=Erhebung.Status.ARCHIVIERT
+        ).filter(eigentuemerinnen=self):
+            if erhebung.eigentuemerinnen.count() == 1:
+                raise ProtectedError(
+                    "Aktive Erhebungen brauchen mindestens eine Eigentümerin; bitte "
+                    "übertragen Sie die Erhebung vorher.",
+                    [erhebung],
                 )
 
         return super().delete(using=using, keep_parents=keep_parents)
