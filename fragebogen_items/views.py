@@ -7,7 +7,11 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
-from konten.navigation import ADMINISTRATORIN_GRUPPE, ist_administratorin
+from konten.navigation import (
+    ADMINISTRATORIN_GRUPPE,
+    FORSCHENDE_GRUPPE,
+    ist_administratorin,
+)
 from konten.models import Konto
 
 from .forms import FragebogenItemForm
@@ -15,7 +19,7 @@ from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
 
 _BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
     {
-        "Forschende:r",
+        FORSCHENDE_GRUPPE,
         ADMINISTRATORIN_GRUPPE,
     }
 )
@@ -42,7 +46,7 @@ def _forschende_erforderlich(
         # Prüft die Gruppenrolle vor dem Aufruf der geschützten View.
         if not (
             ist_administratorin(request.user)
-            or request.user.groups.filter(name="Forschende:r").exists()
+            or request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists()
         ):
             return HttpResponse(status=403)
         return view(request, *args, **kwargs)
