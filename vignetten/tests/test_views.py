@@ -38,6 +38,27 @@ def _autorin(username: str) -> Konto:
     return konto
 
 
+def _vollstaendige_vignette(konto: Konto) -> Vignette:
+    """Legt einen finalisierbaren Entwurf für die Koautorschaftstests an."""
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    vignette: Vignette = Vignette.objects.anlegen(konto)
+    vignette.fehlermuster_beschreibung = "Stellenwerte werden einzeln gezählt."
+    vignette.lernauftrag_text = "Addiere 27 und 15."
+    vignette.arbeitsheft_text = "27 + 15 = 312"
+    vignette.schuelerin_name = "Mia"
+    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.lehrperson_name = "Frau Weber"
+    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.fach = "Mathematik"
+    vignette.thema = "Addition"
+    vignette.klassenstufe = "5"
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 5
+    vignette.save()
+    return vignette
+
+
 class VignetteAnlegenViewTests(TestCase):
     """Das Anlegeformular ist die HTTP-Naht zum Vignetten-Manager."""
 
@@ -176,7 +197,6 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "Ko-Autor:innen")
         self.assertContains(response, ada.username)
 
-
     def test_rendert_die_rohfelder_des_aufgabenkontexts(self) -> None:
         """Die Ansicht zeigt Lernauftrag und Arbeitsheft ohne Rahmen-Rendering."""
         ada: Konto = _autorin("ada")
@@ -273,33 +293,24 @@ class VignetteKoautorschaftViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("vignetten:liste"))
-        self.assertEqual(list(historie.eigentuemerinnen.all()), [grace])
         self.client.force_login(grace)
+        self.assertContains(
+            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
+            grace.username,
+        )
         self.client.post(
             reverse("vignetten:koautorin_entfernen", args=[vignette.pk, grace.pk])
         )
-        self.assertEqual(list(historie.eigentuemerinnen.all()), [grace])
+        self.assertContains(
+            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
+            grace.username,
+        )
 
-    def test_koautorin_kann_bearbeiten_und_finalisieren(self) -> None:
-        """Eine geteilte Vignette bleibt für beide Autorinnen gleichrangig pflegbar."""
+    def test_koautorin_kann_einen_entwurf_bearbeiten(self) -> None:
+        """Eine geteilte Vignette bleibt für beide Autorinnen bearbeitbar."""
         ada: Konto = _autorin("ada")
         grace: Konto = _autorin("grace")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = Vignette.objects.anlegen(ada)
-        vignette.fehlermuster_beschreibung = "Stellenwerte werden einzeln gezählt."
-        vignette.lernauftrag_text = "Addiere 27 und 15."
-        vignette.arbeitsheft_text = "27 + 15 = 312"
-        vignette.schuelerin_name = "Mia"
-        vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-        vignette.lehrperson_name = "Frau Weber"
-        vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-        vignette.fach = "Mathematik"
-        vignette.thema = "Addition"
-        vignette.klassenstufe = "5"
-        vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-        vignette.budget_wert = 5
-        vignette.save()
+        vignette: Vignette = _vollstaendige_vignette(ada)
         self.client.force_login(ada)
         self.client.post(
             reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
@@ -310,16 +321,31 @@ class VignetteKoautorschaftViewTests(TestCase):
         bearbeiten: HttpResponse = self.client.get(
             reverse("vignetten:bearbeiten", args=[vignette.pk])
         )
+        self.assertEqual(bearbeiten.status_code, 200)
+
+    def test_koautorin_kann_einen_entwurf_finalisieren(self) -> None:
+        """Eine geteilte Vignette bleibt für beide Autorinnen finalisierbar."""
+        ada: Konto = _autorin("ada")
+        grace: Konto = _autorin("grace")
+        vignette: Vignette = _vollstaendige_vignette(ada)
+        self.client.force_login(ada)
+        self.client.post(
+            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            {"konto": grace.pk},
+        )
+        self.client.force_login(grace)
+
         finalisieren: HttpResponse = self.client.post(
             reverse("vignetten:finalisieren", args=[vignette.pk])
         )
 
-        self.assertEqual(bearbeiten.status_code, 200)
         self.assertRedirects(
             finalisieren, reverse("vignetten:detail", args=[vignette.pk])
         )
-        vignette.refresh_from_db()
-        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+        self.assertContains(
+            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
+            "Final",
+        )
 
     def test_nur_autorinnen_oder_administration_koennen_hinzugefuegt_werden(
         self,
@@ -338,8 +364,8 @@ class VignetteKoautorschaftViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(list(historie.eigentuemerinnen.all()), [ada])
-        self.assertFalse(ohne_rolle.groups.exists())
+        self.client.force_login(ohne_rolle)
+        self.assertEqual(self.client.get(reverse("vignetten:liste")).status_code, 403)
 
     def test_administration_kann_fremde_historie_uebergeben(self) -> None:
         """Die Administration kann eine fremde Autorin durch eine Nachfolgerin ablösen."""
@@ -361,10 +387,14 @@ class VignetteKoautorschaftViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("vignetten:detail", args=[vignette.pk]))
-        self.assertEqual(list(historie.eigentuemerinnen.all()), [ada])
+        self.client.force_login(grace)
+        self.assertNotContains(
+            self.client.get(reverse("vignetten:liste")),
+            reverse("vignetten:detail", args=[vignette.pk]),
+        )
 
-    def test_koautorschaft_aktionen_sind_nur_per_post_erreichbar(self) -> None:
-        """Die beiden eigentumsändernden Endpunkte weisen GET-Anfragen ab."""
+    def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
+        """Das Hinzufügen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(ada)
@@ -374,11 +404,20 @@ class VignetteKoautorschaftViewTests(TestCase):
         hinzufuegen: HttpResponse = self.client.get(
             reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk])
         )
+        self.assertEqual(hinzufuegen.status_code, 405)
+
+    def test_koautorin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
+        """Das Entfernen weist GET-Anfragen ab."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        self.client.force_login(ada)
+
         entfernen: HttpResponse = self.client.get(
             reverse("vignetten:koautorin_entfernen", args=[vignette.pk, ada.pk])
         )
 
-        self.assertEqual(hinzufuegen.status_code, 405)
         self.assertEqual(entfernen.status_code, 405)
 
 

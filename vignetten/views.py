@@ -5,7 +5,7 @@ from typing import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -19,6 +19,12 @@ from konten.navigation import (
 
 from .forms import VignetteForm, zufaellige_akteure
 from .models import Vignette, Vignettenhistorie
+
+
+_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
+    {AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE}
+)
+
 
 def _fallback_label(vignette: Vignette) -> str:
     """Leitet ein lesbares Label aus dem Unterrichtskontext ab."""
@@ -70,7 +76,7 @@ def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
 def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Konto]:
     """Liefert Autorinnen und Administratorinnen außerhalb des Eigentümer-Kreises."""
     return (
-        Konto.objects.filter(groups__name__in={AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE})
+        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
         .exclude(vignettenhistorie=historie)
         .distinct()
     )
@@ -141,22 +147,16 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
+    eigentuemerinnen: list[Konto] = list(vignette.historie.eigentuemerinnen.all())
     return render(
         request,
         "vignetten/detail.html",
         {
             "vignette": vignette,
             "zustand_badge": _zustand_badge(vignette),
-            "eigentuemerinnen": vignette.historie.eigentuemerinnen.all(),
-            "hat_mehrere_eigentuemerinnen": (
-                vignette.historie.eigentuemerinnen.count() > 1
-            ),
+            "eigentuemerinnen": eigentuemerinnen,
+            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
             "moegliche_koautorinnen": _moegliche_koautorinnen(vignette.historie),
-            "koautorinnen_abschnitt_id": "detail-koautorinnen",
-            "koautorinnen_abschnitt_nummer": "07",
-            "koautorin_hinzufuegen_url": "vignetten:koautorin_hinzufuegen",
-            "koautorin_entfernen_url": "vignetten:koautorin_entfernen",
-            "objekt_pk": vignette.pk,
         },
     )
 
@@ -184,10 +184,14 @@ def koautorin_entfernen(
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
-    if vignette.historie.eigentuemerinnen.count() > 1:
-        vignette.historie.eigentuemerinnen.remove(konto_pk)
-        if konto_pk == request.user.pk:
-            return redirect("vignetten:liste")
+    with transaction.atomic():
+        historie: Vignettenhistorie = Vignettenhistorie.objects.select_for_update().get(
+            pk=vignette.historie_id
+        )
+        if historie.eigentuemerinnen.count() > 1:
+            historie.eigentuemerinnen.remove(konto_pk)
+            if konto_pk == request.user.pk:
+                return redirect("vignetten:liste")
     return redirect("vignetten:detail", pk=vignette.pk)
 
 
