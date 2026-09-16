@@ -11,6 +11,14 @@ Autor:innen und Administrator:innen erreichbar. Die Sidebar zeigt anschließend
 nur die Bereiche und Links der jeweiligen Gruppenrollen; die Anmeldung erfolgt
 unter `/accounts/login/`.
 
+## Vignetten verwalten
+
+Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen
+sehen alle. In der Detailansicht lässt sich eine weitere Autorin oder
+Administratorin als Ko-Autorin hinzufügen oder eine vorhandene entfernen. Der
+Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
+die verbleibenden Ko-Autor:innen.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die
@@ -74,10 +82,11 @@ Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
 Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
-wieder entarchivieren, sofern keine Stichprobe läuft. Unter einer finalen
-Erhebung lassen sich Stichproben mit Beginn und Ende anlegen; die Detailseite
-zeigt ihren kopierbaren Teilnahme-Link, die aktuelle Phase und die Zahl ihrer
-Teilnahmen. Datenfreie Stichproben lassen sich archivieren.
+wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
+Eigentümerin eingetragen ist. Unter einer finalen Erhebung lassen sich
+Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
+Teilnahme-Link, die aktuelle Phase und die Zahl ihrer Teilnahmen. Datenfreie
+Stichproben lassen sich archivieren.
 Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
 zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
 Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.

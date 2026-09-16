@@ -846,6 +846,25 @@ def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
 
 
 @pytest.mark.django_db
+def test_eigentuemerlose_erhebung_kann_nicht_entarchiviert_werden() -> None:
+    """Eine archivierte Erhebung braucht vor der Rückkehr eine Eigentümerin."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="fake"
+    )
+    ModellKonfiguration.objects.aktivieren(konfiguration)
+    erhebung.finalisieren()
+    erhebung.archivieren()
+    erhebung.eigentuemerinnen.clear()
+
+    with pytest.raises(ValidationError, match="Eigentümerin"):
+        erhebung.entarchivieren()
+
+
+@pytest.mark.django_db
 def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
     """Finale Erhebungen können weder still geändert noch gelöscht werden."""
 

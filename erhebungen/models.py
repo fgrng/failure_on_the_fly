@@ -212,7 +212,11 @@ class Erhebung(models.Model):
     def kann_entarchiviert_werden(self) -> bool:
         """Prüft den Entarchivierungs-Guard für archivierte Erhebungen."""
 
-        return self.status == self.Status.ARCHIVIERT and not self.hat_laufende_stichprobe
+        return (
+            self.status == self.Status.ARCHIVIERT
+            and self.eigentuemerinnen.exists()
+            and not self.hat_laufende_stichprobe
+        )
 
     @property
     def hat_laufende_stichprobe(self) -> bool:
@@ -225,6 +229,10 @@ class Erhebung(models.Model):
     def entarchivieren(self) -> None:
         """Macht eine archivierte Erhebung wieder final."""
 
+        if not self.eigentuemerinnen.exists():
+            raise ValidationError(
+                "Erhebungen brauchen zum Entarchivieren eine Eigentümerin."
+            )
         if self.status == self.Status.ARCHIVIERT and self.hat_laufende_stichprobe:
             raise ValidationError(
                 "Erhebungen mit laufenden Stichproben können nicht entarchiviert werden."
