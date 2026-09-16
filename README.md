@@ -83,7 +83,9 @@ Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
-Eigentümerin eingetragen ist. Unter einer finalen Erhebung lassen sich
+Eigentümerin eingetragen ist. Eigentümerinnen teilen und übergeben eine Erhebung
+über die Detailansicht; auch bei finalen und laufenden Erhebungen bleibt dieser
+Kreis änderbar. Unter einer finalen Erhebung lassen sich
 Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
 Teilnahme-Link, die aktuelle Phase und die Zahl ihrer Teilnahmen. Datenfreie
 Stichproben lassen sich archivieren.

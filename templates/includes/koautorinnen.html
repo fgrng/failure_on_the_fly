@@ -1,7 +1,7 @@
 <section class="page-section" aria-labelledby="{{ koautorinnen_abschnitt_id }}">
     <div class="page-section__head">
         <b>{{ koautorinnen_abschnitt_nummer }}</b>
-        <div><h2 id="{{ koautorinnen_abschnitt_id }}">Ko-Autor:innen</h2></div>
+        <div><h2 id="{{ koautorinnen_abschnitt_id }}">{{ eigentuemerinnen_ueberschrift|default:"Ko-Autor:innen" }}</h2></div>
     </div>
     <ul>
         {% for konto in eigentuemerinnen %}
@@ -18,11 +18,11 @@
     </ul>
     <form method="post" action="{% url koautorin_hinzufuegen_url objekt_pk %}">
         {% csrf_token %}
-        <label>Ko-Autor:in <select name="konto">
+        <label>{{ eigentuemerinnen_feldbeschriftung|default:"Ko-Autor:in" }} <select name="konto">
             {% for konto in moegliche_koautorinnen %}
                 <option value="{{ konto.pk }}">{{ konto.username }}</option>
             {% endfor %}
         </select></label>
-        <button class="button" type="submit">Ko-Autor:in hinzufügen</button>
+        <button class="button" type="submit">{{ eigentuemerinnen_hinzufuegen_beschriftung|default:"Ko-Autor:in hinzufügen" }}</button>
     </form>
 </section>

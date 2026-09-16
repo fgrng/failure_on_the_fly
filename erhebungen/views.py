@@ -23,6 +23,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
+from konten.models import Konto
+from konten.navigation import ADMINISTRATORIN_GRUPPE, ist_administratorin
+
 from .ablauf import Itemblock, block_vorlegen, naechster_schritt
 from .export import datenspur_zip
 from .models import (
@@ -51,6 +54,9 @@ _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
 _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
 _FORSCHENDE_GRUPPE: str = "Forschende:r"
+_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
+    {_FORSCHENDE_GRUPPE, ADMINISTRATORIN_GRUPPE}
+)
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
@@ -95,6 +101,28 @@ def _forschende_erforderlich(
     return geschuetzte_view
 
 
+def _forschende_oder_administration_erforderlich(
+    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
+) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
+    """Erlaubt den Eigentümerwechsel auch für die Administration."""
+
+    @wraps(view)
+    def geschuetzte_view(
+        request: HttpRequest,
+        /,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> HttpResponse:
+        if not (
+            ist_administratorin(request.user)
+            or request.user.groups.filter(name=_FORSCHENDE_GRUPPE).exists()
+        ):
+            return HttpResponse(status=403)
+        return view(request, *args, **kwargs)
+
+    return geschuetzte_view
+
+
 def itemseite_prototype(request: HttpRequest) -> HttpResponse:
     """Zeigt drei rein statische Varianten der Teilnehmer:innen-Itemseite."""
 
@@ -121,6 +149,16 @@ def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
     """Lädt eine für die eingeloggte Forschende sichtbare Erhebung."""
 
     return get_object_or_404(Erhebung.objects.sichtbar_fuer(request.user), pk=pk)
+
+
+def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
+    """Liefert berechtigte Konten außerhalb des Eigentümer-Kreises."""
+
+    return (
+        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
+        .exclude(erhebung=erhebung)
+        .distinct()
+    )
 
 
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
@@ -243,7 +281,7 @@ def _validierte_aktion_ausfuehren(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administration_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die eigenen Erhebungen einer Forschenden."""
 
@@ -268,7 +306,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administration_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine eigene Erhebung zur weiteren Bearbeitung."""
 
@@ -338,6 +376,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "erhebung": erhebung,
             "status_badge": _status_badge(erhebung),
+            "eigentuemerinnen": list(erhebung.eigentuemerinnen.all()),
+            "hat_mehrere_eigentuemerinnen": erhebung.eigentuemerinnen.count() > 1,
+            "moegliche_koautorinnen": _moegliche_ko_forschende(erhebung),
             "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
                 [
@@ -372,6 +413,40 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "stichproben": stichproben,
         },
     )
+
+
+@login_required
+@_forschende_oder_administration_erforderlich
+def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    konto: Konto = get_object_or_404(
+        _moegliche_ko_forschende(erhebung), pk=request.POST.get("konto")
+    )
+    erhebung.eigentuemerinnen.add(konto)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_oder_administration_erforderlich
+def koautorin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
+    """Entfernt eine Eigentümerin, ohne aktive Erhebungen zu verwaisen."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    with transaction.atomic():
+        erhebung = Erhebung.objects.select_for_update().get(pk=erhebung.pk)
+        if erhebung.eigentuemerinnen.count() > 1:
+            erhebung.eigentuemerinnen.remove(konto_pk)
+            if konto_pk == request.user.pk:
+                return redirect("erhebungen:liste")
+    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required

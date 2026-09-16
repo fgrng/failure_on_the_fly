@@ -52,6 +52,8 @@
         </div>
     {% endif %}
 
+    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_id="detail-koautorinnen" koautorinnen_abschnitt_nummer="01" koautorin_hinzufuegen_url="erhebungen:koautorin_hinzufuegen" koautorin_entfernen_url="erhebungen:koautorin_entfernen" eigentuemerinnen_ueberschrift="Eigentümerinnen" eigentuemerinnen_feldbeschriftung="Eigentümerin" eigentuemerinnen_hinzufuegen_beschriftung="Eigentümerin hinzufügen" objekt_pk=erhebung.pk %}
+
     {% if erhebung.status == erhebung.Status.ENTWURF %}
         <div id="erhebung-entwurf-editor" x-data="{ randomisierung: '{{ erhebung.randomisierung }}' }">
         <div data-zuordnung-daten>{{ aufgenommene_daten|json_script:"aufgenommene-daten" }}</div>

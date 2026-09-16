@@ -142,6 +142,20 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertNotContains(liste, "badge--entwurf")
         self.assertNotContains(liste, "badge--archiviert")
 
+    def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
+        """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Fremde Erhebung", eigentuemerin=grace
+        )
+        administratorin: Konto = get_user_model().objects.create_user(username="ada")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        self.client.force_login(administratorin)
+
+        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
+
+        self.assertContains(liste, erhebung.name)
+
 
 class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
     """Die Detail- und Lösch-URLs folgen der Eigentümersicht."""
@@ -192,6 +206,134 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
         self.assertRedirects(geloescht, reverse("erhebungen:liste"))
         self.assertFalse(Erhebung.objects.filter(pk=self.entwurf.pk).exists())
         self.assertNotContains(liste, reverse("erhebungen:loeschen", args=[finale.pk]))
+
+
+class ErhebungenKoForschendenViewTests(TestCase):
+    """Forschende teilen Erhebungen mit gleichrangigen Ko-Forschenden."""
+
+    def test_hinzufuegen_gibt_ko_forschender_listen_und_editorzugriff(self) -> None:
+        """Eine eingetragene Ko-Forschende sieht und bearbeitet den Entwurf."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Geteilte Erhebung", eigentuemerin=ada
+        )
+        self.client.force_login(ada)
+
+        hinzufuegen: HttpResponse = self.client.post(
+            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            {"konto": grace.pk},
+        )
+
+        self.assertRedirects(
+            hinzufuegen, reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        self.client.force_login(grace)
+        self.assertContains(
+            self.client.get(reverse("erhebungen:liste")), erhebung.name
+        )
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        self.assertContains(detail, "Eigentümerinnen")
+        self.assertContains(detail, ada.username)
+        self.assertContains(detail, grace.username)
+
+    def test_selbstentfernung_uebergibt_finale_und_laufende_erhebung(self) -> None:
+        """Eine Forschende kann die Verantwortung auch im Erhebungszeitraum abgeben."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Laufende Erhebung", eigentuemerin=ada
+        )
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="gpt-forschung")
+        )
+        erhebung.finalisieren()
+        Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        erhebung.eigentuemerinnen.add(grace)
+        self.client.force_login(ada)
+
+        entfernen: HttpResponse = self.client.post(
+            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, ada.pk])
+        )
+
+        self.assertRedirects(entfernen, reverse("erhebungen:liste"))
+        self.assertEqual(list(erhebung.eigentuemerinnen.all()), [grace])
+
+    def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
+        """Die Bedienung kann eine aktive Erhebung nicht eigentümerlos machen."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Geschützte Erhebung", eigentuemerin=ada
+        )
+        self.client.force_login(ada)
+
+        self.client.post(
+            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, ada.pk])
+        )
+
+        self.assertEqual(list(erhebung.eigentuemerinnen.all()), [ada])
+
+    def test_teilen_laesst_nur_forschende_oder_administration_zu(self) -> None:
+        """Das Eintragen vergibt keine Rolle und lässt Unberechtigte außen vor."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Geschützte Erhebung", eigentuemerin=ada
+        )
+        self.client.force_login(ada)
+
+        hinzufuegen: HttpResponse = self.client.post(
+            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            {"konto": ohne_rolle.pk},
+        )
+
+        self.assertEqual(hinzufuegen.status_code, 404)
+        self.assertFalse(erhebung.eigentuemerinnen.filter(pk=ohne_rolle.pk).exists())
+        self.assertFalse(ohne_rolle.groups.exists())
+
+    def test_administration_kann_fremde_erhebung_uebergeben(self) -> None:
+        """Die Administration kann eine fremde Forschende durch eine andere ablösen."""
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        erhebung: Erhebung = Erhebung.objects.create(
+            name="Fremde Erhebung", eigentuemerin=grace
+        )
+        self.client.force_login(administratorin)
+
+        self.client.post(
+            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            {"konto": ada.pk},
+        )
+        self.client.post(
+            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            {"konto": administratorin.pk},
+        )
+        entfernen: HttpResponse = self.client.post(
+            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, grace.pk])
+        )
+
+        self.assertRedirects(
+            entfernen, reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        self.assertEqual(
+            set(erhebung.eigentuemerinnen.all()), {ada, administratorin}
+        )
 
 
 class ErhebungenEntwurfKonfigurierenTests(TestCase):
