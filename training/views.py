@@ -1,7 +1,7 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
+from typing import Callable, Concatenate, ParamSpec
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
@@ -33,10 +33,6 @@ from sitzungen.views import sitzungsnavigation
 from vignetten.models import Vignette, Vignettenhistorie
 
 from .models import Training, Trainingsbindung
-
-if TYPE_CHECKING:
-    from konten.models import Konto
-
 
 _BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
     {AUSBILDERIN_GRUPPE, ADMINISTRATORIN_GRUPPE}
@@ -321,14 +317,15 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt ein sichtbares Training zur Kuratierung."""
     training: Training = _sichtbares_training(request, pk)
+    eigentuemerinnen: list[Konto] = list(training.eigentuemerinnen.all())
     return render(
         request,
         "training/kuratieren.html",
         {
             "training": training,
             "zustand_badge": _zustand_badge(training),
-            "eigentuemerinnen": list(training.eigentuemerinnen.all()),
-            "hat_mehrere_eigentuemerinnen": training.eigentuemerinnen.count() > 1,
+            "eigentuemerinnen": eigentuemerinnen,
+            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
             "moegliche_koautorinnen": _moegliche_koautorinnen(training),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
