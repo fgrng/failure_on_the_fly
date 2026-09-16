@@ -59,6 +59,13 @@ def _vollstaendige_vignette(konto: Konto) -> Vignette:
     return vignette
 
 
+def _vignette_mit_eigentuemerinnen(*konten: Konto) -> Vignette:
+    """Legt eine Vignette mit dem angegebenen Eigentümer-Kreis an."""
+    historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+    historie.eigentuemerinnen.add(*konten)
+    return Vignette.objects._erstellen(historie=historie)
+
+
 class VignetteAnlegenViewTests(TestCase):
     """Das Anlegeformular ist die HTTP-Naht zum Vignetten-Manager."""
 
@@ -185,9 +192,7 @@ class VignetteDetailViewTests(TestCase):
     def test_zeigt_die_eigentuemerin_der_historie(self) -> None:
         """Die Detailansicht macht den Eigentümer-Kreis der Vignette sichtbar."""
         ada: Konto = _autorin("ada")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -260,9 +265,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         """Eine hinzugefügte Autorin sieht die Vignettenhistorie in ihrer Liste."""
         ada: Konto = _autorin("ada")
         grace: Konto = _autorin("grace")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
@@ -277,32 +280,36 @@ class VignetteKoautorschaftViewTests(TestCase):
             reverse("vignetten:detail", args=[vignette.pk]),
         )
 
-    def test_selbstentfernung_uebergibt_die_historie_und_leert_sie_nicht(
-        self,
-    ) -> None:
-        """Eine Autorin kann sich nur bei verbleibender Ko-Autorin entfernen."""
+    def test_selbstentfernung_uebergibt_die_historie(self) -> None:
+        """Eine Autorin kann sich bei verbleibender Ko-Autorin entfernen."""
         ada: Konto = _autorin("ada")
         grace: Konto = _autorin("grace")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada, grace)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada, grace)
         self.client.force_login(ada)
 
-        response: HttpResponse = self.client.post(
+        self.client.post(
             reverse("vignetten:koautorin_entfernen", args=[vignette.pk, ada.pk])
         )
-
-        self.assertRedirects(response, reverse("vignetten:liste"))
-        self.client.force_login(grace)
-        self.assertContains(
-            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
-            grace.username,
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
         )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
+        """Eine Vignettenhistorie behält ihre letzte Eigentümerin."""
+        grace: Konto = _autorin("grace")
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(grace)
+        self.client.force_login(grace)
         self.client.post(
             reverse("vignetten:koautorin_entfernen", args=[vignette.pk, grace.pk])
         )
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
         self.assertContains(
-            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
+            response,
             grace.username,
         )
 
@@ -353,9 +360,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         """Teilen vergibt keine Rollen und akzeptiert nur berechtigte Konten."""
         ada: Konto = _autorin("ada")
         ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
@@ -373,9 +378,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         ada: Konto = _autorin("ada")
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
         administratorin.groups.add(Group.objects.get(name="Administrator:in"))
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(grace)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(grace)
         self.client.force_login(administratorin)
 
         self.client.post(
@@ -396,9 +399,7 @@ class VignetteKoautorschaftViewTests(TestCase):
     def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Hinzufügen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.get(
@@ -409,9 +410,7 @@ class VignetteKoautorschaftViewTests(TestCase):
     def test_koautorin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Entfernen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(ada)
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         entfernen: HttpResponse = self.client.get(
