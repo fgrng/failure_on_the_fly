@@ -74,9 +74,9 @@ Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetz
 
 ## Erhebungen verwalten
 
-Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` ihre
-eigenen Erhebungen; Administrator:innen sehen dort alle Erhebungen. In einem
-Entwurf wählen sie eigene finale Vignetten,
+Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` die
+Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
+Erhebungen. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
 Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
 Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive

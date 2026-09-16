@@ -16,6 +16,10 @@ Der Eigentümer ist ein Fremdschlüssel auf dem Objekt. Bei der Vignette trägt 
 
 > **Nachgeführt durch ADR-0022 (Ko-Autorschaft):** Aus dem einzelnen Fremdschlüssel ist ein Many-to-Many gleichrangiger Eigentümerinnen an der Vignettenhistorie geworden. `sichtbar_fuer` prüft dann Mengenzugehörigkeit statt Fremdschlüssel-Gleichheit; die Stelle und die Regel bleiben. Die guardian-Verwerfung unten gilt weiter — Eigentümerschaft ist uniform, kein Rechte-Gitter.
 
+> **Nachgeführt durch ADR-0032 (Eigentümerschaft):** Das gleiche M2M trägt
+> auch Training und Erhebung. Ihre `sichtbar_fuer`-Abfragen prüfen den
+> Eigentümer-Kreis; die Administration sieht alle drei Bestände.
+
 Die Regel selbst lebt als benannte Methode am QuerySet:
 
 ```python

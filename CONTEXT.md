@@ -173,11 +173,11 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder 
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Training**:
-Ein von einer Ausbilder:in kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items; Zugang über die Navigation mit Nutzerkonto.
+Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items; Zugang über die Navigation mit Nutzerkonto.
 _Avoid_: Übung, Kurs, Übungsmodus
 
 **Erhebung**:
-Ein von Forschenden zusammengestelltes Untersuchungsdesign aus finalen Vignetten, ihrer Reihenfolge und Fragebogen-Items. Zugang über einen Teilnahme-Link.
+Ein von einem Eigentümer-Kreis der Forschenden zusammengestelltes Untersuchungsdesign aus finalen Vignetten, ihrer Reihenfolge und Fragebogen-Items. Zugang über einen Teilnahme-Link.
 _Avoid_: Studie, Umfrage, Survey, Experiment
 
 **Stichprobe**:
@@ -224,11 +224,11 @@ Wer Vignetten anlegt und pflegt. Sieht und bearbeitet ausschließlich die Vignet
 _Avoid_: Vignettenautor, Redakteur
 
 **Ausbilder:in**:
-Wer Trainings zusammenstellt und die Sitzungen der eigenen Trainingsteilnehmenden namentlich einsieht.
+Wer Trainings zusammenstellt, an denen die Person Eigentümerin ist, und die Sitzungen ihrer Trainingsteilnehmenden namentlich einsieht.
 _Avoid_: Dozent, Lehrender, Trainer
 
 **Forschende:r**:
-Wer Erhebungen zusammenstellt, ihren Ablauf steuert und die Datenspur exportiert.
+Wer Erhebungen zusammenstellt, an denen die Person Eigentümerin ist, ihren Ablauf steuert und die Datenspur exportiert.
 _Avoid_: Wissenschaftler, Studienleiter
 
 **Administrator:in**:
