@@ -9,7 +9,7 @@ status: accepted
 > **Nachgeführt durch ADR-0032 (Eigentümerschaft):** Die Privatheit hat zwei
 > bewusste Ausnahmen: Ko-Forschende sehen über eine gemeinsame Erhebung deren
 > Vignetten- und Item-Inhalte, und die Administration sieht alle Vignetten-,
-> Item- und Erhebungsbestände.
+> Item-, Trainings- und Erhebungsbestände.
 
 Eine Autor:in sieht und bearbeitet **ausschließlich ihre eigenen Vignetten**. Es gibt keinen Mechanismus, eine Vignette anderen Autor:innen derselben Instanz zugänglich zu machen — und deshalb auch keinen Status *veröffentlicht* im Versions-Lebenszyklus (siehe ADR-0003). Sichtbarkeit ist kein Attribut, sondern eine Konstante.
 

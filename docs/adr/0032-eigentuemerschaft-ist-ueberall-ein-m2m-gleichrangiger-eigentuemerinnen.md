@@ -4,7 +4,7 @@ status: accepted
 
 # Eigentümerschaft ist überall ein M2M gleichrangiger Eigentümerinnen
 
-ADR-0022s M2M gleichrangiger Eigentümerinnen gilt auch für Training und
+Das M2M gleichrangiger Eigentümerinnen aus ADR-0022 gilt auch für Training und
 Erhebung. Damit tragen alle fachlichen Bestände einen Eigentümer-Kreis;
 Eigentümerschaft bleibt je Objekt uniform und alles-oder-nichts.
 
@@ -14,13 +14,14 @@ Eine Vignette oder ein Fragebogen-Item lässt sich in eine Erhebung einbinden,
 wenn sich ihr Eigentümer-Kreis mit dem der Erhebung schneidet. So kann jede
 Ko-Forschende die gemeinsame Erhebung verantworten. Sie sieht über deren
 Detailansicht und Export auch Vignetten- und Item-Inhalte, an denen sie nicht
-Ko-Autorin ist. Das ist bewusst akzeptiert: ADR-0015s Privatheit regelt den
-Zugriff auf den Bestand, nicht die Unsichtbarkeit jedes Inhalts in einer
-gemeinsam verantworteten Erhebung.
+Ko-Autorin ist. Das ist bewusst akzeptiert: Die in ADR-0015 festgelegte
+Privatheit regelt den Zugriff auf den Bestand, nicht die Unsichtbarkeit jedes
+Inhalts in einer gemeinsam verantworteten Erhebung.
 
 ## Verantwortlichkeit bleibt beweglich
 
-Jedes Training und jede aktive Erhebung hat mindestens eine Eigentümerin.
+Jedes Training und jede nicht archivierte Erhebung hat mindestens eine
+Eigentümerin.
 Archivierte Erhebungen dürfen eigentümerlos werden; Training hat dafür bewusst
 keinen Archiv-Zustand. Beim Löschen eines Kontos wird keine Nachfolgerin
 automatisch eingetragen: Ein Mensch fügt sie vorher dem Kreis hinzu und entfernt
@@ -37,7 +38,7 @@ führt ADR-0019 fort und ist neben dem Teilungskanal der Erhebung die zweite
 Aufweichung von ADR-0015 an derselben Stelle: Privatheit schließt andere
 Eigentümer-Kreise aus, nicht die Administration.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Eine Übertragungs-Operation** — verworfen. Übertragung ist die Änderung
   des Eigentümer-Kreises: Nachfolgerin hinzufügen, sich selbst entfernen.
@@ -48,7 +49,7 @@ Eigentümer-Kreise aus, nicht die Administration.
 - **`django-guardian`** — verworfen. Die Eigentümerschaft ist kein
   Rechte-Gitter, sondern uniform und alles-oder-nichts je Objekt.
 
-## Consequences
+## Folgen
 
 - ADR-0022 ist für Training und Erhebung fortgeführt: Auch sie gehören einem
   Kreis gleichrangiger Eigentümerinnen.

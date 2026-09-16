@@ -18,7 +18,10 @@ Der Eigentümer ist ein Fremdschlüssel auf dem Objekt. Bei der Vignette trägt 
 
 > **Nachgeführt durch ADR-0032 (Eigentümerschaft):** Das gleiche M2M trägt
 > auch Training und Erhebung. Ihre `sichtbar_fuer`-Abfragen prüfen den
-> Eigentümer-Kreis; die Administration sieht alle drei Bestände.
+> Eigentümer-Kreis; die Administration sieht alle Vignetten-, Item-, Trainings-
+> und Erhebungsbestände. Die zuvor offene Frage des Eigentümerwechsels ist damit
+> entschieden: Eine Nachfolgerin wird zum Kreis hinzugefügt, danach entfernt
+> sich die bisherige Eigentümerin.
 
 Die Regel selbst lebt als benannte Methode am QuerySet:
 
