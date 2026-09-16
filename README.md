@@ -19,6 +19,15 @@ Administratorin als Ko-Autorin hinzufügen oder eine vorhandene entfernen. Der
 Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
 die verbleibenden Ko-Autor:innen.
 
+## Trainings verwalten
+
+Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
+Administrator:innen sehen alle. In der Kuratierungsansicht lässt sich eine
+weitere Ausbilderin oder Administratorin als Ko-Autorin hinzufügen oder eine
+vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
+besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
+Ko-Autor:innen.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die
