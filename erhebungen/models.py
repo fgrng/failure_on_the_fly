@@ -22,16 +22,17 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
 
     def anlegen(self, konto: "Konto", **kwargs: object) -> "Erhebung":
         """Legt eine Erhebung an und trägt ihre erste Eigentümerin ein."""
-        erhebung: Erhebung = self.create(**kwargs)
+        erhebung: Erhebung = super().create(**kwargs)
         erhebung.eigentuemerinnen.add(konto)
         return erhebung
 
     def create(self, **kwargs: object) -> "Erhebung":
-        """Übernimmt die frühere Anlegeform in bestehende Testdaten."""
+        """Übernimmt die frühere Anlegeform nur mit einer Eigentümerin."""
         eigentuemerin: object | None = kwargs.pop("eigentuemerin", None)
+        if eigentuemerin is None:
+            raise ValidationError("Aktive Erhebungen brauchen eine Eigentümerin.")
         erhebung: Erhebung = super().create(**kwargs)
-        if eigentuemerin is not None:
-            erhebung.eigentuemerinnen.add(eigentuemerin)
+        erhebung.eigentuemerinnen.add(eigentuemerin)
         return erhebung
 
     def update(self, **kwargs: object) -> int:

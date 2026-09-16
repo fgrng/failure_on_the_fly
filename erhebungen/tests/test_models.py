@@ -70,6 +70,14 @@ def _finale_vignette_anlegen(konto: Konto) -> Vignette:
 
 
 @pytest.mark.django_db
+def test_aktive_erhebung_braucht_beim_anlegen_eine_eigentuemerin() -> None:
+    """Nur archivierte Erhebungen dürfen ihren Eigentümerinnen-Kreis verlieren."""
+
+    with pytest.raises(ValidationError, match="Eigentümerin"):
+        Erhebung.objects.create(name="Brüche")
+
+
+@pytest.mark.django_db
 def test_neue_erhebungsbindung_traegt_entstehungszeitpunkt() -> None:
     """Eine neue Erhebungsbindung hält ihren Entstehungszeitpunkt fest."""
 
@@ -136,6 +144,47 @@ def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
         MigrationExecutor(connection).migrate(nachher)
 
     assert werte == [None, None, None, None]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_eigentuemerinnen_migration_uebernimmt_bestand_und_stellt_trigger_zurueck() -> None:
+    """Die M2M-Migration bewahrt den Bestand und ihre reversible Trigger-Semantik."""
+
+    vorher = [("erhebungen", "0011_likert_gueltig")]
+    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    executor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        apps = executor.loader.project_state(vorher).apps
+        KontoVorher = apps.get_model("konten", "Konto")
+        ErhebungVorher = apps.get_model("erhebungen", "Erhebung")
+        ada = KontoVorher.objects.create(username="ada")
+        erhebung = ErhebungVorher.objects.create(name="Brüche", eigentuemerin=ada)
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([("erhebungen", "0013_erhebungsvignette_eigentuemerinnen")])
+        apps = executor.loader.project_state(
+            [("erhebungen", "0013_erhebungsvignette_eigentuemerinnen")]
+        ).apps
+        ErhebungNachher = apps.get_model("erhebungen", "Erhebung")
+        assert list(
+            ErhebungNachher.objects.get(pk=erhebung.pk).eigentuemerinnen.values_list(
+                "username", flat=True
+            )
+        ) == ["ada"]
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(vorher)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'trigger' "
+                "AND name = 'erhebungen_reihenfolgeregel_bewahren'"
+            )
+            trigger_sql = cursor.fetchone()[0]
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
+
+    assert "AFTER UPDATE OF randomisierung" in trigger_sql
 
 
 @pytest.mark.django_db
