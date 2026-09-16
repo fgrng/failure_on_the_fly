@@ -350,7 +350,7 @@ class VignetteKoautorschaftViewTests(TestCase):
     def test_nur_autorinnen_oder_administration_koennen_hinzugefuegt_werden(
         self,
     ) -> None:
-        """Das Teilen vergibt keine Rollen und akzeptiert nur aufrufberechtigte Konten."""
+        """Teilen vergibt keine Rollen und akzeptiert nur berechtigte Konten."""
         ada: Konto = _autorin("ada")
         ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
