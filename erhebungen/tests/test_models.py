@@ -866,8 +866,25 @@ def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
 
 
 @pytest.mark.django_db
-def test_finale_und_laufende_erhebung_behalten_aenderbaren_eigentuemerinnenkreis() -> None:
+def test_finale_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
     """Das Einfrieren betrifft das Design, nicht die Verantwortung."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="fake"
+    )
+    ModellKonfiguration.objects.aktivieren(konfiguration)
+    erhebung.finalisieren()
+    erhebung.eigentuemerinnen.add(grace)
+
+    assert set(erhebung.eigentuemerinnen.all()) == {ada, grace}
+
+
+@pytest.mark.django_db
+def test_laufende_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
+    """Auch laufende Erhebungen können ihre Verantwortung übertragen."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")

@@ -182,7 +182,6 @@ def test_konto_loeschen_geteilte_oder_archivierte_erhebung_ueberlebt() -> None:
     assert set(geteilt.eigentuemerinnen.all()) == {grace, linus}
 
     archiviert: Erhebung = Erhebung.objects.anlegen(grace, name="Archiv")
-    archiviert.status = Erhebung.Status.ARCHIVIERT
     archiviert._schreibqueryset().filter(pk=archiviert.pk).update(
         status=Erhebung.Status.ARCHIVIERT
     )

@@ -5,7 +5,9 @@ from importlib import import_module
 from django.db import migrations
 
 
-_migration = import_module("erhebungen.migrations.0012_erhebung_eigentuemerinnen")
+_eigentuemerinnen_migration = import_module(
+    "erhebungen.migrations.0012_erhebung_eigentuemerinnen"
+)
 _REIHENFOLGEREGEL_TRIGGER_SQL = """
     DROP TRIGGER erhebungen_reihenfolgeregel_bewahren;
     CREATE TRIGGER erhebungen_reihenfolgeregel_bewahren
@@ -44,8 +46,15 @@ _VORHERIGE_REIHENFOLGEREGEL_TRIGGER_SQL = """
 """
 
 
-def _trigger_sql(name: str, ereignis: str, vorlage: str) -> str:
-    return f"DROP TRIGGER {name};\n" + vorlage.format(name=name, ereignis=ereignis)
+def _vignetten_trigger_ersetzen(name: str, ereignis: str) -> migrations.RunSQL:
+    """Ersetzt einen Vignetten-Trigger in beide Migrationsrichtungen gleich."""
+    sql = (
+        f"DROP TRIGGER {name};\n"
+        + _eigentuemerinnen_migration._VIGNETTEN_TRIGGER_SQL.format(
+            name=name, ereignis=ereignis
+        )
+    )
+    return migrations.RunSQL(sql, sql)
 
 
 class Migration(migrations.Migration):
@@ -57,29 +66,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            _trigger_sql(
-                "erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
-                "BEFORE INSERT",
-                _migration._VIGNETTEN_TRIGGER_SQL,
-            ),
-            _trigger_sql(
-                "erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
-                "BEFORE INSERT",
-                _migration._VIGNETTEN_TRIGGER_SQL,
-            ),
+        _vignetten_trigger_ersetzen(
+            "erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
+            "BEFORE INSERT",
         ),
-        migrations.RunSQL(
-            _trigger_sql(
-                "erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
-                "BEFORE UPDATE OF erhebung_id, vignette_id, position",
-                _migration._VIGNETTEN_TRIGGER_SQL,
-            ),
-            _trigger_sql(
-                "erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
-                "BEFORE UPDATE OF erhebung_id, vignette_id, position",
-                _migration._VIGNETTEN_TRIGGER_SQL,
-            ),
+        _vignetten_trigger_ersetzen(
+            "erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
+            "BEFORE UPDATE OF erhebung_id, vignette_id, position",
         ),
         migrations.RunSQL(
             _REIHENFOLGEREGEL_TRIGGER_SQL,
