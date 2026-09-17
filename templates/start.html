@@ -1,42 +1,68 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Startseite{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/start-page.css' %}">
+{% endblock %}
+
 {% block content %}
-<h1>FailureOnTheFly</h1>
-<div class="card-grid">
-    <article class="card card--authoring">
-        <header class="card__header">
-            <h2>Entwicklung</h2>
-        </header>
-        <div class="card__body">
-            <a class="button" href="{% url 'vignetten:liste' %}">Vignetten verwalten</a>
-            <a class="button" href="{% url 'simulation:kern' %}">Simulationskern ansehen</a>
-        </div>
-    </article>
-    <article class="card card--participant card--disabled">
-        <header class="card__header">
-            <h2>Teilnehmer:in</h2>
-        </header>
-        <div class="card__body">
-            <p>geplant</p>
-        </div>
-    </article>
-    <article class="card card--research card--disabled">
-        <header class="card__header">
-            <h2>Forschung</h2>
-        </header>
-        <div class="card__body">
-            <p>geplant</p>
-        </div>
-    </article>
-    <article class="card card--system card--disabled">
-        <header class="card__header">
-            <h2>System</h2>
-        </header>
-        <div class="card__body">
-            <p>geplant</p>
-        </div>
-    </article>
-</div>
+<section class="welcome">
+    <div class="welcome__aussage">
+        <p>Willkommen bei</p>
+        <h1>FailureOnTheFly</h1>
+        <p class="welcome__claim">
+            Ein Simulator von Schüler:innen mit Fehlermustern. Für das Üben
+            diagnostischer Gesprächsführung – und für die Forschung darüber.
+        </p>
+        {% if user.is_authenticated %}
+            <small>Ihre Bereiche finden Sie in der Navigation links.</small>
+        {% else %}
+            <a class="button" href="{% url 'login' %}">Anmelden</a>
+            <small>Zugang erhalten Sie über Ihre Ausbildungsinstitution.</small>
+        {% endif %}
+    </div>
+
+    <div class="welcome__spalten">
+        <article class="welcome__spalte area--authoring">
+            <header>
+                <span>Autor:in</span>
+                <h2>Vignetten bauen</h2>
+            </header>
+            <ul>
+                <li><strong>Vignetten anlegen</strong> – Fehlermuster, Lernauftrag, Arbeitsheft, Bilder.</li>
+                <li><strong>Unterrichtskontext setzen</strong> – Fach, Thema, Klassenstufe.</li>
+                <li><strong>Probelauf</strong> – die eigene Vignette sofort selbst spielen.</li>
+                <li><strong>Ko-Autor:innen</strong> – gemeinsam an einem Bestand arbeiten.</li>
+            </ul>
+        </article>
+
+        <article class="welcome__spalte area--participant">
+            <header>
+                <span>Lehrperson in Ausbildung</span>
+                <h2>Gespräche führen</h2>
+            </header>
+            <ul>
+                <li><strong>Diagnosegespräch</strong> – mit einer simulierten Schüler:in, die ihr Fehlermuster konsequent anwendet.</li>
+                <li><strong>Sprechen statt tippen</strong> – Aufnahme mit Transkription, nach eigener Einwilligung.</li>
+                <li><strong>Debrief</strong> – die eigene Diagnose formulieren und einordnen.</li>
+                <li><strong>Meine Trainings</strong> – eigene Sitzungen wiederfinden.</li>
+            </ul>
+        </article>
+
+        <article class="welcome__spalte area--research">
+            <header>
+                <span>Ausbildung &amp; Forschung</span>
+                <h2>Erheben und auswerten</h2>
+            </header>
+            <ul>
+                <li><strong>Trainingskataloge</strong> – Vignetten für Kohorten zusammenstellen.</li>
+                <li><strong>Erhebungen</strong> – pseudonyme Teilnahme über einen Link.</li>
+                <li><strong>Fragebogen-Items</strong> – Likert und Freitext an definierten Andockpunkten.</li>
+                <li><strong>Export</strong> – Sitzungen als auswertbare Datenspur.</li>
+            </ul>
+        </article>
+    </div>
+</section>
 {% endblock %}

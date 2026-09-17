@@ -5,11 +5,12 @@ diagnostischer Gesprächsführung.
 
 ## Start und Anmeldung
 
-Die öffentliche Startseite unter `/` verlinkt auf den Vignetten-Editor und die
-Ansicht des Simulationskerns. Beide Bereiche sind nach Anmeldung nur für
-Autor:innen und Administrator:innen erreichbar. Die Sidebar zeigt anschließend
-nur die Bereiche und Links der jeweiligen Gruppenrollen; die Anmeldung erfolgt
-unter `/accounts/login/`.
+Die öffentliche Startseite unter `/` ist eine kurze Willkommensseite: Sie nennt
+den Zweck der Plattform und stellt die Funktionen in drei Rollenspalten vor
+(Autor:in, Lehrperson in Ausbildung, Ausbildung & Forschung). Sie verlinkt
+selbst auf keinen geschützten Bereich; ohne Anmeldung führt sie zum Login unter
+`/accounts/login/`. Nach der Anmeldung zeigt die Sidebar nur die Bereiche und
+Links der jeweiligen Gruppenrollen.
 
 ## Vignetten verwalten
 
