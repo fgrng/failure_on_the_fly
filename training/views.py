@@ -359,7 +359,10 @@ def koautorin_entfernen(
     training: Training = _sichtbares_training(request, pk)
     with transaction.atomic():
         training = Training.objects.select_for_update().get(pk=training.pk)
-        if training.eigentuemerinnen.count() > 1:
+        if (
+            training.eigentuemerinnen.filter(pk=konto_pk).exists()
+            and training.eigentuemerinnen.count() > 1
+        ):
             training.eigentuemerinnen.remove(konto_pk)
             if konto_pk == request.user.pk:
                 return redirect("training:liste")

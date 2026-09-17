@@ -333,6 +333,27 @@ class TrainingKoautorschaftTests(TestCase):
             404,
         )
 
+    def test_nicht_eigentuemerin_kann_keine_uebergabe_ausloesen(self) -> None:
+        """Eine fremde Administration bleibt beim Training, wenn sie niemanden entfernt."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        training.eigentuemerinnen.add(grace)
+        self.client.force_login(administratorin)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "training:koautorin_entfernen", args=[training.pk, administratorin.pk]
+            )
+        )
+
+        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.assertEqual(set(training.eigentuemerinnen.all()), {ada, grace})
+
     def test_koautorinnen_aktionen_sind_nur_per_post_erreichbar(self) -> None:
         """Die Eigentümerinnen-Aktionen weisen GET-Anfragen ab."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
