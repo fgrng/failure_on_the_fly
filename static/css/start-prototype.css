@@ -1,0 +1,244 @@
+/* Wegwerf-Stylesheet für den Startseiten-Prototyp (PROTOTYPE_STARTSEITE.md).
+   Nutzt ausschliesslich die Tokens aus tokens.css. */
+
+.start-prototype {
+    width: 100%;
+    padding-bottom: var(--space-8);
+}
+
+/* ============ Variante A · Ablaufband ============ */
+.ablauf__kopf {
+    max-width: 52ch;
+    margin-bottom: var(--space-6);
+}
+.ablauf__kopf p {
+    margin: 0 0 var(--space-2);
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+.ablauf__kopf h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3.3rem);
+}
+.ablauf__kopf span {
+    display: block;
+    margin-top: var(--space-3);
+    color: var(--color-text-muted);
+    font-size: 1.05rem;
+}
+
+.ablauf__band {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-border);
+}
+.ablauf__schritt {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+.ablauf__schritt b {
+    font-family: var(--font-heading);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--color-border);
+}
+.ablauf__schritt h2 {
+    margin: 0 0 var(--space-1);
+    font-size: 1.35rem;
+}
+.ablauf__schritt p {
+    margin: 0;
+    max-width: 70ch;
+    color: var(--color-text-muted);
+}
+.ablauf__schritt--betont {
+    position: relative;
+    padding-left: var(--space-3);
+    background: var(--color-surface-muted);
+}
+.ablauf__schritt--betont::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 4px;
+    background: var(--color-accent);
+}
+.ablauf__schritt--betont b {
+    color: var(--color-accent);
+}
+
+.ablauf__fuss {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+.ablauf__fuss span {
+    color: var(--color-text-muted);
+    font-size: .95rem;
+}
+
+/* ============ Variante B · Rolleneinstieg ============ */
+.rollen {
+    display: grid;
+    grid-template-columns: minmax(280px, .85fr) minmax(0, 2fr);
+    gap: var(--space-6);
+    align-items: start;
+}
+.rollen__aussage {
+    position: sticky;
+    top: var(--space-4);
+}
+.rollen__aussage > p:first-child {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+.rollen__aussage h1 {
+    margin: var(--space-1) 0 var(--space-3);
+    font-size: clamp(2rem, 3.4vw, 2.9rem);
+}
+.rollen__claim {
+    margin: 0 0 var(--space-3);
+    color: var(--color-text-muted);
+}
+.rollen__aussage small {
+    display: block;
+    margin-top: var(--space-2);
+    color: var(--color-text-muted);
+}
+
+.rollen__spalten {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--space-3);
+}
+.rollen__spalte {
+    padding-top: var(--space-2);
+    border-top: 4px solid var(--area-solid, var(--color-border));
+}
+.rollen__spalte header span {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+.rollen__spalte h2 {
+    margin: var(--space-1) 0 var(--space-2);
+    font-size: 1.4rem;
+}
+.rollen__spalte ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.rollen__spalte li {
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: .95rem;
+}
+.rollen__spalte li strong {
+    display: block;
+    color: var(--color-text);
+}
+
+/* ============ Variante C · Texttafel ============ */
+.tafel {
+    max-width: 78ch;
+}
+.tafel__wortmarke {
+    margin: 0;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    letter-spacing: -.02em;
+}
+.tafel__satz {
+    margin: var(--space-2) 0 var(--space-5);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid var(--color-text);
+    font-size: 1.25rem;
+    line-height: 1.45;
+}
+.tafel__liste {
+    margin: 0;
+}
+.tafel__liste > div {
+    display: grid;
+    grid-template-columns: minmax(180px, .5fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+.tafel__liste dt {
+    font-weight: 700;
+}
+.tafel__liste dd {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+.tafel__fuss {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+.tafel__fuss span {
+    color: var(--color-text-muted);
+    font-size: .95rem;
+}
+
+/* ============ Varianten-Umschalter (nicht Teil des Entwurfs) ============ */
+.prototype-switcher {
+    position: fixed;
+    z-index: 1;
+    bottom: var(--space-3);
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: 999px;
+    background: var(--phsg-gray-900);
+    box-shadow: 0 6px 24px rgb(0 0 0 / .25);
+    color: var(--phsg-white);
+    font-size: .85rem;
+    transform: translateX(-50%);
+}
+.prototype-switcher__pfeil {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+.prototype-switcher__pfeil:hover {
+    background: var(--color-focus);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+@media (max-width: 1050px) {
+    .rollen { grid-template-columns: 1fr; }
+    .rollen__aussage { position: static; }
+}
+@media (max-width: 760px) {
+    .ablauf__schritt { grid-template-columns: 48px minmax(0, 1fr); }
+    .tafel__liste > div { grid-template-columns: 1fr; gap: var(--space-1); }
+    .ablauf__fuss, .tafel__fuss { flex-direction: column; align-items: start; }
+}

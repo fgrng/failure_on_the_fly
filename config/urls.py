@@ -20,9 +20,16 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from django.urls import include, path
 
+from config.prototype_views import startseite_prototype
+
 urlpatterns = [
     path("", TemplateView.as_view(template_name="start.html"), name="start"),
-    path('admin/', admin.site.urls),
+    path(
+        "prototype/start/",
+        startseite_prototype,
+        name="startseite_prototype",
+    ),
+    path("admin/", admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('erhebungen/', include('erhebungen.urls')),
     path('fragebogen-items/', include('fragebogen_items.urls')),
