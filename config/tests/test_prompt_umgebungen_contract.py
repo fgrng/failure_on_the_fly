@@ -1,7 +1,33 @@
 """Vertragstest für die Liste der umgebungserzeugenden Prompt-Platzhalter."""
 
-from simulation.models import PROMPT_PLATZHALTER_MIT_UMGEBUNG, VERTRAG_PROMPT
-from vignetten.models import Vignette, prompt_platzhalter
+from simulation.models import (
+    PROMPT_PLATZHALTER_MIT_UMGEBUNG,
+    VERTRAG_PROMPT,
+    VERTRAG_RAHMEN,
+)
+from vignetten.models import Vignette, prompt_platzhalter, rahmen_platzhalter
+
+
+def test_vignettenwerte_decken_sich_mit_beiden_vertraegen() -> None:
+    """Jeder Vertragsname wird geliefert, und kein Wert ist vertragsfremd."""
+
+    vignette: Vignette = Vignette(
+        schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
+    )
+    vertraege_und_werte: tuple[tuple[str, frozenset[str], dict[str, str]], ...] = (
+        ("Prompt", VERTRAG_PROMPT, prompt_platzhalter(vignette)),
+        ("Rahmenhandlung", VERTRAG_RAHMEN, rahmen_platzhalter(vignette)),
+    )
+
+    for name, vertrag, werte in vertraege_und_werte:
+        vertragsnamen: set[str] = set(vertrag)
+        wertnamen: set[str] = set(werte)
+        assert vertragsnamen == wertnamen, (
+            f"{name}-Vertrag und gelieferte Werte weichen ab: "
+            f"nur im Vertrag: {sorted(vertragsnamen - wertnamen)}; "
+            f"nur in den Werten: {sorted(wertnamen - vertragsnamen)}."
+        )
 
 
 def test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe() -> None:
