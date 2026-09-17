@@ -113,7 +113,7 @@ class VignetteAnlegenViewTests(TestCase):
         self.client.force_login(ada)
 
         with patch(
-            "vignetten.forms.random.choice",
+            "vignetten.models.random.choice",
             side_effect=[
                 ("Mia", Vignette.Geschlecht.WEIBLICH),
                 ("Koch", Vignette.Geschlecht.MAENNLICH),

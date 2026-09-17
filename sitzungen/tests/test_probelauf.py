@@ -93,6 +93,20 @@ class ProbelaufStartTests(TestCase):
             "gespraechsschritte": [],
         })
 
+    def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
+        """Der Probelauf verwendet die beim Anlegen gesetzten Akteure."""
+        entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        entwurf.fach = "Mathematik"
+        entwurf.thema = "Brüche"
+        entwurf.klassenstufe = "5"
+        entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[entwurf.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
 

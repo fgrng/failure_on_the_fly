@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from pathlib import Path
+import random
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -17,6 +18,27 @@ from simulation.models import Simulationskern
 
 
 _POSITIONSMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
+
+_SCHUELERINNEN: tuple[tuple[str, str], ...] = (
+    ("Mia", "weiblich"),
+    ("Noah", "männlich"),
+)
+_LEHRPERSONEN: tuple[tuple[str, str], ...] = (
+    ("Weber", "weiblich"),
+    ("Koch", "männlich"),
+)
+
+
+def zufaellige_akteure() -> dict[str, str]:
+    """Liefert überschreibbare Startwerte für die beiden Akteure."""
+    schuelerin_name, schuelerin_geschlecht = random.choice(_SCHUELERINNEN)
+    lehrperson_name, lehrperson_geschlecht = random.choice(_LEHRPERSONEN)
+    return {
+        "schuelerin_name": schuelerin_name,
+        "schuelerin_geschlecht": schuelerin_geschlecht,
+        "lehrperson_name": lehrperson_name,
+        "lehrperson_geschlecht": lehrperson_geschlecht,
+    }
 
 
 def _am_positionsmarker_zerlegen(text: str, bild: object) -> tuple[str, str]:
@@ -162,7 +184,9 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         ).latest("finalisiert_am", "pk")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         historie.eigentuemerinnen.add(konto)
-        return self._erstellen(historie=historie, gepinnter_kern=kern)
+        return self._erstellen(
+            historie=historie, gepinnter_kern=kern, **zufaellige_akteure()
+        )
 
 
 class Vignette(models.Model):
