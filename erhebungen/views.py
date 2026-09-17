@@ -42,7 +42,7 @@ from .models import (
     Vignettenposition,
 )
 from simulation.models import ModellKonfiguration, Simulationskern
-from fragebogen_items.models import FragebogenItem, FragebogenItemHistorie
+from fragebogen_items.models import FragebogenItem
 from sitzungen.models import Sitzung
 from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.sink import DBSink
@@ -175,9 +175,7 @@ def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
 def _eigene_finalen_items(request: HttpRequest) -> QuerySet[FragebogenItem]:
     """Liefert einbindbare Item-Fassungen aus dem Eigentümer-Kreis der Forschenden."""
 
-    return FragebogenItem.objects.einbindbar().filter(
-        historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
-    )
+    return FragebogenItem.objects.einbindbar().sichtbar_fuer(request.user)
 
 
 def _status_badge(erhebung: Erhebung) -> str:

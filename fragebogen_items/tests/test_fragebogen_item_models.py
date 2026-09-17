@@ -79,6 +79,95 @@ class FragebogenItemHistorieTests(TestCase):
         )
 
 
+class FragebogenItemQuerySetTests(TestCase):
+    """Die Fassungsabfragen übernehmen die Sichtbarkeit ihrer Historie."""
+
+    def setUp(self) -> None:
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.grace: Konto = get_user_model().objects.create_user(username="grace")
+        self.dijkstra: Konto = get_user_model().objects.create_user(username="dijkstra")
+        self.administratorin: Konto = get_user_model().objects.create_user(
+            username="admin"
+        )
+        self.administratorin.groups.add(
+            Group.objects.get(name=ADMINISTRATORIN_GRUPPE)
+        )
+
+        self.eigenes: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Eigenes Item"
+        )
+        self.geteiltes: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Geteiltes Item"
+        )
+        self.geteiltes.historie.eigentuemerinnen.add(self.grace)
+        self.fremdes: FragebogenItem = FragebogenItem.objects.anlegen(
+            get_user_model().objects.create_user(username="linus"),
+            wortlaut="Fremdes Item",
+        )
+        for item in (self.eigenes, self.geteiltes, self.fremdes):
+            item.finalisieren()
+
+    def test_sichtbar_fuer_liefert_fassungen_der_eigentuemerin(self) -> None:
+        """Die Eigentümerin sieht ihre eigenen und geteilten Fassungen."""
+        self.assertEqual(
+            list(FragebogenItem.objects.sichtbar_fuer(self.ada)),
+            [self.eigenes, self.geteiltes],
+        )
+
+    def test_sichtbar_fuer_liefert_fassungen_der_koeigentuemerin(self) -> None:
+        """Die Ko-Eigentümerin sieht die geteilte Fassung."""
+        self.assertEqual(
+            list(FragebogenItem.objects.sichtbar_fuer(self.grace)), [self.geteiltes]
+        )
+
+    def test_sichtbar_fuer_liefert_dritten_keine_fassungen(self) -> None:
+        """Ein Konto außerhalb aller Eigentümer-Kreise sieht keine Fassung."""
+        self.assertEqual(list(FragebogenItem.objects.sichtbar_fuer(self.dijkstra)), [])
+
+    def test_sichtbar_fuer_liefert_der_administration_alle_fassungen(self) -> None:
+        """Die Administration sieht auch Fassungen fremder Eigentümer-Kreise."""
+        self.assertEqual(
+            list(FragebogenItem.objects.sichtbar_fuer(self.administratorin)),
+            [self.eigenes, self.geteiltes, self.fremdes],
+        )
+
+    def test_sichtbar_fuer_ist_nach_zustandsfilter_verkettbar(self) -> None:
+        """Sichtbarkeit lässt sich nach einem Zustandsfilter anwenden."""
+        self.assertEqual(
+            list(
+                FragebogenItem.objects.filter(
+                    zustand=FragebogenItem.Zustand.FINAL
+                ).sichtbar_fuer(self.ada)
+            ),
+            [self.eigenes, self.geteiltes],
+        )
+
+    def test_sichtbar_fuer_ist_vor_zustandsfilter_verkettbar(self) -> None:
+        """Ein Zustandsfilter lässt sich nach der Sichtbarkeit anwenden."""
+        self.assertEqual(
+            list(
+                FragebogenItem.objects.sichtbar_fuer(self.ada).filter(
+                    zustand=FragebogenItem.Zustand.FINAL
+                )
+            ),
+            [self.eigenes, self.geteiltes],
+        )
+
+    def test_sichtbar_fuer_ist_nach_einbindbar_verkettbar(self) -> None:
+        """Sichtbarkeit bleibt nach der Abfrage einbindbarer Fassungen verfügbar."""
+        self.assertEqual(
+            list(FragebogenItem.objects.einbindbar().sichtbar_fuer(self.ada)),
+            [self.eigenes, self.geteiltes],
+        )
+
+    def test_sichtbar_fuer_ist_vor_einbindbar_verkettbar(self) -> None:
+        """Die Abfrage einbindbarer Fassungen bleibt nach Sichtbarkeit verfügbar."""
+        self.assertEqual(
+            list(FragebogenItem.objects.sichtbar_fuer(self.ada).einbindbar()),
+            [self.eigenes, self.geteiltes],
+        )
+
+
 class FragebogenItemConstraintTests(TestCase):
     """Die Datenbank schützt die gemeinsame Lebenszyklus-Form."""
 
