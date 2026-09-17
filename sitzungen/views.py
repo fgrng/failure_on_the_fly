@@ -31,7 +31,7 @@ from sitzungen.sink import (
     ScratchSink,
     probelauf_laeuft,
 )
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -121,9 +121,8 @@ def _sitzung_anzeigen(
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
     """Liefert die Entwürfe aus dem Eigentümer-Kreis eines Kontos."""
 
-    return Vignette.objects.filter(
-        historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto),
-        zustand=Vignette.Zustand.ENTWURF,
+    return Vignette.objects.sichtbar_fuer(konto).filter(
+        zustand=Vignette.Zustand.ENTWURF
     )
 
 
@@ -134,9 +133,7 @@ def _eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
     Fassung laufen – Entwurf wie finalisiert oder archiviert.
     """
 
-    return Vignette.objects.filter(
-        historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto),
-    )
+    return Vignette.objects.sichtbar_fuer(konto)
 
 
 def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:

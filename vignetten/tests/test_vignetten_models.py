@@ -449,6 +449,82 @@ class VignetteConstraintTests(TestCase):
             )
 
 
+class VignetteSichtbarFuerQuerySetTests(TestCase):
+    """Die Sichtbarkeitsabfrage über Vignettenfassungen."""
+
+    def setUp(self) -> None:
+        """Erzeugt Fassungen für verschiedene Sichtbarkeitsrollen."""
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.grace: Konto = get_user_model().objects.create_user(username="grace")
+        self.linus: Konto = get_user_model().objects.create_user(username="linus")
+        self.administratorin: Konto = get_user_model().objects.create_user(
+            username="admin"
+        )
+        self.administratorin.groups.add(
+            Group.objects.get(name=ADMINISTRATORIN_GRUPPE)
+        )
+
+        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        eigene_historie.eigentuemerinnen.add(self.ada)
+        self.eigene_fassung: Vignette = Vignette.objects._erstellen(
+            historie=eigene_historie
+        )
+        geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        geteilte_historie.eigentuemerinnen.add(self.ada, self.grace)
+        self.geteilte_finale: Vignette = Vignette.objects._erstellen(
+            historie=geteilte_historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
+            arbeitsheft_text="Bearbeitung",
+        )
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(self.linus)
+        self.fremde_fassung: Vignette = Vignette.objects._erstellen(
+            historie=fremde_historie
+        )
+
+    def test_sichtbar_fuer_liefert_eigene_und_geteilte_fassungen(self) -> None:
+        """Eine Eigentümerin sieht eigene und geteilte Fassungen."""
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(self.ada)),
+            [self.eigene_fassung, self.geteilte_finale],
+        )
+
+    def test_sichtbar_fuer_liefert_koeigentuemerin_geteilte_fassung(self) -> None:
+        """Eine Ko-Eigentümerin sieht die geteilte Fassung."""
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(self.grace)), [self.geteilte_finale]
+        )
+
+    def test_sichtbar_fuer_liefert_dritter_ihre_fassung(self) -> None:
+        """Eine nicht beteiligte Person sieht nur ihre eigene Fassung."""
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(self.linus)), [self.fremde_fassung]
+        )
+
+    def test_sichtbar_fuer_liefert_administration_alle_fassungen(self) -> None:
+        """Die Administration sieht alle Fassungen."""
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(self.administratorin)),
+            [self.eigene_fassung, self.geteilte_finale, self.fremde_fassung],
+        )
+
+    def test_sichtbar_fuer_laesst_sich_vor_einbindbar_verketten(self) -> None:
+        """Sichtbarkeit vor Einbindbarkeit liefert sichtbare finale Fassungen."""
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(self.ada).einbindbar()),
+            [self.geteilte_finale],
+        )
+
+    def test_sichtbar_fuer_laesst_sich_nach_einbindbar_verketten(self) -> None:
+        """Einbindbarkeit vor Sichtbarkeit liefert sichtbare finale Fassungen."""
+        self.assertEqual(
+            list(Vignette.objects.einbindbar().sichtbar_fuer(self.ada)),
+            [self.geteilte_finale],
+        )
+
+
 class VignetteQuerySetTests(TestCase):
     """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
 

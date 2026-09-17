@@ -52,7 +52,7 @@ from sitzungen.views import (
     persistierten_debrief_anzeigen,
     zeitbudget_anhalten,
 )
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
@@ -167,9 +167,7 @@ def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     """Liefert einbindbare Fassungen aus dem Eigentümer-Kreis der Forschenden."""
 
-    return Vignette.objects.einbindbar().filter(
-        historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
-    )
+    return Vignette.objects.einbindbar().sichtbar_fuer(request.user)
 
 
 def _eigene_finalen_items(request: HttpRequest) -> QuerySet[FragebogenItem]:

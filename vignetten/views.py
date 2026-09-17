@@ -55,10 +55,7 @@ def _sichtbare_fassung_laden(
 ) -> Vignette:
     """Lädt eine Fassung im erwarteten Zustand aus dem Eigentümer-Kreis."""
     return get_object_or_404(
-        Vignette.objects.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user),
-            zustand=zustand,
-        ),
+        Vignette.objects.sichtbar_fuer(request.user).filter(zustand=zustand),
         pk=pk,
     )
 
@@ -66,9 +63,7 @@ def _sichtbare_fassung_laden(
 def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
     """Lädt eine Vignettenfassung aus dem sichtbaren Eigentümer-Kreis."""
     return get_object_or_404(
-        Vignette.objects.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
-        ),
+        Vignette.objects.sichtbar_fuer(request.user),
         pk=pk,
     )
 
