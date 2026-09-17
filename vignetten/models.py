@@ -102,6 +102,12 @@ class Vignettenhistorie(models.Model):
 class VignetteQuerySet(models.QuerySet["Vignette"]):
     """Abfragen über Vignettenfassungen."""
 
+    def sichtbar_fuer(self, konto: "Konto") -> "VignetteQuerySet":
+        """Liefert Fassungen aus den für das Konto sichtbaren Historien."""
+        return self.filter(
+            historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto)
+        )
+
     def bulk_create(
         self,
         objs: list["Vignette"],
@@ -135,7 +141,7 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
         _fassungslose_historien_entfernen(betroffene_historien)
         return ergebnis
 
-    def einbindbar(self) -> models.QuerySet["Vignette"]:
+    def einbindbar(self) -> "VignetteQuerySet":
         """Liefert die finalen Fassungen, die eingebunden werden dürfen."""
         return self.filter(zustand=Vignette.Zustand.FINAL)
 

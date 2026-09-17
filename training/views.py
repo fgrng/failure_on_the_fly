@@ -30,7 +30,7 @@ from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import DBSink
 from sitzungen.views import sitzungsnavigation
 
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 from .models import Training, Trainingsbindung
 
@@ -71,9 +71,7 @@ def _ausbilderin_erforderlich(
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     """Liefert einbindbare Fassungen aus dem Eigentümer-Kreis."""
 
-    return Vignette.objects.einbindbar().filter(
-        historie__in=Vignettenhistorie.objects.sichtbar_fuer(request.user)
-    )
+    return Vignette.objects.einbindbar().sichtbar_fuer(request.user)
 
 
 def _zustand_badge(training: Training) -> str:

@@ -442,6 +442,59 @@ class VignetteConstraintTests(TestCase):
 class VignetteQuerySetTests(TestCase):
     """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
 
+    def test_sichtbar_fuer_liefert_fassungen_aus_dem_eigentuemer_kreis(self) -> None:
+        """Eigentümerinnen sehen ihre Fassungen, die Administration alle."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        linus: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+
+        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        eigene_historie.eigentuemerinnen.add(ada)
+        eigene_fassung: Vignette = Vignette.objects._erstellen(
+            historie=eigene_historie
+        )
+        geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        geteilte_historie.eigentuemerinnen.add(ada, grace)
+        geteilte_finale: Vignette = Vignette.objects._erstellen(
+            historie=geteilte_historie,
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            lernauftrag_text="Lernauftrag",
+            arbeitsheft_text="Bearbeitung",
+        )
+        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        fremde_historie.eigentuemerinnen.add(linus)
+        fremde_fassung: Vignette = Vignette.objects._erstellen(
+            historie=fremde_historie
+        )
+
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(ada)),
+            [eigene_fassung, geteilte_finale],
+        )
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(grace)), [geteilte_finale]
+        )
+        self.assertEqual(list(Vignette.objects.sichtbar_fuer(linus)), [fremde_fassung])
+        self.assertEqual(
+            list(Vignette.objects.sichtbar_fuer(administratorin)),
+            [eigene_fassung, geteilte_finale, fremde_fassung],
+        )
+        self.assertEqual(
+            list(
+                Vignette.objects.sichtbar_fuer(ada).einbindbar()
+            ),
+            [geteilte_finale],
+        )
+        self.assertEqual(
+            list(
+                Vignette.objects.einbindbar().sichtbar_fuer(ada)
+            ),
+            [geteilte_finale],
+        )
+
     def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
         """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
