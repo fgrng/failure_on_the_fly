@@ -5,8 +5,9 @@ status: accepted
 # Eigentümerschaft ist überall ein M2M gleichrangiger Eigentümerinnen
 
 Das M2M gleichrangiger Eigentümerinnen aus ADR-0022 gilt auch für Training und
-Erhebung. Damit tragen alle fachlichen Bestände einen Eigentümer-Kreis;
-Eigentümerschaft bleibt je Objekt uniform und alles-oder-nichts.
+Erhebung. Damit tragen Vignetten- und Fragebogen-Item-Historien ebenso wie
+Training und Erhebung einen Eigentümer-Kreis; Eigentümerschaft bleibt je Objekt
+uniform und alles-oder-nichts.
 
 ## Die Erhebung teilt ihren Bestand
 

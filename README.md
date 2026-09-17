@@ -78,8 +78,9 @@ Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
 Erhebungen. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
-Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; finale
-Erhebungen bleiben unveränderlich erhalten. Das Finalisieren pinnt die aktive
+Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; das Design
+finaler Erhebungen bleibt unveränderlich, ihr Eigentümer-Kreis änderbar. Das
+Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
