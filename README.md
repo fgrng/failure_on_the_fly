@@ -23,10 +23,10 @@ die verbleibenden Ko-Autor:innen.
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
 Administrator:innen sehen alle. In der Kuratierungsansicht lässt sich eine
-weitere Ausbilderin oder Administratorin als Ko-Autorin hinzufügen oder eine
+weitere Ausbilderin oder Administratorin als Eigentümerin hinzufügen oder eine
 vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
-Ko-Autor:innen.
+Eigentümerinnen.
 
 ## Simulationskern
 

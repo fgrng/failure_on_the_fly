@@ -41,16 +41,16 @@ def test_open_questions_removes_the_resolved_export_question() -> None:
     open_questions: str = OPEN_QUESTIONS_PATH.read_text()
 
     assert "## 2. Export-Formate und Granularität" not in open_questions
-    assert "## 2. Wiederholversuche und Sitzungsobergrenze" in open_questions
-    assert "## 3. Zulässige Anbieter und Modelle" in open_questions
-    assert "## 4." not in open_questions
+    assert "## 1. Wiederholversuche und Sitzungsobergrenze" in open_questions
+    assert "## 2. Zulässige Anbieter und Modelle" in open_questions
+    assert "## 3." not in open_questions
 
 
 def test_adr_0016_references_the_renumbered_model_question() -> None:
     """Der Verweis auf die offene Modellfrage folgt ihrer neuen Nummer."""
     domain_adr: str = DOMAIN_ADR_PATH.read_text()
 
-    assert "Frage 3" in domain_adr
+    assert "Frage 2" in domain_adr
     assert "Frage 7" not in domain_adr
 
 
