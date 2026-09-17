@@ -4,6 +4,11 @@ status: accepted
 
 # Ko-Autorschaft: Eigentümerschaft ist ein M2M gleichrangiger Eigentümerinnen
 
+> **Nachgeführt durch ADR-0032 (Eigentümerschaft):** Das M2M gleichrangiger
+> Eigentümerinnen gilt auch für Training und Erhebung. Es bleibt je Objekt
+> uniform und alles-oder-nichts; der Teilungskanal einer Erhebung und ihre
+> weitergehenden Folgen sind dort festgehalten.
+
 Eine Vignettenhistorie gehört **einer oder mehreren** Autor:innen, alle gleichrangig. Das führt ADR-0019 (Eigentümer als einzelner Fremdschlüssel) und ADR-0015 (eine Autor:in sieht ausschließlich ihre eigenen Vignetten) an einem Punkt fort: Aus dem Fremdschlüssel wird ein Many-to-Many `eigentuemerinnen` an der Vignettenhistorie, und die Privatheit verengt sich, statt zu fallen.
 
 ## Was sich ändert

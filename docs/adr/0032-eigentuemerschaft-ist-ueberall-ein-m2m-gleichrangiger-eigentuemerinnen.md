@@ -33,10 +33,10 @@ gerade laufende Bestände müssen übertragbar bleiben.
 
 ## Administration und Privatheit
 
-Die Administration sieht alle Vignetten-, Item- und Erhebungsbestände. Das
-führt ADR-0019 fort und ist neben dem Teilungskanal der Erhebung die zweite
-Aufweichung von ADR-0015 an derselben Stelle: Privatheit schließt andere
-Eigentümer-Kreise aus, nicht die Administration.
+Die Administration sieht alle Vignetten-, Item-, Trainings- und
+Erhebungsbestände. Das führt ADR-0019 fort und ist neben dem Teilungskanal der
+Erhebung die zweite Aufweichung von ADR-0015 an derselben Stelle: Privatheit
+schließt andere Eigentümer-Kreise aus, nicht die Administration.
 
 ## Erwogene Optionen
 

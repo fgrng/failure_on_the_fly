@@ -41,5 +41,11 @@ Ein kleines Interface über einer Regel, die sonst in jeder View erneut geschrie
 - Die Administrator:in ist in `sichtbar_fuer` ein Sonderfall: Sie sieht alles. Der Sonderfall steht damit an genau einer Stelle.
 - Die Teilnehmer:in ist die einzige Rolle, die **ohne Konto** auftreten kann — in einer Erhebung ist sie ein Teilnahme-Token (ADR-0006, ADR-0018). Sie ist deshalb keine Group, sondern die Abwesenheit jeder anderen Rolle.
 - Groups tragen keine Django-Permissions. Wer eine Rolle prüft, prüft Gruppenmitgliedschaft, nicht `user.has_perm`. Beide Mechanismen nebeneinander zu benutzen, wäre der Anfang von zwei Wahrheiten.
-- Was mit Vignetten, Trainings und Erhebungen einer weggegangenen Autor:in geschieht, bleibt offen (siehe `docs/open-questions.md`, Frage 1). Dieser ADR legt nur fest, **wo** der Eigentümer sitzt, nicht wie er wechselt.
-- Fällt die Privatheit aus ADR-0015, bleibt der Fremdschlüssel an der Historie richtig, ist aber nicht mehr die ganze Antwort: Aus Eigentümerschaft würde eine Zugriffsregel mit mehreren Beteiligten, und `sichtbar_fuer` wäre die Stelle, an der sie einzöge.
+- Der Weggang einer Eigentümerin bleibt ein menschlicher Übergang: Sie fügt vor
+  dem Löschen eine Nachfolgerin zum Kreis hinzu und entfernt sich dann selbst.
+  Eine aktive Erhebung oder ein Training wird dabei nie automatisch
+  eigentümerlos (ADR-0032).
+- Fällt die Privatheit aus ADR-0015 weiter, bleibt der Eigentümer-Kreis an der
+  Historie richtig, ist aber nicht mehr die ganze Antwort: Aus
+  Eigentümerschaft würde eine Zugriffsregel mit mehreren Beteiligten, und
+  `sichtbar_fuer` wäre die Stelle, an der sie einzöge.
