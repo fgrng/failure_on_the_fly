@@ -24,7 +24,11 @@ from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
 from konten.models import Konto
-from konten.navigation import ADMINISTRATORIN_GRUPPE, ist_administratorin
+from konten.navigation import (
+    ADMINISTRATORIN_GRUPPE,
+    FORSCHENDE_GRUPPE,
+    ist_administratorin,
+)
 
 from .ablauf import Itemblock, block_vorlegen, naechster_schritt
 from .export import datenspur_zip
@@ -53,9 +57,8 @@ from vignetten.models import Vignette, Vignettenhistorie
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
 _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
-_FORSCHENDE_GRUPPE: str = "Forschende:r"
 _BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
-    {_FORSCHENDE_GRUPPE, ADMINISTRATORIN_GRUPPE}
+    {FORSCHENDE_GRUPPE, ADMINISTRATORIN_GRUPPE}
 )
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
@@ -94,7 +97,7 @@ def _forschende_erforderlich(
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> HttpResponse:
-        if not request.user.groups.filter(name=_FORSCHENDE_GRUPPE).exists():
+        if not request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists():
             return HttpResponse(status=403)
         return view(request, *args, **kwargs)
 
@@ -115,7 +118,7 @@ def _forschende_oder_administration_erforderlich(
     ) -> HttpResponse:
         if not (
             ist_administratorin(request.user)
-            or request.user.groups.filter(name=_FORSCHENDE_GRUPPE).exists()
+            or request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists()
         ):
             return HttpResponse(status=403)
         return view(request, *args, **kwargs)
@@ -308,7 +311,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 @login_required
 @_forschende_oder_administration_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt eine eigene Erhebung zur weiteren Bearbeitung."""
+    """Zeigt eine sichtbare Erhebung zur weiteren Bearbeitung."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     stichproben: QuerySet[Stichprobe] = erhebung.stichprobe_set.annotate(
@@ -370,14 +373,15 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             ),
         }
 
+    eigentuemerinnen: list[Konto] = list(erhebung.eigentuemerinnen.all())
     return render(
         request,
         "erhebungen/detail.html",
         {
             "erhebung": erhebung,
             "status_badge": _status_badge(erhebung),
-            "eigentuemerinnen": list(erhebung.eigentuemerinnen.all()),
-            "hat_mehrere_eigentuemerinnen": erhebung.eigentuemerinnen.count() > 1,
+            "eigentuemerinnen": eigentuemerinnen,
+            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
             "moegliche_koautorinnen": _moegliche_ko_forschende(erhebung),
             "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
