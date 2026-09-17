@@ -11,22 +11,39 @@ _erhebungen_migration = import_module(
 _vorherige_vignetten_migration = import_module(
     "vignetten.migrations.0006_vignette_arbeitsheft_simulationshinweise_and_more"
 )
-_TRIGGER_LOESCHEN_SQL = """
-    DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen;
-    DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_aendern;
-    DROP TRIGGER training_nur_finale_vignetten_einbinden;
-"""
-_TRIGGER_ERSTELLEN_SQL = (
-    _erhebungen_migration._VIGNETTEN_TRIGGER_SQL.format(
-        name="erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
-        ereignis="BEFORE INSERT",
-    )
-    + _erhebungen_migration._VIGNETTEN_TRIGGER_SQL.format(
-        name="erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
-        ereignis="BEFORE UPDATE OF erhebung_id, vignette_id, position",
-    )
-    + _vorherige_vignetten_migration._TRAINING_TRIGGER_SQL
+_TRIGGER_NAMEN = (
+    "erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen",
+    "erhebungen_gueltige_vignettenzugehoerigkeit_aendern",
+    "training_nur_finale_vignetten_einbinden",
 )
+_TRIGGER_LOESCHEN_SQL = "\n".join(f"DROP TRIGGER {name};" for name in _TRIGGER_NAMEN)
+_TRIGGER_ERSTELLEN_SQL = "\n".join(
+    (
+        _erhebungen_migration._VIGNETTEN_TRIGGER_SQL.format(
+            name=_TRIGGER_NAMEN[0],
+            ereignis="BEFORE INSERT",
+        ),
+        _erhebungen_migration._VIGNETTEN_TRIGGER_SQL.format(
+            name=_TRIGGER_NAMEN[1],
+            ereignis="BEFORE UPDATE OF erhebung_id, vignette_id, position",
+        ),
+        _vorherige_vignetten_migration._TRAINING_TRIGGER_SQL,
+    )
+)
+
+
+def geschlechter_auffuellen(
+    apps: migrations.StateApps, schema_editor: migrations.BaseDatabaseSchemaEditor
+) -> None:
+    """Ersetzt leere Geschlechter von Bestandsfassungen durch den Startwert."""
+
+    Vignette = apps.get_model("vignetten", "Vignette")
+    Vignette.objects.filter(schuelerin_geschlecht="").update(
+        schuelerin_geschlecht="weiblich"
+    )
+    Vignette.objects.filter(lehrperson_geschlecht="").update(
+        lehrperson_geschlecht="weiblich"
+    )
 
 
 class Migration(migrations.Migration):
@@ -49,6 +66,7 @@ class Migration(migrations.Migration):
             name='schuelerin_geschlecht',
             field=models.CharField(choices=[('männlich', 'Männlich'), ('weiblich', 'Weiblich')], help_text='Geschlecht der zu simulierenden Schüler:in; steuert die Grammatik der Rahmenhandlung und die Illustration des Gesprächsanlasses. Wird für die Simulation einbezogen. Für Teilnehmer:in sichtbar.', max_length=9),
         ),
+        migrations.RunPython(geschlechter_auffuellen, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='vignette',
             constraint=models.CheckConstraint(condition=models.Q(('schuelerin_geschlecht', ''), ('lehrperson_geschlecht', ''), _connector='OR', _negated=True), name='vignetten_geschlechter_nicht_leer'),

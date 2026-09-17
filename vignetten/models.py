@@ -581,9 +581,8 @@ class Vignette(models.Model):
                 | ~(Q(lernauftrag_text="") & Q(lernauftrag_bild="")),
                 name="vignetten_lernauftrag_text_oder_bild",
             ),
-            # Anders als die übrigen Inhalts-Constraints gilt dies auch für
-            # Entwürfe: Der Probelauf leitet daraus schon Rahmenhandlung und
-            # Illustrationen ab (ADR-0017).
+            # Der Probelauf leitet daraus bereits Rahmenhandlung und
+            # Illustrationen ab.
             models.CheckConstraint(
                 condition=~(
                     Q(schuelerin_geschlecht="") | Q(lehrperson_geschlecht="")

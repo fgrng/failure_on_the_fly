@@ -2,11 +2,13 @@
 
 from datetime import datetime
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
 from django.utils import timezone
 
@@ -461,6 +463,42 @@ class VignetteConstraintTests(TestCase):
                 zustand=Vignette.Zustand.FINAL,
                 finalisiert_am=timezone.now(),
             )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_geschlechter_migration_fuellt_leere_bestandswerte_auf() -> None:
+    """Die Pflicht-Constraint-Migration bleibt für alte Entwürfe installierbar."""
+
+    vorher: list[tuple[str, str]] = [
+        ("vignetten", "0006_vignette_arbeitsheft_simulationshinweise_and_more")
+    ]
+    nachher: list[tuple[str, str]] = MigrationExecutor(
+        connection
+    ).loader.graph.leaf_nodes()
+    executor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        apps = executor.loader.project_state(vorher).apps
+        Historie = apps.get_model("vignetten", "Vignettenhistorie")
+        VignetteVorher = apps.get_model("vignetten", "Vignette")
+        alte_fassung = VignetteVorher.objects.create(
+            historie=Historie.objects.create(),
+            schuelerin_geschlecht="",
+            lehrperson_geschlecht="",
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([("vignetten", "0007_geschlechter_nicht_leer")])
+        apps = executor.loader.project_state(
+            [("vignetten", "0007_geschlechter_nicht_leer")]
+        ).apps
+        VignetteNachher = apps.get_model("vignetten", "Vignette")
+        migrierte_fassung = VignetteNachher.objects.get(pk=alte_fassung.pk)
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
+
+    assert migrierte_fassung.schuelerin_geschlecht == Vignette.Geschlecht.WEIBLICH
+    assert migrierte_fassung.lehrperson_geschlecht == Vignette.Geschlecht.WEIBLICH
 
 
 class VignetteSichtbarFuerQuerySetTests(TestCase):
