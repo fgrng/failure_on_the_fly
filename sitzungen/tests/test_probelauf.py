@@ -94,7 +94,7 @@ class ProbelaufStartTests(TestCase):
         })
 
     def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
-        """Der Probelauf verwendet die beim Anlegen gesetzten Akteure."""
+        """Der Probelauf rendert mit den beim Anlegen gesetzten Akteuren."""
         entwurf: Vignette = Vignette.objects.anlegen(self.ada)
         entwurf.fach = "Mathematik"
         entwurf.thema = "Brüche"
@@ -106,6 +106,8 @@ class ProbelaufStartTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "begleitet Sie bei Mathematik in Klasse 5.")
+        self.assertContains(response, "zeigt Ihnen die Bearbeitung.")
 
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""

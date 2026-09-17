@@ -431,6 +431,25 @@ class VignetteBearbeitenViewTests(TestCase):
         self.vignette: Vignette = Vignette.objects._erstellen(historie=self.historie)
         self.client.force_login(ada)
 
+    def _geschlechter(self) -> dict[str, Vignette.Geschlecht]:
+        """Liefert die beim Teil-POST stets mitgesendeten Pflichtfelder."""
+        return {
+            "schuelerin_geschlecht": self.vignette.schuelerin_geschlecht,
+            "lehrperson_geschlecht": self.vignette.lehrperson_geschlecht,
+        }
+
+    def test_leeres_geschlecht_zeigt_formularfehler(self) -> None:
+        """Das Leeren eines Geschlechts bleibt eine verständliche Formularmeldung."""
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+            {**self._geschlechter(), "schuelerin_geschlecht": ""},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+        self.vignette.refresh_from_db()
+        self.assertEqual(self.vignette.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)
+
     def test_speichert_entwurf_mit_leeren_inhaltsfeldern(self) -> None:
         """Entwürfe bleiben beim Bearbeiten bewusst lückentolerant."""
         self.vignette.lernauftrag_text = "Wird gelöscht."
@@ -438,7 +457,7 @@ class VignetteBearbeitenViewTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
-            {},
+            self._geschlechter(),
         )
 
         self.assertRedirects(
@@ -494,7 +513,10 @@ class VignetteBearbeitenViewTests(TestCase):
             bearbeiten_url: str = reverse(
                 "vignetten:bearbeiten", args=[self.vignette.pk]
             )
-            self.client.post(bearbeiten_url, {"arbeitsheft_bild": _gif_upload()})
+            self.client.post(
+                bearbeiten_url,
+                {**self._geschlechter(), "arbeitsheft_bild": _gif_upload()},
+            )
 
             self.vignette.refresh_from_db()
             self.assertTrue(
@@ -510,7 +532,10 @@ class VignetteBearbeitenViewTests(TestCase):
             bearbeiten_url: str = reverse(
                 "vignetten:bearbeiten", args=[self.vignette.pk]
             )
-            self.client.post(bearbeiten_url, {"lernauftrag_bild": _gif_upload()})
+            self.client.post(
+                bearbeiten_url,
+                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
+            )
 
             self.vignette.refresh_from_db()
             self.assertTrue(
@@ -526,7 +551,10 @@ class VignetteBearbeitenViewTests(TestCase):
             bearbeiten_url: str = reverse(
                 "vignetten:bearbeiten", args=[self.vignette.pk]
             )
-            self.client.post(bearbeiten_url, {"arbeitsheft_bild": _gif_upload()})
+            self.client.post(
+                bearbeiten_url,
+                {**self._geschlechter(), "arbeitsheft_bild": _gif_upload()},
+            )
             self.vignette.refresh_from_db()
 
             response: HttpResponse = self.client.get(
@@ -544,7 +572,10 @@ class VignetteBearbeitenViewTests(TestCase):
             bearbeiten_url: str = reverse(
                 "vignetten:bearbeiten", args=[self.vignette.pk]
             )
-            self.client.post(bearbeiten_url, {"lernauftrag_bild": _gif_upload()})
+            self.client.post(
+                bearbeiten_url,
+                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
+            )
             self.vignette.refresh_from_db()
 
             response: HttpResponse = self.client.get(
@@ -564,14 +595,14 @@ class VignetteBearbeitenViewTests(TestCase):
             )
             self.client.post(
                 bearbeiten_url,
-                {"arbeitsheft_bild": _gif_upload()},
+                {**self._geschlechter(), "arbeitsheft_bild": _gif_upload()},
             )
             self.vignette.refresh_from_db()
             erster_pfad: str = self.vignette.arbeitsheft_bild.name
 
             self.client.post(
                 bearbeiten_url,
-                {"arbeitsheft_bild": _gif_upload()},
+                {**self._geschlechter(), "arbeitsheft_bild": _gif_upload()},
             )
             self.vignette.refresh_from_db()
 
@@ -594,14 +625,14 @@ class VignetteBearbeitenViewTests(TestCase):
             )
             self.client.post(
                 bearbeiten_url,
-                {"lernauftrag_bild": _gif_upload()},
+                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
             )
             self.vignette.refresh_from_db()
             erster_pfad: str = self.vignette.lernauftrag_bild.name
 
             self.client.post(
                 bearbeiten_url,
-                {"lernauftrag_bild": _gif_upload()},
+                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
             )
             self.vignette.refresh_from_db()
 
@@ -703,6 +734,16 @@ class VignetteAutovervollstaendigungViewTests(TestCase):
 
 class VignetteFormularSeiteTests(TestCase):
     """Anlegen und Bearbeiten teilen sich ein Formular-Template."""
+
+    def test_geschlechter_sind_pflichtfelder(self) -> None:
+        """Leere Geschlechter werden im Formular verständlich zurückgewiesen."""
+        form: VignetteForm = VignetteForm(data={})
+
+        self.assertFalse(form.is_valid())
+        self.assertCountEqual(
+            form.errors,
+            ["schuelerin_geschlecht", "lehrperson_geschlecht"],
+        )
 
     def test_beide_editoren_rendern_alle_formularfelder(self) -> None:
         """Das gemeinsame Template darf beim Erweitern kein Feld unterschlagen."""

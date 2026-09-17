@@ -73,9 +73,7 @@ class Aufgabenkontextteil:
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
     "schuelerin_name",
-    "schuelerin_geschlecht",
     "lehrperson_name",
-    "lehrperson_geschlecht",
     "fach",
     "thema",
     "klassenstufe",
@@ -177,6 +175,8 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
 
     def _erstellen(self, **werte: object) -> "Vignette":
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
+        werte.setdefault("schuelerin_geschlecht", Vignette.Geschlecht.WEIBLICH)
+        werte.setdefault("lehrperson_geschlecht", Vignette.Geschlecht.WEIBLICH)
         vignette: Vignette = self.model(**werte)
         vignette._wird_angelegt = True
         vignette.save(using=self.db)
@@ -275,7 +275,6 @@ class Vignette(models.Model):
     schuelerin_geschlecht: models.CharField = models.CharField(
         max_length=9,
         choices=Geschlecht,
-        blank=True,
         help_text="Geschlecht der zu simulierenden Schüler:in; steuert die "
         "Grammatik der Rahmenhandlung und die Illustration des "
         "Gesprächsanlasses. Wird für die Simulation einbezogen. "
@@ -292,7 +291,6 @@ class Vignette(models.Model):
     lehrperson_geschlecht: models.CharField = models.CharField(
         max_length=9,
         choices=Geschlecht,
-        blank=True,
         help_text="Geschlecht der erfahrenen Lehrperson; steuert Anrede "
         "(Frau/Herr), Pronomen und die Illustrationen der Rahmenhandlung. "
         "Wird für die Simulation nicht einbezogen. "
@@ -582,6 +580,15 @@ class Vignette(models.Model):
                 condition=Q(zustand="entwurf")
                 | ~(Q(lernauftrag_text="") & Q(lernauftrag_bild="")),
                 name="vignetten_lernauftrag_text_oder_bild",
+            ),
+            # Anders als die übrigen Inhalts-Constraints gilt dies auch für
+            # Entwürfe: Der Probelauf leitet daraus schon Rahmenhandlung und
+            # Illustrationen ab (ADR-0017).
+            models.CheckConstraint(
+                condition=~(
+                    Q(schuelerin_geschlecht="") | Q(lehrperson_geschlecht="")
+                ),
+                name="vignetten_geschlechter_nicht_leer",
             ),
         ]
 

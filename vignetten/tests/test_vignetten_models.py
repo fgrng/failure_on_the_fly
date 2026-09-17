@@ -384,6 +384,20 @@ class VignetteAnlegenTests(TestCase):
 class VignetteConstraintTests(TestCase):
     """Die Datenbank schützt die gemeinsame Lebenszyklus-Form."""
 
+    def test_fassung_braucht_beide_geschlechter(self) -> None:
+        """Auch ein Entwurf darf keines der Geschlechter leer lassen."""
+        for feldname in ("schuelerin_geschlecht", "lehrperson_geschlecht"):
+            with self.subTest(feldname=feldname):
+                werte: dict[str, str] = {
+                    "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+                    "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
+                    feldname: "",
+                }
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    Vignette.objects._erstellen(
+                        historie=Vignettenhistorie.objects.create(), **werte
+                    )
+
     def test_historie_hat_hoechstens_einen_entwurf(self) -> None:
         """Ein zweiter Entwurf derselben Historie scheitert am Unique-Index."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
