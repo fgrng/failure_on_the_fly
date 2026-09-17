@@ -457,6 +457,7 @@ class VignetteSichtbarFuerQuerySetTests(TestCase):
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.grace: Konto = get_user_model().objects.create_user(username="grace")
         self.linus: Konto = get_user_model().objects.create_user(username="linus")
+        self.dijkstra: Konto = get_user_model().objects.create_user(username="dijkstra")
         self.administratorin: Konto = get_user_model().objects.create_user(
             username="admin"
         )
@@ -502,6 +503,10 @@ class VignetteSichtbarFuerQuerySetTests(TestCase):
         self.assertEqual(
             list(Vignette.objects.sichtbar_fuer(self.linus)), [self.fremde_fassung]
         )
+
+    def test_sichtbar_fuer_liefert_unbeteiligter_keine_fassung(self) -> None:
+        """Eine Person außerhalb aller Eigentümer-Kreise sieht keine Fassung."""
+        self.assertEqual(list(Vignette.objects.sichtbar_fuer(self.dijkstra)), [])
 
     def test_sichtbar_fuer_liefert_administration_alle_fassungen(self) -> None:
         """Die Administration sieht alle Fassungen."""
