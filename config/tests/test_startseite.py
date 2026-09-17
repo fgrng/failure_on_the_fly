@@ -93,12 +93,23 @@ class StartseiteTests(TestCase):
                     self.assertNotIn(link, sidebar)
                 self.client.logout()
 
-    def test_bereichskarten_folgen_der_farbcodierung(self) -> None:
-        """Simulationskern und Vignetten teilen sich den Entwicklungsbereich."""
+    def test_rollenspalten_folgen_der_farbcodierung(self) -> None:
+        """Die Willkommensseite stellt je Rolle genau eine Spalte vor."""
         response: HttpResponse = self.client.get(reverse("start"))
 
-        self.assertContains(response, 'card card--authoring', count=1)
-        self.assertContains(response, 'card card--system card--disabled', count=1)
+        for bereich in ("authoring", "participant", "research"):
+            with self.subTest(bereich=bereich):
+                self.assertContains(
+                    response, f'welcome__spalte area--{bereich}', count=1
+                )
+
+    def test_startseite_nennt_die_plattform_ohne_anmeldung(self) -> None:
+        """Ohne Anmeldung erklärt die Startseite, worum es geht."""
+        response: HttpResponse = self.client.get(reverse("start"))
+
+        self.assertContains(response, "FailureOnTheFly")
+        self.assertContains(response, "Diagnosegespräch")
+        self.assertContains(response, "Anmelden")
 
     def test_loginseite_rendert_das_passwortfeld(self) -> None:
         """Djangos Login-URL liefert ein verwendbares Formular aus."""
