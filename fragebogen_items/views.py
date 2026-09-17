@@ -78,6 +78,11 @@ def _zustand_badge(item: FragebogenItem) -> str:
     }[item.zustand]
 
 
+def _bezeichnung(item: FragebogenItem) -> str:
+    # Benennt eine Fassung über ihre Historie, hilfsweise über den Wortlaut.
+    return item.historie.name or item.wortlaut or "Unbenannter Entwurf"
+
+
 def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
     # Prüft, ob eine Fassung die aktuelle Spitze ihrer Historie ist.
     return item.zustand != FragebogenItem.Zustand.ARCHIVIERT and not (
@@ -102,7 +107,7 @@ def liste(request: HttpRequest) -> HttpResponse:
         item_zeilen.append(
             {
                 "item": item,
-                "bezeichnung": historie.name or item.wortlaut or "Unbenannter Entwurf",
+                "bezeichnung": _bezeichnung(item),
                 "zustand_badge": _zustand_badge(item),
             }
         )
@@ -133,6 +138,8 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         "fragebogen_items/detail.html",
         {
             "item": item,
+            "bezeichnung": _bezeichnung(item),
+            "zustand_badge": _zustand_badge(item),
             "likert_skalenpole": LikertSkalenpol.choices,
             "ist_neueste_nichtarchivierte_fassung": (
                 _ist_neueste_nichtarchivierte_fassung(item)

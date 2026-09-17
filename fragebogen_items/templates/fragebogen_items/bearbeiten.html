@@ -1,30 +1,47 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Fragebogen-Item bearbeiten{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
 {% block content %}
 <section class="page area--research">
-    <header class="area-band"><h1>Fragebogen-Item bearbeiten</h1></header>
+    <header class="page-head">
+        <div>
+            <p>Forschung / Fragebogen-Items</p>
+            <h1>Fragebogen-Item bearbeiten</h1>
+            <span>Änderungen betreffen nur diese Entwurfsfassung.</span>
+        </div>
+    </header>
     <form method="post">
         {% csrf_token %}
-        <section class="page-section">
-            <div class="page-section__head"><b>01</b><div><h2>Item</h2></div></div>
+        {{ form.non_field_errors }}
+        <section class="page-section" aria-labelledby="section-item">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-item">Item</h2><small>Wonach wird die teilnehmende Person gefragt?</small></span>
+            </header>
             <div class="field-grid">
-                <p>{{ form.typ.label_tag }} {{ form.typ }}</p>
-                <p class="page-field--wide">{{ form.wortlaut.label_tag }} {{ form.wortlaut }}</p>
+                {% include "vignetten/includes/form_field.html" with field=form.typ %}
+                {% include "vignetten/includes/form_field.html" with field=form.wortlaut wide=True %}
+                {% if item.vorgaengerin %}
+                    <p id="typwechsel-warnung" class="page-field--wide" hidden>Typwechsel: Antworten der Vorgängerin bleiben beim bisherigen Typ.</p>
+                    <script>
+                        const typ = document.getElementById("id_typ");
+                        const warnung = document.getElementById("typwechsel-warnung");
+                        const aktualisiereWarnung = () => { warnung.hidden = typ.value === "{{ item.vorgaengerin.typ }}"; };
+                        typ.addEventListener("change", aktualisiereWarnung);
+                        aktualisiereWarnung();
+                    </script>
+                {% endif %}
             </div>
-            {% if item.vorgaengerin %}
-                <p id="typwechsel-warnung" hidden>Typwechsel: Antworten der Vorgängerin bleiben beim bisherigen Typ.</p>
-                <script>
-                    const typ = document.getElementById("id_typ");
-                    const warnung = document.getElementById("typwechsel-warnung");
-                    const aktualisiereWarnung = () => { warnung.hidden = typ.value === "{{ item.vorgaengerin.typ }}"; };
-                    typ.addEventListener("change", aktualisiereWarnung);
-                    aktualisiereWarnung();
-                </script>
-            {% endif %}
         </section>
-        <p><button class="button" type="submit">Änderungen speichern</button></p>
+        <div class="vignette-form-actions">
+            <a href="{% url 'fragebogen_items:detail' item.pk %}">Abbrechen</a>
+            <button class="button" type="submit">Änderungen speichern</button>
+        </div>
     </form>
 </section>
 {% endblock %}

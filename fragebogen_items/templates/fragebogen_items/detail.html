@@ -1,51 +1,78 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Fragebogen-Item{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
 <section class="page area--research">
-    <header class="area-band"><h1>Fragebogen-Item</h1></header>
-    <section class="page-section">
-        <div class="page-section__head"><b>01</b><div><h2>Fassung</h2></div></div>
+    <header class="page-head">
+        <div>
+            <p>Forschung / Fragebogen-Items</p>
+            <h1>{{ bezeichnung }}</h1>
+            <span>{{ item.get_typ_display }}</span>
+        </div>
+        <span class="badge badge--{{ zustand_badge }} badge--research">{{ item.get_zustand_display }}</span>
+    </header>
+
+    <div class="vignette-detail-actions">
+        {% if item.zustand == item.Zustand.ENTWURF %}
+            <a class="button button--secondary" href="{% url 'fragebogen_items:bearbeiten' item.pk %}">Bearbeiten</a>
+            <form method="post" action="{% url 'fragebogen_items:finalisieren' item.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Finalisieren</button>
+            </form>
+            <form method="post" action="{% url 'fragebogen_items:loeschen' item.pk %}">
+                {% csrf_token %}
+                <button class="button button--danger" type="submit">Entwurf löschen</button>
+            </form>
+        {% elif item.zustand == item.Zustand.FINAL %}
+            {% if ist_neueste_nichtarchivierte_fassung %}
+                <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
+                    {% csrf_token %}
+                    <button class="button button--secondary" type="submit">Neue Fassung</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{% url 'fragebogen_items:archivieren' item.pk %}">
+                {% csrf_token %}
+                <button class="button button--danger" type="submit">Archivieren</button>
+            </form>
+        {% elif item.zustand == item.Zustand.ARCHIVIERT and kann_entarchiviert_werden %}
+            <form method="post" action="{% url 'fragebogen_items:entarchivieren' item.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Entarchivieren</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <section class="page-section" aria-labelledby="detail-fassung">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="detail-fassung">Fassung</h2><small>Typ, Zustand und Wortlaut dieser Item-Fassung</small></span>
+        </header>
         <dl class="field-grid">
             <div><dt>Typ</dt><dd>{{ item.get_typ_display }}</dd></div>
             <div><dt>Zustand</dt><dd>{{ item.get_zustand_display }}</dd></div>
             <div class="page-field--wide"><dt>Wortlaut</dt><dd>{{ item.wortlaut|default:"—" }}</dd></div>
         </dl>
     </section>
-    {% if item.zustand == item.Zustand.ENTWURF %}
-        <p><a class="button button--secondary" href="{% url 'fragebogen_items:bearbeiten' item.pk %}">Bearbeiten</a></p>
-        <form method="post" action="{% url 'fragebogen_items:finalisieren' item.pk %}">
-            {% csrf_token %}
-            <button class="button" type="submit">Finalisieren</button>
-        </form>
-        <form method="post" action="{% url 'fragebogen_items:loeschen' item.pk %}">
-            {% csrf_token %}
-            <button class="button button--danger" type="submit">Entwurf löschen</button>
-        </form>
-    {% elif item.zustand == item.Zustand.FINAL %}
-        {% if ist_neueste_nichtarchivierte_fassung %}
-            <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
-                {% csrf_token %}
-                <button class="button button--secondary" type="submit">Neue Fassung</button>
-            </form>
-        {% endif %}
-        <form method="post" action="{% url 'fragebogen_items:archivieren' item.pk %}">
-            {% csrf_token %}
-            <button class="button button--danger" type="submit">Archivieren</button>
-        </form>
-    {% elif item.zustand == item.Zustand.ARCHIVIERT and kann_entarchiviert_werden %}
-        <form method="post" action="{% url 'fragebogen_items:entarchivieren' item.pk %}">
-            {% csrf_token %}
-            <button class="button" type="submit">Entarchivieren</button>
-        </form>
-    {% endif %}
+
     {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_id="detail-koautorinnen" koautorinnen_abschnitt_nummer="02" koautorin_hinzufuegen_url="fragebogen_items:koautorin_hinzufuegen" koautorin_entfernen_url="fragebogen_items:koautorin_entfernen" objekt_pk=item.pk %}
+
     {% if item.typ == item.Typ.LIKERT %}
-        <section class="page-section">
-            <div class="page-section__head"><b>03</b><div><h2>Likert-Skala</h2><small>Global festgelegt</small></div></div>
+        <section class="page-section" aria-labelledby="detail-likert">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="detail-likert">Likert-Skala</h2><small>Global festgelegte Skalenpole</small></span>
+            </header>
             <ol>{% for pol in likert_skalenpole %}<li>{{ pol.1 }}</li>{% endfor %}</ol>
         </section>
     {% endif %}
+
+    <div class="vignette-form-actions" style="margin-top: 2rem;">
+        <a class="button button--secondary" href="{% url 'fragebogen_items:liste' %}">Zu meinen Fragebogen-Items</a>
+    </div>
 </section>
 {% endblock %}

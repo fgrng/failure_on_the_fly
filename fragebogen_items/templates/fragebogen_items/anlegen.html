@@ -1,20 +1,37 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Fragebogen-Item anlegen{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
 {% block content %}
 <section class="page area--research">
-    <header class="area-band"><h1>Fragebogen-Item anlegen</h1></header>
+    <header class="page-head">
+        <div>
+            <p>Forschung</p>
+            <h1>Neues Fragebogen-Item anlegen</h1>
+            <span>Typ und Wortlaut bilden die erste Entwurfsfassung.</span>
+        </div>
+    </header>
     <form method="post">
         {% csrf_token %}
-        <section class="page-section">
-            <div class="page-section__head"><b>01</b><div><h2>Item</h2></div></div>
+        {{ form.non_field_errors }}
+        <section class="page-section" aria-labelledby="section-item">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-item">Item</h2><small>Wonach wird die teilnehmende Person gefragt?</small></span>
+            </header>
             <div class="field-grid">
-                <p>{{ form.typ.label_tag }} {{ form.typ }}</p>
-                <p class="page-field--wide">{{ form.wortlaut.label_tag }} {{ form.wortlaut }}</p>
+                {% include "vignetten/includes/form_field.html" with field=form.typ %}
+                {% include "vignetten/includes/form_field.html" with field=form.wortlaut wide=True %}
             </div>
         </section>
-        <p><button class="button" type="submit">Item anlegen</button></p>
+        <div class="vignette-form-actions">
+            <a href="{% url 'fragebogen_items:liste' %}">Abbrechen</a>
+            <button class="button" type="submit">Item anlegen</button>
+        </div>
     </form>
 </section>
 {% endblock %}

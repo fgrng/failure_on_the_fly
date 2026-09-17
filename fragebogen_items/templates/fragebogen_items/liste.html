@@ -1,22 +1,48 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Fragebogen-Items{% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
 {% block content %}
-<section class="page area--research">
-    <header class="area-band"><h1>Fragebogen-Items</h1></header>
-    <section class="page-section">
-        <div class="page-section__head"><b>01</b><div><h2>Item-Bibliothek</h2></div></div>
+<section class="page area--research vignette-index-page">
+    <header class="page-head">
         <div>
-            <p><a class="button" href="{% url 'fragebogen_items:anlegen' %}">Neues Item anlegen</a></p>
-            <ul>
-                {% for zeile in item_zeilen %}
-                    <li><a href="{% url 'fragebogen_items:detail' zeile.item.pk %}">{{ zeile.bezeichnung }}</a> <span class="badge badge--{{ zeile.zustand_badge }} badge--research">{{ zeile.item.get_zustand_display }}</span></li>
-                {% empty %}
-                    <li>Noch keine Fragebogen-Items vorhanden.</li>
-                {% endfor %}
-            </ul>
+            <p>Forschung</p>
+            <h1>Fragebogen-Items</h1>
+            <span>Items entwerfen, finalisieren und für Erhebungen bereitstellen.</span>
         </div>
-    </section>
+        <a class="button" href="{% url 'fragebogen_items:anlegen' %}">Neues Item anlegen</a>
+    </header>
+
+    {% if item_zeilen %}
+        <div class="table-wrap vignette-index-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Typ</th>
+                        <th scope="col">Zustand</th>
+                        <th scope="col">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for zeile in item_zeilen %}
+                        <tr>
+                            <td>{{ zeile.bezeichnung }}</td>
+                            <td>{{ zeile.item.get_typ_display }}</td>
+                            <td><span class="badge badge--{{ zeile.zustand_badge }} badge--research">{{ zeile.item.get_zustand_display }}</span></td>
+                            <td><a class="button button--secondary" href="{% url 'fragebogen_items:detail' zeile.item.pk %}">Öffnen</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>Noch keine Fragebogen-Items vorhanden.</p>
+    {% endif %}
 </section>
 {% endblock %}
