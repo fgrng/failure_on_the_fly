@@ -19,6 +19,16 @@ urlpatterns: list[URLPattern] = [
         name="veroeffentlichen",
     ),
     path(
+        "eigene/<int:pk>/koautorinnen/hinzufuegen/",
+        views.koautorin_hinzufuegen,
+        name="koautorin_hinzufuegen",
+    ),
+    path(
+        "eigene/<int:pk>/koautorinnen/<int:konto_pk>/entfernen/",
+        views.koautorin_entfernen,
+        name="koautorin_entfernen",
+    ),
+    path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,
         name="vignette_hinzufuegen",

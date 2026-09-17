@@ -107,6 +107,20 @@ class TrainingAnlegenTests(TestCase):
 class TrainingKuratierenTests(TestCase):
     """Ausbilder:innen kuratieren finale Vignetten ihres Eigentümer-Kreises."""
 
+    def test_zeigt_den_eigentuemer_kreis(self) -> None:
+        """Die Kuratierungsansicht macht den Eigentümer-Kreis sichtbar."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[training.pk])
+        )
+
+        self.assertContains(response, "Ko-Autor:innen")
+        self.assertContains(response, ada.username)
+
     def test_nimmt_nur_eigene_finale_vignetten_auf_und_entfernt_sie_wieder(
         self,
     ) -> None:
@@ -192,6 +206,216 @@ class TrainingKuratierenTests(TestCase):
         )
         self.assertEqual(list(training.vignetten.all()), [])
         self.assertFalse(training.vignetten.filter(pk=fremde_finale.pk).exists())
+
+
+class TrainingKoautorschaftTests(TestCase):
+    """Ausbilder:innen teilen Trainings mit gleichrangigen Ko-Eigentümerinnen."""
+
+    def test_hinzufuegen_gibt_koeigentuemern_listenzugriff(self) -> None:
+        """Eine eingetragene Ausbilderin sieht das Training in ihrer Liste."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": grace.pk},
+        )
+
+        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.client.force_login(grace)
+        self.assertContains(
+            self.client.get(reverse("training:liste")),
+            reverse("training:kuratieren", args=[training.pk]),
+        )
+
+    def test_hinzufuegen_erlaubt_koeigentuemern_das_veroeffentlichen(self) -> None:
+        """Eine eingetragene Ausbilderin darf das Training veröffentlichen."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+        self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": grace.pk},
+        )
+        self.client.force_login(grace)
+
+        self.assertRedirects(
+            self.client.post(reverse("training:veroeffentlichen", args=[training.pk])),
+            reverse("training:kuratieren", args=[training.pk]),
+        )
+
+    def test_selbstentfernung_uebergibt_training(self) -> None:
+        """Die Übergabe entfernt die eigene Person bei verbleibender Ko-Autorin."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        training.eigentuemerinnen.add(grace)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+        )
+
+        self.assertRedirects(response, reverse("training:liste"))
+        self.assertEqual(
+            self.client.get(reverse("training:kuratieren", args=[training.pk])).status_code,
+            404,
+        )
+
+    def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
+        """Der Eigentümer-Kreis eines Trainings bleibt besetzt."""
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(grace, name="Brüche")
+        self.client.force_login(grace)
+        self.client.post(
+            reverse("training:koautorin_entfernen", args=[training.pk, grace.pk])
+        )
+        self.assertContains(
+            self.client.get(reverse("training:kuratieren", args=[training.pk])),
+            grace.username,
+        )
+
+    def test_hinzufuegen_erfordert_bestehende_ausbilderrolle(self) -> None:
+        """Teilen akzeptiert keine Konten ohne Ausbilder- oder Administrationsrolle."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": ohne_rolle.pk},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.client.force_login(ohne_rolle)
+        self.assertEqual(self.client.get(reverse("training:liste")).status_code, 403)
+
+    def test_hinzufuegen_akzeptiert_administratorinnen(self) -> None:
+        """Eine Administratorin kann als Ko-Eigentümerin eingetragen werden."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+        self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": administratorin.pk},
+        )
+        self.client.force_login(administratorin)
+
+        self.assertContains(
+            self.client.get(reverse("training:liste")),
+            reverse("training:kuratieren", args=[training.pk]),
+        )
+
+    def test_veroeffentlichtes_training_kann_weiter_uebergeben_werden(self) -> None:
+        """Die Veröffentlichung friert die Verantwortung nicht ein."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        training.veroeffentlichen()
+        self.client.force_login(ada)
+
+        self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": grace.pk},
+        )
+        self.client.post(
+            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+        )
+
+        self.client.force_login(grace)
+
+        self.assertContains(
+            self.client.get(reverse("training:kuratieren", args=[training.pk])),
+            "Veröffentlicht",
+        )
+
+    def test_administration_kann_fremdes_training_uebergeben(self) -> None:
+        """Die Administration kann eine fremde Ausbilderin durch eine andere ablösen."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        training: Training = Training.objects.anlegen(grace, name="Brüche")
+        self.client.force_login(administratorin)
+
+        self.client.post(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            {"konto": ada.pk},
+        )
+        response: HttpResponse = self.client.post(
+            reverse("training:koautorin_entfernen", args=[training.pk, grace.pk])
+        )
+
+        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.client.force_login(grace)
+        self.assertEqual(
+            self.client.get(reverse("training:kuratieren", args=[training.pk])).status_code,
+            404,
+        )
+
+    def test_nicht_eigentuemerin_kann_keine_uebergabe_ausloesen(self) -> None:
+        """Eine fremde Administration bleibt beim Training, wenn sie niemanden entfernt."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
+        administratorin: Konto = get_user_model().objects.create_user(username="linus")
+        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        training.eigentuemerinnen.add(grace)
+        self.client.force_login(administratorin)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "training:koautorin_entfernen", args=[training.pk, administratorin.pk]
+            )
+        )
+
+        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+
+    def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
+        """Das Hinzufügen weist GET-Anfragen ab."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        hinzufuegen: HttpResponse = self.client.get(
+            reverse("training:koautorin_hinzufuegen", args=[training.pk])
+        )
+        self.assertEqual(hinzufuegen.status_code, 405)
+
+    def test_koautorin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
+        """Das Entfernen weist GET-Anfragen ab."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        entfernen: HttpResponse = self.client.get(
+            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+        )
+
+        self.assertEqual(entfernen.status_code, 405)
 
 
 class TrainingSichtbarkeitTests(TestCase):

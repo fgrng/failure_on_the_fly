@@ -1,7 +1,7 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec
+from typing import Callable, Concatenate, ParamSpec
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
@@ -15,7 +15,12 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.navigation import ist_administratorin
+from konten.models import Konto
+from konten.navigation import (
+    ADMINISTRATORIN_GRUPPE,
+    AUSBILDERIN_GRUPPE,
+    ist_administratorin,
+)
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -29,11 +34,9 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 from .models import Training, Trainingsbindung
 
-if TYPE_CHECKING:
-    from konten.models import Konto
-
-
-_AUSBILDERIN_GRUPPE: str = "Ausbilder:in"
+_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
+    {AUSBILDERIN_GRUPPE, ADMINISTRATORIN_GRUPPE}
+)
 P = ParamSpec("P")
 
 
@@ -42,7 +45,7 @@ def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
 
     return (
         ist_administratorin(konto)
-        or konto.groups.filter(name=_AUSBILDERIN_GRUPPE).exists()
+        or konto.groups.filter(name=AUSBILDERIN_GRUPPE).exists()
     )
 
 
@@ -96,6 +99,15 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     """Lädt ein für die eingeloggte Person sichtbares Training."""
 
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
+
+
+def _moegliche_koautorinnen(training: Training) -> QuerySet[Konto]:
+    """Liefert Ausbilderinnen und Administration außerhalb des Eigentümer-Kreises."""
+    return (
+        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
+        .exclude(training=training)
+        .distinct()
+    )
 
 
 def _veroeffentlichtes_training(pk: int) -> Training:
@@ -305,17 +317,56 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt ein sichtbares Training zur Kuratierung."""
     training: Training = _sichtbares_training(request, pk)
+    eigentuemerinnen: list[Konto] = list(training.eigentuemerinnen.all())
     return render(
         request,
         "training/kuratieren.html",
         {
             "training": training,
             "zustand_badge": _zustand_badge(training),
+            "eigentuemerinnen": eigentuemerinnen,
+            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
+            "moegliche_koautorinnen": _moegliche_koautorinnen(training),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
         },
     )
+
+
+@login_required
+@_ausbilderin_erforderlich
+def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    konto: Konto = get_object_or_404(
+        _moegliche_koautorinnen(training), pk=request.POST.get("konto")
+    )
+    training.eigentuemerinnen.add(konto)
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+@_ausbilderin_erforderlich
+def koautorin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
+    """Entfernt eine Ko-Autorin, ohne das Training eigentümerlos zu lassen."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    with transaction.atomic():
+        training = Training.objects.select_for_update().get(pk=training.pk)
+        if (
+            training.eigentuemerinnen.filter(pk=konto_pk).exists()
+            and training.eigentuemerinnen.count() > 1
+        ):
+            training.eigentuemerinnen.remove(konto_pk)
+            if konto_pk == request.user.pk:
+                return redirect("training:liste")
+    return redirect("training:kuratieren", pk=training.pk)
 
 
 @login_required
