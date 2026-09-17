@@ -88,7 +88,13 @@ class FragebogenItemQuerySet(models.QuerySet["FragebogenItem"]):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete()
 
-    def einbindbar(self) -> models.QuerySet["FragebogenItem"]:
+    def sichtbar_fuer(self, konto: "Konto") -> "FragebogenItemQuerySet":
+        """Liefert Fassungen aus den für ein Konto sichtbaren Historien."""
+        return self.filter(
+            historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(konto)
+        )
+
+    def einbindbar(self) -> "FragebogenItemQuerySet":
         """Liefert die finalen Fassungen, die eingebunden werden dürfen."""
         return self.filter(zustand=FragebogenItem.Zustand.FINAL)
 

@@ -61,9 +61,7 @@ def _sichtbares_item(
     zustand: FragebogenItem.Zustand | None = None,
 ) -> FragebogenItem:
     # Lädt eine Item-Fassung aus dem Eigentümer-Kreis der eingeloggten Person.
-    items = FragebogenItem.objects.filter(
-        historie__in=FragebogenItemHistorie.objects.sichtbar_fuer(request.user)
-    )
+    items = FragebogenItem.objects.sichtbar_fuer(request.user)
     if zustand is not None:
         items = items.filter(zustand=zustand)
     return get_object_or_404(items, pk=pk)
