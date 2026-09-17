@@ -17,8 +17,8 @@ from konten.navigation import (
     autorin_erforderlich as _autorin_erforderlich,
 )
 
-from .forms import VignetteForm, zufaellige_akteure
-from .models import Vignette, Vignettenhistorie
+from .forms import VignetteForm
+from .models import Vignette, Vignettenhistorie, zufaellige_akteure
 
 
 _BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(

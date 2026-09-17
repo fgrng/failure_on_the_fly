@@ -370,6 +370,16 @@ class VignetteAnlegenTests(TestCase):
 
         self.assertEqual(list(vignette.historie.eigentuemerinnen.all()), [konto])
 
+    def test_anlegen_vergibt_akteure(self) -> None:
+        """Ein neuer Entwurf trägt ohne Formular beide Akteure."""
+        vignette: Vignette
+        vignette, _, _ = self._vignette_mit_zwei_finalen_kernen_anlegen()
+
+        self.assertTrue(vignette.schuelerin_name)
+        self.assertIn(vignette.schuelerin_geschlecht, Vignette.Geschlecht.values)
+        self.assertTrue(vignette.lehrperson_name)
+        self.assertIn(vignette.lehrperson_geschlecht, Vignette.Geschlecht.values)
+
 
 class VignetteConstraintTests(TestCase):
     """Die Datenbank schützt die gemeinsame Lebenszyklus-Form."""

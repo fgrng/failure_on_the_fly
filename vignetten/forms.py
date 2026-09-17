@@ -1,20 +1,8 @@
 """Formulare des Vignetten-Editors."""
 
-import random
-
 from django.forms import Form, ModelForm
 
 from .models import Vignette
-
-
-_SCHUELERINNEN: tuple[tuple[str, Vignette.Geschlecht], ...] = (
-    ("Mia", Vignette.Geschlecht.WEIBLICH),
-    ("Noah", Vignette.Geschlecht.MAENNLICH),
-)
-_LEHRPERSONEN: tuple[tuple[str, Vignette.Geschlecht], ...] = (
-    ("Weber", Vignette.Geschlecht.WEIBLICH),
-    ("Koch", Vignette.Geschlecht.MAENNLICH),
-)
 
 
 class VignetteForm(ModelForm):
@@ -81,15 +69,3 @@ class VignetteForm(ModelForm):
 
 class FinalisierenForm(Form):
     """Trägt die nicht feldgebundenen Fehler der Finalisieren-Aktion."""
-
-
-def zufaellige_akteure() -> dict[str, str]:
-    """Liefert überschreibbare Startwerte für die beiden Akteure."""
-    schuelerin_name, schuelerin_geschlecht = random.choice(_SCHUELERINNEN)
-    lehrperson_name, lehrperson_geschlecht = random.choice(_LEHRPERSONEN)
-    return {
-        "schuelerin_name": schuelerin_name,
-        "schuelerin_geschlecht": schuelerin_geschlecht,
-        "lehrperson_name": lehrperson_name,
-        "lehrperson_geschlecht": lehrperson_geschlecht,
-    }
