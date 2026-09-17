@@ -240,6 +240,16 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.assertContains(detail, "Eigentümerinnen")
         self.assertContains(detail, ada.username)
         self.assertContains(detail, grace.username)
+        bearbeiten: HttpResponse = self.client.post(
+            reverse("erhebungen:konfiguration_speichern", args=[erhebung.pk]),
+            {"instruktionstext": "Bitte denken Sie laut.", "randomisierung": "fest"},
+        )
+
+        self.assertRedirects(
+            bearbeiten, reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+        erhebung.refresh_from_db()
+        self.assertEqual(erhebung.instruktionstext, "Bitte denken Sie laut.")
 
     def test_selbstentfernung_uebergibt_finale_und_laufende_erhebung(self) -> None:
         """Eine Forschende kann die Verantwortung auch im Erhebungszeitraum abgeben."""
