@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.state import StateApps
 from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
@@ -53,16 +54,18 @@ def test_erneute_migration_entfernt_berechtigungen_der_kontorollen() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_administrationsmigration_macht_gruppenmitglied_zum_superuser() -> None:
     """Die alte Administration wird ohne Rollenverlust zu Django migriert."""
-    vorher = [("konten", "0001_initial")]
-    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
-    executor = MigrationExecutor(connection)
+    vorher: list[tuple[str, str]] = [("konten", "0001_initial")]
+    nachher: list[tuple[str, str]] = MigrationExecutor(
+        connection
+    ).loader.graph.leaf_nodes()
+    executor: MigrationExecutor = MigrationExecutor(connection)
     executor.migrate(vorher)
     try:
-        apps = executor.loader.project_state(vorher).apps
-        KontoVorher = apps.get_model("konten", "Konto")
-        GroupVorher = apps.get_model("auth", "Group")
-        administration = GroupVorher.objects.create(name="Administrator:in")
-        konto = KontoVorher.objects.create(username="ada")
+        apps: StateApps = executor.loader.project_state(vorher).apps
+        KontoVorher: type[Konto] = apps.get_model("konten", "Konto")
+        GroupVorher: type[Group] = apps.get_model("auth", "Group")
+        administration: Group = GroupVorher.objects.create(name="Administrator:in")
+        konto: Konto = KontoVorher.objects.create(username="ada")
         konto.groups.add(administration)
 
         executor = MigrationExecutor(connection)
@@ -70,12 +73,14 @@ def test_administrationsmigration_macht_gruppenmitglied_zum_superuser() -> None:
         apps = executor.loader.project_state(
             [("konten", "0002_administration_ist_superuser")]
         ).apps
-        KontoNachher = apps.get_model("konten", "Konto")
+        KontoNachher: type[Konto] = apps.get_model("konten", "Konto")
 
-        migriert = KontoNachher.objects.get(pk=konto.pk)
-        assert migriert.is_superuser
-        assert migriert.is_staff
-        assert not Group.objects.filter(name="Administrator:in").exists()
+        migriert: Konto = KontoNachher.objects.get(pk=konto.pk)
+        assert (
+            migriert.is_superuser,
+            migriert.is_staff,
+            Group.objects.filter(name="Administrator:in").exists(),
+        ) == (True, True, False)
     finally:
         MigrationExecutor(connection).migrate(nachher)
 
@@ -133,6 +138,16 @@ def test_superuser_wird_beim_speichern_auch_staff() -> None:
 
 
 @pytest.mark.django_db
+def test_superuser_aus_fixture_wird_auch_staff() -> None:
+    """Auch ein Superuser aus einer Django-Fixture erreicht den Admin."""
+    call_command("loaddata", "superuser_ohne_staff", verbosity=0)
+
+    konto: Konto = Konto.objects.get(username="fixture-admin")
+
+    assert konto.is_staff
+
+
+@pytest.mark.django_db
 def test_konten_mit_rolle_oder_administration_enthaelt_beide() -> None:
     """Ko-Autorinnen können die Fachrolle oder Administration tragen."""
     ausbilderin: Konto = Konto.objects.create_user(username="ausbilderin")
@@ -142,7 +157,9 @@ def test_konten_mit_rolle_oder_administration_enthaelt_beide() -> None:
     )
     teilnehmerin: Konto = Konto.objects.create_user(username="teilnehmerin")
 
-    konten = Konto.objects.mit_rolle_oder_administration("Ausbilder:in")
+    konten: QuerySet[Konto] = Konto.objects.mit_rolle_oder_administration(
+        "Ausbilder:in"
+    )
 
     assert set(konten) == {ausbilderin, administratorin}
     assert teilnehmerin not in konten
