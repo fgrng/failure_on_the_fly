@@ -17,7 +17,7 @@ class KontoAdminTests(TestCase):
         self.client.force_login(admin)
 
         response = self.client.post(
-            "/admin/konten/konto/add/",
+            reverse("admin:konten_konto_add"),
             {
                 "username": "ada",
                 "password1": "sicheres-passwort",
@@ -39,7 +39,7 @@ class KontoAdminTests(TestCase):
         self.client.force_login(admin)
 
         response = self.client.post(
-            "/admin/konten/konto/add/",
+            reverse("admin:konten_konto_add"),
             {
                 "username": "ada",
                 "password1": "sicheres-passwort",
@@ -55,6 +55,50 @@ class KontoAdminTests(TestCase):
         self.assertTrue(konto.is_superuser)
         self.assertTrue(konto.is_staff)
         self.assertTrue(konto.groups.filter(pk=gruppe.pk).exists())
+
+    def test_administration_aendert_passwort_gehasht(self) -> None:
+        """Ein im Admin neu gesetztes Passwort wird gehasht gespeichert."""
+        admin = get_user_model().objects.create_user(
+            username="admin", password="admin-passwort", is_superuser=True
+        )
+        konto = get_user_model().objects.create_user(
+            username="ada", password="altes-passwort"
+        )
+        self.client.force_login(admin)
+
+        response = self.client.post(
+            reverse("admin:auth_user_password_change", args=(konto.pk,)),
+            {"password1": "neues-passwort", "password2": "neues-passwort"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        konto.refresh_from_db()
+        self.assertTrue(konto.check_password("neues-passwort"))
+
+    def test_administration_entzieht_rolle(self) -> None:
+        """Die Änderungsmaske entfernt eine zuvor zugewiesene fachliche Rolle."""
+        admin = get_user_model().objects.create_user(
+            username="admin", password="admin-passwort", is_superuser=True
+        )
+        gruppe = Group.objects.get(name="Autor:in")
+        konto = get_user_model().objects.create_user(
+            username="ada", password="sicheres-passwort"
+        )
+        konto.groups.add(gruppe)
+        self.client.force_login(admin)
+
+        response = self.client.post(
+            reverse("admin:konten_konto_change", args=(konto.pk,)),
+            {
+                "username": konto.username,
+                "is_active": "on",
+                "date_joined_0": konto.date_joined.strftime("%Y-%m-%d"),
+                "date_joined_1": konto.date_joined.strftime("%H:%M:%S"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(konto.groups.filter(pk=gruppe.pk).exists())
 
     def test_nur_superuser_erreicht_nicht_leeren_admin_index(self) -> None:
         """Die Administration bleibt der einzige Zugang zum Nutzerbereich."""
