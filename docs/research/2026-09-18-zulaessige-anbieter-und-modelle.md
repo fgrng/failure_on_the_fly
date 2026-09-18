@@ -1,6 +1,10 @@
 # Zulässige Anbieter und Modelle: OpenRouter und Infomaniak
 
-Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166) (`docs/open-questions.md` Frage 2).
+Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die offene Frage »Zulässige Anbieter und Modelle« aus `docs/open-questions.md`:
+
+> Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
+
+Die Frage hat damit zwei Hälften: die **Liste** und die **Gleichzeitigkeit**. Beide werden hier behandelt.
 Stand: 2026-09-18. Geprüfte Codebasis: `simulation/sprachmodell/__init__.py`, `simulation/transkription/__init__.py`, `simulation/models.py`, `erhebungen/export.py`, `config/settings.py`, `litellm==1.80.10`.
 
 Vorgabe aus dem Gespräch mit dem Dev: **genau zwei Anbieter** werden unterstützt — **OpenRouter** (Router auf die großen Anbieter) und **Infomaniak** (Schweizer Anbieter, souveräne Open-Source-Modelle). Zweite Vorgabe: **Zugangsdaten wandern aus den Umgebungsvariablen in die Modell-Konfiguration**, in eine benannte Feldgruppe, mit dem Anbieter als Auswahl aus einer festen Liste.
@@ -17,7 +21,7 @@ Die **Zugangsdaten wandern in die Konfiguration**, in eine benannte Feldgruppe `
 
 Beide Anbieter liefern ihre Modellliste per API — OpenRouter **öffentlich und nach Structured Output filterbar**, Infomaniak nur mit Token. Das trägt eine Autovervollständigung im Formular, aber keine harte Prüfung (Abschnitt 4).
 
-Zur eigentlichen Frage 2: **keine erzwungene Modellliste** (bestätigt #165), stattdessen zwei Betriebs-Tore und ein Rauchtest über den Probelauf.
+Zur ersten Hälfte der offenen Frage — der **Liste**: keine erzwungene Modellliste (bestätigt #165), stattdessen zwei Betriebs-Tore und ein Rauchtest über den Probelauf.
 
 ## 1. Sprachmodell-Naht
 
@@ -183,7 +187,7 @@ Beide Anbieter liefern ihre Modellliste über die API — mit einem entscheidend
 | Abfrage | Treffer | Nutzen |
 |---|---|---|
 | `?supported_parameters=structured_outputs` | 340 | Kandidaten für die Sprachmodell-Naht (ADR-0005) |
-| `?supported_parameters=structured_outputs,reasoning` | 239 | beides zugleich — beantwortet open-questions Frage 6 für OpenRouter |
+| `?supported_parameters=structured_outputs,reasoning` | 239 | beides zugleich — beantwortet für OpenRouter die zweite Hälfte der offenen Frage (»ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind«) |
 | `?output_modalities=transcription` | 21 | Kandidaten für die Transkriptions-Naht |
 
 Der kombinierte Filter wirkt als UND (alle 239 Treffer führen beide Parameter). Die Transkriptionsmodelle tauchen in der ungefilterten Liste **nicht** auf; sie sind nur über den Modalitätsfilter erreichbar.
@@ -232,7 +236,7 @@ Keine Sperre im Code — sie liegen in der Verantwortung der Betreiber:in (6.1).
 - **Greifen `zdr`/`data_collection` auf OpenRouters Transkriptionsroute?** Ohne Antwort ist die Transkription über OpenRouter nach ADR-0026 nicht freizugeben. Bei OpenRouter zu erfragen.
 - **AVV und Verarbeitungsort bei OpenRouter.** Ohne Klärung bleibt OpenRouter auf Training und Probelauf beschränkt.
 - **AVV bei Infomaniak.** Die öffentliche Zusage deckt ADR-0026 inhaltlich; das Papier fehlt.
-- **Verbindliche Modellliste von Infomaniak** über `GET /1/ai/models` mit Token — samt der Frage, welche Modelle Structured Output *und* Reasoning zugleich liefern. Für OpenRouter ist das mit 4.1 beantwortet (239 Modelle können beides).
+- **Verbindliche Modellliste von Infomaniak** über `GET /1/ai/models` mit Token — samt der Frage, welche Modelle Structured Output *und* Reasoning zugleich liefern. Für OpenRouter ist diese zweite Hälfte der offenen Frage mit 4.1 beantwortet (239 Modelle können beides); für Infomaniak bleibt sie offen — und wird gegenstandslos, falls die native Spur nach Abschnitt 7 fällt.
 - **Empirische Prüfung**, ob Infomaniak eine native Reasoning-Spur als Text zurückgibt oder nur `reasoning_tokens` zählt.
 - **Verschlüsselung von `anbieter_token` at rest** — eigene Entscheidung, nicht Teil dieser Frage.
 
@@ -296,7 +300,7 @@ Bei positiver Entscheidung:
 
 - ADR zu den zwei zulässigen Anbietern und der Nicht-Erzwingung der Modellliste.
 - ADR zur Anbieter-Feldgruppe, zur Trennung der beiden Konfigurationen und zu ihren unterschiedlichen Lebensdauern (append-only vs. veränderlich).
-- `docs/open-questions.md` Frage 2 streichen.
+- Die Frage »Zulässige Anbieter und Modelle« in `docs/open-questions.md` streichen.
 - Ticket: Anbieter-Feldgruppe an `ModellKonfiguration` samt Migration, `clean()`-Prüfung je Anbieter, write-only-Token, Maskierung an beiden Anzeigestellen, `anbieter` im Export (ADR-0029 ergänzen).
 - Ticket: `TranskriptionsKonfiguration` als eigenes, veränderliches Objekt; löst `TRANSKRIPTION_ANBIETER`/`TRANSKRIPTION_MODELL` ab, nicht im Export.
 - Ticket: Autovervollständigung der Modellnamen im Anlegeformular aus den Anbieter-APIs (Abschnitt 4).

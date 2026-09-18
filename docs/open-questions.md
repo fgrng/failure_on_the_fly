@@ -14,3 +14,7 @@ Superuser in ADR-0033 entschieden; nur die drei Fachrollen sind Groups.
 ## 2. Zulässige Anbieter und Modelle
 
 `docs/adr/0005` schreibt fest, dass die Denkspur immer aus dem Structured Output stammt. Damit sind nur Anbieter und Modelle zulässig, die das beherrschen. Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
+
+**Stand 2026-09-18** ([#166](https://github.com/fgrng/failure_on_the_fly/issues/166), Recherche in `docs/research/2026-09-18-zulaessige-anbieter-und-modelle.md`): Unterstützt werden **OpenRouter** und **Infomaniak**. Die Liste wird **nicht erzwungen** — bei OpenRouter hängt Structured Output am Endpunkt statt am Modell, eine Namens-Whitelist wäre Scheinsicherheit; geprüft wird stattdessen die Anbieterbindung. Die Gleichzeitigkeit von Structured Output und nativem Reasoning ist für OpenRouter beantwortet (239 Modelle können beides), für Infomaniak offen.
+
+Die Frage bleibt dennoch stehen, weil zweierlei aussteht: der ADR, und die Überlegung, die **native Reasoning-Spur ganz zu streichen** und das Structured Output für alle Modelle zu vereinheitlichen (zur Diskussion an [#168](https://github.com/fgrng/failure_on_the_fly/issues/168)). Fällt die native Spur, verliert die zweite Hälfte dieser Frage ihren Gegenstand.
