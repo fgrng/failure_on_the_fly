@@ -28,3 +28,8 @@ python_files = ["test_*.py"]
 [tool.ruff]
 line-length = 88
 target-version = "py314"
+
+[tool.ruff.format]
+# Django generiert Migrationen; ihr Umbruch ist nicht unsere Entscheidung.
+# Der Linter prüft sie weiterhin, nur der Formatter lässt sie in Ruhe.
+exclude = ["**/migrations/**"]
