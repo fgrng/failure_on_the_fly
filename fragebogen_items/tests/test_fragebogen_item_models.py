@@ -67,7 +67,9 @@ class FragebogenItemHistorieTests(TestCase):
         administratorin: Konto = get_user_model().objects.create_user(username="admin")
         administratorin.is_superuser = True
         administratorin.save()
-        fremde_historie: FragebogenItemHistorie = FragebogenItemHistorie.objects.create()
+        fremde_historie: FragebogenItemHistorie = (
+            FragebogenItemHistorie.objects.create()
+        )
         fremde_historie.eigentuemerinnen.add(
             get_user_model().objects.create_user(username="linus")
         )

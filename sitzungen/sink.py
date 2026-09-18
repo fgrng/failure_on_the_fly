@@ -211,9 +211,7 @@ class ScratchSink:
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
         """Liefert die gespeicherten Schritte für Ansicht und Modellverlauf."""
 
-        return cast(
-            list[GespraechsschrittDaten], self._zustand["gespraechsschritte"]
-        )
+        return cast(list[GespraechsschrittDaten], self._zustand["gespraechsschritte"])
 
     @property
     def vignette_pk(self) -> int:
@@ -352,9 +350,7 @@ class ScratchSink:
     def zeitbudget_anhalten(self) -> None:
         """Hält die Uhr für Modellaufruf und Fehlversuche an."""
 
-        startzeit: float | None = self._zustand.pop(
-            _ZEIT_LAEUFT_SEIT_SCHLUESSEL, None
-        )
+        startzeit: float | None = self._zustand.pop(_ZEIT_LAEUFT_SEIT_SCHLUESSEL, None)
         if startzeit is not None:
             self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = self.verbrauchte_zeit + (
                 monotonic() - startzeit

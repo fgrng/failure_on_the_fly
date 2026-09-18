@@ -63,12 +63,8 @@ urlpatterns: list[URLPattern] = [
         name="konfiguration_speichern",
     ),
     path("eigene/<int:pk>/loeschen/", views.loeschen, name="loeschen"),
-    path(
-        "eigene/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"
-    ),
-    path(
-        "eigene/<int:pk>/zurueckziehen/", views.zurueckziehen, name="zurueckziehen"
-    ),
+    path("eigene/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
+    path("eigene/<int:pk>/zurueckziehen/", views.zurueckziehen, name="zurueckziehen"),
     path("eigene/<int:pk>/archivieren/", views.archivieren, name="archivieren"),
     path(
         "eigene/<int:pk>/entarchivieren/",
@@ -97,7 +93,9 @@ urlpatterns: list[URLPattern] = [
         name="instruktion",
     ),
     path("teilnahme/<uuid:teilnahme_link>/spielen/", views.spielen, name="spielen"),
-    path("teilnahme/<uuid:teilnahme_link>/abschluss/", views.abschluss, name="abschluss"),
+    path(
+        "teilnahme/<uuid:teilnahme_link>/abschluss/", views.abschluss, name="abschluss"
+    ),
     path("teilnahme/token/<str:token>/items/", views.itemblock, name="itemblock"),
     path("teilnahme/token/<str:token>/gespraech/", views.gespraech, name="gespraech"),
     path(

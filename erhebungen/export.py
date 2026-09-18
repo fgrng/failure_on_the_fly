@@ -34,9 +34,7 @@ def _csv_inhalt(spalten: Sequence[str], zeilen: Iterable[Sequence[Any]]) -> str:
     ausgabe: StringIO = StringIO(newline="")
     schreiber: Any = csv.writer(ausgabe)
     schreiber.writerow(spalten)
-    schreiber.writerows(
-        [_zellenwert(wert) for wert in zeile] for zeile in zeilen
-    )
+    schreiber.writerows([_zellenwert(wert) for wert in zeile] for zeile in zeilen)
     return ausgabe.getvalue()
 
 
@@ -80,7 +78,12 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             _csv_inhalt(
                 ("id", "beginn", "ende", "archiviert"),
                 (
-                    (stichprobe.pk, stichprobe.beginn, stichprobe.ende, stichprobe.archiviert)
+                    (
+                        stichprobe.pk,
+                        stichprobe.beginn,
+                        stichprobe.ende,
+                        stichprobe.archiviert,
+                    )
                     for stichprobe in erhebung.stichprobe_set.order_by("pk")
                 ),
             ),
@@ -109,11 +112,9 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        ziehungen: QuerySet[Vignettenziehung] = (
-            Vignettenziehung.objects.filter(
-                erhebungsbindung__stichprobe__erhebung=erhebung
-            ).order_by("erhebungsbindung_id", "position")
-        )
+        ziehungen: QuerySet[Vignettenziehung] = Vignettenziehung.objects.filter(
+            erhebungsbindung__stichprobe__erhebung=erhebung
+        ).order_by("erhebungsbindung_id", "position")
         ziehung_vignetten_ids = ziehungen.values("vignette_id")
         zip_datei.writestr(
             "vignettenziehungen.csv",
@@ -129,11 +130,9 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        positionen: QuerySet[Vignettenposition] = (
-            Vignettenposition.objects.filter(
-                erhebungsbindung__stichprobe__erhebung=erhebung
-            ).order_by("erhebungsbindung_id", "position")
-        )
+        positionen: QuerySet[Vignettenposition] = Vignettenposition.objects.filter(
+            erhebungsbindung__stichprobe__erhebung=erhebung
+        ).order_by("erhebungsbindung_id", "position")
         zip_datei.writestr(
             "sitzungen.csv",
             _csv_inhalt(
@@ -227,10 +226,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             ),
         )
         vignetten: QuerySet[Vignette] = Vignette.objects.filter(
-            Q(
-                pk__in=ziehung_vignetten_ids
-            )
-            | Q(pk__in=positionen.values("vignette_id"))
+            Q(pk__in=ziehung_vignetten_ids) | Q(pk__in=positionen.values("vignette_id"))
         ).order_by("pk")
         zip_datei.writestr(
             "vignettenfassungen.csv",

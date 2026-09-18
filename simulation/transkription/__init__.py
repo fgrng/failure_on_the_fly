@@ -51,9 +51,7 @@ class OpenAITranskription:
         """Sendet Audio nur bei zugesicherter Zero-Retention an OpenAI."""
 
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
-            raise TranskriptionsAnbieterfehler(
-                "Die Zero-Retention-Zusicherung fehlt."
-            )
+            raise TranskriptionsAnbieterfehler("Die Zero-Retention-Zusicherung fehlt.")
         if settings.TRANSKRIPTION_ANBIETER != "openai":
             raise TranskriptionsAnbieterfehler("Unbekannter Transkriptions-Anbieter.")
         try:

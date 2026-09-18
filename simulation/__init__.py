@@ -51,13 +51,10 @@ def render(vorlage_text: str, mapping: Mapping[str, str]) -> str:
     """Füllt eine Vorlage mit genau ihren vereinbarten Platzhaltern."""
 
     vorlage: Template = Template(vorlage_text)
-    ueberzaehlige_platzhalter: set[str] = set(mapping) - set(
-        vorlage.get_identifiers()
-    )
+    ueberzaehlige_platzhalter: set[str] = set(mapping) - set(vorlage.get_identifiers())
     if ueberzaehlige_platzhalter:
         raise ValueError(
-            "Überzählige Platzhalter: "
-            f"{', '.join(sorted(ueberzaehlige_platzhalter))}."
+            f"Überzählige Platzhalter: {', '.join(sorted(ueberzaehlige_platzhalter))}."
         )
     return vorlage.substitute(mapping)
 

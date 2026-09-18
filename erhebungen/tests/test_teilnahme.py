@@ -34,9 +34,7 @@ class ErhebungsteilnahmeTests(TestCase):
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
             parameter={
-                "skript": [
-                    {"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."}
-                ]
+                "skript": [{"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."}]
             },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
@@ -201,7 +199,9 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
         self.assertEqual(Erhebungsbindung.objects.count(), 1)
-        self.assertEqual(Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id)
+        self.assertEqual(
+            Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id
+        )
 
     def test_einwilligung_holt_die_getrennte_audioentscheidung_ein(self) -> None:
         """Teilnahme und Audioverarbeitung bleiben zwei unabhängige Zustimmungen."""
@@ -266,7 +266,9 @@ class ErhebungsteilnahmeTests(TestCase):
         )
 
         self.assertEqual(antwort.status_code, 400)
-        self.assertFalse(Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt)
+        self.assertFalse(
+            Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt
+        )
 
     def test_einwilligung_und_instruktion_zeigen_die_erhebungstexte(self) -> None:
         """Die Teilnahme informiert vor dem Spiel über Zustimmung und Begrenzung."""
@@ -353,9 +355,7 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
-        gespraech_url: str = reverse(
-            "erhebungen:gespraech", args=[bindung.token]
-        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
         self.assertRedirects(start_antwort, gespraech_url)
         self.assertEqual(Vignettenposition.objects.get().position, 1)
         fortsetzung: HttpResponse = self.client.post(
@@ -412,13 +412,13 @@ class ErhebungsteilnahmeTests(TestCase):
             antwort, reverse("erhebungen:gespraech", args=[bindung.token])
         )
         self.assertEqual(
-            list(
-                Vignettenposition.objects.values_list("vignette_id", "position")
-            ),
+            list(Vignettenposition.objects.values_list("vignette_id", "position")),
             [(erste.pk, 1), (zweite.pk, 2)],
         )
 
-    def test_abschluss_block_speichert_antworten_und_darf_uebersprungen_werden(self) -> None:
+    def test_abschluss_block_speichert_antworten_und_darf_uebersprungen_werden(
+        self,
+    ) -> None:
         """Der Abschluss-Block legt Nonresponse an und speichert sofort pro Feld."""
 
         self._vignette_anlegen()
@@ -443,7 +443,9 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
         self.assertContains(gespeicherte_antwort, "Hilfreich")
-        self.assertEqual(itemantwort.erhebungsbindung.itemantworten.get().freitext, "Hilfreich")
+        self.assertEqual(
+            itemantwort.erhebungsbindung.itemantworten.get().freitext, "Hilfreich"
+        )
         weiter = self.client.post(
             block_url, {"antwort": itemantwort.pk, "weiter": "ja"}
         )
@@ -711,9 +713,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Die Diagnose schließt die Sitzung und ergänzt ihren Itemblock in-place."""
 
         self._vignette_anlegen()
-        self._fragebogen_item_nach_sitzung_anlegen(
-            "Wie hilfreich war das Gespräch?"
-        )
+        self._fragebogen_item_nach_sitzung_anlegen("Wie hilfreich war das Gespräch?")
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -883,7 +883,9 @@ class ErhebungsteilnahmeTests(TestCase):
             beginn=timezone.now(),
             ende=timezone.now() + timedelta(days=1),
         )
-        self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
+        self.url = reverse(
+            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
+        )
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
@@ -916,7 +918,9 @@ class ErhebungsteilnahmeTests(TestCase):
             beginn=timezone.now(),
             ende=timezone.now() + timedelta(days=1),
         )
-        self.url = reverse("erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link])
+        self.url = reverse(
+            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
+        )
         self._vignette_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
@@ -929,7 +933,9 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
         schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
         self.assertIsNone(schritt.aeusserung)
-        self.assertEqual(Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3)
+        self.assertEqual(
+            Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3
+        )
 
     def test_vorzeitiges_gespraechsende_zeigt_den_debrief(self) -> None:
         """Ein freiwilliges Ende führt bei laufender Sitzung in den Debrief."""

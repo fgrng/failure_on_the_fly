@@ -101,9 +101,9 @@ def itemseite_prototype(request: HttpRequest) -> HttpResponse:
     variante: str = request.GET.get("variant", "a")
     if variante not in _ITEMSEITEN_PROTOTYP_VARIANTEN:
         variante = "a"
-    bezeichnung, vorherige_variante, naechste_variante = (
-        _ITEMSEITEN_PROTOTYP_VARIANTEN[variante]
-    )
+    bezeichnung, vorherige_variante, naechste_variante = _ITEMSEITEN_PROTOTYP_VARIANTEN[
+        variante
+    ]
 
     return render(
         request,
@@ -126,9 +126,8 @@ def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
 def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
     """Liefert berechtigte Konten außerhalb des Eigentümer-Kreises."""
 
-    return (
-        Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE)
-        .exclude(erhebung=erhebung)
+    return Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE).exclude(
+        erhebung=erhebung
     )
 
 
@@ -228,7 +227,9 @@ def _itemzeilen(
             aktionen.append(
                 {
                     "beschriftung": "Entfernen",
-                    "aktion_url": reverse(aktion, args=[erhebung.pk, zugehoerigkeit.pk]),
+                    "aktion_url": reverse(
+                        aktion, args=[erhebung.pk, zugehoerigkeit.pk]
+                    ),
                 }
             )
             zeile["aktionen"] = aktionen
@@ -400,9 +401,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def koautorin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
+def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Entfernt eine Eigentümerin, ohne aktive Erhebungen zu verwaisen."""
 
     if request.method != "POST":
@@ -1097,7 +1096,9 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             wert = request.POST[feld]
             if antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT:
                 if wert and wert not in {"1", "2", "3", "4", "5", "6"}:
-                    return HttpResponseBadRequest("Likert-Stufen liegen zwischen 1 und 6.")
+                    return HttpResponseBadRequest(
+                        "Likert-Stufen liegen zwischen 1 und 6."
+                    )
                 antwort.likert_stufe = int(wert) if wert else None
                 antwort.freitext = None
             else:
@@ -1117,8 +1118,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
                     return redirect("erhebungen:gespraech", token=bindung.token)
                 return _weiter_nach_der_letzten_vignette(bindung)
             if any(
-                antwort.erhebungsitem.andockpunkt
-                != Erhebungsitem.Andockpunkt.AM_ENDE
+                antwort.erhebungsitem.andockpunkt != Erhebungsitem.Andockpunkt.AM_ENDE
                 for antwort in antworten
             ):
                 return HttpResponseBadRequest("Unbekannter Abschluss-Block.")
@@ -1211,7 +1211,10 @@ def _laufende_bindung(token: str) -> Erhebungsbindung:
         Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"),
         token=token,
     )
-    if bindung.stichprobe.archiviert or bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND:
+    if (
+        bindung.stichprobe.archiviert
+        or bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND
+    ):
         raise PermissionDenied
     return bindung
 

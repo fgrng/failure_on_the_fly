@@ -122,7 +122,9 @@ class FakeSprachmodell:
             )
         except KeyError as exc:
             raise Formatbruch(str(eintrag.get("rohantwort", ""))) from exc
-        if not isinstance(antwort.denkspur, str) or not isinstance(antwort.aeusserung, str):
+        if not isinstance(antwort.denkspur, str) or not isinstance(
+            antwort.aeusserung, str
+        ):
             raise Formatbruch(str(eintrag.get("rohantwort", "")))
         native_reasoning_spur: object = eintrag.get("native_reasoning_spur")
         if native_reasoning_spur is not None and not isinstance(
@@ -194,14 +196,24 @@ class LiteLLMSprachmodell:
             )
         except ContentFilter:
             raise
-        except (AttributeError, IndexError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        except (
+            AttributeError,
+            IndexError,
+            KeyError,
+            TypeError,
+            json.JSONDecodeError,
+        ) as exc:
             raise Formatbruch(rohantwort) from exc
-        if not isinstance(antwort.denkspur, str) or not isinstance(antwort.aeusserung, str):
+        if not isinstance(antwort.denkspur, str) or not isinstance(
+            antwort.aeusserung, str
+        ):
             raise Formatbruch(rohantwort)
 
         native_reasoning_spur: object = getattr(nachricht, "reasoning_content", None)
         if native_reasoning_spur is None:
             native_reasoning_spur = getattr(nachricht, "thinking", None)
-        if native_reasoning_spur is not None and not isinstance(native_reasoning_spur, str):
+        if native_reasoning_spur is not None and not isinstance(
+            native_reasoning_spur, str
+        ):
             raise Formatbruch(rohantwort)
         return antwort, native_reasoning_spur

@@ -206,7 +206,9 @@ class Simulationskern(models.Model):
 
         if self._state.adding:
             if not getattr(self, "_wird_angelegt", False):
-                raise RuntimeError("Kern-Fassungen werden über die Anlege-Naht erzeugt.")
+                raise RuntimeError(
+                    "Kern-Fassungen werden über die Anlege-Naht erzeugt."
+                )
         else:
             vorherige_fassung: Simulationskern = type(self).objects.get(pk=self.pk)
             if vorherige_fassung.zustand != self.Zustand.ENTWURF:
@@ -215,16 +217,22 @@ class Simulationskern(models.Model):
                 self.zustand != vorherige_fassung.zustand
                 or self.finalisiert_am != vorherige_fassung.finalisiert_am
             ):
-                raise RuntimeError("Zustandswechsel laufen über die Lebenszyklus-Methoden.")
+                raise RuntimeError(
+                    "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+                )
         super().save(*args, **kwargs)
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
 
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ENTWURF,
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.ENTWURF,
+            )
+            .exists()
+        ):
             raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete(*args, **kwargs)
 
@@ -237,10 +245,14 @@ class Simulationskern(models.Model):
     def bearbeiten(self) -> "Simulationskern":
         """Erzeugt aus einer finalen Fassung einen neuen Entwurf."""
 
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.FINAL,
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.FINAL,
+            )
+            .exists()
+        ):
             raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
         return type(self).objects._erstellen(
             historie=self.historie,
@@ -263,12 +275,16 @@ class Simulationskern(models.Model):
         self.full_clean()
         self.save()
         finalisiert_am: datetime = timezone.now()
-        if not self._schreibqueryset().filter(
-            pk=self.pk,
-            zustand=self.Zustand.ENTWURF,
-        ).update(
-            zustand=self.Zustand.FINAL,
-            finalisiert_am=finalisiert_am,
+        if (
+            not self._schreibqueryset()
+            .filter(
+                pk=self.pk,
+                zustand=self.Zustand.ENTWURF,
+            )
+            .update(
+                zustand=self.Zustand.FINAL,
+                finalisiert_am=finalisiert_am,
+            )
         ):
             raise ValueError("Der Kern-Entwurf wurde inzwischen geändert.")
         self.zustand = self.Zustand.FINAL
@@ -278,10 +294,14 @@ class Simulationskern(models.Model):
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
 
-        if not self._schreibqueryset().filter(
-            pk=self.pk,
-            zustand=self.Zustand.FINAL,
-        ).update(zustand=self.Zustand.ARCHIVIERT):
+        if (
+            not self._schreibqueryset()
+            .filter(
+                pk=self.pk,
+                zustand=self.Zustand.FINAL,
+            )
+            .update(zustand=self.Zustand.ARCHIVIERT)
+        ):
             raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
         self.zustand = self.Zustand.ARCHIVIERT
 
@@ -289,10 +309,14 @@ class Simulationskern(models.Model):
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
 
-        if not self._schreibqueryset().filter(
-            pk=self.pk,
-            zustand=self.Zustand.ARCHIVIERT,
-        ).update(zustand=self.Zustand.FINAL):
+        if (
+            not self._schreibqueryset()
+            .filter(
+                pk=self.pk,
+                zustand=self.Zustand.ARCHIVIERT,
+            )
+            .update(zustand=self.Zustand.FINAL)
+        ):
             raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
         self.zustand = self.Zustand.FINAL
 

@@ -21,7 +21,10 @@ def test_fake_transkription_liefert_das_naechste_skript_transkript() -> None:
 
     transkription = FakeTranskription(["Wie hast du gerechnet?"])
 
-    assert transkription.transkribieren(b"aufgenommene-audiobytes") == "Wie hast du gerechnet?"
+    assert (
+        transkription.transkribieren(b"aufgenommene-audiobytes")
+        == "Wie hast du gerechnet?"
+    )
 
 
 @pytest.mark.parametrize(
@@ -55,7 +58,9 @@ def test_openai_transkription_ohne_zero_retention_nicht_aufruft() -> None:
     TRANSKRIPTION_MODELL="gpt-4o-transcribe",
     TRANSKRIPTION_ZERO_RETENTION=True,
 )
-def test_openai_transkription_reicht_audio_ohne_sprache_an_konfiguriertes_modell() -> None:
+def test_openai_transkription_reicht_audio_ohne_sprache_an_konfiguriertes_modell() -> (
+    None
+):
     """OpenAI erkennt die Sprache selbst."""
 
     audio = b"aufgenommene-audiobytes"
@@ -121,7 +126,9 @@ def test_openai_transkription_kennzeichnet_leere_antwort() -> None:
 
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
-def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler() -> None:
+def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler() -> (
+    None
+):
     """Eine unerwartete Anbieternachricht bleibt kein technisches Detail der Naht."""
 
     client = Mock()

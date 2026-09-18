@@ -64,9 +64,8 @@ def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
 
 def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Konto]:
     """Liefert Autorinnen und Administratorinnen außerhalb des Eigentümer-Kreises."""
-    return (
-        Konto.objects.mit_rolle_oder_administration(AUTORIN_GRUPPE)
-        .exclude(vignettenhistorie=historie)
+    return Konto.objects.mit_rolle_oder_administration(AUTORIN_GRUPPE).exclude(
+        vignettenhistorie=historie
     )
 
 
@@ -127,7 +126,9 @@ def anlegen(request: HttpRequest) -> HttpResponse:
             return redirect("vignetten:detail", pk=vignette.pk)
     else:
         form = VignetteForm(initial=zufaellige_akteure())
-    return render(request, "vignetten/anlegen.html", {"form": form, **_unterrichtskontext_werte()})
+    return render(
+        request, "vignetten/anlegen.html", {"form": form, **_unterrichtskontext_werte()}
+    )
 
 
 @login_required
@@ -165,9 +166,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_autorin_erforderlich
-def koautorin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
+def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Entfernt eine Ko-Autorin, ohne die aktive Historie eigentümerlos zu lassen."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -237,9 +236,7 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    finale: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.FINAL
-    )
+    finale: Vignette = _sichtbare_fassung_laden(request, pk, Vignette.Zustand.FINAL)
     entwurf: Vignette | None = Vignette.objects.filter(
         historie=finale.historie,
         zustand=Vignette.Zustand.ENTWURF,
@@ -260,9 +257,7 @@ reversionieren = neue_fassung
 @_autorin_erforderlich
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die Inhaltsfelder eines eigenen Entwurfs."""
-    vignette: Vignette = _sichtbare_fassung_laden(
-        request, pk, Vignette.Zustand.ENTWURF
-    )
+    vignette: Vignette = _sichtbare_fassung_laden(request, pk, Vignette.Zustand.ENTWURF)
     if request.method == "POST":
         form: VignetteForm = VignetteForm(
             request.POST, request.FILES, instance=vignette

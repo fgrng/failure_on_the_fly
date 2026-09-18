@@ -14,7 +14,9 @@ def test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an() -> None:
 
     kern: Simulationskern = Simulationskern.objects.get()
     assert kern.zustand == Simulationskern.Zustand.FINAL
-    assert "innerhalb des kurzen Gesprächs nicht plötzlich" in kern.system_prompt_vorlage
+    assert (
+        "innerhalb des kurzen Gesprächs nicht plötzlich" in kern.system_prompt_vorlage
+    )
     assert "$fehlermuster_beschreibung" in kern.system_prompt_vorlage
     assert "<fehlermuster_beschreibung>" not in kern.system_prompt_vorlage
     assert "$arbeitsheft" in kern.user_prompt_vorlage

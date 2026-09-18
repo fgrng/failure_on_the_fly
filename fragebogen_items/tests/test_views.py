@@ -190,7 +190,9 @@ class FragebogenItemReversionierenViewTests(TestCase):
         )
 
         self.assertContains(editor, "Typwechsel")
-        self.assertRedirects(response, reverse("fragebogen_items:detail", args=[entwurf.pk]))
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[entwurf.pk])
+        )
         entwurf.refresh_from_db()
         self.assertEqual(entwurf.typ, FragebogenItem.Typ.LIKERT)
 
@@ -450,9 +452,7 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         self.ada = _forschende("ada")
         self.grace = _forschende("grace")
         self.linus = _forschende("linus")
-        self.item = FragebogenItem.objects.anlegen(
-            self.ada, wortlaut="Geteiltes Item"
-        )
+        self.item = FragebogenItem.objects.anlegen(self.ada, wortlaut="Geteiltes Item")
 
     def test_editor_zeigt_die_eigentuemerin(self) -> None:
         """Die Eigentümerin erscheint in der Ko-Autorinnenliste des Editors."""
@@ -624,5 +624,5 @@ class FragebogenItemListeViewTests(TestCase):
         self.assertContains(response, "Entwurf")
         self.assertContains(response, "Bereits final")
         self.assertContains(response, "Final")
-        self.assertContains(response, 'badge--final')
-        self.assertContains(response, 'badge--research')
+        self.assertContains(response, "badge--final")
+        self.assertContains(response, "badge--research")

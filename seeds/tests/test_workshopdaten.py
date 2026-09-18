@@ -45,9 +45,7 @@ class WorkshopdatenTests(TestCase):
                 )
                 self.assertFalse(konto.is_staff)
                 self.assertFalse(konto.is_superuser)
-                self.assertTrue(
-                    Client().login(username=anmeldename, password=passwort)
-                )
+                self.assertTrue(Client().login(username=anmeldename, password=passwort))
 
     def test_stellt_kern_und_aktive_modell_konfiguration_bereit(self) -> None:
         """Ohne beides käme kein Probelauf zustande."""

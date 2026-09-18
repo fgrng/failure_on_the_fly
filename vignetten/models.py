@@ -70,6 +70,7 @@ class Aufgabenkontextteil:
         """Liefert den Text des Teils ohne Positionsmarker."""
         return self.text_vor_bild + self.text_nach_bild
 
+
 _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "fehlermuster_beschreibung",
     "schuelerin_name",
@@ -124,9 +125,7 @@ class VignetteQuerySet(models.QuerySet["Vignette"]):
 
     def sichtbar_fuer(self, konto: "Konto") -> "VignetteQuerySet":
         """Liefert Fassungen aus den für das Konto sichtbaren Historien."""
-        return self.filter(
-            historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto)
-        )
+        return self.filter(historie__in=Vignettenhistorie.objects.sichtbar_fuer(konto))
 
     def bulk_create(
         self,
@@ -230,7 +229,8 @@ class Vignette(models.Model):
         "self", null=True, blank=True, on_delete=models.PROTECT
     )
     fehlermuster_beschreibung: models.TextField = models.TextField(
-        blank=True, help_text="Ausführliche Beschreibung des Fehlermusters; bestenfalls mit Beispielen für fehlerbezogenes Verhalten. Wird für die Simulation einbezogen."
+        blank=True,
+        help_text="Ausführliche Beschreibung des Fehlermusters; bestenfalls mit Beispielen für fehlerbezogenes Verhalten. Wird für die Simulation einbezogen.",
     )
     lernauftrag_text: models.TextField = models.TextField(
         blank=True,
@@ -399,9 +399,8 @@ class Vignette(models.Model):
                 raise RuntimeError("Vignetten werden über die Anlege-Naht erzeugt.")
         else:
             gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
-            if (
-                self.zustand != gespeicherte_fassung.zustand
-                and not getattr(self, "_wechselt_zustand", False)
+            if self.zustand != gespeicherte_fassung.zustand and not getattr(
+                self, "_wechselt_zustand", False
             ):
                 raise ValidationError(
                     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
@@ -417,10 +416,14 @@ class Vignette(models.Model):
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ENTWURF,
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.ENTWURF,
+            )
+            .exists()
+        ):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         historie_id: int = self.historie_id
         ergebnis: tuple[int, dict[str, int]] = super().delete(*args, **kwargs)
@@ -476,10 +479,14 @@ class Vignette(models.Model):
     @transaction.atomic
     def vorspulen(self) -> None:
         """Pinnt einen Entwurf auf die aktuellste finale Kern-Fassung."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ENTWURF,
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.ENTWURF,
+            )
+            .exists()
+        ):
             raise ValidationError("Nur Entwürfe können vorgespult werden.")
         self.gepinnter_kern = Simulationskern.objects.filter(
             zustand=Simulationskern.Zustand.FINAL
@@ -489,21 +496,31 @@ class Vignette(models.Model):
     @transaction.atomic
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.FINAL,
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.FINAL,
+            )
+            .exists()
+        ):
             raise ValidationError("Nur finale Fassungen können archiviert werden.")
         self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
 
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
-        if not type(self).objects.filter(
-            pk=self.pk,
-            zustand=self.Zustand.ARCHIVIERT,
-        ).exists():
-            raise ValidationError("Nur archivierte Fassungen können entarchiviert werden.")
+        if (
+            not type(self)
+            .objects.filter(
+                pk=self.pk,
+                zustand=self.Zustand.ARCHIVIERT,
+            )
+            .exists()
+        ):
+            raise ValidationError(
+                "Nur archivierte Fassungen können entarchiviert werden."
+            )
         self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
 
     @transaction.atomic
@@ -512,9 +529,7 @@ class Vignette(models.Model):
         if self.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können finalisiert werden.")
         fehlende_felder: list[str] = [
-            feldname
-            for feldname in _PFLICHTFELD_NAMEN
-            if not getattr(self, feldname)
+            feldname for feldname in _PFLICHTFELD_NAMEN if not getattr(self, feldname)
         ]
         if fehlende_felder:
             raise ValidationError(
@@ -534,7 +549,9 @@ class Vignette(models.Model):
         if self.budget_wert is None or self.budget_wert <= 0:
             raise ValidationError("Zum Finalisieren muss das Budget größer als 0 sein.")
         if self.gepinnter_kern is None:
-            raise ValidationError("Zum Finalisieren fehlt ein gepinnter Simulationskern.")
+            raise ValidationError(
+                "Zum Finalisieren fehlt ein gepinnter Simulationskern."
+            )
         if self.gepinnter_kern.zustand == Simulationskern.Zustand.ARCHIVIERT:
             raise ValidationError(
                 "Der gepinnte Simulationskern wurde archiviert; bitte vorspulen()."
@@ -584,9 +601,7 @@ class Vignette(models.Model):
             # Der Probelauf leitet daraus bereits Rahmenhandlung und
             # Illustrationen ab.
             models.CheckConstraint(
-                condition=~(
-                    Q(schuelerin_geschlecht="") | Q(lehrperson_geschlecht="")
-                ),
+                condition=~(Q(schuelerin_geschlecht="") | Q(lehrperson_geschlecht="")),
                 name="vignetten_geschlechter_nicht_leer",
             ),
         ]
@@ -642,9 +657,7 @@ def _aufgabenkontext_prompt(teil: Aufgabenkontextteil) -> str:
     else:
         stuecke = ((f"{name}_text", teil.text),)
     inhalt: str = "\n".join(
-        umgebung
-        for tag, wert in stuecke
-        if (umgebung := _umgebung(tag, wert))
+        umgebung for tag, wert in stuecke if (umgebung := _umgebung(tag, wert))
     )
     return _huelle(name, inhalt)
 

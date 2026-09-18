@@ -43,7 +43,8 @@ def block_vorlegen(
             erhebungsbindung=bindung,
             erhebungsitem__andockpunkt=andockpunkt,
             sitzung=sitzung,
-        ).select_related("erhebungsitem__item")
+        )
+        .select_related("erhebungsitem__item")
         .order_by("erhebungsitem__position")
     )
 

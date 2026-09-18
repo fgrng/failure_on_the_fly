@@ -232,9 +232,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
             hinzufuegen, reverse("erhebungen:detail", args=[erhebung.pk])
         )
         self.client.force_login(grace)
-        self.assertContains(
-            self.client.get(reverse("erhebungen:liste")), erhebung.name
-        )
+        self.assertContains(self.client.get(reverse("erhebungen:liste")), erhebung.name)
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[erhebung.pk])
         )
@@ -348,9 +346,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.assertRedirects(
             entfernen, reverse("erhebungen:detail", args=[erhebung.pk])
         )
-        self.assertEqual(
-            set(erhebung.eigentuemerinnen.all()), {ada, administratorin}
-        )
+        self.assertEqual(set(erhebung.eigentuemerinnen.all()), {ada, administratorin})
 
 
 class ErhebungenEntwurfKonfigurierenTests(TestCase):

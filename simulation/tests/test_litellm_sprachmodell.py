@@ -17,8 +17,9 @@ from simulation.sprachmodell import (
 from vignetten.models import Vignette
 
 
-def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_durch(
-) -> None:
+def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_durch() -> (
+    None
+):
     """Der Modell-String routet LiteLLM, ohne dass ein Anbieterzweig entsteht."""
 
     completion = Mock(

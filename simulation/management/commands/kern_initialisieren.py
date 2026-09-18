@@ -15,7 +15,5 @@ class Command(BaseCommand):
         if Simulationskern.objects.exists():
             return
 
-        kern: Simulationskern = Simulationskern.objects.anlegen(
-            **STANDARDKERN_VORLAGEN
-        )
+        kern: Simulationskern = Simulationskern.objects.anlegen(**STANDARDKERN_VORLAGEN)
         kern.finalisieren()

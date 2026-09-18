@@ -69,9 +69,8 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 
 def _moegliche_koautorinnen(training: Training) -> QuerySet[Konto]:
     """Liefert Ausbilderinnen und Administration außerhalb des Eigentümer-Kreises."""
-    return (
-        Konto.objects.mit_rolle_oder_administration(AUSBILDERIN_GRUPPE)
-        .exclude(training=training)
+    return Konto.objects.mit_rolle_oder_administration(AUSBILDERIN_GRUPPE).exclude(
+        training=training
     )
 
 
@@ -315,9 +314,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_ausbilderin_erforderlich
-def koautorin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
+def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Entfernt eine Ko-Autorin, ohne das Training eigentümerlos zu lassen."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])

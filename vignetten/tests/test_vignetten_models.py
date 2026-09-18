@@ -117,7 +117,7 @@ def test_prompt_platzhalter_reicht_spitze_klammern_unveraendert_durch() -> None:
         Vignette(
             fehlermuster_beschreibung="a < b & b > c",
             lernauftrag_text="Vergleiche <a> mit &amp;.",
-            arbeitsheft_simulationshinweise="Mia schreibt \"5 < 7\".",
+            arbeitsheft_simulationshinweise='Mia schreibt "5 < 7".',
             schuelerin_name="Mia & Tom",
         )
     )
@@ -356,9 +356,7 @@ class VignetteAnlegenTests(TestCase):
         """Eine neue Vignette pinnt den neuesten finalen Simulationskern."""
         vignette: Vignette
         neuester_kern: Simulationskern
-        vignette, _, neuester_kern = (
-            self._vignette_mit_zwei_finalen_kernen_anlegen()
-        )
+        vignette, _, neuester_kern = self._vignette_mit_zwei_finalen_kernen_anlegen()
 
         self.assertEqual(vignette.gepinnter_kern, neuester_kern)
 
@@ -895,9 +893,7 @@ class VignetteBearbeitenTests(TestCase):
             entwurf.lernauftrag_simulationshinweise, "Zusatzhinweis zum Lernauftrag"
         )
         self.assertEqual(entwurf.arbeitsheft_bild.name, "vignettenbilder/heft.gif")
-        self.assertEqual(
-            entwurf.arbeitsheft_bildbeschreibung, "27 + 15 = 312"
-        )
+        self.assertEqual(entwurf.arbeitsheft_bildbeschreibung, "27 + 15 = 312")
         self.assertEqual(
             entwurf.arbeitsheft_simulationshinweise, "Zusatzhinweis zum Arbeitsheft"
         )

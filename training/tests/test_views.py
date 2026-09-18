@@ -226,7 +226,9 @@ class TrainingKoautorschaftTests(TestCase):
             {"konto": grace.pk},
         )
 
-        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.assertRedirects(
+            response, reverse("training:kuratieren", args=[training.pk])
+        )
         self.client.force_login(grace)
         self.assertContains(
             self.client.get(reverse("training:liste")),
@@ -268,7 +270,9 @@ class TrainingKoautorschaftTests(TestCase):
 
         self.assertRedirects(response, reverse("training:liste"))
         self.assertEqual(
-            self.client.get(reverse("training:kuratieren", args=[training.pk])).status_code,
+            self.client.get(
+                reverse("training:kuratieren", args=[training.pk])
+            ).status_code,
             404,
         )
 
@@ -374,10 +378,14 @@ class TrainingKoautorschaftTests(TestCase):
             reverse("training:koautorin_entfernen", args=[training.pk, grace.pk])
         )
 
-        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.assertRedirects(
+            response, reverse("training:kuratieren", args=[training.pk])
+        )
         self.client.force_login(grace)
         self.assertEqual(
-            self.client.get(reverse("training:kuratieren", args=[training.pk])).status_code,
+            self.client.get(
+                reverse("training:kuratieren", args=[training.pk])
+            ).status_code,
             404,
         )
 
@@ -400,7 +408,9 @@ class TrainingKoautorschaftTests(TestCase):
             )
         )
 
-        self.assertRedirects(response, reverse("training:kuratieren", args=[training.pk]))
+        self.assertRedirects(
+            response, reverse("training:kuratieren", args=[training.pk])
+        )
 
     def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Hinzufügen weist GET-Anfragen ab."""

@@ -170,12 +170,13 @@ class FragebogenItem(models.Model):
         """
         if self._state.adding:
             if not getattr(self, "_wird_angelegt", False):
-                raise RuntimeError("Fragebogen-Items werden über die Anlege-Naht erzeugt.")
+                raise RuntimeError(
+                    "Fragebogen-Items werden über die Anlege-Naht erzeugt."
+                )
         else:
             gespeicherte_fassung: FragebogenItem = type(self).objects.get(pk=self.pk)
-            if (
-                self.zustand != gespeicherte_fassung.zustand
-                and not getattr(self, "_wechselt_zustand", False)
+            if self.zustand != gespeicherte_fassung.zustand and not getattr(
+                self, "_wechselt_zustand", False
             ):
                 raise ValidationError(
                     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
@@ -253,9 +254,13 @@ class FragebogenItem(models.Model):
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
         if not self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT):
-            raise ValidationError("Nur archivierte Fassungen können entarchiviert werden.")
+            raise ValidationError(
+                "Nur archivierte Fassungen können entarchiviert werden."
+            )
         if not self.kann_entarchiviert_werden():
-            raise ValidationError("Die Vorgängerin hat bereits eine aktive Nachfolgerin.")
+            raise ValidationError(
+                "Die Vorgängerin hat bereits eine aktive Nachfolgerin."
+            )
         self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
 
     class Meta:

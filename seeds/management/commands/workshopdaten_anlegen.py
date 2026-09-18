@@ -87,9 +87,7 @@ class Command(BaseCommand):
             self.stdout.write("  Simulationskern vorhanden.")
             return
 
-        kern: Simulationskern = Simulationskern.objects.anlegen(
-            **STANDARDKERN_VORLAGEN
-        )
+        kern: Simulationskern = Simulationskern.objects.anlegen(**STANDARDKERN_VORLAGEN)
         kern.finalisieren()
         self.stdout.write("  Simulationskern angelegt und finalisiert.")
 

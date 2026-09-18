@@ -101,7 +101,7 @@ class StartseiteTests(TestCase):
         for bereich in ("authoring", "participant", "research"):
             with self.subTest(bereich=bereich):
                 self.assertContains(
-                    response, f'welcome__spalte area--{bereich}', count=1
+                    response, f"welcome__spalte area--{bereich}", count=1
                 )
 
     def test_startseite_nennt_die_plattform_ohne_anmeldung(self) -> None:

@@ -16,6 +16,7 @@ from konten.models import Konto
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
 
+
 class ItemZeile(TypedDict):
     """Die für eine Zeile der Item-Bibliothek benötigten Werte."""
 
@@ -122,8 +123,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
             "moegliche_koautorinnen": (
-                Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE)
-                .exclude(fragebogenitemhistorie=item.historie)
+                Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE).exclude(
+                    fragebogenitemhistorie=item.historie
+                )
             ),
         },
     )

@@ -144,9 +144,7 @@ def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
     return None
 
 
-def _probelauf_vignetten(
-    konto: "Konto", sink: ScratchSink
-) -> QuerySet[Vignette]:
+def _probelauf_vignetten(konto: "Konto", sink: ScratchSink) -> QuerySet[Vignette]:
     """Begrenzt Vignetten passend zum gewählten Probelauf-Einstieg."""
 
     if sink.freie_auswahl:
@@ -421,9 +419,7 @@ def transkriptions_endpunkt(
             if sitzung is None:
                 raise PermissionDenied
             if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
-                return JsonResponse(
-                    {"status": "einwilligung_verweigert"}, status=403
-                )
+                return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         audio: bytes = request.FILES["audio"].read()
@@ -487,9 +483,10 @@ def _budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
         return False
     if sitzung.vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
         return _persistierte_schritte(sitzung).count() >= sitzung.vignette.budget_wert
-    return request.session.get(
-        _zeitbudget_schluessel(sitzung, "verbrauchte_zeit"), 0.0
-    ) >= sitzung.vignette.budget_wert
+    return (
+        request.session.get(_zeitbudget_schluessel(sitzung, "verbrauchte_zeit"), 0.0)
+        >= sitzung.vignette.budget_wert
+    )
 
 
 def persistierten_debrief_anzeigen(
@@ -590,7 +587,12 @@ def persistiertes_gespraech(
         return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _persistiertes_gespraech_anzeigen(
-            request, sitzung, schritte, ist_lesend=True, navigation=navigation, anhang=anhang
+            request,
+            sitzung,
+            schritte,
+            ist_lesend=True,
+            navigation=navigation,
+            anhang=anhang,
         )
     if request.method == "GET":
         _zeitbudget_fortsetzen(request, sitzung)

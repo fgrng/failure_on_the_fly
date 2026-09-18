@@ -39,7 +39,9 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
         """Hält finale Designs und Statuswechsel an den Lebenszyklus-Methoden."""
 
         if {"status", "modell_konfiguration"} & kwargs.keys():
-            raise ValidationError("Zustandswechsel laufen über die Lebenszyklus-Methoden.")
+            raise ValidationError(
+                "Zustandswechsel laufen über die Lebenszyklus-Methoden."
+            )
         if kwargs and self.exclude(status=Erhebung.Status.ENTWURF).exists():
             raise ValidationError("Finale Erhebungen sind eingefroren.")
         return super().update(**kwargs)
@@ -116,9 +118,11 @@ class Erhebung(models.Model):
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt physisches Löschen ausschließlich für Entwürfe."""
 
-        if not type(self).objects.filter(
-            pk=self.pk, status=self.Status.ENTWURF
-        ).exists():
+        if (
+            not type(self)
+            .objects.filter(pk=self.pk, status=self.Status.ENTWURF)
+            .exists()
+        ):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete(*args, **kwargs)
 
@@ -136,9 +140,11 @@ class Erhebung(models.Model):
     ) -> None:
         # Schreibt einen geprüften Lebenszyklus-Übergang und aktualisiert die Instanz.
 
-        if not self._schreibqueryset().filter(
-            pk=self.pk, status=erwarteter_status
-        ).update(status=zielstatus, **aktualisierungen):
+        if (
+            not self._schreibqueryset()
+            .filter(pk=self.pk, status=erwarteter_status)
+            .update(status=zielstatus, **aktualisierungen)
+        ):
             raise ValidationError(fehlermeldung)
         self.status = zielstatus
         for feld, wert in aktualisierungen.items():
@@ -163,9 +169,7 @@ class Erhebung(models.Model):
         """Macht eine datenfreie finale Erhebung wieder bearbeitbar."""
 
         if self.status != self.Status.FINAL:
-            raise ValidationError(
-                "Nur finale Erhebungen können zurückgezogen werden."
-            )
+            raise ValidationError("Nur finale Erhebungen können zurückgezogen werden.")
         if not self.kann_zurueckgezogen_werden:
             raise ValidationError(
                 "Erhebungen mit nicht archivierten Stichproben oder datentragenden "
@@ -183,9 +187,7 @@ class Erhebung(models.Model):
 
         return self.status == self.Status.FINAL and not (
             self.stichprobe_set.filter(archiviert=False).exists()
-            or any(
-                stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all()
-            )
+            or any(stichprobe.traegt_daten for stichprobe in self.stichprobe_set.all())
         )
 
     @transaction.atomic
@@ -319,9 +321,7 @@ class Erhebungsitem(models.Model):
     item: models.ForeignKey = models.ForeignKey(
         "fragebogen_items.FragebogenItem", on_delete=models.PROTECT
     )
-    andockpunkt: models.CharField = models.CharField(
-        max_length=13, choices=Andockpunkt
-    )
+    andockpunkt: models.CharField = models.CharField(max_length=13, choices=Andockpunkt)
     position: models.PositiveIntegerField = models.PositiveIntegerField()
 
     def clean(self) -> None:
@@ -414,7 +414,9 @@ class Stichprobe(models.Model):
         if self.archiviert:
             raise ValidationError("Die Stichprobe ist bereits archiviert.")
         if self.traegt_daten:
-            raise ValidationError("Datentragende Stichproben können nicht archiviert werden.")
+            raise ValidationError(
+                "Datentragende Stichproben können nicht archiviert werden."
+            )
         self._wird_archiviert = True
         try:
             self.archiviert = True
@@ -427,7 +429,10 @@ class Stichprobe(models.Model):
         """Erkennt die mit einer Stichprobe verbundenen Erhebungsdaten."""
 
         for relation in self._meta.related_objects:
-            if relation.related_model._meta.label_lower != "erhebungen.erhebungsbindung":
+            if (
+                relation.related_model._meta.label_lower
+                != "erhebungen.erhebungsbindung"
+            ):
                 continue
             return relation.related_model.objects.filter(
                 **{relation.field.name: self}
@@ -450,8 +455,10 @@ _TOKEN_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 def _teilnahme_token() -> str:
     """Erzeugt ein gut ablesbares, achtstelliges Pseudonym."""
-    return "".join(choice(_TOKEN_ALPHABET) for _ in range(4)) + "-" + "".join(
-        choice(_TOKEN_ALPHABET) for _ in range(4)
+    return (
+        "".join(choice(_TOKEN_ALPHABET) for _ in range(4))
+        + "-"
+        + "".join(choice(_TOKEN_ALPHABET) for _ in range(4))
     )
 
 
@@ -490,10 +497,12 @@ class Erhebungsbindung(models.Model):
         on_delete=models.PROTECT,
     )
     token: models.CharField = models.CharField(max_length=9, unique=True)
-    randomisierungs_seed: models.PositiveBigIntegerField = models.PositiveBigIntegerField(
-        null=True,
-        blank=True,
-        editable=False,
+    randomisierungs_seed: models.PositiveBigIntegerField = (
+        models.PositiveBigIntegerField(
+            null=True,
+            blank=True,
+            editable=False,
+        )
     )
     abgeschlossen_am: models.DateTimeField = models.DateTimeField(null=True, blank=True)
 
@@ -634,9 +643,14 @@ class ItemAntwort(models.Model):
         from fragebogen_items.models import FragebogenItem
 
         fehler: dict[str, str] = {}
-        if self.sitzung_id and self.sitzung.teilnahme_id != self.erhebungsbindung.teilnahme_id:
+        if (
+            self.sitzung_id
+            and self.sitzung.teilnahme_id != self.erhebungsbindung.teilnahme_id
+        ):
             fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
-        ist_am_ende = self.erhebungsitem.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
+        ist_am_ende = (
+            self.erhebungsitem.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
+        )
         if (self.sitzung_id is None) != ist_am_ende:
             fehler["sitzung"] = (
                 "Sitzungen gehören nur zu Fragebogen-Items am Andockpunkt nach_sitzung."
@@ -672,7 +686,8 @@ class ItemAntwort(models.Model):
                 name="erhebungen_antwort_am_ende_eindeutig",
             ),
             models.CheckConstraint(
-                condition=models.Q(freitext__isnull=True) | models.Q(likert_stufe__isnull=True),
+                condition=models.Q(freitext__isnull=True)
+                | models.Q(likert_stufe__isnull=True),
                 name="erhebungen_antwort_hoechstens_ein_wert",
             ),
             models.CheckConstraint(

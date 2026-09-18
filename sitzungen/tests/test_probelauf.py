@@ -9,7 +9,13 @@ from unittest.mock import patch
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from vignetten.models import Vignette
 
 
@@ -78,19 +84,26 @@ class ProbelaufStartTests(TestCase):
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
 
-        self.assertContains(response, "Frau Weber begleitet Sie bei Mathematik in Klasse 5.")
+        self.assertContains(
+            response, "Frau Weber begleitet Sie bei Mathematik in Klasse 5."
+        )
         self.assertContains(response, "Mia zeigt Ihnen die Bearbeitung.")
         self.assertContains(response, "Ihre nächste Frage")
         self.assertNotContains(response, "Diagnosegespräch beginnen")
-        gespraech: HttpResponse = self.client.get(reverse("sitzungen:probelauf_gespraech"))
+        gespraech: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech")
+        )
         self.assertContains(gespraech, "Ihre nächste Frage")
         session = self.client.session
-        self.assertEqual(session["probelauf"], {
-            "vignette_pk": self.entwurf.pk,
-            "kern_pk": self.kern.pk,
-            "modell_konfiguration_pk": self.konfiguration.pk,
-            "gespraechsschritte": [],
-        })
+        self.assertEqual(
+            session["probelauf"],
+            {
+                "vignette_pk": self.entwurf.pk,
+                "kern_pk": self.kern.pk,
+                "modell_konfiguration_pk": self.konfiguration.pk,
+                "gespraechsschritte": [],
+            },
+        )
 
     def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
         """Der Probelauf rendert mit den beim Anlegen gesetzten Akteuren."""
@@ -149,7 +162,9 @@ class ProbelaufStartTests(TestCase):
         self.entwurf.save()
 
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        response: HttpResponse = self.client.get(reverse("sitzungen:probelauf_gespraech"))
+        response: HttpResponse = self.client.get(
+            reverse("sitzungen:probelauf_gespraech")
+        )
 
         inhalt: str = response.content.decode()
         self.assertLess(inhalt.index("Rechnung oben "), inhalt.index("heft.gif"))
@@ -175,8 +190,6 @@ class ProbelaufStartTests(TestCase):
         self.assertContains(response, 'alt="Arbeitsblatt mit Zahlenreihe"')
         self.assertNotContains(response, "[BILD]")
 
-
-
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,
     ) -> None:
@@ -194,12 +207,15 @@ class ProbelaufStartTests(TestCase):
 
         self.client.get(reverse("sitzungen:probelauf_auswahl"))
 
-        self.assertEqual(self.client.session["probelauf"], {
-            "vignette_pk": self.entwurf.pk,
-            "kern_pk": self.kern.pk,
-            "modell_konfiguration_pk": self.konfiguration.pk,
-            "gespraechsschritte": [],
-        })
+        self.assertEqual(
+            self.client.session["probelauf"],
+            {
+                "vignette_pk": self.entwurf.pk,
+                "kern_pk": self.kern.pk,
+                "modell_konfiguration_pk": self.konfiguration.pk,
+                "gespraechsschritte": [],
+            },
+        )
         self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
         self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
         self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
@@ -217,9 +233,7 @@ class ProbelaufStartTests(TestCase):
         )
 
         self.assertContains(einleitung, "Gespräch beenden")
-        debrief: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_beenden")
-        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
 
 
@@ -293,9 +307,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self._erfolgreiche_antwort_konfigurieren()
         self.entwurf.lernauftrag_text = "Löse die Aufgabe."
-        self.entwurf.lernauftrag_simulationshinweise = "Geheimer Hinweis zum Lernauftrag"
+        self.entwurf.lernauftrag_simulationshinweise = (
+            "Geheimer Hinweis zum Lernauftrag"
+        )
         self.entwurf.arbeitsheft_text = "Meine Rechnung."
-        self.entwurf.arbeitsheft_simulationshinweise = "Geheimer Hinweis zum Arbeitsheft"
+        self.entwurf.arbeitsheft_simulationshinweise = (
+            "Geheimer Hinweis zum Arbeitsheft"
+        )
         self.entwurf.save()
 
         # 1. Startseite des Probelaufs prüfen
@@ -356,9 +374,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(gespraech, "data-spracheingabe")
         self.assertContains(gespraech, "Frage aufnehmen")
 
-        debrief: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_beenden")
-        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
 
         self.assertContains(debrief, "data-spracheingabe")
         self.assertContains(debrief, "Diagnose aufnehmen")
@@ -396,7 +412,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertContains(erste_antwort, "Wie rechnest du?")
-        self.assertContains(erste_antwort, "Ich rechne eins plus eins und zwei plus drei.")
+        self.assertContains(
+            erste_antwort, "Ich rechne eins plus eins und zwei plus drei."
+        )
         self.assertContains(erste_antwort, "Mia addiert Zähler und Nenner.")
         self.assertContains(erste_antwort, "native erste Spur")
 
@@ -404,26 +422,33 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
         )
 
-        self.assertContains(zweite_antwort, "Ich rechne eins plus eins und zwei plus drei.")
-        self.assertEqual(self.client.session["probelauf"]["gespraechsschritte"], [
-            {
-                "reihenfolge": 1,
-                "eingabe": "Wie rechnest du?",
-                "denkspur": "Mia addiert Zähler und Nenner.",
-                "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                "native_reasoning_spur": "native erste Spur",
-                "fehlversuche": [],
-            },
-            {
-                "reihenfolge": 2,
-                "eingabe": "Und warum?",
-                "denkspur": "Mia addiert Zähler und Nenner.",
-                "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                "native_reasoning_spur": "native erste Spur",
-                "fehlversuche": [],
-            },
-        ])
-        zweite_nachrichten: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
+        self.assertContains(
+            zweite_antwort, "Ich rechne eins plus eins und zwei plus drei."
+        )
+        self.assertEqual(
+            self.client.session["probelauf"]["gespraechsschritte"],
+            [
+                {
+                    "reihenfolge": 1,
+                    "eingabe": "Wie rechnest du?",
+                    "denkspur": "Mia addiert Zähler und Nenner.",
+                    "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
+                    "native_reasoning_spur": "native erste Spur",
+                    "fehlversuche": [],
+                },
+                {
+                    "reihenfolge": 2,
+                    "eingabe": "Und warum?",
+                    "denkspur": "Mia addiert Zähler und Nenner.",
+                    "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
+                    "native_reasoning_spur": "native erste Spur",
+                    "fehlversuche": [],
+                },
+            ],
+        )
+        zweite_nachrichten: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][
+            0
+        ]
         self.assertIn(
             {
                 "role": "assistant",
@@ -682,7 +707,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self._endgueltigen_fehlschlag_ausloesen()
 
-        response: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden")
+        )
 
         self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
 
@@ -708,20 +735,21 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         einleitung: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
-        self.assertContains(einleitung, "Frau Weber begleitet Sie bei Mathematik in Klasse 5.")
+        self.assertContains(
+            einleitung, "Frau Weber begleitet Sie bei Mathematik in Klasse 5."
+        )
         schritt: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
         self.assertContains(schritt, "Ich rechne eins plus eins und zwei plus drei.")
         self.assertContains(schritt, "Mia addiert Zähler und Nenner.")
-        debrief: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_beenden")
-        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertContains(debrief, "Ihre Diagnose")
         ende: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_debrief"), {"diagnose": "Brüche werden addiert."}
+            reverse("sitzungen:probelauf_debrief"),
+            {"diagnose": "Brüche werden addiert."},
         )
 
         self.assertRedirects(ende, reverse("sitzungen:probelauf_auswahl"))
@@ -737,7 +765,9 @@ class AdministratorinProbelaufTests(TestCase):
     def setUp(self) -> None:
         """Legt ein administrativ frei kombinierbares Tripel an."""
 
-        self.administratorin: Konto = get_user_model().objects.create_user(username="admin")
+        self.administratorin: Konto = get_user_model().objects.create_user(
+            username="admin"
+        )
         self.administratorin.is_superuser = True
         self.administratorin.save()
         autorin: Konto = get_user_model().objects.create_user(username="ada")
@@ -748,17 +778,26 @@ class AdministratorinProbelaufTests(TestCase):
         self.kern_entwurf.rahmenhandlung_gespraechseinleitung = (
             "$schuelerin_name zeigt Ihnen das Arbeitsheft."
         )
-        self.kern_entwurf.rahmenhandlung_debrief = "$lehrperson_name beendet den Probelauf."
+        self.kern_entwurf.rahmenhandlung_debrief = (
+            "$lehrperson_name beendet den Probelauf."
+        )
         self.kern_entwurf.save()
         aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(aktive_konfiguration)
-        self.test_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={
-                "skript": [{"denkspur": "Sie zählt Zähler und Nenner.", "aeusserung": "So."}]
-            },
+        self.test_konfiguration: ModellKonfiguration = (
+            ModellKonfiguration.objects.create(
+                sprachmodell="fake",
+                parameter={
+                    "skript": [
+                        {
+                            "denkspur": "Sie zählt Zähler und Nenner.",
+                            "aeusserung": "So.",
+                        }
+                    ]
+                },
+            )
         )
         self.vignette: Vignette = Vignette.objects.anlegen(autorin)
         for feld, wert in {
@@ -809,7 +848,9 @@ class AdministratorinProbelaufTests(TestCase):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
         )
         self.assertContains(gespraech, "Sie zählt Zähler und Nenner.")
-        self.assertEqual(self.client.session["probelauf"]["kern_pk"], self.kern_entwurf.pk)
+        self.assertEqual(
+            self.client.session["probelauf"]["kern_pk"], self.kern_entwurf.pk
+        )
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
         self.assertContains(debrief, "Weber beendet den Probelauf.")
         ende: HttpResponse = self.client.post(
@@ -821,7 +862,9 @@ class AdministratorinProbelaufTests(TestCase):
         self.assertNotIn("probelauf", self.client.session)
         self.vignette.refresh_from_db()
         self.assertEqual(self.vignette.gepinnter_kern_id, self.gepinnter_kern_pk)
-        self.assertNotEqual(ModellKonfiguration.objects.aktive(), self.test_konfiguration)
+        self.assertNotEqual(
+            ModellKonfiguration.objects.aktive(), self.test_konfiguration
+        )
 
     def test_nicht_administratorin_erreicht_freien_auswaehler_nicht(self) -> None:
         """Der administrative Einstieg ist ausschließlich der Group vorbehalten."""

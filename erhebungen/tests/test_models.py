@@ -27,9 +27,7 @@ from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
-def _erhebungsbindung_anlegen(
-    konto: Konto, teilnahme: Teilnahme
-) -> Erhebungsbindung:
+def _erhebungsbindung_anlegen(konto: Konto, teilnahme: Teilnahme) -> Erhebungsbindung:
     """Erstellt eine Erhebungsbindung mit der kleinsten gültigen Umgebung."""
 
     erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
@@ -145,7 +143,9 @@ def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_eigentuemerinnen_migration_uebernimmt_bestand_und_stellt_trigger_zurueck() -> None:
+def test_eigentuemerinnen_migration_uebernimmt_bestand_und_stellt_trigger_zurueck() -> (
+    None
+):
     """Die M2M-Migration bewahrt den Bestand und ihre reversible Trigger-Semantik."""
 
     vorher = [("erhebungen", "0011_likert_gueltig")]
@@ -273,11 +273,7 @@ def test_erhebungsvignette_lehnt_fremde_finale_fassung_ab() -> None:
 
     with pytest.raises(IntegrityError, match="eigene"), transaction.atomic():
         Erhebungsvignette.objects.bulk_create(
-            [
-                Erhebungsvignette(
-                    erhebung=erhebung, vignette=fremde_finale, position=1
-                )
-            ]
+            [Erhebungsvignette(erhebung=erhebung, vignette=fremde_finale, position=1)]
         )
 
 
@@ -328,9 +324,7 @@ def test_zufaellige_erhebung_hat_keine_vignettenpositionen() -> None:
     finale: Vignette = _finale_vignette_anlegen(ada)
 
     with pytest.raises(ValidationError, match="keine Position"):
-        Erhebungsvignette.objects.create(
-            erhebung=erhebung, vignette=finale, position=1
-        )
+        Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale, position=1)
 
 
 @pytest.mark.django_db
@@ -407,7 +401,9 @@ def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
 
 
 @pytest.mark.django_db
-def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig() -> None:
+def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig() -> (
+    None
+):
     """Die partielle Eindeutigkeit schützt auch die NULL-Sitzung."""
 
     ada = Konto.objects.create_user(username="ada")
@@ -465,9 +461,7 @@ def test_itemantwort_erlaubt_hoechstens_eine_wertspalte() -> None:
         (FragebogenItem.Typ.LIKERT, {"freitext": "Hilfreich"}),
     ],
 )
-def test_itemantwort_wert_passt_zum_itemtyp(
-    typ: str, werte: dict[str, object]
-) -> None:
+def test_itemantwort_wert_passt_zum_itemtyp(typ: str, werte: dict[str, object]) -> None:
     """Die Antwortspalte folgt dem Typ der gepinnten Item-Fassung."""
 
     ada = Konto.objects.create_user(username=f"ada-{typ}")
@@ -532,7 +526,9 @@ def test_itemposition_ist_je_andockpunkt_eindeutig() -> None:
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
     erstes_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Erstes")
-    zweites_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Zweites")
+    zweites_item: FragebogenItem = FragebogenItem.objects.anlegen(
+        ada, wortlaut="Zweites"
+    )
     for item in (erstes_item, zweites_item):
         item.finalisieren()
 
@@ -569,9 +565,7 @@ def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
-    entwurf: FragebogenItem = FragebogenItem.objects.anlegen(
-        ada, wortlaut="Entwurf"
-    )
+    entwurf: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Entwurf")
     fremdes_item: FragebogenItem = FragebogenItem.objects.anlegen(
         grace, wortlaut="Fremd"
     )
@@ -590,9 +584,7 @@ def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
                 ]
             )
 
-    eigenes_item: FragebogenItem = FragebogenItem.objects.anlegen(
-        ada, wortlaut="Eigen"
-    )
+    eigenes_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Eigen")
     eigenes_item.finalisieren()
     Erhebungsitem.objects.create(
         erhebung=erhebung,

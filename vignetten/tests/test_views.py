@@ -454,7 +454,9 @@ class VignetteBearbeitenViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "This field is required.")
         self.vignette.refresh_from_db()
-        self.assertEqual(self.vignette.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)
+        self.assertEqual(
+            self.vignette.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH
+        )
 
     def test_speichert_entwurf_mit_leeren_inhaltsfeldern(self) -> None:
         """Entwürfe bleiben beim Bearbeiten bewusst lückentolerant."""
@@ -831,7 +833,7 @@ class VignetteFinalisierenViewTests(TestCase):
         self.assertRedirects(
             response, reverse("vignetten:detail", args=[self.vignette.pk])
         )
-        self.assertContains(response, 'badge--final')
+        self.assertContains(response, "badge--final")
 
     def test_finalisieren_ist_ohne_simulationshinweise_moeglich(self) -> None:
         """Simulationshinweise sind optional und blockieren das Finalisieren nicht."""
@@ -862,9 +864,7 @@ class VignetteFinalisierenViewTests(TestCase):
 
     def test_zeigt_fehler_fuer_leeres_arbeitsheft(self) -> None:
         """Ein leeres Arbeitsheft wird verständlich benannt."""
-        self._assert_finalisieren_zeigt_fehler(
-            "arbeitsheft_text", "", "Arbeitsheft"
-        )
+        self._assert_finalisieren_zeigt_fehler("arbeitsheft_text", "", "Arbeitsheft")
 
     def test_zeigt_fehler_fuer_arbeitsheft_bild_ohne_bildbeschreibung(self) -> None:
         """Ein Arbeitsheft-Bild ohne Bildbeschreibung wird beim Finalisieren abgelehnt."""
@@ -882,18 +882,14 @@ class VignetteFinalisierenViewTests(TestCase):
         """Ein nicht finaler Kern-Pin wird verständlich abgelehnt."""
         kern: Simulationskern = self.vignette.gepinnter_kern.bearbeiten()
 
-        self._assert_finalisieren_zeigt_fehler(
-            "gepinnter_kern", kern, "nicht final"
-        )
+        self._assert_finalisieren_zeigt_fehler("gepinnter_kern", kern, "nicht final")
 
     def test_zeigt_fehler_fuer_archivierten_kern_pin(self) -> None:
         """Ein archivierter Kern-Pin wird verständlich abgelehnt."""
         kern: Simulationskern = self.vignette.gepinnter_kern
         kern.archivieren()
 
-        self._assert_finalisieren_zeigt_fehler(
-            "gepinnter_kern", kern, "archiviert"
-        )
+        self._assert_finalisieren_zeigt_fehler("gepinnter_kern", kern, "archiviert")
 
 
 class VignetteNeueFassungViewTests(TestCase):
@@ -955,14 +951,15 @@ class VignetteNeueFassungViewTests(TestCase):
     def _geerbte_werte(self, vignette: Vignette) -> dict[str, object]:
         # Bündelt den vollständigen Vererbungsvertrag für einen Vergleich.
         werte: dict[str, object] = {
-            feldname: getattr(vignette, feldname)
-            for feldname in self._GEERBTE_FELDER
+            feldname: getattr(vignette, feldname) for feldname in self._GEERBTE_FELDER
         }
         werte["arbeitsheft_bild"] = vignette.arbeitsheft_bild.name
         werte["lernauftrag_bild"] = vignette.lernauftrag_bild.name
         return werte
 
-    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(self) -> None:
+    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(
+        self,
+    ) -> None:
         """Re-Versionieren führt zum Folgeentwurf derselben Vignettenhistorie."""
         response: HttpResponse = self.client.post(
             reverse("vignetten:neue_fassung", args=[self.finale.pk])
@@ -975,9 +972,7 @@ class VignetteNeueFassungViewTests(TestCase):
 
     def test_laesst_die_finale_fassung_unveraendert(self) -> None:
         """Re-Versionieren verändert Zustand und Bildpfad der Quelle nicht."""
-        self.client.post(
-            reverse("vignetten:neue_fassung", args=[self.finale.pk])
-        )
+        self.client.post(reverse("vignetten:neue_fassung", args=[self.finale.pk]))
 
         self.finale.refresh_from_db()
         self.assertEqual(
@@ -1170,7 +1165,9 @@ class VignetteArchivierenViewTests(TestCase):
 
         for name, vignette in eigene_fassungen:
             self.assertEqual(
-                self.client.get(reverse(f"vignetten:{name}", args=[vignette.pk])).status_code,
+                self.client.get(
+                    reverse(f"vignetten:{name}", args=[vignette.pk])
+                ).status_code,
                 405,
             )
         self.assertEqual(
@@ -1228,7 +1225,10 @@ class VignettenRollenTests(TestCase):
             "reversionieren",
         ):
             args = [] if name in {"liste", "anlegen"} else [1]
-            self.assertEqual(self.client.get(reverse(f"vignetten:{name}", args=args)).status_code, 403)
+            self.assertEqual(
+                self.client.get(reverse(f"vignetten:{name}", args=args)).status_code,
+                403,
+            )
 
     def test_administratorin_erreicht_den_editor(self) -> None:
         """Djangos Superuser ist der serverseitige Override."""

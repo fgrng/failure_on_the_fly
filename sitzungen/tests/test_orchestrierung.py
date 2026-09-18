@@ -34,7 +34,9 @@ def _persistierbares_tripel(
     )
 
 
-def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form() -> None:
+def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form() -> (
+    None
+):
     """Der schreibfreie Sink bewahrt jeden Zug in der späteren Persistenzform auf."""
 
     session: SessionStore = SessionStore()
