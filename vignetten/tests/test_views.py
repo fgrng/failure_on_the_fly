@@ -376,12 +376,17 @@ class VignetteKoautorschaftViewTests(TestCase):
         """Die Administration kann eine fremde Autorin durch eine Nachfolgerin ablösen."""
         grace: Konto = _autorin("grace")
         ada: Konto = _autorin("ada")
-        administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.is_superuser = True
-        administratorin.save()
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
         vignette: Vignette = _vignette_mit_eigentuemerinnen(grace)
         self.client.force_login(administratorin)
 
+        self.assertContains(
+            self.client.get(reverse("vignetten:detail", args=[vignette.pk])),
+            f'<option value="{administratorin.pk}">{administratorin.username}</option>',
+            html=True,
+        )
         self.client.post(
             reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
             {"konto": ada.pk},
@@ -1226,7 +1231,7 @@ class VignettenRollenTests(TestCase):
             self.assertEqual(self.client.get(reverse(f"vignetten:{name}", args=args)).status_code, 403)
 
     def test_administratorin_erreicht_den_editor(self) -> None:
-        """Die Administratorinnen-Gruppe ist der serverseitige Override."""
+        """Djangos Superuser ist der serverseitige Override."""
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
         administratorin.is_superuser = True
         administratorin.save()

@@ -307,11 +307,17 @@ class TrainingKoautorschaftTests(TestCase):
         """Eine Administratorin kann als Ko-Eigentümerin eingetragen werden."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
-        administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.is_superuser = True
-        administratorin.save()
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
         training: Training = Training.objects.anlegen(ada, name="Brüche")
         self.client.force_login(ada)
+
+        self.assertContains(
+            self.client.get(reverse("training:kuratieren", args=[training.pk])),
+            f'<option value="{administratorin.pk}">{administratorin.username}</option>',
+            html=True,
+        )
         self.client.post(
             reverse("training:koautorin_hinzufuegen", args=[training.pk]),
             {"konto": administratorin.pk},

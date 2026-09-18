@@ -320,14 +320,19 @@ class ErhebungenKoForschendenViewTests(TestCase):
         grace.groups.add(Group.objects.get(name="Forschende:r"))
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.is_superuser = True
-        administratorin.save()
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
         erhebung: Erhebung = Erhebung.objects.create(
             name="Fremde Erhebung", eigentuemerin=grace
         )
         self.client.force_login(administratorin)
 
+        self.assertContains(
+            self.client.get(reverse("erhebungen:detail", args=[erhebung.pk])),
+            f'<option value="{administratorin.pk}">{administratorin.username}</option>',
+            html=True,
+        )
         self.client.post(
             reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
             {"konto": ada.pk},

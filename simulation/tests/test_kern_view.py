@@ -156,7 +156,7 @@ class SimulationskernRollenTests(TestCase):
     """Der Simulationskern ist Teil der geschützten Entwicklung."""
 
     def test_teilnehmerin_wird_abgewiesen_und_administratorin_zugelassen(self) -> None:
-        """Die Gruppenrollen entscheiden statt is_superuser oder Template-Links."""
+        """Gruppenrollen und is_superuser entscheiden statt Template-Links."""
         teilnehmerin: Konto = get_user_model().objects.create_user(username="studi")
         self.client.force_login(teilnehmerin)
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 403)

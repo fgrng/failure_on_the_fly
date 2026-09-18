@@ -464,6 +464,23 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 
         self.assertContains(response, self.ada.username)
 
+    def test_editor_zeigt_administration_als_moegliche_koautorin(self) -> None:
+        """Ein Superuser erscheint in der Ko-Autorinnenliste des Editors."""
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="admin", is_superuser=True
+        )
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(
+            response,
+            f'<option value="{administratorin.pk}">{administratorin.username}</option>',
+            html=True,
+        )
+
     def test_hinzufuegen_gibt_koautorin_bibliothekszugriff(self) -> None:
         """Eine hinzugefügte Ko-Autorin sieht die Item-Linie in ihrer Bibliothek."""
         self.client.force_login(self.ada)
