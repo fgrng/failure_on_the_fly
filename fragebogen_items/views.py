@@ -1,7 +1,6 @@
 """Views für den privaten Fragebogen-Item-Editor."""
 
-from functools import wraps
-from typing import Callable, Concatenate, ParamSpec, TypedDict
+from typing import TypedDict
 
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
@@ -10,14 +9,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from konten.navigation import (
     FORSCHENDE_GRUPPE,
     ist_administratorin,
+    rolle_erforderlich,
 )
 from konten.models import Konto
 
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
-
-P: ParamSpec = ParamSpec("P")
-
 
 class ItemZeile(TypedDict):
     """Die für eine Zeile der Item-Bibliothek benötigten Werte."""
@@ -27,24 +24,15 @@ class ItemZeile(TypedDict):
     zustand_badge: str
 
 
-def _forschende_erforderlich(
-    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
-) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
-    # Schützt eine View des Fragebogen-Editors mit einer berechtigten Rolle.
+def _forschende_oder_administratorin(konto: Konto) -> bool:
+    """Prüft den Zugang zum Fragebogen-Item-Editor."""
 
-    @wraps(view)
-    def geschuetzte_view(
-        request: HttpRequest, /, *args: P.args, **kwargs: P.kwargs
-    ) -> HttpResponse:
-        # Prüft die Gruppenrolle vor dem Aufruf der geschützten View.
-        if not (
-            ist_administratorin(request.user)
-            or request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists()
-        ):
-            return HttpResponse(status=403)
-        return view(request, *args, **kwargs)
+    return ist_administratorin(konto) or konto.groups.filter(
+        name=FORSCHENDE_GRUPPE
+    ).exists()
 
-    return geschuetzte_view
+
+_forschende_erforderlich = rolle_erforderlich(_forschende_oder_administratorin)
 
 
 def _sichtbares_item(
