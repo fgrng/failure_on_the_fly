@@ -35,20 +35,32 @@ def ist_administratorin(konto: "Konto") -> bool:
     return konto.is_superuser
 
 
-def autorin_erforderlich(
-    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
-) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
-    """Schützt Entwicklungs-Views mit der Autorenrolle."""
+def rolle_erforderlich(
+    rollen_pruefung: Callable[["Konto"], bool],
+) -> Callable[
+    [Callable[Concatenate[HttpRequest, P], HttpResponse]],
+    Callable[Concatenate[HttpRequest, P], HttpResponse],
+]:
+    """Erzeugt einen View-Decorator, der eine Rolle mit 403 durchsetzt."""
 
-    @wraps(view)
-    def geschuetzte_view(
-        request: HttpRequest, /, *args: P.args, **kwargs: P.kwargs
-    ) -> HttpResponse:
-        if not ist_autorin(request.user):
-            return HttpResponse(status=403)
-        return view(request, *args, **kwargs)
+    def decorator(
+        view: Callable[Concatenate[HttpRequest, P], HttpResponse],
+    ) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
+        @wraps(view)
+        def geschuetzte_view(
+            request: HttpRequest, /, *args: P.args, **kwargs: P.kwargs
+        ) -> HttpResponse:
+            if not rollen_pruefung(request.user):
+                return HttpResponse(status=403)
+            return view(request, *args, **kwargs)
 
-    return geschuetzte_view
+        return geschuetzte_view
+
+    return decorator
+
+
+autorin_erforderlich = rolle_erforderlich(ist_autorin)
+administratorin_erforderlich = rolle_erforderlich(ist_administratorin)
 
 
 def navigation(request: HttpRequest) -> dict[str, bool]:
@@ -67,8 +79,7 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
     administration: bool = ist_administratorin(request.user)
     return {
         "zeige_entwicklung": administration or AUTORIN_GRUPPE in rollen,
-        "zeige_ausbildung_kuratieren": administration
-        or AUSBILDERIN_GRUPPE in rollen,
+        "zeige_ausbildung_kuratieren": administration or AUSBILDERIN_GRUPPE in rollen,
         "zeige_teilnahme": not rollen and not administration,
         "zeige_forschung": administration or FORSCHENDE_GRUPPE in rollen,
         "zeige_system": administration,

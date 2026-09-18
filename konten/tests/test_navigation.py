@@ -3,12 +3,18 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.http import HttpRequest
+from django.contrib.auth.models import AnonymousUser
+from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
 
-from konten.navigation import ist_administratorin, navigation
+from konten.navigation import (
+    AUTORIN_GRUPPE,
+    administratorin_erforderlich,
+    ist_administratorin,
+    navigation,
+)
 from konten.models import Konto
 
 
@@ -106,6 +112,33 @@ def test_ist_administratorin_prueft_die_administrationsrolle(
     )
 
     assert ist_administratorin(konto) is erwartet
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("is_superuser", "ist_autorin", "erwarteter_status"),
+    [(True, False, 200), (False, True, 403), (False, False, 403)],
+)
+def test_administratorin_erforderlich_schuetzt_views_mit_der_administrationsrolle(
+    is_superuser: bool, ist_autorin: bool, erwarteter_status: int
+) -> None:
+    """Nur die Administratorin passiert den Decorator, auch ohne Anmeldung nicht."""
+    request: HttpRequest = RequestFactory().get("/")
+    if is_superuser or ist_autorin:
+        konto: Konto = get_user_model().objects.create_user(
+            username="ada", is_superuser=is_superuser
+        )
+        if ist_autorin:
+            konto.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
+        request.user = konto
+    else:
+        request.user = AnonymousUser()
+
+    @administratorin_erforderlich
+    def geschuetzte_view(request: HttpRequest) -> HttpResponse:
+        return HttpResponse()
+
+    assert geschuetzte_view(request).status_code == erwarteter_status
 
 
 class SidebarNavigationTests(TestCase):
