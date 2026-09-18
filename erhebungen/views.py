@@ -78,6 +78,8 @@ _ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
     "c": ("C · Antwortkarten", "b", "a"),
     "vergleich": ("Vergleich · alle Varianten", "c", "a"),
 }
+
+
 def _ist_forschende(konto: Konto) -> bool:
     """Prüft die Forschungsrolle ohne Administrations-Override."""
 
@@ -91,7 +93,7 @@ def _forschende_oder_administratorin(konto: Konto) -> bool:
 
 
 _forschende_erforderlich = rolle_erforderlich(_ist_forschende)
-_forschende_oder_administration_erforderlich = rolle_erforderlich(
+_forschende_oder_administratorin_erforderlich = rolle_erforderlich(
     _forschende_oder_administratorin
 )
 
@@ -249,7 +251,7 @@ def _validierte_aktion_ausfuehren(
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die eigenen Erhebungen einer Forschenden."""
 
@@ -274,7 +276,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Erhebung zur weiteren Bearbeitung."""
 
@@ -385,7 +387,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
 
@@ -400,7 +402,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_entfernen(
     request: HttpRequest, pk: int, konto_pk: int
 ) -> HttpResponse:

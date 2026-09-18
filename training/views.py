@@ -31,7 +31,8 @@ from vignetten.models import Vignette
 
 from .models import Training, Trainingsbindung
 
-def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
+
+def _ausbilderin_oder_administratorin(konto: Konto) -> bool:
     """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
 
     return ist_administratorin(konto) or konto.groups.filter(
