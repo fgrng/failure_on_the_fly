@@ -156,7 +156,6 @@ def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
     return (
         Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE)
         .exclude(erhebung=erhebung)
-        .distinct()
     )
 
 

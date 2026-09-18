@@ -72,3 +72,11 @@ class EntwicklungsdatenTests(TestCase):
         ausbilderin: Konto = Konto.objects.get(username="autor")
 
         self.assertTrue(Training.objects.filter(eigentuemerinnen=ausbilderin).exists())
+
+    def test_autor_ist_administrationskonto(self) -> None:
+        """Der Entwicklungs-Seed macht das Administrationskonto zum Superuser."""
+        call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+
+        konto: Konto = Konto.objects.get(username="autor")
+
+        self.assertEqual((konto.is_superuser, konto.is_staff), (True, True))

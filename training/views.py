@@ -100,7 +100,6 @@ def _moegliche_koautorinnen(training: Training) -> QuerySet[Konto]:
     return (
         Konto.objects.mit_rolle_oder_administration(AUSBILDERIN_GRUPPE)
         .exclude(training=training)
-        .distinct()
     )
 
 

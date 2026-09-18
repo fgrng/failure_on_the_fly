@@ -4,6 +4,9 @@ status: accepted
 
 # Rollen sind Groups, Eigentümerschaft ist ein Fremdschlüssel, die Sichtbarkeitsregel lebt am QuerySet
 
+Der folgende ursprüngliche Beschluss gilt nach ADR-0033 nur noch für die drei
+Fachrollen; die damalige Formulierung bleibt als Entscheidungsstand erhalten.
+
 Die fünf Rollen aus `CONTEXT.md` — Teilnehmer:in, Autor:in, Ausbilder:in, Forschende:r, Administrator:in — werden als **Django-Groups** geführt, nicht als Feld am Nutzer. Rollen sind **additiv**: Dieselbe Person schreibt Vignetten und leitet eine Erhebung. ADR-0015 macht das sogar zur Pflicht — wer eine Erhebung zusammenstellen will, muss ihre Vignetten selbst als Autor:in geschrieben haben. Ein einzelnes `rolle`-Feld zwänge diese Person zu zwei Konten und damit zu zwei getrennten Vignettenbeständen, was den Zweck vereitelt.
 
 `konten` definiert von Anfang an ein **eigenes Nutzer-Modell**. Das ist keine Vorratshaltung, sondern eine Frist: Ein Wechsel des User-Modells nach der ersten Migration ist in Django schmerzhaft, und die Entscheidung fällt vor dem ersten `migrate` oder gar nicht.

@@ -138,11 +138,10 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": Konto.objects.mit_rolle_oder_administration(
-                FORSCHENDE_GRUPPE
-            )
-            .exclude(fragebogenitemhistorie=item.historie)
-            .distinct(),
+            "moegliche_koautorinnen": (
+                Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE)
+                .exclude(fragebogenitemhistorie=item.historie)
+            ),
         },
     )
 

@@ -67,7 +67,6 @@ def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Kont
     return (
         Konto.objects.mit_rolle_oder_administration(AUTORIN_GRUPPE)
         .exclude(vignettenhistorie=historie)
-        .distinct()
     )
 
 

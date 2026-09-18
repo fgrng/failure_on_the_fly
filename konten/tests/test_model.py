@@ -155,14 +155,13 @@ def test_konten_mit_rolle_oder_administration_enthaelt_beide() -> None:
     administratorin: Konto = Konto.objects.create_user(
         username="administratorin", is_superuser=True
     )
-    teilnehmerin: Konto = Konto.objects.create_user(username="teilnehmerin")
+    Konto.objects.create_user(username="teilnehmerin")
 
     konten: QuerySet[Konto] = Konto.objects.mit_rolle_oder_administration(
         "Ausbilder:in"
     )
 
     assert set(konten) == {ausbilderin, administratorin}
-    assert teilnehmerin not in konten
 
 
 @pytest.mark.django_db

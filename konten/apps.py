@@ -25,13 +25,18 @@ def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:
 
 
 def fixture_superuser_zu_staff(
-    sender: type[Konto], instance: Konto, raw: bool, **kwargs: object
+    sender: type[Konto],
+    *,
+    instance: Konto,
+    raw: bool,
+    using: str,
+    **kwargs: object,
 ) -> None:
     """Gleicht den von Django umgangenen Speicherpfad für Fixtures aus."""
     if raw:
-        from .models import Konto
-
-        Konto.objects.filter(pk=instance.pk).update(is_staff=instance.is_superuser)
+        sender.objects.using(using).filter(pk=instance.pk).update(
+            is_staff=instance.is_superuser
+        )
         instance.is_staff = instance.is_superuser
 
 
