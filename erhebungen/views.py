@@ -1,8 +1,7 @@
 """Öffentlicher Einstieg in pseudonyme Erhebungen."""
 
 from datetime import datetime
-from functools import wraps
-from typing import Callable, Concatenate, Iterable, ParamSpec
+from typing import Callable, Iterable
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -27,6 +26,7 @@ from konten.models import Konto
 from konten.navigation import (
     FORSCHENDE_GRUPPE,
     ist_administratorin,
+    rolle_erforderlich,
 )
 
 from .ablauf import Itemblock, block_vorlegen, naechster_schritt
@@ -78,48 +78,24 @@ _ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
     "c": ("C · Antwortkarten", "b", "a"),
     "vergleich": ("Vergleich · alle Varianten", "c", "a"),
 }
-P = ParamSpec("P")
 
 
-def _forschende_erforderlich(
-    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
-) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
-    """Schützt eine View der Forschenden-UI mit der Rollenprüfung."""
+def _ist_forschende(konto: Konto) -> bool:
+    """Prüft die Forschungsrolle ohne Administrations-Override."""
 
-    @wraps(view)
-    def geschuetzte_view(
-        request: HttpRequest,
-        /,
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> HttpResponse:
-        if not request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists():
-            return HttpResponse(status=403)
-        return view(request, *args, **kwargs)
-
-    return geschuetzte_view
+    return konto.groups.filter(name=FORSCHENDE_GRUPPE).exists()
 
 
-def _forschende_oder_administration_erforderlich(
-    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
-) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
-    """Erlaubt den Eigentümerwechsel auch für die Administration."""
+def _forschende_oder_administratorin(konto: Konto) -> bool:
+    """Prüft den Zugang zum Eigentümerwechsel einer Erhebung."""
 
-    @wraps(view)
-    def geschuetzte_view(
-        request: HttpRequest,
-        /,
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> HttpResponse:
-        if not (
-            ist_administratorin(request.user)
-            or request.user.groups.filter(name=FORSCHENDE_GRUPPE).exists()
-        ):
-            return HttpResponse(status=403)
-        return view(request, *args, **kwargs)
+    return ist_administratorin(konto) or _ist_forschende(konto)
 
-    return geschuetzte_view
+
+_forschende_erforderlich = rolle_erforderlich(_ist_forschende)
+_forschende_oder_administratorin_erforderlich = rolle_erforderlich(
+    _forschende_oder_administratorin
+)
 
 
 def itemseite_prototype(request: HttpRequest) -> HttpResponse:
@@ -275,7 +251,7 @@ def _validierte_aktion_ausfuehren(
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Listet die eigenen Erhebungen einer Forschenden."""
 
@@ -300,7 +276,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Erhebung zur weiteren Bearbeitung."""
 
@@ -411,7 +387,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
 
@@ -426,7 +402,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_oder_administration_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_entfernen(
     request: HttpRequest, pk: int, konto_pk: int
 ) -> HttpResponse:

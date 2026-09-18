@@ -1,8 +1,5 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
-from functools import wraps
-from typing import Callable, Concatenate, ParamSpec
-
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import Count, QuerySet
@@ -19,6 +16,7 @@ from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
     ist_administratorin,
+    rolle_erforderlich,
 )
 
 from .forms import TrainingForm
@@ -33,35 +31,16 @@ from vignetten.models import Vignette
 
 from .models import Training, Trainingsbindung
 
-P = ParamSpec("P")
 
-
-def _ausbilderin_oder_administratorin(konto: "Konto") -> bool:
+def _ausbilderin_oder_administratorin(konto: Konto) -> bool:
     """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
 
-    return (
-        ist_administratorin(konto)
-        or konto.groups.filter(name=AUSBILDERIN_GRUPPE).exists()
-    )
+    return ist_administratorin(konto) or konto.groups.filter(
+        name=AUSBILDERIN_GRUPPE
+    ).exists()
 
 
-def _ausbilderin_erforderlich(
-    view: Callable[Concatenate[HttpRequest, P], HttpResponse],
-) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
-    """Schützt eine View der Ausbilder-UI mit der Rollenprüfung."""
-
-    @wraps(view)
-    def geschuetzte_view(
-        request: HttpRequest,
-        /,
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> HttpResponse:
-        if not _ausbilderin_oder_administratorin(request.user):
-            return HttpResponse(status=403)
-        return view(request, *args, **kwargs)
-
-    return geschuetzte_view
+_ausbilderin_erforderlich = rolle_erforderlich(_ausbilderin_oder_administratorin)
 
 
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
