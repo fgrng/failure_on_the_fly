@@ -12,6 +12,10 @@ selbst auf keinen geschützten Bereich; ohne Anmeldung führt sie zum Login unte
 `/accounts/login/`. Nach der Anmeldung zeigt die Sidebar nur die Bereiche und
 Links der jeweiligen Gruppenrollen; die Administration ist dabei ein Django-
 Superuser, keine Group, und wird mit `manage.py createsuperuser` eingerichtet.
+Über `/admin/` legt die Administration weitere Konten an, setzt deren Passwörter,
+vergibt die drei fachlichen Rollen als Groups und kann weitere Superuser ernennen.
+Konten lassen sich dort bewusst nicht löschen, solange #156 den Umgang mit
+Löschbegehren noch nicht festlegt.
 
 ## Vignetten verwalten
 
