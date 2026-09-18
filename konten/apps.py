@@ -1,16 +1,9 @@
 """Django-App-Konfiguration für Konten."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 from django.apps import AppConfig
-from django.db.models.signals import post_migrate, post_save
+from django.db.models.signals import post_migrate
 
 from .navigation import KONTOROLLEN
-
-if TYPE_CHECKING:
-    from .models import Konto
 
 
 def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:
@@ -24,22 +17,6 @@ def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:
         gruppe.permissions.clear()
 
 
-def fixture_superuser_zu_staff(
-    sender: type[Konto],
-    *,
-    instance: Konto,
-    raw: bool,
-    using: str,
-    **kwargs: object,
-) -> None:
-    """Gleicht den von Django umgangenen Speicherpfad für Fixtures aus."""
-    if raw:
-        sender.objects.using(using).filter(pk=instance.pk).update(
-            is_staff=instance.is_superuser
-        )
-        instance.is_staff = instance.is_superuser
-
-
 class KontenConfig(AppConfig):
     """Konfiguriert die Konten-App."""
 
@@ -47,15 +24,8 @@ class KontenConfig(AppConfig):
 
     def ready(self) -> None:
         """Registriert die Rollen-Anlage nach der Migration."""
-        from .models import Konto
-
         post_migrate.connect(
             erstelle_kontorollen,
             sender=self,
             dispatch_uid="konten.erstelle_kontorollen",
-        )
-        post_save.connect(
-            fixture_superuser_zu_staff,
-            sender=Konto,
-            dispatch_uid="konten.fixture_superuser_zu_staff",
         )

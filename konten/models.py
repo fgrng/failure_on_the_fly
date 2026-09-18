@@ -13,7 +13,7 @@ class KontoQuerySet(models.QuerySet["Konto"]):
         return self.filter(Q(groups__name=rolle) | Q(is_superuser=True)).distinct()
 
 
-class KontoManager(UserManager.from_queryset(KontoQuerySet)):  # type: ignore[misc]
+class KontoManager(UserManager.from_queryset(KontoQuerySet)):
     """Stellt Konto-spezifische Abfragen neben Djangos Nutzeranlage bereit."""
 
 

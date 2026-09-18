@@ -25,8 +25,8 @@ from django.utils.text import slugify
 from konten.models import Konto
 from konten.navigation import (
     FORSCHENDE_GRUPPE,
-    ist_administratorin,
     rolle_erforderlich,
+    rolle_oder_administration,
 )
 
 from .ablauf import Itemblock, block_vorlegen, naechster_schritt
@@ -86,10 +86,7 @@ def _ist_forschende(konto: Konto) -> bool:
     return konto.groups.filter(name=FORSCHENDE_GRUPPE).exists()
 
 
-def _forschende_oder_administratorin(konto: Konto) -> bool:
-    """Prüft den Zugang zum Eigentümerwechsel einer Erhebung."""
-
-    return ist_administratorin(konto) or _ist_forschende(konto)
+_forschende_oder_administratorin = rolle_oder_administration(FORSCHENDE_GRUPPE)
 
 
 _forschende_erforderlich = rolle_erforderlich(_ist_forschende)

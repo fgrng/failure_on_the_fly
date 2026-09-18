@@ -37,15 +37,14 @@ ENTWICKLUNGSPASSWORT: str = "entwicklung"
 BEISPIELBILDER: Path = Path(__file__).resolve().parents[2] / "beispielbilder"
 BILDFELDER: tuple[str, ...] = ("lernauftrag_bild", "arbeitsheft_bild")
 
-# Die Testkonten. Der Schlüssel ist der Anmeldename, der Wert die Liste der
-# zugewiesenen Rollen (Gruppennamen aus konten.apps.KONTOROLLEN). "autor" trägt
-# alle Rollen gleichzeitig, "studi" ist ein reines Teilnehmerinnenkonto ohne
-# Sonderrolle.
-TESTKONTEN: dict[str, list[str]] = {
-    "autor": list(KONTOROLLEN),
-    "studi": [],
+# Die Testkonten. Der Schlüssel ist der Anmeldename, der Wert die zugewiesenen
+# Rollen (Gruppennamen aus konten.navigation.KONTOROLLEN) und die Administration.
+# Die Administration ist keine Rolle mehr, sondern Djangos Superuser (ADR-0033).
+# "autor" trägt alles gleichzeitig, "studi" ist ein reines Teilnehmerinnenkonto.
+TESTKONTEN: dict[str, tuple[list[str], bool]] = {
+    "autor": (list(KONTOROLLEN), True),
+    "studi": ([], False),
 }
-ADMINISTRATORINNEN: frozenset[str] = frozenset({"autor"})
 
 # Die optionale OpenAI-Konfiguration für einen echten Modelllauf.
 SIMULATIONSMODELL: str = "openai/gpt-4o"
@@ -175,14 +174,12 @@ class Command(BaseCommand):
         """Legt je Testkonto an und weist die zugehörigen Gruppen zu."""
         konto_modell: type[Konto] = get_user_model()
         konten: dict[str, object] = {}
-        for anmeldename, rollen in TESTKONTEN.items():
+        for anmeldename, (rollen, administration) in TESTKONTEN.items():
             konto, neu = konto_modell.objects.get_or_create(username=anmeldename)
             if neu:
                 konto.set_password(ENTWICKLUNGSPASSWORT)
-                konto.save()
-            if anmeldename in ADMINISTRATORINNEN:
-                konto.is_superuser = True
-                konto.save(update_fields=["is_superuser"])
+            konto.is_superuser = administration
+            konto.save()
             for rolle in rollen:
                 konto.groups.add(Group.objects.get(name=rolle))
             konten[anmeldename] = konto

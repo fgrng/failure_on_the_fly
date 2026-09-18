@@ -37,3 +37,9 @@ Ausnahme an einer Stelle, wie `sichtbar_fuer` in ADR-0019.
   Teilnehmer:in.
 - Die Anwendung prüft Administration über `is_superuser`; die ehemalige Group
   existiert nicht mehr.
+- `Konto.save()` ist der einzige Ableitungsort. Djangos `loaddata` umgeht
+  `save()`, ein aus einer Fixture geladener Superuser bliebe also ohne
+  `is_staff` und käme nicht in den Admin. Das wird bewusst hingenommen: Konten
+  werden in diesem Projekt nirgends per Fixture geladen, und der
+  Entwicklungs-Seed umgeht Fixtures ausdrücklich. Ein `post_save`-Signal für
+  den `raw`-Pfad wäre ein zweiter Ableitungsort und wurde deshalb verworfen.

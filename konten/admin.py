@@ -25,14 +25,24 @@ class KontoCreationForm(AdminUserCreationForm):
 class KontoAdmin(UserAdmin):
     """Verwaltet Konten mit Djangos sicherer Passwortbehandlung."""
 
-    fieldsets = (
+    # is_staff bleibt überall unsichtbar: Konto.save() leitet es aus
+    # is_superuser ab, ein zweiter Anzeigeort wäre eine zweite Wahrheit.
+    list_display: tuple[str, ...] = (
+        "username",
+        "email",
+        "first_name",
+        "last_name",
+        "is_superuser",
+    )
+    list_filter: tuple[str, ...] = ("is_superuser", "is_active", "groups")
+    fieldsets: tuple[tuple[str | None, dict[str, Any]], ...] = (
         (None, {"fields": ("username", "password")}),
         ("Persönliche Angaben", {"fields": ("first_name", "last_name", "email")}),
         ("Berechtigungen", {"fields": ("is_active", "is_superuser", "groups")}),
         ("Wichtige Daten", {"fields": ("last_login", "date_joined")}),
     )
-    add_form = KontoCreationForm
-    add_fieldsets = (
+    add_form: type[KontoCreationForm] = KontoCreationForm
+    add_fieldsets: tuple[tuple[str | None, dict[str, Any]], ...] = (
         (
             None,
             {

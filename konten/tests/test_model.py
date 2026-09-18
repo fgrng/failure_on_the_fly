@@ -138,16 +138,6 @@ def test_superuser_wird_beim_speichern_auch_staff() -> None:
 
 
 @pytest.mark.django_db
-def test_superuser_aus_fixture_wird_auch_staff() -> None:
-    """Auch ein Superuser aus einer Django-Fixture erreicht den Admin."""
-    call_command("loaddata", "superuser_ohne_staff", verbosity=0)
-
-    konto: Konto = Konto.objects.get(username="fixture-admin")
-
-    assert konto.is_staff
-
-
-@pytest.mark.django_db
 def test_konten_mit_rolle_oder_administration_enthaelt_beide() -> None:
     """Ko-Autorinnen können die Fachrolle oder Administration tragen."""
     ausbilderin: Konto = Konto.objects.create_user(username="ausbilderin")

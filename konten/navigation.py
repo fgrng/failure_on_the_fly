@@ -35,6 +35,15 @@ def ist_administratorin(konto: "Konto") -> bool:
     return konto.is_superuser
 
 
+def rolle_oder_administration(gruppe: str) -> Callable[["Konto"], bool]:
+    """Erzeugt ein Rollen-Prädikat einschließlich Administrations-Override."""
+
+    def praedikat(konto: "Konto") -> bool:
+        return ist_administratorin(konto) or konto.groups.filter(name=gruppe).exists()
+
+    return praedikat
+
+
 def rolle_erforderlich(
     rollen_pruefung: Callable[["Konto"], bool],
 ) -> Callable[

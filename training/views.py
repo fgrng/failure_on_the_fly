@@ -15,8 +15,8 @@ from django.urls import reverse
 from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
-    ist_administratorin,
     rolle_erforderlich,
+    rolle_oder_administration,
 )
 
 from .forms import TrainingForm
@@ -32,14 +32,7 @@ from vignetten.models import Vignette
 from .models import Training, Trainingsbindung
 
 
-def _ausbilderin_oder_administratorin(konto: Konto) -> bool:
-    """Prüft, ob ein Konto die Ausbilder-UI erreichen darf."""
-
-    return ist_administratorin(konto) or konto.groups.filter(
-        name=AUSBILDERIN_GRUPPE
-    ).exists()
-
-
+_ausbilderin_oder_administratorin = rolle_oder_administration(AUSBILDERIN_GRUPPE)
 _ausbilderin_erforderlich = rolle_erforderlich(_ausbilderin_oder_administratorin)
 
 

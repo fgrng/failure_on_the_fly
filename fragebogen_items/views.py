@@ -8,8 +8,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from konten.navigation import (
     FORSCHENDE_GRUPPE,
-    ist_administratorin,
     rolle_erforderlich,
+    rolle_oder_administration,
 )
 from konten.models import Konto
 
@@ -24,15 +24,10 @@ class ItemZeile(TypedDict):
     zustand_badge: str
 
 
-def _forschende_oder_administratorin(konto: Konto) -> bool:
-    """Prüft den Zugang zum Fragebogen-Item-Editor."""
-
-    return ist_administratorin(konto) or konto.groups.filter(
-        name=FORSCHENDE_GRUPPE
-    ).exists()
-
-
-_forschende_erforderlich = rolle_erforderlich(_forschende_oder_administratorin)
+_forschende_oder_administratorin = rolle_oder_administration(FORSCHENDE_GRUPPE)
+_forschende_oder_administratorin_erforderlich = rolle_erforderlich(
+    _forschende_oder_administratorin
+)
 
 
 def _sichtbares_item(
@@ -72,7 +67,7 @@ def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def liste(request: HttpRequest) -> HttpResponse:
     """Zeigt pro sichtbarer Historie ihre neueste Fassung."""
     sichtbare_historien = (
@@ -94,7 +89,7 @@ def liste(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine erste Entwurfsfassung über die Manager-Naht an."""
     form: FragebogenItemForm = FragebogenItemForm(request.POST or None)
@@ -107,7 +102,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Fragebogen-Item-Fassung."""
     item: FragebogenItem = _sichtbares_item(request, pk)
@@ -135,7 +130,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert Typ und Wortlaut eines sichtbaren Entwurfs."""
     item: FragebogenItem = _sichtbares_item(
@@ -161,7 +156,7 @@ def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Fassung einen bearbeitbaren Folgeentwurf."""
     if request.method != "POST":
@@ -181,7 +176,7 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen sichtbaren Entwurf über die Modell-Naht."""
     if request.method != "POST":
@@ -196,7 +191,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine sichtbare finale Fassung über die Modell-Naht."""
     if request.method != "POST":
@@ -207,7 +202,7 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Teilt eine sichtbare Item-Historie mit einer weiteren Forschenden."""
     if request.method != "POST":
@@ -222,7 +217,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Macht eine sichtbare archivierte Fassung wieder final."""
     if request.method != "POST":
@@ -235,7 +230,7 @@ def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
     """Löscht einen sichtbaren Entwurf physisch über die Modell-Naht."""
     if request.method != "POST":
@@ -246,7 +241,7 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Entzieht einer Ko-Autorin den Zugang zu einer sichtbaren Item-Historie."""
     if request.method != "POST":
