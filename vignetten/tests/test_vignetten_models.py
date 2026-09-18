@@ -4,7 +4,6 @@ from datetime import datetime
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
@@ -13,7 +12,6 @@ from django.test import TestCase
 from django.utils import timezone
 
 from konten.models import Konto
-from konten.navigation import ADMINISTRATORIN_GRUPPE
 from simulation.models import Simulationskern
 from vignetten.models import (
     Vignette,
@@ -513,9 +511,8 @@ class VignetteSichtbarFuerQuerySetTests(TestCase):
         self.administratorin: Konto = get_user_model().objects.create_user(
             username="admin"
         )
-        self.administratorin.groups.add(
-            Group.objects.get(name=ADMINISTRATORIN_GRUPPE)
-        )
+        self.administratorin.is_superuser = True
+        self.administratorin.save()
 
         eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         eigene_historie.eigentuemerinnen.add(self.ada)
@@ -602,7 +599,8 @@ class VignetteQuerySetTests(TestCase):
     def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
         """Die Administration sieht auch fremde Vignettenhistorien."""
         administratorin: Konto = get_user_model().objects.create_user(username="admin")
-        administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+        administratorin.is_superuser = True
+        administratorin.save()
         fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         fremde_historie.eigentuemerinnen.add(
             get_user_model().objects.create_user(username="linus")

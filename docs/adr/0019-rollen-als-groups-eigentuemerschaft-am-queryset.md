@@ -23,6 +23,11 @@ Der Eigentümer ist ein Fremdschlüssel auf dem Objekt. Bei der Vignette trägt 
 > entschieden: Eine Nachfolgerin wird zum Kreis hinzugefügt, danach entfernt
 > sich die bisherige Eigentümerin.
 
+> **Nachgeführt durch ADR-0033 (Administration):** Die Administrator:in ist
+> die begrenzte Ausnahme von den Groups: Sie ist Djangos `is_superuser`.
+> Autor:in, Ausbilder:in und Forschende:r bleiben permissionfreie Groups; die
+> Rolle-oder-Administration-Regel lebt als benannte Konto-QuerySet-Methode.
+
 Die Regel selbst lebt als benannte Methode am QuerySet:
 
 ```python

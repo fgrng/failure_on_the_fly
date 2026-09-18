@@ -149,7 +149,8 @@ class ErhebungenAnlegenUndListeTests(TestCase):
             name="Fremde Erhebung", eigentuemerin=grace
         )
         administratorin: Konto = get_user_model().objects.create_user(username="ada")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         self.client.force_login(administratorin)
 
         liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
@@ -320,7 +321,8 @@ class ErhebungenKoForschendenViewTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         erhebung: Erhebung = Erhebung.objects.create(
             name="Fremde Erhebung", eigentuemerin=grace
         )

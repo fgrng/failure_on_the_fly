@@ -232,7 +232,7 @@ Wer Erhebungen zusammenstellt, an denen die Person Eigentümerin ist, ihren Abla
 _Avoid_: Wissenschaftler, Studienleiter
 
 **Administrator:in**:
-Wer die Instanz betreibt, Nutzer und Rollen verwaltet, die Modell-Konfiguration setzt und als Einzige den Simulationskern pflegt.
+Wer die Instanz betreibt, Nutzer und Rollen verwaltet, die Modell-Konfiguration setzt und als Einzige den Simulationskern pflegt. Technisch ist sie ein Django-Superuser, keine Group.
 _Avoid_: Admin, Betreiber
 
 ## Architektur

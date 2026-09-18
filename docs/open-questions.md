@@ -4,6 +4,9 @@ Fragen, die in den Modellierungssitzungen aufgetaucht, aber **nicht entschieden*
 
 Begriffe folgen `CONTEXT.md`.
 
+Die Administration ist keine offene Rollenfrage mehr: Sie ist als Django-
+Superuser in ADR-0033 entschieden; nur die drei Fachrollen sind Groups.
+
 ## 1. Wiederholversuche und Sitzungsobergrenze
 
 `docs/adr/0011` lässt begrenzte Wiederholungen eines gescheiterten Gesprächsschritts zu, ohne die Grenze zu nennen. Offen: Wie viele Versuche, bevor eine Sitzung aufgibt, und was sieht die Teilnehmer:in dann? Getrennt davon verlangt `docs/adr/0012` eine **harte Obergrenze** gegen ewig offene Sitzungen — sie hat nichts mit dem Gesprächsbudget zu tun und ist noch unbeziffert.

@@ -12,12 +12,10 @@ if TYPE_CHECKING:
 AUTORIN_GRUPPE: str = "Autor:in"
 AUSBILDERIN_GRUPPE: str = "Ausbilder:in"
 FORSCHENDE_GRUPPE: str = "Forschende:r"
-ADMINISTRATORIN_GRUPPE: str = "Administrator:in"
 KONTOROLLEN: tuple[str, ...] = (
     AUTORIN_GRUPPE,
     AUSBILDERIN_GRUPPE,
     FORSCHENDE_GRUPPE,
-    ADMINISTRATORIN_GRUPPE,
 )
 P: ParamSpec = ParamSpec("P")
 
@@ -29,12 +27,12 @@ def _rollen(konto: "Konto") -> set[str]:
 
 def ist_autorin(konto: "Konto") -> bool:
     """Prüft die Entwicklungsrolle einschließlich Administrations-Override."""
-    return bool(_rollen(konto) & {AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE})
+    return ist_administratorin(konto) or AUTORIN_GRUPPE in _rollen(konto)
 
 
 def ist_administratorin(konto: "Konto") -> bool:
     """Prüft die Administrationsrolle."""
-    return ADMINISTRATORIN_GRUPPE in _rollen(konto)
+    return konto.is_superuser
 
 
 def autorin_erforderlich(
@@ -66,13 +64,13 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
         }
 
     rollen: set[str] = _rollen(request.user)
-    ist_administratorin: bool = ADMINISTRATORIN_GRUPPE in rollen
+    administration: bool = ist_administratorin(request.user)
     return {
-        "zeige_entwicklung": ist_administratorin or AUTORIN_GRUPPE in rollen,
-        "zeige_ausbildung_kuratieren": ist_administratorin
+        "zeige_entwicklung": administration or AUTORIN_GRUPPE in rollen,
+        "zeige_ausbildung_kuratieren": administration
         or AUSBILDERIN_GRUPPE in rollen,
-        "zeige_teilnahme": not rollen,
-        "zeige_forschung": ist_administratorin or FORSCHENDE_GRUPPE in rollen,
-        "zeige_system": ist_administratorin,
-        "simulationskern_verwalten": ist_administratorin,
+        "zeige_teilnahme": not rollen and not administration,
+        "zeige_forschung": administration or FORSCHENDE_GRUPPE in rollen,
+        "zeige_system": administration,
+        "simulationskern_verwalten": administration,
     }

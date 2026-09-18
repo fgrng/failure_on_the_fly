@@ -12,18 +12,12 @@ from django.urls import reverse
 
 from konten.models import Konto
 from konten.navigation import (
-    ADMINISTRATORIN_GRUPPE,
     AUTORIN_GRUPPE,
     autorin_erforderlich as _autorin_erforderlich,
 )
 
 from .forms import VignetteForm
 from .models import Vignette, Vignettenhistorie, zufaellige_akteure
-
-
-_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
-    {AUTORIN_GRUPPE, ADMINISTRATORIN_GRUPPE}
-)
 
 
 def _fallback_label(vignette: Vignette) -> str:
@@ -71,7 +65,7 @@ def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
 def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Konto]:
     """Liefert Autorinnen und Administratorinnen außerhalb des Eigentümer-Kreises."""
     return (
-        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
+        Konto.objects.mit_rolle_oder_administration(AUTORIN_GRUPPE)
         .exclude(vignettenhistorie=historie)
         .distinct()
     )

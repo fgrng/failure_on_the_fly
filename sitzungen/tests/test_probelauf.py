@@ -1,7 +1,6 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -739,7 +738,8 @@ class AdministratorinProbelaufTests(TestCase):
         """Legt ein administrativ frei kombinierbares Tripel an."""
 
         self.administratorin: Konto = get_user_model().objects.create_user(username="admin")
-        self.administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        self.administratorin.is_superuser = True
+        self.administratorin.save()
         autorin: Konto = get_user_model().objects.create_user(username="ada")
         finaler_kern: Simulationskern = Simulationskern.objects.anlegen()
         finaler_kern.finalisieren()

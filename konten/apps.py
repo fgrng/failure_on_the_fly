@@ -7,7 +7,7 @@ from .navigation import KONTOROLLEN
 
 
 def erstelle_kontorollen(*, using: str, **kwargs: object) -> None:
-    """Stellt die vier additiven Kontorollen bereit."""
+    """Stellt die drei additiven Kontorollen bereit."""
     from django.contrib.auth.models import Group
 
     rollenname: str

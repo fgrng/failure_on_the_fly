@@ -2,7 +2,6 @@
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import Group
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
@@ -181,7 +180,8 @@ def test_sichtbar_fuer_liefert_eigene_trainings_und_alle_fuer_administration() -
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
     administratorin: Konto = Konto.objects.create_user(username="linus")
-    administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+    administratorin.is_superuser = True
+    administratorin.save()
     eigenes: Training = Training.objects.anlegen(ada, name="Brüche")
     fremdes: Training = Training.objects.anlegen(grace, name="Addition")
 

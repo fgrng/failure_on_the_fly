@@ -14,10 +14,11 @@ from konten.models import Konto
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("rollen", "erwartet"),
+    ("rollen", "is_superuser", "erwartet"),
     [
         (
             [],
+            False,
             {
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": False,
@@ -29,6 +30,7 @@ from konten.models import Konto
         ),
         (
             ["Autor:in"],
+            False,
             {
                 "zeige_entwicklung": True,
                 "zeige_ausbildung_kuratieren": False,
@@ -40,6 +42,7 @@ from konten.models import Konto
         ),
         (
             ["Ausbilder:in"],
+            False,
             {
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": True,
@@ -51,6 +54,7 @@ from konten.models import Konto
         ),
         (
             ["Forschende:r"],
+            False,
             {
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": False,
@@ -61,7 +65,8 @@ from konten.models import Konto
             },
         ),
         (
-            ["Administrator:in"],
+            [],
+            True,
             {
                 "zeige_entwicklung": True,
                 "zeige_ausbildung_kuratieren": True,
@@ -74,10 +79,12 @@ from konten.models import Konto
     ],
 )
 def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
-    rollen: list[str], erwartet: dict[str, bool]
+    rollen: list[str], is_superuser: bool, erwartet: dict[str, bool]
 ) -> None:
     """Die Navigation kennt Gruppenrollen und den Admin-Override zentral."""
-    konto: Konto = get_user_model().objects.create_user(username="ada")
+    konto: Konto = get_user_model().objects.create_user(
+        username="ada", is_superuser=is_superuser
+    )
     konto.groups.add(*Group.objects.filter(name__in=rollen))
     request: HttpRequest = RequestFactory().get("/")
     request.user = konto
@@ -87,15 +94,16 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("rollen", "erwartet"),
-    [([], False), (["Administrator:in"], True)],
+    ("is_superuser", "erwartet"),
+    [(False, False), (True, True)],
 )
 def test_ist_administratorin_prueft_die_administrationsrolle(
-    rollen: list[str], erwartet: bool
+    is_superuser: bool, erwartet: bool
 ) -> None:
     """Die Rollenprüfung ist die gemeinsame Administrations-Naht."""
-    konto: Konto = get_user_model().objects.create_user(username="ada")
-    konto.groups.add(*Group.objects.filter(name__in=rollen))
+    konto: Konto = get_user_model().objects.create_user(
+        username="ada", is_superuser=is_superuser
+    )
 
     assert ist_administratorin(konto) is erwartet
 
@@ -103,8 +111,10 @@ def test_ist_administratorin_prueft_die_administrationsrolle(
 class SidebarNavigationTests(TestCase):
     """Die Sidebar verwendet ausschließlich die berechneten Booleans."""
 
-    def _sidebar_fuer(self, *rollen: str) -> str:
-        konto: Konto = get_user_model().objects.create_user(username="ada")
+    def _sidebar_fuer(self, *rollen: str, is_superuser: bool = False) -> str:
+        konto: Konto = get_user_model().objects.create_user(
+            username="ada", is_superuser=is_superuser
+        )
         konto.groups.add(*Group.objects.filter(name__in=rollen))
         self.client.force_login(konto)
         return self.client.get(reverse("training:katalog")).content.decode()
@@ -148,8 +158,8 @@ class SidebarNavigationTests(TestCase):
         self.assertIn("Fragebogen-Items", sidebar)
 
     def test_administratorin_sieht_alle_bereiche_ausser_teilnahme(self) -> None:
-        """Die Gruppenrolle der Administration überschreibt fast alle Sichtbarkeiten."""
-        sidebar: str = self._sidebar_fuer("Administrator:in")
+        """Die Administration überschreibt fast alle Sichtbarkeiten."""
+        sidebar: str = self._sidebar_fuer(is_superuser=True)
 
         for text in (
             "Vignetten ansehen",

@@ -1,11 +1,33 @@
 """Datenmodelle für Nutzerkonten."""
 
-from django.contrib.auth.models import AbstractUser
-from django.db.models import ProtectedError
+from django.contrib.auth.models import AbstractUser, UserManager
+from django.db import models
+from django.db.models import ProtectedError, Q
+
+
+class KontoQuerySet(models.QuerySet["Konto"]):
+    """Abfragen über Konten und ihre fachlichen Rollen."""
+
+    def mit_rolle_oder_administration(self, rolle: str) -> "KontoQuerySet":
+        """Liefert Konten mit einer Rolle einschließlich der Administration."""
+        return self.filter(Q(groups__name=rolle) | Q(is_superuser=True)).distinct()
+
+
+class KontoManager(UserManager.from_queryset(KontoQuerySet)):  # type: ignore[misc]
+    """Stellt Konto-spezifische Abfragen neben Djangos Nutzeranlage bereit."""
 
 
 class Konto(AbstractUser):
     """Das Nutzerkonto der Anwendung mit Djangos Standard-Anmeldefeldern."""
+
+    objects: KontoManager = KontoManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Leitet den Django-Admin-Zutritt aus der Administration ab."""
+        self.is_staff = self.is_superuser
+        if update_fields := kwargs.get("update_fields"):
+            kwargs["update_fields"] = set(update_fields) | {"is_staff"}
+        super().save(*args, **kwargs)
 
     def delete(
         self,

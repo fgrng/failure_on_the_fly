@@ -45,6 +45,7 @@ TESTKONTEN: dict[str, list[str]] = {
     "autor": list(KONTOROLLEN),
     "studi": [],
 }
+ADMINISTRATORINNEN: frozenset[str] = frozenset({"autor"})
 
 # Die optionale OpenAI-Konfiguration für einen echten Modelllauf.
 SIMULATIONSMODELL: str = "openai/gpt-4o"
@@ -178,10 +179,10 @@ class Command(BaseCommand):
             konto, neu = konto_modell.objects.get_or_create(username=anmeldename)
             if neu:
                 konto.set_password(ENTWICKLUNGSPASSWORT)
-                if "Administrator:in" in rollen:
-                    konto.is_staff = True
-                    konto.is_superuser = True
                 konto.save()
+            if anmeldename in ADMINISTRATORINNEN:
+                konto.is_superuser = True
+                konto.save(update_fields=["is_superuser"])
             for rolle in rollen:
                 konto.groups.add(Group.objects.get(name=rolle))
             konten[anmeldename] = konto

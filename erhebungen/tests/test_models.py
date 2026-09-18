@@ -5,14 +5,12 @@ import re
 from unittest.mock import patch
 
 import pytest
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
-from konten.navigation import ADMINISTRATORIN_GRUPPE
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -216,8 +214,9 @@ def test_geteilte_erhebung_ist_fuer_alle_eigentuemerinnen_sichtbar() -> None:
 def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
     """Die Administration sieht auch fremde Erhebungen."""
 
-    administratorin: Konto = Konto.objects.create_user(username="admin")
-    administratorin.groups.add(Group.objects.get(name=ADMINISTRATORIN_GRUPPE))
+    administratorin: Konto = Konto.objects.create_user(
+        username="admin", is_superuser=True
+    )
     fremde: Erhebung = Erhebung.objects.create(
         name="Addition",
         eigentuemerin=Konto.objects.create_user(username="grace"),

@@ -17,7 +17,6 @@ from django.urls import reverse
 
 from konten.models import Konto
 from konten.navigation import (
-    ADMINISTRATORIN_GRUPPE,
     AUSBILDERIN_GRUPPE,
     ist_administratorin,
 )
@@ -34,9 +33,6 @@ from vignetten.models import Vignette
 
 from .models import Training, Trainingsbindung
 
-_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
-    {AUSBILDERIN_GRUPPE, ADMINISTRATORIN_GRUPPE}
-)
 P = ParamSpec("P")
 
 
@@ -102,7 +98,7 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 def _moegliche_koautorinnen(training: Training) -> QuerySet[Konto]:
     """Liefert Ausbilderinnen und Administration außerhalb des Eigentümer-Kreises."""
     return (
-        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
+        Konto.objects.mit_rolle_oder_administration(AUSBILDERIN_GRUPPE)
         .exclude(training=training)
         .distinct()
     )

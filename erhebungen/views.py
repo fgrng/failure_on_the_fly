@@ -25,7 +25,6 @@ from django.utils.text import slugify
 
 from konten.models import Konto
 from konten.navigation import (
-    ADMINISTRATORIN_GRUPPE,
     FORSCHENDE_GRUPPE,
     ist_administratorin,
 )
@@ -57,9 +56,6 @@ from vignetten.models import Vignette
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
 _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
-_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
-    {FORSCHENDE_GRUPPE, ADMINISTRATORIN_GRUPPE}
-)
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
@@ -158,7 +154,7 @@ def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
     """Liefert berechtigte Konten außerhalb des Eigentümer-Kreises."""
 
     return (
-        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN)
+        Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE)
         .exclude(erhebung=erhebung)
         .distinct()
     )

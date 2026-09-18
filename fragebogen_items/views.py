@@ -8,7 +8,6 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllow
 from django.shortcuts import get_object_or_404, redirect, render
 
 from konten.navigation import (
-    ADMINISTRATORIN_GRUPPE,
     FORSCHENDE_GRUPPE,
     ist_administratorin,
 )
@@ -17,12 +16,6 @@ from konten.models import Konto
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
 
-_BERECHTIGTE_GRUPPEN: frozenset[str] = frozenset(
-    {
-        FORSCHENDE_GRUPPE,
-        ADMINISTRATORIN_GRUPPE,
-    }
-)
 P: ParamSpec = ParamSpec("P")
 
 
@@ -145,8 +138,8 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": Konto.objects.filter(
-                groups__name__in=_BERECHTIGTE_GRUPPEN
+            "moegliche_koautorinnen": Konto.objects.mit_rolle_oder_administration(
+                FORSCHENDE_GRUPPE
             )
             .exclude(fragebogenitemhistorie=item.historie)
             .distinct(),
@@ -234,7 +227,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     item: FragebogenItem = _sichtbares_item(request, pk)
     konto: Konto = get_object_or_404(
-        Konto.objects.filter(groups__name__in=_BERECHTIGTE_GRUPPEN).distinct(),
+        Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE),
         pk=request.POST.get("konto"),
     )
     item.historie.eigentuemerinnen.add(konto)

@@ -377,7 +377,8 @@ class VignetteKoautorschaftViewTests(TestCase):
         grace: Konto = _autorin("grace")
         ada: Konto = _autorin("ada")
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         vignette: Vignette = _vignette_mit_eigentuemerinnen(grace)
         self.client.force_login(administratorin)
 
@@ -1227,7 +1228,8 @@ class VignettenRollenTests(TestCase):
     def test_administratorin_erreicht_den_editor(self) -> None:
         """Die Administratorinnen-Gruppe ist der serverseitige Override."""
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         self.client.force_login(administratorin)
 
         self.assertEqual(self.client.get(reverse("vignetten:liste")).status_code, 200)

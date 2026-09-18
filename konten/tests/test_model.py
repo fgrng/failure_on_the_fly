@@ -4,6 +4,8 @@ import pytest
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
@@ -14,11 +16,10 @@ from vignetten.models import Vignettenhistorie
 
 @pytest.mark.django_db
 def test_kontorollen_werden_nach_migration_angelegt() -> None:
-    """Die vier Kontorollen existieren als berechtigungsfreie Django-Groups."""
+    """Die drei Fachrollen existieren als berechtigungsfreie Django-Groups."""
     rollen: QuerySet[Group] = Group.objects.order_by("name")
 
     assert list(rollen.values_list("name", flat=True)) == [
-        "Administrator:in",
         "Ausbilder:in",
         "Autor:in",
         "Forschende:r",
@@ -28,10 +29,10 @@ def test_kontorollen_werden_nach_migration_angelegt() -> None:
 
 @pytest.mark.django_db
 def test_erneute_migration_dupliziert_kontorollen_nicht() -> None:
-    """Ein erneuter Migrationslauf dupliziert die vier Kontorollen nicht."""
+    """Ein erneuter Migrationslauf dupliziert die drei Kontorollen nicht."""
     call_command("migrate", verbosity=0)
 
-    assert Group.objects.count() == 4
+    assert Group.objects.count() == 3
 
 
 @pytest.mark.django_db
@@ -47,6 +48,36 @@ def test_erneute_migration_entfernt_berechtigungen_der_kontorollen() -> None:
     call_command("migrate", verbosity=0)
 
     assert not Group.objects.filter(permissions__isnull=False).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_administrationsmigration_macht_gruppenmitglied_zum_superuser() -> None:
+    """Die alte Administration wird ohne Rollenverlust zu Django migriert."""
+    vorher = [("konten", "0001_initial")]
+    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    executor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        apps = executor.loader.project_state(vorher).apps
+        KontoVorher = apps.get_model("konten", "Konto")
+        GroupVorher = apps.get_model("auth", "Group")
+        administration = GroupVorher.objects.create(name="Administrator:in")
+        konto = KontoVorher.objects.create(username="ada")
+        konto.groups.add(administration)
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([("konten", "0002_administration_ist_superuser")])
+        apps = executor.loader.project_state(
+            [("konten", "0002_administration_ist_superuser")]
+        ).apps
+        KontoNachher = apps.get_model("konten", "Konto")
+
+        migriert = KontoNachher.objects.get(pk=konto.pk)
+        assert migriert.is_superuser
+        assert migriert.is_staff
+        assert not Group.objects.filter(name="Administrator:in").exists()
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
 
 
 @pytest.mark.django_db
@@ -89,6 +120,32 @@ def test_konto_behaelt_django_standardfelder() -> None:
         "Ada",
         "Lovelace",
     )
+
+
+@pytest.mark.django_db
+def test_superuser_wird_beim_speichern_auch_staff() -> None:
+    """Der Superuser-Status öffnet stets auch den Django-Admin."""
+    konto: Konto = Konto.objects.create_user(username="admin", is_superuser=True)
+
+    konto.refresh_from_db()
+
+    assert konto.is_staff
+
+
+@pytest.mark.django_db
+def test_konten_mit_rolle_oder_administration_enthaelt_beide() -> None:
+    """Ko-Autorinnen können die Fachrolle oder Administration tragen."""
+    ausbilderin: Konto = Konto.objects.create_user(username="ausbilderin")
+    ausbilderin.groups.add(Group.objects.get(name="Ausbilder:in"))
+    administratorin: Konto = Konto.objects.create_user(
+        username="administratorin", is_superuser=True
+    )
+    teilnehmerin: Konto = Konto.objects.create_user(username="teilnehmerin")
+
+    konten = Konto.objects.mit_rolle_oder_administration("Ausbilder:in")
+
+    assert set(konten) == {ausbilderin, administratorin}
+    assert teilnehmerin not in konten
 
 
 @pytest.mark.django_db
@@ -173,8 +230,9 @@ def test_konto_loeschen_geteilte_oder_archivierte_erhebung_ueberlebt() -> None:
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
     linus: Konto = Konto.objects.create_user(username="linus")
-    administratorin: Konto = Konto.objects.create_user(username="admin")
-    administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+    administratorin: Konto = Konto.objects.create_user(
+        username="admin", is_superuser=True
+    )
     geteilt: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilt")
     geteilt.eigentuemerinnen.add(grace, linus)
     ada.delete()

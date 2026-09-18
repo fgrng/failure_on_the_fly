@@ -67,7 +67,7 @@ class StartseiteTests(TestCase):
                 ("Vignetten ansehen", "Trainingskataloge ansehen", "Administration"),
             ),
             (
-                "Administrator:in",
+                "Administration",
                 (
                     "Simulationskern verwalten",
                     "Administration",
@@ -79,9 +79,10 @@ class StartseiteTests(TestCase):
         ):
             with self.subTest(rolle=rolle):
                 konto: Konto = get_user_model().objects.create_user(
-                    username=rolle, is_staff=rolle == "Administrator:in"
+                    username=rolle, is_superuser=rolle == "Administration"
                 )
-                konto.groups.add(Group.objects.get(name=rolle))
+                if rolle != "Administration":
+                    konto.groups.add(Group.objects.get(name=rolle))
                 self.client.force_login(konto)
 
                 response: HttpResponse = self.client.get(reverse("start"))

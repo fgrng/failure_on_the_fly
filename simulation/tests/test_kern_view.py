@@ -162,6 +162,7 @@ class SimulationskernRollenTests(TestCase):
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 403)
 
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         self.client.force_login(administratorin)
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 200)

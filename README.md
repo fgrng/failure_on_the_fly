@@ -10,7 +10,8 @@ den Zweck der Plattform und stellt die Funktionen in drei Rollenspalten vor
 (Autor:in, Lehrperson in Ausbildung, Ausbildung & Forschung). Sie verlinkt
 selbst auf keinen geschützten Bereich; ohne Anmeldung führt sie zum Login unter
 `/accounts/login/`. Nach der Anmeldung zeigt die Sidebar nur die Bereiche und
-Links der jeweiligen Gruppenrollen.
+Links der jeweiligen Gruppenrollen; die Administration ist dabei ein Django-
+Superuser, keine Group, und wird mit `manage.py createsuperuser` eingerichtet.
 
 ## Vignetten verwalten
 

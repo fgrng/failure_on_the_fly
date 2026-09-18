@@ -58,7 +58,8 @@ class TrainingAnlegenTests(TestCase):
     def test_administratorin_erreicht_alle_sichtbaren_trainings(self) -> None:
         """Die administrative Sonderrolle darf die Ausbilder-UI vollständig nutzen."""
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         ada: Konto = get_user_model().objects.create_user(username="ada")
         grace: Konto = get_user_model().objects.create_user(username="grace")
         eigenes: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
@@ -307,7 +308,8 @@ class TrainingKoautorschaftTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         training: Training = Training.objects.anlegen(ada, name="Brüche")
         self.client.force_login(ada)
         self.client.post(
@@ -353,7 +355,8 @@ class TrainingKoautorschaftTests(TestCase):
         grace: Konto = get_user_model().objects.create_user(username="grace")
         grace.groups.add(Group.objects.get(name="Ausbilder:in"))
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         training: Training = Training.objects.anlegen(grace, name="Brüche")
         self.client.force_login(administratorin)
 
@@ -379,7 +382,8 @@ class TrainingKoautorschaftTests(TestCase):
         grace: Konto = get_user_model().objects.create_user(username="grace")
         grace.groups.add(Group.objects.get(name="Ausbilder:in"))
         administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.groups.add(Group.objects.get(name="Administrator:in"))
+        administratorin.is_superuser = True
+        administratorin.save()
         training: Training = Training.objects.anlegen(ada, name="Brüche")
         training.eigentuemerinnen.add(grace)
         self.client.force_login(administratorin)
