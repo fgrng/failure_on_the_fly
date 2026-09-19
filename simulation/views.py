@@ -5,6 +5,7 @@ from collections.abc import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -19,6 +20,12 @@ from .models import (
     ModellKonfiguration,
     Simulationskern,
 )
+
+
+# Zustandswert der Vignettenfassungen, die das Archivieren betrifft. Die Zahl
+# kommt über den Rückwärts-Zugriff auf den Fremdschlüssel in `vignetten`; ein
+# Import in diese Richtung wäre eine Kante gegen ADR-0016.
+_VIGNETTENENTWURF: str = "entwurf"
 
 
 def _kern_kontext() -> dict[str, object]:
@@ -105,7 +112,14 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             ).first(),
             "finale_fassungen": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.FINAL
-            ).order_by("-finalisiert_am", "-pk"),
+            )
+            .annotate(
+                gepinnte_entwuerfe=Count(
+                    "vignette",
+                    filter=Q(vignette__zustand=_VIGNETTENENTWURF),
+                )
+            )
+            .order_by("-finalisiert_am", "-pk"),
             "archivierte_fassungen": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ARCHIVIERT
             ).order_by("-finalisiert_am", "-pk"),
@@ -147,4 +161,28 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
         pk,
         Simulationskern.Zustand.ENTWURF,
         Simulationskern.delete,
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Archiviert eine finale Kern-Fassung."""
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Simulationskern.Zustand.FINAL,
+        Simulationskern.archivieren,
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Holt eine archivierte Kern-Fassung zurück."""
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Simulationskern.Zustand.ARCHIVIERT,
+        Simulationskern.entarchivieren,
     )

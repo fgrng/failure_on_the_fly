@@ -42,7 +42,12 @@ kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisiere
 hin. Administrator:innen erhalten unter `/system/kern/verwalten/` außerdem den
 Überblick über Entwürfe, alle finalen und eingeklappten archivierten Kern-Fassungen.
 Sie ziehen aus einer finalen Fassung einen Entwurf, finalisieren ihn oder
-verwerfen ihn wieder.
+verwerfen ihn wieder. Eine finale Fassung lässt sich außerdem archivieren und
+wieder zurückholen; am Archivieren-Knopf steht, wie viele Vignettenentwürfe auf
+dieser Fassung gepinnt sind. Die Zahl warnt nur vor: Archivieren ist umkehrbar,
+trifft laufende Sitzungen nicht, und betroffene Vignettenentwürfe scheitern erst
+beim Finalisieren — dann hilft Vorspulen. Die letzte finale Fassung kann nicht
+archiviert werden.
 
 ## Audioverarbeitung im Training
 

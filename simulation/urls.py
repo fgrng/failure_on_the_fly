@@ -13,4 +13,10 @@ urlpatterns: list[URLPattern] = [
     path("kern/<int:pk>/neue-fassung/", views.neue_fassung, name="neue_fassung"),
     path("kern/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
     path("kern/<int:pk>/verwerfen/", views.verwerfen, name="verwerfen"),
+    path("kern/<int:pk>/archivieren/", views.archivieren, name="archivieren"),
+    path(
+        "kern/<int:pk>/entarchivieren/",
+        views.entarchivieren,
+        name="entarchivieren",
+    ),
 ]
