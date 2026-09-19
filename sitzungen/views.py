@@ -87,7 +87,7 @@ def _probelauf_vignette_und_kern(
     return vignette, kern
 
 
-def _probelauf_navigation() -> Sitzungsnavigation:
+def _sitzungsnavigation() -> Sitzungsnavigation:
     # Bündelt die modusspezifischen Routen für die schreibfreie Probelaufansicht.
 
     return Sitzungsnavigation(
@@ -114,7 +114,7 @@ def _gespraech_anzeigen(
         kern=kern,
         gespraechsschritte=schritte,
         ist_probelauf=True,
-        navigation=_probelauf_navigation(),
+        navigation=_sitzungsnavigation(),
         erneute_eingabe=erneute_eingabe,
         spracheingabe_verfuegbar=True,
     )
@@ -134,7 +134,7 @@ def _debrief_anzeigen(
         kern=kern,
         gespraechsschritte=schritte,
         ist_probelauf=True,
-        navigation=_probelauf_navigation(),
+        navigation=_sitzungsnavigation(),
         zeigt_debrief=True,
         spracheingabe_verfuegbar=True,
     )
@@ -169,7 +169,7 @@ def _probelauf_starten(
         kern=kern,
         gespraechsschritte=sink.gespraechsschritte,
         ist_probelauf=True,
-        navigation=_probelauf_navigation(),
+        navigation=_sitzungsnavigation(),
         spracheingabe_verfuegbar=True,
     )
 
@@ -356,7 +356,7 @@ def transkriptions_endpunkt(
     return endpunkt
 
 
-def _persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
+def persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
     # Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge.
 
     return sitzung.gespraechsschritt_set.order_by("reihenfolge")
@@ -402,7 +402,7 @@ def _budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
     if sitzung.vignette.budget_wert is None:
         return False
     if sitzung.vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-        return _persistierte_schritte(sitzung).count() >= sitzung.vignette.budget_wert
+        return persistierte_schritte(sitzung).count() >= sitzung.vignette.budget_wert
     return (
         request.session.get(_zeitbudget_schluessel(sitzung, "verbrauchte_zeit"), 0.0)
         >= sitzung.vignette.budget_wert
@@ -421,7 +421,7 @@ def persistierten_debrief_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=_persistierte_schritte(sitzung),
+        gespraechsschritte=persistierte_schritte(sitzung),
         ist_probelauf=False,
         zeigt_debrief=True,
         navigation=navigation,
@@ -442,7 +442,7 @@ def persistierten_fehler_anzeigen(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        _persistierte_schritte(sitzung),
+        persistierte_schritte(sitzung),
         ist_gescheitert=True,
         navigation=navigation,
         anhang=anhang,
@@ -488,7 +488,7 @@ def persistiertes_gespraech(
         return HttpResponseNotAllowed(["GET", "POST"])
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
         return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
-    schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
+    schritte: QuerySet[Gespraechsschritt] = persistierte_schritte(sitzung)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
@@ -527,6 +527,6 @@ def persistiertes_gespraech(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        _persistierte_schritte(sitzung),
+        persistierte_schritte(sitzung),
         navigation=navigation,
     )

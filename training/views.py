@@ -30,6 +30,7 @@ from sitzungen.durchlauf import (
 from sitzungen.models import Sitzung
 from sitzungen.sink import DBSink
 from sitzungen.views import (
+    persistierte_schritte,
     persistierten_debrief_anzeigen,
     persistierten_fehler_anzeigen,
     persistiertes_gespraech,
@@ -595,7 +596,7 @@ def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=sitzung.gespraechsschritt_set.order_by("reihenfolge"),
+        gespraechsschritte=persistierte_schritte(sitzung),
         ist_probelauf=False,
         navigation=_sitzungsnavigation(),
         zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
