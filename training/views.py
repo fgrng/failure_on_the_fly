@@ -1,6 +1,7 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import Count, QuerySet
 from django.http import (
@@ -21,9 +22,19 @@ from konten.navigation import (
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.durchlauf import sitzung_anzeigen, sitzung_starten
+from sitzungen.durchlauf import (
+    Sitzungsnavigation,
+    sitzung_anzeigen,
+    sitzung_starten,
+)
 from sitzungen.models import Sitzung
 from sitzungen.sink import DBSink
+from sitzungen.views import (
+    persistierten_debrief_anzeigen,
+    persistierten_fehler_anzeigen,
+    persistiertes_gespraech,
+    zeitbudget_anhalten,
+)
 
 from vignetten.models import Vignette
 
@@ -438,6 +449,44 @@ def _trainingsbindung_laden_oder_anlegen(
     return bindung
 
 
+def _sitzungsnavigation() -> Sitzungsnavigation:
+    # Bündelt die modusspezifischen Routen für die Trainingssitzungsansicht.
+
+    return Sitzungsnavigation(
+        bezeichnung="Training",
+        gespraech_url=reverse("training:gespraech"),
+        beenden_url=reverse("training:gespraech_beenden"),
+        debrief_url=reverse("training:debrief"),
+        abbrechen_url=reverse("training:abbrechen"),
+    )
+
+
+def _training_sitzung(request: HttpRequest) -> Sitzung:
+    """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto."""
+
+    sitzung_pk: int | None = request.session.get("training_sitzung_pk")
+    if sitzung_pk is None:
+        raise PermissionDenied
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        pk=sitzung_pk,
+    )
+    get_object_or_404(
+        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
+    )
+    return sitzung
+
+
+def _zur_auswahl_zurueckkehren(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
+    """Löst die aktive Sitzung und kehrt zur Auswahl ihres Trainings zurück."""
+
+    training_pk: int = get_object_or_404(
+        Trainingsbindung, teilnahme=sitzung.teilnahme
+    ).training_id
+    request.session.pop("training_sitzung_pk", None)
+    return redirect("training:detail", pk=training_pk)
+
+
 def _sitzung_starten(
     request: HttpRequest, bindung: Trainingsbindung, vignette: Vignette
 ) -> HttpResponse:
@@ -463,6 +512,92 @@ def _sitzung_starten(
         kern=kern,
         gespraechsschritte=[],
         ist_probelauf=False,
+        navigation=_sitzungsnavigation(),
         spracheingabe_verfuegbar=bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sink.sitzung.pk,
+    )
+
+
+@login_required
+def gespraech(request: HttpRequest) -> HttpResponse:
+    """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
+
+    return persistiertes_gespraech(
+        request, _training_sitzung(request), _sitzungsnavigation()
+    )
+
+
+@login_required
+def gespraech_beenden(request: HttpRequest) -> HttpResponse:
+    """Beendet das Diagnosegespräch vorzeitig und zeigt seinen Debrief."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    navigation: Sitzungsnavigation = _sitzungsnavigation()
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return persistierten_fehler_anzeigen(request, sitzung, navigation)
+    zeitbudget_anhalten(request, sitzung)
+    return persistierten_debrief_anzeigen(request, sitzung, navigation)
+
+
+@login_required
+def abbrechen(request: HttpRequest) -> HttpResponse:
+    """Bricht eine Trainingssitzung ohne Diagnose gewollt ab."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    navigation: Sitzungsnavigation = _sitzungsnavigation()
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return persistierten_fehler_anzeigen(request, sitzung, navigation)
+    if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
+        return persistierten_debrief_anzeigen(request, sitzung, navigation)
+    if sitzung.status == Sitzung.Status.ABGEBROCHEN:
+        return _zur_auswahl_zurueckkehren(request, sitzung)
+    zeitbudget_anhalten(request, sitzung)
+    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    return _zur_auswahl_zurueckkehren(request, sitzung)
+
+
+@login_required
+def debrief(request: HttpRequest) -> HttpResponse:
+    """Speichert die Diagnose und kehrt zur freien Trainingswahl zurück."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    sitzung: Sitzung = _training_sitzung(request)
+    with transaction.atomic():
+        sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
+        if sitzung.status == Sitzung.Status.GESCHEITERT:
+            return persistierten_fehler_anzeigen(
+                request, sitzung, _sitzungsnavigation()
+            )
+        if sitzung.status != Sitzung.Status.LAUFEND:
+            return _zur_auswahl_zurueckkehren(request, sitzung)
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+    return _zur_auswahl_zurueckkehren(request, sitzung)
+
+
+@login_required
+def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt eine vergangene Trainingssitzung schreibgeschützt an."""
+
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        pk=pk,
+    )
+    get_object_or_404(
+        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
+    )
+
+    return sitzung_anzeigen(
+        request,
+        vignette=sitzung.vignette,
+        kern=sitzung.simulationskern,
+        gespraechsschritte=sitzung.gespraechsschritt_set.order_by("reihenfolge"),
+        ist_probelauf=False,
+        navigation=_sitzungsnavigation(),
+        zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
+        ist_lesend=True,
     )
