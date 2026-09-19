@@ -34,13 +34,4 @@ urlpatterns: list[URLPattern] = [
         views.transkriptions_endpunkt(OpenAITranskription()),
         name="transkription",
     ),
-    path("training/gespraech/", views.training_gespraech, name="training_gespraech"),
-    path("training/beenden/", views.training_beenden, name="training_beenden"),
-    path("training/abbrechen/", views.training_abbrechen, name="training_abbrechen"),
-    path("training/debrief/", views.training_debrief, name="training_debrief"),
-    path(
-        "training/sitzung/<int:pk>/ansehen/",
-        views.training_sitzung_ansehen,
-        name="training_sitzung_ansehen",
-    ),
 ]

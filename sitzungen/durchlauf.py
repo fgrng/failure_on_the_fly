@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
-from django.urls import reverse
 
 from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -87,26 +86,6 @@ class Sitzungsnavigation:
     abbrechen_url: str | None
 
 
-def _sitzungsnavigation(ist_probelauf: bool) -> Sitzungsnavigation:
-    # Bündelt die modusspezifischen Routen für die gemeinsame Sitzungsansicht.
-
-    if ist_probelauf:
-        return Sitzungsnavigation(
-            bezeichnung="Probelauf",
-            gespraech_url=reverse("sitzungen:probelauf_gespraech"),
-            beenden_url=reverse("sitzungen:probelauf_beenden"),
-            debrief_url=reverse("sitzungen:probelauf_debrief"),
-            abbrechen_url=None,
-        )
-    return Sitzungsnavigation(
-        bezeichnung="Training",
-        gespraech_url=reverse("sitzungen:training_gespraech"),
-        beenden_url=reverse("sitzungen:training_beenden"),
-        debrief_url=reverse("sitzungen:training_debrief"),
-        abbrechen_url=reverse("sitzungen:training_abbrechen"),
-    )
-
-
 def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     # Füllt einen Abschnitt der Rahmenhandlung mit den Werten seiner Vignette.
 
@@ -126,12 +105,12 @@ def sitzung_anzeigen(
     kern: Simulationskern,
     gespraechsschritte: list[GespraechsschrittDaten] | QuerySet[Gespraechsschritt],
     ist_probelauf: bool,
+    navigation: Sitzungsnavigation,
     erneute_eingabe: str | None = None,
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
     ist_lesend: bool = False,
     spracheingabe_verfuegbar: bool = False,
-    navigation: Sitzungsnavigation | None = None,
     sitzung_pk: int | None = None,
     anhang: str | None = None,
 ) -> HttpResponse:
@@ -151,7 +130,7 @@ def sitzung_anzeigen(
         "zeigt_debrief": zeigt_debrief,
         "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
-        "navigation": navigation or _sitzungsnavigation(ist_probelauf),
+        "navigation": navigation,
         "sitzung_pk": sitzung_pk,
         "anhang": anhang,
     }

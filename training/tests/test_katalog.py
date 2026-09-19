@@ -186,19 +186,19 @@ class TrainingskatalogTests(TestCase):
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.count(), 1)
         gespraech: HttpResponse = self.client.post(
-            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(gespraech, "Ich addiere einfach alles.")
         self.assertNotContains(gespraech, "Mia addiert Zähler und Nenner.")
         schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
         self.assertEqual(schritt.denkspur, "Mia addiert Zähler und Nenner.")
-        debrief: HttpResponse = self.client.post(reverse("sitzungen:training_beenden"))
+        debrief: HttpResponse = self.client.post(reverse("training:gespraech_beenden"))
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertContains(debrief, "Diagnose aufnehmen")
         fertig: HttpResponse = self.client.post(
-            reverse("sitzungen:training_debrief"),
+            reverse("training:debrief"),
             {"diagnose": "Mia addiert Zähler und Nenner."},
         )
 
@@ -336,7 +336,7 @@ class TrainingsabbruchTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(response, "Ich addiere alles.")
@@ -346,9 +346,7 @@ class TrainingsabbruchTests(TestCase):
         """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""
         training: Training = self._sitzung_starten()
 
-        response: HttpResponse = self.client.post(
-            reverse("sitzungen:training_abbrechen")
-        )
+        response: HttpResponse = self.client.post(reverse("training:abbrechen"))
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
@@ -360,7 +358,7 @@ class TrainingsabbruchTests(TestCase):
         self._sitzung_starten([{"fehler": "anbieterfehler"}] * 3)
 
         response: HttpResponse = self.client.post(
-            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
+            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
