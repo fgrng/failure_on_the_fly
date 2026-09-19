@@ -73,6 +73,10 @@ class SitzungSink(Protocol):
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Setzt den Lebenszyklusstatus der Sitzung."""
 
+    @property
+    def verbrauchte_zeit(self) -> float:
+        """Liefert die während der Züge verbrauchte Zeit in Sekunden."""
+
     def budget_erschoepft(self, vignette: Vignette) -> bool:
         """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
 
@@ -240,8 +244,8 @@ class DBSink:
             schluessel_verbraucht: str = self._zeitbudget_schluessel(
                 _VERBRAUCHTE_ZEIT_SCHLUESSEL
             )
-            self.session[schluessel_verbraucht] = (
-                self.verbrauchte_zeit + monotonic() - startzeit
+            self.session[schluessel_verbraucht] = self.verbrauchte_zeit + (
+                monotonic() - startzeit
             )
             self._als_geaendert_markieren()
 

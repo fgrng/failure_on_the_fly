@@ -12,7 +12,12 @@ from sitzungen.models import (
     Sitzung,
     Teilnahme,
 )
-from sitzungen.durchlauf import gespraechsschritt_ausfuehren, sitzung_starten
+from sitzungen.durchlauf import (
+    gespraechsschritt_ausfuehren,
+    sitzung_abbrechen,
+    sitzung_beenden,
+    sitzung_starten,
+)
 from sitzungen.sink import DBSink, ScratchSink
 from vignetten.models import Vignette
 
@@ -311,32 +316,29 @@ def test_scratch_und_db_sink_pausieren_und_messen_zeit_paritaetisch(
     vignette.budget_wert = 10
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    for sink, session in [
-        (ScratchSink(SessionStore()), "scratch"),
-        (DBSink(Teilnahme.objects.create(), session=SessionStore()), "db"),
-    ]:
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+    ):
         zeiten = iter([100.0, 105.0, 120.0, 125.0])
         monkeypatch.setattr("sitzungen.sink.monotonic", lambda: next(zeiten))
 
         sitzung_starten(sink, vignette, kern, konfiguration)
 
-        # 1. Uhr fortsetzen (bei 100.0)
         sink.zeitbudget_fortsetzen()
-
-        # 2. Uhr anhalten (bei 105.0) -> 5.0 Sekunden verbraucht
         sink.zeitbudget_anhalten()
         assert sink.verbrauchte_zeit == 5.0
 
-        # 3. Uhr fortsetzen (bei 120.0 - Pause von 105 bis 120 zählt nicht)
+        # Die Pause zwischen 105.0 und 120.0 zählt nicht zum Verbrauch.
         sink.zeitbudget_fortsetzen()
-
-        # 4. Uhr anhalten (bei 125.0) -> weitere 5.0 Sekunden -> insgesamt 10.0
         sink.zeitbudget_anhalten()
         assert sink.verbrauchte_zeit == 10.0
 
 
 @pytest.mark.django_db
-def test_scratch_und_db_sink_pruefen_budget_paritaetisch() -> None:
+def test_scratch_und_db_sink_pruefen_budget_paritaetisch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Beide Sink-Adapter prüfen Schritt- und Zeitbudget nach denselben Regeln."""
 
     vignette_schritte, kern, konfiguration = _persistierbares_tripel(
@@ -353,27 +355,84 @@ def test_scratch_und_db_sink_pruefen_budget_paritaetisch() -> None:
     vignette_zeit.budget_wert = 5
     vignette_zeit.save(update_fields=["budget_typ", "budget_wert"])
 
-    scratch_session = SessionStore()
-    db_session = SessionStore()
-    scratch_sink = ScratchSink(scratch_session)
-    db_sink = DBSink(Teilnahme.objects.create(), session=db_session)
+    vignette_ohne_budget = Vignette.objects.anlegen(
+        Konto.objects.create_user(username="ada_ohne_budget")
+    )
+    vignette_ohne_budget.budget_wert = None
+    vignette_ohne_budget.save(update_fields=["budget_wert"])
 
-    for sink in (scratch_sink, db_sink):
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+    ):
         sitzung_starten(sink, vignette_schritte, kern, konfiguration)
         assert not sink.budget_erschoepft(vignette_schritte)
-        assert not sink.budget_erschoepft(vignette_zeit)
+        assert not sink.budget_erschoepft(vignette_ohne_budget)
 
-    # Nach einem Schritt: Schrittbudget erschöpft, Zeitbudget noch nicht
-    for sink in (scratch_sink, db_sink):
         gespraechsschritt_ausfuehren(
             sink, vignette_schritte, kern, konfiguration, verlauf=[], eingabe="Warum?"
         )
         assert sink.budget_erschoepft(vignette_schritte)
+        assert not sink.budget_erschoepft(vignette_ohne_budget)
+
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+    ):
+        zeiten = iter([100.0, 105.0])
+        monkeypatch.setattr("sitzungen.sink.monotonic", lambda: next(zeiten))
+
+        sitzung_starten(sink, vignette_zeit, kern, konfiguration)
         assert not sink.budget_erschoepft(vignette_zeit)
 
-    # Zeitbudget prüfen bei verbrauchter Zeit
-    scratch_session["probelauf"]["verbrauchte_zeit"] = 5.0
-    db_session[f"sitzung_{db_sink._sitzung.pk}_verbrauchte_zeit"] = 5.0
+        sink.zeitbudget_fortsetzen()
+        sink.zeitbudget_anhalten()
+        assert sink.budget_erschoepft(vignette_zeit)
 
-    assert scratch_sink.budget_erschoepft(vignette_zeit)
-    assert db_sink.budget_erschoepft(vignette_zeit)
+
+@pytest.mark.django_db
+def test_sitzung_beenden_haelt_das_zeitbudget_an(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Das Beenden einer Sitzung stoppt die laufende Uhr beider Sinks."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
+    vignette.budget_wert = 10
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+    ):
+        zeiten = iter([100.0, 107.0])
+        monkeypatch.setattr("sitzungen.sink.monotonic", lambda: next(zeiten))
+
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        sink.zeitbudget_fortsetzen()
+        sitzung_beenden(sink)
+
+        assert sink.verbrauchte_zeit == 7.0
+
+
+@pytest.mark.django_db
+def test_sitzung_abbrechen_haelt_die_uhr_an_und_setzt_status_abgebrochen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Das Abbrechen hält die Uhr an und markiert die Sitzung als abgebrochen."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
+    vignette.budget_wert = 10
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+
+    sink: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+    zeiten = iter([100.0, 103.0])
+    monkeypatch.setattr("sitzungen.sink.monotonic", lambda: next(zeiten))
+
+    sitzung_starten(sink, vignette, kern, konfiguration)
+    sink.zeitbudget_fortsetzen()
+    sitzung_abbrechen(sink)
+
+    assert sink.verbrauchte_zeit == 3.0
+    assert Sitzung.objects.get().status == Sitzung.Status.ABGEBROCHEN
