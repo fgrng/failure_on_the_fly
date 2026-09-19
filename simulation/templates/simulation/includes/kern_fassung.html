@@ -12,10 +12,7 @@
                 <p class="system-page-empty">Noch keine Rahmenhandlung vorhanden.</p>
             {% endif %}
         </div>
-        <aside class="system-page-placeholders">
-            <h3>Erlaubte Platzhalter</h3>
-            <ul>{% for platzhalter in rahmen_platzhalter %}<li><code>${{ platzhalter }}</code></li>{% endfor %}</ul>
-        </aside>
+        {% include "simulation/includes/rahmen_platzhalter.html" %}
     </div>
 </section>
 
@@ -32,9 +29,6 @@
                 <p class="system-page-empty">Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
             {% endif %}
         </div>
-        <aside class="system-page-placeholders">
-            <h3>Erlaubte Platzhalter</h3>
-            <ul>{% for platzhalter in prompt_platzhalter %}<li><code>${{ platzhalter }}</code>{% if platzhalter in prompt_platzhalter_mit_umgebung %} — erzeugt eine benannte Umgebung{% endif %}</li>{% endfor %}</ul>
-        </aside>
+        {% include "simulation/includes/prompt_platzhalter.html" %}
     </div>
 </section>

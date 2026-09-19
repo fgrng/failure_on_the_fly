@@ -11,9 +11,12 @@ from django.views.decorators.http import require_POST
 
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
-from . import models
+
 from .forms import SimulationskernForm
 from .models import (
+    PROMPT_PLATZHALTER_MIT_UMGEBUNG,
+    VERTRAG_PROMPT,
+    VERTRAG_RAHMEN,
     AktiveModellKonfiguration,
     ModellKonfiguration,
     Simulationskern,
@@ -30,9 +33,9 @@ def _kern_kontext() -> dict[str, object]:
         modell_konfiguration = None
     return {
         "modell_konfiguration": modell_konfiguration,
-        "prompt_platzhalter": sorted(models.VERTRAG_PROMPT),
-        "prompt_platzhalter_mit_umgebung": models.PROMPT_PLATZHALTER_MIT_UMGEBUNG,
-        "rahmen_platzhalter": sorted(models.VERTRAG_RAHMEN),
+        "prompt_platzhalter": sorted(VERTRAG_PROMPT),
+        "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
+        "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
     }
 
 
@@ -120,6 +123,7 @@ def kern_bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
         Simulationskern.objects.filter(zustand=Simulationskern.Zustand.ENTWURF),
         pk=pk,
     )
+    form: SimulationskernForm
     if request.method == "POST":
         form = SimulationskernForm(request.POST, instance=simulationskern)
         if form.is_valid():

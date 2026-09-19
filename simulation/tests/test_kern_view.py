@@ -5,10 +5,13 @@ from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from unittest.mock import patch
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import (
+    VERTRAG_PROMPT,
+    ModellKonfiguration,
+    Simulationskern,
+)
 
 
 def _autorin(username: str) -> Konto:
@@ -277,12 +280,8 @@ class SimulationskernVerwaltungTests(TestCase):
         ):
             self.assertContains(response, f">{bezeichnung}</label>")
 
-    @patch(
-        "simulation.models.VERTRAG_PROMPT",
-        frozenset({"fehlermuster_beschreibung", "neuer_platzhalter"}),
-    )
-    def test_platzhalteranzeige_folgt_dem_erweiterten_vertrag(self) -> None:
-        """Ein neuer Vertragsplatzhalter erscheint ohne Template- oder Textänderung."""
+    def test_platzhalteranzeige_folgt_dem_prompt_vertrag(self) -> None:
+        """Die Seite nennt jeden Platzhalter des Prompt-Vertrags."""
         entwurf: Simulationskern = Simulationskern.objects.get(
             zustand=Simulationskern.Zustand.ENTWURF
         )
@@ -291,7 +290,8 @@ class SimulationskernVerwaltungTests(TestCase):
             reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
         )
 
-        self.assertContains(response, "$neuer_platzhalter", count=3)
+        for platzhalter in VERTRAG_PROMPT:
+            self.assertContains(response, f"${platzhalter}")
 
     def test_ungueltiger_platzhalter_erscheint_am_verursachenden_feld(self) -> None:
         """Die Formularvalidierung ordnet Vertragsverletzungen dem Feld zu."""
