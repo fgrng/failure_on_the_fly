@@ -1,4 +1,4 @@
-"""Naht für die Ziele einer Spielorchestrierung."""
+"""Naht für die Ziele eines Sitzungslaufs."""
 
 from collections.abc import MutableMapping
 from time import monotonic
@@ -41,7 +41,7 @@ class GespraechsschrittDaten(TypedDict):
 
 
 class SitzungSink(Protocol):
-    """Das Ziel, an das die Spielorchestrierung ihre Ergebnisse übergibt."""
+    """Das Ziel, an das der Lauf einer Sitzung seine Ergebnisse übergibt."""
 
     def sitzung_starten(
         self,

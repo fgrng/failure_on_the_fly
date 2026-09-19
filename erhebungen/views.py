@@ -42,11 +42,10 @@ from .models import (
 )
 from simulation.models import ModellKonfiguration, Simulationskern
 from fragebogen_items.models import FragebogenItem
+from sitzungen.durchlauf import Sitzungsnavigation, sitzung_starten
 from sitzungen.models import Sitzung
-from sitzungen.orchestrierung import sitzung_starten
 from sitzungen.sink import DBSink
 from sitzungen.views import (
-    Sitzungsnavigation,
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
     zeitbudget_anhalten,

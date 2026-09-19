@@ -1,7 +1,6 @@
 """Views für Probeläufe und persistierte Trainingssitzungen."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from time import monotonic
 from typing import TYPE_CHECKING
 
@@ -12,7 +11,6 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 
 from konten.navigation import ist_administratorin
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -22,9 +20,13 @@ from simulation.transkription import (
     Transkription,
     TranskriptionsAnbieterfehler,
 )
+from sitzungen.durchlauf import (
+    Sitzungsnavigation,
+    gespraechsschritt_ausfuehren,
+    sitzung_anzeigen,
+    sitzung_starten,
+)
 from sitzungen.models import Gespraechsschritt, Sitzung
-from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
-from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import (
     DBSink,
     GespraechsschrittDaten,
@@ -35,87 +37,6 @@ from vignetten.models import Vignette
 
 if TYPE_CHECKING:
     from konten.models import Konto
-
-
-@dataclass(frozen=True)
-class Sitzungsnavigation:
-    """Die Routen und Bezeichnung einer angezeigten Sitzung."""
-
-    bezeichnung: str
-    gespraech_url: str
-    beenden_url: str
-    debrief_url: str
-    abbrechen_url: str | None
-
-
-def _ist_htmx(request: HttpRequest) -> bool:
-    """Erkennt einen partiellen Seitenaufbau durch die vorhandene HTMX-Naht."""
-
-    return request.headers.get("HX-Request") == "true"
-
-
-def sitzungsnavigation(ist_probelauf: bool) -> Sitzungsnavigation:
-    # Bündelt die modusspezifischen Routen für die gemeinsame Sitzungsansicht.
-
-    if ist_probelauf:
-        return Sitzungsnavigation(
-            bezeichnung="Probelauf",
-            gespraech_url=reverse("sitzungen:probelauf_gespraech"),
-            beenden_url=reverse("sitzungen:probelauf_beenden"),
-            debrief_url=reverse("sitzungen:probelauf_debrief"),
-            abbrechen_url=None,
-        )
-    return Sitzungsnavigation(
-        bezeichnung="Training",
-        gespraech_url=reverse("sitzungen:training_gespraech"),
-        beenden_url=reverse("sitzungen:training_beenden"),
-        debrief_url=reverse("sitzungen:training_debrief"),
-        abbrechen_url=reverse("sitzungen:training_abbrechen"),
-    )
-
-
-def _sitzung_anzeigen(
-    request: HttpRequest,
-    *,
-    vignette: Vignette,
-    kern: Simulationskern,
-    gespraechsschritte: list[GespraechsschrittDaten] | QuerySet[Gespraechsschritt],
-    ist_probelauf: bool,
-    erneute_eingabe: str | None = None,
-    ist_gescheitert: bool = False,
-    zeigt_debrief: bool = False,
-    ist_lesend: bool = False,
-    spracheingabe_verfuegbar: bool = False,
-    navigation: Sitzungsnavigation | None = None,
-    sitzung_pk: int | None = None,
-    anhang: str | None = None,
-) -> HttpResponse:
-    """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
-
-    context: dict[str, object] = {
-        "vignette": vignette,
-        "einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette),
-        "gespraechseinleitung": rahmen_rendern(
-            kern.rahmenhandlung_gespraechseinleitung, vignette
-        ),
-        "gespraechsschritte": gespraechsschritte,
-        "ist_probelauf": ist_probelauf,
-        "erneute_eingabe": erneute_eingabe,
-        "ist_gescheitert": ist_gescheitert,
-        "debrief": rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
-        "zeigt_debrief": zeigt_debrief,
-        "ist_lesend": ist_lesend,
-        "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
-        "navigation": navigation or sitzungsnavigation(ist_probelauf),
-        "sitzung_pk": sitzung_pk,
-        "anhang": anhang,
-    }
-    template: str = (
-        "sitzungen/includes/sitzung_fortsetzung.html"
-        if _ist_htmx(request)
-        else "sitzungen/sitzung.html"
-    )
-    return render(request, template, context)
 
 
 def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
@@ -175,7 +96,7 @@ def _gespraech_anzeigen(
 ) -> HttpResponse:
     """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
 
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=vignette,
         kern=kern,
@@ -194,7 +115,7 @@ def _debrief_anzeigen(
 ) -> HttpResponse:
     """Rendert den Debrief nach dem Ende des Diagnosegesprächs."""
 
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=vignette,
         kern=kern,
@@ -228,7 +149,7 @@ def _probelauf_starten(
     sitzung_starten(sink, vignette, kern, modell_konfiguration)
     if freie_auswahl:
         sink.freie_auswahl_setzen()
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=vignette,
         kern=kern,
@@ -497,7 +418,7 @@ def persistierten_debrief_anzeigen(
 ) -> HttpResponse:
     # Rendert den Debrief einer persistierten Sitzung.
 
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
@@ -541,7 +462,7 @@ def _persistiertes_gespraech_anzeigen(
 ) -> HttpResponse:
     # Rendert eine persistierte Sitzung in der gemeinsamen Sitzungsansicht.
 
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
@@ -695,7 +616,7 @@ def training_sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
     )
 
-    return _sitzung_anzeigen(
+    return sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,

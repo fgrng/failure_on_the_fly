@@ -1,4 +1,4 @@
-"""Tests der Spielorchestrierung über ihren beiden Sinks."""
+"""Tests des Sitzungslaufs über seinen beiden Sinks."""
 
 import pytest
 from django.contrib.sessions.backends.db import SessionStore
@@ -12,7 +12,7 @@ from sitzungen.models import (
     Sitzung,
     Teilnahme,
 )
-from sitzungen.orchestrierung import gespraechsschritt_ausfuehren, sitzung_starten
+from sitzungen.durchlauf import gespraechsschritt_ausfuehren, sitzung_starten
 from sitzungen.sink import DBSink, ScratchSink
 from vignetten.models import Vignette
 

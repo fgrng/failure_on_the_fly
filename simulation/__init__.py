@@ -59,6 +59,16 @@ def render(vorlage_text: str, mapping: Mapping[str, str]) -> str:
     return vorlage.substitute(mapping)
 
 
+def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
+    """Übergibt dem strikten Renderer nur die in der Vorlage benutzten Platzhalter."""
+
+    vorlage: Template = Template(vorlage_text)
+    return render(
+        vorlage_text,
+        {name: platzhalter[name] for name in vorlage.get_identifiers()},
+    )
+
+
 def antwort_versuchen(
     vignette: "Vignette",
     kern: "Simulationskern",
@@ -71,8 +81,8 @@ def antwort_versuchen(
     from vignetten.models import prompt_platzhalter
 
     platzhalter: dict[str, str] = prompt_platzhalter(vignette)
-    system_prompt: str = _prompt_rendern(kern.system_prompt_vorlage, platzhalter)
-    user_prompt: str = _prompt_rendern(kern.user_prompt_vorlage, platzhalter)
+    system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
+    user_prompt: str = vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)
     fehlversuche: list[Fehlversuch] = []
 
@@ -103,14 +113,4 @@ def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmode
         return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
     return LiteLLMSprachmodell(
         modell_konfiguration.sprachmodell, modell_konfiguration.parameter
-    )
-
-
-def _prompt_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
-    """Übergibt dem strikten Renderer nur die in der Vorlage verwendeten Werte."""
-
-    vorlage: Template = Template(vorlage_text)
-    return render(
-        vorlage_text,
-        {name: platzhalter[name] for name in vorlage.get_identifiers()},
     )

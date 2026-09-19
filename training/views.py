@@ -21,11 +21,9 @@ from konten.navigation import (
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.durchlauf import sitzung_anzeigen, sitzung_starten, sitzungsnavigation
 from sitzungen.models import Sitzung
-from sitzungen.orchestrierung import sitzung_starten
-from sitzungen.rahmen import rahmen_rendern
 from sitzungen.sink import DBSink
-from sitzungen.views import sitzungsnavigation
 
 from vignetten.models import Vignette
 
@@ -461,20 +459,13 @@ def _sitzung_starten(
             ModellKonfiguration.objects.aktive(),
         )
     request.session["training_sitzung_pk"] = sink.sitzung.pk
-    return render(
+    return sitzung_anzeigen(
         request,
-        "sitzungen/sitzung.html",
-        {
-            "vignette": vignette,
-            "einleitung": rahmen_rendern(kern.rahmenhandlung_einleitung, vignette),
-            "gespraechseinleitung": rahmen_rendern(
-                kern.rahmenhandlung_gespraechseinleitung, vignette
-            ),
-            "gespraechsschritte": [],
-            "ist_probelauf": False,
-            "navigation": sitzungsnavigation(ist_probelauf=False),
-            "spracheingabe_verfuegbar": bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
-            "zeigt_debrief": False,
-            "ist_lesend": False,
-        },
+        vignette=vignette,
+        kern=kern,
+        gespraechsschritte=[],
+        ist_probelauf=False,
+        navigation=sitzungsnavigation(ist_probelauf=False),
+        spracheingabe_verfuegbar=bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        sitzung_pk=sink.sitzung.pk,
     )
