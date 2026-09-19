@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Kern-Entwurf bearbeiten{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System</p>
+            <h1>Kern-Entwurf bearbeiten</h1>
+            <span>Vorlagen und Rahmenhandlung der nächsten Kern-Fassung.</span>
+        </div>
+        <span class="badge badge--system">{{ simulationskern.get_zustand_display }}</span>
+    </header>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <section class="page-section" aria-label="Rahmenhandlung">
+            <header class="page-section__head">
+                <b>01</b><span><h2>Rahmenhandlung</h2><small>Hospitationseinleitung, Gesprächseinleitung und Debrief jeder Sitzung</small></span>
+            </header>
+            <div class="system-page-fields">
+                <div class="system-page-field-list">
+                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_einleitung %}
+                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_gespraechseinleitung %}
+                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_debrief %}
+                </div>
+                {% include "simulation/includes/rahmen_platzhalter.html" %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-label="Prompt-Vorlagen">
+            <header class="page-section__head">
+                <b>02</b><span><h2>Prompt-Vorlagen</h2><small>Verhalten und Gesprächseingabe der Simulation</small></span>
+            </header>
+            <div class="system-page-fields">
+                <div class="system-page-field-list">
+                    {% include "vignetten/includes/form_field.html" with field=form.system_prompt_vorlage %}
+                    {% include "vignetten/includes/form_field.html" with field=form.user_prompt_vorlage %}
+                </div>
+                {% include "simulation/includes/prompt_platzhalter.html" %}
+            </div>
+        </section>
+
+        <div class="vignette-form-actions">
+            <a href="{% url 'simulation:kern_verwalten' %}">Abbrechen</a>
+            <button class="button" type="submit">Kern-Entwurf speichern</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

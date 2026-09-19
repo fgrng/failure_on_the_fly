@@ -10,6 +10,7 @@
             <small class="system-page-hint">Gepinnte Vignettenentwürfe: {{ simulationskern.gepinnte_entwuerfe }}. Archivieren ist umkehrbar und trifft laufende Sitzungen nicht; betroffene Entwürfe lassen sich weiter bearbeiten und scheitern erst beim Finalisieren — dann hilft vorspulen.</small>
         </form>
     {% elif simulationskern.zustand == simulationskern.Zustand.ENTWURF %}
+        <a class="button" href="{% url 'simulation:kern_bearbeiten' simulationskern.pk %}">Bearbeiten</a>
         <form method="post" action="{% url 'simulation:finalisieren' simulationskern.pk %}">
             {% csrf_token %}
             <button class="button" type="submit">Finalisieren</button>

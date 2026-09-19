@@ -11,7 +11,11 @@ from django.urls import reverse
 
 from konten.models import Konto
 from simulation import views
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import (
+    VERTRAG_PROMPT,
+    ModellKonfiguration,
+    Simulationskern,
+)
 from vignetten.models import Vignette
 
 
@@ -227,6 +231,152 @@ class SimulationskernVerwaltungTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, "Entwurfs-Prompt")
+
+    def test_verlinkt_den_entwurf_zur_eigenen_bearbeitungsseite(self) -> None:
+        """Die Übersicht führt für Inhaltsänderungen auf eine eigene Seite."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(
+            response,
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk]),
+        )
+
+    def test_bearbeitungsseite_zeigt_felder_und_platzhaltervertraege(self) -> None:
+        """Das Formular gliedert Felder und Vertragsreferenzen wie die Ansicht."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        for text in (
+            "Rahmenhandlung",
+            "Prompt-Vorlagen",
+            "rahmenhandlung_einleitung",
+            "system_prompt_vorlage",
+            "$lehrperson_anrede",
+            "$fehlermuster_beschreibung",
+            "erzeugt eine benannte Umgebung",
+        ):
+            self.assertContains(response, text)
+
+    def test_bearbeitungsseite_benennt_die_felder_wie_die_ansicht(self) -> None:
+        """Formular und Ansicht tragen dieselben Feldbezeichnungen."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        for bezeichnung in (
+            "Hospitationseinleitung",
+            "Gesprächseinleitung",
+            "Debrief",
+            "System-Prompt-Vorlage",
+            "User-Prompt-Vorlage",
+        ):
+            self.assertContains(response, f">{bezeichnung}</label>")
+
+    def test_platzhalteranzeige_folgt_dem_prompt_vertrag(self) -> None:
+        """Die Seite nennt jeden Platzhalter des Prompt-Vertrags."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        for platzhalter in VERTRAG_PROMPT:
+            self.assertContains(response, f"${platzhalter}")
+
+    def test_ungueltiger_platzhalter_erscheint_am_verursachenden_feld(self) -> None:
+        """Die Formularvalidierung ordnet Vertragsverletzungen dem Feld zu."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk]),
+            {
+                "rahmenhandlung_einleitung": entwurf.rahmenhandlung_einleitung,
+                "rahmenhandlung_gespraechseinleitung": (
+                    entwurf.rahmenhandlung_gespraechseinleitung
+                ),
+                "rahmenhandlung_debrief": entwurf.rahmenhandlung_debrief,
+                "system_prompt_vorlage": "$unbekannt",
+                "user_prompt_vorlage": entwurf.user_prompt_vorlage,
+            },
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "system_prompt_vorlage",
+            "Enthält ungültige Platzhalter.",
+        )
+        self.assertNotIn("__all__", response.context["form"].errors)
+
+    def test_speichert_aenderungen_und_zeigt_sie_nach_finalisierung_an(self) -> None:
+        """Die bearbeitete Entwurfsfassung wird nach dem Finalisieren verwendet."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk]),
+            {
+                "rahmenhandlung_einleitung": entwurf.rahmenhandlung_einleitung,
+                "rahmenhandlung_gespraechseinleitung": (
+                    entwurf.rahmenhandlung_gespraechseinleitung
+                ),
+                "rahmenhandlung_debrief": entwurf.rahmenhandlung_debrief,
+                "system_prompt_vorlage": "Geänderter System-Prompt",
+                "user_prompt_vorlage": entwurf.user_prompt_vorlage,
+            },
+        )
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+
+        self.client.post(reverse("simulation:finalisieren", args=[entwurf.pk]))
+        response = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, "Geänderter System-Prompt")
+
+    def test_bearbeiten_weist_finale_und_archivierte_fassungen_ab(self) -> None:
+        """Nur der Entwurf ist über die Bearbeitungsroute zugänglich."""
+        finale: Simulationskern = Simulationskern.objects.get(
+            system_prompt_vorlage="Aktueller Prompt"
+        )
+        archiviert: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ARCHIVIERT
+        )
+
+        for simulationskern in (finale, archiviert):
+            response: HttpResponse = self.client.get(
+                reverse("simulation:kern_bearbeiten", args=[simulationskern.pk])
+            )
+
+            self.assertEqual(response.status_code, 404)
+
+    def test_bearbeiten_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
+        """Die Inhaltsbearbeitung ist ausschließlich Administratorinnen erlaubt."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_zieht_aus_finaler_fassung_einen_entwurf(self) -> None:
         """Die Verwaltung legt aus der gewählten finalen Fassung einen Entwurf an."""

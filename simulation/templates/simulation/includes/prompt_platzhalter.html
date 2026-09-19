@@ -1,0 +1,4 @@
+<aside class="system-page-placeholders">
+    <h3>Erlaubte Platzhalter</h3>
+    <ul>{% for platzhalter in prompt_platzhalter %}<li><code>${{ platzhalter }}</code>{% if platzhalter in prompt_platzhalter_mit_umgebung %} — erzeugt eine benannte Umgebung{% endif %}</li>{% endfor %}</ul>
+</aside>

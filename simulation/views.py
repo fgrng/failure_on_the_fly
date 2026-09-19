@@ -12,6 +12,8 @@ from django.views.decorators.http import require_POST
 
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
+
+from .forms import SimulationskernForm
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
@@ -128,6 +130,28 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "archivierte_fassungen": _fassungen(Simulationskern.Zustand.ARCHIVIERT),
             **_kern_kontext(),
         },
+    )
+
+
+@administratorin_erforderlich
+def kern_bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
+    """Bearbeitet die Inhaltsfelder eines Kern-Entwurfs."""
+    simulationskern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.filter(zustand=Simulationskern.Zustand.ENTWURF),
+        pk=pk,
+    )
+    form: SimulationskernForm
+    if request.method == "POST":
+        form = SimulationskernForm(request.POST, instance=simulationskern)
+        if form.is_valid():
+            form.save()
+            return redirect("simulation:kern_verwalten")
+    else:
+        form = SimulationskernForm(instance=simulationskern)
+    return render(
+        request,
+        "simulation/kern_bearbeiten.html",
+        {"form": form, "simulationskern": simulationskern, **_kern_kontext()},
     )
 
 
