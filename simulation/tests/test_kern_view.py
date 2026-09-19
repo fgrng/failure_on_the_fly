@@ -176,8 +176,8 @@ class SimulationskernRollenTests(TestCase):
 class SimulationskernVerwaltungTests(TestCase):
     """Die Verwaltung zeigt alle Kern-Fassungen der einzigen Historie."""
 
-    def test_zeigt_entwurf_finale_und_eingeklappte_archivierte_fassungen(self) -> None:
-        """Administratorinnen überblicken die gesamte Kern-Historie."""
+    def setUp(self) -> None:
+        """Legt eine vollständige Kern-Historie für die Übersicht an."""
         aelteste_fassung: Simulationskern = Simulationskern.objects.anlegen(
             system_prompt_vorlage="Archivierter Prompt"
         )
@@ -192,24 +192,61 @@ class SimulationskernVerwaltungTests(TestCase):
         entwurf.save()
         self.client.force_login(_administratorin("linus"))
 
+    def test_traegt_die_system_farbfläche(self) -> None:
+        """Die Verwaltungsübersicht gehört zum System-Bereich."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, 'class="page system-page area--system"')
+
+    def test_zeigt_den_entwurf(self) -> None:
+        """Die Verwaltungsübersicht zeigt den vorhandenen Entwurf."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
         self.assertContains(response, "Entwurfs-Prompt")
+
+    def test_kennzeichnet_die_juengste_finale_fassung_als_verwendet(self) -> None:
+        """Die Verwaltungsübersicht hebt die aktuell verwendete Fassung hervor."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "Verwendete finale Fassung")
+
+    def test_zeigt_die_juengste_finale_fassung(self) -> None:
+        """Die Verwaltungsübersicht zeigt die jüngste finale Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
         self.assertContains(response, "Aktueller Prompt")
+
+    def test_zeigt_die_archivierte_fassung(self) -> None:
+        """Die Verwaltungsübersicht zeigt die archivierte Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
         self.assertContains(response, "Archivierter Prompt")
+
+    def test_klappt_archivierte_fassungen_ein(self) -> None:
+        """Die Verwaltungsübersicht hält archivierte Fassungen eingeklappt bereit."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
         self.assertContains(response, "<details>", html=False)
 
-    def test_weist_autorin_und_konto_ohne_rolle_ab(self) -> None:
-        """Nur Administratorinnen dürfen die blaue Übersicht öffnen."""
-        for konto in (_autorin("ada"), get_user_model().objects.create_user("studi")):
-            self.client.force_login(konto)
+    def test_weist_autorin_ab(self) -> None:
+        """Eine Autorin ohne Administrationsrolle darf die Übersicht nicht öffnen."""
+        self.client.force_login(_autorin("ada"))
 
-            response: HttpResponse = self.client.get(
-                reverse("simulation:kern_verwalten")
-            )
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
-            self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 403)
+
+    def test_weist_konto_ohne_rolle_ab(self) -> None:
+        """Ein Konto ohne Rolle darf die Übersicht nicht öffnen."""
+        self.client.force_login(get_user_model().objects.create_user("studi"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertEqual(response.status_code, 403)
+
+
+class SimulationskernSeitennavigationTests(TestCase):
+    """Chrome und Sidebar unterscheiden die zwei Kern-Ansichten."""
 
     def test_markiert_die_autorinnen_ansicht_gelb(self) -> None:
         """Die read-only Ansicht erbt das Chrome ihres Entwicklungsbereichs."""
@@ -236,5 +273,22 @@ class SimulationskernVerwaltungTests(TestCase):
         self.assertContains(
             response,
             '<a href="/system/kern/verwalten/" aria-current="page">Simulationskern verwalten</a>',
+            html=False,
+        )
+
+    def test_markiert_in_der_sidebar_nur_den_ansichtslink(self) -> None:
+        """Die Kernansicht aktiviert nur ihren eigenen Sidebar-Link."""
+        self.client.force_login(_administratorin("linus"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(
+            response,
+            '<a href="/system/kern/" aria-current="page">Simulationskern ansehen</a>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<a href="/system/kern/verwalten/">Simulationskern verwalten</a>',
             html=False,
         )
