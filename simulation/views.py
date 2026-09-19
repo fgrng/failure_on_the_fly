@@ -51,7 +51,6 @@ def kern(request: HttpRequest) -> HttpResponse:
     )
 
 
-@login_required
 @administratorin_erforderlich
 def kern_verwalten(request: HttpRequest) -> HttpResponse:
     """Zeigt alle Kern-Fassungen für die Administration."""

@@ -887,6 +887,7 @@ class VignetteFinalisierenViewTests(TestCase):
     def test_zeigt_fehler_fuer_archivierten_kern_pin(self) -> None:
         """Ein archivierter Kern-Pin wird verständlich abgelehnt."""
         kern: Simulationskern = self.vignette.gepinnter_kern
+        kern.bearbeiten().finalisieren()
         kern.archivieren()
 
         self._assert_finalisieren_zeigt_fehler("gepinnter_kern", kern, "archiviert")

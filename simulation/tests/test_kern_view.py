@@ -114,6 +114,17 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         ):
             self.assertContains(response, f"<li><code>${platzhalter}</code></li>")
 
+    def test_benennt_die_gemeinsamen_abschnitte_fuer_hilfstechnologien(self) -> None:
+        """Die extrahierten Abschnitte behalten ihre zugänglichen Namen."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        for abschnitt in (
+            "Rahmenhandlung",
+            "Prompt-Vorlagen",
+            "Modell-Konfiguration",
+        ):
+            self.assertContains(response, f'aria-label="{abschnitt}"')
+
 
 class SimulationskernLeereAnsichtTests(TestCase):
     """Die Kernansicht bleibt ohne Kern und Konfiguration verständlich."""
@@ -239,6 +250,14 @@ class SimulationskernVerwaltungTests(TestCase):
     def test_weist_konto_ohne_rolle_ab(self) -> None:
         """Ein Konto ohne Rolle darf die Übersicht nicht öffnen."""
         self.client.force_login(get_user_model().objects.create_user("studi"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_weist_nicht_angemeldetes_konto_ab(self) -> None:
+        """Auch anonyme Anfragen erhalten die geforderte Zugriffsverweigerung."""
+        self.client.logout()
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 

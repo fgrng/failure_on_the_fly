@@ -654,6 +654,7 @@ class VignetteFinalisierenTests(TestCase):
         if kern_zustand != Simulationskern.Zustand.ENTWURF:
             kern.finalisieren()
         if kern_zustand == Simulationskern.Zustand.ARCHIVIERT:
+            kern.bearbeiten().finalisieren()
             kern.archivieren()
         return Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
