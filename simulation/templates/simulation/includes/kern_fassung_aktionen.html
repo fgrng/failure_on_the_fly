@@ -4,6 +4,11 @@
             {% csrf_token %}
             <button class="button" type="submit">Entwurf ziehen</button>
         </form>
+        <form method="post" action="{% url 'simulation:archivieren' simulationskern.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Archivieren</button>
+            <small class="system-page-hint">Gepinnte Vignettenentwürfe: {{ simulationskern.gepinnte_entwuerfe }}. Archivieren ist umkehrbar und trifft laufende Sitzungen nicht; betroffene Entwürfe lassen sich weiter bearbeiten und scheitern erst beim Finalisieren — dann hilft vorspulen.</small>
+        </form>
     {% elif simulationskern.zustand == simulationskern.Zustand.ENTWURF %}
         <form method="post" action="{% url 'simulation:finalisieren' simulationskern.pk %}">
             {% csrf_token %}
@@ -12,6 +17,11 @@
         <form method="post" action="{% url 'simulation:verwerfen' simulationskern.pk %}">
             {% csrf_token %}
             <button class="button" type="submit">Verwerfen</button>
+        </form>
+    {% elif simulationskern.zustand == simulationskern.Zustand.ARCHIVIERT %}
+        <form method="post" action="{% url 'simulation:entarchivieren' simulationskern.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Entarchivieren</button>
         </form>
     {% endif %}
 </div>

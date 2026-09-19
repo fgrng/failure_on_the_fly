@@ -1,5 +1,8 @@
 """HTTP-Tests für die read-only Ansicht des Simulationskerns."""
 
+import ast
+from pathlib import Path
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -7,7 +10,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
+from simulation import views
 from simulation.models import ModellKonfiguration, Simulationskern
+from vignetten.models import Vignette
 
 
 def _autorin(username: str) -> Konto:
@@ -419,4 +424,159 @@ class SimulationskernSeitennavigationTests(TestCase):
             response,
             '<a href="/system/kern/verwalten/">Simulationskern verwalten</a>',
             html=False,
+        )
+
+
+def _vollstaendiger_vignettenentwurf(konto: Konto, kern: Simulationskern) -> Vignette:
+    """Legt einen finalisierbaren Vignettenentwurf auf der gegebenen Fassung an."""
+    vignette: Vignette = Vignette.objects.anlegen(konto)
+    vignette.gepinnter_kern = kern
+    vignette.fehlermuster_beschreibung = "Stellenwerte werden einzeln gezählt."
+    vignette.lernauftrag_text = "Addiere 27 und 15."
+    vignette.arbeitsheft_text = "27 + 15 = 312"
+    vignette.schuelerin_name = "Mia"
+    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.lehrperson_name = "Frau Weber"
+    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.fach = "Mathematik"
+    vignette.thema = "Addition"
+    vignette.klassenstufe = "5"
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 5
+    vignette.save()
+    return vignette
+
+
+class SimulationskernArchivierenTests(TestCase):
+    """Archivieren und Entarchivieren laufen über die blaue Übersicht."""
+
+    def setUp(self) -> None:
+        """Legt zwei finale Kern-Fassungen und eine Administratorin an."""
+        self.aeltere: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="Ältere Fassung"
+        )
+        self.aeltere.finalisieren()
+        self.juengere: Simulationskern = self.aeltere.bearbeiten()
+        self.juengere.system_prompt_vorlage = "Jüngere Fassung"
+        self.juengere.save()
+        self.juengere.finalisieren()
+        self.client.force_login(_administratorin("linus"))
+
+    def _zustand(self, simulationskern: Simulationskern) -> str:
+        """Liest den gespeicherten Zustand einer Fassung zurück."""
+        return Simulationskern.objects.get(pk=simulationskern.pk).zustand
+
+    def test_faehrt_den_vollen_kreis_aus_archivieren_und_entarchivieren(self) -> None:
+        """Eine finale Fassung lässt sich archivieren und zurückholen."""
+        self.client.post(reverse("simulation:archivieren", args=[self.aeltere.pk]))
+        self.assertEqual(
+            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
+        )
+
+        self.client.post(reverse("simulation:entarchivieren", args=[self.aeltere.pk]))
+
+        self.assertEqual(self._zustand(self.aeltere), Simulationskern.Zustand.FINAL)
+
+    def test_archivieren_kennt_keine_bestaetigungs_zwischenseite(self) -> None:
+        """Die Geste wirkt sofort und leitet auf die Übersicht zurück."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:archivieren", args=[self.aeltere.pk])
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        self.assertEqual(
+            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
+        )
+
+    def test_zaehlt_ausschliesslich_gepinnte_vignettenentwuerfe(self) -> None:
+        """Finale und archivierte Vignetten zählen im Vorwarnen nicht mit."""
+        konto: Konto = _autorin("ada")
+        _vollstaendiger_vignettenentwurf(konto, self.aeltere)
+        finale: Vignette = _vollstaendiger_vignettenentwurf(konto, self.aeltere)
+        finale.finalisieren()
+        archivierte: Vignette = _vollstaendiger_vignettenentwurf(konto, self.aeltere)
+        archivierte.finalisieren()
+        archivierte.archivieren()
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "Gepinnte Vignettenentwürfe: 1")
+        self.assertContains(response, "Gepinnte Vignettenentwürfe: 0")
+
+    def test_gepinnte_entwuerfe_sperren_das_archivieren_nicht(self) -> None:
+        """Die Zahl warnt vor, sie hält die Kern-Historie nicht an."""
+        _vollstaendiger_vignettenentwurf(_autorin("ada"), self.aeltere)
+
+        self.client.post(reverse("simulation:archivieren", args=[self.aeltere.pk]))
+
+        self.assertEqual(
+            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
+        )
+
+    def test_ordnet_die_wirkung_des_archivierens_am_knopf_ein(self) -> None:
+        """Der Hinweis nennt Umkehrbarkeit, Sitzungen und das Vorspulen."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        for aussage in (
+            "umkehrbar",
+            "laufende Sitzungen",
+            "Finalisieren",
+            "vorspulen",
+        ):
+            self.assertContains(response, aussage)
+
+    def test_zeigt_abgelehntes_archivieren_der_letzten_fassung_als_meldung(
+        self,
+    ) -> None:
+        """Die letzte finale Fassung bleibt stehen, mit lesbarer Begründung."""
+        self.aeltere.archivieren()
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:archivieren", args=[self.juengere.pk]), follow=True
+        )
+
+        self.assertContains(
+            response, "Die letzte finale Kern-Fassung kann nicht archiviert werden."
+        )
+        self.assertEqual(self._zustand(self.juengere), Simulationskern.Zustand.FINAL)
+
+    def test_zeigt_abgelehntes_entarchivieren_als_meldung(self) -> None:
+        """Eine nicht archivierte Schwester verhindert das Zurückholen lesbar."""
+        self.juengere.archivieren()
+        self.aeltere.bearbeiten()
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:entarchivieren", args=[self.juengere.pk]), follow=True
+        )
+
+        self.assertContains(response, "nicht archivierte Schwester")
+        self.assertEqual(
+            self._zustand(self.juengere), Simulationskern.Zustand.ARCHIVIERT
+        )
+
+    def test_archivgesten_sind_post_und_administratorinnen_vorbehalten(self) -> None:
+        """GET und Autorinnen ohne Administrationsrolle werden abgewiesen."""
+        urls: tuple[str, ...] = (
+            reverse("simulation:archivieren", args=[self.aeltere.pk]),
+            reverse("simulation:entarchivieren", args=[self.aeltere.pk]),
+        )
+
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 405)
+        self.client.force_login(_autorin("ada"))
+        for url in urls:
+            self.assertEqual(self.client.post(url).status_code, 403)
+
+    def test_kern_verwaltung_importiert_die_vignetten_schicht_nicht(self) -> None:
+        """Die Zahl kommt über den Rückwärts-Zugriff, nicht über eine neue Kante."""
+        baum: ast.Module = ast.parse(Path(views.__file__).read_text(encoding="utf-8"))
+        importierte_module: set[str] = set()
+        for knoten in ast.walk(baum):
+            if isinstance(knoten, ast.Import):
+                importierte_module.update(alias.name for alias in knoten.names)
+            elif isinstance(knoten, ast.ImportFrom):
+                importierte_module.add(knoten.module or "")
+
+        self.assertNotIn(
+            "vignetten", {modul.split(".", 1)[0] for modul in importierte_module}
         )
