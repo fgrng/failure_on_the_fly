@@ -1,5 +1,7 @@
 """Ansichten für den Simulationskern."""
 
+from collections.abc import Callable
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -40,7 +42,8 @@ def _fassung_im_zustand_laden(
     pk: int,
     zustand: Simulationskern.Zustand,
 ) -> Simulationskern | None:
-    """Lädt eine Fassung im erwarteten Zustand oder erklärt die Ablehnung."""
+    # Lädt eine Fassung im erwarteten Zustand oder erklärt die Ablehnung.
+
     simulationskern: Simulationskern = get_object_or_404(Simulationskern, pk=pk)
     if simulationskern.zustand != zustand:
         messages.error(request, "Diese Kern-Fassung hat nicht den erwarteten Zustand.")
@@ -48,14 +51,27 @@ def _fassung_im_zustand_laden(
     return simulationskern
 
 
-def _modellfehler_als_meldung(
-    request: HttpRequest, error: ValueError | ValidationError
-) -> None:
-    """Übersetzt Modellfehler der Lebenszyklusgesten in Übersichtsmeldungen."""
-    if isinstance(error, ValidationError):
-        messages.error(request, "; ".join(error.messages))
-    else:
-        messages.error(request, str(error))
+def _lebenszyklus_aktion_ausfuehren(
+    request: HttpRequest,
+    pk: int,
+    zustand: Simulationskern.Zustand,
+    aktion: Callable[[Simulationskern], object],
+) -> HttpResponse:
+    # Führt eine zustandsgebundene Aktion aus und zeigt Modellfehler an.
+
+    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
+        request, pk, zustand
+    )
+    if simulationskern is None:
+        return redirect("simulation:kern_verwalten")
+    try:
+        aktion(simulationskern)
+    except (RuntimeError, ValueError, ValidationError) as error:
+        if isinstance(error, ValidationError):
+            messages.error(request, "; ".join(error.messages))
+        else:
+            messages.error(request, str(error))
+    return redirect("simulation:kern_verwalten")
 
 
 @login_required
@@ -87,7 +103,6 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "entwurf": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ENTWURF
             ).first(),
-            "kann_verwalten": True,
             "finale_fassungen": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.FINAL
             ).order_by("-finalisiert_am", "-pk"),
@@ -103,39 +118,33 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
 @require_POST
 def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht aus einer finalen Kern-Fassung einen Entwurf."""
-    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
-        request, pk, Simulationskern.Zustand.FINAL
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Simulationskern.Zustand.FINAL,
+        Simulationskern.bearbeiten,
     )
-    if simulationskern is not None:
-        try:
-            simulationskern.bearbeiten()
-        except (ValueError, ValidationError) as error:
-            _modellfehler_als_meldung(request, error)
-    return redirect("simulation:kern_verwalten")
 
 
 @administratorin_erforderlich
 @require_POST
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen Kern-Entwurf."""
-    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
-        request, pk, Simulationskern.Zustand.ENTWURF
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Simulationskern.Zustand.ENTWURF,
+        Simulationskern.finalisieren,
     )
-    if simulationskern is not None:
-        try:
-            simulationskern.finalisieren()
-        except (ValueError, ValidationError) as error:
-            _modellfehler_als_meldung(request, error)
-    return redirect("simulation:kern_verwalten")
 
 
 @administratorin_erforderlich
 @require_POST
 def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
     """Verwirft einen Kern-Entwurf."""
-    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
-        request, pk, Simulationskern.Zustand.ENTWURF
+    return _lebenszyklus_aktion_ausfuehren(
+        request,
+        pk,
+        Simulationskern.Zustand.ENTWURF,
+        Simulationskern.delete,
     )
-    if simulationskern is not None:
-        simulationskern.delete()
-    return redirect("simulation:kern_verwalten")

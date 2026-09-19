@@ -1,0 +1,17 @@
+<div class="page-actions">
+    {% if simulationskern.zustand == simulationskern.Zustand.FINAL %}
+        <form method="post" action="{% url 'simulation:neue_fassung' simulationskern.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Entwurf ziehen</button>
+        </form>
+    {% elif simulationskern.zustand == simulationskern.Zustand.ENTWURF %}
+        <form method="post" action="{% url 'simulation:finalisieren' simulationskern.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Finalisieren</button>
+        </form>
+        <form method="post" action="{% url 'simulation:verwerfen' simulationskern.pk %}">
+            {% csrf_token %}
+            <button class="button" type="submit">Verwerfen</button>
+        </form>
+    {% endif %}
+</div>

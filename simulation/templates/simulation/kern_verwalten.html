@@ -20,11 +20,13 @@
     {% if entwurf %}
         <h2>Entwurf</h2>
         {% include "simulation/includes/kern_fassung.html" with simulationskern=entwurf %}
+        {% include "simulation/includes/kern_fassung_aktionen.html" with simulationskern=entwurf %}
     {% endif %}
 
     {% for simulationskern in finale_fassungen %}
         <h2>{% if forloop.first %}Verwendete finale Fassung{% else %}Finale Fassung{% endif %}</h2>
         {% include "simulation/includes/kern_fassung.html" %}
+        {% include "simulation/includes/kern_fassung_aktionen.html" %}
     {% empty %}
         <p class="system-page-empty">Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
     {% endfor %}
@@ -34,6 +36,7 @@
             <summary>Archivierte Fassungen</summary>
             {% for simulationskern in archivierte_fassungen %}
                 {% include "simulation/includes/kern_fassung.html" %}
+                {% include "simulation/includes/kern_fassung_aktionen.html" %}
             {% endfor %}
         </details>
     {% endif %}

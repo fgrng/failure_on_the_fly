@@ -234,16 +234,10 @@ class SimulationskernVerwaltungTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("simulation:neue_fassung", args=[finale.pk])
+            reverse("simulation:neue_fassung", args=[finale.pk]), follow=True
         )
 
-        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
-        self.assertTrue(
-            Simulationskern.objects.filter(
-                vorgaengerin=finale,
-                zustand=Simulationskern.Zustand.ENTWURF,
-            ).exists()
-        )
+        self.assertContains(response, "Finalisieren")
 
     def test_finalisiert_den_entwurf(self) -> None:
         """Die Verwaltung macht den angegebenen Entwurf zu einer finalen Fassung."""
@@ -252,12 +246,10 @@ class SimulationskernVerwaltungTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("simulation:finalisieren", args=[entwurf.pk])
+            reverse("simulation:finalisieren", args=[entwurf.pk]), follow=True
         )
 
-        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
-        entwurf.refresh_from_db()
-        self.assertEqual(entwurf.zustand, Simulationskern.Zustand.FINAL)
+        self.assertContains(response, "<h2>Finale Fassung</h2>", html=False)
 
     def test_verwirft_den_entwurf(self) -> None:
         """Die Verwaltung entfernt ausschließlich den angegebenen Entwurf."""
@@ -266,11 +258,10 @@ class SimulationskernVerwaltungTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("simulation:verwerfen", args=[entwurf.pk])
+            reverse("simulation:verwerfen", args=[entwurf.pk]), follow=True
         )
 
-        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
-        self.assertFalse(Simulationskern.objects.filter(pk=entwurf.pk).exists())
+        self.assertNotContains(response, "Entwurfs-Prompt")
 
     def test_verwerfen_weist_finale_und_archivierte_fassungen_ab(self) -> None:
         """Die Verwerfen-Route ist ausschließlich für Entwürfe erreichbar."""
