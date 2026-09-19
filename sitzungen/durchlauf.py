@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Gespraechsschritt
+from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from vignetten.models import Vignette, rahmen_platzhalter
 
@@ -61,6 +61,19 @@ def gespraechsschritt_ausfuehren(
         fehlversuche=fehlversuche,
     )
     return antwortversuch
+
+
+def sitzung_beenden(sink: SitzungSink) -> None:
+    """Hält die Uhr an und bereitet das Erreichen des Debriefs vor."""
+
+    sink.zeitbudget_anhalten()
+
+
+def sitzung_abbrechen(sink: SitzungSink) -> None:
+    """Hält die Uhr an und markiert die Sitzung als abgebrochen."""
+
+    sink.zeitbudget_anhalten()
+    sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
 
 
 @dataclass(frozen=True)

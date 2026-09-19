@@ -1,7 +1,6 @@
 """Views für Probeläufe und persistierte Trainingssitzungen."""
 
 from collections.abc import Callable
-from time import monotonic
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
@@ -23,7 +22,9 @@ from simulation.transkription import (
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     gespraechsschritt_ausfuehren,
+    sitzung_abbrechen,
     sitzung_anzeigen,
+    sitzung_beenden,
     sitzung_starten,
 )
 from sitzungen.models import Gespraechsschritt, Sitzung
@@ -282,6 +283,7 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sink: ScratchSink = ScratchSink(request.session)
+    sitzung_beenden(sink)
     sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
     return _gespeicherten_debrief_anzeigen(request, sink)
 
@@ -361,53 +363,6 @@ def _persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
     # Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge.
 
     return sitzung.gespraechsschritt_set.order_by("reihenfolge")
-
-
-def _zeitbudget_schluessel(sitzung: Sitzung, name: str) -> str:
-    # Isoliert die Uhr jeder persistierten Sitzung von allen anderen Sitzungen.
-
-    return f"sitzung_{sitzung.pk}_{name}"
-
-
-def _zeitbudget_fortsetzen(request: HttpRequest, sitzung: Sitzung) -> None:
-    # Startet die unsichtbare Uhr ausschließlich während des Teilnehmer:innenzugs.
-
-    schluessel: str = _zeitbudget_schluessel(sitzung, "zeit_laeuft_seit")
-    if (
-        sitzung.vignette.budget_typ == Vignette.BudgetTyp.ZEIT
-        and schluessel not in request.session
-    ):
-        request.session[schluessel] = monotonic()
-
-
-def zeitbudget_anhalten(request: HttpRequest, sitzung: Sitzung) -> None:
-    # Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort.
-
-    startzeit: float | None = request.session.pop(
-        _zeitbudget_schluessel(sitzung, "zeit_laeuft_seit"), None
-    )
-    if startzeit is not None:
-        verbrauchte_zeit_schluessel: str = _zeitbudget_schluessel(
-            sitzung, "verbrauchte_zeit"
-        )
-        request.session[verbrauchte_zeit_schluessel] = (
-            request.session.get(verbrauchte_zeit_schluessel, 0.0)
-            + monotonic()
-            - startzeit
-        )
-
-
-def _budget_erschoepft(request: HttpRequest, sitzung: Sitzung) -> bool:
-    # Prüft das unsichtbare Gesprächsbudget nach einem vollständigen Schritt.
-
-    if sitzung.vignette.budget_wert is None:
-        return False
-    if sitzung.vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-        return _persistierte_schritte(sitzung).count() >= sitzung.vignette.budget_wert
-    return (
-        request.session.get(_zeitbudget_schluessel(sitzung, "verbrauchte_zeit"), 0.0)
-        >= sitzung.vignette.budget_wert
-    )
 
 
 def persistierten_debrief_anzeigen(
@@ -515,13 +470,13 @@ def persistiertes_gespraech(
             navigation=navigation,
             anhang=anhang,
         )
+    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
     if request.method == "GET":
-        _zeitbudget_fortsetzen(request, sitzung)
+        sink.zeitbudget_fortsetzen()
         return _persistiertes_gespraech_anzeigen(
             request, sitzung, schritte, navigation=navigation
         )
-    zeitbudget_anhalten(request, sitzung)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung)
+    sink.zeitbudget_anhalten()
     antwortversuch = gespraechsschritt_ausfuehren(
         sink,
         sitzung.vignette,
@@ -536,9 +491,9 @@ def persistiertes_gespraech(
     )
     if antwortversuch.endgueltig_gescheitert:
         return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
-    if _budget_erschoepft(request, sitzung):
+    if sink.budget_erschoepft(sitzung.vignette):
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
-    _zeitbudget_fortsetzen(request, sitzung)
+    sink.zeitbudget_fortsetzen()
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
@@ -563,7 +518,8 @@ def training_beenden(request: HttpRequest) -> HttpResponse:
     sitzung: Sitzung = _training_sitzung(request)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return _persistierten_fehler_anzeigen(request, sitzung)
-    zeitbudget_anhalten(request, sitzung)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung)
 
 
@@ -580,8 +536,8 @@ def training_abbrechen(request: HttpRequest) -> HttpResponse:
         return persistierten_debrief_anzeigen(request, sitzung)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _training_zur_auswahl_zurueckkehren(request, sitzung)
-    zeitbudget_anhalten(request, sitzung)
-    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sitzung_abbrechen(sink)
     return _training_zur_auswahl_zurueckkehren(request, sitzung)
 
 

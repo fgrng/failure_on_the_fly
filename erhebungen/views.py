@@ -42,13 +42,17 @@ from .models import (
 )
 from simulation.models import ModellKonfiguration, Simulationskern
 from fragebogen_items.models import FragebogenItem
-from sitzungen.durchlauf import Sitzungsnavigation, sitzung_starten
+from sitzungen.durchlauf import (
+    Sitzungsnavigation,
+    sitzung_abbrechen,
+    sitzung_beenden,
+    sitzung_starten,
+)
 from sitzungen.models import Sitzung
 from sitzungen.sink import DBSink
 from sitzungen.views import (
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
-    zeitbudget_anhalten,
 )
 from vignetten.models import Vignette
 
@@ -942,7 +946,8 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, _bindung = _erhebungssitzung(token)
-    zeitbudget_anhalten(request, sitzung)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
 
@@ -952,8 +957,8 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
-    zeitbudget_anhalten(request, sitzung)
-    DBSink.fuer_sitzung(sitzung).status_setzen(Sitzung.Status.ABGEBROCHEN)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sitzung_abbrechen(sink)
     anhang = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistiertes_gespraech(

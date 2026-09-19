@@ -684,7 +684,7 @@ class ErhebungsteilnahmeTests(TestCase):
         session["training_verbrauchte_zeit"] = 999.0
         session.save()
 
-        with patch("sitzungen.views.monotonic", side_effect=[10.0, 11.0, 11.0]):
+        with patch("sitzungen.sink.monotonic", side_effect=[10.0, 11.0, 11.0]):
             self.client.get(gespraech_url)
             antwort: HttpResponse = self.client.post(
                 gespraech_url, {"eingabe": "Wie rechnest du?"}

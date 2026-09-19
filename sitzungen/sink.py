@@ -73,21 +73,39 @@ class SitzungSink(Protocol):
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Setzt den Lebenszyklusstatus der Sitzung."""
 
+    def budget_erschoepft(self, vignette: Vignette) -> bool:
+        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
+
+    def zeitbudget_fortsetzen(self) -> None:
+        """Startet die Uhr, wenn die teilnehmende Person wieder eine Eingabe verfassen kann."""
+
+    def zeitbudget_anhalten(self) -> None:
+        """Hält die Uhr für Modellaufruf und Fehlversuche an."""
+
 
 class DBSink:
     """Persistiert eine Sitzung inkrementell über die ORM-Modelle."""
 
-    def __init__(self, teilnahme: Teilnahme) -> None:
-        """Bindet den Sink an die Teilnahme, zu der die Sitzung gehört."""
+    def __init__(
+        self,
+        teilnahme: Teilnahme,
+        session: MutableMapping[str, Any] | None = None,
+    ) -> None:
+        """Bindet den Sink an die Teilnahme und optional an die Browser-Session."""
 
         self.teilnahme: Teilnahme = teilnahme
         self.sitzung: Sitzung | None = None
+        self.session: MutableMapping[str, Any] = {} if session is None else session
 
     @classmethod
-    def fuer_sitzung(cls, sitzung: Sitzung) -> "DBSink":
+    def fuer_sitzung(
+        cls,
+        sitzung: Sitzung,
+        session: MutableMapping[str, Any] | None = None,
+    ) -> "DBSink":
         """Stellt den Sink für eine bereits persistierte Sitzung wieder her."""
 
-        sink: DBSink = cls(sitzung.teilnahme)
+        sink: DBSink = cls(sitzung.teilnahme, session=session)
         sink.sitzung = sitzung
         return sink
 
@@ -174,6 +192,64 @@ class DBSink:
         # Bestimmt die fortlaufende Position des nächsten Gesprächsschritts.
 
         return self._sitzung.gespraechsschritt_set.count() + 1
+
+    def _zeitbudget_schluessel(self, name: str) -> str:
+        # Isoliert die Uhr jeder persistierten Sitzung von allen anderen Sitzungen.
+
+        return f"sitzung_{self._sitzung.pk}_{name}"
+
+    def budget_erschoepft(self, vignette: Vignette) -> bool:
+        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
+
+        if vignette.budget_wert is None:
+            return False
+        if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
+            return self._sitzung.gespraechsschritt_set.count() >= vignette.budget_wert
+        return self.verbrauchte_zeit >= vignette.budget_wert
+
+    @property
+    def verbrauchte_zeit(self) -> float:
+        """Liefert die verbrauchte Zeit aus der Session."""
+
+        return cast(
+            float,
+            self.session.get(
+                self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL), 0.0
+            ),
+        )
+
+    def zeitbudget_fortsetzen(self) -> None:
+        """Startet die unsichtbare Uhr ausschließlich während des Teilnahmezugs."""
+
+        schluessel: str = self._zeitbudget_schluessel(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
+        if (
+            self._sitzung.vignette.budget_typ == Vignette.BudgetTyp.ZEIT
+            and schluessel not in self.session
+        ):
+            self.session[schluessel] = monotonic()
+            self._als_geaendert_markieren()
+
+    def zeitbudget_anhalten(self) -> None:
+        """Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort."""
+
+        schluessel_startzeit: str = self._zeitbudget_schluessel(
+            _ZEIT_LAEUFT_SEIT_SCHLUESSEL
+        )
+        startzeit: float | None = self.session.pop(schluessel_startzeit, None)
+        if startzeit is not None:
+            schluessel_verbraucht: str = self._zeitbudget_schluessel(
+                _VERBRAUCHTE_ZEIT_SCHLUESSEL
+            )
+            self.session[schluessel_verbraucht] = (
+                self.verbrauchte_zeit + monotonic() - startzeit
+            )
+            self._als_geaendert_markieren()
+
+    def _als_geaendert_markieren(self) -> None:
+        # Markiert Session-Änderungen für Django als speicherwürdig.
+
+        if hasattr(self.session, "modified"):
+            self.session.modified = True
 
 
 def probelauf_laeuft(session: MutableMapping[str, Any]) -> bool:
