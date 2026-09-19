@@ -21,7 +21,7 @@ from konten.navigation import (
 
 from .forms import TrainingForm
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.durchlauf import sitzung_anzeigen, sitzung_starten, sitzungsnavigation
+from sitzungen.durchlauf import sitzung_anzeigen, sitzung_starten
 from sitzungen.models import Sitzung
 from sitzungen.sink import DBSink
 
@@ -465,7 +465,6 @@ def _sitzung_starten(
         kern=kern,
         gespraechsschritte=[],
         ist_probelauf=False,
-        navigation=sitzungsnavigation(ist_probelauf=False),
         spracheingabe_verfuegbar=bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sink.sitzung.pk,
     )

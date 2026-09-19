@@ -15,37 +15,6 @@ from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from vignetten.models import Vignette, rahmen_platzhalter
 
 
-@dataclass(frozen=True)
-class Sitzungsnavigation:
-    """Die Routen und Bezeichnung einer angezeigten Sitzung."""
-
-    bezeichnung: str
-    gespraech_url: str
-    beenden_url: str
-    debrief_url: str
-    abbrechen_url: str | None
-
-
-def sitzungsnavigation(ist_probelauf: bool) -> Sitzungsnavigation:
-    # Bündelt die modusspezifischen Routen für die gemeinsame Sitzungsansicht.
-
-    if ist_probelauf:
-        return Sitzungsnavigation(
-            bezeichnung="Probelauf",
-            gespraech_url=reverse("sitzungen:probelauf_gespraech"),
-            beenden_url=reverse("sitzungen:probelauf_beenden"),
-            debrief_url=reverse("sitzungen:probelauf_debrief"),
-            abbrechen_url=None,
-        )
-    return Sitzungsnavigation(
-        bezeichnung="Training",
-        gespraech_url=reverse("sitzungen:training_gespraech"),
-        beenden_url=reverse("sitzungen:training_beenden"),
-        debrief_url=reverse("sitzungen:training_debrief"),
-        abbrechen_url=reverse("sitzungen:training_abbrechen"),
-    )
-
-
 def sitzung_starten(
     sink: SitzungSink,
     vignette: Vignette,
@@ -94,6 +63,37 @@ def gespraechsschritt_ausfuehren(
     return antwortversuch
 
 
+@dataclass(frozen=True)
+class Sitzungsnavigation:
+    """Die Routen und Bezeichnung einer angezeigten Sitzung."""
+
+    bezeichnung: str
+    gespraech_url: str
+    beenden_url: str
+    debrief_url: str
+    abbrechen_url: str | None
+
+
+def _sitzungsnavigation(ist_probelauf: bool) -> Sitzungsnavigation:
+    # Bündelt die modusspezifischen Routen für die gemeinsame Sitzungsansicht.
+
+    if ist_probelauf:
+        return Sitzungsnavigation(
+            bezeichnung="Probelauf",
+            gespraech_url=reverse("sitzungen:probelauf_gespraech"),
+            beenden_url=reverse("sitzungen:probelauf_beenden"),
+            debrief_url=reverse("sitzungen:probelauf_debrief"),
+            abbrechen_url=None,
+        )
+    return Sitzungsnavigation(
+        bezeichnung="Training",
+        gespraech_url=reverse("sitzungen:training_gespraech"),
+        beenden_url=reverse("sitzungen:training_beenden"),
+        debrief_url=reverse("sitzungen:training_debrief"),
+        abbrechen_url=reverse("sitzungen:training_abbrechen"),
+    )
+
+
 def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
     # Füllt einen Abschnitt der Rahmenhandlung mit den Werten seiner Vignette.
 
@@ -138,7 +138,7 @@ def sitzung_anzeigen(
         "zeigt_debrief": zeigt_debrief,
         "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
-        "navigation": navigation or sitzungsnavigation(ist_probelauf),
+        "navigation": navigation or _sitzungsnavigation(ist_probelauf),
         "sitzung_pk": sitzung_pk,
         "anhang": anhang,
     }

@@ -84,24 +84,16 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertContains(self.start_response, "Aufnahme starten")
-
-    def test_startseite_liefert_dieselben_kontextschluessel_wie_das_gespraech(
-        self,
-    ) -> None:
-        """Die Startseite der Sitzung baut ihren Kontext nicht mehr von Hand nach."""
-
-        self._sitzung_starten(
-            [{"denkspur": "Mia addiert alles.", "aeusserung": "Ich addiere alles."}]
-        )
-
-        gespraech: HttpResponse = self.client.post(
-            reverse("sitzungen:training_gespraech"), {"eingabe": "Wie rechnest du?"}
-        )
-
-        self.assertEqual(
-            set(self.start_response.context.keys()), set(gespraech.context.keys())
-        )
         self.assertNotContains(self.start_response, "Gespräch beginnen")
+
+    def test_startseite_bindet_die_spracheingabe_an_die_laufende_sitzung(self) -> None:
+        """Schon die erste Seite kennt die Sitzung, der Aufnahmen zugeordnet werden."""
+
+        self._sitzung_starten([])
+
+        self.assertContains(
+            self.start_response, f'data-sitzung-pk="{Sitzung.objects.get().pk}"'
+        )
 
     def test_training_ohne_audioeinwilligung_zeigt_nur_tastatureingabe(self) -> None:
         """Abgelehnte Einwilligung blendet die Aufnahme-Steuerung aus."""
