@@ -253,9 +253,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                     "id": sitzung.pk,
                     "status": sitzung.get_status_display(),
                     "status_badge": _sitzung_status_badge(sitzung.status),
-                    "url": reverse(
-                        "sitzungen:training_sitzung_ansehen", args=[sitzung.pk]
-                    ),
+                    "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
                 }
             )
 
