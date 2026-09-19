@@ -241,6 +241,18 @@ class Simulationskern(models.Model):
 
         return models.QuerySet(model=type(self), using=self._state.db)
 
+    def _hat_zustand_in_datenbank(self, zustand: str) -> bool:
+        # Prüft den gespeicherten Zustand über die interne Schreibroute.
+
+        return (
+            self._schreibqueryset()
+            .filter(
+                pk=self.pk,
+                zustand=zustand,
+            )
+            .exists()
+        )
+
     @transaction.atomic
     def bearbeiten(self) -> "Simulationskern":
         """Erzeugt aus einer finalen Fassung einen neuen Entwurf."""
@@ -312,14 +324,7 @@ class Simulationskern(models.Model):
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
 
-        if (
-            not self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=self.Zustand.FINAL,
-            )
-            .exists()
-        ):
+        if not self._hat_zustand_in_datenbank(self.Zustand.FINAL):
             raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
         if not (
             type(self)
@@ -345,14 +350,7 @@ class Simulationskern(models.Model):
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
 
-        if (
-            not self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=self.Zustand.ARCHIVIERT,
-            )
-            .exists()
-        ):
+        if not self._hat_zustand_in_datenbank(self.Zustand.ARCHIVIERT):
             raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
         if self.vorgaengerin_id is not None and (
             type(self)
