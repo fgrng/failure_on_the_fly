@@ -1,8 +1,11 @@
-"""Schreibgeschützte Views für den Simulationskern."""
+"""Ansichten für den Simulationskern."""
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
@@ -30,6 +33,29 @@ def _kern_kontext() -> dict[str, object]:
         "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
         "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
     }
+
+
+def _fassung_im_zustand_laden(
+    request: HttpRequest,
+    pk: int,
+    zustand: Simulationskern.Zustand,
+) -> Simulationskern | None:
+    """Lädt eine Fassung im erwarteten Zustand oder erklärt die Ablehnung."""
+    simulationskern: Simulationskern = get_object_or_404(Simulationskern, pk=pk)
+    if simulationskern.zustand != zustand:
+        messages.error(request, "Diese Kern-Fassung hat nicht den erwarteten Zustand.")
+        return None
+    return simulationskern
+
+
+def _modellfehler_als_meldung(
+    request: HttpRequest, error: ValueError | ValidationError
+) -> None:
+    """Übersetzt Modellfehler der Lebenszyklusgesten in Übersichtsmeldungen."""
+    if isinstance(error, ValidationError):
+        messages.error(request, "; ".join(error.messages))
+    else:
+        messages.error(request, str(error))
 
 
 @login_required
@@ -61,6 +87,7 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "entwurf": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ENTWURF
             ).first(),
+            "kann_verwalten": True,
             "finale_fassungen": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.FINAL
             ).order_by("-finalisiert_am", "-pk"),
@@ -70,3 +97,45 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             **_kern_kontext(),
         },
     )
+
+
+@administratorin_erforderlich
+@require_POST
+def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zieht aus einer finalen Kern-Fassung einen Entwurf."""
+    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
+        request, pk, Simulationskern.Zustand.FINAL
+    )
+    if simulationskern is not None:
+        try:
+            simulationskern.bearbeiten()
+        except (ValueError, ValidationError) as error:
+            _modellfehler_als_meldung(request, error)
+    return redirect("simulation:kern_verwalten")
+
+
+@administratorin_erforderlich
+@require_POST
+def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert einen Kern-Entwurf."""
+    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
+        request, pk, Simulationskern.Zustand.ENTWURF
+    )
+    if simulationskern is not None:
+        try:
+            simulationskern.finalisieren()
+        except (ValueError, ValidationError) as error:
+            _modellfehler_als_meldung(request, error)
+    return redirect("simulation:kern_verwalten")
+
+
+@administratorin_erforderlich
+@require_POST
+def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Verwirft einen Kern-Entwurf."""
+    simulationskern: Simulationskern | None = _fassung_im_zustand_laden(
+        request, pk, Simulationskern.Zustand.ENTWURF
+    )
+    if simulationskern is not None:
+        simulationskern.delete()
+    return redirect("simulation:kern_verwalten")

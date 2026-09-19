@@ -125,6 +125,14 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         ):
             self.assertContains(response, f'aria-label="{abschnitt}"')
 
+    def test_zeigt_keine_verwaltungsgesten(self) -> None:
+        """Die gelbe Leseansicht bleibt trotz gemeinsamem Fassung-Include schreibfrei."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertNotContains(response, "Entwurf ziehen")
+        self.assertNotContains(response, "Finalisieren")
+        self.assertNotContains(response, "Verwerfen")
+
 
 class SimulationskernLeereAnsichtTests(TestCase):
     """Die Kernansicht bleibt ohne Kern und Konfiguration verständlich."""
@@ -214,6 +222,116 @@ class SimulationskernVerwaltungTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, "Entwurfs-Prompt")
+
+    def test_zieht_aus_finaler_fassung_einen_entwurf(self) -> None:
+        """Die Verwaltung legt aus der gewählten finalen Fassung einen Entwurf an."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+        entwurf.delete()
+        finale: Simulationskern = Simulationskern.objects.get(
+            system_prompt_vorlage="Aktueller Prompt"
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:neue_fassung", args=[finale.pk])
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        self.assertTrue(
+            Simulationskern.objects.filter(
+                vorgaengerin=finale,
+                zustand=Simulationskern.Zustand.ENTWURF,
+            ).exists()
+        )
+
+    def test_finalisiert_den_entwurf(self) -> None:
+        """Die Verwaltung macht den angegebenen Entwurf zu einer finalen Fassung."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:finalisieren", args=[entwurf.pk])
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        entwurf.refresh_from_db()
+        self.assertEqual(entwurf.zustand, Simulationskern.Zustand.FINAL)
+
+    def test_verwirft_den_entwurf(self) -> None:
+        """Die Verwaltung entfernt ausschließlich den angegebenen Entwurf."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:verwerfen", args=[entwurf.pk])
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        self.assertFalse(Simulationskern.objects.filter(pk=entwurf.pk).exists())
+
+    def test_verwerfen_weist_finale_und_archivierte_fassungen_ab(self) -> None:
+        """Die Verwerfen-Route ist ausschließlich für Entwürfe erreichbar."""
+        finale: Simulationskern = Simulationskern.objects.get(
+            system_prompt_vorlage="Aktueller Prompt"
+        )
+        archiviert: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ARCHIVIERT
+        )
+
+        for simulationskern in (finale, archiviert):
+            response: HttpResponse = self.client.post(
+                reverse("simulation:verwerfen", args=[simulationskern.pk]), follow=True
+            )
+            self.assertContains(response, "hat nicht den erwarteten Zustand")
+            self.assertTrue(
+                Simulationskern.objects.filter(pk=simulationskern.pk).exists()
+            )
+
+    def test_gesten_sind_post_und_administratorinnen_vorbehalten(self) -> None:
+        """Die schreibenden Routen weisen GET und Autorinnen ohne Adminrolle ab."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+        urls: tuple[str, ...] = (
+            reverse("simulation:neue_fassung", args=[entwurf.vorgaengerin_id]),
+            reverse("simulation:finalisieren", args=[entwurf.pk]),
+            reverse("simulation:verwerfen", args=[entwurf.pk]),
+        )
+
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 405)
+        self.client.force_login(_autorin("ada"))
+        for url in urls:
+            self.assertEqual(self.client.post(url).status_code, 403)
+
+    def test_zeigt_modellfehler_als_meldung(self) -> None:
+        """Ein belegter Entwurfsplatz wird auf der Übersicht verständlich erklärt."""
+        finale: Simulationskern = Simulationskern.objects.get(
+            system_prompt_vorlage="Aktueller Prompt"
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:neue_fassung", args=[finale.pk]), follow=True
+        )
+
+        self.assertContains(response, "Ein Kern-Entwurf existiert bereits.")
+
+    def test_zeigt_unvollstaendigen_entwurf_als_meldung(self) -> None:
+        """Ein vertragswidriger Entwurf scheitert auf der Übersicht lesbar."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+        entwurf.system_prompt_vorlage = "$unbekannt"
+        entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:finalisieren", args=[entwurf.pk]), follow=True
+        )
+
+        self.assertContains(response, "Enthält ungültige Platzhalter.")
 
     def test_kennzeichnet_die_juengste_finale_fassung_als_verwendet(self) -> None:
         """Die Verwaltungsübersicht hebt die aktuell verwendete Fassung hervor."""
