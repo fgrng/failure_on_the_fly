@@ -333,9 +333,9 @@ def transkriptions_endpunkt(
         if not (request.user.is_authenticated and probelauf_laeuft(request.session)):
             sitzung: Sitzung | None = sitzung_fuer_transkription(request)
             if sitzung is None and request.user.is_authenticated:
-                from training.views import _training_sitzung
+                from training.views import training_sitzung
 
-                sitzung = _training_sitzung(request)
+                sitzung = training_sitzung(request)
             if sitzung is None:
                 raise PermissionDenied
             if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:

@@ -462,7 +462,7 @@ def _sitzungsnavigation() -> Sitzungsnavigation:
     )
 
 
-def _training_sitzung(request: HttpRequest) -> Sitzung:
+def training_sitzung(request: HttpRequest) -> Sitzung:
     """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto."""
 
     sitzung_pk: int | None = request.session.get("training_sitzung_pk")
@@ -524,7 +524,7 @@ def gespraech(request: HttpRequest) -> HttpResponse:
     """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
 
     return persistiertes_gespraech(
-        request, _training_sitzung(request), _sitzungsnavigation()
+        request, training_sitzung(request), _sitzungsnavigation()
     )
 
 
@@ -534,7 +534,7 @@ def gespraech_beenden(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = _training_sitzung(request)
+    sitzung: Sitzung = training_sitzung(request)
     navigation: Sitzungsnavigation = _sitzungsnavigation()
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation)
@@ -548,7 +548,7 @@ def abbrechen(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = _training_sitzung(request)
+    sitzung: Sitzung = training_sitzung(request)
     navigation: Sitzungsnavigation = _sitzungsnavigation()
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation)
@@ -567,7 +567,7 @@ def debrief(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = _training_sitzung(request)
+    sitzung: Sitzung = training_sitzung(request)
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status == Sitzung.Status.GESCHEITERT:
