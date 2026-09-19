@@ -5,7 +5,7 @@ from collections.abc import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -22,10 +22,18 @@ from .models import (
 )
 
 
-# Zustandswert der Vignettenfassungen, die das Archivieren betrifft. Die Zahl
-# kommt über den Rückwärts-Zugriff auf den Fremdschlüssel in `vignetten`; ein
-# Import in diese Richtung wäre eine Kante gegen ADR-0016.
-_VIGNETTENENTWURF: str = "entwurf"
+# Zustandswert der Vignettenfassungen, vor denen das Archivieren warnt. Er steht
+# als Literal da, weil `simulation` die Vignetten-Schicht laut ADR-0016 nicht
+# importiert; gezählt wird über den Rückwärts-Zugriff auf den Fremdschlüssel.
+_VIGNETTEN_ZUSTAND_ENTWURF: str = "entwurf"
+
+
+def _fassungen(zustand: Simulationskern.Zustand) -> QuerySet[Simulationskern]:
+    # Liefert alle Fassungen eines Zustands, die jüngste zuerst.
+
+    return Simulationskern.objects.filter(zustand=zustand).order_by(
+        "-finalisiert_am", "-pk"
+    )
 
 
 def _kern_kontext() -> dict[str, object]:
@@ -85,11 +93,9 @@ def _lebenszyklus_aktion_ausfuehren(
 @autorin_erforderlich
 def kern(request: HttpRequest) -> HttpResponse:
     """Zeigt die jüngste finale Kern-Fassung und aktive Modell-Konfiguration."""
-    simulationskern: Simulationskern | None = (
-        Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL)
-        .order_by("-finalisiert_am", "-pk")
-        .first()
-    )
+    simulationskern: Simulationskern | None = _fassungen(
+        Simulationskern.Zustand.FINAL
+    ).first()
     return render(
         request,
         "simulation/kern.html",
@@ -103,6 +109,14 @@ def kern(request: HttpRequest) -> HttpResponse:
 @administratorin_erforderlich
 def kern_verwalten(request: HttpRequest) -> HttpResponse:
     """Zeigt alle Kern-Fassungen für die Administration."""
+    finale_fassungen: QuerySet[Simulationskern] = _fassungen(
+        Simulationskern.Zustand.FINAL
+    ).annotate(
+        gepinnte_entwuerfe=Count(
+            "vignette",
+            filter=Q(vignette__zustand=_VIGNETTEN_ZUSTAND_ENTWURF),
+        )
+    )
     return render(
         request,
         "simulation/kern_verwalten.html",
@@ -110,19 +124,8 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "entwurf": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ENTWURF
             ).first(),
-            "finale_fassungen": Simulationskern.objects.filter(
-                zustand=Simulationskern.Zustand.FINAL
-            )
-            .annotate(
-                gepinnte_entwuerfe=Count(
-                    "vignette",
-                    filter=Q(vignette__zustand=_VIGNETTENENTWURF),
-                )
-            )
-            .order_by("-finalisiert_am", "-pk"),
-            "archivierte_fassungen": Simulationskern.objects.filter(
-                zustand=Simulationskern.Zustand.ARCHIVIERT
-            ).order_by("-finalisiert_am", "-pk"),
+            "finale_fassungen": finale_fassungen,
+            "archivierte_fassungen": _fassungen(Simulationskern.Zustand.ARCHIVIERT),
             **_kern_kontext(),
         },
     )

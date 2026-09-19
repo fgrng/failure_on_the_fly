@@ -1,6 +1,8 @@
 """HTTP-Tests für die read-only Ansicht des Simulationskerns."""
 
+import ast
 from pathlib import Path
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -565,9 +567,16 @@ class SimulationskernArchivierenTests(TestCase):
         for url in urls:
             self.assertEqual(self.client.post(url).status_code, 403)
 
-    def test_simulationsschicht_importiert_die_vignetten_schicht_nicht(self) -> None:
+    def test_kern_verwaltung_importiert_die_vignetten_schicht_nicht(self) -> None:
         """Die Zahl kommt über den Rückwärts-Zugriff, nicht über eine neue Kante."""
-        quelltext: str = Path(views.__file__).read_text(encoding="utf-8")
+        baum: ast.Module = ast.parse(Path(views.__file__).read_text(encoding="utf-8"))
+        importierte_module: set[str] = set()
+        for knoten in ast.walk(baum):
+            if isinstance(knoten, ast.Import):
+                importierte_module.update(alias.name for alias in knoten.names)
+            elif isinstance(knoten, ast.ImportFrom):
+                importierte_module.add(knoten.module or "")
 
-        self.assertNotIn("from vignetten", quelltext)
-        self.assertNotIn("import vignetten", quelltext)
+        self.assertNotIn(
+            "vignetten", {modul.split(".", 1)[0] for modul in importierte_module}
+        )
