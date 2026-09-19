@@ -81,7 +81,6 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
             "zeige_teilnahme": False,
             "zeige_forschung": False,
             "zeige_system": False,
-            "simulationskern_verwalten": False,
         }
 
     rollen: set[str] = _rollen(request.user)
@@ -92,5 +91,4 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
         "zeige_teilnahme": not rollen and not administration,
         "zeige_forschung": administration or FORSCHENDE_GRUPPE in rollen,
         "zeige_system": administration,
-        "simulationskern_verwalten": administration,
     }

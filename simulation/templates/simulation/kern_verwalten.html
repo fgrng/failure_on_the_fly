@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Simulationskern verwalten{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System</p>
+            <h1>Simulationskern verwalten</h1>
+            <span>Alle Fassungen der Verhaltensspezifikation und die aktive Modell-Konfiguration.</span>
+        </div>
+    </header>
+
+    {% if entwurf %}
+        <h2>Entwurf</h2>
+        {% include "simulation/includes/kern_fassung.html" with simulationskern=entwurf %}
+    {% endif %}
+
+    {% for simulationskern in finale_fassungen %}
+        <h2>{% if forloop.first %}Verwendete finale Fassung{% else %}Finale Fassung{% endif %}</h2>
+        {% include "simulation/includes/kern_fassung.html" %}
+    {% empty %}
+        <p class="system-page-empty">Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
+    {% endfor %}
+
+    {% if archivierte_fassungen %}
+        <details>
+            <summary>Archivierte Fassungen</summary>
+            {% for simulationskern in archivierte_fassungen %}
+                {% include "simulation/includes/kern_fassung.html" %}
+            {% endfor %}
+        </details>
+    {% endif %}
+
+    {% include "simulation/includes/modell_konfiguration.html" %}
+</section>
+{% endblock %}

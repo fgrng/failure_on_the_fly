@@ -39,7 +39,8 @@ Eigentümerinnen.
 Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die
 aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
-hin.
+hin. Administrator:innen erhalten unter `/system/kern/verwalten/` außerdem den
+Überblick über Entwürfe, alle finalen und eingeklappten archivierten Kern-Fassungen.
 
 ## Audioverarbeitung im Training
 

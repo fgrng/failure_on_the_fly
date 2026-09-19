@@ -10,7 +10,7 @@
                 <div>
                     <a href="{% url 'vignetten:liste' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name != "anlegen" %} aria-current="page"{% endif %}>Vignetten ansehen</a>
                     <a href="{% url 'vignetten:anlegen' %}"{% if request.resolver_match.namespace == "vignetten" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neue Vignette erstellen</a>
-                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" %} aria-current="page"{% endif %}>Simulationskern {% if simulationskern_verwalten %}verwalten{% else %}ansehen{% endif %}</a>
+                    <a href="{% url 'simulation:kern' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "kern" %} aria-current="page"{% endif %}>Simulationskern ansehen</a>
                 </div>
             </section>
         {% endif %}
@@ -70,6 +70,7 @@
                 <h2>System</h2>
                 <div>
                     <span>Modell-Konfiguration <small>geplant</small></span>
+                    <a href="{% url 'simulation:kern_verwalten' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "kern_verwalten" %} aria-current="page"{% endif %}>Simulationskern verwalten</a>
                     <a href="{% url 'admin:index' %}"{% if request.resolver_match.namespace == "admin" %} aria-current="page"{% endif %}>Administration</a>
                 </div>
             </section>

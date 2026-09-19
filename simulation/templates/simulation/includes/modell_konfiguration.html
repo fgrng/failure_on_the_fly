@@ -1,0 +1,13 @@
+<section class="page-section">
+    <header class="page-section__head">
+        <b>03</b><span><h2>Modell-Konfiguration</h2><small>Aktives Sprachmodell und seine Parameter</small></span>
+    </header>
+    {% if modell_konfiguration %}
+        <dl class="field-grid">
+            <div><dt>Sprachmodell</dt><dd>{{ modell_konfiguration.sprachmodell }}</dd></div>
+            <div><dt>Parameter</dt><dd><pre>{{ modell_konfiguration.parameter }}</pre></dd></div>
+        </dl>
+    {% else %}
+        <p class="system-page-empty">Keine aktive Modell-Konfiguration.</p>
+    {% endif %}
+</section>

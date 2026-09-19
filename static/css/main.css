@@ -163,6 +163,10 @@ a:hover {
     background: var(--color-area-system-tint);
     color: var(--color-text);
 }
+.badge--authoring {
+    background: var(--color-area-authoring-tint);
+    color: var(--color-text);
+}
 .badge--archived {
     background: var(--color-border);
     color: var(--color-text-muted);

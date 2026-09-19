@@ -31,7 +31,6 @@ from konten.models import Konto
                 "zeige_teilnahme": True,
                 "zeige_forschung": False,
                 "zeige_system": False,
-                "simulationskern_verwalten": False,
             },
         ),
         (
@@ -43,7 +42,6 @@ from konten.models import Konto
                 "zeige_teilnahme": False,
                 "zeige_forschung": False,
                 "zeige_system": False,
-                "simulationskern_verwalten": False,
             },
         ),
         (
@@ -55,7 +53,6 @@ from konten.models import Konto
                 "zeige_teilnahme": False,
                 "zeige_forschung": False,
                 "zeige_system": False,
-                "simulationskern_verwalten": False,
             },
         ),
         (
@@ -67,7 +64,6 @@ from konten.models import Konto
                 "zeige_teilnahme": False,
                 "zeige_forschung": True,
                 "zeige_system": False,
-                "simulationskern_verwalten": False,
             },
         ),
         (
@@ -79,7 +75,6 @@ from konten.models import Konto
                 "zeige_teilnahme": False,
                 "zeige_forschung": True,
                 "zeige_system": True,
-                "simulationskern_verwalten": True,
             },
         ),
     ],
@@ -196,6 +191,7 @@ class SidebarNavigationTests(TestCase):
 
         for text in (
             "Vignetten ansehen",
+            "Simulationskern ansehen",
             "Simulationskern verwalten",
             "Trainingskatalog erstellen",
             "Meine Erhebungen",

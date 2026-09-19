@@ -17,6 +17,11 @@ def _autorin(username: str) -> Konto:
     return konto
 
 
+def _administratorin(username: str) -> Konto:
+    """Legt ein Konto mit Zugriff auf die Kern-Verwaltung an."""
+    return get_user_model().objects.create_user(username=username, is_superuser=True)
+
+
 class SimulationskernAnsichtMitKernTests(TestCase):
     """Die Kernansicht zeigt die aktuelle finale Fassung ohne Schreibroute."""
 
@@ -166,3 +171,70 @@ class SimulationskernRollenTests(TestCase):
         administratorin.save()
         self.client.force_login(administratorin)
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 200)
+
+
+class SimulationskernVerwaltungTests(TestCase):
+    """Die Verwaltung zeigt alle Kern-Fassungen der einzigen Historie."""
+
+    def test_zeigt_entwurf_finale_und_eingeklappte_archivierte_fassungen(self) -> None:
+        """Administratorinnen überblicken die gesamte Kern-Historie."""
+        aelteste_fassung: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="Archivierter Prompt"
+        )
+        aelteste_fassung.finalisieren()
+        aktuelle_fassung: Simulationskern = aelteste_fassung.bearbeiten()
+        aktuelle_fassung.system_prompt_vorlage = "Aktueller Prompt"
+        aktuelle_fassung.save()
+        aktuelle_fassung.finalisieren()
+        aelteste_fassung.archivieren()
+        entwurf: Simulationskern = aktuelle_fassung.bearbeiten()
+        entwurf.system_prompt_vorlage = "Entwurfs-Prompt"
+        entwurf.save()
+        self.client.force_login(_administratorin("linus"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, 'class="page system-page area--system"')
+        self.assertContains(response, "Entwurfs-Prompt")
+        self.assertContains(response, "Aktueller Prompt")
+        self.assertContains(response, "Archivierter Prompt")
+        self.assertContains(response, "<details>", html=False)
+
+    def test_weist_autorin_und_konto_ohne_rolle_ab(self) -> None:
+        """Nur Administratorinnen dürfen die blaue Übersicht öffnen."""
+        for konto in (_autorin("ada"), get_user_model().objects.create_user("studi")):
+            self.client.force_login(konto)
+
+            response: HttpResponse = self.client.get(
+                reverse("simulation:kern_verwalten")
+            )
+
+            self.assertEqual(response.status_code, 403)
+
+    def test_markiert_die_autorinnen_ansicht_gelb(self) -> None:
+        """Die read-only Ansicht erbt das Chrome ihres Entwicklungsbereichs."""
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, 'class="page system-page area--authoring"')
+        self.assertContains(response, 'class="badge badge--authoring"')
+
+    def test_markiert_in_der_sidebar_nur_den_verwaltungslink(self) -> None:
+        """Die zwei Kern-Routen teilen den Namespace, nicht den aktiven Link."""
+        self.client.force_login(_administratorin("linus"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(
+            response,
+            '<a href="/system/kern/">Simulationskern ansehen</a>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<a href="/system/kern/verwalten/" aria-current="page">Simulationskern verwalten</a>',
+            html=False,
+        )
