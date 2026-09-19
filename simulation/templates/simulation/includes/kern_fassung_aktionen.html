@@ -5,6 +5,7 @@
             <button class="button" type="submit">Entwurf ziehen</button>
         </form>
     {% elif simulationskern.zustand == simulationskern.Zustand.ENTWURF %}
+        <a class="button" href="{% url 'simulation:kern_bearbeiten' simulationskern.pk %}">Bearbeiten</a>
         <form method="post" action="{% url 'simulation:finalisieren' simulationskern.pk %}">
             {% csrf_token %}
             <button class="button" type="submit">Finalisieren</button>

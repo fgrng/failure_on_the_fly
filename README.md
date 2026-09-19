@@ -41,8 +41,8 @@ aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Is
 kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
 hin. Administrator:innen erhalten unter `/system/kern/verwalten/` außerdem den
 Überblick über Entwürfe, alle finalen und eingeklappten archivierten Kern-Fassungen.
-Sie ziehen aus einer finalen Fassung einen Entwurf, finalisieren ihn oder
-verwerfen ihn wieder.
+Sie ziehen aus einer finalen Fassung einen Entwurf, bearbeiten dessen Vorlagen auf
+einer eigenen Seite, finalisieren ihn oder verwerfen ihn wieder.
 
 ## Audioverarbeitung im Training
 

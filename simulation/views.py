@@ -11,10 +11,9 @@ from django.views.decorators.http import require_POST
 
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
+from . import models
+from .forms import SimulationskernForm
 from .models import (
-    PROMPT_PLATZHALTER_MIT_UMGEBUNG,
-    VERTRAG_PROMPT,
-    VERTRAG_RAHMEN,
     AktiveModellKonfiguration,
     ModellKonfiguration,
     Simulationskern,
@@ -31,9 +30,9 @@ def _kern_kontext() -> dict[str, object]:
         modell_konfiguration = None
     return {
         "modell_konfiguration": modell_konfiguration,
-        "prompt_platzhalter": sorted(VERTRAG_PROMPT),
-        "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
-        "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
+        "prompt_platzhalter": sorted(models.VERTRAG_PROMPT),
+        "prompt_platzhalter_mit_umgebung": models.PROMPT_PLATZHALTER_MIT_UMGEBUNG,
+        "rahmen_platzhalter": sorted(models.VERTRAG_RAHMEN),
     }
 
 
@@ -111,6 +110,27 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             ).order_by("-finalisiert_am", "-pk"),
             **_kern_kontext(),
         },
+    )
+
+
+@administratorin_erforderlich
+def kern_bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
+    """Bearbeitet die Inhaltsfelder eines Kern-Entwurfs."""
+    simulationskern: Simulationskern = get_object_or_404(
+        Simulationskern.objects.filter(zustand=Simulationskern.Zustand.ENTWURF),
+        pk=pk,
+    )
+    if request.method == "POST":
+        form = SimulationskernForm(request.POST, instance=simulationskern)
+        if form.is_valid():
+            form.save()
+            return redirect("simulation:kern_verwalten")
+    else:
+        form = SimulationskernForm(instance=simulationskern)
+    return render(
+        request,
+        "simulation/kern_bearbeiten.html",
+        {"form": form, "simulationskern": simulationskern, **_kern_kontext()},
     )
 
 
