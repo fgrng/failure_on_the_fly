@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum, auto
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -177,6 +178,7 @@ def sitzung_anzeigen(
         "zeigt_debrief": zeigt_debrief,
         "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,
+        "aufnahme_maximale_bytes": settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES,
         "navigation": navigation,
         "sitzung_pk": sitzung_pk,
         "anhang": anhang,

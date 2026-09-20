@@ -1,8 +1,13 @@
 (() => {
+    // Abstand der "dataavailable"-Ereignisse; ohne ihn liefert der Recorder die
+    // Aufnahme erst am Ende und die Grenze griffe zu spät.
+    const AUFNAHME_ZEITSCHEIBE_MS = 1000;
+
     const meldungen = {
         leeres_transkript: "Es wurde kein Text erkannt. Nehmen Sie bitte erneut auf.",
         anbieterfehler: "Die Transkription ist fehlgeschlagen. Nehmen Sie bitte erneut auf.",
         anbieter_nicht_erreichbar: "Die Transkription ist derzeit nicht erreichbar. Versuchen Sie es bitte erneut.",
+        aufnahme_zu_gross: "Die Aufnahme ist zu lang. Nehmen Sie bitte in kürzeren Abschnitten auf.",
     };
 
     const einrichten = (bereich) => {
@@ -16,10 +21,14 @@
         const status = bereich.querySelector(".spracheingabe__status");
         if (!formular || !eingabe || !steuerung || !status) return;
         const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
+        // Dieselbe Grenze hält der Endpunkt; hier erspart sie die vergebliche Anfrage.
+        const maximaleBytes = Number(bereich.dataset.maximaleBytes);
 
         let recorder;
         let stream;
         let audioTeile = [];
+        let aufgenommeneBytes = 0;
+        let grenzeErreicht = false;
 
         const zustand = (text, aufnahme = false) => {
             status.textContent = text;
@@ -41,7 +50,10 @@
             ziel.value += `${ziel.value ? "\n" : ""}${text}`;
         };
         const transkribieren = async () => {
-            zustand("Ihre Aufnahme wird transkribiert.");
+            zustand(grenzeErreicht
+                ? "Die maximale Aufnahmelänge ist erreicht. Ihre Aufnahme wird transkribiert."
+                : "Ihre Aufnahme wird transkribiert."
+            );
             const daten = new FormData();
             daten.append("audio", new Blob(audioTeile, { type: recorder.mimeType || "audio/webm" }), "aufnahme.webm");
             if (bereich.dataset.sitzungPk) daten.append("sitzung_pk", bereich.dataset.sitzungPk);
@@ -85,10 +97,20 @@
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioTeile = [];
+                aufgenommeneBytes = 0;
+                grenzeErreicht = false;
                 recorder = new MediaRecorder(stream);
-                recorder.addEventListener("dataavailable", (ereignis) => audioTeile.push(ereignis.data));
+                recorder.addEventListener("dataavailable", (ereignis) => {
+                    audioTeile.push(ereignis.data);
+                    aufgenommeneBytes += ereignis.data.size;
+                    if (aufgenommeneBytes >= maximaleBytes && recorder.state === "recording") {
+                        // Die Aufnahme wird beendet und transkribiert, nicht verworfen.
+                        grenzeErreicht = true;
+                        stoppen();
+                    }
+                });
                 recorder.addEventListener("stop", transkribieren, { once: true });
-                recorder.start();
+                recorder.start(AUFNAHME_ZEITSCHEIBE_MS);
                 steuerung.textContent = "Aufnahme beenden";
                 steuerung.setAttribute("aria-pressed", "true");
                 zustand("Aufnahme läuft. Beenden Sie die Aufnahme, wenn sie vollständig ist.", true);

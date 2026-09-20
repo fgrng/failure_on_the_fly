@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -55,18 +56,28 @@ class ProbelaufTranskriptionTests(TestCase):
         # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
         return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
 
+    def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
+        # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
+        return SimpleUploadedFile("aufnahme.webm", b"\0" * groesse, "audio/webm")
+
     def _probelauf_starten(self) -> None:
         # Legt den Probelaufzustand über die echte HTTP-Naht in der Session ab.
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-    def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
+    def _anfragen(
+        self, anbieter: FakeTranskription, aufnahme: SimpleUploadedFile | None = None
+    ) -> HttpResponse:
         # Ruft den Endpunkt mit einer Fabrik auf, die diesen einen Anbieter gibt.
-        return self._anfragen_mit_fabrik(lambda: anbieter)
+        return self._anfragen_mit_fabrik(lambda: anbieter, aufnahme)
 
-    def _anfragen_mit_fabrik(self, fabrik: Callable[[], Transkription]) -> HttpResponse:
+    def _anfragen_mit_fabrik(
+        self,
+        fabrik: Callable[[], Transkription],
+        aufnahme: SimpleUploadedFile | None = None,
+    ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
-            "/sitzungen/transkription/", {"audio": self._aufnahme()}
+            "/sitzungen/transkription/", {"audio": aufnahme or self._aufnahme()}
         )
         request.user = self.autorin
         request.session = self.client.session
@@ -141,6 +152,32 @@ class ProbelaufTranskriptionTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
         self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_lehnt_aufnahme_ueber_der_grenze_mit_eigenem_status_ab(self) -> None:
+        """Eine Aufnahme jenseits der Grenze erreicht den Anbieter nicht."""
+        self._probelauf_starten()
+        anbieter = FakeTranskription(["Text"])
+
+        response: HttpResponse = self._anfragen(
+            anbieter,
+            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES + 1),
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertJSONEqual(response.content, {"status": "aufnahme_zu_gross"})
+        self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_nimmt_aufnahme_genau_auf_der_grenze_an(self) -> None:
+        """Die Grenze schließt die letzte erlaubte Größe ein."""
+        self._probelauf_starten()
+
+        response: HttpResponse = self._anfragen(
+            FakeTranskription(["Wie hast du gerechnet?"]),
+            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"text": "Wie hast du gerechnet?"})
 
     def test_persistiert_keine_aufnahme(self) -> None:
         """Nach der Transkription liegt keine Audio-Datei im Medienverzeichnis."""
