@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
+from config.tests.dokumentation import REPO_ROOT
 
-REPO_ROOT: Path = Path(__file__).parents[2]
+
 ADR_PATH: Path = REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md"
 OPEN_QUESTIONS_PATH: Path = REPO_ROOT / "docs/open-questions.md"
 DOMAIN_ADR_PATH: Path = (

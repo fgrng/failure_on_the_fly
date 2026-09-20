@@ -46,7 +46,7 @@ def test_readme_nennt_das_abgeloeste_vorgabemodell_nicht_mehr() -> None:
     """Weder Seed noch Anleitung kennen noch ein OpenAI-Vorgabemodell."""
     readme: str = README_PATH.read_text()
 
-    for abgeloest in ("OpenAI", "gpt-", "OPENAI_API_KEY"):
+    for abgeloest in ("OpenAI", "gpt-"):
         assert abgeloest not in readme
 
 
@@ -62,9 +62,7 @@ def test_env_beispiel_fuehrt_nur_noch_die_zero_retention_einstellung() -> None:
 def test_keine_dokumentationsstelle_nennt_zugangsdaten_in_der_umgebung() -> None:
     """Zugangsdaten für das Sprachmodell stehen nirgends als Umgebungsvariable."""
     for pfad in (README_PATH, CONTEXT_PATH, ENV_BEISPIEL_PATH):
-        text: str = pfad.read_text()
-        for umgebungsschluessel in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "API_KEY"):
-            assert umgebungsschluessel not in text
+        assert "API_KEY" not in pfad.read_text()
 
 
 def test_glossar_fuehrt_den_anbieter_als_eigenen_begriff() -> None:
@@ -82,7 +80,8 @@ def test_glossar_stellt_die_lebenszyklen_der_konfigurationen_gegenueber() -> Non
 
     assert "unveränderlich" in modell
     assert "gepinnt" in modell
-    assert "veränderlich" in transkription
+    assert "aber veränderlich" in transkription
+    assert "unveränderlich" not in transkription
     assert "weder gepinnt noch exportiert" in transkription
 
 
