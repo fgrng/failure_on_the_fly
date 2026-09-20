@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 
 MAX_VERSUCHE: int = 3
 
+# Die datenschutzrechtliche Zusage aus ADR-0026 steht in keiner Konfiguration:
+# Ein Tor, das im selben Formular abschaltbar wäre, in dem man den Anbieter
+# wählt, ist keins.
 OPENROUTER_PROVIDER_FILTER: dict[str, object] = {
     "require_parameters": True,
     "data_collection": "deny",
@@ -118,8 +121,5 @@ def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmode
     if modell_konfiguration.anbieter_basis_url:
         aufrufparameter["api_base"] = modell_konfiguration.anbieter_basis_url
     if modell_konfiguration.anbieter == Anbieter.OPENROUTER:
-        # Die Zusage aus ADR-0026 steht in keiner Konfiguration: Ein Tor, das
-        # im selben Formular abschaltbar wäre, in dem man den Anbieter wählt,
-        # ist keins.
         aufrufparameter["extra_body"] = {"provider": OPENROUTER_PROVIDER_FILTER}
     return LiteLLMSprachmodell(modell_konfiguration.sprachmodell, aufrufparameter)

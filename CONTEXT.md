@@ -112,7 +112,7 @@ _Avoid_: Protokoll, Chatverlauf, Mitschrift
 ## Simulationsablauf
 
 **Modell-Konfiguration**:
-Das verwendete Sprachmodell samt seiner Parameter. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Kein versioniertes Artefakt.
+Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036). Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
 
 **Simulationskern**:

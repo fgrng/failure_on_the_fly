@@ -364,6 +364,9 @@ class Anbieter(models.TextChoices):
     INFOMANIAK: tuple[str, str] = "infomaniak", "Infomaniak"
 
 
+# Der Anbieter `fake` bedient genau ein Modell, das seinen Namen trägt.
+FAKE_MODELLNAME: str = "fake"
+# Das Präfix, mit dem LiteLLM einen Modellnamen zum Anbieter routet.
 ANBIETER_PRAEFIX: dict[str, str] = {
     Anbieter.OPENROUTER: "openrouter/",
     Anbieter.INFOMANIAK: "openai/",
@@ -453,35 +456,43 @@ class ModellKonfiguration(models.Model):
 
         if self.anbieter not in Anbieter.values:
             return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
-        fehler: dict[str, str] = {}
-        if self.anbieter == Anbieter.FAKE:
-            if self.sprachmodell != Anbieter.FAKE:
-                fehler["sprachmodell"] = (
-                    "Der Anbieter »fake« bedient nur das Modell »fake«."
-                )
-            if self.anbieter_basis_url:
-                fehler["anbieter_basis_url"] = (
-                    "Der Anbieter »fake« hat keinen Endpunkt."
-                )
-            if self.anbieter_token:
-                fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
-        else:
-            praefix: str = ANBIETER_PRAEFIX[self.anbieter]
-            if not self.sprachmodell.startswith(praefix):
-                fehler["sprachmodell"] = (
-                    f"Dieser Anbieter verlangt das Präfix »{praefix}«."
-                )
-            if not self.anbieter_token:
-                fehler["anbieter_token"] = (
-                    "Ohne Token bedient der Anbieter keinen Aufruf."
-                )
-            if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
-                fehler["anbieter_basis_url"] = (
-                    "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
-                )
-        fehler.update(self._parameter_fehler())
+        fehler: dict[str, str] = {
+            **self._bindungsfehler(),
+            **self._parameter_fehler(),
+        }
         if fehler:
             raise ValidationError(fehler)
+
+    def _bindungsfehler(self) -> dict[str, str]:
+        # Prüft Modellname und Zugangsdaten gegen die Erwartungen des Anbieters.
+
+        if self.anbieter == Anbieter.FAKE:
+            return self._fake_bindungsfehler()
+        fehler: dict[str, str] = {}
+        praefix: str = ANBIETER_PRAEFIX[self.anbieter]
+        if not self.sprachmodell.startswith(praefix):
+            fehler["sprachmodell"] = f"Dieser Anbieter verlangt das Präfix »{praefix}«."
+        if not self.anbieter_token:
+            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+        if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
+            fehler["anbieter_basis_url"] = (
+                "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
+            )
+        return fehler
+
+    def _fake_bindungsfehler(self) -> dict[str, str]:
+        # Der deterministische Adapter hat weder Endpunkt noch Zugangsdaten.
+
+        fehler: dict[str, str] = {}
+        if self.sprachmodell != FAKE_MODELLNAME:
+            fehler["sprachmodell"] = (
+                "Der Anbieter »fake« bedient nur das Modell »fake«."
+            )
+        if self.anbieter_basis_url:
+            fehler["anbieter_basis_url"] = "Der Anbieter »fake« hat keinen Endpunkt."
+        if self.anbieter_token:
+            fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
+        return fehler
 
     def _parameter_fehler(self) -> dict[str, str]:
         # Prüft die Parameter gegen die Allowlist des gewählten Anbieters.

@@ -23,9 +23,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
-# Das Sprachmodell des Workshops. Ohne eigene Parameter gelten die Standardwerte
-# des Anbieters.
-# Der Workshop läuft ohne Zugangsdaten und ohne Netz.
+# Das Sprachmodell des Workshops: Er läuft ohne Zugangsdaten und ohne Netz.
 SIMULATIONSMODELL: str = "fake"
 
 # Zeichenvorrat ohne verwechselbare Zeichen (kein l, I, 1, O, 0): Die Passwörter

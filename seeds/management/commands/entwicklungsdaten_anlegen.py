@@ -46,8 +46,6 @@ TESTKONTEN: dict[str, tuple[list[str], bool]] = {
     "studi": ([], False),
 }
 
-# Die optionale OpenAI-Konfiguration für einen echten Modelllauf.
-
 # Die aktive Fake-Antwort für beliebig viele Offline-Gesprächsschritte. Der
 # Adapter wird je Schritt neu erzeugt und beginnt deshalb immer von vorn.
 FAKE_SKRIPT: list[dict[str, str]] = [
