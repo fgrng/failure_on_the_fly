@@ -664,13 +664,13 @@ class SimulationskernArchivierenTests(TestCase):
         )
 
     def test_ordnet_die_wirkung_des_archivierens_am_knopf_ein(self) -> None:
-        """Der Hinweis nennt Umkehrbarkeit, Sitzungen und das Vorspulen."""
+        """Der Hinweis nennt Umkehrbarkeit, Sitzungen und das freigestellte Vorspulen."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         for aussage in (
             "umkehrbar",
             "laufende Sitzungen",
-            "Finalisieren",
+            "finalisieren und spielen",
             "vorspulen",
         ):
             self.assertContains(response, aussage)

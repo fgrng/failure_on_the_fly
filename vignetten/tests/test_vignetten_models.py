@@ -825,27 +825,28 @@ class VignetteFinalisierenTests(TestCase):
         with self.assertRaisesMessage(ValidationError, "größer als 0"):
             vignette.finalisieren()
 
-    def test_finalisieren_lehnt_entwurfs_kern_pin_ab(self) -> None:
-        """Nur ein finaler Simulationskern kann dauerhaft gepinnt werden."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(
-            Simulationskern.Zustand.ENTWURF
-        )
-
-        with self.assertRaisesMessage(ValidationError, "nicht final"):
-            vignette.finalisieren()
-
-    def test_finalisieren_verweist_bei_archiviertem_kern_aufs_vorspulen(
-        self,
-    ) -> None:
-        """Ein überholter Pin erklärt Autor:innen die nächste Handlung."""
+    def test_finalisieren_laesst_ueberholten_kern_pin_zu(self) -> None:
+        """Ein überholter Pin hält niemanden auf; Vorspulen ist eine Wahl."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen(
             Simulationskern.Zustand.ARCHIVIERT
         )
 
-        with self.assertRaisesMessage(ValidationError, "archiviert") as fehler:
-            vignette.finalisieren()
+        vignette.finalisieren()
 
-        self.assertIn("vorspulen", str(fehler.exception))
+        vignette.refresh_from_db()
+        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
+        self.assertEqual(
+            vignette.gepinnter_kern.zustand, Simulationskern.Zustand.ARCHIVIERT
+        )
+
+    def test_finalisieren_lehnt_fehlenden_kern_pin_ab(self) -> None:
+        """Ohne gepinnten Kern gäbe es zur Spielzeit kein Gesprächsverhalten."""
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette.gepinnter_kern = None
+        vignette.save()
+
+        with self.assertRaisesMessage(ValidationError, "fehlt ein gepinnter"):
+            vignette.finalisieren()
 
 
 class VignetteBearbeitenTests(TestCase):

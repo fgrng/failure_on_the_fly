@@ -552,12 +552,9 @@ class Vignette(models.Model):
             raise ValidationError(
                 "Zum Finalisieren fehlt ein gepinnter Simulationskern."
             )
-        if self.gepinnter_kern.zustand == Simulationskern.Zustand.ARCHIVIERT:
-            raise ValidationError(
-                "Der gepinnte Simulationskern wurde archiviert; bitte vorspulen()."
-            )
-        if self.gepinnter_kern.zustand != Simulationskern.Zustand.FINAL:
-            raise ValidationError("Der gepinnte Simulationskern ist nicht final.")
+        # Der Zustand des gepinnten Kerns bleibt absichtlich ungeprüft: Gespielt
+        # wird, worauf gepinnt wurde (ADR-0003). Ein überholter Pin trägt einen
+        # Hinweis in der Detailansicht, keine Sperre.
 
         self.finalisiert_am = timezone.now()
         self._zustand_wechseln(

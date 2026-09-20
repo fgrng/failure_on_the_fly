@@ -242,6 +242,57 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "Hinweis Lernauftrag")
         self.assertContains(response, "Hinweis Arbeitsheft")
 
+    def _entwurf_mit_ueberholtem_kern(self, konto: Konto) -> Vignette:
+        # Überholt den gepinnten Kern durch eine finalisierte Nachfolgefassung.
+        vignette: Vignette = _vollstaendige_vignette(konto)
+        kern: Simulationskern = vignette.gepinnter_kern
+        kern.bearbeiten().finalisieren()
+        kern.archivieren()
+        return vignette
+
+    def test_zeigt_den_hinweis_am_entwurf_mit_ueberholtem_kern(self) -> None:
+        """Der Entwurf sagt, dass der Pin überholt und trotzdem tragfähig ist."""
+        ada: Konto = _autorin("ada")
+        vignette: Vignette = self._entwurf_mit_ueberholtem_kern(ada)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
+        self.assertContains(response, "überholte Kern-Fassung gepinnt")
+        self.assertContains(response, "lässt sich so finalisieren und spielen")
+
+    def test_zeigt_keinen_hinweis_am_entwurf_mit_aktuellem_kern(self) -> None:
+        """Ein aktueller Pin ist der Normalfall und bleibt unkommentiert."""
+        ada: Konto = _autorin("ada")
+        vignette: Vignette = _vollstaendige_vignette(ada)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
+        self.assertNotContains(response, "überholte Kern-Fassung gepinnt")
+
+    def test_zeigt_keinen_hinweis_an_nicht_vorspulbaren_fassungen(self) -> None:
+        """Finale und archivierte Fassungen sind gepinnt (ADR-0004), nicht vorspulbar."""
+        ada: Konto = _autorin("ada")
+        vignette: Vignette = self._entwurf_mit_ueberholtem_kern(ada)
+        vignette.finalisieren()
+        self.client.force_login(ada)
+
+        finale_antwort: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+        vignette.archivieren()
+        archivierte_antwort: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
+        self.assertNotContains(finale_antwort, "überholte Kern-Fassung gepinnt")
+        self.assertNotContains(archivierte_antwort, "überholte Kern-Fassung gepinnt")
+
     def test_versteckt_fremde_fassung(self) -> None:
         """Detail-URLs geben keine Fassungen anderer Eigentümerinnen preis."""
         ada: Konto = _autorin("ada")
@@ -878,19 +929,21 @@ class VignetteFinalisierenViewTests(TestCase):
         """Ein Budget von null wird verständlich abgelehnt."""
         self._assert_finalisieren_zeigt_fehler("budget_wert", 0, "größer als 0")
 
-    def test_zeigt_fehler_fuer_nicht_finalen_kern_pin(self) -> None:
-        """Ein nicht finaler Kern-Pin wird verständlich abgelehnt."""
-        kern: Simulationskern = self.vignette.gepinnter_kern.bearbeiten()
+    def test_zeigt_fehler_fuer_fehlenden_kern_pin(self) -> None:
+        """Ohne gepinnten Kern wird verständlich abgelehnt."""
+        self._assert_finalisieren_zeigt_fehler("gepinnter_kern", None, "fehlt ein")
 
-        self._assert_finalisieren_zeigt_fehler("gepinnter_kern", kern, "nicht final")
-
-    def test_zeigt_fehler_fuer_archivierten_kern_pin(self) -> None:
-        """Ein archivierter Kern-Pin wird verständlich abgelehnt."""
+    def test_finalisiert_einen_entwurf_mit_ueberholtem_kern_pin(self) -> None:
+        """Ein überholter Pin hält das Finalisieren über HTTP nicht auf."""
         kern: Simulationskern = self.vignette.gepinnter_kern
         kern.bearbeiten().finalisieren()
         kern.archivieren()
 
-        self._assert_finalisieren_zeigt_fehler("gepinnter_kern", kern, "archiviert")
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:finalisieren", args=[self.vignette.pk]), follow=True
+        )
+
+        self.assertContains(response, "badge--final")
 
 
 class VignetteNeueFassungViewTests(TestCase):

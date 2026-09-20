@@ -46,9 +46,10 @@ einer eigenen Seite, finalisieren ihn oder verwerfen ihn wieder. Eine finale
 Fassung lässt sich außerdem archivieren und wieder zurückholen; am
 Archivieren-Knopf steht, wie viele Vignettenentwürfe auf dieser Fassung gepinnt
 sind. Die Zahl warnt nur vor: Archivieren ist umkehrbar, trifft laufende
-Sitzungen nicht, und betroffene Vignettenentwürfe scheitern erst beim
-Finalisieren — dann hilft Vorspulen. Die letzte finale Fassung kann nicht
-archiviert werden.
+Sitzungen nicht, und betroffene Vignettenentwürfe bleiben finalisierbar und
+spielbar. Ihre Detailansicht weist neben dem Vorspulen-Knopf auf den überholten
+Pin hin; Vorspulen bleibt eine Wahl der Autor:in. Die letzte finale Fassung kann
+nicht archiviert werden.
 
 ## Audioverarbeitung im Training
 

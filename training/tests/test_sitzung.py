@@ -23,6 +23,7 @@ class TrainingssitzungTests(TestCase):
         budget_typ: Vignette.BudgetTyp = Vignette.BudgetTyp.SCHRITTE,
         budget_wert: int = 3,
         audioverarbeitung_eingewilligt: bool = True,
+        kern_ueberholen: bool = False,
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
@@ -33,6 +34,9 @@ class TrainingssitzungTests(TestCase):
             )
         )
         kern.finalisieren()
+        if kern_ueberholen:
+            kern.bearbeiten().finalisieren()
+            kern.archivieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
             parameter={"skript": skript},
@@ -85,6 +89,17 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertContains(self.start_response, "Aufnahme starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
+
+    def test_training_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
+        """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
+
+        self._sitzung_starten([], kern_ueberholen=True)
+
+        self.assertContains(self.start_response, "Mia zeigt Ihnen die Bearbeitung.")
+        self.assertEqual(
+            Sitzung.objects.get().simulationskern.zustand,
+            Simulationskern.Zustand.ARCHIVIERT,
+        )
 
     def test_startseite_bindet_die_spracheingabe_an_die_laufende_sitzung(self) -> None:
         """Schon die erste Seite kennt die Sitzung, der Aufnahmen zugeordnet werden."""

@@ -342,6 +342,23 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotEqual(zweite_bindung.teilnahme_id, erster_browser.teilnahme_id)
         self.assertFalse(zweite_bindung.teilnahme.einwilligung_erteilt)
 
+    def test_token_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
+        """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
+
+        vignette: Vignette = self._vignette_anlegen()
+        kern: Simulationskern = vignette.gepinnter_kern
+        kern.bearbeiten().finalisieren()
+        kern.archivieren()
+
+        self._laufende_sitzung_starten()
+
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.LAUFEND)
+        self.assertEqual(sitzung.simulationskern, kern)
+        self.assertEqual(
+            sitzung.simulationskern.zustand, Simulationskern.Zustand.ARCHIVIERT
+        )
+
     def test_token_spielt_eine_vignette_bis_zum_abschluss(self) -> None:
         """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""
 
