@@ -352,7 +352,8 @@ def transkriptions_endpunkt(
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         aufnahme: UploadedFile = request.FILES["audio"]
-        # Die Größe steht vor dem Einlesen fest; der Worker bleibt frei.
+        # Die Größe steht vor dem Einlesen fest: Eine zu große Aufnahme wird
+        # abgewiesen, ohne sie je in den Speicher zu holen.
         if aufnahme.size > settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES:
             return JsonResponse({"status": "aufnahme_zu_gross"}, status=413)
         audio: bytes = aufnahme.read()

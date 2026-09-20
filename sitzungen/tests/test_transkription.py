@@ -3,6 +3,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -52,6 +53,10 @@ class ProbelaufTranskriptionTests(TestCase):
     def _aufnahme(self) -> SimpleUploadedFile:
         # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
         return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
+
+    def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
+        # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
+        return SimpleUploadedFile("aufnahme.webm", b"\0" * groesse, "audio/webm")
 
     def _probelauf_starten(self) -> None:
         # Legt den Probelaufzustand über die echte HTTP-Naht in der Session ab.
@@ -123,19 +128,14 @@ class ProbelaufTranskriptionTests(TestCase):
         self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
         self.assertEqual(anbieter.skript, ["Text"])
 
-    GRENZE: int = 15 * 1024 * 1024
-
-    def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
-        # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
-        return SimpleUploadedFile("aufnahme.webm", b"\0" * groesse, "audio/webm")
-
     def test_lehnt_aufnahme_ueber_der_grenze_mit_eigenem_status_ab(self) -> None:
-        """Eine Aufnahme über 15 MB erreicht den Anbieter nicht."""
+        """Eine Aufnahme jenseits der Grenze erreicht den Anbieter nicht."""
         self._probelauf_starten()
         anbieter = FakeTranskription(["Text"])
 
         response: HttpResponse = self._anfragen(
-            anbieter, self._aufnahme_mit_groesse(self.GRENZE + 1)
+            anbieter,
+            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES + 1),
         )
 
         self.assertEqual(response.status_code, 413)
@@ -143,12 +143,12 @@ class ProbelaufTranskriptionTests(TestCase):
         self.assertEqual(anbieter.skript, ["Text"])
 
     def test_nimmt_aufnahme_genau_auf_der_grenze_an(self) -> None:
-        """Die Grenze schließt die 15 MB ein, statt sie schon abzulehnen."""
+        """Die Grenze schließt die letzte erlaubte Größe ein."""
         self._probelauf_starten()
 
         response: HttpResponse = self._anfragen(
             FakeTranskription(["Wie hast du gerechnet?"]),
-            self._aufnahme_mit_groesse(self.GRENZE),
+            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES),
         )
 
         self.assertEqual(response.status_code, 200)
