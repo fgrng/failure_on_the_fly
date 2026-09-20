@@ -1,10 +1,11 @@
 """Naht für die Ziele eines Sitzungslaufs."""
 
-from collections.abc import MutableMapping
+from collections.abc import Iterable, MutableMapping
 from time import monotonic
 from typing import Any, Protocol, TypedDict, cast
 
 from django.db import transaction
+from django.db.models import QuerySet
 
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import (
@@ -50,6 +51,12 @@ class SitzungSink(Protocol):
         modell_konfiguration: ModellKonfiguration,
     ) -> None:
         """Beginnt eine Sitzung über ihrem festgelegten Tripel."""
+
+    @property
+    def gespraechsschritte(
+        self,
+    ) -> Iterable[GespraechsschrittDaten | Gespraechsschritt]:
+        """Liefert die bisherigen Gesprächsschritte in gespeicherter Reihenfolge."""
 
     def gespraechsschritt_anhaengen(
         self,
@@ -185,6 +192,12 @@ class DBSink:
         self._sitzung.save(update_fields=["status"])
 
     @property
+    def gespraechsschritte(self) -> QuerySet[Gespraechsschritt]:
+        """Liefert die gespeicherten Schritte in ihrer Reihenfolge."""
+
+        return self._sitzung.gespraechsschritte
+
+    @property
     def _sitzung(self) -> Sitzung:
         # Liefert die gestartete Sitzung oder weist auf einen falschen Ablauf hin.
 
@@ -195,7 +208,7 @@ class DBSink:
     def _naechste_reihenfolge(self) -> int:
         # Bestimmt die fortlaufende Position des nächsten Gesprächsschritts.
 
-        return self._sitzung.gespraechsschritt_set.count() + 1
+        return self.gespraechsschritte.count() + 1
 
     def _zeitbudget_schluessel(self, name: str) -> str:
         # Isoliert die Uhr jeder persistierten Sitzung von allen anderen Sitzungen.
@@ -208,7 +221,7 @@ class DBSink:
         if vignette.budget_wert is None:
             return False
         if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-            return self._sitzung.gespraechsschritt_set.count() >= vignette.budget_wert
+            return self.gespraechsschritte.count() >= vignette.budget_wert
         return self.verbrauchte_zeit >= vignette.budget_wert
 
     @property

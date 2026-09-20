@@ -1,6 +1,6 @@
 """Der Lauf einer Sitzung: ihr Ablauf über den Sink und ihre Darstellung."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from django.db.models import QuerySet
@@ -25,12 +25,36 @@ def sitzung_starten(
     sink.sitzung_starten(vignette, simulationskern, modell_konfiguration)
 
 
+def modellverlauf(sink: SitzungSink) -> list[tuple[str, str]]:
+    """Projiziert die bisherigen Schritte auf die beiden sichtbaren Gesprächsseiten.
+
+    Die Denkspur bleibt draußen (ADR-0005), ebenso ein Schritt ohne Äußerung —
+    der dokumentiert im Transkript den Abbruch, nicht den Kontext (ADR-0011).
+    """
+
+    verlauf: list[tuple[str, str]] = []
+    for schritt in sink.gespraechsschritte:
+        eingabe, aeusserung = _gespraechsseiten(schritt)
+        if aeusserung is not None:
+            verlauf.append((eingabe, aeusserung))
+    return verlauf
+
+
+def _gespraechsseiten(
+    schritt: GespraechsschrittDaten | Gespraechsschritt,
+) -> tuple[str, str | None]:
+    # Liest beide Gesprächsseiten aus der Speicherform, in der ihr Sink sie hält.
+
+    if isinstance(schritt, Mapping):
+        return schritt["eingabe"], schritt["aeusserung"]
+    return schritt.eingabe, schritt.aeusserung
+
+
 def gespraechsschritt_ausfuehren(
     sink: SitzungSink,
     vignette: Vignette,
     simulationskern: Simulationskern,
     modell_konfiguration: ModellKonfiguration,
-    verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> Antwortversuch:
     """Versucht eine Antwort und übergibt ihren Schritt ausschließlich dem Sink."""
@@ -39,7 +63,7 @@ def gespraechsschritt_ausfuehren(
         vignette,
         simulationskern,
         modell_konfiguration,
-        verlauf,
+        modellverlauf(sink),
         eingabe,
     )
     fehlversuche: list[FehlversuchDaten] = [

@@ -273,11 +273,6 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         vignette,
         kern,
         modell_konfiguration,
-        [
-            (schritt["eingabe"], schritt["aeusserung"])
-            for schritt in schritte
-            if schritt["aeusserung"] is not None
-        ],
         eingabe,
     )
     if antwortversuch.endgueltig_gescheitert:
@@ -375,12 +370,6 @@ def transkriptions_endpunkt(
     return endpunkt
 
 
-def persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
-    # Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge.
-
-    return sitzung.gespraechsschritt_set.order_by("reihenfolge")
-
-
 def persistierten_debrief_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
@@ -393,7 +382,7 @@ def persistierten_debrief_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=persistierte_schritte(sitzung),
+        gespraechsschritte=sitzung.gespraechsschritte,
         ist_probelauf=False,
         zeigt_debrief=True,
         navigation=navigation,
@@ -414,7 +403,7 @@ def persistierten_fehler_anzeigen(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        persistierte_schritte(sitzung),
+        sitzung.gespraechsschritte,
         ist_gescheitert=True,
         navigation=navigation,
         anhang=anhang,
@@ -460,7 +449,7 @@ def persistiertes_gespraech(
         return HttpResponseNotAllowed(["GET", "POST"])
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
         return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
-    schritte: QuerySet[Gespraechsschritt] = persistierte_schritte(sitzung)
+    schritte: QuerySet[Gespraechsschritt] = sitzung.gespraechsschritte
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
@@ -484,11 +473,6 @@ def persistiertes_gespraech(
         sitzung.vignette,
         sitzung.simulationskern,
         sitzung.modell_konfiguration,
-        list(
-            schritte.exclude(aeusserung__isnull=True).values_list(
-                "eingabe", "aeusserung"
-            )
-        ),
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
@@ -499,6 +483,6 @@ def persistiertes_gespraech(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        persistierte_schritte(sitzung),
+        sitzung.gespraechsschritte,
         navigation=navigation,
     )

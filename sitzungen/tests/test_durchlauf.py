@@ -14,6 +14,7 @@ from sitzungen.models import (
 )
 from sitzungen.durchlauf import (
     gespraechsschritt_ausfuehren,
+    modellverlauf,
     sitzung_abbrechen,
     sitzung_beenden,
     sitzung_starten,
@@ -64,7 +65,6 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         vignette,
         kern,
         konfiguration,
-        verlauf=[],
         eingabe="Wie hast du gerechnet?",
     )
 
@@ -100,7 +100,6 @@ def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() ->
         vignette,
         kern,
         konfiguration,
-        verlauf=[],
         eingabe="Wie hast du gerechnet?",
     )
 
@@ -143,7 +142,6 @@ def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
         vignette,
         kern,
         konfiguration,
-        verlauf=[],
         eingabe="Wie hast du gerechnet?",
     )
 
@@ -181,9 +179,7 @@ def test_db_sink_haengt_fehlversuche_neben_den_erfolgreichen_schritt() -> None:
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
     sitzung_starten(sink, vignette, kern, konfiguration)
-    gespraechsschritt_ausfuehren(
-        sink, vignette, kern, konfiguration, verlauf=[], eingabe="Warum?"
-    )
+    gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, eingabe="Warum?")
 
     schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
     assert schritt.aeusserung == "2/5."
@@ -204,9 +200,7 @@ def test_db_sink_persistiert_answerless_schritt_und_gescheiterten_status() -> No
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
     sitzung_starten(sink, vignette, kern, konfiguration)
-    gespraechsschritt_ausfuehren(
-        sink, vignette, kern, konfiguration, verlauf=[], eingabe="Warum?"
-    )
+    gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, eingabe="Warum?")
 
     sitzung: Sitzung = Sitzung.objects.get()
     schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
@@ -283,7 +277,7 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
         gespraechsschritt_ausfuehren(
-            sink, vignette, kern, konfiguration, verlauf=[], eingabe="Warum?"
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
         )
 
     db_schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
@@ -370,7 +364,7 @@ def test_scratch_und_db_sink_pruefen_budget_paritaetisch(
         assert not sink.budget_erschoepft(vignette_ohne_budget)
 
         gespraechsschritt_ausfuehren(
-            sink, vignette_schritte, kern, konfiguration, verlauf=[], eingabe="Warum?"
+            sink, vignette_schritte, kern, konfiguration, eingabe="Warum?"
         )
         assert sink.budget_erschoepft(vignette_schritte)
         assert not sink.budget_erschoepft(vignette_ohne_budget)
@@ -436,3 +430,78 @@ def test_sitzung_abbrechen_haelt_die_uhr_an_und_setzt_status_abgebrochen(
 
     assert sink.verbrauchte_zeit == 3.0
     assert Sitzung.objects.get().status == Sitzung.Status.ABGEBROCHEN
+
+
+@pytest.mark.django_db
+def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
+    """Probelauf und persistierte Sitzung reichen dem Modell denselben Verlauf."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "Ich addiere alles.", "aeusserung": "2/5."}]
+    )
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
+
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Und dann?"
+        )
+
+    erwartet: list[tuple[str, str]] = [
+        ("Warum?", "2/5."),
+        ("Und dann?", "2/5."),
+    ]
+    assert modellverlauf(scratch) == erwartet
+    assert modellverlauf(datenbank) == erwartet
+
+
+@pytest.mark.django_db
+def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
+    """Die Denkspur fließt in keinem der beiden Pfade in den Kontext zurück (ADR-0005)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [
+            {
+                "denkspur": "Ich addiere Zähler und Nenner.",
+                "aeusserung": "2/5.",
+                "native_reasoning_spur": "Native Spur.",
+            }
+        ]
+    )
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
+
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+
+        gesagtes: str = " ".join(teil for paar in modellverlauf(sink) for teil in paar)
+        assert "Ich addiere Zähler und Nenner." not in gesagtes
+        assert "Native Spur." not in gesagtes
+        assert "2/5." in gesagtes
+
+
+@pytest.mark.django_db
+def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
+    """Ein antwortloser Schritt bleibt aus dem Verlauf, aber im Transkript (ADR-0011)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"fehler": "anbieterfehler"}] * 3
+    )
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
+
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+
+        assert modellverlauf(sink) == []
+        assert len(list(sink.gespraechsschritte)) == 1

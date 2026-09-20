@@ -56,6 +56,12 @@ class Sitzung(models.Model):
         null=True,
     )
 
+    @property
+    def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:
+        """Liefert die Gesprächsschritte dieser Sitzung in ihrer Reihenfolge."""
+
+        return self.gespraechsschritt_set.order_by("reihenfolge")
+
 
 class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
     """Schreibt answerless Schritte atomar mit ihren Fehlversuchen."""
