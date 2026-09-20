@@ -23,6 +23,12 @@ if TYPE_CHECKING:
 
 MAX_VERSUCHE: int = 3
 
+OPENROUTER_PROVIDER_FILTER: dict[str, object] = {
+    "require_parameters": True,
+    "data_collection": "deny",
+    "zdr": True,
+}
+
 
 @dataclass(frozen=True)
 class Fehlversuch:
@@ -103,8 +109,17 @@ def antwort_versuchen(
 def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmodell:
     """Bildet den in der Konfiguration gewählten Adapter."""
 
-    if modell_konfiguration.sprachmodell == "fake":
+    from simulation.models import Anbieter
+
+    if modell_konfiguration.anbieter == Anbieter.FAKE:
         return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
-    return LiteLLMSprachmodell(
-        modell_konfiguration.sprachmodell, modell_konfiguration.parameter
-    )
+    aufrufparameter: dict[str, object] = dict(modell_konfiguration.parameter)
+    aufrufparameter["api_key"] = modell_konfiguration.anbieter_token
+    if modell_konfiguration.anbieter_basis_url:
+        aufrufparameter["api_base"] = modell_konfiguration.anbieter_basis_url
+    if modell_konfiguration.anbieter == Anbieter.OPENROUTER:
+        # Die Zusage aus ADR-0026 steht in keiner Konfiguration: Ein Tor, das
+        # im selben Formular abschaltbar wäre, in dem man den Anbieter wählt,
+        # ist keins.
+        aufrufparameter["extra_body"] = {"provider": OPENROUTER_PROVIDER_FILTER}
+    return LiteLLMSprachmodell(modell_konfiguration.sprachmodell, aufrufparameter)

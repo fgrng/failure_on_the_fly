@@ -25,7 +25,8 @@ from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 # Das Sprachmodell des Workshops. Ohne eigene Parameter gelten die Standardwerte
 # des Anbieters.
-SIMULATIONSMODELL: str = "openai/gpt-4o"
+# Der Workshop läuft ohne Zugangsdaten und ohne Netz.
+SIMULATIONSMODELL: str = "fake"
 
 # Zeichenvorrat ohne verwechselbare Zeichen (kein l, I, 1, O, 0): Die Passwörter
 # werden im Workshop von Zetteln abgetippt.

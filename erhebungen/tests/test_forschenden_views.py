@@ -25,7 +25,7 @@ from erhebungen.models import (
     Vignettenziehung,
 )
 from fragebogen_items.models import FragebogenItem
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from sitzungen.models import (
     Diagnose,
     Fehlversuch,
@@ -35,6 +35,20 @@ from sitzungen.models import (
 )
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
+
+
+def _forschungskonfiguration(
+    name: str = "forschung",
+    parameter: dict[str, object] | None = None,
+) -> ModellKonfiguration:
+    """Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt."""
+
+    return ModellKonfiguration.objects.create(
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell=f"openrouter/{name}",
+        anbieter_token="sk-or-geheim",
+        parameter=parameter or {},
+    )
 
 
 def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
@@ -118,9 +132,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="gpt-forschung")
-        )
+        ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
         Erhebung.objects.create(name="Noch Entwurf", eigentuemerin=ada)
         finale: Erhebung = Erhebung.objects.create(
             name="Schon final", eigentuemerin=ada
@@ -259,9 +271,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         erhebung: Erhebung = Erhebung.objects.create(
             name="Laufende Erhebung", eigentuemerin=ada
         )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="gpt-forschung")
-        )
+        ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
         erhebung.finalisieren()
         Stichprobe.objects.create(
             erhebung=erhebung,
@@ -1031,9 +1041,7 @@ class ErhebungenFinalisierenTests(TestCase):
         self.erhebung: Erhebung = Erhebung.objects.create(
             name="Brüche", eigentuemerin=self.ada
         )
-        self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        self.konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.force_login(self.ada)
 
@@ -1045,7 +1053,7 @@ class ErhebungenFinalisierenTests(TestCase):
         )
 
         self.assertContains(response, "Final")
-        self.assertContains(response, "gpt-forschung")
+        self.assertContains(response, "openrouter/forschung")
         self.assertNotContains(response, "Konfiguration speichern")
         self.assertNotContains(response, "Finale Vignetten aufnehmen")
         self.assertNotContains(response, ">Entfernen<")
@@ -1110,9 +1118,7 @@ class StichprobenAnlegenTests(TestCase):
         self.erhebung: Erhebung = Erhebung.objects.create(
             name="Brüche", eigentuemerin=self.ada
         )
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
         self.client.force_login(self.ada)
@@ -1217,9 +1223,7 @@ class ErhebungenArchivierenTests(TestCase):
         self.erhebung: Erhebung = Erhebung.objects.create(
             name="Brüche", eigentuemerin=self.ada
         )
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
         self.client.force_login(self.ada)
@@ -1360,9 +1364,7 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(
             name="Brüche & Zahlen",
@@ -1441,17 +1443,17 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erste_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-erstes-modell", parameter={"temperatur": 0.2}
+        erste_konfiguration: ModellKonfiguration = _forschungskonfiguration(
+            "erstes-modell", parameter={"temperature": 0.2}
         )
         ModellKonfiguration.objects.aktivieren(erste_konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
         erhebung.finalisieren()
-        zweite_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-zweites-modell", parameter={"temperatur": 0.7}
+        zweite_konfiguration: ModellKonfiguration = _forschungskonfiguration(
+            "zweites-modell", parameter={"temperature": 0.7}
         )
-        ungenutzte_konfiguration: ModellKonfiguration = (
-            ModellKonfiguration.objects.create(sprachmodell="nicht-exportieren")
+        ungenutzte_konfiguration: ModellKonfiguration = _forschungskonfiguration(
+            "nicht-exportieren"
         )
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
@@ -1655,8 +1657,8 @@ class ErhebungsExportTests(TestCase):
                 for konfiguration in konfigurationen
             },
             {
-                str(erste_konfiguration.pk): {"temperatur": 0.2},
-                str(zweite_konfiguration.pk): {"temperatur": 0.7},
+                str(erste_konfiguration.pk): {"temperature": 0.2},
+                str(zweite_konfiguration.pk): {"temperature": 0.7},
             },
         )
 
@@ -1665,9 +1667,7 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
         erhebung.finalisieren()
@@ -1769,9 +1769,7 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
         erhebung.finalisieren()
@@ -2018,9 +2016,7 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="gpt-forschung"
-        )
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(name="Archiv", eigentuemerin=ada)
         erhebung.finalisieren()

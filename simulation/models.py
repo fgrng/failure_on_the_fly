@@ -356,6 +356,37 @@ class Simulationskern(models.Model):
         ]
 
 
+class Anbieter(models.TextChoices):
+    """Die Anbieter, die eine Naht dieser Anwendung bedienen können."""
+
+    FAKE: tuple[str, str] = "fake", "Fake (ohne Netz)"
+    OPENROUTER: tuple[str, str] = "openrouter", "OpenRouter"
+    INFOMANIAK: tuple[str, str] = "infomaniak", "Infomaniak"
+
+
+ANBIETER_PRAEFIX: dict[str, str] = {
+    Anbieter.OPENROUTER: "openrouter/",
+    Anbieter.INFOMANIAK: "openai/",
+}
+MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
+    {
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "max_completion_tokens",
+        "reasoning_effort",
+        "thinking",
+        "seed",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty",
+        "logit_bias",
+        "verbosity",
+    }
+)
+FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript"})
+
+
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
     """QuerySets für unveränderliche Modell-Konfigurationen."""
 
@@ -391,17 +422,85 @@ class ModellKonfigurationManager(
 class ModellKonfiguration(models.Model):
     """Unveränderliche Konfiguration eines Sprachmodells."""
 
+    anbieter: models.CharField = models.CharField(
+        max_length=10,
+        choices=Anbieter,
+        default=Anbieter.FAKE,
+    )
+    anbieter_basis_url: models.URLField = models.URLField(blank=True, default="")
+    anbieter_token: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
     sprachmodell: models.CharField = models.CharField(max_length=255)
-    parameter: models.JSONField = models.JSONField(default=dict)
+    parameter: models.JSONField = models.JSONField(default=dict, blank=True)
 
     objects: ModellKonfigurationManager = ModellKonfigurationManager()
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Verhindert jede Mutation einer bereits angelegten Konfiguration."""
+        """Verhindert jede Mutation und prüft die Konfiguration beim Anlegen."""
 
         if not self._state.adding:
             raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
+        # Append-only heißt: Das Anlegen ist die einzige Stelle, an der eine
+        # Konfiguration verbindlich wird — also auch aus Shell und Seeds.
+        self.full_clean()
         super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        """Bindet Modellname, Zugangsdaten und Parameter an den Anbieter."""
+
+        if self.anbieter not in Anbieter.values:
+            return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
+        fehler: dict[str, str] = {}
+        if self.anbieter == Anbieter.FAKE:
+            if self.sprachmodell != Anbieter.FAKE:
+                fehler["sprachmodell"] = (
+                    "Der Anbieter »fake« bedient nur das Modell »fake«."
+                )
+            if self.anbieter_basis_url:
+                fehler["anbieter_basis_url"] = (
+                    "Der Anbieter »fake« hat keinen Endpunkt."
+                )
+            if self.anbieter_token:
+                fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
+        else:
+            praefix: str = ANBIETER_PRAEFIX[self.anbieter]
+            if not self.sprachmodell.startswith(praefix):
+                fehler["sprachmodell"] = (
+                    f"Dieser Anbieter verlangt das Präfix »{praefix}«."
+                )
+            if not self.anbieter_token:
+                fehler["anbieter_token"] = (
+                    "Ohne Token bedient der Anbieter keinen Aufruf."
+                )
+            if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
+                fehler["anbieter_basis_url"] = (
+                    "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
+                )
+        fehler.update(self._parameter_fehler())
+        if fehler:
+            raise ValidationError(fehler)
+
+    def _parameter_fehler(self) -> dict[str, str]:
+        # Prüft die Parameter gegen die Allowlist des gewählten Anbieters.
+
+        if not isinstance(self.parameter, dict):
+            return {"parameter": "Parameter sind ein Objekt aus Schlüsseln und Werten."}
+        erlaubt: frozenset[str] = (
+            FAKE_STELLSCHRAUBEN
+            if self.anbieter == Anbieter.FAKE
+            else MIKRO_STELLSCHRAUBEN
+        )
+        ueberzaehlig: list[str] = sorted(set(self.parameter) - erlaubt)
+        if ueberzaehlig:
+            return {
+                "parameter": (
+                    f"Bei diesem Anbieter nicht erlaubt: {', '.join(ueberzaehlig)}."
+                )
+            }
+        return {}
 
 
 class AktiveModellKonfiguration(models.Model):

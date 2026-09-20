@@ -9,7 +9,12 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
 from simulation import render
-from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
+from simulation.models import (
+    Anbieter,
+    KernHistorie,
+    ModellKonfiguration,
+    Simulationskern,
+)
 
 
 def test_render_substituiert_alle_vereinbarten_platzhalter() -> None:
@@ -344,18 +349,22 @@ def test_finalisiert_am_muss_genau_dem_zustand_entsprechen(
         )
 
 
+def _openrouter_konfiguration(name: str) -> ModellKonfiguration:
+    # Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt.
+
+    return ModellKonfiguration.objects.create(
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell=f"openrouter/{name}",
+        anbieter_token="sk-or-geheim",
+    )
+
+
 @pytest.mark.django_db
 def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None:
     """Erneutes Aktivieren ersetzt die aktive Konfiguration statt sie zu ergänzen."""
 
-    erste: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="erstes-modell",
-        parameter={},
-    )
-    zweite: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="zweites-modell",
-        parameter={},
-    )
+    erste: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
+    zweite: ModellKonfiguration = _openrouter_konfiguration("zweites-modell")
 
     ModellKonfiguration.objects.aktivieren(erste)
     ModellKonfiguration.objects.aktivieren(zweite)
@@ -367,11 +376,8 @@ def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None
 def test_modell_konfiguration_ist_nach_dem_anlegen_unveraenderlich() -> None:
     """Eine angelegte Modell-Konfiguration bleibt unveränderlich."""
 
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="erstes-modell",
-        parameter={"temperatur": 0.2},
-    )
-    konfiguration.sprachmodell = "zweites-modell"
+    konfiguration: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
+    konfiguration.sprachmodell = "openrouter/zweites-modell"
 
     with pytest.raises(RuntimeError, match="append-only"):
         konfiguration.save()
@@ -381,14 +387,11 @@ def test_modell_konfiguration_ist_nach_dem_anlegen_unveraenderlich() -> None:
 def test_modell_konfiguration_kann_nicht_per_queryset_mutiert_werden() -> None:
     """Die Append-only-Garantie gilt auch für die QuerySet-Schreibroute."""
 
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="erstes-modell",
-        parameter={},
-    )
+    konfiguration: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
 
     with pytest.raises(RuntimeError, match="append-only"):
         ModellKonfiguration.objects.filter(pk=konfiguration.pk).update(
-            sprachmodell="zweites-modell",
+            sprachmodell="openrouter/zweites-modell",
         )
 
 
@@ -396,10 +399,7 @@ def test_modell_konfiguration_kann_nicht_per_queryset_mutiert_werden() -> None:
 def test_aktive_modell_konfiguration_kann_nicht_geloescht_werden() -> None:
     """Der aktive Zeiger schützt seine Konfiguration vor dem Löschen."""
 
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="erstes-modell",
-        parameter={},
-    )
+    konfiguration: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
     ModellKonfiguration.objects.aktivieren(konfiguration)
 
     with pytest.raises(ProtectedError):

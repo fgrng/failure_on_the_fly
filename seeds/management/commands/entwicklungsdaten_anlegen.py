@@ -47,8 +47,6 @@ TESTKONTEN: dict[str, tuple[list[str], bool]] = {
 }
 
 # Die optionale OpenAI-Konfiguration für einen echten Modelllauf.
-SIMULATIONSMODELL: str = "openai/gpt-4o"
-SIMULATIONSPARAMETER: dict[str, object] = {"temperature": 0.2}
 
 # Die aktive Fake-Antwort für beliebig viele Offline-Gesprächsschritte. Der
 # Adapter wird je Schritt neu erzeugt und beginnt deshalb immer von vorn.
@@ -222,12 +220,7 @@ class Command(BaseCommand):
         return kern
 
     def _modell_konfiguration_sicherstellen(self) -> None:
-        """Legt OpenAI und Fake an und aktiviert Fake für Offline-Klicktests."""
-        ModellKonfiguration.objects.filter(
-            sprachmodell=SIMULATIONSMODELL
-        ).first() or ModellKonfiguration.objects.create(
-            sprachmodell=SIMULATIONSMODELL, parameter=SIMULATIONSPARAMETER
-        )
+        """Legt die Fake-Konfiguration an und aktiviert sie für Offline-Klicktests."""
         fake_parameter: dict[str, object] = {"skript": FAKE_SKRIPT}
         fake: ModellKonfiguration = ModellKonfiguration.objects.filter(
             sprachmodell="fake", parameter=fake_parameter
@@ -235,10 +228,7 @@ class Command(BaseCommand):
             sprachmodell="fake", parameter=fake_parameter
         )
         ModellKonfiguration.objects.aktivieren(fake)
-        self.stdout.write(
-            "  Modell-Konfiguration 'fake' für Offline-Tests aktiv "
-            f"('{SIMULATIONSMODELL}' ebenfalls vorhanden)."
-        )
+        self.stdout.write("  Modell-Konfiguration 'fake' für Offline-Tests aktiv.")
 
     def _vignetten_anlegen(
         self, autorin: object, kern: Simulationskern
@@ -342,6 +332,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Passwort für alle Testkonten: {ENTWICKLUNGSPASSWORT}")
         self.stdout.write("Konten: " + ", ".join(TESTKONTEN))
         self.stdout.write(
-            "Aktives Modell: fake (für echte Antworten "
-            f"'{SIMULATIONSMODELL}' mit OPENAI_API_KEY aktivieren)."
+            "Aktives Modell: fake (für echte Antworten eine Konfiguration mit "
+            "Anbieter und Token anlegen und aktivieren)."
         )

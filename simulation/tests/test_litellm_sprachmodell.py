@@ -7,7 +7,7 @@ import pytest
 from litellm import ContentPolicyViolationError
 
 from simulation import antwort_versuchen
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import (
     AUSGABE_SCHEMA,
     ContentFilter,
@@ -143,7 +143,10 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
-                sprachmodell="openai/gpt-test", parameter={"max_tokens": 100}
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+                parameter={"max_tokens": 100},
             ),
             verlauf=[],
             eingabe="Wie hast du gerechnet?",
@@ -151,7 +154,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
 
     assert antwortversuch.antwort is not None
     assert antwortversuch.native_reasoning_spur == "native Reasoning-Spur"
-    assert completion.call_args.kwargs["model"] == "openai/gpt-test"
+    assert completion.call_args.kwargs["model"] == "openrouter/openai/gpt-test"
     assert completion.call_args.kwargs["max_tokens"] == 100
 
 
@@ -225,3 +228,95 @@ def test_litellm_adapter_kennzeichnet_zusaetzliches_feld_als_formatbruch() -> No
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
         )
+
+
+def _geglueckte_completion() -> Mock:
+    # Liefert eine schemakonforme Modellantwort, ohne das Netz zu berühren.
+
+    return Mock(
+        return_value=SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}'
+                    )
+                )
+            ]
+        )
+    )
+
+
+def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> None:
+    """Die Zugangsdaten kommen aus den Feldern, nicht aus der Umgebung."""
+
+    completion: Mock = _geglueckte_completion()
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.INFOMANIAK,
+                sprachmodell="openai/mistral24b",
+                anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+                anbieter_token="infomaniak-geheim",
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert completion.call_args.kwargs["api_key"] == "infomaniak-geheim"
+    assert completion.call_args.kwargs["api_base"] == (
+        "https://api.infomaniak.com/1/ai/4711/openai"
+    )
+
+
+def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
+    """Die datenschutzrechtliche Zusage steht in keiner Konfiguration."""
+
+    completion: Mock = _geglueckte_completion()
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/anthropic/claude-opus-4-8",
+                anbieter_token="sk-or-geheim",
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert completion.call_args.kwargs["extra_body"] == {
+        "provider": {
+            "require_parameters": True,
+            "data_collection": "deny",
+            "zdr": True,
+        }
+    }
+
+
+def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> None:
+    """Der deterministische Adapter hängt am Feld, nicht am Modellnamen."""
+
+    completion: Mock = _geglueckte_completion()
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwortversuch = antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.FAKE,
+                sprachmodell="fake",
+                parameter={
+                    "skript": [{"denkspur": "Ich addiere.", "aeusserung": "2/5."}]
+                },
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert antwortversuch.antwort is not None
+    completion.assert_not_called()

@@ -22,7 +22,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -743,10 +743,14 @@ def test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration() 
         name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
     )
     erste: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="erste"
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell="openrouter/erste",
+        anbieter_token="sk-or-geheim",
     )
     zweite: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="zweite"
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell="openrouter/zweite",
+        anbieter_token="sk-or-geheim",
     )
     ModellKonfiguration.objects.aktivieren(erste)
     erhebung.finalisieren()

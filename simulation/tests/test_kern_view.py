@@ -13,6 +13,7 @@ from konten.models import Konto
 from simulation import views
 from simulation.models import (
     VERTRAG_PROMPT,
+    Anbieter,
     ModellKonfiguration,
     Simulationskern,
 )
@@ -49,7 +50,10 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         kern.save()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"temperature": 0.2}
+            anbieter=Anbieter.OPENROUTER,
+            sprachmodell="openrouter/gpt-test",
+            anbieter_token="sk-or-geheim",
+            parameter={"temperature": 0.2},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.client.force_login(konto)
@@ -94,7 +98,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         """Angemeldete sehen die aktive Modell-Konfiguration."""
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertContains(response, "fake")
+        self.assertContains(response, "openrouter/gpt-test")
 
     def test_zeigt_die_erlaubten_platzhalter_beider_vertraege(self) -> None:
         """Die Referenzspalten stammen aus Prompt- und Rahmenvertrag."""

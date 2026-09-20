@@ -157,9 +157,10 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
    ```
 
 2. **Konfiguration anlegen.** Kopiere `.env.example` nach `.env` und trage die
-   Werte ein — mindestens einen beliebigen `SECRET_KEY`, `DEBUG=True` und für
-   echte Diagnosegespräche `OPENAI_API_KEY`. Audio-Transkription bleibt ohne
-   `TRANSKRIPTION_ZERO_RETENTION=True` bewusst gesperrt:
+   Werte ein — mindestens einen beliebigen `SECRET_KEY` und `DEBUG=True`. Die
+   Zugangsdaten des Sprachmodells liegen an der Modell-Konfiguration, nicht in
+   der Umgebung; `OPENAI_API_KEY` bedient die Audio-Transkription, und die
+   bleibt ohne `TRANSKRIPTION_ZERO_RETENTION=True` bewusst gesperrt:
 
    ```
    cp .env.example .env
@@ -198,8 +199,10 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 Die Testsuite läuft mit `uv run python manage.py test`.
 
 > Der Entwicklungs-Seed aktiviert das Fake-Sprachmodell, damit sich
-> Diagnosegespräche ohne API-Schlüssel durchklicken lassen. Für echte Antworten
-> muss die OpenAI-Konfiguration mit gesetztem `OPENAI_API_KEY` aktiviert werden.
+> Diagnosegespräche ohne Zugangsdaten durchklicken lassen. Für echte Antworten
+> wird eine Modell-Konfiguration mit Anbieter, Modellnamen und Token angelegt
+> und aktiviert; die Zugangsdaten des Sprachmodells liegen an der
+> Konfiguration, nicht mehr in der Umgebung.
 
 ## Deployment auf Uberspace
 
@@ -278,7 +281,8 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
 Für einen Workshop, in dem ausschließlich Vignetten angelegt, bearbeitet und im
 Probelauf erprobt werden, richtet ein eigener Seed die Instanz ein. Er läuft
 bewusst auch mit `DEBUG=False`, ist idempotent und legt Konten, einen finalen
-Simulationskern und die aktive Modell-Konfiguration `openai/gpt-4o` an:
+Simulationskern und die aktive Modell-Konfiguration `fake` an — der Workshop
+läuft damit ohne Zugangsdaten und ohne Netz:
 
 ```
 uv run python manage.py workshopdaten_anlegen
