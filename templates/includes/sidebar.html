@@ -70,6 +70,7 @@
                 <h2>System</h2>
                 <div>
                     <a href="{% url 'simulation:modell_konfiguration' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "modell_konfiguration" %} aria-current="page"{% endif %}>Modell-Konfiguration</a>
+                    <a href="{% url 'simulation:transkriptions_konfiguration' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "transkriptions_konfiguration" %} aria-current="page"{% endif %}>Transkription</a>
                     <a href="{% url 'simulation:kern_verwalten' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "kern_verwalten" %} aria-current="page"{% endif %}>Simulationskern verwalten</a>
                     <a href="{% url 'admin:index' %}"{% if request.resolver_match.namespace == "admin" %} aria-current="page"{% endif %}>Administration</a>
                 </div>

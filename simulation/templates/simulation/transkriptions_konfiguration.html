@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Transkription{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System</p>
+            <h1>Transkription</h1>
+            <span>Der eine Anbieterzugang der Spracheingabe. Eine Änderung wirkt bei der nächsten Aufnahme.</span>
+        </div>
+    </header>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <section class="page-section" aria-label="Anbieterzugang">
+            <header class="page-section__head">
+                <b>01</b><span><h2>Anbieterzugang</h2><small>Wer die Aufnahmen entgegennimmt und unter welcher Wurzel</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
+                <p class="system-page-empty">
+                    Hinterlegtes Token:
+                    {% if konfiguration.token_maskiert %}
+                        <code>{{ konfiguration.token_maskiert }}</code>
+                    {% else %}
+                        keines.
+                    {% endif %}
+                </p>
+            </div>
+        </section>
+
+        <section class="page-section" aria-label="Modell und Sprache">
+            <header class="page-section__head">
+                <b>02</b><span><h2>Modell und Sprache</h2><small>Was die Aufnahme in Text überführt und in welcher Sprache</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {% include "vignetten/includes/form_field.html" with field=form.transkriptionsmodell %}
+                {% include "vignetten/includes/form_field.html" with field=form.sprache %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-label="Zero-Retention">
+            <header class="page-section__head">
+                <b>03</b><span><h2>Zero-Retention</h2><small>Die Zusicherung aus ADR-0026 wird hier nicht umgeschaltet</small></span>
+            </header>
+            <p>
+                Ob diese Instanz überhaupt extern transkribiert, ist eine
+                Instanz-Einstellung der Umgebung und steht bewusst nicht auf dieser
+                Seite. Bei OpenRouter liegt es in der Verantwortung der
+                Administrator:in, dass der gewählte Endpunkt die Aufnahmen weder
+                speichert noch zum Training nutzt (ADR-0026).
+            </p>
+        </section>
+
+        <div class="vignette-form-actions">
+            <button class="button" type="submit">Transkription speichern</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

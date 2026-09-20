@@ -1,4 +1,4 @@
-"""Formulare der Simulationskern-Verwaltung."""
+"""Formulare der Systemverwaltung: Simulationskern und Transkription."""
 
 from django.forms import ModelForm, PasswordInput
 
@@ -9,6 +9,7 @@ from .models import (
     Anbieter,
     ModellKonfiguration,
     Simulationskern,
+    TranskriptionsKonfiguration,
     erlaubte_stellschrauben,
 )
 
@@ -115,3 +116,42 @@ class ModellKonfigurationForm(ModelForm):
         """Liest ein leer gelassenes Feld als leeren Beutel, nicht als Nichts."""
         parameter: dict[str, object] | None = self.cleaned_data["parameter"]
         return {} if parameter is None else parameter
+
+
+class TranskriptionsKonfigurationForm(ModelForm):
+    """Der eine, veränderliche Anbieterzugang der Transkription."""
+
+    class Meta:
+        """Führt die Felder der Konfiguration; das Token gibt sie nie zurück."""
+
+        model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
+        fields: list[str] = [
+            "anbieter",
+            "anbieter_basis_url",
+            "anbieter_token",
+            "transkriptionsmodell",
+            "sprache",
+        ]
+        labels: dict[str, str] = {
+            "anbieter": "Anbieter",
+            "anbieter_basis_url": "Basis-URL",
+            "anbieter_token": "Zugangstoken",
+            "transkriptionsmodell": "Transkriptionsmodell",
+            "sprache": "Sprache",
+        }
+        help_texts: dict[str, str] = {
+            "anbieter_basis_url": "Bei Infomaniak die Wurzel des eigenen Kontos.",
+            "anbieter_token": "Leer lassen behält das hinterlegte Token.",
+            "sprache": "Sprachkürzel, damit die Transkription nicht raten muss.",
+        }
+        widgets: dict[str, PasswordInput] = {
+            "anbieter_token": PasswordInput(render_value=False),
+        }
+
+    def clean_anbieter_token(self) -> str:
+        """Liest eine leere Eingabe als »unverändert«, nicht als »löschen«.
+
+        Das Feld zeigt den gesetzten Wert nie an; ohne diese Lesart wäre jede
+        Änderung an einem anderen Feld ein versehentlicher Tokenverlust.
+        """
+        return self.cleaned_data["anbieter_token"] or self.instance.anbieter_token

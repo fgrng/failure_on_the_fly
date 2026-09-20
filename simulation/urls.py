@@ -24,4 +24,9 @@ urlpatterns: list[URLPattern] = [
         views.modell_konfiguration_aktivieren,
         name="modell_konfiguration_aktivieren",
     ),
+    path(
+        "transkription/",
+        views.transkriptions_konfiguration,
+        name="transkriptions_konfiguration",
+    ),
 ]
