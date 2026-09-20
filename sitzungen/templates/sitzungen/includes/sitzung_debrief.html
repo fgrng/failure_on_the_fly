@@ -15,7 +15,6 @@
         <button class="button" type="submit">{{ navigation.bezeichnung }} beenden</button>
     </form>
     {% if spracheingabe_verfuegbar %}
-        {% url 'sitzungen:transkription' as transkription_url %}
-        {% include "sitzungen/includes/spracheingabe.html" with formular_id="diagnose-formular" eingabe_id="diagnose-transkript" tastatureingabe_id="diagnose" transkription_url=transkription_url automatisch_absenden="false" aufnahme_titel="Diagnose aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn dieser Teil Ihrer Diagnose vollständig ist." %}
+        {% include "sitzungen/includes/spracheingabe.html" with formular_id="diagnose-formular" eingabe_id="diagnose-transkript" tastatureingabe_id="diagnose" transkription_url=navigation.transkription_url automatisch_absenden="false" aufnahme_titel="Diagnose aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn dieser Teil Ihrer Diagnose vollständig ist." %}
     {% endif %}
 </section>

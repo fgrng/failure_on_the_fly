@@ -3,7 +3,7 @@
 from django.urls import path
 from django.urls.resolvers import URLPattern
 
-from simulation.transkription import OpenAITranskription
+from simulation.transkription import transkriptions_anbieter
 
 from . import views
 
@@ -31,7 +31,9 @@ urlpatterns: list[URLPattern] = [
     path("probelauf/debrief/", views.probelauf_debrief, name="probelauf_debrief"),
     path(
         "transkription/",
-        views.transkriptions_endpunkt(OpenAITranskription()),
+        views.transkriptions_endpunkt(
+            transkriptions_anbieter(), views.probelauf_sitzung_fuer_transkription
+        ),
         name="transkription",
     ),
 ]

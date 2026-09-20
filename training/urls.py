@@ -3,6 +3,9 @@
 from django.urls import path
 from django.urls.resolvers import URLPattern
 
+from simulation.transkription import transkriptions_anbieter
+from sitzungen.views import transkriptions_endpunkt
+
 from . import views
 
 app_name: str = "training"
@@ -54,4 +57,9 @@ urlpatterns: list[URLPattern] = [
     path("sitzung/abbrechen/", views.abbrechen, name="abbrechen"),
     path("sitzung/debrief/", views.debrief, name="debrief"),
     path("sitzung/<int:pk>/ansehen/", views.sitzung_ansehen, name="sitzung_ansehen"),
+    path(
+        "sitzung/transkription/",
+        transkriptions_endpunkt(transkriptions_anbieter(), views.training_sitzung),
+        name="transkription",
+    ),
 ]

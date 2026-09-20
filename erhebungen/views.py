@@ -888,6 +888,7 @@ def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
         beenden_url=reverse("erhebungen:gespraech_beenden", args=[token]),
         debrief_url=reverse("erhebungen:debrief", args=[token]),
         abbrechen_url=reverse("erhebungen:abbrechen", args=[token]),
+        transkription_url=reverse("erhebungen:transkription"),
     )
 
 
@@ -903,15 +904,15 @@ def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
     return sitzung, bindung
 
 
-def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
+def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
     """Löst eine laufende Erhebungssitzung ausschließlich aus Browser-Tokens auf."""
 
     sitzung_pk: str | None = request.POST.get("sitzung_pk")
     if sitzung_pk is None:
-        return None
+        raise PermissionDenied
     tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
     jetzt: datetime = timezone.now()
-    return (
+    sitzung: Sitzung | None = (
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
         .filter(
             pk=sitzung_pk,
@@ -922,6 +923,9 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
         )
         .first()
     )
+    if sitzung is None:
+        raise PermissionDenied
+    return sitzung
 
 
 def gespraech(request: HttpRequest, token: str) -> HttpResponse:

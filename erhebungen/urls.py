@@ -3,6 +3,9 @@
 from django.urls import path
 from django.urls.resolvers import URLPattern
 
+from simulation.transkription import transkriptions_anbieter
+from sitzungen.views import transkriptions_endpunkt
+
 from . import views
 
 app_name: str = "erhebungen"
@@ -109,4 +112,11 @@ urlpatterns: list[URLPattern] = [
         name="abbrechen",
     ),
     path("teilnahme/token/<str:token>/debrief/", views.debrief, name="debrief"),
+    path(
+        "teilnahme/transkription/",
+        transkriptions_endpunkt(
+            transkriptions_anbieter(), views.sitzung_fuer_transkription
+        ),
+        name="transkription",
+    ),
 ]

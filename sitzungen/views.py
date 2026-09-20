@@ -96,6 +96,7 @@ def _sitzungsnavigation() -> Sitzungsnavigation:
         beenden_url=reverse("sitzungen:probelauf_beenden"),
         debrief_url=reverse("sitzungen:probelauf_debrief"),
         abbrechen_url=None,
+        transkription_url=reverse("sitzungen:transkription"),
     )
 
 
@@ -318,29 +319,39 @@ def probelauf_debrief(request: HttpRequest) -> HttpResponse:
     return redirect(ziel)
 
 
+def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:
+    """Gibt den laufenden Probelauf frei, dem jedes Einwilligungsobjekt fehlt.
+
+    Hier spricht die angemeldete Autor:in über eigenes Material; es gibt keine
+    Teilnahme, die einwilligen könnte (ADR-0026).
+    """
+
+    if not (request.user.is_authenticated and probelauf_laeuft(request.session)):
+        raise PermissionDenied
+    return None
+
+
 def transkriptions_endpunkt(
     anbieter: Transkription,
+    sitzung_aufloesen: Callable[[HttpRequest], Sitzung | None],
 ) -> Callable[[HttpRequest], HttpResponse]:
-    """Erzeugt den geschützten Endpunkt für einen Transkriptions-Anbieter."""
+    """Erzeugt den geschützten Endpunkt eines Prinzipals für seinen Anbieter.
+
+    Die Auflösung liefert die Sitzung, deren Audioeinwilligung hier geprüft
+    wird — oder nichts, wenn es kein Einwilligungsobjekt gibt —, oder sie
+    verweigert den Zugriff selbst.
+    """
 
     def endpunkt(request: HttpRequest) -> HttpResponse:
         # Prüft die Vorbedingungen, bevor Audio den Anbieter erreichen kann.
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
-        from erhebungen.views import sitzung_fuer_transkription
-
-        # Im Probelauf spricht die angemeldete Autor:in über eigenes Material;
-        # es gibt keine Teilnahme, die einwilligen könnte (ADR-0026).
-        if not (request.user.is_authenticated and probelauf_laeuft(request.session)):
-            sitzung: Sitzung | None = sitzung_fuer_transkription(request)
-            if sitzung is None and request.user.is_authenticated:
-                from training.views import training_sitzung
-
-                sitzung = training_sitzung(request)
-            if sitzung is None:
-                raise PermissionDenied
-            if not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt:
-                return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
+        sitzung: Sitzung | None = sitzung_aufloesen(request)
+        if (
+            sitzung is not None
+            and not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt
+        ):
+            return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         audio: bytes = request.FILES["audio"].read()

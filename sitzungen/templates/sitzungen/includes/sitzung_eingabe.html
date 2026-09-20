@@ -18,8 +18,7 @@
             <button class="button gespraechseingabe__senden" type="submit">Senden</button>
         </form>
         {% if spracheingabe_verfuegbar %}
-            {% url 'sitzungen:transkription' as transkription_url %}
-            {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
+            {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=navigation.transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
         {% endif %}
     </div>
 {% endif %}

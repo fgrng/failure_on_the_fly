@@ -460,6 +460,7 @@ def _sitzungsnavigation() -> Sitzungsnavigation:
         beenden_url=reverse("training:gespraech_beenden"),
         debrief_url=reverse("training:debrief"),
         abbrechen_url=reverse("training:abbrechen"),
+        transkription_url=reverse("training:transkription"),
     )
 
 

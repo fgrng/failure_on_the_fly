@@ -84,6 +84,7 @@ class Sitzungsnavigation:
     beenden_url: str
     debrief_url: str
     abbrechen_url: str | None
+    transkription_url: str
 
 
 def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:

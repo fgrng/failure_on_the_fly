@@ -68,3 +68,9 @@ class OpenAITranskription:
         if not isinstance(text, str) or not text.strip():
             raise LeeresTranskript
         return text
+
+
+def transkriptions_anbieter() -> Transkription:
+    """Bildet den Anbieter, den die Transkriptions-Endpunkte der Apps benutzen."""
+
+    return OpenAITranskription()
