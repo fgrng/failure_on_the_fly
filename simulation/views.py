@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
-from .forms import SimulationskernForm
+from .forms import SimulationskernForm, TranskriptionsKonfigurationForm
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
@@ -21,6 +21,7 @@ from .models import (
     AktiveModellKonfiguration,
     ModellKonfiguration,
     Simulationskern,
+    TranskriptionsKonfiguration,
 )
 
 
@@ -178,4 +179,28 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
         pk,
         Simulationskern.Zustand.ENTWURF,
         Simulationskern.delete,
+    )
+
+
+@administratorin_erforderlich
+def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
+    """Bearbeitet den einen Anbieterzugang der Transkription."""
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+    form: TranskriptionsKonfigurationForm
+    if request.method == "POST":
+        form = TranskriptionsKonfigurationForm(request.POST, instance=konfiguration)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Die Transkription ist neu eingestellt.")
+            # Der Umweg über die Umleitung hält das gespeicherte Token
+            # aus dem Antwortkörper heraus.
+            return redirect("simulation:transkriptions_konfiguration")
+    else:
+        form = TranskriptionsKonfigurationForm(instance=konfiguration)
+    return render(
+        request,
+        "simulation/transkriptions_konfiguration.html",
+        {"form": form, "konfiguration": konfiguration},
     )

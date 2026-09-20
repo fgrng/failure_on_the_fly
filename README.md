@@ -207,7 +207,8 @@ Die Testsuite läuft mit `uv run python manage.py test`.
 > Diagnosegespräche ohne Zugangsdaten durchklicken lassen. Für echte Antworten
 > wird eine Modell-Konfiguration mit Anbieter, Modellnamen und Token angelegt
 > und aktiviert; die Transkription wählt ihren Anbieter ebenso über ihre eigene
-> Konfiguration. Die Zugangsdaten liegen an diesen Konfigurationen, nicht mehr
+> Konfiguration, die die Administration unter `/system/transkription/`
+> bearbeitet. Die Zugangsdaten liegen an diesen Konfigurationen, nicht mehr
 > in der Umgebung.
 
 ## Deployment auf Uberspace

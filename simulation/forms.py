@@ -1,12 +1,13 @@
 """Formulare der Simulationskern-Verwaltung."""
 
-from django.forms import ModelForm
+from django.forms import ModelForm, PasswordInput
 
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
     Simulationskern,
+    TranskriptionsKonfiguration,
 )
 
 _RAHMEN_FELDER: dict[str, str] = {
@@ -59,3 +60,40 @@ class SimulationskernForm(ModelForm):
         for feldname, bezeichnung in felder.items():
             self.fields[feldname].label = bezeichnung
             self.fields[feldname].help_text = hinweis
+
+
+class TranskriptionsKonfigurationForm(ModelForm):
+    """Der eine, veränderliche Anbieterzugang der Transkription."""
+
+    class Meta:
+        """Führt alle fünf Felder; das Token gibt das Formular nie zurück."""
+
+        model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
+        fields: list[str] = [
+            "anbieter",
+            "anbieter_basis_url",
+            "anbieter_token",
+            "transkriptionsmodell",
+            "sprache",
+        ]
+        labels: dict[str, str] = {
+            "anbieter": "Anbieter",
+            "anbieter_basis_url": "Basis-URL",
+            "anbieter_token": "Zugangstoken",
+            "transkriptionsmodell": "Transkriptionsmodell",
+            "sprache": "Sprache",
+        }
+        help_texts: dict[str, str] = {
+            "anbieter_basis_url": "Bei Infomaniak die Wurzel des eigenen Kontos.",
+            "anbieter_token": "Leer lassen behält das hinterlegte Token.",
+            "sprache": "Sprachkürzel, damit die Transkription nicht raten muss.",
+        }
+        widgets: dict[str, PasswordInput] = {
+            "anbieter_token": PasswordInput(render_value=False),
+        }
+
+    def clean_anbieter_token(self) -> str:
+        """Liest eine leere Eingabe als »unverändert«, nicht als »löschen«."""
+        # Das Feld gibt den gesetzten Wert nie zurück; eine leere Eingabe wäre
+        # sonst bei jeder anderen Änderung ein versehentlicher Tokenverlust.
+        return self.cleaned_data["anbieter_token"] or self.instance.anbieter_token

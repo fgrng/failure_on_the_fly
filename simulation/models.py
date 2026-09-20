@@ -388,6 +388,9 @@ MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
     }
 )
 FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript"})
+# Die Maskierung eines hinterlegten Tokens in der blauen Ansicht (Spec C).
+TOKEN_MASKE: str = "•" * 8
+TOKEN_SICHTBARE_ZEICHEN: int = 4
 
 
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
@@ -577,6 +580,36 @@ class TranskriptionsKonfiguration(models.Model):
     sprache: models.CharField = models.CharField(max_length=5, default="de")
 
     objects: TranskriptionsKonfigurationManager = TranskriptionsKonfigurationManager()
+
+    @property
+    def token_maskiert(self) -> str:
+        """Zeigt wiedererkennbar an, welches Token hinterlegt ist."""
+
+        if not self.anbieter_token:
+            return ""
+        if len(self.anbieter_token) <= TOKEN_SICHTBARE_ZEICHEN:
+            # Ein kurzes Token verriete sich sonst vollständig.
+            return TOKEN_MASKE
+        return TOKEN_MASKE + self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]
+
+    def clean(self) -> None:
+        """Bindet Modellname und Zugangsdaten an den gewählten Anbieter."""
+
+        if self.anbieter == Anbieter.FAKE:
+            return  # Der Platzhalter-Adapter hat weder Endpunkt noch Modell.
+        fehler: dict[str, str] = {}
+        if not self.transkriptionsmodell:
+            fehler["transkriptionsmodell"] = (
+                "Ohne Modellnamen weiß der Anbieter nicht, was er laden soll."
+            )
+        if not self.anbieter_token:
+            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+        if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
+            fehler["anbieter_basis_url"] = (
+                "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
+            )
+        if fehler:
+            raise ValidationError(fehler)
 
     class Meta:
         constraints: list[models.BaseConstraint] = [
