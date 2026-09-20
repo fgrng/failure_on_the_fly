@@ -285,11 +285,11 @@ class Simulationskern(models.Model):
         self.save()
         finalisiert_am: datetime = timezone.now()
         # Die bisherige finale Fassung weicht vor dem eigenen Zustandswechsel:
-        # Der partielle Unique-Index greift sofort und ließe die beiden nicht
-        # einmal für eine Anweisung nebeneinander stehen. Bei der ersten
-        # Fassung der Historie trifft das Archivieren keine Zeile.
+        # Der partielle Unique-Index duldet zwei finale Fassungen keine
+        # Anweisung lang nebeneinander. Bei der ersten Fassung der Historie
+        # trifft das Archivieren keine Zeile.
         self._schreibqueryset().filter(
-            historie_id=self.historie_id,
+            historie=self.historie,
             zustand=self.Zustand.FINAL,
         ).update(zustand=self.Zustand.ARCHIVIERT)
         if (

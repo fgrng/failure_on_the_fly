@@ -169,7 +169,7 @@ def test_bearbeiten_lehnt_zweiten_entwurf_ab() -> None:
 
 
 @pytest.mark.django_db
-def test_finalisieren_archiviert_die_vorgaengerin() -> None:
+def test_finalisieren_laesst_genau_eine_finale_fassung_zurueck() -> None:
     """Nach beliebig vielen Runden trägt der Kern genau eine finale Fassung."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen()

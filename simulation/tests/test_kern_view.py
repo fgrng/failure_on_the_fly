@@ -212,6 +212,7 @@ class SimulationskernVerwaltungTests(TestCase):
         aktuelle_fassung: Simulationskern = aelteste_fassung.bearbeiten()
         aktuelle_fassung.system_prompt_vorlage = "Aktueller Prompt"
         aktuelle_fassung.save()
+        # Das Finalisieren der zweiten Fassung archiviert die erste.
         aktuelle_fassung.finalisieren()
         entwurf: Simulationskern = aktuelle_fassung.bearbeiten()
         entwurf.system_prompt_vorlage = "Entwurfs-Prompt"
@@ -477,15 +478,17 @@ class SimulationskernVerwaltungTests(TestCase):
 
         self.assertContains(response, "Enthält ungültige Platzhalter.")
 
-    def test_ueberschreibt_die_eine_finale_fassung_schlicht(self) -> None:
+    def test_ueberschreibt_die_finale_fassung_ohne_verwendungs_markierung(
+        self,
+    ) -> None:
         """Bei genau einer finalen Fassung hat eine Verwendungs-Markierung nichts zu sagen."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, "<h2>Finale Fassung</h2>", html=False)
         self.assertNotContains(response, "Verwendete finale Fassung")
 
-    def test_zeigt_die_juengste_finale_fassung(self) -> None:
-        """Die Verwaltungsübersicht zeigt die jüngste finale Fassung."""
+    def test_zeigt_die_finale_fassung(self) -> None:
+        """Die Verwaltungsübersicht zeigt die eine finale Fassung."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, "Aktueller Prompt")
@@ -497,7 +500,7 @@ class SimulationskernVerwaltungTests(TestCase):
         self.assertContains(response, "Archivierter Prompt")
 
     def test_zeigt_archivierte_fassungen_ohne_aktionsbereich(self) -> None:
-        """Eine überholte Fassung bleibt lesbar, aber ohne jede Geste."""
+        """Eine überholte Fassung bleibt lesbar, trägt aber keinen Aktionsbereich."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
         seite: str = response.content.decode()
 
