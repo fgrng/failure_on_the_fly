@@ -111,8 +111,12 @@ _Avoid_: Protokoll, Chatverlauf, Mitschrift
 
 ## Simulationsablauf
 
+**Anbieter**:
+Der Dienst, der eine Naht nach außen bedient — eine feste Auswahl aus `fake`, `openrouter` und `infomaniak` (ADR-0036). Aus ihm folgt, welches Präfix der Modellname trägt, ob Basis-URL und Token nötig sind und welche Stellschrauben in den Parametern erlaubt sind. Sprachmodell und Transkription wählen ihn je für sich; `fake` telefoniert nicht nach außen und braucht keine Zugangsdaten.
+_Avoid_: Provider, Vendor, Backend, Hoster
+
 **Modell-Konfiguration**:
-Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036). Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Kein versioniertes Artefakt.
+Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036). Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
 
 **Transkriptions-Konfiguration**:
@@ -236,7 +240,7 @@ Wer Erhebungen zusammenstellt, an denen die Person Eigentümerin ist, ihren Abla
 _Avoid_: Wissenschaftler, Studienleiter
 
 **Administrator:in**:
-Wer die Instanz betreibt, Nutzer und Rollen verwaltet, die Modell-Konfiguration setzt und als Einzige den Simulationskern pflegt. Technisch ist sie ein Django-Superuser, keine Group.
+Wer die Instanz betreibt, Nutzer und Rollen verwaltet, die Modell- und die Transkriptions-Konfiguration setzt und als Einzige den Simulationskern pflegt. Technisch ist sie ein Django-Superuser, keine Group.
 _Avoid_: Admin, Betreiber
 
 ## Architektur

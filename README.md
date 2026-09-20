@@ -54,6 +54,10 @@ Wahl der Autor:in.
 ## Modell-Konfiguration
 
 Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/`.
+Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —,
+der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
+und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
+Modellverhaltens auf, bei `fake` ausschließlich das Skript.
 Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
 Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
 genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
@@ -62,6 +66,19 @@ Umschalten trifft laufende Trainings sofort und laufende Erhebungen gar nicht; e
 Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren. Das
 Token wird eingegeben, aber nie zurückgegeben: Die Liste zeigt es nur maskiert mit
 seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte.
+
+## Transkriptions-Konfiguration
+
+Die Transkription hängt an einer eigenen Konfiguration, die die Administration
+unter `/system/transkription/` bearbeitet — mit denselben Anbieterfeldern wie das
+Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und das
+Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau eine
+Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
+anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
+(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
+Ob überhaupt transkribiert wird, entscheidet weiterhin die Instanz über
+`TRANSKRIPTION_ZERO_RETENTION` in der Umgebung — die Zusage der Betreiber:in
+gehört nicht in dasselbe Formular wie die Anbieterwahl.
 
 ## Audioverarbeitung im Training
 
@@ -190,8 +207,8 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
    ```
 
 4. **Entwicklungsdaten befüllen.** Der Seed legt Testkonten, einen
-   finalen Simulationskern, eine aktive Fake- und eine inaktive OpenAI-Modell-
-   Konfiguration, finale Vignetten sowie ein veröffentlichtes und ein
+   finalen Simulationskern, eine aktive Modell-Konfiguration auf dem Anbieter
+   `fake`, finale Vignetten sowie ein veröffentlichtes und ein
    Entwurfs-Training an. Er ist idempotent und läuft nur mit `DEBUG=True`:
 
    ```
@@ -289,6 +306,22 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
    uberspace web backend set /media --apache
    uberspace web backend set / --http --port 8000
    ```
+
+6. **Administration anlegen und das Sprachmodell aktivieren.** Die Migration
+   allein macht die Instanz nicht betriebsbereit: Die Zugangsdaten kommen nicht
+   aus der Umgebung, sondern von den Konfigurationen in der Datenbank, und nach
+   der Migration ist keine benutzbare Modell-Konfiguration aktiv — es antwortet
+   bis dahin kein Sprachmodell.
+
+   ```
+   uv run python manage.py createsuperuser
+   ```
+
+   Danach unter `/system/modell-konfiguration/` eine Konfiguration mit Anbieter,
+   Modellnamen und Token anlegen und aktivieren. Das ist dieselbe Folge, die
+   später jede Schlüsselrotation verlangt: anlegen und aktivieren, nie
+   bearbeiten. Soll auch gesprochen werden, trägt `/system/transkription/`
+   denselben Anbieterzugang für das Audio ein.
 
 > Unter `/media/` liegende Vignettenbilder sind ohne Anmeldung abrufbar, wer
 > ihre URL kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber

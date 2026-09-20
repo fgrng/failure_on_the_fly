@@ -2,8 +2,12 @@
 
 from pathlib import Path
 
+from config.tests.dokumentation import (
+    REPO_ROOT,
+    glossareintrag,
+    readme_abschnitt,
+)
 
-REPO_ROOT: Path = Path(__file__).parents[2]
 ADR_0003_PATH: Path = (
     REPO_ROOT / "docs/adr/0003-versionierte-artefakte-entwurf-final.md"
 )
@@ -13,28 +17,10 @@ ADR_0021_PATH: Path = (
 ADR_0035_PATH: Path = (
     REPO_ROOT / "docs/adr/0035-simulationskern-genau-eine-finale-fassung.md"
 )
-CONTEXT_PATH: Path = REPO_ROOT / "CONTEXT.md"
-README_PATH: Path = REPO_ROOT / "README.md"
 AUTOR_GEM_PATH: Path = (
     REPO_ROOT / "docs/vignette-author-gem/knowledge/01-editor-felder-und-schema.md"
 )
 ZEIGER_AUF_ADR_0035: str = "Für den Simulationskern gilt stattdessen ADR-0035."
-
-
-def readme_kern_abschnitt() -> str:
-    """Liefert den README-Abschnitt zum Simulationskern in einer Zeile."""
-    abschnitt: str = (
-        README_PATH.read_text().split("## Simulationskern")[1].split("\n## ")[0]
-    )
-    return " ".join(abschnitt.split())
-
-
-def glossareintrag(begriff: str) -> str:
-    """Liefert den Glossartext zu einem Begriff aus CONTEXT.md in einer Zeile."""
-    eintrag: str = (
-        CONTEXT_PATH.read_text().split(f"\n**{begriff}**:")[1].split("\n_Avoid_")[0]
-    )
-    return " ".join(eintrag.split())
 
 
 def absatz_mit(text: str, zusage: str) -> str:
@@ -122,7 +108,7 @@ def test_glossar_nimmt_den_kern_von_der_umkehrbarkeit_aus() -> None:
 def test_keine_projektdokumentation_kennt_die_kern_archivgesten() -> None:
     """Archivieren und Entarchivieren des Kerns stehen nirgends als Geste."""
     for text in (
-        readme_kern_abschnitt(),
+        readme_abschnitt("Simulationskern"),
         glossareintrag("Historie"),
         glossareintrag("Archiviert"),
         AUTOR_GEM_PATH.read_text(),
@@ -133,7 +119,7 @@ def test_keine_projektdokumentation_kennt_die_kern_archivgesten() -> None:
 
 def test_readme_beschreibt_den_kern_nach_dem_ueberholen() -> None:
     """Der README-Abschnitt zum Kern nennt die eine Fassung und den Hinweis."""
-    kern_abschnitt: str = readme_kern_abschnitt()
+    kern_abschnitt: str = readme_abschnitt("Simulationskern")
 
     for klausel in (
         "genau eine finale Fassung",
