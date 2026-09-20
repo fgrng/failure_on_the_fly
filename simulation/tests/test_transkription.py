@@ -1,5 +1,6 @@
 """Transkription an ihrer austauschbaren Anbieter-Naht."""
 
+import itertools
 from unittest.mock import Mock, patch
 
 import httpx
@@ -8,9 +9,12 @@ from openai import APIConnectionError
 
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
+    INFOMANIAK_INTERVALL_SEKUNDEN,
     PLATZHALTER_TRANSKRIPT,
+    TRANSKRIPTION_BUDGET_SEKUNDEN,
     AnbieterNichtErreichbar,
     FakeTranskription,
+    InfomaniakTranskription,
     LeeresTranskript,
     OpenAITranskription,
     TranskriptionsAnbieterfehler,
@@ -165,22 +169,145 @@ def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguratio
     openai.assert_called_once_with(
         base_url="https://openrouter.ai/api/v1",
         api_key="geheimes-token",
-        timeout=120.0,
+        timeout=TRANSKRIPTION_BUDGET_SEKUNDEN,
     )
     assert anbieter.client is openai.return_value
     assert anbieter.modell == "whisper-large-v3"
     assert anbieter.sprache == "fr"
 
 
+def _antwort(nutzlast: object) -> Mock:
+    # Bildet eine httpx-Antwort nach: JSON-Körper und ein Statuswächter.
+
+    antwort = Mock()
+    antwort.json.return_value = nutzlast
+    antwort.raise_for_status.return_value = None
+    return antwort
+
+
+def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
+    # Bildet den Adapter so, wie die Anbieterfunktion ihn bildet.
+
+    return InfomaniakTranskription(
+        client,
+        basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+        modell="whisper",
+        sprache="de",
+    )
+
+
+def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
+    """Absenden und Abholen ergeben zusammen ein Transkript, ohne Netzzugriff."""
+
+    audio = b"aufgenommene-audiobytes"
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort(
+        {"data": {"status": "success", "data": "Wie hast du gerechnet?"}}
+    )
+
+    assert _infomaniak_transkription(client).transkribieren(audio) == (
+        "Wie hast du gerechnet?"
+    )
+    client.post.assert_called_once_with(
+        "https://api.infomaniak.com/1/ai/4711/openai/audio/transcriptions",
+        data={"model": "whisper", "language": "de", "response_format": "text"},
+        files={"file": ("aufnahme.webm", audio, "audio/webm")},
+    )
+    client.get.assert_called_once_with(
+        "https://api.infomaniak.com/1/ai/4711/results/b-1"
+    )
+
+
+def test_infomaniak_transkription_endet_nach_dem_budget_statt_endlos_zu_fragen() -> (
+    None
+):
+    """Ein nie fertig werdendes Ergebnis terminiert als Anbieterfehler."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort({"data": {"status": "pending"}})
+    # Die Uhr springt je Abfrage um das Intervall weiter; der Schlaf entfällt.
+    uhr = itertools.count(0.0, INFOMANIAK_INTERVALL_SEKUNDEN)
+
+    with (
+        patch("simulation.transkription.time.sleep") as schlafen,
+        patch("simulation.transkription.time.monotonic", lambda: next(uhr)),
+        pytest.raises(TranskriptionsAnbieterfehler),
+    ):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+    erwartete_abfragen = int(
+        TRANSKRIPTION_BUDGET_SEKUNDEN / INFOMANIAK_INTERVALL_SEKUNDEN
+    )
+    assert client.get.call_count == erwartete_abfragen
+    schlafen.assert_called_with(INFOMANIAK_INTERVALL_SEKUNDEN)
+
+
+def test_infomaniak_transkription_reicht_einen_gemeldeten_fehlschlag_weiter() -> None:
+    """Ein gescheiterter Stapel ist ein Anbieterfehler, kein leeres Transkript."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort({"data": {"status": "error"}})
+
+    with pytest.raises(TranskriptionsAnbieterfehler):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
+def test_infomaniak_transkription_kennzeichnet_ein_leeres_ergebnis() -> None:
+    """Ein fertiges, aber leeres Transkript bleibt vom Anbieterfehler unterscheidbar."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort({"data": {"status": "success", "data": "  "}})
+
+    with pytest.raises(LeeresTranskript):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
+def test_infomaniak_transkription_meldet_eine_unerreichbare_route() -> None:
+    """Ein Transportfehler bleibt von einer Anbieterabsage unterscheidbar."""
+
+    client = Mock()
+    client.post.side_effect = httpx.ConnectError("keine Verbindung")
+
+    with pytest.raises(AnbieterNichtErreichbar):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
+def test_infomaniak_transkription_meldet_eine_antwort_ohne_kennung() -> None:
+    """Ohne Stapelkennung gibt es nichts abzuholen; das ist ein Anbieterfehler."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {}})
+
+    with pytest.raises(TranskriptionsAnbieterfehler):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
 @pytest.mark.django_db
-def test_anbieterfunktion_kennt_infomaniak_noch_nicht() -> None:
-    """Der asynchrone Adapter fehlt; die Naht sagt das, statt zu raten."""
+def test_anbieterfunktion_bildet_fuer_infomaniak_den_asynchronen_adapter() -> None:
+    """Die Fabrik bildet den Polling-Adapter aus der Konfiguration."""
 
     konfiguration: TranskriptionsKonfiguration = (
         TranskriptionsKonfiguration.objects.aktuelle()
     )
     konfiguration.anbieter = Anbieter.INFOMANIAK
+    konfiguration.anbieter_basis_url = "https://api.infomaniak.com/1/ai/4711/openai"
+    konfiguration.anbieter_token = "geheimes-token"
+    konfiguration.transkriptionsmodell = "whisper"
+    konfiguration.sprache = "fr"
     konfiguration.save()
 
-    with pytest.raises(TranskriptionsAnbieterfehler):
-        transkriptions_anbieter()
+    with patch("simulation.transkription.httpx.Client") as httpx_client:
+        anbieter: InfomaniakTranskription = transkriptions_anbieter()
+
+    httpx_client.assert_called_once_with(
+        headers={"Authorization": "Bearer geheimes-token"},
+        timeout=TRANSKRIPTION_BUDGET_SEKUNDEN,
+    )
+    assert anbieter.client is httpx_client.return_value
+    assert anbieter.basis_url == "https://api.infomaniak.com/1/ai/4711/openai"
+    assert anbieter.modell == "whisper"
+    assert anbieter.sprache == "fr"
