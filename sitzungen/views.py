@@ -354,12 +354,6 @@ def transkriptions_endpunkt(
     return endpunkt
 
 
-def _persistierte_schritte(sitzung: Sitzung) -> QuerySet[Gespraechsschritt]:
-    # Liefert den sichtbaren Verlauf in seiner gespeicherten Reihenfolge.
-
-    return sitzung.gespraechsschritt_set.order_by("reihenfolge")
-
-
 def persistierten_debrief_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
@@ -372,7 +366,7 @@ def persistierten_debrief_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=_persistierte_schritte(sitzung),
+        gespraechsschritte=sitzung.gespraechsschritte,
         ist_probelauf=False,
         zeigt_debrief=True,
         navigation=navigation,
@@ -393,7 +387,7 @@ def _persistierten_fehler_anzeigen(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        _persistierte_schritte(sitzung),
+        sitzung.gespraechsschritte,
         ist_gescheitert=True,
         navigation=navigation,
         anhang=anhang,
@@ -453,7 +447,7 @@ def persistiertes_gespraech(
         return HttpResponseNotAllowed(["GET", "POST"])
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
         return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
-    schritte: QuerySet[Gespraechsschritt] = _persistierte_schritte(sitzung)
+    schritte: QuerySet[Gespraechsschritt] = sitzung.gespraechsschritte
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return _persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
@@ -487,7 +481,7 @@ def persistiertes_gespraech(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        _persistierte_schritte(sitzung),
+        sitzung.gespraechsschritte,
         navigation=navigation,
     )
 
@@ -566,7 +560,7 @@ def training_sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=_persistierte_schritte(sitzung),
+        gespraechsschritte=sitzung.gespraechsschritte,
         ist_probelauf=False,
         zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
         ist_lesend=True,

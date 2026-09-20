@@ -444,8 +444,12 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
 
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
-        gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, "Warum?")
-        gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, "Und dann?")
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Und dann?"
+        )
 
     erwartet: list[tuple[str, str]] = [
         ("Warum?", "2/5."),
@@ -473,7 +477,9 @@ def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
 
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
-        gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, "Warum?")
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
 
         gesagtes: str = " ".join(teil for paar in modellverlauf(sink) for teil in paar)
         assert "Ich addiere Zähler und Nenner." not in gesagtes
@@ -493,7 +499,9 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
 
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
-        gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, "Warum?")
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
 
         assert modellverlauf(sink) == []
         assert len(list(sink.gespraechsschritte)) == 1

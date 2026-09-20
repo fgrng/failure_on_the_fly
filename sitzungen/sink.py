@@ -195,7 +195,7 @@ class DBSink:
     def gespraechsschritte(self) -> QuerySet[Gespraechsschritt]:
         """Liefert die gespeicherten Schritte in ihrer Reihenfolge."""
 
-        return self._sitzung.gespraechsschritt_set.order_by("reihenfolge")
+        return self._sitzung.gespraechsschritte
 
     @property
     def _sitzung(self) -> Sitzung:
