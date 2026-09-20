@@ -20,7 +20,7 @@ Je Historie existiert **höchstens ein Entwurf**. Zwei gleichzeitig offene Entw�
 
 ## Archivierung statt Löschen
 
-Eine finale Fassung kann **archiviert** werden — das logische Löschen. Physisches Löschen finaler Fassungen gibt es nicht, denn Datenspuren müssen sie noch Jahre später darstellen können. Auch eine ganze **Vignettenhistorie** ist archivierbar; sie archiviert dann alle ihre Fassungen und löscht den offenen Entwurf. Eine vollständig archivierte Historie ist eine tote Linie: Es gibt keine nicht-archivierte Fassung mehr, von der aus ein Entwurf entstehen könnte.
+Eine finale Fassung kann **archiviert** werden — das logische Löschen. Für den Simulationskern gilt stattdessen ADR-0035. Dort ist Archivieren keine eigene Geste, sondern die Nebenwirkung des Finalisierens der Nachfolgerin, und es ist nicht umkehrbar. Physisches Löschen finaler Fassungen gibt es nicht, denn Datenspuren müssen sie noch Jahre später darstellen können. Auch eine ganze **Vignettenhistorie** ist archivierbar; sie archiviert dann alle ihre Fassungen und löscht den offenen Entwurf. Eine vollständig archivierte Historie ist eine tote Linie: Es gibt keine nicht-archivierte Fassung mehr, von der aus ein Entwurf entstehen könnte.
 
 Was Archivierung bewirkt:
 
@@ -31,7 +31,7 @@ Was Archivierung bewirkt:
 
 Die Asymmetrie zwischen Training und Erhebung folgt derselben Linie wie das Austauschen von Vignetten im laufenden Betrieb: Ein Training ist ein Übungsangebot, eine laufende Erhebung ist eine Messung. Der Preis: Eine Autor:in, die eine fehlerhafte Vignette archiviert, stoppt sie im Training sofort, nicht aber in der Erhebung, in der sie gerade Schaden anrichtet. Dort muss die Forschende:r die Erhebung selbst anhalten — eine Forschungsentscheidung, keine Autorenentscheidung.
 
-**Archivierung ist umkehrbar**, solange sie keine Verzweigung erzeugt. Wurde die archivierte Fassung inzwischen dadurch überholt, dass aus einer ihrer Vorgängerinnen eine neue finale Fassung entstanden ist, bliebe sie nach dem Entarchivieren als Schwester mit derselben Vorgängerin zurück — das ist ausgeschlossen. Gelöschte Entwürfe kehren nie zurück.
+**Archivierung ist umkehrbar**, solange sie keine Verzweigung erzeugt. Wurde die archivierte Fassung inzwischen dadurch überholt, dass aus einer ihrer Vorgängerinnen eine neue finale Fassung entstanden ist, bliebe sie nach dem Entarchivieren als Schwester mit derselben Vorgängerin zurück — das ist ausgeschlossen. Gelöschte Entwürfe kehren nie zurück. Für den Simulationskern gilt stattdessen ADR-0035.
 
 ## Consequences
 
@@ -40,3 +40,4 @@ Die Asymmetrie zwischen Training und Erhebung folgt derselben Linie wie das Aust
 - Trainings dürfen im laufenden Betrieb Vignetten austauschen. Alte Sitzungen zeigen weiterhin die damals gespielte Fassung an.
 - Das Archivieren der Spitze macht die vorletzte Fassung wieder zur Basis für neue Entwürfe. Archivieren ist damit auch das Werkzeug, um eine misslungene Fassung zurückzunehmen.
 - Ein irreversibles Archivieren wäre ein physisches Löschen mit besserer Presse. Deshalb die Umkehrbarkeit.
+- Die beiden vorstehenden Punkte gelten für den Simulationskern nicht. Für den Simulationskern gilt stattdessen ADR-0035.

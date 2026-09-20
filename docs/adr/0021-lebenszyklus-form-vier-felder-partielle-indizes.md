@@ -15,7 +15,7 @@ ADR-0017 verbietet die gemeinsame Basisklasse, nicht die gemeinsame **Form**. Je
 | `historie` | Fremdschlüssel, **NOT NULL** |
 | `vorgaengerin` | selbstreferenzierend, nullbar |
 
-Der Automat hat drei Kanten: `entwurf → final`, `final → archiviert`, `archiviert → final`. Ein Entwurf wird nie archiviert, sondern physisch gelöscht (ADR-0003). Deshalb impliziert `archiviert` immer „war einmal final", und `finalisiert_am` überlebt das Entarchivieren.
+Der Automat hat drei Kanten: `entwurf → final`, `final → archiviert`, `archiviert → final`. Für den Simulationskern gilt stattdessen ADR-0035. Dort bleibt von den drei Kanten nur `entwurf → final` als eigenständiger Übergang. Ein Entwurf wird nie archiviert, sondern physisch gelöscht (ADR-0003). Deshalb impliziert `archiviert` immer „war einmal final", und `finalisiert_am` überlebt das Entarchivieren.
 
 ## Die Invarianten sind partielle Unique-Indizes, keine Prüfungen
 
