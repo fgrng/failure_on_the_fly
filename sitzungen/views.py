@@ -258,11 +258,6 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         vignette,
         kern,
         modell_konfiguration,
-        [
-            (schritt["eingabe"], schritt["aeusserung"])
-            for schritt in schritte
-            if schritt["aeusserung"] is not None
-        ],
         eingabe,
     )
     if antwortversuch.endgueltig_gescheitert:
@@ -482,11 +477,6 @@ def persistiertes_gespraech(
         sitzung.vignette,
         sitzung.simulationskern,
         sitzung.modell_konfiguration,
-        list(
-            schritte.exclude(aeusserung__isnull=True).values_list(
-                "eingabe", "aeusserung"
-            )
-        ),
         request.POST["eingabe"],
     )
     if antwortversuch.endgueltig_gescheitert:
