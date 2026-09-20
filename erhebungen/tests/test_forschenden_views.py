@@ -51,6 +51,18 @@ def _forschungskonfiguration(
     )
 
 
+def _infomaniak_konfiguration() -> ModellKonfiguration:
+    """Legt eine Konfiguration an, die Basis-URL und Token wirklich trägt."""
+
+    return ModellKonfiguration.objects.create(
+        anbieter=Anbieter.INFOMANIAK,
+        sprachmodell="openai/mistral24b",
+        anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+        anbieter_token="sk-infomaniak-geheim",
+        parameter={"temperature": 0.2},
+    )
+
+
 def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     """Legt eine einbindbare finale Vignette an."""
 
@@ -1034,17 +1046,11 @@ class ErhebungsansichtAnbieterTests(TestCase):
     """Die gelbe Ansicht zeigt genau die Exportspalten der Konfiguration."""
 
     def setUp(self) -> None:
-        """Pinnt eine Infomaniak-Konfiguration an eine finale Erhebung."""
+        # Pinnt eine Infomaniak-Konfiguration an eine finale Erhebung.
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            anbieter=Anbieter.INFOMANIAK,
-            sprachmodell="openai/mistral24b",
-            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
-            anbieter_token="sk-infomaniak-geheim",
-            parameter={"temperature": 0.2},
-        )
+        self.konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.erhebung: Erhebung = Erhebung.objects.create(
             name="Brüche", eigentuemerin=self.ada
@@ -1712,13 +1718,7 @@ class ErhebungsExportTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            anbieter=Anbieter.INFOMANIAK,
-            sprachmodell="openai/mistral24b",
-            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
-            anbieter_token="sk-infomaniak-geheim",
-            parameter={"temperature": 0.2},
-        )
+        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
         erhebung.finalisieren()
@@ -1774,8 +1774,9 @@ class ErhebungsExportTests(TestCase):
         )
 
         with ZipFile(BytesIO(response.content)) as zip_datei:
-            self.assertNotIn("transkriptionskonfiguration.csv", zip_datei.namelist())
-            self.assertNotIn("transkriptionskonfigurationen.csv", zip_datei.namelist())
+            dateinamen: list[str] = zip_datei.namelist()
+
+        self.assertEqual([name for name in dateinamen if "transkription" in name], [])
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
         """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""
