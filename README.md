@@ -36,20 +36,20 @@ Eigentümerinnen.
 
 ## Simulationskern
 
-Autor:innen und Administrator:innen können die aktuellste finale Kern-Fassung und die
+Autor:innen und Administrator:innen können die finale Kern-Fassung und die
 aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
 hin. Administrator:innen erhalten unter `/system/kern/verwalten/` außerdem den
-Überblick über Entwürfe, alle finalen und eingeklappten archivierten Kern-Fassungen.
-Sie ziehen aus einer finalen Fassung einen Entwurf, bearbeiten dessen Vorlagen auf
-einer eigenen Seite, finalisieren ihn oder verwerfen ihn wieder. Eine finale
-Fassung lässt sich außerdem archivieren und wieder zurückholen; am
-Archivieren-Knopf steht, wie viele Vignettenentwürfe auf dieser Fassung gepinnt
-sind. Die Zahl warnt nur vor: Archivieren ist umkehrbar, trifft laufende
-Sitzungen nicht, und betroffene Vignettenentwürfe bleiben finalisierbar und
-spielbar. Ihre Detailansicht weist neben dem Vorspulen-Knopf auf den überholten
-Pin hin; Vorspulen bleibt eine Wahl der Autor:in. Die letzte finale Fassung kann
-nicht archiviert werden.
+Überblick über den Entwurf, die finale Fassung und die eingeklappten archivierten
+Kern-Fassungen. Sie ziehen aus der finalen Fassung einen Entwurf, bearbeiten dessen
+Vorlagen auf einer eigenen Seite, finalisieren ihn oder verwerfen ihn wieder. Der
+Kern trägt zu jedem Zeitpunkt genau eine finale Fassung: Das Finalisieren archiviert
+die bisherige. Archivierte Fassungen bleiben eingeklappt lesbar, tragen aber keine
+Aktionen mehr; eine misslungene Fassung wird nicht zurückgenommen, sondern durch eine
+neue ersetzt. Das Überholen trifft laufende Sitzungen nicht, und Vignettenentwürfe
+auf der bisherigen Fassung bleiben finalisierbar und spielbar. Ihre Detailansicht
+weist neben dem Vorspulen-Knopf auf den überholten Pin hin; Vorspulen bleibt eine
+Wahl der Autor:in.
 
 ## Audioverarbeitung im Training
 
