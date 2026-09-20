@@ -69,11 +69,9 @@
             {% csrf_token %}
             {{ form.non_field_errors }}
             <div class="system-page-field-list">
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                {% include "vignetten/includes/form_field.html" with field=form.sprachmodell %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
-                {% include "vignetten/includes/form_field.html" with field=form.parameter %}
+                {% for field in form %}
+                    {% include "vignetten/includes/form_field.html" %}
+                {% endfor %}
             </div>
             <div class="vignette-form-actions">
                 <button class="button" type="submit">Konfiguration anlegen</button>

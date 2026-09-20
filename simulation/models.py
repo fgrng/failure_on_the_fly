@@ -394,6 +394,14 @@ TOKEN_MASKE: str = "•" * 8
 TOKEN_ERKENNBAR_AB: int = 12
 
 
+def erlaubte_stellschrauben(anbieter: str) -> frozenset[str]:
+    """Liefert die Allowlist der Parameter, die dieser Anbieter kennt."""
+
+    if anbieter == Anbieter.FAKE:
+        return FAKE_STELLSCHRAUBEN
+    return MIKRO_STELLSCHRAUBEN
+
+
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
     """QuerySets für unveränderliche Modell-Konfigurationen."""
 
@@ -513,11 +521,7 @@ class ModellKonfiguration(models.Model):
 
         if not isinstance(self.parameter, dict):
             return {"parameter": "Parameter sind ein Objekt aus Schlüsseln und Werten."}
-        erlaubt: frozenset[str] = (
-            FAKE_STELLSCHRAUBEN
-            if self.anbieter == Anbieter.FAKE
-            else MIKRO_STELLSCHRAUBEN
-        )
+        erlaubt: frozenset[str] = erlaubte_stellschrauben(self.anbieter)
         ueberzaehlig: list[str] = sorted(set(self.parameter) - erlaubt)
         if ueberzaehlig:
             return {

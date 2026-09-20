@@ -38,16 +38,19 @@ def _archivierte_fassungen() -> QuerySet[Simulationskern]:
     ).order_by("-finalisiert_am", "-pk")
 
 
+def _aktive_konfiguration() -> ModellKonfiguration | None:
+    # Liefert die aktive Konfiguration, solange der Zeiger schon gesetzt ist.
+
+    try:
+        return ModellKonfiguration.objects.aktive()
+    except AktiveModellKonfiguration.DoesNotExist:
+        return None
+
+
 def _kern_kontext() -> dict[str, object]:
     """Liefert die gemeinsame Anzeige-Referenz für Kern-Ansichten."""
-    try:
-        modell_konfiguration: ModellKonfiguration | None = (
-            ModellKonfiguration.objects.aktive()
-        )
-    except AktiveModellKonfiguration.DoesNotExist:
-        modell_konfiguration = None
     return {
-        "modell_konfiguration": modell_konfiguration,
+        "modell_konfiguration": _aktive_konfiguration(),
         "prompt_platzhalter": sorted(VERTRAG_PROMPT),
         "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
         "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
@@ -184,10 +187,8 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
 def _konfigurationszeilen() -> list[dict[str, object]]:
     # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
 
-    try:
-        aktive_pk: int | None = ModellKonfiguration.objects.aktive().pk
-    except AktiveModellKonfiguration.DoesNotExist:
-        aktive_pk = None
+    aktive: ModellKonfiguration | None = _aktive_konfiguration()
+    aktive_pk: int | None = aktive.pk if aktive else None
     return [
         {
             "pk": konfiguration.pk,

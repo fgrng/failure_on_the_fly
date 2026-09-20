@@ -23,6 +23,11 @@ def _autorin(username: str) -> Konto:
     return konto
 
 
+def _administratorin(username: str = "linus") -> Konto:
+    """Legt ein Konto mit Administrationsrolle an."""
+    return get_user_model().objects.create_user(username=username, is_superuser=True)
+
+
 def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
     """Legt eine gültige Konfiguration an, wie sie die Seite auflistet."""
     return ModellKonfiguration.objects.create(
@@ -79,17 +84,19 @@ class ModellKonfigurationRollenTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-class ModellKonfigurationListeTests(TestCase):
-    """Die Liste zeigt alle je angelegten Fassungen und die aktive."""
+class ZweiFassungenTestCase(TestCase):
+    """Zwei angelegte Fassungen, die ältere aktiv, als Administratorin gesehen."""
 
     def setUp(self) -> None:
         """Legt zwei Konfigurationen an und aktiviert die ältere."""
         self.aeltere: ModellKonfiguration = _openrouter("openrouter/altes-modell")
         self.neuere: ModellKonfiguration = _openrouter("openrouter/neues-modell")
         ModellKonfiguration.objects.aktivieren(self.aeltere)
-        self.client.force_login(
-            get_user_model().objects.create_user(username="linus", is_superuser=True)
-        )
+        self.client.force_login(_administratorin())
+
+
+class ModellKonfigurationListeTests(ZweiFassungenTestCase):
+    """Die Liste zeigt alle je angelegten Fassungen und die aktive."""
 
     def test_traegt_die_system_farbflaeche(self) -> None:
         """Die Seite gehört zum blauen System-Bereich."""
@@ -173,9 +180,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet eine Administratorin an."""
-        self.client.force_login(
-            get_user_model().objects.create_user(username="linus", is_superuser=True)
-        )
+        self.client.force_login(_administratorin())
 
     def test_legt_eine_neue_konfiguration_an(self) -> None:
         """Das Formular schreibt eine Zeile und kehrt zur Liste zurück."""
@@ -256,17 +261,8 @@ class ModellKonfigurationAnlegenTests(TestCase):
         self.assertNotContains(response, TOKEN)
 
 
-class ModellKonfigurationAktivierenTests(TestCase):
+class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
     """Das Umschalten läuft über die Manager-Geste."""
-
-    def setUp(self) -> None:
-        """Legt zwei Konfigurationen an und aktiviert die ältere."""
-        self.aeltere: ModellKonfiguration = _openrouter("openrouter/altes-modell")
-        self.neuere: ModellKonfiguration = _openrouter("openrouter/neues-modell")
-        ModellKonfiguration.objects.aktivieren(self.aeltere)
-        self.client.force_login(
-            get_user_model().objects.create_user(username="linus", is_superuser=True)
-        )
 
     def test_aktiviert_eine_bestehende_konfiguration(self) -> None:
         """Nach dem Umschalten zeigt die Liste die neue als aktiv."""
@@ -306,9 +302,7 @@ class ModellKonfigurationNavigationTests(TestCase):
 
     def test_verlinkt_die_seite_in_der_gruppe_system(self) -> None:
         """Der `geplant`-Platzhalter ist durch einen echten Link ersetzt."""
-        self.client.force_login(
-            get_user_model().objects.create_user(username="linus", is_superuser=True)
-        )
+        self.client.force_login(_administratorin())
 
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
@@ -327,9 +321,7 @@ class ModellKonfigurationFakeTests(TestCase):
 
     def test_legt_eine_fake_konfiguration_ohne_parameter_an(self) -> None:
         """Ein leer gelassenes Parameter-Feld ist ein leerer Beutel."""
-        self.client.force_login(
-            get_user_model().objects.create_user(username="linus", is_superuser=True)
-        )
+        self.client.force_login(_administratorin())
 
         response: HttpResponse = self.client.post(
             reverse("simulation:modell_konfiguration"),

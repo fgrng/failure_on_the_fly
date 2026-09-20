@@ -3,13 +3,13 @@
 from django.forms import ModelForm, PasswordInput
 
 from .models import (
-    FAKE_STELLSCHRAUBEN,
-    MIKRO_STELLSCHRAUBEN,
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
+    Anbieter,
     ModellKonfiguration,
     Simulationskern,
+    erlaubte_stellschrauben,
 )
 
 _RAHMEN_FELDER: dict[str, str] = {
@@ -66,8 +66,8 @@ class SimulationskernForm(ModelForm):
 
 def _stellschrauben_hinweis() -> str:
     """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
-    echte: str = ", ".join(sorted(MIKRO_STELLSCHRAUBEN))
-    fake: str = ", ".join(sorted(FAKE_STELLSCHRAUBEN))
+    echte: str = ", ".join(sorted(erlaubte_stellschrauben(Anbieter.OPENROUTER)))
+    fake: str = ", ".join(sorted(erlaubte_stellschrauben(Anbieter.FAKE)))
     return f"Erlaubt sind bei echten Anbietern: {echte}. Beim Anbieter »fake«: {fake}."
 
 
