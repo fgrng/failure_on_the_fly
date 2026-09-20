@@ -388,6 +388,10 @@ MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
     }
 )
 FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript"})
+# Die Maske verrät die Länge des Tokens nicht: immer acht Punkte.
+TOKEN_MASKE: str = "•" * 8
+# Erst ab dieser Länge geben vier sichtbare Zeichen nicht das halbe Token preis.
+TOKEN_ERKENNBAR_AB: int = 12
 
 
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
@@ -440,6 +444,16 @@ class ModellKonfiguration(models.Model):
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
 
     objects: ModellKonfigurationManager = ModellKonfigurationManager()
+
+    @property
+    def anbieter_token_maskiert(self) -> str:
+        """Liefert den einzigen Wert des Tokens, der eine Ansicht erreichen darf."""
+
+        if not self.anbieter_token:
+            return ""
+        if len(self.anbieter_token) < TOKEN_ERKENNBAR_AB:
+            return TOKEN_MASKE
+        return f"{TOKEN_MASKE}{self.anbieter_token[-4:]}"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert jede Mutation und prüft die Konfiguration beim Anlegen."""
@@ -508,7 +522,8 @@ class ModellKonfiguration(models.Model):
         if ueberzaehlig:
             return {
                 "parameter": (
-                    f"Bei diesem Anbieter nicht erlaubt: {', '.join(ueberzaehlig)}."
+                    f"Bei diesem Anbieter nicht erlaubt: {', '.join(ueberzaehlig)}. "
+                    f"Erlaubt sind: {', '.join(sorted(erlaubt))}."
                 )
             }
         return {}

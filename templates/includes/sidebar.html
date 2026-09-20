@@ -69,7 +69,7 @@
             <section class="sidebar-nav__group sidebar-nav__group--system">
                 <h2>System</h2>
                 <div>
-                    <span>Modell-Konfiguration <small>geplant</small></span>
+                    <a href="{% url 'simulation:modell_konfiguration' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "modell_konfiguration" %} aria-current="page"{% endif %}>Modell-Konfiguration</a>
                     <a href="{% url 'simulation:kern_verwalten' %}"{% if request.resolver_match.namespace == "simulation" and request.resolver_match.url_name == "kern_verwalten" %} aria-current="page"{% endif %}>Simulationskern verwalten</a>
                     <a href="{% url 'admin:index' %}"{% if request.resolver_match.namespace == "admin" %} aria-current="page"{% endif %}>Administration</a>
                 </div>

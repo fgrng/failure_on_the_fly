@@ -51,6 +51,18 @@ auf der bisherigen Fassung bleiben finalisierbar und spielbar. Ihre Detailansich
 weist neben dem Vorspulen-Knopf auf den überholten Pin hin; Vorspulen bleibt eine
 Wahl der Autor:in.
 
+## Modell-Konfiguration
+
+Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/`.
+Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
+Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
+genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
+eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt. Ein
+Umschalten trifft laufende Trainings sofort und laufende Erhebungen gar nicht; eine
+Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren. Das
+Token wird eingegeben, aber nie zurückgegeben: Die Liste zeigt es nur maskiert mit
+seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte.
+
 ## Audioverarbeitung im Training
 
 Vor dem ersten Start eines Trainings entscheiden Teilnehmende einmalig, ob ihr

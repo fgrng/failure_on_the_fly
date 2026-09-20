@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Modell-Konfiguration{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System</p>
+            <h1>Modell-Konfiguration</h1>
+            <span>Alle je angelegten Konfigurationen des Sprachmodells und die aktive.</span>
+        </div>
+    </header>
+
+    <section class="page-section" aria-label="Betriebsfolge">
+        <header class="page-section__head">
+            <b>01</b><span><h2>Betriebsfolge</h2><small>Was ein Umschalten bewirkt — und was eine Rotation verlangt</small></span>
+        </header>
+        <div class="system-page-field-list">
+            <p>Eine Konfiguration wird angelegt und aktiviert, nie geändert: Abgeschlossene Erhebungen pinnen ihre Fassung, und ihre Datenspur bleibt deshalb unberührt.</p>
+            <p>Ein Umschalten trifft <strong>laufende Trainings sofort</strong> und <strong>laufende Erhebungen gar nicht</strong>.</p>
+            <p>Eine Schlüsselrotation ist deshalb kein Feldupdate, sondern <strong>Anlegen plus Aktivieren</strong>: Die neue Fassung trägt das neue Token und wird anschließend aktiviert.</p>
+        </div>
+    </section>
+
+    <section class="page-section" aria-label="Angelegte Konfigurationen">
+        <header class="page-section__head">
+            <b>02</b><span><h2>Angelegte Konfigurationen</h2><small>Die aktive bedient jede neue Sitzung</small></span>
+        </header>
+        <div class="system-page-field-list">
+            {% for konfiguration in konfigurationen %}
+                <section class="page-field">
+                    <h3>
+                        {{ konfiguration.sprachmodell }}
+                        {% if konfiguration.ist_aktiv %}<span class="badge badge--system">Aktiv</span>{% endif %}
+                    </h3>
+                    <dl class="field-grid">
+                        <div><dt>Anbieter</dt><dd>{{ konfiguration.anbieter }}</dd></div>
+                        <div><dt>Basis-URL</dt><dd>{{ konfiguration.anbieter_basis_url|default:"—" }}</dd></div>
+                        <div><dt>Token</dt><dd>{{ konfiguration.anbieter_token_maskiert|default:"Kein Token hinterlegt" }}</dd></div>
+                        <div><dt>Parameter</dt><dd><pre>{{ konfiguration.parameter }}</pre></dd></div>
+                    </dl>
+                    {% if not konfiguration.ist_aktiv %}
+                        <div class="page-actions">
+                            <form method="post" action="{% url 'simulation:modell_konfiguration_aktivieren' konfiguration.pk %}">
+                                {% csrf_token %}
+                                <button class="button" type="submit">Aktivieren</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </section>
+            {% empty %}
+                <p class="system-page-empty">Noch keine Modell-Konfiguration angelegt.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="page-section" aria-label="Neue Konfiguration anlegen">
+        <header class="page-section__head">
+            <b>03</b><span><h2>Neue Konfiguration anlegen</h2><small>Eine neue Fassung entsteht; bestehende bleiben unverändert</small></span>
+        </header>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <div class="system-page-field-list">
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
+                {% include "vignetten/includes/form_field.html" with field=form.sprachmodell %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
+                {% include "vignetten/includes/form_field.html" with field=form.parameter %}
+            </div>
+            <div class="vignette-form-actions">
+                <button class="button" type="submit">Konfiguration anlegen</button>
+            </div>
+        </form>
+    </section>
+</section>
+{% endblock %}

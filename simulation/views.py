@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
-from .forms import SimulationskernForm
+from .forms import ModellKonfigurationForm, SimulationskernForm
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
@@ -179,3 +179,52 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
         Simulationskern.Zustand.ENTWURF,
         Simulationskern.delete,
     )
+
+
+def _konfigurationszeilen() -> list[dict[str, object]]:
+    # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
+
+    try:
+        aktive_pk: int | None = ModellKonfiguration.objects.aktive().pk
+    except AktiveModellKonfiguration.DoesNotExist:
+        aktive_pk = None
+    return [
+        {
+            "pk": konfiguration.pk,
+            "anbieter": konfiguration.get_anbieter_display(),
+            "sprachmodell": konfiguration.sprachmodell,
+            "anbieter_basis_url": konfiguration.anbieter_basis_url,
+            "anbieter_token_maskiert": konfiguration.anbieter_token_maskiert,
+            "parameter": konfiguration.parameter,
+            "ist_aktiv": konfiguration.pk == aktive_pk,
+        }
+        for konfiguration in ModellKonfiguration.objects.order_by("-pk")
+    ]
+
+
+@administratorin_erforderlich
+def modell_konfiguration(request: HttpRequest) -> HttpResponse:
+    """Listet alle Modell-Konfigurationen und legt eine neue Fassung an."""
+    form: ModellKonfigurationForm
+    if request.method == "POST":
+        form = ModellKonfigurationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("simulation:modell_konfiguration")
+    else:
+        form = ModellKonfigurationForm()
+    return render(
+        request,
+        "simulation/modell_konfiguration.html",
+        {"form": form, "konfigurationen": _konfigurationszeilen()},
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def modell_konfiguration_aktivieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Richtet den einzigen aktiven Zeiger auf eine bestehende Fassung."""
+    ModellKonfiguration.objects.aktivieren(
+        get_object_or_404(ModellKonfiguration, pk=pk)
+    )
+    return redirect("simulation:modell_konfiguration")

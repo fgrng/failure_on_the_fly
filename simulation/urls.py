@@ -14,4 +14,14 @@ urlpatterns: list[URLPattern] = [
     path("kern/<int:pk>/neue-fassung/", views.neue_fassung, name="neue_fassung"),
     path("kern/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
     path("kern/<int:pk>/verwerfen/", views.verwerfen, name="verwerfen"),
+    path(
+        "modell-konfiguration/",
+        views.modell_konfiguration,
+        name="modell_konfiguration",
+    ),
+    path(
+        "modell-konfiguration/<int:pk>/aktivieren/",
+        views.modell_konfiguration_aktivieren,
+        name="modell_konfiguration_aktivieren",
+    ),
 ]

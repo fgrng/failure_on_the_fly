@@ -1,11 +1,14 @@
 """Formulare der Simulationskern-Verwaltung."""
 
-from django.forms import ModelForm
+from django.forms import ModelForm, PasswordInput
 
 from .models import (
+    FAKE_STELLSCHRAUBEN,
+    MIKRO_STELLSCHRAUBEN,
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
+    ModellKonfiguration,
     Simulationskern,
 )
 
@@ -59,3 +62,56 @@ class SimulationskernForm(ModelForm):
         for feldname, bezeichnung in felder.items():
             self.fields[feldname].label = bezeichnung
             self.fields[feldname].help_text = hinweis
+
+
+def _stellschrauben_hinweis() -> str:
+    """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
+    echte: str = ", ".join(sorted(MIKRO_STELLSCHRAUBEN))
+    fake: str = ", ".join(sorted(FAKE_STELLSCHRAUBEN))
+    return f"Erlaubt sind bei echten Anbietern: {echte}. Beim Anbieter »fake«: {fake}."
+
+
+class ModellKonfigurationForm(ModelForm):
+    """Die einzige Schreibgeste an einer append-only Modell-Konfiguration."""
+
+    class Meta:
+        """Beschränkt das Formular auf die Felder einer neuen Fassung."""
+
+        model: type[ModellKonfiguration] = ModellKonfiguration
+        fields: list[str] = [
+            "anbieter",
+            "sprachmodell",
+            "anbieter_basis_url",
+            "anbieter_token",
+            "parameter",
+        ]
+        labels: dict[str, str] = {
+            "anbieter": "Anbieter",
+            "sprachmodell": "Sprachmodell",
+            "anbieter_basis_url": "Basis-URL",
+            "anbieter_token": "Token",
+            "parameter": "Parameter",
+        }
+        help_texts: dict[str, str] = {
+            "sprachmodell": "Mit dem Präfix des gewählten Anbieters.",
+            "anbieter_basis_url": "Die Endpunktwurzel des Anbieters.",
+            "anbieter_token": "Wird gespeichert, aber nie wieder angezeigt.",
+        }
+        # Write-only: Der gesetzte Wert wird nie zurückgerendert — bei einem
+        # Formularfehler ebenso wenig wie nach dem Speichern.
+        widgets: dict[str, PasswordInput] = {
+            "anbieter_token": PasswordInput(render_value=False),
+        }
+        error_messages: dict[str, dict[str, str]] = {
+            "parameter": {"invalid": "Bitte gültiges JSON eintragen."},
+        }
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Leitet den sichtbaren Allowlist-Hinweis aus den Prüfkonstanten ab."""
+        super().__init__(*args, **kwargs)
+        self.fields["parameter"].help_text = _stellschrauben_hinweis()
+
+    def clean_parameter(self) -> dict[str, object]:
+        """Liest ein leer gelassenes Feld als leeren Beutel, nicht als Nichts."""
+        parameter: dict[str, object] | None = self.cleaned_data["parameter"]
+        return {} if parameter is None else parameter
