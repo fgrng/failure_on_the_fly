@@ -57,10 +57,12 @@ class ProbelaufTranskriptionTests(TestCase):
         # Legt den Probelaufzustand über die echte HTTP-Naht in der Session ab.
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-    def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
+    def _anfragen(
+        self, anbieter: FakeTranskription, aufnahme: SimpleUploadedFile | None = None
+    ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
-            "/sitzungen/transkription/", {"audio": self._aufnahme()}
+            "/sitzungen/transkription/", {"audio": aufnahme or self._aufnahme()}
         )
         request.user = self.autorin
         request.session = self.client.session
@@ -120,6 +122,37 @@ class ProbelaufTranskriptionTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
         self.assertEqual(anbieter.skript, ["Text"])
+
+    GRENZE: int = 15 * 1024 * 1024
+
+    def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
+        # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
+        return SimpleUploadedFile("aufnahme.webm", b"\0" * groesse, "audio/webm")
+
+    def test_lehnt_aufnahme_ueber_der_grenze_mit_eigenem_status_ab(self) -> None:
+        """Eine Aufnahme über 15 MB erreicht den Anbieter nicht."""
+        self._probelauf_starten()
+        anbieter = FakeTranskription(["Text"])
+
+        response: HttpResponse = self._anfragen(
+            anbieter, self._aufnahme_mit_groesse(self.GRENZE + 1)
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertJSONEqual(response.content, {"status": "aufnahme_zu_gross"})
+        self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_nimmt_aufnahme_genau_auf_der_grenze_an(self) -> None:
+        """Die Grenze schließt die 15 MB ein, statt sie schon abzulehnen."""
+        self._probelauf_starten()
+
+        response: HttpResponse = self._anfragen(
+            FakeTranskription(["Wie hast du gerechnet?"]),
+            self._aufnahme_mit_groesse(self.GRENZE),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"text": "Wie hast du gerechnet?"})
 
     def test_persistiert_keine_aufnahme(self) -> None:
         """Nach der Transkription liegt keine Audio-Datei im Medienverzeichnis."""

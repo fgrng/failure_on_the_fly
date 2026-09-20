@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django.core.files.uploadedfile import UploadedFile
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -350,7 +351,11 @@ def transkriptions_endpunkt(
             return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
         if not settings.TRANSKRIPTION_ZERO_RETENTION:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
-        audio: bytes = request.FILES["audio"].read()
+        aufnahme: UploadedFile = request.FILES["audio"]
+        # Die Größe steht vor dem Einlesen fest; der Worker bleibt frei.
+        if aufnahme.size > settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES:
+            return JsonResponse({"status": "aufnahme_zu_gross"}, status=413)
+        audio: bytes = aufnahme.read()
         try:
             text: str = anbieter.transkribieren(audio)
         except LeeresTranskript:

@@ -1,5 +1,6 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import Client, TestCase
@@ -360,6 +361,20 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self.assertContains(einstieg, "data-spracheingabe")
         self.assertContains(einstieg, "Frage aufnehmen")
+
+    def test_spracheingabe_traegt_dieselbe_aufnahmegrenze_wie_der_endpunkt(
+        self,
+    ) -> None:
+        """Der Browser zählt gegen die Grenze, die der Endpunkt danach hält."""
+
+        einstieg: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(
+            einstieg,
+            f'data-maximale-bytes="{settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES}"',
+        )
 
     def test_spracheingabe_steht_im_gespraech_und_im_debrief_bereit(self) -> None:
         """Der Probelauf bietet das Mikrofon ohne Einwilligungsschritt an."""

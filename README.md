@@ -66,6 +66,11 @@ in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie b
 und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann
 die Aufnahme wiederholt werden.
 
+Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
+Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
+transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der
+Transkriptions-Endpunkt: Eine größere Aufnahme lehnt er ab, bevor er sie einliest.
+
 Im **Probelauf** der Autor:innen gibt es keinen Einwilligungsschritt: Dort
 spricht die angemeldete Autor:in über ihr eigenes Material, nicht eine
 pseudonyme Teilnehmer:in. Das Mikrofon steht im Diagnosegespräch und im
