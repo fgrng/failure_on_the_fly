@@ -1,4 +1,4 @@
-"""Views für Probeläufe und persistierte Trainingssitzungen."""
+"""Views für Probeläufe und die Bausteine persistierter Sitzungen ihrer Aufrufer."""
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -337,9 +337,16 @@ def transkriptions_endpunkt(
 ) -> Callable[[HttpRequest], HttpResponse]:
     """Erzeugt den geschützten Endpunkt eines Prinzipals für seinen Anbieter.
 
-    Die Auflösung liefert die Sitzung, deren Audioeinwilligung hier geprüft
-    wird — oder nichts, wenn es kein Einwilligungsobjekt gibt —, oder sie
-    verweigert den Zugriff selbst.
+    `sitzung_aufloesen` trägt die Autorisierung des jeweiligen Prinzipals und
+    hat drei erlaubte Ausgänge:
+
+    - eine Sitzung: Ihre Teilnahme muss in die Audioverarbeitung eingewilligt
+      haben, sonst endet die Anfrage hier.
+    - `None`: Es gibt keine Teilnahme, die einwilligen könnte, etwa im
+      Probelauf (ADR-0026).
+    - `PermissionDenied`: Die Auflösung verweigert den Zugriff selbst.
+
+    Das Zero-Retention-Tor aus ADR-0026 liegt dahinter und gilt für alle.
     """
 
     def endpunkt(request: HttpRequest) -> HttpResponse:
