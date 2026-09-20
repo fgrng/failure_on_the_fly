@@ -247,7 +247,6 @@ class VignetteDetailViewTests(TestCase):
         vignette: Vignette = _vollstaendige_vignette(konto)
         kern: Simulationskern = vignette.gepinnter_kern
         kern.bearbeiten().finalisieren()
-        kern.archivieren()
         return vignette
 
     def test_zeigt_den_hinweis_am_entwurf_mit_ueberholtem_kern(self) -> None:
@@ -937,7 +936,6 @@ class VignetteFinalisierenViewTests(TestCase):
         """Ein überholter Pin hält das Finalisieren über HTTP nicht auf."""
         kern: Simulationskern = self.vignette.gepinnter_kern
         kern.bearbeiten().finalisieren()
-        kern.archivieren()
 
         response: HttpResponse = self.client.post(
             reverse("vignetten:finalisieren", args=[self.vignette.pk]), follow=True

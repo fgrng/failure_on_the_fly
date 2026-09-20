@@ -241,18 +241,6 @@ class Simulationskern(models.Model):
 
         return models.QuerySet(model=type(self), using=self._state.db)
 
-    def _hat_zustand_in_datenbank(self, zustand: str) -> bool:
-        # Prüft den gespeicherten Zustand über die interne Schreibroute.
-
-        return (
-            self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=zustand,
-            )
-            .exists()
-        )
-
     @transaction.atomic
     def bearbeiten(self) -> "Simulationskern":
         """Erzeugt aus einer finalen Fassung einen neuen Entwurf."""
@@ -275,15 +263,6 @@ class Simulationskern(models.Model):
             .exists()
         ):
             raise ValueError("Ein Kern-Entwurf existiert bereits.")
-        if (
-            type(self)
-            .objects.filter(vorgaengerin=self)
-            .exclude(zustand=self.Zustand.ARCHIVIERT)
-            .exists()
-        ):
-            raise ValueError(
-                "Diese Kern-Fassung hat bereits eine nicht archivierte Nachfolgerin."
-            )
         return type(self).objects._erstellen(
             historie=self.historie,
             vorgaengerin=self,
@@ -305,6 +284,14 @@ class Simulationskern(models.Model):
         self.full_clean()
         self.save()
         finalisiert_am: datetime = timezone.now()
+        # Die bisherige finale Fassung weicht vor dem eigenen Zustandswechsel:
+        # Der partielle Unique-Index greift sofort und ließe die beiden nicht
+        # einmal für eine Anweisung nebeneinander stehen. Bei der ersten
+        # Fassung der Historie trifft das Archivieren keine Zeile.
+        self._schreibqueryset().filter(
+            historie_id=self.historie_id,
+            zustand=self.Zustand.FINAL,
+        ).update(zustand=self.Zustand.ARCHIVIERT)
         if (
             not self._schreibqueryset()
             .filter(
@@ -319,59 +306,6 @@ class Simulationskern(models.Model):
             raise ValueError("Der Kern-Entwurf wurde inzwischen geändert.")
         self.zustand = self.Zustand.FINAL
         self.finalisiert_am = finalisiert_am
-
-    @transaction.atomic
-    def archivieren(self) -> None:
-        """Archiviert eine finale Fassung."""
-
-        if not self._hat_zustand_in_datenbank(self.Zustand.FINAL):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
-        if not (
-            type(self)
-            .objects.filter(zustand=self.Zustand.FINAL)
-            .exclude(pk=self.pk)
-            .exists()
-        ):
-            raise ValueError(
-                "Die letzte finale Kern-Fassung kann nicht archiviert werden."
-            )
-        if (
-            not self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=self.Zustand.FINAL,
-            )
-            .update(zustand=self.Zustand.ARCHIVIERT)
-        ):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
-        self.zustand = self.Zustand.ARCHIVIERT
-
-    @transaction.atomic
-    def entarchivieren(self) -> None:
-        """Macht eine archivierte Fassung wieder final."""
-
-        if not self._hat_zustand_in_datenbank(self.Zustand.ARCHIVIERT):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
-        if self.vorgaengerin_id is not None and (
-            type(self)
-            .objects.filter(vorgaengerin_id=self.vorgaengerin_id)
-            .exclude(pk=self.pk)
-            .exclude(zustand=self.Zustand.ARCHIVIERT)
-            .exists()
-        ):
-            raise ValueError(
-                "Die Vorgängerin hat bereits eine nicht archivierte Schwester."
-            )
-        if (
-            not self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=self.Zustand.ARCHIVIERT,
-            )
-            .update(zustand=self.Zustand.FINAL)
-        ):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
-        self.zustand = self.Zustand.FINAL
 
     def clean(self) -> None:
         """Lehnt Vorlagen mit Platzhaltern außerhalb ihres Vertrags ab."""
@@ -401,6 +335,11 @@ class Simulationskern(models.Model):
                 fields=["historie"],
                 condition=Q(zustand="entwurf"),
                 name="simulation_ein_entwurf_pro_historie",
+            ),
+            models.UniqueConstraint(
+                fields=["historie"],
+                condition=Q(zustand="final"),
+                name="simulation_eine_finale_fassung_pro_historie",
             ),
             models.UniqueConstraint(
                 fields=["vorgaengerin"],

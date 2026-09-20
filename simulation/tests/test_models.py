@@ -3,7 +3,6 @@
 from datetime import datetime
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
@@ -11,7 +10,6 @@ from django.utils import timezone
 
 from simulation import render
 from simulation.models import KernHistorie, ModellKonfiguration, Simulationskern
-from vignetten.models import Vignette
 
 
 def test_render_substituiert_alle_vereinbarten_platzhalter() -> None:
@@ -171,16 +169,22 @@ def test_bearbeiten_lehnt_zweiten_entwurf_ab() -> None:
 
 
 @pytest.mark.django_db
-def test_bearbeiten_lehnt_nicht_archivierte_nachfolgerin_ab() -> None:
-    """Eine aktive Nachfolgerin belegt ihre Vorgängerin für weitere Entwürfe."""
+def test_finalisieren_archiviert_die_vorgaengerin() -> None:
+    """Nach beliebig vielen Runden trägt der Kern genau eine finale Fassung."""
 
-    vorgaengerin: Simulationskern = Simulationskern.objects.anlegen()
-    vorgaengerin.finalisieren()
-    nachfolgerin: Simulationskern = vorgaengerin.bearbeiten()
-    nachfolgerin.finalisieren()
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    # Die erste Fassung der Historie hat keine Vorgängerin, die weichen müsste.
+    kern.finalisieren()
+    assert kern.zustand == Simulationskern.Zustand.FINAL
 
-    with pytest.raises(ValueError, match="nicht archivierte Nachfolgerin"):
-        vorgaengerin.bearbeiten()
+    for _ in range(3):
+        neue_fassung: Simulationskern = kern.bearbeiten()
+        neue_fassung.finalisieren()
+        kern = neue_fassung
+
+    assert list(
+        Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL)
+    ) == [kern]
 
 
 @pytest.mark.django_db
@@ -235,65 +239,12 @@ def test_archivierte_fassung_kann_nicht_physisch_geloescht_werden() -> None:
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    zweite_fassung: Simulationskern = kern.bearbeiten()
-    zweite_fassung.finalisieren()
-    zweite_fassung.archivieren()
-
-    with pytest.raises(RuntimeError, match="gelöscht"):
-        zweite_fassung.delete()
-
-
-@pytest.mark.django_db
-def test_lebenszyklus_akzeptiert_keine_veraltete_fassung() -> None:
-    """Jeder Übergang prüft den in der Datenbank gespeicherten Zustand."""
-
-    veraltet: Simulationskern = Simulationskern.objects.anlegen()
-    veraltet.finalisieren()
-    weitere_finale_fassung: Simulationskern = veraltet.bearbeiten()
-    weitere_finale_fassung.finalisieren()
-    aktuell: Simulationskern = Simulationskern.objects.get(pk=veraltet.pk)
-    aktuell.archivieren()
-
-    with pytest.raises(ValueError, match="inzwischen geändert"):
-        veraltet.archivieren()
-
-
-@pytest.mark.django_db
-def test_finale_fassung_kann_archiviert_und_entarchiviert_werden() -> None:
-    """Eine von zwei finalen Fassungen bewahrt beim Rückweg ihren Zeitstempel."""
-
-    erste_fassung: Simulationskern = Simulationskern.objects.anlegen()
-    erste_fassung.finalisieren()
-    kern: Simulationskern = erste_fassung.bearbeiten()
-    kern.finalisieren()
-    finalisiert_am: datetime | None = kern.finalisiert_am
-
-    kern.archivieren()
+    kern.bearbeiten().finalisieren()
+    kern.refresh_from_db()
 
     assert kern.zustand == Simulationskern.Zustand.ARCHIVIERT
-    assert kern.finalisiert_am == finalisiert_am
-
-    kern.entarchivieren()
-
-    assert kern.zustand == Simulationskern.Zustand.FINAL
-    assert kern.finalisiert_am == finalisiert_am
-
-
-@pytest.mark.django_db
-def test_letzte_finale_fassung_kann_nicht_archiviert_werden() -> None:
-    """Eine finale Kern-Fassung bleibt für neue Vignetten immer verfügbar."""
-
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-
-    with pytest.raises(ValueError, match="letzte finale Kern-Fassung"):
-        kern.archivieren()
-
-    vignette: Vignette = Vignette.objects.anlegen(
-        get_user_model().objects.create_user(username="ada"),
-    )
-
-    assert vignette.gepinnter_kern == kern
+    with pytest.raises(RuntimeError, match="gelöscht"):
+        kern.delete()
 
 
 @pytest.mark.django_db
@@ -351,19 +302,22 @@ def test_historie_hat_hoechstens_einen_entwurf() -> None:
 
 
 @pytest.mark.django_db
-def test_entarchivieren_zu_einer_schwester_wird_verhindert() -> None:
-    """Eine archivierte Schwester meldet den Konflikt vor dem Datenbank-Constraint."""
+def test_historie_hat_hoechstens_eine_finale_fassung() -> None:
+    """Die eine Linie des Kerns ist eine Eigenschaft der Daten, keine Absicht."""
 
-    vorgaengerin: Simulationskern = Simulationskern.objects.anlegen()
-    vorgaengerin.finalisieren()
-    archivierte_schwester: Simulationskern = vorgaengerin.bearbeiten()
-    archivierte_schwester.finalisieren()
-    archivierte_schwester.archivieren()
-    neue_schwester: Simulationskern = vorgaengerin.bearbeiten()
-    neue_schwester.finalisieren()
+    historie: KernHistorie = KernHistorie.objects.create()
+    _direkt_einfuegen(
+        historie=historie,
+        zustand=Simulationskern.Zustand.FINAL,
+        finalisiert_am=timezone.now(),
+    )
 
-    with pytest.raises(ValueError, match="nicht archivierte Schwester"):
-        archivierte_schwester.entarchivieren()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        _direkt_einfuegen(
+            historie=historie,
+            zustand=Simulationskern.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+        )
 
 
 @pytest.mark.django_db

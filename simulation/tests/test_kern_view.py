@@ -16,7 +16,6 @@ from simulation.models import (
     ModellKonfiguration,
     Simulationskern,
 )
-from vignetten.models import Vignette
 
 
 def _autorin(username: str) -> Konto:
@@ -214,7 +213,6 @@ class SimulationskernVerwaltungTests(TestCase):
         aktuelle_fassung.system_prompt_vorlage = "Aktueller Prompt"
         aktuelle_fassung.save()
         aktuelle_fassung.finalisieren()
-        aelteste_fassung.archivieren()
         entwurf: Simulationskern = aktuelle_fassung.bearbeiten()
         entwurf.system_prompt_vorlage = "Entwurfs-Prompt"
         entwurf.save()
@@ -479,11 +477,12 @@ class SimulationskernVerwaltungTests(TestCase):
 
         self.assertContains(response, "Enthält ungültige Platzhalter.")
 
-    def test_kennzeichnet_die_juengste_finale_fassung_als_verwendet(self) -> None:
-        """Die Verwaltungsübersicht hebt die aktuell verwendete Fassung hervor."""
+    def test_ueberschreibt_die_eine_finale_fassung_schlicht(self) -> None:
+        """Bei genau einer finalen Fassung hat eine Verwendungs-Markierung nichts zu sagen."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
-        self.assertContains(response, "Verwendete finale Fassung")
+        self.assertContains(response, "<h2>Finale Fassung</h2>", html=False)
+        self.assertNotContains(response, "Verwendete finale Fassung")
 
     def test_zeigt_die_juengste_finale_fassung(self) -> None:
         """Die Verwaltungsübersicht zeigt die jüngste finale Fassung."""
@@ -496,6 +495,15 @@ class SimulationskernVerwaltungTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertContains(response, "Archivierter Prompt")
+
+    def test_zeigt_archivierte_fassungen_ohne_aktionsbereich(self) -> None:
+        """Eine überholte Fassung bleibt lesbar, aber ohne jede Geste."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+        seite: str = response.content.decode()
+
+        eingeklappt: str = seite[seite.index("<details>") : seite.index("</details>")]
+        self.assertIn("Archivierter Prompt", eingeklappt)
+        self.assertNotIn("page-actions", eingeklappt)
 
     def test_klappt_archivierte_fassungen_ein(self) -> None:
         """Die Verwaltungsübersicht hält archivierte Fassungen eingeklappt bereit."""
@@ -577,148 +585,11 @@ class SimulationskernSeitennavigationTests(TestCase):
         )
 
 
-def _vollstaendiger_vignettenentwurf(konto: Konto, kern: Simulationskern) -> Vignette:
-    """Legt einen finalisierbaren Vignettenentwurf auf der gegebenen Fassung an."""
-    vignette: Vignette = Vignette.objects.anlegen(konto)
-    vignette.gepinnter_kern = kern
-    vignette.fehlermuster_beschreibung = "Stellenwerte werden einzeln gezählt."
-    vignette.lernauftrag_text = "Addiere 27 und 15."
-    vignette.arbeitsheft_text = "27 + 15 = 312"
-    vignette.schuelerin_name = "Mia"
-    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.lehrperson_name = "Frau Weber"
-    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.fach = "Mathematik"
-    vignette.thema = "Addition"
-    vignette.klassenstufe = "5"
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 5
-    vignette.save()
-    return vignette
-
-
-class SimulationskernArchivierenTests(TestCase):
-    """Archivieren und Entarchivieren laufen über die blaue Übersicht."""
-
-    def setUp(self) -> None:
-        """Legt zwei finale Kern-Fassungen und eine Administratorin an."""
-        self.aeltere: Simulationskern = Simulationskern.objects.anlegen(
-            system_prompt_vorlage="Ältere Fassung"
-        )
-        self.aeltere.finalisieren()
-        self.juengere: Simulationskern = self.aeltere.bearbeiten()
-        self.juengere.system_prompt_vorlage = "Jüngere Fassung"
-        self.juengere.save()
-        self.juengere.finalisieren()
-        self.client.force_login(_administratorin("linus"))
-
-    def _zustand(self, simulationskern: Simulationskern) -> str:
-        """Liest den gespeicherten Zustand einer Fassung zurück."""
-        return Simulationskern.objects.get(pk=simulationskern.pk).zustand
-
-    def test_faehrt_den_vollen_kreis_aus_archivieren_und_entarchivieren(self) -> None:
-        """Eine finale Fassung lässt sich archivieren und zurückholen."""
-        self.client.post(reverse("simulation:archivieren", args=[self.aeltere.pk]))
-        self.assertEqual(
-            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
-        )
-
-        self.client.post(reverse("simulation:entarchivieren", args=[self.aeltere.pk]))
-
-        self.assertEqual(self._zustand(self.aeltere), Simulationskern.Zustand.FINAL)
-
-    def test_archivieren_kennt_keine_bestaetigungs_zwischenseite(self) -> None:
-        """Die Geste wirkt sofort und leitet auf die Übersicht zurück."""
-        response: HttpResponse = self.client.post(
-            reverse("simulation:archivieren", args=[self.aeltere.pk])
-        )
-
-        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
-        self.assertEqual(
-            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
-        )
-
-    def test_zaehlt_ausschliesslich_gepinnte_vignettenentwuerfe(self) -> None:
-        """Finale und archivierte Vignetten zählen im Vorwarnen nicht mit."""
-        konto: Konto = _autorin("ada")
-        _vollstaendiger_vignettenentwurf(konto, self.aeltere)
-        finale: Vignette = _vollstaendiger_vignettenentwurf(konto, self.aeltere)
-        finale.finalisieren()
-        archivierte: Vignette = _vollstaendiger_vignettenentwurf(konto, self.aeltere)
-        archivierte.finalisieren()
-        archivierte.archivieren()
-
-        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
-
-        self.assertContains(response, "Gepinnte Vignettenentwürfe: 1")
-        self.assertContains(response, "Gepinnte Vignettenentwürfe: 0")
-
-    def test_gepinnte_entwuerfe_sperren_das_archivieren_nicht(self) -> None:
-        """Die Zahl warnt vor, sie hält die Kern-Historie nicht an."""
-        _vollstaendiger_vignettenentwurf(_autorin("ada"), self.aeltere)
-
-        self.client.post(reverse("simulation:archivieren", args=[self.aeltere.pk]))
-
-        self.assertEqual(
-            self._zustand(self.aeltere), Simulationskern.Zustand.ARCHIVIERT
-        )
-
-    def test_ordnet_die_wirkung_des_archivierens_am_knopf_ein(self) -> None:
-        """Der Hinweis nennt Umkehrbarkeit, Sitzungen und das freigestellte Vorspulen."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
-
-        for aussage in (
-            "umkehrbar",
-            "laufende Sitzungen",
-            "finalisieren und spielen",
-            "vorspulen",
-        ):
-            self.assertContains(response, aussage)
-
-    def test_zeigt_abgelehntes_archivieren_der_letzten_fassung_als_meldung(
-        self,
-    ) -> None:
-        """Die letzte finale Fassung bleibt stehen, mit lesbarer Begründung."""
-        self.aeltere.archivieren()
-
-        response: HttpResponse = self.client.post(
-            reverse("simulation:archivieren", args=[self.juengere.pk]), follow=True
-        )
-
-        self.assertContains(
-            response, "Die letzte finale Kern-Fassung kann nicht archiviert werden."
-        )
-        self.assertEqual(self._zustand(self.juengere), Simulationskern.Zustand.FINAL)
-
-    def test_zeigt_abgelehntes_entarchivieren_als_meldung(self) -> None:
-        """Eine nicht archivierte Schwester verhindert das Zurückholen lesbar."""
-        self.juengere.archivieren()
-        self.aeltere.bearbeiten()
-
-        response: HttpResponse = self.client.post(
-            reverse("simulation:entarchivieren", args=[self.juengere.pk]), follow=True
-        )
-
-        self.assertContains(response, "nicht archivierte Schwester")
-        self.assertEqual(
-            self._zustand(self.juengere), Simulationskern.Zustand.ARCHIVIERT
-        )
-
-    def test_archivgesten_sind_post_und_administratorinnen_vorbehalten(self) -> None:
-        """GET und Autorinnen ohne Administrationsrolle werden abgewiesen."""
-        urls: tuple[str, ...] = (
-            reverse("simulation:archivieren", args=[self.aeltere.pk]),
-            reverse("simulation:entarchivieren", args=[self.aeltere.pk]),
-        )
-
-        for url in urls:
-            self.assertEqual(self.client.get(url).status_code, 405)
-        self.client.force_login(_autorin("ada"))
-        for url in urls:
-            self.assertEqual(self.client.post(url).status_code, 403)
+class SimulationsschichtImportgraphTests(TestCase):
+    """Die Kern-Verwaltung kennt die Vignetten-Schicht nicht (ADR-0016)."""
 
     def test_kern_verwaltung_importiert_die_vignetten_schicht_nicht(self) -> None:
-        """Die Zahl kommt über den Rückwärts-Zugriff, nicht über eine neue Kante."""
+        """Kein Import führt von der Systemansicht in die Vignetten-Schicht."""
         baum: ast.Module = ast.parse(Path(views.__file__).read_text(encoding="utf-8"))
         importierte_module: set[str] = set()
         for knoten in ast.walk(baum):

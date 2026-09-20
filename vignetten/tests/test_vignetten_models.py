@@ -653,7 +653,6 @@ class VignetteFinalisierenTests(TestCase):
         kern.finalisieren()
         if kern_ueberholen:
             kern.bearbeiten().finalisieren()
-            kern.archivieren()
         return Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(),
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",

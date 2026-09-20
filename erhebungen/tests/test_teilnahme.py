@@ -348,7 +348,6 @@ class ErhebungsteilnahmeTests(TestCase):
         vignette: Vignette = self._vignette_anlegen()
         kern: Simulationskern = vignette.gepinnter_kern
         kern.bearbeiten().finalisieren()
-        kern.archivieren()
 
         self._laufende_sitzung_starten()
 
