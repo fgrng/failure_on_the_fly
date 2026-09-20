@@ -1,5 +1,6 @@
 """HTTP-Vertrag des Transkriptions-Endpunkts im schreibfreien Probelauf."""
 
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -16,6 +17,7 @@ from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
     LeeresTranskript,
+    Transkription,
     TranskriptionsAnbieterfehler,
 )
 from sitzungen.models import Sitzung, Teilnahme
@@ -58,6 +60,10 @@ class ProbelaufTranskriptionTests(TestCase):
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
     def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
+        # Ruft den Endpunkt mit einem festen Anbieter je Anfrage auf.
+        return self._anfragen_mit_fabrik(lambda: anbieter)
+
+    def _anfragen_mit_fabrik(self, fabrik: Callable[[], Transkription]) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
             "/sitzungen/transkription/", {"audio": self._aufnahme()}
@@ -66,10 +72,24 @@ class ProbelaufTranskriptionTests(TestCase):
         request.session = self.client.session
         try:
             return transkriptions_endpunkt(
-                anbieter, probelauf_sitzung_fuer_transkription
+                fabrik, probelauf_sitzung_fuer_transkription
             )(request)
         finally:
             request.close()
+
+    def test_bildet_den_anbieter_je_anfrage_neu(self) -> None:
+        """Eine geänderte Konfiguration greift sofort, nicht erst beim Neustart."""
+        self._probelauf_starten()
+        gebildete: list[FakeTranskription] = []
+
+        def fabrik() -> FakeTranskription:
+            gebildete.append(FakeTranskription(["Wie hast du gerechnet?"]))
+            return gebildete[-1]
+
+        for _ in range(2):
+            self.assertEqual(self._anfragen_mit_fabrik(fabrik).status_code, 200)
+
+        self.assertEqual(len(gebildete), 2)
 
     def test_laufender_probelauf_transkribiert_ohne_teilnahme(self) -> None:
         """Die Autor:in spricht über eigenes Material, ohne einzuwilligen."""

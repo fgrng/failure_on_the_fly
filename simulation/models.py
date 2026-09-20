@@ -424,3 +424,61 @@ class AktiveModellKonfiguration(models.Model):
                 name="simulation_aktive_modell_konfiguration_ist_singleton",
             ),
         ]
+
+
+class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
+    """Zugang zur einzigen Transkriptions-Konfiguration."""
+
+    def aktuelle(self) -> "TranskriptionsKonfiguration":
+        """Liefert die eine Zeile und legt sie beim ersten Zugriff an."""
+
+        konfiguration, _ = self.get_or_create(pk=1)
+        return konfiguration
+
+
+class TranskriptionsKonfiguration(models.Model):
+    """Der einzige, veränderliche Anbieterzugang der Transkription.
+
+    Anders als die Modell-Konfiguration wird sie nicht gepinnt und nicht
+    exportiert (ADR-0026); eine alte Fassung trüge deshalb keine Information.
+    """
+
+    class Anbieter(models.TextChoices):
+        """Die Anbieter, zwischen denen die Administrator:in wählt."""
+
+        FAKE: tuple[str, str] = "fake", "Fake"
+        OPENROUTER: tuple[str, str] = "openrouter", "OpenRouter"
+        INFOMANIAK: tuple[str, str] = "infomaniak", "Infomaniak"
+
+    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        primary_key=True,
+        default=1,
+        editable=False,
+    )
+    anbieter: models.CharField = models.CharField(
+        max_length=10,
+        choices=Anbieter,
+        default=Anbieter.FAKE,
+    )
+    anbieter_basis_url: models.URLField = models.URLField(blank=True, default="")
+    anbieter_token: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    transkriptionsmodell: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    sprache: models.CharField = models.CharField(max_length=5, default="de")
+
+    objects: TranskriptionsKonfigurationManager = TranskriptionsKonfigurationManager()
+
+    class Meta:
+        constraints: list[models.BaseConstraint] = [
+            models.CheckConstraint(
+                condition=Q(id=1),
+                name="simulation_transkriptions_konfiguration_ist_singleton",
+            ),
+        ]

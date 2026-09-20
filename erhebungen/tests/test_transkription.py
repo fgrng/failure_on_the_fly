@@ -86,9 +86,9 @@ class ErhebungsTranskriptionTests(TestCase):
         request.user = AnonymousUser()
         request.session = self.client.session
         try:
-            return transkriptions_endpunkt(anbieter, sitzung_fuer_transkription)(
-                request
-            )
+            return transkriptions_endpunkt(
+                lambda: anbieter, sitzung_fuer_transkription
+            )(request)
         finally:
             request.close()
 

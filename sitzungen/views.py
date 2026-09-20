@@ -321,10 +321,13 @@ def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None
 
 
 def transkriptions_endpunkt(
-    anbieter: Transkription,
+    anbieter_bilden: Callable[[], Transkription],
     sitzung_aufloesen: Callable[[HttpRequest], Sitzung | None],
 ) -> Callable[[HttpRequest], HttpResponse]:
     """Erzeugt den geschützten Endpunkt eines Prinzipals für seinen Anbieter.
+
+    `anbieter_bilden` wird je Anfrage gerufen: Die Anbieterkonfiguration liegt
+    in der Datenbank, und ein gehaltener Adapter überlebte ihre Änderung.
 
     `sitzung_aufloesen` trägt die Autorisierung des jeweiligen Prinzipals und
     hat drei erlaubte Ausgänge:
@@ -352,7 +355,7 @@ def transkriptions_endpunkt(
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         audio: bytes = request.FILES["audio"].read()
         try:
-            text: str = anbieter.transkribieren(audio)
+            text: str = anbieter_bilden().transkribieren(audio)
         except LeeresTranskript:
             return JsonResponse({"status": "leeres_transkript"}, status=422)
         except TranskriptionsAnbieterfehler:
