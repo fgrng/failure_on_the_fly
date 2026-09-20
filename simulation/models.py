@@ -388,9 +388,19 @@ MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
     }
 )
 FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript"})
-# Die Maskierung eines hinterlegten Tokens in der blauen Ansicht (Spec C).
-TOKEN_MASKE: str = "•" * 8
-TOKEN_SICHTBARE_ZEICHEN: int = 4
+
+
+def _zugangsfehler(anbieter: str, token: str, basis_url: str) -> dict[str, str]:
+    # Prüft die Zugangsdaten, die jeder echte Anbieter gleichermaßen verlangt.
+
+    fehler: dict[str, str] = {}
+    if not token:
+        fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+    if anbieter == Anbieter.INFOMANIAK and not basis_url:
+        fehler["anbieter_basis_url"] = (
+            "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
+        )
+    return fehler
 
 
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
@@ -471,16 +481,14 @@ class ModellKonfiguration(models.Model):
 
         if self.anbieter == Anbieter.FAKE:
             return self._fake_bindungsfehler()
-        fehler: dict[str, str] = {}
+        fehler: dict[str, str] = _zugangsfehler(
+            self.anbieter,
+            self.anbieter_token,
+            self.anbieter_basis_url,
+        )
         praefix: str = ANBIETER_PRAEFIX[self.anbieter]
         if not self.sprachmodell.startswith(praefix):
             fehler["sprachmodell"] = f"Dieser Anbieter verlangt das Präfix »{praefix}«."
-        if not self.anbieter_token:
-            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
-        if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
-            fehler["anbieter_basis_url"] = (
-                "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
-            )
         return fehler
 
     def _fake_bindungsfehler(self) -> dict[str, str]:
@@ -537,6 +545,12 @@ class AktiveModellKonfiguration(models.Model):
                 name="simulation_aktive_modell_konfiguration_ist_singleton",
             ),
         ]
+
+
+# Ein hinterlegtes Token bleibt an der Oberfläche nur an seinen letzten
+# Zeichen wiedererkennbar.
+TOKEN_MASKE: str = "•" * 8
+TOKEN_SICHTBARE_ZEICHEN: int = 4
 
 
 class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
@@ -597,16 +611,14 @@ class TranskriptionsKonfiguration(models.Model):
 
         if self.anbieter == Anbieter.FAKE:
             return  # Der Platzhalter-Adapter hat weder Endpunkt noch Modell.
-        fehler: dict[str, str] = {}
+        fehler: dict[str, str] = _zugangsfehler(
+            self.anbieter,
+            self.anbieter_token,
+            self.anbieter_basis_url,
+        )
         if not self.transkriptionsmodell:
             fehler["transkriptionsmodell"] = (
                 "Ohne Modellnamen weiß der Anbieter nicht, was er laden soll."
-            )
-        if not self.anbieter_token:
-            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
-        if self.anbieter == Anbieter.INFOMANIAK and not self.anbieter_basis_url:
-            fehler["anbieter_basis_url"] = (
-                "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
             )
         if fehler:
             raise ValidationError(fehler)

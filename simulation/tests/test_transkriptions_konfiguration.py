@@ -28,6 +28,18 @@ def _eingabe(**werte: object) -> dict[str, object]:
     }
 
 
+def _administratorin(username: str) -> Konto:
+    """Legt ein Konto mit Zugriff auf die Systemseiten an."""
+    return get_user_model().objects.create_user(username=username, is_superuser=True)
+
+
+def _autorin(username: str) -> Konto:
+    """Legt ein Konto mit Entwicklungs-, aber ohne Administrationsrolle an."""
+    konto: Konto = get_user_model().objects.create_user(username=username)
+    konto.groups.add(Group.objects.get(name="Autor:in"))
+    return konto
+
+
 @pytest.mark.django_db
 def test_fake_braucht_weder_modell_noch_zugangsdaten() -> None:
     """Die Vorgabe bleibt gültig, ohne dass jemand etwas einträgt."""
@@ -95,18 +107,6 @@ def test_maskierung_ohne_token_bleibt_leer() -> None:
     """Ohne hinterlegtes Token gibt es nichts zu maskieren."""
 
     assert TranskriptionsKonfiguration().token_maskiert == ""
-
-
-def _administratorin(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf die Systemseiten an."""
-    return get_user_model().objects.create_user(username=username, is_superuser=True)
-
-
-def _autorin(username: str) -> Konto:
-    """Legt ein Konto mit Entwicklungs-, aber ohne Administrationsrolle an."""
-    konto: Konto = get_user_model().objects.create_user(username=username)
-    konto.groups.add(Group.objects.get(name="Autor:in"))
-    return konto
 
 
 class TranskriptionsKonfigurationRollenTests(TestCase):

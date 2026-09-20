@@ -1,4 +1,4 @@
-"""Formulare der Simulationskern-Verwaltung."""
+"""Formulare der Systemverwaltung: Simulationskern und Transkription."""
 
 from django.forms import ModelForm, PasswordInput
 
@@ -66,7 +66,7 @@ class TranskriptionsKonfigurationForm(ModelForm):
     """Der eine, veränderliche Anbieterzugang der Transkription."""
 
     class Meta:
-        """Führt alle fünf Felder; das Token gibt das Formular nie zurück."""
+        """Führt die Felder der Konfiguration; das Token gibt sie nie zurück."""
 
         model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
         fields: list[str] = [
@@ -93,7 +93,9 @@ class TranskriptionsKonfigurationForm(ModelForm):
         }
 
     def clean_anbieter_token(self) -> str:
-        """Liest eine leere Eingabe als »unverändert«, nicht als »löschen«."""
-        # Das Feld gibt den gesetzten Wert nie zurück; eine leere Eingabe wäre
-        # sonst bei jeder anderen Änderung ein versehentlicher Tokenverlust.
+        """Liest eine leere Eingabe als »unverändert«, nicht als »löschen«.
+
+        Das Feld zeigt den gesetzten Wert nie an; ohne diese Lesart wäre jede
+        Änderung an einem anderen Feld ein versehentlicher Tokenverlust.
+        """
         return self.cleaned_data["anbieter_token"] or self.instance.anbieter_token
