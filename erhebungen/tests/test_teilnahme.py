@@ -21,6 +21,7 @@ from erhebungen.models import (
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -867,7 +868,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
 
     def test_modellversagen_zeigt_den_sitzungsblock(self) -> None:
-        """Ein gescheitertes Diagnosegespräch trägt ebenfalls seine Itemzeilen."""
+        """Ein gescheitertes Diagnosegespräch trägt seine Itemzeilen nach einem Schritt."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
@@ -889,6 +890,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        anfragen_vorher: int = len(FakeSprachmodell.letzte_anfragen)
 
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:gespraech", args=[bindung.token]),
@@ -897,6 +899,8 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
+        # Ein Gesprächsschritt je Anfrage: die drei Versuche aus ADR-0011, sonst nichts.
+        self.assertEqual(len(FakeSprachmodell.letzte_anfragen) - anfragen_vorher, 3)
 
     def test_endgueltiger_fehlschlag_bewahrt_gespraechsschritt_ohne_antwort(
         self,

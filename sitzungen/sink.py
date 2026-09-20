@@ -69,10 +69,10 @@ class SitzungSink(Protocol):
     ) -> None:
         """Bewahrt einen geglückten Gesprächsschritt auf."""
 
-    def gescheiterten_schritt_anhaengen(
+    def gescheiterten_schritt_behandeln(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Bewahrt einen endgültig fehlgeschlagenen Schritt und beendet die Sitzung."""
+        """Behält oder verwirft den endgültig fehlgeschlagenen Schritt."""
 
     def diagnose_setzen(self, text: str) -> None:
         """Bewahrt die abschließende Diagnose auf."""
@@ -86,6 +86,9 @@ class SitzungSink(Protocol):
 
     def budget_erschoepft(self, vignette: Vignette) -> bool:
         """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
+
+    def gespraechsende_vermerken(self) -> None:
+        """Hält fest, dass das erschöpfte Budget das Diagnosegespräch beendet hat."""
 
     def zeitbudget_fortsetzen(self) -> None:
         """Startet die Uhr, wenn die teilnehmende Person wieder eine Eingabe verfassen kann."""
@@ -162,10 +165,10 @@ class DBSink:
                 ]
             )
 
-    def gescheiterten_schritt_anhaengen(
+    def gescheiterten_schritt_behandeln(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Schreibt Abbruchschritt und gescheiterten Status atomar."""
+        """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0011)."""
 
         with transaction.atomic():
             Gespraechsschritt.objects.answerless_anlegen(
@@ -223,6 +226,9 @@ class DBSink:
         if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
             return self.gespraechsschritte.count() >= vignette.budget_wert
         return self.verbrauchte_zeit >= vignette.budget_wert
+
+    def gespraechsende_vermerken(self) -> None:
+        """Lässt die Sitzung laufen: Erst die Diagnose schließt sie ab (ADR-0009)."""
 
     @property
     def verbrauchte_zeit(self) -> float:
@@ -325,12 +331,6 @@ class ScratchSink:
         return cast(int, self._zustand["modell_konfiguration_pk"])
 
     @property
-    def ist_gescheitert(self) -> bool:
-        """Kennzeichnet einen terminal fehlgeschlagenen Probelauf."""
-
-        return self._zustand.get("status") == Sitzung.Status.GESCHEITERT
-
-    @property
     def ist_beendet(self) -> bool:
         """Kennzeichnet einen Probelauf, dessen Debrief bereits erreicht ist."""
 
@@ -373,29 +373,14 @@ class ScratchSink:
         )
         self._als_geaendert_markieren()
 
-    def gescheiterten_schritt_verwerfen(self) -> None:
-        """Entfernt einen endgültig gescheiterten Schritt aus dem Probelauf."""
-
-        self.gespraechsschritte.pop()
-        self._zustand.pop("status")
-        self._als_geaendert_markieren()
-
-    def gescheiterten_schritt_anhaengen(
+    def gescheiterten_schritt_behandeln(
         self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
     ) -> None:
-        """Hängt den antwortlosen Schritt an und beendet den Probelauf."""
+        """Verwirft den gescheiterten Schritt: Der Probelauf hält keinen Abbruch fest.
 
-        self.gespraechsschritte.append(
-            {
-                "reihenfolge": len(self.gespraechsschritte) + 1,
-                "eingabe": eingabe,
-                "denkspur": None,
-                "aeusserung": None,
-                "native_reasoning_spur": None,
-                "fehlversuche": fehlversuche,
-            }
-        )
-        self.status_setzen(Sitzung.Status.GESCHEITERT)
+        Er dokumentiert nichts (ADR-0014) und bleibt offen, damit die Autor:in
+        dieselbe Eingabe erneut senden kann.
+        """
 
     def diagnose_setzen(self, text: str) -> None:
         """Hält die im Probelauf verworfene Diagnose in der Session."""
@@ -408,6 +393,11 @@ class ScratchSink:
 
         self._zustand["status"] = status
         self._als_geaendert_markieren()
+
+    def gespraechsende_vermerken(self) -> None:
+        """Schließt den Probelauf ab, den keine gespeicherte Diagnose beenden wird."""
+
+        self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
 
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""

@@ -38,7 +38,11 @@ Die eine Methode nimmt System-Prompt, User-Prompt, den bisherigen Gesprächsverl
 
 Dass der **Verlauf hinter die Naht** reicht statt davor zu einem Prompt-String zusammengeklebt zu werden, hat denselben Grund: Wie eine Konversation gegenüber einem Anbieter dargestellt wird — abwechselnde `user`- und `assistant`-Rollen — ist Adapter-Wissen. Die Domänenseite übergibt Gesprächsschritte als Paare aus Eingabe und sichtbarer Äußerung und weiß nicht, in welches Format sie geraten.
 
-Der **Sink** (`sitzungen/sink.py`): das Ziel einer Spielorchestrierung, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Die Orchestrierung kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.
+Der **Sink** (`sitzungen/sink.py`): das Ziel eines Sitzungslaufs, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Der Lauf (`sitzungen/durchlauf.py`) kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.
+
+Der Sink ist **mehr als Persistenz**. Er trägt zusätzlich die unsichtbare Uhr und die Prüfung des Gesprächsbudgets aus ADR-0012, den lesenden Zugriff auf die bisherigen Gesprächsschritte und die beiden Stellen, an denen die Anlässe auseinandergehen: ob ein endgültig gescheiterter Schritt neben dem Transkript stehen bleibt (ADR-0011: die persistierte Sitzung behält ihn, der Probelauf verwirft ihn) und ob das erschöpfte Budget die Sitzung abschließt (der Probelauf tut es, die persistierte Sitzung wartet auf ihre Diagnose). Damit existiert der Ablauf eines Gesprächsschritts **einmal** — und ADR-0014, „der Probelauf unterscheidet sich allein in der Persistierung", ist strukturell wahr statt behauptet. Läge eines dieser Stücke vor der Naht, müsste es jeder Anlass ein zweites Mal richtig hinschreiben.
+
+Was der Lauf an seine Aufruferin zurückgibt, ist der **Ausgang** des Gesprächsschritts — fortgesetzt, gescheitert oder Budget erschöpft. Er ist ein Rückgabewert und kein Gegenstand mit Eigenleben; deshalb steht er nicht im Glossar. Die Aufruferin verzweigt auf ihn, bevor sie rendert, statt die Regel „endgültig gescheitert" ein zweites Mal nachzurechnen.
 
 Der Ablauf ist keine Naht: `erhebungen/ablauf.py` sequenziert ausschließlich Erhebungsbindungen, und Training hat keinen entsprechenden Ablauf. `naechster_schritt(teilnahme)` liefert eine Vignetten-Fassung, einen berechneten `am_ende`-Itemblock oder das Ende direkt aus dem Erhebungsmodell. Nur der Abschluss-Block ist ein Ablauf-Schritt, weil er aus der Datenbank rekonstruierbar ist; der Sitzungs-Block hängt am Ausgang einer Sitzung und wird durch den generischen Anhang-Slot der Sitzungsdarstellung gerendert.
 
@@ -56,7 +60,7 @@ Der übergebene `verlauf` ist eine Liste sichtbarer Äußerungen. Die Denkspur h
 
 Bindend sind der Schnitt entlang der Domänenobjekte, die Azyklizität samt Kantenrichtung und die Zahl der Nähte. Eine Abweichung davon ist ein neues ADR, das dieses ablöst.
 
-Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst.
+Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Für sie gilt: **Die Views eines Anlasses liegen bei der App dieses Anlasses** — die Trainings-Views bei `training`, die Erhebungs-Views bei `erhebungen`, die Probelauf-Views bei `sitzungen`, jede mit ihren eigenen Routen. Das folgt aus der Kantenrichtung: Views, die `sitzungen` für einen seiner Aufrufer hielte, zwängen es, diesen Aufrufer zu kennen. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst.
 
 ## Considered Options
 

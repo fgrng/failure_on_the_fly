@@ -20,6 +20,7 @@ from simulation.transkription import (
     TranskriptionsAnbieterfehler,
 )
 from sitzungen.durchlauf import (
+    Ausgang,
     Sitzungsnavigation,
     gespraechsschritt_ausfuehren,
     sitzung_anzeigen,
@@ -261,28 +262,21 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
         sink.zeitbudget_fortsetzen()
         return _gespraech_anzeigen(request, vignette, kern, schritte)
-    if sink.ist_gescheitert:
-        return _gespraech_anzeigen(request, vignette, kern, schritte)
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
-    sink.zeitbudget_anhalten()
-    antwortversuch = gespraechsschritt_ausfuehren(
+    ausgang: Ausgang = gespraechsschritt_ausfuehren(
         sink,
         vignette,
         kern,
         modell_konfiguration,
         eingabe,
     )
-    if antwortversuch.endgueltig_gescheitert:
-        sink.gescheiterten_schritt_verwerfen()
-        sink.zeitbudget_fortsetzen()
+    if ausgang is Ausgang.GESCHEITERT:
         return _gespraech_anzeigen(request, vignette, kern, schritte, eingabe)
-    if sink.budget_erschoepft(vignette):
-        sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+    if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return _debrief_anzeigen(request, vignette, kern, schritte)
-    sink.zeitbudget_fortsetzen()
     return _gespraech_anzeigen(request, vignette, kern, schritte)
 
 
@@ -442,8 +436,14 @@ def persistiertes_gespraech(
     sitzung: Sitzung,
     navigation: Sitzungsnavigation,
     anhang: str | None = None,
+    sitzungsblock: Callable[[], str] | None = None,
 ) -> HttpResponse:
-    """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus."""
+    """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus.
+
+    `sitzungsblock` hängt einer gescheiterten Sitzung den Block ihrer Aufruferin
+    an. Er wird erst nach dem Ausgang des Schritts berechnet, weil sein Anlegen
+    zur Datenspur gehört (ADR-0029).
+    """
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
@@ -467,19 +467,19 @@ def persistiertes_gespraech(
         return _persistiertes_gespraech_anzeigen(
             request, sitzung, schritte, navigation=navigation
         )
-    sink.zeitbudget_anhalten()
-    antwortversuch = gespraechsschritt_ausfuehren(
+    ausgang: Ausgang = gespraechsschritt_ausfuehren(
         sink,
         sitzung.vignette,
         sitzung.simulationskern,
         sitzung.modell_konfiguration,
         request.POST["eingabe"],
     )
-    if antwortversuch.endgueltig_gescheitert:
+    if ausgang is Ausgang.GESCHEITERT:
+        if sitzungsblock is not None:
+            anhang = sitzungsblock()
         return persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
-    if sink.budget_erschoepft(sitzung.vignette):
+    if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
-    sink.zeitbudget_fortsetzen()
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,

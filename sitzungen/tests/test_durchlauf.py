@@ -13,6 +13,7 @@ from sitzungen.models import (
     Teilnahme,
 )
 from sitzungen.durchlauf import (
+    Ausgang,
     gespraechsschritt_ausfuehren,
     modellverlauf,
     sitzung_abbrechen,
@@ -80,44 +81,6 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
             ],
         }
     ]
-
-
-def test_scratch_sink_haelt_den_answerless_schritt_und_gescheiterten_status() -> None:
-    """Ein endgültig verworfener Antwortversuch beendet die schreibfreie Sitzung."""
-
-    session: SessionStore = SessionStore()
-    sink: ScratchSink = ScratchSink(session)
-    vignette: Vignette = Vignette(lernauftrag_text="Addiere zwei Brüche.")
-    kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
-    konfiguration: ModellKonfiguration = ModellKonfiguration(
-        sprachmodell="fake",
-        parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
-    )
-
-    sitzung_starten(sink, vignette, kern, konfiguration)
-    gespraechsschritt_ausfuehren(
-        sink,
-        vignette,
-        kern,
-        konfiguration,
-        eingabe="Wie hast du gerechnet?",
-    )
-
-    assert session["probelauf"]["gespraechsschritte"] == [
-        {
-            "reihenfolge": 1,
-            "eingabe": "Wie hast du gerechnet?",
-            "denkspur": None,
-            "aeusserung": None,
-            "native_reasoning_spur": None,
-            "fehlversuche": [
-                {"grund": "Anbieterfehler", "rohantwort": ""},
-                {"grund": "Anbieterfehler", "rohantwort": ""},
-                {"grund": "Anbieterfehler", "rohantwort": ""},
-            ],
-        }
-    ]
-    assert session["probelauf"]["status"] == "gescheitert"
 
 
 @pytest.mark.django_db
@@ -504,4 +467,82 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
         )
 
         assert modellverlauf(sink) == []
-        assert len(list(sink.gespraechsschritte)) == 1
+
+    assert len(list(datenbank.gespraechsschritte)) == 1
+
+
+@pytest.mark.django_db
+def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> None:
+    """Ein geglückter Schritt im Budget hält das Gespräch für beide Sinks offen."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
+    )
+
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+    ):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+
+        ausgang = gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+
+        assert ausgang is Ausgang.FORTGESETZT
+
+
+@pytest.mark.django_db
+def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behandelt() -> (
+    None
+):
+    """Der Probelauf verwirft den gescheiterten Schritt, die Sitzung behält ihn (ADR-0011)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"fehler": "anbieterfehler"}] * 3
+    )
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+
+    ausgaenge = []
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        ausgaenge.append(
+            gespraechsschritt_ausfuehren(
+                sink, vignette, kern, konfiguration, eingabe="Warum?"
+            )
+        )
+
+    assert ausgaenge == [Ausgang.GESCHEITERT, Ausgang.GESCHEITERT]
+    assert scratch.gespraechsschritte == []
+    assert Sitzung.objects.get().status == Sitzung.Status.GESCHEITERT
+    assert Gespraechsschritt.objects.get().aeusserung is None
+
+
+@pytest.mark.django_db
+def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probelauf_ab() -> (
+    None
+):
+    """Das Budget beendet das Gespräch; die persistierte Sitzung schließt erst die Diagnose ab."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}] * 2
+    )
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 1
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+
+    ausgaenge = []
+    for sink in (scratch, datenbank):
+        sitzung_starten(sink, vignette, kern, konfiguration)
+        ausgaenge.append(
+            gespraechsschritt_ausfuehren(
+                sink, vignette, kern, konfiguration, eingabe="Warum?"
+            )
+        )
+
+    assert ausgaenge == [Ausgang.BUDGET_ERSCHOEPFT, Ausgang.BUDGET_ERSCHOEPFT]
+    assert scratch.ist_beendet
+    assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND

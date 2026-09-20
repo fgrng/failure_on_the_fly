@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum, auto
 
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
@@ -50,15 +51,30 @@ def _gespraechsseiten(
     return schritt.eingabe, schritt.aeusserung
 
 
+class Ausgang(Enum):
+    """Wie ein Gesprächsschritt endet und woran seine Aufruferin verzweigt."""
+
+    FORTGESETZT = auto()
+    GESCHEITERT = auto()
+    BUDGET_ERSCHOEPFT = auto()
+
+
 def gespraechsschritt_ausfuehren(
     sink: SitzungSink,
     vignette: Vignette,
     simulationskern: Simulationskern,
     modell_konfiguration: ModellKonfiguration,
     eingabe: str,
-) -> Antwortversuch:
-    """Versucht eine Antwort und übergibt ihren Schritt ausschließlich dem Sink."""
+) -> Ausgang:
+    """Führt den einen Gesprächsschritt aller drei Anlässe aus und meldet seinen Ausgang.
 
+    Die Uhr steht still, solange das Modell antwortet (ADR-0012). Ob ein
+    endgültig gescheiterter Schritt neben dem Transkript stehen bleibt
+    (ADR-0011) und ob das erschöpfte Budget die Sitzung abschließt, entscheidet
+    der Sink hinter der Naht — nicht dieser Ablauf.
+    """
+
+    sink.zeitbudget_anhalten()
     antwortversuch: Antwortversuch = antwort_versuchen(
         vignette,
         simulationskern,
@@ -71,11 +87,12 @@ def gespraechsschritt_ausfuehren(
         for fehlversuch in antwortversuch.fehlversuche
     ]
     if antwortversuch.antwort is None:
-        sink.gescheiterten_schritt_anhaengen(
+        sink.gescheiterten_schritt_behandeln(
             eingabe=eingabe,
             fehlversuche=fehlversuche,
         )
-        return antwortversuch
+        sink.zeitbudget_fortsetzen()
+        return Ausgang.GESCHEITERT
     sink.gespraechsschritt_anhaengen(
         eingabe=eingabe,
         denkspur=antwortversuch.antwort.denkspur,
@@ -83,7 +100,11 @@ def gespraechsschritt_ausfuehren(
         native_reasoning_spur=antwortversuch.native_reasoning_spur,
         fehlversuche=fehlversuche,
     )
-    return antwortversuch
+    if sink.budget_erschoepft(vignette):
+        sink.gespraechsende_vermerken()
+        return Ausgang.BUDGET_ERSCHOEPFT
+    sink.zeitbudget_fortsetzen()
+    return Ausgang.FORTGESETZT
 
 
 def sitzung_beenden(sink: SitzungSink) -> None:

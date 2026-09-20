@@ -932,15 +932,11 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
 
     sitzung, bindung = _erhebungssitzung(token)
-    antwort = persistiertes_gespraech(request, sitzung, _sitzungsnavigation(token))
-    sitzung.refresh_from_db(fields=["status"])
-    if sitzung.status != Sitzung.Status.GESCHEITERT:
-        return antwort
     return persistiertes_gespraech(
         request,
         sitzung,
         _sitzungsnavigation(token),
-        anhang=_sitzungsblock_rendern(request, bindung, sitzung),
+        sitzungsblock=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
     )
 
 
