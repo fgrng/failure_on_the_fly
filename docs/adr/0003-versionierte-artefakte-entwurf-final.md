@@ -20,7 +20,7 @@ Je Historie existiert **höchstens ein Entwurf**. Zwei gleichzeitig offene Entw�
 
 ## Archivierung statt Löschen
 
-Eine finale Fassung kann **archiviert** werden — das logische Löschen. Physisches Löschen finaler Fassungen gibt es nicht, denn Datenspuren müssen sie noch Jahre später darstellen können. Auch eine ganze **Vignettenhistorie** ist archivierbar; sie archiviert dann alle ihre Fassungen und löscht den offenen Entwurf. Eine vollständig archivierte Historie ist eine tote Linie: Es gibt keine nicht-archivierte Fassung mehr, von der aus ein Entwurf entstehen könnte.
+Eine finale Fassung kann **archiviert** werden — das logische Löschen. Für den Simulationskern gilt stattdessen ADR-0035. Dort ist Archivieren keine eigene Geste, sondern die Nebenwirkung des Finalisierens der Nachfolgerin, und es ist nicht umkehrbar. Physisches Löschen finaler Fassungen gibt es nicht, denn Datenspuren müssen sie noch Jahre später darstellen können. Auch eine ganze **Vignettenhistorie** ist archivierbar; sie archiviert dann alle ihre Fassungen und löscht den offenen Entwurf. Eine vollständig archivierte Historie ist eine tote Linie: Es gibt keine nicht-archivierte Fassung mehr, von der aus ein Entwurf entstehen könnte.
 
 Was Archivierung bewirkt:
 

@@ -148,8 +148,9 @@ unvollständig sein. Erst das **Finalisieren** validiert:
    `budget_typ`.
 2. Das Arbeitsheft trägt **Text oder Bild** (mindestens eines von beiden).
 3. Der Budget-Wert ist gesetzt und größer als 0.
-4. Der gepinnte Simulationskern existiert und ist final — ein archivierter Kern
-   verlangt vorher ein Vorspulen.
+4. Ein Simulationskern ist gepinnt. Sein Zustand spielt keine Rolle: Ist die
+   gepinnte Fassung inzwischen überholt, lässt sich der Entwurf trotzdem
+   finalisieren und spielen; **Vorspulen** ist eine Wahl, keine Bedingung.
 
 Eine inhaltliche Qualitätsprüfung gibt es nicht. Ob das Fehlermuster simulierbar
 ist, entscheidet allein die Autor:in — deshalb ist der Leitfaden in
