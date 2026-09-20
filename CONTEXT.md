@@ -153,7 +153,7 @@ Der unveränderliche Zustand eines versionierten Artefakts. Nur finale Fassungen
 _Avoid_: veröffentlicht, publiziert, freigegeben — Vignetten sind privat, es gibt nichts zu veröffentlichen.
 
 **Archiviert**:
-Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar, bleibt aber aus jeder Datenspur heraus lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar.
+Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar, bleibt aber aus jeder Datenspur heraus lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar. Beim Simulationskern heißt derselbe Zustand **überholt**: Dort entsteht er nur als Nebenwirkung des Finalisierens der Nachfolgerin und ist nicht umkehrbar (ADR-0035).
 _Avoid_: gelöscht, deaktiviert, zurückgezogen
 
 **Historie**:
