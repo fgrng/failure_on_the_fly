@@ -82,7 +82,7 @@ class TranskriptionsEndpointTests(TestCase):
         request.user = get_user_model().objects.get(username="grace")
         request.session = self.client.session
         try:
-            return transkriptions_endpunkt(anbieter, training_sitzung)(request)
+            return transkriptions_endpunkt(lambda: anbieter, training_sitzung)(request)
         finally:
             request.close()
 

@@ -4,15 +4,17 @@ from unittest.mock import Mock, patch
 
 import httpx
 import pytest
-from django.test import override_settings
 from openai import APIConnectionError
 
+from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
+    PLATZHALTER_TRANSKRIPT,
     AnbieterNichtErreichbar,
     FakeTranskription,
     LeeresTranskript,
-    TranskriptionsAnbieterfehler,
     OpenAITranskription,
+    TranskriptionsAnbieterfehler,
+    transkriptions_anbieter,
 )
 
 
@@ -42,52 +44,31 @@ def test_fake_transkription_spielt_jeden_fehlerzustand_ab(
         transkription.transkribieren(b"aufgenommene-audiobytes")
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
-def test_openai_transkription_ohne_zero_retention_nicht_aufruft() -> None:
-    """Ohne vertragliche Zusicherung verlässt kein Audio den Server."""
+def _openai_transkription(client: Mock) -> OpenAITranskription:
+    # Bildet den Adapter so, wie die Anbieterfunktion ihn bildet.
 
-    with patch("simulation.transkription.OpenAI") as openai:
-        with pytest.raises(TranskriptionsAnbieterfehler):
-            OpenAITranskription().transkribieren(b"aufgenommene-audiobytes")
-
-    openai.assert_not_called()
+    return OpenAITranskription(client, modell="gpt-4o-transcribe", sprache="de")
 
 
-@override_settings(
-    TRANSKRIPTION_ANBIETER="openai",
-    TRANSKRIPTION_MODELL="gpt-4o-transcribe",
-    TRANSKRIPTION_ZERO_RETENTION=True,
-)
-def test_openai_transkription_reicht_audio_ohne_sprache_an_konfiguriertes_modell() -> (
+def test_openai_transkription_reicht_audio_an_konfiguriertes_modell_und_sprache() -> (
     None
 ):
-    """OpenAI erkennt die Sprache selbst."""
+    """Modell und Sprache stehen am Aufruf, statt vom Anbieter geraten zu werden."""
 
     audio = b"aufgenommene-audiobytes"
     client = Mock()
     client.audio.transcriptions.create.return_value.text = "Wie hast du gerechnet?"
-    transkription = OpenAITranskription(client)
 
-    assert transkription.transkribieren(audio) == "Wie hast du gerechnet?"
+    assert _openai_transkription(client).transkribieren(audio) == (
+        "Wie hast du gerechnet?"
+    )
     client.audio.transcriptions.create.assert_called_once_with(
         model="gpt-4o-transcribe",
+        language="de",
         file=("aufnahme.webm", audio, "audio/webm"),
     )
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
-def test_openai_transkription_erstellt_den_client_mit_zwei_minuten_timeout() -> None:
-    """Die Anbieterverbindung bricht nach zwei Minuten ab."""
-
-    with patch("simulation.transkription.OpenAI") as openai:
-        openai.return_value.audio.transcriptions.create.return_value.text = "Text"
-
-        OpenAITranskription().transkribieren(b"aufgenommene-audiobytes")
-
-    openai.assert_called_once_with(timeout=120.0)
-
-
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 @pytest.mark.parametrize(
     ("fehler", "erwarteter_fehler"),
     [
@@ -111,10 +92,9 @@ def test_openai_transkription_unterscheidet_anbieterfehler_und_nichterreichbarke
     client.audio.transcriptions.create.side_effect = fehler
 
     with pytest.raises(erwarteter_fehler):
-        OpenAITranskription(client).transkribieren(b"aufgenommene-audiobytes")
+        _openai_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 def test_openai_transkription_kennzeichnet_leere_antwort() -> None:
     """Ein leerer Anbietertext ist kein erfolgreicher Gesprächsbeitrag."""
 
@@ -122,10 +102,9 @@ def test_openai_transkription_kennzeichnet_leere_antwort() -> None:
     client.audio.transcriptions.create.return_value.text = "  "
 
     with pytest.raises(LeeresTranskript):
-        OpenAITranskription(client).transkribieren(b"aufgenommene-audiobytes")
+        _openai_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler() -> (
     None
 ):
@@ -135,4 +114,73 @@ def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler
     client.audio.transcriptions.create.return_value = object()
 
     with pytest.raises(TranskriptionsAnbieterfehler):
-        OpenAITranskription(client).transkribieren(b"aufgenommene-audiobytes")
+        _openai_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
+@pytest.mark.django_db
+def test_anbieterfunktion_bildet_fuer_fake_einen_platzhalter_ohne_netz() -> None:
+    """Der deterministische Adapter bekommt produktiv einen konstanten Text."""
+
+    with patch("simulation.transkription.OpenAI") as openai:
+        anbieter = transkriptions_anbieter()
+
+    assert anbieter.transkribieren(b"aufgenommene-audiobytes") == (
+        PLATZHALTER_TRANSKRIPT
+    )
+    openai.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_anbieterfunktion_haelt_keinen_adapter_ueber_anfragen_hinweg() -> None:
+    """Jede Anfrage bekommt einen frischen Adapter mit vollem Skript."""
+
+    erster: FakeTranskription = transkriptions_anbieter()
+    erster.transkribieren(b"aufgenommene-audiobytes")
+
+    zweiter: FakeTranskription = transkriptions_anbieter()
+
+    assert zweiter is not erster
+    assert zweiter.transkribieren(b"aufgenommene-audiobytes") == PLATZHALTER_TRANSKRIPT
+
+
+@pytest.mark.django_db
+def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguration() -> (
+    None
+):
+    """Zugangsdaten und Endpunktwurzel kommen aus der Datenbank, nicht der Umgebung."""
+
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+    konfiguration.anbieter = Anbieter.OPENROUTER
+    konfiguration.anbieter_basis_url = "https://openrouter.ai/api/v1"
+    konfiguration.anbieter_token = "geheimes-token"
+    konfiguration.transkriptionsmodell = "whisper-large-v3"
+    konfiguration.sprache = "fr"
+    konfiguration.save()
+
+    with patch("simulation.transkription.OpenAI") as openai:
+        anbieter: OpenAITranskription = transkriptions_anbieter()
+
+    openai.assert_called_once_with(
+        base_url="https://openrouter.ai/api/v1",
+        api_key="geheimes-token",
+        timeout=120.0,
+    )
+    assert anbieter.client is openai.return_value
+    assert anbieter.modell == "whisper-large-v3"
+    assert anbieter.sprache == "fr"
+
+
+@pytest.mark.django_db
+def test_anbieterfunktion_kennt_infomaniak_noch_nicht() -> None:
+    """Der asynchrone Adapter fehlt; die Naht sagt das, statt zu raten."""
+
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+    konfiguration.anbieter = Anbieter.INFOMANIAK
+    konfiguration.save()
+
+    with pytest.raises(TranskriptionsAnbieterfehler):
+        transkriptions_anbieter()

@@ -178,8 +178,6 @@ MEDIA_URL: str = "/media/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-TRANSKRIPTION_ANBIETER: str = os.environ.get("TRANSKRIPTION_ANBIETER", "openai")
-TRANSKRIPTION_MODELL: str = os.environ.get("TRANSKRIPTION_MODELL", "gpt-4o-transcribe")
 TRANSKRIPTION_ZERO_RETENTION: bool = (
     os.environ.get("TRANSKRIPTION_ZERO_RETENTION", "False") == "True"
 )

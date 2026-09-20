@@ -115,7 +115,7 @@ urlpatterns: list[URLPattern] = [
     path(
         "teilnahme/transkription/",
         transkriptions_endpunkt(
-            transkriptions_anbieter(), views.sitzung_fuer_transkription
+            transkriptions_anbieter, views.sitzung_fuer_transkription
         ),
         name="transkription",
     ),

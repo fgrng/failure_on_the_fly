@@ -158,9 +158,9 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 
 2. **Konfiguration anlegen.** Kopiere `.env.example` nach `.env` und trage die
    Werte ein — mindestens einen beliebigen `SECRET_KEY` und `DEBUG=True`. Die
-   Zugangsdaten des Sprachmodells liegen an der Modell-Konfiguration, nicht in
-   der Umgebung; `OPENAI_API_KEY` bedient die Audio-Transkription, und die
-   bleibt ohne `TRANSKRIPTION_ZERO_RETENTION=True` bewusst gesperrt:
+   Zugangsdaten von Sprachmodell und Transkription liegen an ihren
+   Konfigurationen, nicht in der Umgebung; die Transkription bleibt ohne
+   `TRANSKRIPTION_ZERO_RETENTION=True` bewusst gesperrt:
 
    ```
    cp .env.example .env
@@ -201,8 +201,9 @@ Die Testsuite läuft mit `uv run python manage.py test`.
 > Der Entwicklungs-Seed aktiviert das Fake-Sprachmodell, damit sich
 > Diagnosegespräche ohne Zugangsdaten durchklicken lassen. Für echte Antworten
 > wird eine Modell-Konfiguration mit Anbieter, Modellnamen und Token angelegt
-> und aktiviert; die Zugangsdaten des Sprachmodells liegen an der
-> Konfiguration, nicht mehr in der Umgebung.
+> und aktiviert; die Transkription wählt ihren Anbieter ebenso über ihre eigene
+> Konfiguration. Die Zugangsdaten liegen an diesen Konfigurationen, nicht mehr
+> in der Umgebung.
 
 ## Deployment auf Uberspace
 
@@ -228,7 +229,6 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
    CSRF_TRUSTED_ORIGINS=https://isabell.uber.space
    STATIC_ROOT=/home/isabell/html/static
    MEDIA_ROOT=/home/isabell/html/media
-   OPENAI_API_KEY=<Schlüssel>
    TRANSKRIPTION_ZERO_RETENTION=True
    ```
 

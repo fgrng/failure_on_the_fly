@@ -59,7 +59,7 @@ urlpatterns: list[URLPattern] = [
     path("sitzung/<int:pk>/ansehen/", views.sitzung_ansehen, name="sitzung_ansehen"),
     path(
         "sitzung/transkription/",
-        transkriptions_endpunkt(transkriptions_anbieter(), views.training_sitzung),
+        transkriptions_endpunkt(transkriptions_anbieter, views.training_sitzung),
         name="transkription",
     ),
 ]

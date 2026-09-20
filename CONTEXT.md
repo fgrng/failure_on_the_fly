@@ -115,6 +115,10 @@ _Avoid_: Protokoll, Chatverlauf, Mitschrift
 Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036). Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
 
+**Transkriptions-Konfiguration**:
+Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0036).
+_Avoid_: Transkriptionseinstellungen, Whisper-Konfiguration, STT-Konfiguration
+
 **Simulationskern**:
 Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Prompt-Vorlage, User-Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
 _Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.

@@ -14,6 +14,7 @@ from simulation.models import (
     KernHistorie,
     ModellKonfiguration,
     Simulationskern,
+    TranskriptionsKonfiguration,
 )
 
 
@@ -404,3 +405,48 @@ def test_aktive_modell_konfiguration_kann_nicht_geloescht_werden() -> None:
 
     with pytest.raises(ProtectedError):
         konfiguration.delete()
+
+
+@pytest.mark.django_db
+def test_transkriptions_konfiguration_beginnt_bei_fake_auf_deutsch() -> None:
+    """Ohne Zutun telefoniert die Transkription nicht nach außen."""
+
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+
+    assert konfiguration.anbieter == Anbieter.FAKE
+    assert konfiguration.sprache == "de"
+    assert konfiguration.anbieter_basis_url == ""
+    assert konfiguration.anbieter_token == ""
+    assert konfiguration.transkriptionsmodell == ""
+
+
+@pytest.mark.django_db
+def test_transkriptions_konfiguration_ueberschreibt_ihre_eine_zeile() -> None:
+    """Ein zweites Speichern rotiert die Zugangsdaten, statt anzuhäufen."""
+
+    erste: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktuelle()
+    erste.anbieter = Anbieter.OPENROUTER
+    erste.anbieter_token = "erstes-token"
+    erste.save()
+
+    zweite: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktuelle()
+    zweite.anbieter_token = "zweites-token"
+    zweite.save()
+
+    assert TranskriptionsKonfiguration.objects.count() == 1
+    assert TranskriptionsKonfiguration.objects.aktuelle().anbieter_token == (
+        "zweites-token"
+    )
+
+
+@pytest.mark.django_db
+def test_transkriptions_konfiguration_traegt_keinen_rohen_parameterbeutel() -> None:
+    """Was das Verhalten steuert, trägt hier einen Namen."""
+
+    felder: set[str] = {
+        feld.name for feld in TranskriptionsKonfiguration._meta.get_fields()
+    }
+
+    assert "parameter" not in felder

@@ -32,7 +32,7 @@ urlpatterns: list[URLPattern] = [
     path(
         "transkription/",
         views.transkriptions_endpunkt(
-            transkriptions_anbieter(), views.probelauf_sitzung_fuer_transkription
+            transkriptions_anbieter, views.probelauf_sitzung_fuer_transkription
         ),
         name="transkription",
     ),
