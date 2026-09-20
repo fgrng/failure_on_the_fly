@@ -191,3 +191,32 @@ def test_lehnt_parameter_ohne_schluesselraum_ab() -> None:
 
     with pytest.raises(ValidationError, match="parameter"):
         _openrouter(parameter=[{"temperature": 0.2}])
+
+
+@pytest.mark.django_db
+def test_maskiertes_token_zeigt_nur_die_letzten_vier_zeichen() -> None:
+    """Die Anzeige belegt, welches Token hängt, ohne es preiszugeben."""
+
+    konfiguration: ModellKonfiguration = _openrouter(anbieter_token="sk-or-geheim1234")
+
+    assert konfiguration.anbieter_token_maskiert == "••••••••1234"
+
+
+@pytest.mark.django_db
+def test_maskiertes_token_bleibt_ohne_token_leer() -> None:
+    """Wo kein Token hängt, täuscht die Maske auch keines vor."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        sprachmodell="fake",
+    )
+
+    assert konfiguration.anbieter_token_maskiert == ""
+
+
+@pytest.mark.django_db
+def test_maskiertes_token_gibt_ein_kurzes_token_gar_nicht_preis() -> None:
+    """Bei vier Zeichen oder weniger stünde die »Maske« sonst für das Ganze."""
+
+    konfiguration: ModellKonfiguration = _openrouter(anbieter_token="kurz")
+
+    assert konfiguration.anbieter_token_maskiert == "••••••••"

@@ -188,6 +188,38 @@ class SimulationskernLeereAnsichtTests(TestCase):
         )
 
 
+class ModellKonfigurationAnzeigeTests(TestCase):
+    """Die Kern-Ansichten zeigen die Anbieterbindung ohne das Token."""
+
+    def setUp(self) -> None:
+        """Aktiviert eine Infomaniak-Konfiguration mit Basis-URL und Token."""
+        self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            anbieter=Anbieter.INFOMANIAK,
+            sprachmodell="openai/mistral24b",
+            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+            anbieter_token="sk-infomaniak-geheim1234",
+            parameter={"temperature": 0.2},
+        )
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.client.force_login(_administratorin("linus"))
+
+    def test_zeigt_anbieter_basis_url_und_parameter(self) -> None:
+        """Die Administrator:in sieht, an welchem Endpunkt die Sitzung hängt."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "infomaniak")
+        self.assertContains(response, "https://api.infomaniak.com/1/ai/4711/openai")
+        self.assertContains(response, "openai/mistral24b")
+        self.assertContains(response, "temperature")
+
+    def test_zeigt_das_token_nur_maskiert(self) -> None:
+        """Das Geheimnis bleibt auch in der blauen Ansicht ein Geheimnis."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "••••••••1234")
+        self.assertNotContains(response, self.konfiguration.anbieter_token)
+
+
 class SimulationskernRollenTests(TestCase):
     """Der Simulationskern ist Teil der geschützten Entwicklung."""
 

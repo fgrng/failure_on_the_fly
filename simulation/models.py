@@ -366,6 +366,10 @@ class Anbieter(models.TextChoices):
 
 # Der Anbieter `fake` bedient genau ein Modell, das seinen Namen trägt.
 FAKE_MODELLNAME: str = "fake"
+# Die Maske der Token-Anzeige: genug zum Wiedererkennen, zu wenig zum Benutzen.
+TOKEN_MASKE: str = "••••••••"
+TOKEN_SICHTBARE_ZEICHEN: int = 4
+
 # Das Präfix, mit dem LiteLLM einen Modellnamen zum Anbieter routet.
 ANBIETER_PRAEFIX: dict[str, str] = {
     Anbieter.OPENROUTER: "openrouter/",
@@ -440,6 +444,17 @@ class ModellKonfiguration(models.Model):
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
 
     objects: ModellKonfigurationManager = ModellKonfigurationManager()
+
+    @property
+    def anbieter_token_maskiert(self) -> str:
+        """Belegt, welches Token hängt, ohne es in einer Ansicht preiszugeben."""
+
+        if not self.anbieter_token:
+            return ""
+        if len(self.anbieter_token) <= TOKEN_SICHTBARE_ZEICHEN:
+            # Ein kurzes Token stünde sonst vollständig hinter der Maske.
+            return TOKEN_MASKE
+        return f"{TOKEN_MASKE}{self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]}"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert jede Mutation und prüft die Konfiguration beim Anlegen."""

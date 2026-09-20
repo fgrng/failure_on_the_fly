@@ -324,10 +324,11 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         zip_datei.writestr(
             "modellkonfigurationen.csv",
             _csv_inhalt(
-                ("id", "sprachmodell", "parameter"),
+                ("id", "anbieter", "sprachmodell", "parameter"),
                 (
                     (
                         konfiguration.pk,
+                        konfiguration.anbieter,
                         konfiguration.sprachmodell,
                         json.dumps(konfiguration.parameter, ensure_ascii=False),
                     )
