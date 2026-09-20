@@ -101,6 +101,7 @@ def gespraechsschritt_ausfuehren(
         fehlversuche=fehlversuche,
     )
     if sink.budget_erschoepft(vignette):
+        # Die Uhr bleibt stehen: Nach dem Budget verfasst niemand mehr eine Eingabe.
         sink.gespraechsende_vermerken()
         return Ausgang.BUDGET_ERSCHOEPFT
     sink.zeitbudget_fortsetzen()

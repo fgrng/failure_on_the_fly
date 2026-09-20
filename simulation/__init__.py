@@ -40,12 +40,6 @@ class Antwortversuch:
     native_reasoning_spur: str | None
     fehlversuche: list[Fehlversuch]
 
-    @property
-    def endgueltig_gescheitert(self) -> bool:
-        """Kennzeichnet, dass kein verwertbares Ergebnis entstanden ist."""
-
-        return self.antwort is None
-
 
 def render(vorlage_text: str, mapping: Mapping[str, str]) -> str:
     """Füllt eine Vorlage mit genau ihren vereinbarten Platzhaltern."""

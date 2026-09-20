@@ -959,10 +959,10 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     sitzung, bindung = _erhebungssitzung(token)
     sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
     sitzung_abbrechen(sink)
-    anhang = _sitzungsblock_rendern(request, bindung, sitzung)
+    anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistiertes_gespraech(
-            request, sitzung, _sitzungsnavigation(token), anhang=anhang
+            request, sitzung, _sitzungsnavigation(token), sitzungsblock=lambda: anhang
         )
     return redirect(
         "erhebungen:instruktion", teilnahme_link=bindung.stichprobe.teilnahme_link
@@ -983,7 +983,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         if sitzung.status != Sitzung.Status.LAUFEND:
             return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
-    anhang = _sitzungsblock_rendern(request, bindung, sitzung)
+    anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistierten_debrief_anzeigen(
             request, sitzung, _sitzungsnavigation(token), anhang

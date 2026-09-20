@@ -60,7 +60,7 @@ Der übergebene `verlauf` ist eine Liste sichtbarer Äußerungen. Die Denkspur h
 
 Bindend sind der Schnitt entlang der Domänenobjekte, die Azyklizität samt Kantenrichtung und die Zahl der Nähte. Eine Abweichung davon ist ein neues ADR, das dieses ablöst.
 
-Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Für sie gilt: **Die Views eines Anlasses liegen bei der App dieses Anlasses** — die Trainings-Views bei `training`, die Erhebungs-Views bei `erhebungen`, die Probelauf-Views bei `sitzungen`, jede mit ihren eigenen Routen. Das folgt aus der Kantenrichtung: Views, die `sitzungen` für einen seiner Aufrufer hielte, zwängen es, diesen Aufrufer zu kennen. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst.
+Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst. Für die Ablage gilt dabei: **Die Views eines Anlasses liegen bei der App dieses Anlasses** — die Trainings-Views bei `training`, die Erhebungs-Views bei `erhebungen`, die Probelauf-Views bei `sitzungen`, jede mit ihren eigenen Routen. Das folgt aus der Kantenrichtung: Views, die `sitzungen` für einen seiner Aufrufer hielte, zwängen es, diesen Aufrufer zu kennen.
 
 ## Considered Options
 

@@ -431,27 +431,36 @@ def _persistiertes_gespraech_anzeigen(
     )
 
 
+def _kein_sitzungsblock() -> str | None:
+    # Steht für eine Aufruferin, die unter die Sitzung nichts hängt.
+
+    return None
+
+
 def persistiertes_gespraech(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation,
-    anhang: str | None = None,
-    sitzungsblock: Callable[[], str] | None = None,
+    sitzungsblock: Callable[[], str | None] = _kein_sitzungsblock,
 ) -> HttpResponse:
     """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus.
 
-    `sitzungsblock` hängt einer gescheiterten Sitzung den Block ihrer Aufruferin
-    an. Er wird erst nach dem Ausgang des Schritts berechnet, weil sein Anlegen
-    zur Datenspur gehört (ADR-0029).
+    `sitzungsblock` rendert den Anhang, den die Aufruferin unter eine beendete
+    Sitzung hängt. Er wird erst gerufen, wenn die gewählte Darstellung ihn
+    wirklich trägt, weil sein Anlegen zur Datenspur gehört (ADR-0029).
     """
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
-        return persistierten_debrief_anzeigen(request, sitzung, navigation, anhang)
+        return persistierten_debrief_anzeigen(
+            request, sitzung, navigation, sitzungsblock()
+        )
     schritte: QuerySet[Gespraechsschritt] = sitzung.gespraechsschritte
     if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
+        return persistierten_fehler_anzeigen(
+            request, sitzung, navigation, sitzungsblock()
+        )
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _persistiertes_gespraech_anzeigen(
             request,
@@ -459,7 +468,7 @@ def persistiertes_gespraech(
             schritte,
             ist_lesend=True,
             navigation=navigation,
-            anhang=anhang,
+            anhang=sitzungsblock(),
         )
     sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
     if request.method == "GET":
@@ -475,9 +484,9 @@ def persistiertes_gespraech(
         request.POST["eingabe"],
     )
     if ausgang is Ausgang.GESCHEITERT:
-        if sitzungsblock is not None:
-            anhang = sitzungsblock()
-        return persistierten_fehler_anzeigen(request, sitzung, navigation, anhang)
+        return persistierten_fehler_anzeigen(
+            request, sitzung, navigation, sitzungsblock()
+        )
     if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     return _persistiertes_gespraech_anzeigen(

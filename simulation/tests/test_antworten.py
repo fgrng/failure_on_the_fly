@@ -105,7 +105,6 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
         eingabe="Wie hast du gerechnet?",
     )
 
-    assert antwortversuch.endgueltig_gescheitert
     assert antwortversuch.antwort is None
     assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
         "Anbieterfehler"

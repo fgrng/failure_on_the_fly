@@ -479,13 +479,13 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
         [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
     )
 
-    for sink in (
-        ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create(), session=SessionStore()),
-    ):
+    scratch: ScratchSink = ScratchSink(SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+
+    for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
 
-        ausgang = gespraechsschritt_ausfuehren(
+        ausgang: Ausgang = gespraechsschritt_ausfuehren(
             sink, vignette, kern, konfiguration, eingabe="Warum?"
         )
 
@@ -504,7 +504,7 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
     scratch: ScratchSink = ScratchSink(SessionStore())
     datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
 
-    ausgaenge = []
+    ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
         ausgaenge.append(
@@ -534,7 +534,7 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     scratch: ScratchSink = ScratchSink(SessionStore())
     datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
 
-    ausgaenge = []
+    ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
         ausgaenge.append(
