@@ -266,6 +266,22 @@ def test_infomaniak_transkription_kennzeichnet_ein_leeres_ergebnis() -> None:
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
 
+def test_infomaniak_transkription_wartet_bei_einem_unlesbaren_stand_weiter() -> None:
+    """Ein Stand, der keine Zeichenkette ist, läuft ins Budget statt zu brechen."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort({"data": {"status": ["unbekannt"]}})
+    uhr = itertools.count(0.0, INFOMANIAK_INTERVALL_SEKUNDEN)
+
+    with (
+        patch("simulation.transkription.time.sleep"),
+        patch("simulation.transkription.time.monotonic", lambda: next(uhr)),
+        pytest.raises(TranskriptionsAnbieterfehler),
+    ):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+
 def test_infomaniak_transkription_meldet_eine_unerreichbare_route() -> None:
     """Ein Transportfehler bleibt von einer Anbieterabsage unterscheidbar."""
 

@@ -1,7 +1,7 @@
 """Naht zur Audio-Transkription und ihr deterministischer Testadapter."""
 
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 import httpx
@@ -128,17 +128,18 @@ class InfomaniakTranskription:
             time.sleep(INFOMANIAK_INTERVALL_SEKUNDEN)
 
     def _absenden(self, audio: bytes) -> str:
-        """Liefert die Stapelkennung, unter der das Ergebnis abzuholen ist."""
+        # Liefert die Stapelkennung, unter der das Ergebnis abzuholen ist.
 
-        nutzlast: Any = self._anfragen(
-            self.client.post,
-            f"{self.basis_url}/audio/transcriptions",
-            data={
-                "model": self.modell,
-                "language": self.sprache,
-                "response_format": "text",
-            },
-            files={"file": ("aufnahme.webm", audio, "audio/webm")},
+        nutzlast: Any = self._nutzlast(
+            lambda: self.client.post(
+                f"{self.basis_url}/audio/transcriptions",
+                data={
+                    "model": self.modell,
+                    "language": self.sprache,
+                    "response_format": "text",
+                },
+                files={"file": ("aufnahme.webm", audio, "audio/webm")},
+            )
         )
         kennung: Any = nutzlast.get("batch_id") if isinstance(nutzlast, dict) else None
         if not isinstance(kennung, str) or not kennung:
@@ -146,17 +147,21 @@ class InfomaniakTranskription:
         return kennung
 
     def _abholen(self, kennung: str) -> str | None:
-        """Liefert das Transkript, oder None, solange der Stapel noch läuft."""
+        # Liefert das Transkript, oder None, solange der Stapel noch läuft.
 
         # Die Ergebnisroute liegt neben der OpenAI-kompatiblen Wurzel, nicht
         # unter ihr: .../1/ai/<product_id>/results/<batch_id>.
         wurzel: str = self.basis_url.removesuffix("/openai")
-        nutzlast: Any = self._anfragen(self.client.get, f"{wurzel}/results/{kennung}")
+        nutzlast: Any = self._nutzlast(
+            lambda: self.client.get(f"{wurzel}/results/{kennung}")
+        )
         if not isinstance(nutzlast, dict):
             raise TranskriptionsAnbieterfehler(
                 "Infomaniak antwortete nicht mit einem Stapelergebnis."
             )
-        status: Any = nutzlast.get("status")
+        gemeldet: Any = nutzlast.get("status")
+        # Ein Stand, der keine Zeichenkette ist, zählt wie ein unbekannter Name.
+        status: str = gemeldet if isinstance(gemeldet, str) else ""
         if status in INFOMANIAK_GESCHEITERT:
             raise TranskriptionsAnbieterfehler(
                 f"Infomaniak meldet den Stapel als gescheitert: {status}."
@@ -167,7 +172,7 @@ class InfomaniakTranskription:
 
     @staticmethod
     def _transkript(ergebnis: Any) -> str:
-        """Liest den Text aus dem fertigen Stapelergebnis."""
+        # Liest den Text aus dem fertigen Stapelergebnis.
 
         if isinstance(ergebnis, dict):
             ergebnis = ergebnis.get("text")
@@ -178,17 +183,15 @@ class InfomaniakTranskription:
         return ergebnis
 
     @staticmethod
-    def _anfragen(route: Any, *args: Any, **kwargs: Any) -> Any:
-        """Ruft eine Route auf und schält den Umschlag von der Nutzlast."""
+    def _nutzlast(anfrage: Callable[[], Any]) -> Any:
+        # Führt eine Anfrage aus und schält den Umschlag von der Nutzlast.
 
         try:
-            antwort: Any = route(*args, **kwargs)
+            antwort: Any = anfrage()
             antwort.raise_for_status()
             nutzlast: Any = antwort.json()
         except httpx.TransportError as exc:
             raise AnbieterNichtErreichbar from exc
-        except TranskriptionsAnbieterfehler:
-            raise
         except Exception as exc:
             raise TranskriptionsAnbieterfehler from exc
         # Die API der Version 1 umschlägt ihre Nutzlast mit {"result", "data"}.
