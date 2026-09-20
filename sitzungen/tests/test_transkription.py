@@ -60,7 +60,7 @@ class ProbelaufTranskriptionTests(TestCase):
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
     def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
-        # Ruft den Endpunkt mit einem festen Anbieter je Anfrage auf.
+        # Ruft den Endpunkt mit einer Fabrik auf, die diesen einen Anbieter gibt.
         return self._anfragen_mit_fabrik(lambda: anbieter)
 
     def _anfragen_mit_fabrik(self, fabrik: Callable[[], Transkription]) -> HttpResponse:
@@ -83,8 +83,9 @@ class ProbelaufTranskriptionTests(TestCase):
         gebildete: list[FakeTranskription] = []
 
         def fabrik() -> FakeTranskription:
-            gebildete.append(FakeTranskription(["Wie hast du gerechnet?"]))
-            return gebildete[-1]
+            anbieter: FakeTranskription = FakeTranskription(["Wie hast du gerechnet?"])
+            gebildete.append(anbieter)
+            return anbieter
 
         for _ in range(2):
             self.assertEqual(self._anfragen_mit_fabrik(fabrik).status_code, 200)

@@ -85,18 +85,22 @@ def transkriptions_anbieter() -> Transkription:
     konfiguration: TranskriptionsKonfiguration = (
         TranskriptionsKonfiguration.objects.aktuelle()
     )
-    if konfiguration.anbieter == TranskriptionsKonfiguration.Anbieter.FAKE:
+    anbieter: str = konfiguration.anbieter
+    if anbieter == TranskriptionsKonfiguration.Anbieter.FAKE:
         # Der deterministische Adapter verbraucht sein Skript; produktiv trägt
         # der frisch gebildete Adapter deshalb genau einen Platzhaltertext.
         return FakeTranskription([PLATZHALTER_TRANSKRIPT])
-    if konfiguration.anbieter == TranskriptionsKonfiguration.Anbieter.INFOMANIAK:
+    if anbieter == TranskriptionsKonfiguration.Anbieter.INFOMANIAK:
         raise TranskriptionsAnbieterfehler(
             "Der Infomaniak-Adapter ist noch nicht gebaut."
         )
+    # OpenRouter spricht die OpenAI-Route.
     return OpenAITranskription(
         OpenAI(
             # Ohne eigene Endpunktwurzel bleibt die Vorgabe des Clients stehen.
             base_url=konfiguration.anbieter_basis_url or None,
+            # Das Token steht ausschließlich in der Konfiguration; ein leeres
+            # fällt bewusst nicht auf OPENAI_API_KEY aus der Umgebung zurück.
             api_key=konfiguration.anbieter_token,
             timeout=120.0,
         ),

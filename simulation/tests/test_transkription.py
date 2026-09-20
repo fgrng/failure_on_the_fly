@@ -8,12 +8,12 @@ from openai import APIConnectionError
 
 from simulation.models import TranskriptionsKonfiguration
 from simulation.transkription import (
+    PLATZHALTER_TRANSKRIPT,
     AnbieterNichtErreichbar,
     FakeTranskription,
     LeeresTranskript,
-    PLATZHALTER_TRANSKRIPT,
-    TranskriptionsAnbieterfehler,
     OpenAITranskription,
+    TranskriptionsAnbieterfehler,
     transkriptions_anbieter,
 )
 
