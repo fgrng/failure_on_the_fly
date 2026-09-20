@@ -362,6 +362,14 @@ class Vignette(models.Model):
             .exists()
         )
 
+    @property
+    def kern_pin_ueberholt(self) -> bool:
+        """Gibt zurück, ob der gepinnte Kern von einer neueren Fassung überholt wurde."""
+        return (
+            self.gepinnter_kern is not None
+            and self.gepinnter_kern.zustand == Simulationskern.Zustand.ARCHIVIERT
+        )
+
     def _aufgabenkontextteil(
         self, name: str, label: str, artikel: str
     ) -> Aufgabenkontextteil:
@@ -552,9 +560,9 @@ class Vignette(models.Model):
             raise ValidationError(
                 "Zum Finalisieren fehlt ein gepinnter Simulationskern."
             )
-        # Der Zustand des gepinnten Kerns bleibt absichtlich ungeprüft: Gespielt
-        # wird, worauf gepinnt wurde (ADR-0003). Ein überholter Pin trägt einen
-        # Hinweis in der Detailansicht, keine Sperre.
+        # Ein überholter Pin bleibt absichtlich zulässig: Gespielt wird, worauf
+        # gepinnt wurde (ADR-0003). Die Detailansicht weist darauf hin
+        # (kern_pin_ueberholt), Vorspulen bleibt eine Wahl der Autor:in.
 
         self.finalisiert_am = timezone.now()
         self._zustand_wechseln(

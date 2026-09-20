@@ -285,12 +285,12 @@ class VignetteDetailViewTests(TestCase):
         finale_antwort: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[vignette.pk])
         )
+        self.assertNotContains(finale_antwort, "überholte Kern-Fassung gepinnt")
+
         vignette.archivieren()
         archivierte_antwort: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[vignette.pk])
         )
-
-        self.assertNotContains(finale_antwort, "überholte Kern-Fassung gepinnt")
         self.assertNotContains(archivierte_antwort, "überholte Kern-Fassung gepinnt")
 
     def test_versteckt_fremde_fassung(self) -> None:

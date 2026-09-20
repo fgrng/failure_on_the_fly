@@ -646,14 +646,12 @@ class VignetteFinalisierenTests(TestCase):
     """Das Finalisieren prüft die Vignette über ihre öffentliche Modell-API."""
 
     def _vollstaendigen_entwurf_anlegen(
-        self,
-        kern_zustand: Simulationskern.Zustand = Simulationskern.Zustand.FINAL,
+        self, kern_ueberholen: bool = False
     ) -> Vignette:
-        # Erstellt einen vollständigen Entwurf mit einem Kern im gewünschten Zustand.
+        # Erstellt einen vollständigen Entwurf, auf Wunsch mit überholtem Kern-Pin.
         kern: Simulationskern = Simulationskern.objects.anlegen()
-        if kern_zustand != Simulationskern.Zustand.ENTWURF:
-            kern.finalisieren()
-        if kern_zustand == Simulationskern.Zustand.ARCHIVIERT:
+        kern.finalisieren()
+        if kern_ueberholen:
             kern.bearbeiten().finalisieren()
             kern.archivieren()
         return Vignette.objects._erstellen(
@@ -827,9 +825,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisieren_laesst_ueberholten_kern_pin_zu(self) -> None:
         """Ein überholter Pin hält niemanden auf; Vorspulen ist eine Wahl."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(
-            Simulationskern.Zustand.ARCHIVIERT
-        )
+        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(kern_ueberholen=True)
 
         vignette.finalisieren()
 

@@ -33,7 +33,7 @@
                 {% csrf_token %}
                 <button class="button button--secondary" type="submit">Auf aktuellen Kern vorspulen</button>
             </form>
-            {% if vignette.gepinnter_kern.zustand == "archiviert" %}
+            {% if vignette.kern_pin_ueberholt %}
                 <small class="system-page-hint">Dieser Entwurf ist auf eine überholte Kern-Fassung gepinnt. Er lässt sich so finalisieren und spielen; wer das aktuelle Gesprächsverhalten will, spult vor.</small>
             {% endif %}
         {% elif vignette.zustand == "final" %}
