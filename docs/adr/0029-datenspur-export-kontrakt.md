@@ -60,7 +60,32 @@ Pfade statt als Inhalt.
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
-| `modellkonfigurationen.csv` | `id`, `sprachmodell`, `parameter` |
+| `modellkonfigurationen.csv` | `id`, `anbieter`, `sprachmodell`, `parameter` |
+
+## Die Modell-Konfiguration im Export
+
+`modellkonfigurationen.csv` trägt `id`, `anbieter`, `sprachmodell`, `parameter`.
+Der Anbieter steht **vor** dem Modellnamen, weil derselbe Modellstring bei
+verschiedenen Anbietern Verschiedenes bedeutet: Ohne ihn ist der Name nicht
+vollständig interpretierbar, die Lesereihenfolge folgt also der Abhängigkeit.
+
+Zwei Felder der Konfiguration bleiben aus je eigenem Grund draußen:
+`anbieter_token`, weil es ein Geheimnis ist und in keinem ausgelieferten
+Artefakt erscheinen darf; `anbieter_basis_url`, weil sie bei Infomaniak eine
+`product_id` und damit einen Kontoidentifikator trägt, der im pseudonymen
+Datensatz nichts zu suchen hat. Das Selbsttragend-Prinzip bleibt gewahrt: Es
+verlangt den *Inhalt* der Konfiguration, und der ist mit Anbieter, Modell und
+Parametern vollständig — die Basis-URL ist Infrastruktur.
+
+Der Provider-Filter, mit dem die Sprachmodell-Naht bei OpenRouter die
+Datenschutz-Zusicherung erzwingt, wird nicht eigens exportiert. Er folgt
+eindeutig aus dem Anbieter: Aus `anbieter` ist ablesbar, welche Zusicherung für
+die Zeile galt; eine zusätzliche Spalte würde eine Wahlmöglichkeit vortäuschen,
+die keine Konfiguration hat.
+
+Die Transkriptions-Konfiguration erscheint gar nicht im Export (ADR-0026): Die
+Transkription ist eine Deployment-Entscheidung der Betreiber:in, keine
+Eigenschaft der Datenspur.
 
 ## Erwogene Optionen
 

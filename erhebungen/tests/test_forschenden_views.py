@@ -51,6 +51,18 @@ def _forschungskonfiguration(
     )
 
 
+def _infomaniak_konfiguration() -> ModellKonfiguration:
+    """Legt eine Konfiguration an, die Basis-URL und Token wirklich trägt."""
+
+    return ModellKonfiguration.objects.create(
+        anbieter=Anbieter.INFOMANIAK,
+        sprachmodell="openai/mistral24b",
+        anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+        anbieter_token="sk-infomaniak-geheim",
+        parameter={"temperature": 0.2},
+    )
+
+
 def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     """Legt eine einbindbare finale Vignette an."""
 
@@ -1030,6 +1042,45 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertEqual(self.erhebung.instruktionstext, "")
 
 
+class ErhebungsansichtAnbieterTests(TestCase):
+    """Die gelbe Ansicht zeigt genau die Exportspalten der Konfiguration."""
+
+    def setUp(self) -> None:
+        # Pinnt eine Infomaniak-Konfiguration an eine finale Erhebung.
+
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        self.erhebung: Erhebung = Erhebung.objects.create(
+            name="Brüche", eigentuemerin=self.ada
+        )
+        self.erhebung.finalisieren()
+        self.client.force_login(self.ada)
+
+    def test_zeigt_anbieter_sprachmodell_und_parameter(self) -> None:
+        """Die Forschende sieht in der Oberfläche, was auch im Datensatz steht."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "Anbieter")
+        self.assertContains(detail, "infomaniak")
+        self.assertContains(detail, "openai/mistral24b")
+        self.assertContains(detail, "temperature")
+
+    def test_zeigt_weder_basis_url_noch_token(self) -> None:
+        """Kontoidentifikator und Geheimnis bleiben aus der gelben Ansicht heraus."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertNotContains(detail, "infomaniak.com")
+        self.assertNotContains(detail, self.konfiguration.anbieter_token)
+
+
 class ErhebungenFinalisierenTests(TestCase):
     """Forschende finalisieren Entwürfe über die Detailseite."""
 
@@ -1661,6 +1712,71 @@ class ErhebungsExportTests(TestCase):
                 str(zweite_konfiguration.pk): {"temperature": 0.7},
             },
         )
+
+    def test_exportiert_den_anbieter_und_kein_zugangsdatum(self) -> None:
+        """Der Anbieter macht den Modellnamen lesbar; Token und URL bleiben draußen."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung.finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            konfigurationen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(
+                        zip_datei.open("modellkonfigurationen.csv"), encoding="utf-8"
+                    )
+                )
+            )
+            archivinhalt: str = "".join(
+                zip_datei.read(name).decode("utf-8") for name in zip_datei.namelist()
+            )
+
+        self.assertEqual(
+            list(konfigurationen[0].keys()),
+            ["id", "anbieter", "sprachmodell", "parameter"],
+        )
+        self.assertEqual(
+            konfigurationen,
+            [
+                {
+                    "id": str(konfiguration.pk),
+                    "anbieter": "infomaniak",
+                    "sprachmodell": "openai/mistral24b",
+                    "parameter": '{"temperature": 0.2}',
+                }
+            ],
+        )
+        self.assertNotIn(konfiguration.anbieter_token, archivinhalt)
+        self.assertNotIn(konfiguration.anbieter_basis_url, archivinhalt)
+        self.assertNotIn("infomaniak.com", archivinhalt)
+
+    def test_exportiert_die_transkriptions_konfiguration_nicht(self) -> None:
+        """Die Transkription gehört nicht in den Datensatz (ADR-0026)."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
+        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung.finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            dateinamen: list[str] = zip_datei.namelist()
+
+        self.assertEqual([name for name in dateinamen if "transkription" in name], [])
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
         """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""

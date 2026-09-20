@@ -36,6 +36,21 @@ def test_adr_0029_documents_the_self_contained_long_relational_export() -> None:
         assert contract_clause in adr
 
 
+def test_adr_0029_documents_the_provider_column_and_its_exclusions() -> None:
+    """Der Kontrakt nennt Anbieterspalte, ausgeschlossene Felder und Provider-Filter."""
+    adr: str = ADR_PATH.read_text()
+
+    for provider_clause in (
+        "`id`, `anbieter`, `sprachmodell`, `parameter`",
+        "`anbieter_token`",
+        "`anbieter_basis_url`",
+        "product_id",
+        "Provider-Filter",
+        "ADR-0026",
+    ):
+        assert provider_clause in adr
+
+
 def test_open_questions_removes_the_resolved_export_question() -> None:
     """Die übrigen offenen Fragen bleiben lückenlos nummeriert."""
     open_questions: str = OPEN_QUESTIONS_PATH.read_text()
