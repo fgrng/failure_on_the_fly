@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class EigentuemerKreisQuerySet:
     """Die Sichtbarkeitsregel des Eigentümer-Kreises für jedes Bestands-QuerySet."""
 
-    def sichtbar_fuer(self: Self, konto: "Konto") -> Self:
+    def sichtbar_fuer(self, konto: "Konto") -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
@@ -24,9 +24,9 @@ class EigentuemerKreis(models.Model):
     """Der Kreis gleichrangiger Eigentümerinnen eines Bestands (ADR-0032).
 
     Die Basis trägt den Eigentümer-Kreis und nichts sonst. Sie spannt quer zur
-    Lebenszyklus-Achse — zwei Historien und zwei Objekte, die gar keinen
-    Lebenszyklus haben —, weshalb aus ihr niemals eine Lebenszyklus-Basis
-    erwachsen kann (ADR-0017).
+    Lebenszyklus-Achse: Zwei ihrer Erbinnen sind Historien ohne eigenen
+    Lebenszyklus, zwei sind Objekte, die einen tragen. Deshalb darf aus ihr
+    niemals eine Lebenszyklus-Basis erwachsen (ADR-0017).
     """
 
     # Welche Rolle in diesen Kreis eintragbar ist. Eine Aufnahmeregel an der
@@ -40,7 +40,10 @@ class EigentuemerKreis(models.Model):
         abstract: bool = True
 
     def ist_aktiv(self) -> bool:
-        """Sagt, ob der Bestand noch in Gebrauch ist; nur der Löschpfad fragt."""
+        """Sagt, ob der Bestand noch in Gebrauch ist.
+
+        Wer keine Stilllegung kennt, erbt dieses Ja.
+        """
         return True
 
     @property
