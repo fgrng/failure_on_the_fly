@@ -223,9 +223,14 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         zip_datei.writestr(
             "diagnosen.csv",
             _csv_inhalt(
-                ("sitzung_id", "text", "erstellt_am"),
+                ("sitzung_id", "text", "erstellt_am", "eingabemodus"),
                 (
-                    (diagnose.sitzung_id, diagnose.text, diagnose.erstellt_am)
+                    (
+                        diagnose.sitzung_id,
+                        diagnose.text,
+                        diagnose.erstellt_am,
+                        diagnose.eingabemodus,
+                    )
                     for diagnose in Diagnose.objects.filter(
                         sitzung_id__in=sitzung_ids
                     ).order_by("sitzung_id")

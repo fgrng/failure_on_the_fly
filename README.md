@@ -195,10 +195,10 @@ und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt vermerkt dabei seinen
-Eingabemodus: ob die Eingabe getippt oder eingesprochen wurde. Der Wert wird im
-Browser der Teilnehmer:in bestimmt und ist damit eine Angabe für die Auswertung,
-kein Nachweis. Die verwendeten Vignettenfassungen,
+Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerkt
+dabei ihren Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
+zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
+ist damit eine Angabe für die Auswertung, kein Nachweis. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
 Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
 interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe: Die der Erhebung

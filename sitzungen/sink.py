@@ -10,6 +10,7 @@ from django.db.models import QuerySet
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import (
     Diagnose,
+    Eingabemodus,
     Fehlversuch,
     Gespraechsschritt,
     Sitzung,
@@ -78,7 +79,9 @@ class SitzungSink(Protocol):
     ) -> None:
         """Behält oder verwirft den endgültig fehlgeschlagenen Schritt."""
 
-    def diagnose_setzen(self, text: str) -> None:
+    def diagnose_setzen(
+        self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
+    ) -> None:
         """Bewahrt die abschließende Diagnose auf."""
 
     def status_setzen(self, status: Sitzung.Status) -> None:
@@ -190,11 +193,15 @@ class DBSink:
             )
             self.status_setzen(Sitzung.Status.GESCHEITERT)
 
-    def diagnose_setzen(self, text: str) -> None:
+    def diagnose_setzen(
+        self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
+    ) -> None:
         """Speichert die Diagnose und schließt die Sitzung gemeinsam ab."""
 
         with transaction.atomic():
-            Diagnose.objects.create(sitzung=self._sitzung, text=text)
+            Diagnose.objects.create(
+                sitzung=self._sitzung, text=text, eingabemodus=eingabemodus
+            )
             self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
 
     def status_setzen(self, status: Sitzung.Status) -> None:
@@ -395,8 +402,14 @@ class ScratchSink:
         dieselbe Eingabe erneut senden kann.
         """
 
-    def diagnose_setzen(self, text: str) -> None:
-        """Hält die im Probelauf verworfene Diagnose in der Session."""
+    def diagnose_setzen(
+        self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
+    ) -> None:
+        """Hält die im Probelauf verworfene Diagnose in der Session.
+
+        Der Modus reist bis hierher, wird aber nicht festgehalten: Der
+        Probelauf verwirft die Diagnose ohnehin (ADR-0014).
+        """
 
         self._zustand["diagnose"] = text
         self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)

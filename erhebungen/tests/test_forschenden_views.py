@@ -1958,7 +1958,9 @@ class ErhebungsExportTests(TestCase):
                 ],
             )
         )
-        Diagnose.objects.create(sitzung=sitzung, text="Bruchfehler")
+        Diagnose.objects.create(
+            sitzung=sitzung, text="Bruchfehler", eingabemodus=Eingabemodus.GEMISCHT
+        )
         training: Training = Training.objects.anlegen(ada, name="Nicht exportieren")
         training.vignetten.add(vignette)
         trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
@@ -2012,11 +2014,11 @@ class ErhebungsExportTests(TestCase):
                     TextIOWrapper(zip_datei.open("fehlversuche.csv"), encoding="utf-8")
                 )
             )
-            diagnosen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("diagnosen.csv"), encoding="utf-8")
-                )
+            diagnose_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("diagnosen.csv"), encoding="utf-8")
             )
+            diagnosen: list[dict[str, str]] = list(diagnose_leser)
+            diagnose_kopfzeile: list[str] = list(diagnose_leser.fieldnames or [])
 
         self.assertEqual(
             kopfzeile,
@@ -2094,8 +2096,13 @@ class ErhebungsExportTests(TestCase):
                 {
                     "sitzung_id": str(sitzung.pk),
                     "text": "Bruchfehler",
+                    "eingabemodus": "gemischt",
                 }
             ],
+        )
+        self.assertEqual(
+            diagnose_kopfzeile,
+            ["sitzung_id", "text", "erstellt_am", "eingabemodus"],
         )
         self.assertRegex(
             diagnosen[0]["erstellt_am"],

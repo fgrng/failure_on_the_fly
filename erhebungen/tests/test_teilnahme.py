@@ -24,6 +24,7 @@ from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
+    Diagnose,
     Eingabemodus,
     Fehlversuch,
     Gespraechsschritt,
@@ -1228,6 +1229,74 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(
             Gespraechsschritt.objects.get().eingabemodus,
             Eingabemodus.TRANSKRIBIERT,
+        )
+
+    def test_diagnose_traegt_den_eingabemodus_aus_dem_formular(self) -> None:
+        """Die Diagnose liest den Modus wie die Gesprächseingabe (Spec: #122)."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {
+                "diagnose": "Bruchfehler",
+                "sitzung_pk": Sitzung.objects.get().pk,
+                "eingabemodus": "gemischt",
+            },
+        )
+
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GEMISCHT)
+
+    def test_diagnose_ohne_modusfeld_und_mit_unbekanntem_wert_ist_getippt(self) -> None:
+        """Fehlend oder unbekannt heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
+
+        self._vignette_anlegen(position=1)
+        self._vignette_anlegen(position=2)
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
+        ohne_feld: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+
+        self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
+        zweite_sitzung: Sitzung = Sitzung.objects.order_by("pk").last()
+        unbekannt: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {
+                "diagnose": "Noch ein Bruchfehler",
+                "sitzung_pk": zweite_sitzung.pk,
+                "eingabemodus": "gepfiffen",
+            },
+        )
+
+        self.assertEqual(ohne_feld.status_code, 302)
+        self.assertEqual(unbekannt.status_code, 302)
+        self.assertEqual(
+            [
+                diagnose.eingabemodus
+                for diagnose in Diagnose.objects.order_by("sitzung_id")
+            ],
+            [Eingabemodus.GETIPPT, Eingabemodus.GETIPPT],
+        )
+
+    def test_diagnoseformular_traegt_das_versteckte_modusfeld(self) -> None:
+        """Ohne JavaScript bleibt der Modus auf dem Startwert des Formulars."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        debrief: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+        )
+
+        self.assertContains(
+            debrief,
+            '<input type="hidden" name="eingabemodus" value="getippt">',
+            html=True,
         )
 
     def test_vorzeitiges_gespraechsende_zeigt_den_debrief(self) -> None:

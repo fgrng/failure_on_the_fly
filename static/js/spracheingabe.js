@@ -123,6 +123,15 @@
 
         if (tastatureingabe) {
             formular.addEventListener("submit", () => {
+                // Vor dem Anhängen bestimmt: danach steht das Transkript im
+                // getippten Feld und beide Anteile sind nicht mehr trennbar.
+                const hatTranskript = Boolean(eingabe.value.trim());
+                const hatGetipptes = Boolean(tastatureingabe.value.trim());
+                if (formular.elements.eingabemodus) {
+                    formular.elements.eingabemodus.value = !hatTranskript
+                        ? "getippt"
+                        : hatGetipptes ? "gemischt" : "transkribiert";
+                }
                 textAnhaengen(tastatureingabe, eingabe.value);
             });
         }
