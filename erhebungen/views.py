@@ -898,12 +898,16 @@ def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
     # Löst die laufende Sitzung in ihrer besitzenden Erhebungs-App auf.
 
     bindung = _laufende_bindung(token)
-    sitzung: Sitzung = get_object_or_404(
-        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
-        teilnahme=bindung.teilnahme,
-        status=Sitzung.Status.LAUFEND,
-    )
+    sitzung: Sitzung = get_object_or_404(_laufende_sitzungen(bindung))
     return sitzung, bindung
+
+
+def _laufende_sitzungen(bindung: Erhebungsbindung) -> QuerySet[Sitzung]:
+    # Die noch nicht beendeten Sitzungen dieser Teilnahme samt Anzeigedaten.
+
+    return Sitzung.objects.select_related(
+        "vignette", "simulationskern", "teilnahme"
+    ).filter(teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND)
 
 
 def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
@@ -946,11 +950,7 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
 def _anzuzeigende_sitzung(bindung: Erhebungsbindung) -> Sitzung:
     # Zeigt die laufende Sitzung oder die beendete, deren Block noch offen ist.
 
-    sitzung: Sitzung | None = (
-        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
-        .filter(teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND)
-        .first()
-    )
+    sitzung: Sitzung | None = _laufende_sitzungen(bindung).first()
     if sitzung is not None:
         return sitzung
     schritt: Schritt = naechster_schritt(bindung)

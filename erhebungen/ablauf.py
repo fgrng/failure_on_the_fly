@@ -75,7 +75,7 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
 
     bindung.vignetten_ziehen()
     beurteilte_sitzung: Sitzung | None = _sitzung_mit_offenem_block(bindung)
-    if beurteilte_sitzung:
+    if beurteilte_sitzung is not None:
         return OffenerSitzungsblock(beurteilte_sitzung)
     gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
     ziehung: Vignettenziehung | None = (
@@ -93,11 +93,7 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
 def _sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
     # Liefert die älteste beendete Sitzung, deren Block noch nicht erledigt ist.
 
-    if bindung.abgeschlossen_am is not None:
-        return None
-    if not bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
-        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG
-    ).exists():
+    if not _block_kann_offen_sein(bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG):
         return None
     erledigte_sitzungen = bindung.itembloecke.filter(
         andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
@@ -114,16 +110,25 @@ def _sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
 def _abschlussblock_ist_offen(bindung: Erhebungsbindung) -> bool:
     # Ein Abschluss-Block ist offen, solange er Items hat und nicht erledigt ist.
 
-    if bindung.abgeschlossen_am is not None:
-        return False
-    if not bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
-        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
-    ).exists():
+    if not _block_kann_offen_sein(bindung, Erhebungsitem.Andockpunkt.AM_ENDE):
         return False
     block: Itemblock | None = bindung.itembloecke.filter(
         andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
     ).first()
     return block is None or block.erledigt_am is None
+
+
+def _block_kann_offen_sein(
+    bindung: Erhebungsbindung, andockpunkt: Erhebungsitem.Andockpunkt
+) -> bool:
+    # Nach dem Abschluss der Bindung und ohne Items am Andockpunkt bleibt an
+    # diesem Andockpunkt nichts mehr offen.
+
+    if bindung.abgeschlossen_am is not None:
+        return False
+    return bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=andockpunkt
+    ).exists()
 
 
 def block_vorlegen(
