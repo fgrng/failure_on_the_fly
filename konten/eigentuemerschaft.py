@@ -57,11 +57,9 @@ class EigentuemerKreis(models.Model):
         ist das einzige Signal.
         """
         # Serialisiert wird über das `atomic()` selbst: Die Verbindungsoption
-        # `transaction_mode: IMMEDIATE` öffnet jede Transaktion mit
-        # BEGIN IMMEDIATE und nimmt die Schreibsperre sofort. Ein
-        # `select_for_update()` trüge hier nichts bei — Djangos
-        # SQLite-Backend meldet `has_select_for_update = False`, und der
-        # Compiler gattert die Klausel darauf.
+        # `transaction_mode: IMMEDIATE` nimmt die Schreibsperre schon beim
+        # BEGIN. Ein `select_for_update()` trüge nichts bei, weil Djangos
+        # SQLite-Backend die Klausel verwirft (`has_select_for_update`).
         with transaction.atomic():
             if not self.hat_mehrere_eigentuemerinnen:
                 return False

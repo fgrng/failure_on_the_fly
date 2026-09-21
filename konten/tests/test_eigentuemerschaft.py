@@ -1,7 +1,10 @@
 """Tests für den gemeinsamen Eigentümer-Kreis der bestandstragenden Modelle."""
 
+from collections.abc import Callable
+
 import pytest
 from django.apps import apps
+from django.db import connection
 from django.db.models import Model
 
 from erhebungen.models import Erhebung
@@ -153,3 +156,39 @@ def test_archivierter_bestand_behaelt_seine_letzte_eigentuemerin() -> None:
 
     assert not historie.austreten(ada.pk)
     assert list(historie.eigentuemerinnen.all()) == [ada]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_austritt_laeuft_vollstaendig_in_einer_transaktion() -> None:
+    """Zwei gleichzeitige Austritte können den Kreis nicht eigentümerlos machen.
+
+    Serialisiert wird über die Verbindungsoption `transaction_mode: IMMEDIATE`:
+    Die Schreibsperre hängt am `atomic()` selbst. Beobachtet wird deshalb, dass
+    jede Anweisung des Austritts zur selben Transaktion gehört — im Autocommit
+    läsen zwei Austritte denselben Zwei-Personen-Kreis und träten beide aus.
+    """
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    training: Training = Training.objects.anlegen(ada, name="Kurs")
+    training.eigentuemerinnen.add(grace)
+    kreistabelle: str = Training.eigentuemerinnen.through._meta.db_table
+    in_transaktion: list[bool] = []
+
+    def mitschreiben(
+        ausfuehren: Callable[..., object],
+        sql: str,
+        parameter: object,
+        viele: bool,
+        kontext: dict[str, object],
+    ) -> object:
+        # Die Transaktionsklammer selbst (BEGIN, COMMIT) bleibt außen vor;
+        # gefragt ist, ob Lesen und Schreiben am Kreis drinnen liegen.
+        if kreistabelle in sql:
+            in_transaktion.append(connection.in_atomic_block)
+        return ausfuehren(sql, parameter, viele, kontext)
+
+    with connection.execute_wrapper(mitschreiben):
+        assert training.austreten(ada.pk)
+
+    assert in_transaktion and all(in_transaktion)
+    assert list(training.eigentuemerinnen.all()) == [grace]

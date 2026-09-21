@@ -247,8 +247,8 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis der Item-Historie aus.
 
-    Die Selbst-Austretende führt es auf ihre Item-Bibliothek — aber nur, wenn
-    der Austritt an der Invariante nicht gescheitert ist.
+    Wer sich selbst austrägt, landet in der Item-Bibliothek; scheitert der
+    Austritt an der Invariante, bleibt es bei der Detailseite.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])

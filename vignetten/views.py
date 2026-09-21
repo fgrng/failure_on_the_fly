@@ -169,8 +169,8 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis der Vignettenhistorie aus.
 
-    Die Selbst-Austretende führt es auf ihre Vignettenliste — aber nur, wenn
-    der Austritt an der Invariante nicht gescheitert ist.
+    Wer sich selbst austrägt, landet auf der Vignettenliste; scheitert der
+    Austritt an der Invariante, bleibt es bei der Detailseite.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])

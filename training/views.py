@@ -325,8 +325,8 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis des Trainings aus.
 
-    Die Selbst-Austretende führt es auf ihre Trainingsliste — aber nur, wenn
-    der Austritt an der Invariante nicht gescheitert ist.
+    Wer sich selbst austrägt, landet auf der Trainingsliste; scheitert der
+    Austritt an der Invariante, bleibt es bei der Kuratierseite.
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
