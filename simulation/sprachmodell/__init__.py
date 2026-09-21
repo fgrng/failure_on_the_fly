@@ -162,6 +162,11 @@ class LiteLLMSprachmodell:
     ) -> Antwort:
         """Fordert eine JSON-Ausgabe an und gibt allein die geparste Antwort zurück."""
 
+        # Die Frist ist eine Zusage dieser Naht: `timeout` steht nicht in der
+        # Allowlist der Mikro-Stellschrauben und überschreibt einen dort
+        # dennoch gelandeten Wert.
+        aufrufparameter: dict[str, Any] = {**self.parameter, "timeout": timeout}
+
         try:
             modellantwort = self.completion(
                 model=self.modell,
@@ -176,10 +181,7 @@ class LiteLLMSprachmodell:
                         "strict": True,
                     },
                 },
-                # Die Frist ist eine Zusage dieser Naht: `timeout` steht
-                # nicht in der Allowlist der Mikro-Stellschrauben und
-                # überschreibt einen dort dennoch gelandeten Wert.
-                **{**self.parameter, "timeout": timeout},
+                **aufrufparameter,
             )
         except litellm.ContentPolicyViolationError as exc:
             raise ContentFilter from exc

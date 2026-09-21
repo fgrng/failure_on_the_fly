@@ -1,6 +1,5 @@
 """Strukturelle Tests des echten LiteLLM-Adapters ohne Netz."""
 
-from itertools import chain, repeat
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -353,12 +352,26 @@ def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> N
     completion.assert_not_called()
 
 
-def _haengender_anbieter(uhr: list[float], verbrauch: float) -> Mock:
+class _Testuhr:
+    # Eine monotone Uhr anstelle von time.monotonic: Sie rückt bei jedem
+    # Ablesen um `schritt` vor und lässt sich zusätzlich vorstellen.
+
+    def __init__(self, schritt: float = 0.0) -> None:
+        self.stand: float = 0.0
+        self.schritt: float = schritt
+
+    def __call__(self) -> float:
+        abgelesen: float = self.stand
+        self.stand += self.schritt
+        return abgelesen
+
+
+def _haengender_anbieter(uhr: _Testuhr, verbrauch: float) -> Mock:
     # Ein Anbieter, der jede Anfrage bis zu ihrem Timeout hält und dann
     # scheitert: Er rückt die Testuhr um die verbrauchte Zeit vor.
 
     def haengen(**kwargs: object) -> None:
-        uhr[0] += verbrauch
+        uhr.stand += verbrauch
         raise TimeoutError("Der Anbieter antwortete nicht.")
 
     return Mock(side_effect=haengen)
@@ -369,8 +382,8 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
 ) -> None:
     """Ein hängender Anbieter bekommt nach Ablauf der Frist keinen Aufruf mehr."""
 
-    uhr: list[float] = [0.0]
-    monkeypatch.setattr("simulation.time.monotonic", lambda: uhr[0])
+    uhr = _Testuhr()
+    monkeypatch.setattr("simulation.time.monotonic", uhr)
     completion = _haengender_anbieter(uhr, SPRACHMODELL_FRIST_SEKUNDEN * 0.6)
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
@@ -411,13 +424,13 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
 ) -> None:
     """Läuft die Frist zwischen Prüfung und Aufruf ab, hängt keiner mit Null."""
 
-    # Die Uhr steht bei der Prüfung der Schleife kurz vor der Frist und ist,
-    # wenn die Restzeit entsteht, über sie hinweg.
-    uhr = chain(
-        [0.0, SPRACHMODELL_FRIST_SEKUNDEN - 0.5, SPRACHMODELL_FRIST_SEKUNDEN + 10.0],
-        repeat(SPRACHMODELL_FRIST_SEKUNDEN + 10.0),
+    # Die Uhr rückt bei jedem Ablesen so weit vor, dass sie bei der Prüfung
+    # der Schleife kurz vor der Frist steht und beim Berechnen der Restzeit
+    # schon hinter ihr.
+    monkeypatch.setattr(
+        "simulation.time.monotonic",
+        _Testuhr(schritt=SPRACHMODELL_FRIST_SEKUNDEN - 0.5),
     )
-    monkeypatch.setattr("simulation.time.monotonic", lambda: next(uhr))
     completion = Mock(side_effect=TimeoutError("Der Anbieter antwortete nicht."))
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
