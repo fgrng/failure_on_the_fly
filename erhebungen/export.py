@@ -15,7 +15,13 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
 from vignetten.models import Vignette
 
-from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
+from .models import (
+    Erhebung,
+    Erhebungsbindung,
+    Itemblock,
+    Vignettenposition,
+    Vignettenziehung,
+)
 
 
 def _zellenwert(wert: Any) -> str | int | bool:
@@ -220,6 +226,34 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     for diagnose in Diagnose.objects.filter(
                         sitzung_id__in=sitzung_ids
                     ).order_by("sitzung_id")
+                ),
+            ),
+        )
+        zip_datei.writestr(
+            "itembloecke.csv",
+            _csv_inhalt(
+                (
+                    "id",
+                    "teilnahme_token",
+                    "andockpunkt",
+                    "sitzung_id",
+                    "vorgelegt_am",
+                    "erledigt_am",
+                ),
+                (
+                    (
+                        block.pk,
+                        block.erhebungsbindung.token,
+                        block.andockpunkt,
+                        block.sitzung_id,
+                        block.vorgelegt_am,
+                        block.erledigt_am,
+                    )
+                    for block in Itemblock.objects.filter(
+                        erhebungsbindung__stichprobe__erhebung=erhebung
+                    )
+                    .select_related("erhebungsbindung")
+                    .order_by("erhebungsbindung_id", "pk")
                 ),
             ),
         )

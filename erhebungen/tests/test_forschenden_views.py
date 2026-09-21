@@ -9,8 +9,10 @@ from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import connection
 from django.http import HttpResponse
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,6 +22,7 @@ from erhebungen.models import (
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    Itemblock,
     Stichprobe,
     Vignettenposition,
     Vignettenziehung,
@@ -35,6 +38,12 @@ from sitzungen.models import (
 )
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
+
+
+def _zeitstempel(wert: datetime) -> str:
+    """Schreibt einen Zeitstempel so, wie der Export ihn erwartet."""
+
+    return timezone.localtime(wert, timezone.UTC).isoformat(timespec="seconds")
 
 
 def _forschungskonfiguration(
@@ -1440,6 +1449,7 @@ class ErhebungsExportTests(TestCase):
                     "erhebung.csv",
                     "fehlversuche.csv",
                     "gespraechsschritte.csv",
+                    "itembloecke.csv",
                     "modellkonfigurationen.csv",
                     "simulationskerne.csv",
                     "sitzungen.csv",
@@ -2070,6 +2080,107 @@ class ErhebungsExportTests(TestCase):
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
         )
 
+    def test_exportiert_itembloecke_mit_vorlage_und_erledigt_zeitstempel(self) -> None:
+        """Erst der Blockdatensatz trennt »nie vorgelegt« von »leer abgeschickt«."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+        erhebung.finalisieren()
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        bindungen: list[Erhebungsbindung] = [
+            Erhebungsbindung.objects.create(
+                stichprobe=Stichprobe.objects.create(
+                    erhebung=erhebung,
+                    beginn=timezone.now() - timedelta(days=1),
+                    ende=timezone.now() + timedelta(days=1),
+                ),
+                teilnahme=Teilnahme.objects.create(),
+                token=f"2345-678{nummer}",
+            )
+            for nummer in range(1, 3)
+        ]
+        bloecke: list[Itemblock] = []
+        for bindung in bindungen:
+            sitzung: Sitzung = Sitzung.objects.create(
+                teilnahme=bindung.teilnahme,
+                vignette=vignette,
+                simulationskern=kern,
+                modell_konfiguration=konfiguration,
+            )
+            bloecke.append(
+                Itemblock.objects.create(
+                    erhebungsbindung=bindung,
+                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    sitzung=sitzung,
+                    erledigt_am=timezone.now(),
+                )
+            )
+            bloecke.append(
+                Itemblock.objects.create(
+                    erhebungsbindung=bindung,
+                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                )
+            )
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
+        fremde_erhebung.finalisieren()
+        Itemblock.objects.create(
+            erhebungsbindung=Erhebungsbindung.objects.create(
+                stichprobe=Stichprobe.objects.create(
+                    erhebung=fremde_erhebung,
+                    beginn=timezone.now() - timedelta(days=1),
+                    ende=timezone.now() + timedelta(days=1),
+                ),
+                teilnahme=Teilnahme.objects.create(),
+                token="9999-9999",
+            ),
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        self.client.force_login(ada)
+
+        with CaptureQueriesContext(connection) as abfragen:
+            response: HttpResponse = self.client.get(
+                reverse("erhebungen:export", args=[erhebung.pk])
+            )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            zeilen: list[dict[str, str]] = list(
+                csv.DictReader(
+                    TextIOWrapper(zip_datei.open("itembloecke.csv"), encoding="utf-8")
+                )
+            )
+
+        self.assertEqual(
+            zeilen,
+            [
+                {
+                    "id": str(block.pk),
+                    "teilnahme_token": block.erhebungsbindung.token,
+                    "andockpunkt": block.andockpunkt,
+                    "sitzung_id": str(block.sitzung_id or "NA"),
+                    "vorgelegt_am": _zeitstempel(block.vorgelegt_am),
+                    "erledigt_am": (
+                        _zeitstempel(block.erledigt_am) if block.erledigt_am else "NA"
+                    ),
+                }
+                for block in bloecke
+            ],
+        )
+        self.assertEqual(
+            len(
+                [
+                    abfrage
+                    for abfrage in abfragen.captured_queries
+                    if "erhebungen_itemblock" in abfrage["sql"]
+                ]
+            ),
+            1,
+        )
+
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
 
@@ -2111,6 +2222,7 @@ class ErhebungsExportTests(TestCase):
                 "gespraechsschritte.csv",
                 "fehlversuche.csv",
                 "diagnosen.csv",
+                "itembloecke.csv",
                 "vignettenfassungen.csv",
                 "simulationskerne.csv",
                 "modellkonfigurationen.csv",
