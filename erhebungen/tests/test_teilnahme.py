@@ -889,8 +889,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertContains(antwort, 'id="itemblock-formular"')
 
-    def test_wiedereinstieg_ueberspringt_den_offenen_sitzungsblock(self) -> None:
-        """Ein späterer Link-Aufruf kann keinen alten Sitzungsblock weiterführen."""
+    def test_wiedereinstieg_fuehrt_zum_offenen_sitzungsblock(self) -> None:
+        """Ein späterer Link-Aufruf führt den noch offenen Sitzungsblock weiter."""
 
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
@@ -911,7 +911,7 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:itemblock", args=[bindung.token]),
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Zu spät",
+                f"item_{itemantwort.pk}": "Doch nicht",
             },
         )
 
@@ -920,8 +920,48 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:gespraech", args=[bindung.token]),
             fetch_redirect_response=False,
         )
-        self.assertEqual(Sitzung.objects.count(), 2)
-        self.assertEqual(spaete_antwort.status_code, 400)
+        self.assertContains(
+            self.client.get(reverse("erhebungen:gespraech", args=[bindung.token])),
+            "Wie war die Sitzung?",
+        )
+        self.assertEqual(Sitzung.objects.count(), 1)
+        self.assertEqual(spaete_antwort.status_code, 200)
+        itemantwort.refresh_from_db()
+        self.assertEqual(itemantwort.freitext, "Doch nicht")
+
+    def test_offener_sitzungsblock_ueberlebt_den_browserwechsel(self) -> None:
+        """Ein anderer Browser bekommt den offenen Block, den erledigten nicht."""
+
+        self._vignette_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        itemantwort: ItemAntwort = ItemAntwort.objects.get()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        anderer_browser: Client = Client()
+        offener_block: HttpResponse = anderer_browser.get(gespraech_url)
+
+        self.assertContains(offener_block, "Wie war die Sitzung?")
+
+        erledigt: HttpResponse = anderer_browser.post(
+            reverse("erhebungen:itemblock", args=[bindung.token]),
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.pk}": "Hilfreich",
+                "weiter": "ja",
+            },
+        )
+
+        self.assertRedirects(
+            erledigt,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(anderer_browser.get(gespraech_url).status_code, 404)
         itemantwort.refresh_from_db()
         self.assertEqual(itemantwort.freitext, "Hilfreich")
 

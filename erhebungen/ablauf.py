@@ -67,13 +67,16 @@ Schritt = (
 
 
 def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
-    """Liefert die nächste Vignette, den offenen Abschluss-Block oder das Ende.
+    """Liefert den offenen Block, die nächste Vignette oder das Ende.
 
-    Die drei übrigen Fälle des Schritt-Typs bleiben den Folgetickets #210 und
-    #211 vorbehalten; solange bestimmen die Views sie weiterhin selbst.
+    Die beiden übrigen Fälle des Schritt-Typs bleiben dem Folgeticket #211
+    vorbehalten; solange bestimmen die Views sie weiterhin selbst.
     """
 
     bindung.vignetten_ziehen()
+    beurteilte_sitzung: Sitzung | None = _sitzung_mit_offenem_block(bindung)
+    if beurteilte_sitzung:
+        return OffenerSitzungsblock(beurteilte_sitzung)
     gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
     ziehung: Vignettenziehung | None = (
         bindung.vignettenziehungen.select_related("vignette")
@@ -85,6 +88,27 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
     if _abschlussblock_ist_offen(bindung):
         return OffenerAbschlussblock()
     return Ende()
+
+
+def _sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
+    # Liefert die älteste beendete Sitzung, deren Block noch nicht erledigt ist.
+
+    if bindung.abgeschlossen_am is not None:
+        return None
+    if not bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG
+    ).exists():
+        return None
+    erledigte_sitzungen = bindung.itembloecke.filter(
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        erledigt_am__isnull=False,
+    ).values_list("sitzung_id", flat=True)
+    return (
+        bindung.teilnahme.sitzung_set.exclude(status=Sitzung.Status.LAUFEND)
+        .exclude(pk__in=erledigte_sitzungen)
+        .order_by("pk")
+        .first()
+    )
 
 
 def _abschlussblock_ist_offen(bindung: Erhebungsbindung) -> bool:
