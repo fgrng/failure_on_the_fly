@@ -25,11 +25,26 @@ MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 # Abstand zwischen zwei Abfragen des Stapelergebnisses bei Infomaniak.
 INFOMANIAK_INTERVALL_SEKUNDEN: float = 2.0
 
-# Infomaniak meldet den Stand eines Stapels als Zeichenkette. Die Namen stammen
-# aus der Anbieterdokumentation und sind um die üblichen Schreibweisen ergänzt,
-# weil die Verifikation am echten Konto (#193) noch aussteht. Alles, was hier
+# Infomaniak richtet die Gestalt des Stapelergebnisses nach diesem Parameter des
+# Absendens; er ist deshalb bedeutungstragend und nicht kosmetisch. Mit "text"
+# ist `data` die schlichte Transkriptzeichenkette, Zeilen durch `\n` getrennt,
+# und `file_name` endet auf `.txt`. Ohne ihn stünde dort eine JSON-kodierte
+# Zeichenkette der Form {"text": "…"}, die `_transkript` samt Klammern und
+# Feldnamen als Transkript durchreichte. Am echten Konto verifiziert (#232);
+# ein Test hält die Kopplung fest.
+INFOMANIAK_ANTWORTFORMAT: str = "text"
+
+# Infomaniak meldet den Stand eines Stapels als Zeichenkette. Alles, was hier
 # nicht steht, gilt als »noch nicht fertig« — ein unbekannter Name läuft damit
 # ins Budget statt in ein falsches Ergebnis.
+#
+# Am echten Konto verifiziert (#232) sind `success` als fertiger und `pending`
+# als laufender Zustand; die übrigen Namen stammen aus der Anbieterdokumentation
+# und den üblichen Schreibweisen. Der gescheiterte Zustand bleibt unverifiziert:
+# Eine unbrauchbare Datei wird schon beim Absenden mit 422 abgewiesen und wird
+# nie ein Stapel, ein scheiterender Stapel ließ sich deshalb nicht provozieren.
+# Trägt der Anbieter einen anderen Namen, läuft ein gescheiterter Stapel ins
+# volle Budget, statt sofort zu scheitern.
 INFOMANIAK_FERTIG: frozenset[str] = frozenset({"success", "succeeded", "done"})
 INFOMANIAK_GESCHEITERT: frozenset[str] = frozenset({"error", "failed", "canceled"})
 
@@ -147,7 +162,7 @@ class InfomaniakTranskription:
                 data={
                     "model": self.modell,
                     "language": self.sprache,
-                    "response_format": "text",
+                    "response_format": INFOMANIAK_ANTWORTFORMAT,
                 },
                 files={"file": ("aufnahme.webm", audio, "audio/webm")},
                 timeout=self._restzeit(frist),
@@ -187,10 +202,10 @@ class InfomaniakTranskription:
 
     @staticmethod
     def _transkript(ergebnis: Any) -> str:
-        # Liest den Text aus dem fertigen Stapelergebnis.
+        # Liest den Text aus dem fertigen Stapelergebnis. Weil das Absenden
+        # INFOMANIAK_ANTWORTFORMAT mitschickt, ist `data` bereits das rohe
+        # Transkript und wird unverändert durchgereicht.
 
-        if isinstance(ergebnis, dict):
-            ergebnis = ergebnis.get("text")
         if not isinstance(ergebnis, str):
             raise TranskriptionsAnbieterfehler(
                 "Das fertige Stapelergebnis trug keinen Text."
@@ -210,7 +225,11 @@ class InfomaniakTranskription:
         except Exception as exc:
             raise TranskriptionsAnbieterfehler from exc
         # Die API der Version 1 umschlägt ihre Nutzlast mit {"result", "data"}.
-        if isinstance(nutzlast, dict) and "data" in nutzlast:
+        # Erkennbar ist der Umschlag nur am Paar: Das Stapelobjekt der
+        # Ergebnisroute trägt selbst ein `data`-Feld, aber kein `result` — an
+        # `data` allein geschält, gäbe die Heuristik dessen Inhalt statt des
+        # Stapels zurück.
+        if isinstance(nutzlast, dict) and "result" in nutzlast and "data" in nutzlast:
             return nutzlast["data"]
         return nutzlast
 
