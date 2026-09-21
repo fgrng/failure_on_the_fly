@@ -18,6 +18,12 @@ from .forms import (
     SimulationskernForm,
     TranskriptionsKonfigurationForm,
 )
+from .modellverzeichnis import (
+    Modellverzeichnisfehler,
+    Modellvorschlag,
+    Naht,
+    modellverzeichnis,
+)
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
@@ -223,6 +229,40 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
         request,
         "simulation/modell_konfiguration.html",
         {"form": form, "konfigurationen": _konfigurationszeilen()},
+    )
+
+
+# Welches Formularfeld ein gewählter Vorschlag füllt. Die Naht entscheidet es,
+# nicht die Anfrage: Ein von außen genannter Feldname stünde in der Antwort.
+_FELD_JE_NAHT: dict[str, str] = {Naht.SPRACHMODELL: "id_sprachmodell"}
+
+
+@administratorin_erforderlich
+@require_POST
+def modellvorschlaege(request: HttpRequest) -> HttpResponse:
+    """Liefert die Vorschlagsliste zu Anbieter, Naht und getipptem Token.
+
+    Das Token kommt aus dem Formular, geht an das Verzeichnis und sonst
+    nirgendwohin: Es steht weder in der Antwort noch in einem Protokoll.
+    """
+    naht: str = request.POST.get("naht", "")
+    vorschlaege: list[Modellvorschlag] = []
+    fehler: str = ""
+    try:
+        vorschlaege = modellverzeichnis(
+            request.POST.get("anbieter", ""),
+            request.POST.get("anbieter_token", ""),
+        ).vorschlaege(naht)
+    except Modellverzeichnisfehler as modellfehler:
+        fehler = str(modellfehler)
+    return render(
+        request,
+        "simulation/includes/modellvorschlaege.html",
+        {
+            "vorschlaege": vorschlaege,
+            "fehler": fehler,
+            "feld": _FELD_JE_NAHT.get(naht, ""),
+        },
     )
 
 

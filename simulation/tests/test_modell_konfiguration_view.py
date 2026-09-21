@@ -1,5 +1,7 @@
 """HTTP-Tests der blauen Seite für Modell-Konfigurationen."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -12,6 +14,11 @@ from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
     ModellKonfiguration,
+)
+from simulation.modellverzeichnis import (
+    AnbieterNichtErreichbar,
+    Modellvorschlag,
+    Naht,
 )
 
 TOKEN: str = "sk-or-v1-geheimnis-wxyz"
@@ -372,3 +379,138 @@ class ModellKonfigurationFormularTests(TestCase):
         ]
 
         self.assertEqual(stellen, sorted(stellen))
+
+
+def _vorschlag(anzeige: str = "Anthropic: Claude Opus") -> Modellvorschlag:
+    """Liefert einen Vorschlag, wie ihn das Modellverzeichnis bildet."""
+    return Modellvorschlag(
+        wert="openrouter/anthropic/claude-opus-4.8",
+        modellname="anthropic/claude-opus-4.8",
+        anzeige=anzeige,
+    )
+
+
+def _abrufdaten(**werte: object) -> dict[str, object]:
+    """Liefert den Beutel, den der Knopf »Modelle laden« mitschickt."""
+    return {
+        "anbieter": Anbieter.OPENROUTER,
+        "naht": Naht.SPRACHMODELL,
+        "anbieter_token": TOKEN,
+        **werte,
+    }
+
+
+class ModellvorschlaegeEndpunktTests(TestCase):
+    """Der Endpunkt liefert ausschließlich die normalisierte Vorschlagsliste."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.client.force_login(_administratorin())
+
+    def test_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
+        """Der Abruf hängt an derselben Rolle wie die Seite (ADR-0033)."""
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:modellvorschlaege"), _abrufdaten()
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_ist_der_post_route_vorbehalten(self) -> None:
+        """Das getippte Token gehört nicht in eine URL."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modellvorschlaege")
+        )
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_liefert_die_vorschlaege_des_verzeichnisses(self) -> None:
+        """Anbieter, Naht und Token erreichen das Verzeichnis, die Liste die Seite."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"), _abrufdaten()
+            )
+
+        verzeichnis.assert_called_once_with(Anbieter.OPENROUTER, TOKEN)
+        verzeichnis.return_value.vorschlaege.assert_called_once_with(Naht.SPRACHMODELL)
+        self.assertContains(response, "Anthropic: Claude Opus")
+        self.assertContains(response, "openrouter/anthropic/claude-opus-4.8")
+
+    def test_gibt_das_getippte_token_nicht_zurueck(self) -> None:
+        """Das Token bleibt im Formular; die Antwort trägt es nicht."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"), _abrufdaten()
+            )
+
+        self.assertNotContains(response, TOKEN)
+
+    def test_meldet_einen_gescheiterten_abruf_verstaendlich(self) -> None:
+        """Ein stummer Anbieter erzeugt eine Meldung, keinen Serverfehler."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.side_effect = AnbieterNichtErreichbar(
+                "OpenRouter ist nicht erreichbar."
+            )
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"), _abrufdaten()
+            )
+
+        self.assertContains(response, "OpenRouter ist nicht erreichbar.")
+
+    def test_meldet_den_anbieter_fake_ohne_netzaufruf(self) -> None:
+        """Beim Anbieter »fake« gibt es nichts abzurufen."""
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter=Anbieter.FAKE, anbieter_token=""),
+            )
+
+        httpx_client.assert_not_called()
+        self.assertContains(response, "keine Modellliste")
+
+
+class ModellvorschlaegeSeitenTests(TestCase):
+    """Die Seite trägt den Knopf, holt aber beim Rendern nichts."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.client.force_login(_administratorin())
+
+    def _seite(self) -> HttpResponse:
+        # Ruft die Seite ab, auf der der Knopf neben dem Sprachmodell steht.
+
+        return self.client.get(reverse("simulation:modell_konfiguration"))
+
+    def test_traegt_den_knopf_neben_dem_sprachmodell(self) -> None:
+        """Der Knopf ist der einzige Auslöser des Abrufs."""
+        response: HttpResponse = self._seite()
+
+        self.assertContains(response, "Modelle laden")
+        self.assertContains(
+            response, f'hx-post="{reverse("simulation:modellvorschlaege")}"'
+        )
+
+    def test_verbirgt_den_knopf_beim_anbieter_fake(self) -> None:
+        """Ohne echten Anbieter gibt es keinen Knopf."""
+        response: HttpResponse = self._seite()
+
+        self.assertContains(response, "anbieter !== 'fake'")
+
+    def test_holt_beim_rendern_keine_modellliste(self) -> None:
+        """Eine Systemseite rendert ohne Netzaufruf."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            self._seite()
+
+        verzeichnis.assert_not_called()
+
+    def test_leert_die_liste_beim_anbieterwechsel(self) -> None:
+        """Kein Vorschlag des vorigen Anbieters bleibt stehen."""
+        response: HttpResponse = self._seite()
+
+        self.assertContains(response, "$refs.modellvorschlaege.innerHTML = ''")
