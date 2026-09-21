@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sitzungen.models import Sitzung, Teilnahme
+from sitzungen.models import Sitzung
 from vignetten.models import Vignette
 
 from .models import Erhebungsbindung, Erhebungsitem, ItemAntwort
@@ -49,13 +49,12 @@ def block_vorlegen(
     )
 
 
-def naechster_schritt(teilnahme: Teilnahme) -> Vignette | Itemblock | None:
+def naechster_schritt(bindung: Erhebungsbindung) -> Vignette | Itemblock | None:
     """Liefert die nächste ungespielte Vignette oder das definierte Ende."""
 
-    bindung = teilnahme.erhebungsbindung
     bindung.vignetten_ziehen()
     ziehungen = bindung.vignettenziehungen.select_related("vignette")
-    gespielte_ids = teilnahme.sitzung_set.values_list("vignette_id", flat=True)
+    gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
     ziehung = ziehungen.exclude(vignette_id__in=gespielte_ids).first()
     if ziehung:
         return ziehung.vignette
