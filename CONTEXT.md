@@ -144,7 +144,7 @@ Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwo
 _Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
 
 **Gesprächsbudget**:
-Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt.
+Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt — das betrifft die Darstellung, nicht die Lebensdauer: Der verbrauchte Stand wird an der Sitzung geführt und überlebt einen Browserwechsel (ADR-0042).
 _Avoid_: Limit, Zeitlimit, Nachrichtenbudget
 
 ## Versionierung
