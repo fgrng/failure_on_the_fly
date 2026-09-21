@@ -35,6 +35,7 @@ class GespraechsschrittDaten(TypedDict):
 
     reihenfolge: int
     eingabe: str
+    eingabemodus: str
     denkspur: str | None
     aeusserung: str | None
     fehlversuche: list[FehlversuchDaten]
@@ -61,6 +62,7 @@ class SitzungSink(Protocol):
         self,
         *,
         eingabe: str,
+        eingabemodus: str,
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
@@ -68,7 +70,11 @@ class SitzungSink(Protocol):
         """Bewahrt einen geglückten Gesprächsschritt auf."""
 
     def gescheiterten_schritt_behandeln(
-        self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Behält oder verwirft den endgültig fehlgeschlagenen Schritt."""
 
@@ -140,6 +146,7 @@ class DBSink:
         self,
         *,
         eingabe: str,
+        eingabemodus: str,
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
@@ -150,6 +157,7 @@ class DBSink:
             schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
                 sitzung=self._sitzung,
                 eingabe=eingabe,
+                eingabemodus=eingabemodus,
                 denkspur=denkspur,
                 aeusserung=aeusserung,
                 reihenfolge=self._naechste_reihenfolge(),
@@ -162,7 +170,11 @@ class DBSink:
             )
 
     def gescheiterten_schritt_behandeln(
-        self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0011)."""
 
@@ -170,6 +182,7 @@ class DBSink:
             Gespraechsschritt.objects.answerless_anlegen(
                 sitzung=self._sitzung,
                 eingabe=eingabe,
+                eingabemodus=eingabemodus,
                 reihenfolge=self._naechste_reihenfolge(),
                 fehlversuche=[
                     Fehlversuch(**fehlversuch) for fehlversuch in fehlversuche
@@ -350,6 +363,7 @@ class ScratchSink:
         self,
         *,
         eingabe: str,
+        eingabemodus: str,
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
@@ -360,6 +374,7 @@ class ScratchSink:
             {
                 "reihenfolge": len(self.gespraechsschritte) + 1,
                 "eingabe": eingabe,
+                "eingabemodus": eingabemodus,
                 "denkspur": denkspur,
                 "aeusserung": aeusserung,
                 "fehlversuche": fehlversuche,
@@ -368,7 +383,11 @@ class ScratchSink:
         self._als_geaendert_markieren()
 
     def gescheiterten_schritt_behandeln(
-        self, *, eingabe: str, fehlversuche: list[FehlversuchDaten]
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Verwirft den gescheiterten Schritt: Der Probelauf hält keinen Abbruch fest.
 

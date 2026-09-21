@@ -63,6 +63,24 @@ class Sitzung(models.Model):
         return self.gespraechsschritt_set.order_by("reihenfolge")
 
 
+class Eingabemodus(models.TextChoices):
+    """Die Herkunft eines abgeschickten Textes der Teilnehmer:in."""
+
+    GETIPPT: tuple[str, str] = "getippt", "Getippt"
+    TRANSKRIBIERT: tuple[str, str] = "transkribiert", "Transkribiert"
+    GEMISCHT: tuple[str, str] = "gemischt", "Gemischt"
+
+    @classmethod
+    def aus_formular(cls, wert: str | None) -> "Eingabemodus":
+        """Liest den Modus als Beobachtung: fehlend oder unbekannt heißt getippt.
+
+        Der Wert kommt aus dem Browser und hat keine Steuerwirkung; er darf
+        deshalb nie zu einer abgewiesenen Anfrage führen.
+        """
+
+        return cls(wert) if wert in cls.values else cls.GETIPPT
+
+
 class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
     """Schreibt answerless Schritte atomar mit ihren Fehlversuchen."""
 
@@ -74,6 +92,7 @@ class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
         eingabe: str,
         reihenfolge: int,
         fehlversuche: list["Fehlversuch"],
+        eingabemodus: str = Eingabemodus.GETIPPT,
     ) -> "Gespraechsschritt":
         """Legt einen Abbruchschritt erst nach seinen Fehlversuchen answerless an."""
 
@@ -83,6 +102,7 @@ class GespraechsschrittManager(models.Manager["Gespraechsschritt"]):
             denkspur="",
             aeusserung="",
             reihenfolge=reihenfolge,
+            eingabemodus=eingabemodus,
         )
         Fehlversuch.objects.bulk_create(
             [
@@ -113,6 +133,11 @@ class Gespraechsschritt(models.Model):
     denkspur: models.TextField = models.TextField(null=True, blank=True)
     aeusserung: models.TextField = models.TextField(null=True, blank=True)
     reihenfolge: models.PositiveIntegerField = models.PositiveIntegerField()
+    eingabemodus: models.CharField = models.CharField(
+        max_length=13,
+        choices=Eingabemodus,
+        default=Eingabemodus.GETIPPT,
+    )
 
     objects: GespraechsschrittManager = GespraechsschrittManager()
 

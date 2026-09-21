@@ -5,6 +5,7 @@
             <form method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
                 {% csrf_token %}
                 <input type="hidden" name="eingabe" value="{{ erneute_eingabe }}">
+                <input type="hidden" name="eingabemodus" value="{{ erneuter_eingabemodus }}">
                 <button class="button" type="submit">Erneut senden</button>
             </form>
         {% endif %}
@@ -15,6 +16,7 @@
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
+            <input type="hidden" name="eingabemodus" value="getippt">
             <button class="button gespraechseingabe__senden" type="submit">Senden</button>
         </form>
         {% if spracheingabe_verfuegbar %}

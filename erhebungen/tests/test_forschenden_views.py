@@ -31,6 +31,7 @@ from fragebogen_items.models import FragebogenItem
 from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from sitzungen.models import (
     Diagnose,
+    Eingabemodus,
     Fehlversuch,
     Gespraechsschritt,
     Sitzung,
@@ -1933,6 +1934,7 @@ class ErhebungsExportTests(TestCase):
             eingabe="Warum?",
             denkspur="Zeile eins\nZeile zwei",
             aeusserung="Antwort eins\nAntwort zwei",
+            eingabemodus=Eingabemodus.TRANSKRIBIERT,
         )
         Fehlversuch.objects.create(
             gespraechsschritt=erfolgreicher_schritt,
@@ -2026,6 +2028,7 @@ class ErhebungsExportTests(TestCase):
                 "denkspur",
                 "aeusserung",
                 "erstellt_am",
+                "eingabemodus",
             ],
         )
         self.assertEqual(
@@ -2041,6 +2044,7 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Warum?",
                     "denkspur": "Zeile eins\nZeile zwei",
                     "aeusserung": "Antwort eins\nAntwort zwei",
+                    "eingabemodus": "transkribiert",
                 },
                 {
                     "id": str(leerer_schritt.pk),
@@ -2049,6 +2053,7 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Bitte knapp.",
                     "denkspur": "",
                     "aeusserung": "",
+                    "eingabemodus": "getippt",
                 },
                 {
                     "id": str(abbruchschritt.pk),
@@ -2057,6 +2062,7 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Noch einmal?",
                     "denkspur": "NA",
                     "aeusserung": "NA",
+                    "eingabemodus": "getippt",
                 },
             ],
         )

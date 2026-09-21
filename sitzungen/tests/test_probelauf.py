@@ -12,6 +12,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
     Diagnose,
+    Eingabemodus,
     Fehlversuch,
     Gespraechsschritt,
     Sitzung,
@@ -277,7 +278,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.entwurf.budget_wert = budget_wert
         self.entwurf.save()
 
-    def _endgueltigen_fehlschlag_ausloesen(self) -> HttpResponse:
+    def _endgueltigen_fehlschlag_ausloesen(
+        self, eingabemodus: str = Eingabemodus.GETIPPT
+    ) -> HttpResponse:
         # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
 
         self.konfiguration = ModellKonfiguration.objects.create(
@@ -297,7 +300,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         ]
         session.save()
         return self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+            reverse("sitzungen:probelauf_gespraech"),
+            {"eingabe": "Und warum?", "eingabemodus": eingabemodus},
         )
 
     def test_simulationshinweise_erscheinen_nicht_auf_sitzungsseite_aber_im_prompt(
@@ -431,7 +435,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(erste_antwort, "Mia addiert Zähler und Nenner.")
 
         zweite_antwort: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+            reverse("sitzungen:probelauf_gespraech"),
+            {"eingabe": "Und warum?", "eingabemodus": "transkribiert"},
         )
 
         self.assertContains(
@@ -443,6 +448,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 {
                     "reihenfolge": 1,
                     "eingabe": "Wie rechnest du?",
+                    "eingabemodus": "getippt",
                     "denkspur": "Mia addiert Zähler und Nenner.",
                     "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                     "fehlversuche": [],
@@ -450,6 +456,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 {
                     "reihenfolge": 2,
                     "eingabe": "Und warum?",
+                    "eingabemodus": "transkribiert",
                     "denkspur": "Mia addiert Zähler und Nenner.",
                     "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
                     "fehlversuche": [],
@@ -664,6 +671,21 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(
             response,
             '<input type="hidden" name="eingabe" value="Und warum?">',
+            html=True,
+        )
+
+    def test_endgueltiger_fehlschlag_bewahrt_den_eingabemodus_fuer_wiederholung(
+        self,
+    ) -> None:
+        """Die Wiederholung schickt den Modus der ursprünglichen Eingabe mit (Spec: #122)."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen(
+            Eingabemodus.TRANSKRIBIERT
+        )
+
+        self.assertContains(
+            response,
+            '<input type="hidden" name="eingabemodus" value="transkribiert">',
             html=True,
         )
 
