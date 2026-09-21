@@ -1,24 +1,21 @@
 """Vertragstests für den dokumentierten Export-Kontrakt aus ADR-0029."""
 
-from pathlib import Path
-
-from config.tests.dokumentation import REPO_ROOT, readme_abschnitt
-
-
-ADR_0029_PATH: Path = REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md"
+from config.tests.dokumentation import (
+    ADR_0029_PATH,
+    abschnitt,
+    in_einer_zeile,
+    readme_abschnitt,
+)
 
 
 def adr_text() -> str:
     """Liefert ADR-0029 in einer Zeile, damit der Umbruch nichts verdeckt."""
-    return " ".join(ADR_0029_PATH.read_text().split())
+    return in_einer_zeile(ADR_0029_PATH.read_text())
 
 
 def adr_abschnitt(ueberschrift: str) -> str:
     """Liefert den ADR-Abschnitt unter der Überschrift in einer Zeile."""
-    abschnitt: str = (
-        ADR_0029_PATH.read_text().split(f"## {ueberschrift}")[1].split("\n## ")[0]
-    )
-    return " ".join(abschnitt.split())
+    return in_einer_zeile(abschnitt(ADR_0029_PATH, ueberschrift))
 
 
 def test_adr_0029_nennt_die_ausgelieferte_dateizahl() -> None:

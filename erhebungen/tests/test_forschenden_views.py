@@ -16,7 +16,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.dokumentation import REPO_ROOT
+from config.tests.dokumentation import exportdateien_aus_adr_0029
 from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
@@ -1422,19 +1422,6 @@ class ErhebungenArchivierenTests(TestCase):
         self.assertEqual(self.erhebung.status, Erhebung.Status.ARCHIVIERT)
 
 
-def _dateien_aus_adr_0029() -> list[str]:
-    """Liefert die Dateinamen aus der Kontrakttabelle des Export-ADR."""
-    tabelle: str = (
-        (REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md")
-        .read_text()
-        .split("## Dateiformat")[1]
-        .split("\n## ")[0]
-    )
-    return [
-        zeile.split("`")[1] for zeile in tabelle.splitlines() if zeile.startswith("| `")
-    ]
-
-
 class ErhebungsExportTests(TestCase):
     """Forschende laden die minimale relationale Datenspur als ZIP herunter."""
 
@@ -2420,7 +2407,7 @@ class ErhebungsExportTests(TestCase):
 
         with ZipFile(BytesIO(export.content)) as zip_datei:
             self.assertEqual(
-                sorted(zip_datei.namelist()), sorted(_dateien_aus_adr_0029())
+                sorted(zip_datei.namelist()), sorted(exportdateien_aus_adr_0029())
             )
 
 

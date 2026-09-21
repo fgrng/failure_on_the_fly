@@ -6,14 +6,22 @@ from pathlib import Path
 REPO_ROOT: Path = Path(__file__).parents[2]
 CONTEXT_PATH: Path = REPO_ROOT / "CONTEXT.md"
 README_PATH: Path = REPO_ROOT / "README.md"
+ADR_0029_PATH: Path = REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md"
+
+
+def in_einer_zeile(text: str) -> str:
+    """Faltet den Text zu einer Zeile, damit der Umbruch nichts verdeckt."""
+    return " ".join(text.split())
+
+
+def abschnitt(pfad: Path, ueberschrift: str) -> str:
+    """Liefert den Rohtext des Abschnitts unter der Überschrift."""
+    return pfad.read_text().split(f"## {ueberschrift}")[1].split("\n## ")[0]
 
 
 def readme_abschnitt(ueberschrift: str) -> str:
     """Liefert den README-Abschnitt unter der Überschrift in einer Zeile."""
-    abschnitt: str = (
-        README_PATH.read_text().split(f"## {ueberschrift}")[1].split("\n## ")[0]
-    )
-    return " ".join(abschnitt.split())
+    return in_einer_zeile(abschnitt(README_PATH, ueberschrift))
 
 
 def glossareintrag(begriff: str) -> str:
@@ -21,4 +29,13 @@ def glossareintrag(begriff: str) -> str:
     eintrag: str = (
         CONTEXT_PATH.read_text().split(f"\n**{begriff}**:")[1].split("\n_Avoid_")[0]
     )
-    return " ".join(eintrag.split())
+    return in_einer_zeile(eintrag)
+
+
+def exportdateien_aus_adr_0029() -> list[str]:
+    """Liefert die Dateinamen aus der Kontrakttabelle des Export-ADR."""
+    return [
+        zeile.split("`")[1]
+        for zeile in abschnitt(ADR_0029_PATH, "Dateiformat").splitlines()
+        if zeile.startswith("| `")
+    ]
