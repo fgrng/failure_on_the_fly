@@ -61,7 +61,7 @@
     </section>
 
     {# Der Kreis hängt an der Historie, die Routen gehen über die Fassung. #}
-    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_nummer="02" koautorin_hinzufuegen_url="fragebogen_items:koautorin_hinzufuegen" koautorin_entfernen_url="fragebogen_items:koautorin_entfernen" kreis=item.historie objekt_pk=item.pk %}
+    {% include "includes/eigentuemerinnen.html" with eigentuemerinnen_abschnitt_nummer="02" eigentuemerin_hinzufuegen_url="fragebogen_items:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="fragebogen_items:eigentuemerin_entfernen" kreis=item.historie objekt_pk=item.pk %}
 
     {% if item.typ == item.Typ.LIKERT %}
         <section class="page-section" aria-labelledby="detail-likert">

@@ -18,14 +18,14 @@ urlpatterns: list[URLPattern] = [
     path("<int:pk>/neue-fassung/", views.neue_fassung, name="neue_fassung"),
     path("<int:pk>/reversionieren/", views.reversionieren, name="reversionieren"),
     path(
-        "<int:pk>/koautorinnen/hinzufuegen/",
-        views.koautorin_hinzufuegen,
-        name="koautorin_hinzufuegen",
+        "<int:pk>/eigentuemerinnen/hinzufuegen/",
+        views.eigentuemerin_hinzufuegen,
+        name="eigentuemerin_hinzufuegen",
     ),
     path(
-        "<int:pk>/koautorinnen/<int:konto_pk>/entfernen/",
-        views.koautorin_entfernen,
-        name="koautorin_entfernen",
+        "<int:pk>/eigentuemerinnen/<int:konto_pk>/entfernen/",
+        views.eigentuemerin_entfernen,
+        name="eigentuemerin_entfernen",
     ),
     path("<int:pk>/", views.detail, name="detail"),
 ]

@@ -20,14 +20,14 @@ urlpatterns: list[URLPattern] = [
     path("eigene/anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.detail, name="detail"),
     path(
-        "eigene/<int:pk>/koautorinnen/hinzufuegen/",
-        views.koautorin_hinzufuegen,
-        name="koautorin_hinzufuegen",
+        "eigene/<int:pk>/eigentuemerinnen/hinzufuegen/",
+        views.eigentuemerin_hinzufuegen,
+        name="eigentuemerin_hinzufuegen",
     ),
     path(
-        "eigene/<int:pk>/koautorinnen/<int:konto_pk>/entfernen/",
-        views.koautorin_entfernen,
-        name="koautorin_entfernen",
+        "eigene/<int:pk>/eigentuemerinnen/<int:konto_pk>/entfernen/",
+        views.eigentuemerin_entfernen,
+        name="eigentuemerin_entfernen",
     ),
     path("eigene/<int:pk>/export/", views.export, name="export"),
     path(

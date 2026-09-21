@@ -320,7 +320,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk]),
             {"konto": grace.pk},
         )
 
@@ -339,7 +339,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         self.client.force_login(ada)
 
         self.client.post(
-            reverse("vignetten:koautorin_entfernen", args=[vignette.pk, ada.pk])
+            reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, ada.pk])
         )
         response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[vignette.pk])
@@ -353,7 +353,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         vignette: Vignette = _vignette_mit_eigentuemerinnen(grace)
         self.client.force_login(grace)
         self.client.post(
-            reverse("vignetten:koautorin_entfernen", args=[vignette.pk, grace.pk])
+            reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, grace.pk])
         )
         response: HttpResponse = self.client.get(
             reverse("vignetten:detail", args=[vignette.pk])
@@ -371,7 +371,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         vignette: Vignette = _vollstaendige_vignette(ada)
         self.client.force_login(ada)
         self.client.post(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk]),
             {"konto": grace.pk},
         )
         self.client.force_login(grace)
@@ -388,7 +388,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         vignette: Vignette = _vollstaendige_vignette(ada)
         self.client.force_login(ada)
         self.client.post(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk]),
             {"konto": grace.pk},
         )
         self.client.force_login(grace)
@@ -415,7 +415,7 @@ class VignetteKoautorschaftViewTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk]),
             {"konto": ohne_rolle.pk},
         )
 
@@ -439,11 +439,11 @@ class VignetteKoautorschaftViewTests(TestCase):
             html=True,
         )
         self.client.post(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk]),
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk]),
             {"konto": ada.pk},
         )
         response: HttpResponse = self.client.post(
-            reverse("vignetten:koautorin_entfernen", args=[vignette.pk, grace.pk])
+            reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, grace.pk])
         )
 
         self.assertRedirects(response, reverse("vignetten:detail", args=[vignette.pk]))
@@ -465,31 +465,32 @@ class VignetteKoautorschaftViewTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse(
-                "vignetten:koautorin_entfernen", args=[vignette.pk, administratorin.pk]
+                "vignetten:eigentuemerin_entfernen",
+                args=[vignette.pk, administratorin.pk],
             )
         )
 
         self.assertRedirects(response, reverse("vignetten:detail", args=[vignette.pk]))
 
-    def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
+    def test_eigentuemerin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Hinzufügen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
         vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.get(
-            reverse("vignetten:koautorin_hinzufuegen", args=[vignette.pk])
+            reverse("vignetten:eigentuemerin_hinzufuegen", args=[vignette.pk])
         )
         self.assertEqual(hinzufuegen.status_code, 405)
 
-    def test_koautorin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
+    def test_eigentuemerin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Entfernen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
         vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
         self.client.force_login(ada)
 
         entfernen: HttpResponse = self.client.get(
-            reverse("vignetten:koautorin_entfernen", args=[vignette.pk, ada.pk])
+            reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, ada.pk])
         )
 
         self.assertEqual(entfernen.status_code, 405)

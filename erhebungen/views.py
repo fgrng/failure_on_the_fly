@@ -386,7 +386,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
 
     if request.method != "POST":
@@ -401,7 +401,9 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
+def eigentuemerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis der Erhebung aus.
 
     Wer sich selbst austrägt, landet auf der Erhebungsliste; scheitert der
