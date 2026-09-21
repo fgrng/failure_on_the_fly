@@ -34,6 +34,14 @@ class EigentuemerKreis(models.Model):
     # Eigentümerschaft unberührt, sonst verwaisten Bestände.
     ROLLENGRUPPE: str
 
+    # Was das Konto-Löschen meldet, wenn dieser Bestand im Weg steht. Jede
+    # Erbin schreibt ihren Bestand aus; abgeleitet wird nichts, denn Djangos
+    # `verbose_name` ergäbe »fragebogen item historie«.
+    LOESCHSPERRE_MELDUNG: str = (
+        "Dieser Bestand braucht mindestens eine Eigentümerin; bitte tragen "
+        "Sie vorher eine Nachfolgerin ein."
+    )
+
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     class Meta:

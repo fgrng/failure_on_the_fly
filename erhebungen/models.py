@@ -59,6 +59,10 @@ class Erhebung(EigentuemerKreis):
     """Ein Untersuchungsdesign eines Eigentümerinnen-Kreises."""
 
     ROLLENGRUPPE: str = FORSCHENDE_GRUPPE
+    LOESCHSPERRE_MELDUNG: str = (
+        "Aktive Erhebungen brauchen mindestens eine Eigentümerin; bitte tragen "
+        "Sie vorher eine Nachfolgerin ein."
+    )
 
     class Status(models.TextChoices):
         """Die Zustände einer Erhebung."""

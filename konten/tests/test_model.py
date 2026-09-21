@@ -11,6 +11,7 @@ from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
 from erhebungen.models import Erhebung
+from fragebogen_items.models import FragebogenItem, FragebogenItemHistorie
 from training.models import Training
 from vignetten.models import Vignettenhistorie
 
@@ -196,7 +197,7 @@ def test_konto_loeschen_alleinige_eigentuemerin_eines_trainings_wird_blockiert()
     konto: Konto = Konto.objects.create_user(username="ada")
     training: Training = Training.objects.anlegen(konto, name="Brüche")
 
-    with pytest.raises(ProtectedError, match="übertragen"):
+    with pytest.raises(ProtectedError, match="Trainings"):
         konto.delete()
 
     assert Training.objects.filter(pk=training.pk).exists()
@@ -269,3 +270,43 @@ def test_konto_meldet_sich_mit_username_und_passwort_an() -> None:
     )
 
     assert authenticate(username="lehrerin", password="sicheres-passwort") == konto
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_alleinige_eigentuemerin_einer_item_historie_wird_blockiert() -> (
+    None
+):
+    """Auch die Fragebogen-Item-Historie darf nicht eigentümerlos werden."""
+    ada: Konto = Konto.objects.create_user(username="ada")
+    item: FragebogenItem = FragebogenItem.objects.anlegen(ada)
+
+    with pytest.raises(ProtectedError, match="Fragebogen-Item-Historien"):
+        ada.delete()
+
+    assert FragebogenItem.objects.filter(pk=item.pk).exists()
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_geteilte_item_historie_ueberlebt() -> None:
+    """Eine zweite Eigentümerin gibt die Kontolöschung frei."""
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
+    item: FragebogenItem = FragebogenItem.objects.anlegen(ada)
+    item.historie.eigentuemerinnen.add(grace)
+
+    ada.delete()
+
+    assert list(item.historie.eigentuemerinnen.all()) == [grace]
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_fassungslose_item_historie_blockiert_nicht() -> None:
+    """Eine Historie ohne Fassung trägt nichts Sichtbares und wird mit entfernt."""
+    ada: Konto = Konto.objects.create_user(username="ada")
+    item: FragebogenItem = FragebogenItem.objects.anlegen(ada)
+    historie_pk: int = item.historie_id
+
+    item.delete()
+    ada.delete()
+
+    assert not FragebogenItemHistorie.objects.filter(pk=historie_pk).exists()
