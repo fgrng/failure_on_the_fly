@@ -123,6 +123,10 @@ _Avoid_: LLM-Einstellungen, KI-Konfiguration
 Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0036).
 _Avoid_: Transkriptionseinstellungen, Whisper-Konfiguration, STT-Konfiguration
 
+**Modellvorschläge**:
+Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0036). Bei `fake` gibt es nichts abzurufen.
+_Avoid_: Autovervollständigung, Autocomplete, Typeahead, Modellpicker, Modellauswahl — eine Auswahl schlösse aus, was hier nur vorgeschlagen wird.
+
 **Simulationskern**:
 Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Prompt-Vorlage, User-Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
 _Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
