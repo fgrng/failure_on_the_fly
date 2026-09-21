@@ -130,16 +130,26 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         return Erhebungsbindung.objects.get()
 
-    def _scheiternde_erhebung_einrichten(self) -> None:
-        # Ersetzt den Entwurf durch einen, dessen Sitzungen stets scheitern.
+    def _entwurf_ersetzen(
+        self, *, name: str, skript: list[dict]
+    ) -> ModellKonfiguration:
+        # Tauscht aktive Modellkonfiguration und Entwurf gegen einen eigenen Aufbau.
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
-            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
+            parameter={"skript": skript},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung = Erhebung.objects.anlegen(
-            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
+            self.erhebung.eigentuemerinnen.get(), name=name
+        )
+        return konfiguration
+
+    def _scheiternde_erhebung_einrichten(self) -> None:
+        # Ersetzt den Entwurf durch einen, dessen Sitzungen stets scheitern.
+
+        self._entwurf_ersetzen(
+            name="Fehlschlag", skript=[{"fehler": "anbieterfehler"}] * 3
         )
 
     def _abschluss_item_anlegen(
@@ -1373,21 +1383,12 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
         """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {"fehler": "formatbruch", "rohantwort": "{unvollständig"},
-                    {
-                        "denkspur": "Geheime Regel.",
-                        "aeusserung": "Ich addiere.",
-                    },
-                ]
-            },
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.anlegen(
-            self.erhebung.eigentuemerinnen.get(), name="Datenspur"
+        konfiguration: ModellKonfiguration = self._entwurf_ersetzen(
+            name="Datenspur",
+            skript=[
+                {"fehler": "formatbruch", "rohantwort": "{unvollständig"},
+                {"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."},
+            ],
         )
         vignette: Vignette = self._vignette_anlegen()
         self._erhebung_fertigstellen()
