@@ -229,6 +229,11 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
+        itembloecke: QuerySet[Itemblock] = (
+            Itemblock.objects.filter(erhebungsbindung__stichprobe__erhebung=erhebung)
+            .select_related("erhebungsbindung")
+            .order_by("erhebungsbindung_id", "pk")
+        )
         zip_datei.writestr(
             "itembloecke.csv",
             _csv_inhalt(
@@ -249,11 +254,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         block.vorgelegt_am,
                         block.erledigt_am,
                     )
-                    for block in Itemblock.objects.filter(
-                        erhebungsbindung__stichprobe__erhebung=erhebung
-                    )
-                    .select_related("erhebungsbindung")
-                    .order_by("erhebungsbindung_id", "pk")
+                    for block in itembloecke
                 ),
             ),
         )

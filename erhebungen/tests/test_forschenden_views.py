@@ -46,6 +46,20 @@ def _zeitstempel(wert: datetime) -> str:
     return timezone.localtime(wert, timezone.UTC).isoformat(timespec="seconds")
 
 
+def _laufende_bindung(erhebung: Erhebung, token: str) -> Erhebungsbindung:
+    """Bindet eine Teilnahme an eine gerade laufende Stichprobe der Erhebung."""
+
+    return Erhebungsbindung.objects.create(
+        stichprobe=Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        ),
+        teilnahme=Teilnahme.objects.create(),
+        token=token,
+    )
+
+
 def _forschungskonfiguration(
     name: str = "forschung",
     parameter: dict[str, object] | None = None,
@@ -2093,16 +2107,7 @@ class ErhebungsExportTests(TestCase):
         kern.finalisieren()
         vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
         bindungen: list[Erhebungsbindung] = [
-            Erhebungsbindung.objects.create(
-                stichprobe=Stichprobe.objects.create(
-                    erhebung=erhebung,
-                    beginn=timezone.now() - timedelta(days=1),
-                    ende=timezone.now() + timedelta(days=1),
-                ),
-                teilnahme=Teilnahme.objects.create(),
-                token=f"2345-678{nummer}",
-            )
-            for nummer in range(1, 3)
+            _laufende_bindung(erhebung, f"2345-678{nummer}") for nummer in range(1, 3)
         ]
         bloecke: list[Itemblock] = []
         for bindung in bindungen:
@@ -2129,15 +2134,7 @@ class ErhebungsExportTests(TestCase):
         fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
         fremde_erhebung.finalisieren()
         Itemblock.objects.create(
-            erhebungsbindung=Erhebungsbindung.objects.create(
-                stichprobe=Stichprobe.objects.create(
-                    erhebung=fremde_erhebung,
-                    beginn=timezone.now() - timedelta(days=1),
-                    ende=timezone.now() + timedelta(days=1),
-                ),
-                teilnahme=Teilnahme.objects.create(),
-                token="9999-9999",
-            ),
+            erhebungsbindung=_laufende_bindung(fremde_erhebung, "9999-9999"),
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
         )
         self.client.force_login(ada)
@@ -2161,7 +2158,7 @@ class ErhebungsExportTests(TestCase):
                     "id": str(block.pk),
                     "teilnahme_token": block.erhebungsbindung.token,
                     "andockpunkt": block.andockpunkt,
-                    "sitzung_id": str(block.sitzung_id or "NA"),
+                    "sitzung_id": (str(block.sitzung_id) if block.sitzung_id else "NA"),
                     "vorgelegt_am": _zeitstempel(block.vorgelegt_am),
                     "erledigt_am": (
                         _zeitstempel(block.erledigt_am) if block.erledigt_am else "NA"
@@ -2170,13 +2167,12 @@ class ErhebungsExportTests(TestCase):
                 for block in bloecke
             ],
         )
+        # Vier Blöcke, eine Abfrage: der Export zerfällt nicht in N+1-Abfragen.
         self.assertEqual(
-            len(
-                [
-                    abfrage
-                    for abfrage in abfragen.captured_queries
-                    if "erhebungen_itemblock" in abfrage["sql"]
-                ]
+            sum(
+                1
+                for abfrage in abfragen.captured_queries
+                if "erhebungen_itemblock" in abfrage["sql"]
             ),
             1,
         )
