@@ -1,19 +1,17 @@
 """Der Eigentümer-Kreis, den alle bestandstragenden Modelle gemeinsam tragen."""
 
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from django.db import models
 
+from konten.models import Konto
 from konten.navigation import ist_administratorin
-
-if TYPE_CHECKING:
-    from konten.models import Konto
 
 
 class EigentuemerKreisQuerySet:
     """Die Sichtbarkeitsregel des Eigentümer-Kreises für jedes Bestands-QuerySet."""
 
-    def sichtbar_fuer(self, konto: "Konto") -> Self:
+    def sichtbar_fuer(self, konto: Konto) -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
@@ -46,14 +44,12 @@ class EigentuemerKreis(models.Model):
         """
         return True
 
-    def moegliche_ergaenzungen(self) -> "models.QuerySet[Konto]":
+    def moegliche_ergaenzungen(self) -> models.QuerySet[Konto]:
         """Liefert die Konten, die in diesen Kreis aufgenommen werden können.
 
         Das sind die Trägerinnen der Rollengruppe samt Administration, ohne die
         bereits Eingetragenen.
         """
-        from konten.models import Konto
-
         return Konto.objects.mit_rolle_oder_administration(self.ROLLENGRUPPE).exclude(
             pk__in=self.eigentuemerinnen.values("pk")
         )

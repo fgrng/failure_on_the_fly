@@ -124,13 +124,12 @@ def test_kandidatenliste_nennt_die_rolle_und_die_administration(
     administratorin: Konto = Konto.objects.create_user(
         username="admin", is_superuser=True
     )
-    fremde: Konto = Konto.objects.create_user(username="mallory")
-    bestand = modell()
+    # Ohne Rolle und ohne Administration: darf in keiner Liste auftauchen.
+    Konto.objects.create_user(username="mallory")
+    bestand: EigentuemerKreis = modell()
     bestand.save()
     bestand.eigentuemerinnen.add(eingetragene)
 
-    kandidatinnen = set(bestand.moegliche_ergaenzungen())
+    kandidatinnen: set[Konto] = set(bestand.moegliche_ergaenzungen())
 
     assert kandidatinnen == {kandidatin, administratorin}
-    assert eingetragene not in kandidatinnen
-    assert fremde not in kandidatinnen
