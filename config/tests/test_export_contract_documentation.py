@@ -55,8 +55,8 @@ def test_open_questions_removes_the_resolved_export_question() -> None:
 
     assert "## 2. Export-Formate und Granularität" not in open_questions
     assert "## 1. Wiederholversuche und Sitzungsobergrenze" in open_questions
-    assert "## 2. Zulässige Anbieter und Modelle" in open_questions
-    assert "## 3." not in open_questions
+    assert "Zulässige Anbieter und Modelle" not in open_questions
+    assert "## 2." not in open_questions
 
 
 def test_adr_0030_documents_positionsmarker_umhuellung_and_contract_break() -> None:
