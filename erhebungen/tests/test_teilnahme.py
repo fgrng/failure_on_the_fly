@@ -344,7 +344,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(zweite_bindung.teilnahme.einwilligung_erteilt)
 
     def test_token_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
-        """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
+        """Gespielt wird, worauf gepinnt wurde (ADR-0040) — auch überholt."""
 
         vignette: Vignette = self._vignette_anlegen()
         kern: Simulationskern = vignette.gepinnter_kern

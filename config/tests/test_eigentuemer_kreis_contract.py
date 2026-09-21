@@ -62,7 +62,7 @@ def test_austritt_der_letzten_eigentuemerin_aendert_nichts(
 ) -> None:
     """Der letzte Platz im Kreis bleibt besetzt, auch bei stillgelegtem Bestand.
 
-    Die Invariante am Objekt ist bedingungslos (ADR-0032): Ein stillgelegter
+    Die Invariante am Objekt ist bedingungslos (ADR-0039): Ein stillgelegter
     Bestand ist wiederbelebbar und wäre danach aktiv und eigentümerlos. Weil
     jedes Modell anders stillgelegt wird — Archiv-Kennzeichen, Status, gar
     nicht — setzt der Test allein die Antwort von `ist_aktiv()`.

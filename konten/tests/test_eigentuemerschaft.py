@@ -119,7 +119,7 @@ def test_austritt_eines_fremden_kontos_entfernt_nichts() -> None:
 
 @pytest.mark.django_db
 def test_archivierter_bestand_behaelt_seine_letzte_eigentuemerin() -> None:
-    """Die Invariante am Objekt fragt nicht nach `ist_aktiv()` (ADR-0032)."""
+    """Die Invariante am Objekt fragt nicht nach `ist_aktiv()` (ADR-0039)."""
     ada: Konto = Konto.objects.create_user(username="ada")
     historie: Vignettenhistorie = Vignettenhistorie.objects.create(archiviert=True)
     historie.eigentuemerinnen.add(ada)

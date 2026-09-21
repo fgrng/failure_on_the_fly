@@ -4,7 +4,7 @@
 
 > **Nachtrag 2026-09-21** ([#226](https://github.com/fgrng/failure_on_the_fly/issues/226)): Infomaniaks Modellliste ist inzwischen an einem echten Konto abgerufen. Die Abschnitte 1.2 und 4.2 sind auf diesen verifizierten Stand gebracht; der frühere Vorbehalt »kein Konto vorhanden« und die Modellnamen aus der Drittquelle sind ersetzt. Die Empfehlung aus 4.3 — Autovervollständigung ja, harte Prüfung nein — bleibt davon unberührt.
 
-Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die offene Frage »Zulässige Anbieter und Modelle« aus `docs/open-questions.md`:
+Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die damals offene Frage »Zulässige Anbieter und Modelle« (seit ADR-0038 entschieden):
 
 > Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
 
@@ -333,7 +333,6 @@ Bei positiver Entscheidung:
 
 - ADR zu den zwei zulässigen Anbietern und der Nicht-Erzwingung der Modellliste.
 - ADR zur Anbieter-Feldgruppe, zur Trennung der beiden Konfigurationen und zu ihren unterschiedlichen Lebensdauern (append-only vs. veränderlich).
-- Die Frage »Zulässige Anbieter und Modelle« in `docs/open-questions.md` streichen.
 - Ticket: Anbieter-Feldgruppe an `ModellKonfiguration` samt Migration, `clean()`-Prüfung je Anbieter, write-only-Token, Maskierung an beiden Anzeigestellen, `anbieter` im Export (ADR-0029 ergänzen).
 - Ticket: `TranskriptionsKonfiguration` als eigenes, veränderliches Objekt; löst `TRANSKRIPTION_ANBIETER`/`TRANSKRIPTION_MODELL` ab, nicht im Export.
 - Ticket: Autovervollständigung der Modellnamen im Anlegeformular aus den Anbieter-APIs (Abschnitt 4).

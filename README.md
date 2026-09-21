@@ -74,8 +74,8 @@ unter `/system/transkription/` bearbeitet — mit denselben Anbieterfeldern wie 
 Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und das
 Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau eine
 Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
-anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
-(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
+anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert.
+Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
 Ob überhaupt transkribiert wird, entscheidet weiterhin die Instanz über
 `TRANSKRIPTION_ZERO_RETENTION` in der Umgebung — die Zusage der Betreiber:in
 gehört nicht in dasselbe Formular wie die Anbieterwahl.
