@@ -38,14 +38,6 @@ class LikertSkalenpol(models.TextChoices):
         return list(cls).index(pol) + 1
 
 
-def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
-    # Eine Historie ohne Fassung trägt weder Namen noch sichtbaren Bestand und
-    # blockiert sonst unsichtbar das Löschen ihres Kontos (konten.Konto.delete).
-    FragebogenItemHistorie.objects.filter(
-        pk__in=set(historie_ids), fragebogenitem__isnull=True
-    ).delete()
-
-
 class FragebogenItemHistorieQuerySet(
     EigentuemerKreisQuerySet, models.QuerySet["FragebogenItemHistorie"]
 ):
@@ -66,6 +58,14 @@ class FragebogenItemHistorie(EigentuemerKreis):
     objects: models.Manager["FragebogenItemHistorie"] = (
         FragebogenItemHistorieQuerySet.as_manager()
     )
+
+
+def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
+    # Eine Historie ohne Fassung trägt weder Namen noch sichtbaren Bestand und
+    # blockiert sonst unsichtbar das Löschen ihres Kontos (konten.Konto.delete).
+    FragebogenItemHistorie.objects.filter(
+        pk__in=set(historie_ids), fragebogenitem__isnull=True
+    ).delete()
 
 
 class FragebogenItemQuerySet(models.QuerySet["FragebogenItem"]):
@@ -218,6 +218,7 @@ class FragebogenItem(models.Model):
         finally:
             del self._wechselt_zustand
 
+    @transaction.atomic
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
         if not self._hat_gespeicherten_zustand(self.Zustand.ENTWURF):

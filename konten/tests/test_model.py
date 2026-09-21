@@ -11,7 +11,7 @@ from django.db.models import ProtectedError, QuerySet
 
 from konten.models import Konto
 from erhebungen.models import Erhebung
-from fragebogen_items.models import FragebogenItem, FragebogenItemHistorie
+from fragebogen_items.models import FragebogenItem
 from training.models import Training
 from vignetten.models import Vignettenhistorie
 
@@ -301,12 +301,11 @@ def test_konto_loeschen_geteilte_item_historie_ueberlebt() -> None:
 
 @pytest.mark.django_db
 def test_konto_loeschen_fassungslose_item_historie_blockiert_nicht() -> None:
-    """Eine Historie ohne Fassung trägt nichts Sichtbares und wird mit entfernt."""
+    """Eine Historie ohne Fassung trägt nichts Sichtbares und sperrt daher nicht."""
     ada: Konto = Konto.objects.create_user(username="ada")
     item: FragebogenItem = FragebogenItem.objects.anlegen(ada)
-    historie_pk: int = item.historie_id
 
     item.delete()
     ada.delete()
 
-    assert not FragebogenItemHistorie.objects.filter(pk=historie_pk).exists()
+    assert not Konto.objects.filter(pk=ada.pk).exists()

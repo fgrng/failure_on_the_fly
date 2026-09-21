@@ -38,15 +38,16 @@ class Konto(AbstractUser):
         keep_parents: bool = False,
     ) -> tuple[int, dict[str, int]]:
         """Verhindert eigentümerlose aktive Bestände."""
-        # Die Bestände kommen aus Djangos Modellregistrierung statt aus
-        # Importen: Jedes registrierte Modell, das vom Eigentümer-Kreis erbt,
-        # wird geprüft. Das ist kein Trick, sondern die Bedingung dafür, dass
-        # `konten` nicht in die Bestands-Apps zurückimportiert (ADR-0016) und
-        # ein künftiges fünftes Modell am Tag seiner Einführung mitgeschützt
-        # ist.
-        for modell in apps.get_models():
-            if not issubclass(modell, EigentuemerKreis):
-                continue
+        # Die zu prüfenden Bestände kommen aus Djangos Modellregistrierung
+        # statt aus Importen: So importiert `konten` nicht in die Bestands-Apps
+        # zurück (ADR-0016), und ein künftig hinzukommendes Bestandsmodell ist
+        # am Tag seiner Einführung mitgeschützt.
+        bestandsmodelle: list[type[EigentuemerKreis]] = [
+            modell
+            for modell in apps.get_models()
+            if issubclass(modell, EigentuemerKreis)
+        ]
+        for modell in bestandsmodelle:
             for bestand in modell.objects.filter(eigentuemerinnen=self):
                 if bestand.ist_aktiv() and bestand.eigentuemerinnen.count() == 1:
                     raise ProtectedError(modell.LOESCHSPERRE_MELDUNG, [bestand])
