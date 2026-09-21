@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
+from simulation.forms import ModellKonfigurationForm
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -35,6 +36,11 @@ def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
         sprachmodell=sprachmodell,
         anbieter_token=token,
     )
+
+
+def _formularfelder() -> list[str]:
+    """Liefert die Feldnamen in der Reihenfolge, die das Formular führt."""
+    return list(ModellKonfigurationForm().fields)
 
 
 def _anlegedaten(**werte: object) -> dict[str, object]:
@@ -336,3 +342,33 @@ class ModellKonfigurationFakeTests(TestCase):
 
         self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
         self.assertEqual(ModellKonfiguration.objects.get().parameter, {})
+
+
+class ModellKonfigurationFormularTests(TestCase):
+    """Die Seite nennt ihre Felder namentlich — vollständig und in Formularfolge."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.client.force_login(_administratorin())
+
+    def test_nennt_jedes_feld_des_formulars(self) -> None:
+        """Kein im Formular geführtes Feld fehlt auf der Seite."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        for feld in _formularfelder():
+            self.assertContains(response, f'name="{feld}"')
+
+    def test_haelt_die_reihenfolge_des_formulars(self) -> None:
+        """Die namentliche Aufzählung ordnet die Felder wie das Formular."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+        koerper: str = response.content.decode()
+
+        stellen: list[int] = [
+            koerper.index(f'name="{feld}"') for feld in _formularfelder()
+        ]
+
+        self.assertEqual(stellen, sorted(stellen))
