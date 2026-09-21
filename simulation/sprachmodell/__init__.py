@@ -80,8 +80,13 @@ class Sprachmodell(Protocol):
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
+        timeout: float,
     ) -> Antwort:
-        """Liefert die geparste Antwort: Nichts reist am Ausgabeschema vorbei."""
+        """Liefert die geparste Antwort: Nichts reist am Ausgabeschema vorbei.
+
+        `timeout` ist die Restzeit der Frist, die sich alle Versuche eines
+        Gesprächsschritts teilen; der Aufrufer rechnet sie aus.
+        """
 
 
 class FakeSprachmodell:
@@ -99,8 +104,12 @@ class FakeSprachmodell:
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
+        timeout: float,
     ) -> Antwort:
-        """Verbraucht genau einen Eintrag des Fake-Skripts."""
+        """Verbraucht genau einen Eintrag des Fake-Skripts.
+
+        Der Fake antwortet sofort; `timeout` bleibt hier ohne Wirkung.
+        """
 
         type(self).letzte_anfragen.append(
             (
@@ -149,6 +158,7 @@ class LiteLLMSprachmodell:
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
+        timeout: float,
     ) -> Antwort:
         """Fordert eine JSON-Ausgabe an und gibt allein die geparste Antwort zurück."""
 
@@ -166,7 +176,10 @@ class LiteLLMSprachmodell:
                         "strict": True,
                     },
                 },
-                **self.parameter,
+                # Die Frist ist eine Zusage dieser Naht: `timeout` steht
+                # nicht in der Allowlist der Mikro-Stellschrauben und
+                # überschreibt einen dort dennoch gelandeten Wert.
+                **{**self.parameter, "timeout": timeout},
             )
         except litellm.ContentPolicyViolationError as exc:
             raise ContentFilter from exc

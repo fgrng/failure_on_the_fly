@@ -1,13 +1,23 @@
 """Strukturelle Tests des echten LiteLLM-Adapters ohne Netz."""
 
+from itertools import chain, repeat
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 from litellm import ContentPolicyViolationError
 
-from simulation import antwort_versuchen
-from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
+from simulation import (
+    SPRACHMODELL_FRIST_SEKUNDEN,
+    SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN,
+    antwort_versuchen,
+)
+from simulation.models import (
+    MIKRO_STELLSCHRAUBEN,
+    Anbieter,
+    ModellKonfiguration,
+    Simulationskern,
+)
 from simulation.sprachmodell import (
     AUSGABE_SCHEMA,
     Antwort,
@@ -35,7 +45,9 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
 
     antwort = LiteLLMSprachmodell(
         "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
-    ).antworten("System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA)
+    ).antworten(
+        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+    )
 
     assert antwort.denkspur == "Ich addiere."
     assert antwort.aeusserung == "2/5."
@@ -55,6 +67,7 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
             },
         },
         temperature=0.2,
+        timeout=SPRACHMODELL_FRIST_SEKUNDEN,
     )
 
 
@@ -82,6 +95,7 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
         ],
         "Stimmt das denn?",
         AUSGABE_SCHEMA,
+        SPRACHMODELL_FRIST_SEKUNDEN,
     )
 
     assert completion.call_args.kwargs["messages"] == [
@@ -115,7 +129,7 @@ def test_litellm_adapter_reicht_native_reasoning_felder_nicht_durch(
     )
 
     antwort = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
     )
 
     assert antwort == Antwort(denkspur="Ich addiere.", aeusserung="2/5.")
@@ -171,7 +185,12 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
 
     with pytest.raises(ContentFilter) as exc_info:
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            AUSGABE_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
     assert exc_info.value.rohantwort == "Gefilterte Rohantwort"
@@ -188,7 +207,12 @@ def test_litellm_adapter_kennzeichnet_content_policy_exception_als_filter() -> N
 
     with pytest.raises(ContentFilter):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            AUSGABE_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
 
@@ -199,7 +223,12 @@ def test_litellm_adapter_kennzeichnet_fehlende_antworthuelle_als_formatbruch() -
 
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            AUSGABE_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
 
@@ -223,7 +252,12 @@ def test_litellm_adapter_kennzeichnet_zusaetzliches_feld_als_formatbruch() -> No
 
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-            "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            AUSGABE_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
 
@@ -317,3 +351,90 @@ def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> N
 
     assert antwortversuch.antwort is not None
     completion.assert_not_called()
+
+
+def _haengender_anbieter(uhr: list[float], verbrauch: float) -> Mock:
+    # Ein Anbieter, der jede Anfrage bis zu ihrem Timeout hält und dann
+    # scheitert: Er rückt die Testuhr um die verbrauchte Zeit vor.
+
+    def haengen(**kwargs: object) -> None:
+        uhr[0] += verbrauch
+        raise TimeoutError("Der Anbieter antwortete nicht.")
+
+    return Mock(side_effect=haengen)
+
+
+def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ein hängender Anbieter bekommt nach Ablauf der Frist keinen Aufruf mehr."""
+
+    uhr: list[float] = [0.0]
+    monkeypatch.setattr("simulation.time.monotonic", lambda: uhr[0])
+    completion = _haengender_anbieter(uhr, SPRACHMODELL_FRIST_SEKUNDEN * 0.6)
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwortversuch = antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+                parameter={},
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert antwortversuch.antwort is None
+    # Zwei Aufrufe passen in die Frist, der dritte Durchlauf der Schleife
+    # nicht mehr — obwohl MAX_VERSUCHE ihn erlauben würde.
+    assert completion.call_count == 2
+    assert [aufruf.kwargs["timeout"] for aufruf in completion.call_args_list] == [
+        SPRACHMODELL_FRIST_SEKUNDEN,
+        SPRACHMODELL_FRIST_SEKUNDEN * 0.4,
+    ]
+    assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
+        "Anbieterfehler"
+    ] * 3
+
+
+def test_timeout_steht_nicht_in_der_allowlist_der_stellschrauben() -> None:
+    """Die Frist der Naht steht nicht in der Allowlist der Stellschrauben."""
+
+    assert "timeout" not in MIKRO_STELLSCHRAUBEN
+
+
+def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Läuft die Frist zwischen Prüfung und Aufruf ab, hängt keiner mit Null."""
+
+    # Die Uhr steht bei der Prüfung der Schleife kurz vor der Frist und ist,
+    # wenn die Restzeit entsteht, über sie hinweg.
+    uhr = chain(
+        [0.0, SPRACHMODELL_FRIST_SEKUNDEN - 0.5, SPRACHMODELL_FRIST_SEKUNDEN + 10.0],
+        repeat(SPRACHMODELL_FRIST_SEKUNDEN + 10.0),
+    )
+    monkeypatch.setattr("simulation.time.monotonic", lambda: next(uhr))
+    completion = Mock(side_effect=TimeoutError("Der Anbieter antwortete nicht."))
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+                parameter={},
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert (
+        completion.call_args.kwargs["timeout"]
+        == SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN
+    )

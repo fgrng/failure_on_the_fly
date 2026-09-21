@@ -1,5 +1,6 @@
 """Modelle und Abläufe der Simulation."""
 
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from string import Template
@@ -22,6 +23,23 @@ if TYPE_CHECKING:
 
 
 MAX_VERSUCHE: int = 3
+
+# Wie lange ein Gesprächsschritt höchstens auf das Sprachmodell warten darf —
+# alle Versuche eines Schritts teilen sich diese Frist, jeder einzelne Aufruf
+# bekommt die verbliebene Restzeit als Timeout. Das ist nicht das
+# Gesprächsbudget der Vignette (ADR-0012), sondern eine Zusage dieser Naht.
+#
+# Nach oben begrenzt der Worker: 90 s lassen dem Deployment-Timeout (180 s,
+# README) Luft, auch wenn mehrere Versuche in dieselbe Anfrage fallen und der
+# Endpunkt danach noch schreibt. Nach unten begrenzt die Denkspur, die das
+# Ausgabeschema vor der Äußerung erzwingt (ADR-0005): Ein Reasoning-Modell
+# liefert legitim erst nach 20-60 s. 90 s ist der schlechte Fall, nicht der
+# Normalfall.
+SPRACHMODELL_FRIST_SEKUNDEN: float = 90.0
+
+# Ein Aufruf, dessen Frist schon aufgebraucht ist, bekommt noch diese Zeit,
+# damit er sauber scheitert, statt mit einem Timeout von null zu hängen.
+SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 
 # Die datenschutzrechtliche Zusage aus ADR-0026 steht in keiner Konfiguration:
 # Ein Tor, das im selben Formular abschaltbar wäre, in dem man den Anbieter
@@ -87,8 +105,20 @@ def antwort_versuchen(
     user_prompt: str = vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)
     fehlversuche: list[Fehlversuch] = []
+    # Die Frist steht einmal je Gesprächsschritt und gilt für alle Versuche
+    # zusammen; ein hängender Anbieter frisst sie selbst auf, die Wiederholung
+    # entfällt damit von allein.
+    frist: float = time.monotonic() + SPRACHMODELL_FRIST_SEKUNDEN
 
     for _ in range(MAX_VERSUCHE):
+        if time.monotonic() >= frist:
+            fehlversuche.append(
+                Fehlversuch(
+                    "Anbieterfehler",
+                    "Die Frist des Gesprächsschritts war vor dem Versuch erschöpft.",
+                )
+            )
+            break
         try:
             antwort: Antwort = sprachmodell.antworten(
                 system_prompt,
@@ -96,6 +126,7 @@ def antwort_versuchen(
                 verlauf,
                 eingabe,
                 AUSGABE_SCHEMA,
+                _restzeit(frist),
             )
         except Formatbruch as exc:
             fehlversuche.append(Fehlversuch("Formatbruch", exc.rohantwort))
@@ -106,6 +137,12 @@ def antwort_versuchen(
         else:
             return Antwortversuch(antwort, fehlversuche)
     return Antwortversuch(None, fehlversuche)
+
+
+def _restzeit(frist: float) -> float:
+    """Begrenzt einen einzelnen Aufruf auf das, was von der Frist übrig ist."""
+
+    return max(frist - time.monotonic(), SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN)
 
 
 def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmodell:
