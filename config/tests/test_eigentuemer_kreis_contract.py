@@ -1,46 +1,27 @@
 """Vertragstest über alle eigentümer-tragenden Modelle (Spec #207).
 
 Geprüft wird die Menge, nicht der Einzelfall: Die zu prüfenden Modelle kommen
-aus derselben Modellregistrierung, aus der auch der Konto-Löschpfad seine
-Bestände holt. Ein künftiges fünftes Bestandsmodell läuft damit ohne Zutun
-mit.
+aus `bestandsmodelle()` — derselben Herleitung, aus der auch der Konto-Löschpfad
+seine Bestände holt. Ein künftiges fünftes Bestandsmodell läuft damit ohne Zutun
+mit; welche Modelle das heute sind, hält der Testsatz von `konten` fest.
 
 Der Test kennt nur äußeres Verhalten — was im Kreis steht, was ein Konto
 sieht, ob gelöscht wird. Auf welcher Klasse eine Methode liegt und wie sie
 serialisiert, hält er bewusst nicht fest; das prüfen die Testsätze der Apps.
 """
 
-from collections.abc import Callable
-
 import pytest
-from django.apps import apps
 from django.contrib.auth.models import Group
 from django.db.models import ProtectedError
 
-from konten.eigentuemerschaft import EigentuemerKreis
+from konten.eigentuemerschaft import EigentuemerKreis, bestandsmodelle
 from konten.models import Konto
-from simulation.models import Simulationskern
 
-
-def eigentuemer_tragende_modelle() -> list[type[EigentuemerKreis]]:
-    """Liefert jedes registrierte Modell, das einen Eigentümer-Kreis trägt."""
-    return [
-        modell for modell in apps.get_models() if issubclass(modell, EigentuemerKreis)
-    ]
-
-
-je_bestandsmodell: Callable[[Callable[..., None]], Callable[..., None]] = (
-    pytest.mark.parametrize(
-        "modell",
-        eigentuemer_tragende_modelle(),
-        ids=lambda modell: modell.__name__,
-    )
+je_bestandsmodell: pytest.MarkDecorator = pytest.mark.parametrize(
+    "modell",
+    bestandsmodelle(),
+    ids=lambda modell: modell.__name__,
 )
-
-
-def test_der_simulationskern_faellt_nicht_unter_den_vertrag() -> None:
-    """Der Kern gehört der Administration und trägt keinen Eigentümer-Kreis."""
-    assert Simulationskern not in eigentuemer_tragende_modelle()
 
 
 @pytest.mark.django_db
@@ -126,7 +107,7 @@ def test_kandidatenliste_nennt_die_rolle_und_die_administration(
     administratorin: Konto = Konto.objects.create_user(
         username="admin", is_superuser=True
     )
-    # Ohne Rolle und ohne Administration: darf in keiner Liste auftauchen.
+    # Ohne Rolle und ohne Administration: darf nicht als Kandidatin auftauchen.
     Konto.objects.create_user(username="mallory")
     bestand: EigentuemerKreis = modell.objects.anlegen(eingetragene)
 

@@ -3,13 +3,12 @@
 from collections.abc import Callable
 
 import pytest
-from django.apps import apps
 from django.db import connection
 from django.db.models import Model
 
 from erhebungen.models import Erhebung
 from fragebogen_items.models import FragebogenItemHistorie
-from konten.eigentuemerschaft import EigentuemerKreis
+from konten.eigentuemerschaft import EigentuemerKreis, bestandsmodelle
 from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
@@ -21,16 +20,9 @@ from training.models import Training
 from vignetten.models import Vignettenhistorie
 
 
-def _eigentuemer_tragende_modelle() -> list[type[Model]]:
-    # Dieselbe Herleitung, die der Löschpfad später benutzt: die Registrierung.
-    return [
-        modell for modell in apps.get_models() if issubclass(modell, EigentuemerKreis)
-    ]
-
-
 def test_die_vier_bestaende_tragen_den_gemeinsamen_kreis() -> None:
     """Genau die vier eigentümer-tragenden Bestände erben von der Basis."""
-    assert set(_eigentuemer_tragende_modelle()) == {
+    assert set(bestandsmodelle()) == {
         Vignettenhistorie,
         FragebogenItemHistorie,
         Training,
@@ -44,7 +36,7 @@ def test_simulationskern_traegt_keinen_eigentuemer_kreis() -> None:
     assert not hasattr(Simulationskern, "eigentuemerinnen")
 
 
-@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
+@pytest.mark.parametrize("modell", bestandsmodelle())
 def test_jeder_kreis_zeigt_auf_konten(modell: type[Model]) -> None:
     """Der Kreis ist überall dasselbe M2M-Feld auf das Konto."""
     feld = modell._meta.get_field("eigentuemerinnen")
