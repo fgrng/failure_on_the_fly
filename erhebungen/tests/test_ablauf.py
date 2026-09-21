@@ -7,6 +7,7 @@ from erhebungen.ablauf import (
     Ende,
     NaechsteVignette,
     OffenerAbschlussblock,
+    OffenerSitzungsblock,
     bindung_abschliessen,
     block_erledigen,
     block_vorlegen,
@@ -228,3 +229,44 @@ def test_block_ohne_items_am_andockpunkt_entsteht_nicht() -> None:
     assert block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE) is None
     assert Itemblock.objects.count() == 0
     assert naechster_schritt(bindung) == Ende()
+
+
+@pytest.mark.django_db
+def test_beendete_sitzung_stellt_ihren_block_vor_die_naechste_vignette() -> None:
+    """Der Block einer beendeten Sitzung bleibt offen, bis er erledigt ist."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    erste: Vignette = _finale_vignette_anlegen(konto)
+    zweite: Vignette = _finale_vignette_anlegen(konto)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
+    item: FragebogenItem = _finales_item_anlegen(konto)
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=1,
+    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+    sitzung: Sitzung = _sitzung_anlegen(bindung, erste, kern)
+
+    assert naechster_schritt(bindung) == NaechsteVignette(zweite)
+
+    sitzung.status = Sitzung.Status.ABGESCHLOSSEN
+    sitzung.save(update_fields=["status"])
+
+    assert naechster_schritt(bindung) == OffenerSitzungsblock(sitzung)
+
+    block: Itemblock | None = block_vorlegen(
+        bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
+    )
+    assert block is not None
+
+    assert naechster_schritt(bindung) == OffenerSitzungsblock(sitzung)
+
+    block_erledigen(block)
+
+    assert naechster_schritt(bindung) == NaechsteVignette(zweite)

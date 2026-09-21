@@ -123,11 +123,11 @@ Nach jeder beendeten Sitzung erscheinen ihre freiwilligen Fragebogen-Items direk
 unter dem Verlauf; sie können beantwortet oder übersprungen werden, bevor die
 nächste Vignette beginnt. Nach der letzten Sitzung folgen zusätzlich die
 freiwilligen Fragebogen-Items am Andockpunkt `am Ende` als eigene Seite. Jede
-Item-Antwort wird sofort
-gespeichert, und auch übersprungene Fragebogen-Items bleiben als vorgelegt
-dokumentiert. Ein noch nicht abgeschickter Fragebogen am Ende wird auch in einem
-anderen Browser erneut vorgelegt; ein abgeschickter nicht mehr. Anschließend
-endet die Teilnahme mit dem Abschlusstext.
+Item-Antwort wird sofort gespeichert, und auch übersprungene Fragebogen-Items
+bleiben als vorgelegt dokumentiert. Ein noch nicht abgeschickter Fragebogen —
+nach einer Sitzung ebenso wie am Ende — wird auch in einem anderen Browser
+erneut vorgelegt; ein abgeschickter nicht mehr. Anschließend endet die Teilnahme
+mit dem Abschlusstext.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
 kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,
 bleibt der Gesprächsschritt ohne Antwort erhalten.

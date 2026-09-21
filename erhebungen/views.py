@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, F, Max, QuerySet
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
@@ -32,6 +33,8 @@ from konten.navigation import (
 from .ablauf import (
     NaechsteVignette,
     OffenerAbschlussblock,
+    OffenerSitzungsblock,
+    Schritt,
     bindung_abschliessen,
     block_erledigen,
     block_vorlegen,
@@ -65,7 +68,6 @@ from sitzungen.views import (
 from vignetten.models import Vignette
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
-_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
@@ -765,7 +767,6 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         tokens[str(teilnahme_link)] = bindung.token
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
-        _sitzungsblock_besuch_vergessen(request, bindung.token)
         sitzungen = Sitzung.objects.filter(teilnahme=bindung.teilnahme)
         if sitzungen.filter(status=Sitzung.Status.LAUFEND).exists():
             return redirect("erhebungen:gespraech", token=bindung.token)
@@ -773,7 +774,7 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
         if _naechste_sitzung_starten(bindung, stichprobe.erhebung):
             return redirect("erhebungen:gespraech", token=bindung.token)
-        return _weiter_nach_der_letzten_vignette(bindung)
+        return _weiter_im_ablauf(bindung)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
 
 
@@ -837,7 +838,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
     if not _naechste_sitzung_starten(bindung, stichprobe.erhebung):
-        return _weiter_nach_der_letzten_vignette(bindung)
+        return _weiter_im_ablauf(bindung)
     return redirect("erhebungen:gespraech", token=bindung.token)
 
 
@@ -863,13 +864,17 @@ def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> 
     return True
 
 
-def _weiter_nach_der_letzten_vignette(bindung: Erhebungsbindung) -> HttpResponse:
-    """Leitet zum Abschluss-Block oder zum Abschluss der Erhebung weiter."""
+def _weiter_im_ablauf(bindung: Erhebungsbindung) -> HttpResponse:
+    """Leitet zum offenen Block oder zum Abschluss der Erhebung weiter."""
 
-    teilnahme_link: UUID = bindung.stichprobe.teilnahme_link
-    if isinstance(naechster_schritt(bindung), OffenerAbschlussblock):
+    schritt: Schritt = naechster_schritt(bindung)
+    if isinstance(schritt, OffenerSitzungsblock):
+        return redirect("erhebungen:gespraech", token=bindung.token)
+    if isinstance(schritt, OffenerAbschlussblock):
         return redirect("erhebungen:itemblock", token=bindung.token)
-    return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
+    return redirect(
+        "erhebungen:abschluss", teilnahme_link=bindung.stichprobe.teilnahme_link
+    )
 
 
 def _sitzungsnavigation(token: str) -> Sitzungsnavigation:
@@ -889,12 +894,16 @@ def _erhebungssitzung(token: str) -> tuple[Sitzung, Erhebungsbindung]:
     # Löst die laufende Sitzung in ihrer besitzenden Erhebungs-App auf.
 
     bindung = _laufende_bindung(token)
-    sitzung: Sitzung = get_object_or_404(
-        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
-        teilnahme=bindung.teilnahme,
-        status=Sitzung.Status.LAUFEND,
-    )
+    sitzung: Sitzung = get_object_or_404(_laufende_sitzungen(bindung))
     return sitzung, bindung
+
+
+def _laufende_sitzungen(bindung: Erhebungsbindung) -> QuerySet[Sitzung]:
+    # Die noch nicht beendeten Sitzungen dieser Teilnahme samt Anzeigedaten.
+
+    return Sitzung.objects.select_related(
+        "vignette", "simulationskern", "teilnahme"
+    ).filter(teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND)
 
 
 def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
@@ -924,13 +933,26 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
 def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
 
-    sitzung, bindung = _erhebungssitzung(token)
+    bindung: Erhebungsbindung = _laufende_bindung(token)
+    sitzung: Sitzung = _anzuzeigende_sitzung(bindung)
     return persistiertes_gespraech(
         request,
         sitzung,
         _sitzungsnavigation(token),
         sitzungsblock=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
     )
+
+
+def _anzuzeigende_sitzung(bindung: Erhebungsbindung) -> Sitzung:
+    # Zeigt die laufende Sitzung oder die beendete, deren Block noch offen ist.
+
+    sitzung: Sitzung | None = _laufende_sitzungen(bindung).first()
+    if sitzung is not None:
+        return sitzung
+    schritt: Schritt = naechster_schritt(bindung)
+    if isinstance(schritt, OffenerSitzungsblock):
+        return schritt.sitzung
+    raise Http404("Zu diesem Token steht keine Sitzung offen.")
 
 
 def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
@@ -983,7 +1005,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         )
     if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
         return redirect("erhebungen:gespraech", token=bindung.token)
-    return _weiter_nach_der_letzten_vignette(bindung)
+    return _weiter_im_ablauf(bindung)
 
 
 def _sitzungsblock_rendern(
@@ -991,43 +1013,26 @@ def _sitzungsblock_rendern(
 ) -> str:
     # Rendert die Item-Antwortzeilen unter einer beendeten Sitzung.
 
+    if not _sitzungsblock_ist_offen(bindung, sitzung.pk):
+        return ""
     block: Itemblock | None = block_vorlegen(
         bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
     )
     if block is None:
         return ""
-    antworten: list[ItemAntwort] = block.antwortzeilen()
-    sitzungen: dict[str, int] = request.session.get(
-        _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
-    )
-    sitzungen[bindung.token] = sitzung.pk
-    request.session[_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY] = sitzungen
     return render_to_string(
         "erhebungen/includes/itemblock_form.html",
-        {"antworten": antworten, "token": bindung.token},
+        {"antworten": block.antwortzeilen(), "token": bindung.token},
         request=request,
     )
 
 
-def _sitzungsblock_besuch_vergessen(request: HttpRequest, token: str) -> None:
-    # Verwirft den nur für den gerenderten Sitzungs-Block gültigen Besuch.
+def _sitzungsblock_ist_offen(bindung: Erhebungsbindung, sitzung_pk: int) -> bool:
+    # Prüft am Ablauf, ob gerade der Block dieser Sitzung an der Reihe ist.
 
-    sitzungen: dict[str, int] = request.session.get(
-        _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
-    )
-    if token in sitzungen:
-        del sitzungen[token]
-        request.session[_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY] = sitzungen
-
-
-def _sitzungsblock_ist_im_besuch(
-    request: HttpRequest, token: str, sitzung_pk: int
-) -> bool:
-    # Prüft, ob der Block in diesem Browserbesuch unter der Sitzung erschien.
-
+    schritt: Schritt = naechster_schritt(bindung)
     return (
-        request.session.get(_SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}).get(token)
-        == sitzung_pk
+        isinstance(schritt, OffenerSitzungsblock) and schritt.sitzung.pk == sitzung_pk
     )
 
 
@@ -1048,8 +1053,11 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             status=Sitzung.Status.LAUFEND,
         ).exists():
             return redirect("erhebungen:gespraech", token=bindung.token)
+        schritt: Schritt = naechster_schritt(bindung)
+        if isinstance(schritt, OffenerSitzungsblock):
+            return redirect("erhebungen:gespraech", token=bindung.token)
         abschlussblock: Itemblock | None = None
-        if isinstance(naechster_schritt(bindung), OffenerAbschlussblock):
+        if isinstance(schritt, OffenerAbschlussblock):
             abschlussblock = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
         if abschlussblock is None:
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
@@ -1083,7 +1091,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             if len(sitzung_ids) != 1 or None in sitzung_ids:
                 return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
             sitzung_pk = sitzung_ids.pop()
-            if not _sitzungsblock_ist_im_besuch(request, token, sitzung_pk):
+            if not _sitzungsblock_ist_offen(bindung, sitzung_pk):
                 return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
         for antwort in antworten:
             feld = f"item_{antwort.pk}"
@@ -1109,10 +1117,10 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             if not antwort_ids:
                 return HttpResponseBadRequest("Unbekannter Itemblock.")
             if sitzung_pk is not None:
-                _sitzungsblock_besuch_vergessen(request, token)
+                block_erledigen(antworten[0].itemblock)
                 if _naechste_sitzung_starten(bindung, bindung.stichprobe.erhebung):
                     return redirect("erhebungen:gespraech", token=bindung.token)
-                return _weiter_nach_der_letzten_vignette(bindung)
+                return _weiter_im_ablauf(bindung)
             if any(
                 antwort.erhebungsitem.andockpunkt != Erhebungsitem.Andockpunkt.AM_ENDE
                 for antwort in antworten
@@ -1142,9 +1150,11 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         status=Sitzung.Status.LAUFEND,
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
-    schritt = naechster_schritt(bindung)
+    schritt: Schritt = naechster_schritt(bindung)
     if isinstance(schritt, NaechsteVignette):
         return redirect("erhebungen:spielen", teilnahme_link=teilnahme_link)
+    if isinstance(schritt, OffenerSitzungsblock):
+        return redirect("erhebungen:gespraech", token=bindung.token)
     if isinstance(schritt, OffenerAbschlussblock):
         return redirect("erhebungen:itemblock", token=bindung.token)
     bindung_abschliessen(bindung)
