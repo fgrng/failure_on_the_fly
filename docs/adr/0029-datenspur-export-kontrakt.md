@@ -66,9 +66,12 @@ Pfade statt als Inhalt.
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
+| `itembloecke.csv` | `id`, `teilnahme_token`, `andockpunkt`, `sitzung_id`, `vorgelegt_am`, `erledigt_am` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
 | `modellkonfigurationen.csv` | `id`, `anbieter`, `sprachmodell`, `parameter` |
+| `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |
+| `likert_skala.csv` | `stufe`, `pol` |
 
 ## Die Modell-Konfiguration im Export
 
