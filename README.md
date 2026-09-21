@@ -176,7 +176,9 @@ stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
 löschen. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
 Administrator:innen sehen alle Items. Ko-Autor:innen lassen sich direkt an der
-Item-Historie hinzufügen oder entfernen.
+Item-Historie hinzufügen oder entfernen. Der Kreis bleibt dabei immer besetzt;
+die eigene Entfernung übergibt die Historie an die verbleibenden Ko-Autor:innen
+und führt zurück in die Item-Bibliothek.
 Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
 Skalenstufen von 1 = „Stimme gar nicht zu" bis 6 = „Stimme voll zu".
 

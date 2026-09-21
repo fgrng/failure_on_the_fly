@@ -534,6 +534,63 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 
         self.assertEqual({response.status_code for response in responses}, {404})
 
+    def test_selbstentfernung_fuehrt_in_die_bibliothek(self) -> None:
+        """Wer sich austrägt, landet nicht auf einer Seite ohne Zugriff."""
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "fragebogen_items:koautorin_entfernen",
+                args=[self.item.pk, self.ada.pk],
+            )
+        )
+
+        self.assertRedirects(response, reverse("fragebogen_items:liste"))
+        self.assertEqual(list(self.item.historie.eigentuemerinnen.all()), [self.grace])
+
+    def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
+        """Eine Item-Historie behält ihre letzte Eigentümerin."""
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "fragebogen_items:koautorin_entfernen",
+                args=[self.item.pk, self.ada.pk],
+            )
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+        self.assertEqual(list(self.item.historie.eigentuemerinnen.all()), [self.ada])
+
+    def test_nicht_eigentuemerin_loest_keinen_selbst_redirect_aus(self) -> None:
+        """Eine Administratorin bleibt beim Item, wenn sie niemanden entfernt."""
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="admin", is_superuser=True
+        )
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.grace.pk},
+        )
+        self.client.force_login(administratorin)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "fragebogen_items:koautorin_entfernen",
+                args=[self.item.pk, administratorin.pk],
+            )
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
     def test_entfernen_entzieht_koautorin_den_bibliothekszugriff(self) -> None:
         """Eine entfernte Ko-Autorin sieht die Item-Linie nicht mehr."""
         self.client.force_login(self.ada)

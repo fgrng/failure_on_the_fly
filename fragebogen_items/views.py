@@ -245,10 +245,14 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_forschende_oder_administratorin_erforderlich
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
-    """Entzieht einer Ko-Autorin den Zugang zu einer sichtbaren Item-Historie."""
+    """Trägt eine Eigentümerin aus dem Kreis der Item-Historie aus.
+
+    Die Selbst-Austretende führt es auf ihre Item-Bibliothek — aber nur, wenn
+    der Austritt an der Invariante nicht gescheitert ist.
+    """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     item: FragebogenItem = _sichtbares_item(request, pk)
-    if item.historie.eigentuemerinnen.count() > 1:
-        item.historie.eigentuemerinnen.remove(konto_pk)
+    if item.historie.austreten(konto_pk) and konto_pk == request.user.pk:
+        return redirect("fragebogen_items:liste")
     return redirect("fragebogen_items:detail", pk=item.pk)

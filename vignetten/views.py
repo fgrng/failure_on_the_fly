@@ -5,7 +5,7 @@ from typing import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -167,18 +167,16 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_autorin_erforderlich
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
-    """Entfernt eine Ko-Autorin, ohne die aktive Historie eigentümerlos zu lassen."""
+    """Trägt eine Eigentümerin aus dem Kreis der Vignettenhistorie aus.
+
+    Die Selbst-Austretende führt es auf ihre Vignettenliste — aber nur, wenn
+    der Austritt an der Invariante nicht gescheitert ist.
+    """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
-    with transaction.atomic():
-        historie: Vignettenhistorie = Vignettenhistorie.objects.select_for_update().get(
-            pk=vignette.historie_id
-        )
-        if historie.eigentuemerinnen.count() > 1:
-            historie.eigentuemerinnen.remove(konto_pk)
-            if konto_pk == request.user.pk:
-                return redirect("vignetten:liste")
+    if vignette.historie.austreten(konto_pk) and konto_pk == request.user.pk:
+        return redirect("vignetten:liste")
     return redirect("vignetten:detail", pk=vignette.pk)
 
 

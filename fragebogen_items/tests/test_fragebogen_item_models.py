@@ -1,9 +1,13 @@
 """ORM-Tests für Fragebogen-Items und ihre Historien."""
 
+from collections.abc import Callable
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
+
+import pytest
 
 from konten.models import Konto
 from fragebogen_items.models import (
@@ -351,3 +355,39 @@ def test_likert_stufe_wird_aus_ihrem_skalenpol_abgeleitet() -> None:
 def test_likert_skalenpole_sind_nicht_pro_item_konfigurierbar() -> None:
     """Die sechs methodisch festgelegten Pole leben nicht an der Fassung."""
     assert "skalenpole" not in {feld.name for feld in FragebogenItem._meta.fields}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_austritt_aus_der_item_historie_laeuft_in_einer_transaktion() -> None:
+    """Zwei gleichzeitige Austritte können die Historie nicht eigentümerlos machen.
+
+    Serialisiert wird über die Verbindungsoption `transaction_mode: IMMEDIATE`:
+    Die Schreibsperre hängt am `atomic()` selbst. Beobachtet wird deshalb, dass
+    jede Anweisung des Austritts zur selben Transaktion gehört — im Autocommit
+    läsen zwei Austritte denselben Zwei-Personen-Kreis und träten beide aus.
+    """
+    ada: Konto = get_user_model().objects.create_user(username="ada")
+    grace: Konto = get_user_model().objects.create_user(username="grace")
+    historie: FragebogenItemHistorie = FragebogenItem.objects.anlegen(ada).historie
+    historie.eigentuemerinnen.add(grace)
+    kreistabelle: str = FragebogenItemHistorie.eigentuemerinnen.through._meta.db_table
+    in_transaktion: list[bool] = []
+
+    def mitschreiben(
+        ausfuehren: Callable[..., object],
+        sql: str,
+        parameter: object,
+        viele: bool,
+        kontext: dict[str, object],
+    ) -> object:
+        # Die Transaktionsklammer selbst (BEGIN, COMMIT) bleibt außen vor;
+        # gefragt ist, ob Lesen und Schreiben am Kreis drinnen liegen.
+        if kreistabelle in sql:
+            in_transaktion.append(connection.in_atomic_block)
+        return ausfuehren(sql, parameter, viele, kontext)
+
+    with connection.execute_wrapper(mitschreiben):
+        assert historie.austreten(ada.pk)
+
+    assert in_transaktion and all(in_transaktion)
+    assert list(historie.eigentuemerinnen.all()) == [grace]

@@ -323,19 +323,16 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_ausbilderin_erforderlich
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
-    """Entfernt eine Ko-Autorin, ohne das Training eigentümerlos zu lassen."""
+    """Trägt eine Eigentümerin aus dem Kreis des Trainings aus.
+
+    Die Selbst-Austretende führt es auf ihre Trainingsliste — aber nur, wenn
+    der Austritt an der Invariante nicht gescheitert ist.
+    """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
-    with transaction.atomic():
-        training = Training.objects.select_for_update().get(pk=training.pk)
-        if (
-            training.eigentuemerinnen.filter(pk=konto_pk).exists()
-            and training.eigentuemerinnen.count() > 1
-        ):
-            training.eigentuemerinnen.remove(konto_pk)
-            if konto_pk == request.user.pk:
-                return redirect("training:liste")
+    if training.austreten(konto_pk) and konto_pk == request.user.pk:
+        return redirect("training:liste")
     return redirect("training:kuratieren", pk=training.pk)
 
 
