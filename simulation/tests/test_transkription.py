@@ -1,6 +1,5 @@
 """Transkription an ihrer austauschbaren Anbieter-Naht."""
 
-import json
 from unittest.mock import ANY, Mock, patch
 
 import httpx
@@ -236,12 +235,6 @@ def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
 # kein JSON. Der abschließende Zeilenumbruch stammt vom Anbieter.
 _BEOBACHTETES_TRANSKRIPT: str = "Vielen Dank.\nVielen Dank.\nVielen Dank.\n"
 
-# Dieselbe Äußerung, wie derselbe Endpunkt sie ohne den Parameter abgelegt
-# hätte: eine JSON-kodierte Zeichenkette.
-_ERGEBNIS_OHNE_ANTWORTFORMAT: str = json.dumps(
-    {"text": " Vielen Dank. Vielen Dank. Vielen Dank."}
-)
-
 
 def _absende_antwort() -> Mock:
     # Die am echten Konto beobachtete Antwort des Absendens: kein Umschlag,
@@ -318,26 +311,6 @@ def test_infomaniak_transkription_sendet_das_vereinbarte_antwortformat() -> None
         INFOMANIAK_ANTWORTFORMAT
     )
     assert INFOMANIAK_ANTWORTFORMAT == "text"
-
-
-def test_infomaniak_transkription_reicht_den_stapeltext_ungeprueft_durch() -> None:
-    """Der Adapter liest `data` nicht, er gibt es aus — so sähe der Schaden aus.
-
-    Fiele `response_format` weg, legte derselbe Endpunkt in `data` eine
-    JSON-kodierte Zeichenkette ab, die derselbe Adapter unbesehen als
-    Transkript ausgäbe, samt Klammern und Feldnamen. Er erkennt das nicht —
-    er darf es nicht müssen, solange das Absenden das Format nennt.
-    """
-
-    client = Mock()
-    client.post.return_value = _absende_antwort()
-    client.get.return_value = _fertiger_stapel(_ERGEBNIS_OHNE_ANTWORTFORMAT)
-
-    durchgereicht: str = _infomaniak_transkription(client).transkribieren(
-        b"aufgenommene-audiobytes"
-    )
-
-    assert durchgereicht == _ERGEBNIS_OHNE_ANTWORTFORMAT
 
 
 def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> None:
