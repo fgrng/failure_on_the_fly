@@ -11,9 +11,15 @@ from .models import ItemAntwort, Itemblock
 
 
 def _feldname(antwort: ItemAntwort) -> str:
-    # Trägt die Antwortzeile im Feldnamen; gelesen wird er nur hier.
+    # Bindet ein Feld an genau eine Antwortzeile des Blocks.
 
     return f"item_{antwort.pk}"
+
+
+def _ist_likert(antwort: ItemAntwort) -> bool:
+    # Entscheidet an der gepinnten Item-Fassung, nicht am Abgeschickten.
+
+    return antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT
 
 
 def _likert_wahlmoeglichkeiten() -> list[tuple[int, str]]:
@@ -23,10 +29,10 @@ def _likert_wahlmoeglichkeiten() -> list[tuple[int, str]]:
 
 
 def _feld(antwort: ItemAntwort) -> forms.Field:
-    # Wählt das Feld nach dem Typ der gepinnten Item-Fassung.
+    # Baut das Feld zu einer Antwortzeile samt ihrem bisherigen Stand.
 
     wortlaut: str = antwort.erhebungsitem.item.wortlaut
-    if antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT:
+    if _ist_likert(antwort):
         return forms.TypedChoiceField(
             label=wortlaut,
             choices=_likert_wahlmoeglichkeiten(),
@@ -65,8 +71,8 @@ class ItemblockFormular(forms.Form):
 
         with transaction.atomic():
             for antwort in self.antworten:
-                wert: object = self.cleaned_data[_feldname(antwort)]
-                if antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT:
+                wert: int | str | None = self.cleaned_data[_feldname(antwort)]
+                if _ist_likert(antwort):
                     antwort.likert_stufe = wert
                 else:
                     antwort.freitext = wert or None

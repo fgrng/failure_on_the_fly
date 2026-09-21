@@ -29,10 +29,9 @@ class LikertSkalenpol(models.TextChoices):
     def stufen(cls) -> list[int]:
         """Liefert die Stufen der globalen Skala, aufsteigend ab 1.
 
-        Die einzige Stelle, an der die Zahl der Stufen entsteht: Sie ist die
-        Zahl der deklarierten Pole.
+        Die Zahl der Stufen entsteht allein aus der Zahl der deklarierten Pole.
         """
-        return [rang + 1 for rang in range(len(cls))]
+        return list(range(1, len(cls) + 1))
 
     @classmethod
     def fuer_stufe(cls, stufe: int) -> "LikertSkalenpol":

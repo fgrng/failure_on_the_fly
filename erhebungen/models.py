@@ -15,6 +15,8 @@ from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
 
 _LIKERT_STUFEN: list[int] = LikertSkalenpol.stufen()
+_NIEDRIGSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[0]
+_HOECHSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[-1]
 
 
 class ErhebungQuerySet(
@@ -679,8 +681,8 @@ class ItemAntwort(models.Model):
         null=True,
         blank=True,
         validators=[
-            MinValueValidator(_LIKERT_STUFEN[0]),
-            MaxValueValidator(_LIKERT_STUFEN[-1]),
+            MinValueValidator(_NIEDRIGSTE_LIKERT_STUFE),
+            MaxValueValidator(_HOECHSTE_LIKERT_STUFE),
         ],
     )
     vorgelegt_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
@@ -733,8 +735,8 @@ class ItemAntwort(models.Model):
             models.CheckConstraint(
                 condition=models.Q(likert_stufe__isnull=True)
                 | models.Q(
-                    likert_stufe__gte=_LIKERT_STUFEN[0],
-                    likert_stufe__lte=_LIKERT_STUFEN[-1],
+                    likert_stufe__gte=_NIEDRIGSTE_LIKERT_STUFE,
+                    likert_stufe__lte=_HOECHSTE_LIKERT_STUFE,
                 ),
                 name="erhebungen_antwort_likert_gueltig",
             ),
