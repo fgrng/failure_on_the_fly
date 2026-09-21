@@ -1,6 +1,5 @@
 """Naht zur Audio-Transkription und ihr deterministischer Testadapter."""
 
-import json
 import time
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
@@ -25,6 +24,19 @@ MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 
 # Abstand zwischen zwei Abfragen des Stapelergebnisses bei Infomaniak.
 INFOMANIAK_INTERVALL_SEKUNDEN: float = 2.0
+
+# Infomaniak richtet die Gestalt des Stapelergebnisses nach diesem Parameter des
+# Absendens — er ist deshalb bedeutungstragend und nicht kosmetisch:
+#
+# - mit "text" (so senden wir) ist `data` die schlichte Transkriptzeichenkette,
+#   Zeilen durch `\n` getrennt, und `file_name` endet auf `.txt`;
+# - ohne ihn ist `data` stattdessen eine JSON-kodierte Zeichenkette der Form
+#   {"text": "…"} und `file_name` endet auf `.json`.
+#
+# Wer ihn streicht oder ändert, bekäme von `_transkript` also ein JSON-Fragment
+# samt Klammern und Feldnamen als Transkript. Am echten Konto verifiziert
+# (#232); ein Test hält die Kopplung fest.
+INFOMANIAK_ANTWORTFORMAT: str = "text"
 
 # Infomaniak meldet den Stand eines Stapels als Zeichenkette. Alles, was hier
 # nicht steht, gilt als »noch nicht fertig« — ein unbekannter Name läuft damit
@@ -154,7 +166,7 @@ class InfomaniakTranskription:
                 data={
                     "model": self.modell,
                     "language": self.sprache,
-                    "response_format": "text",
+                    "response_format": INFOMANIAK_ANTWORTFORMAT,
                 },
                 files={"file": ("aufnahme.webm", audio, "audio/webm")},
                 timeout=self._restzeit(frist),
@@ -194,27 +206,17 @@ class InfomaniakTranskription:
 
     @staticmethod
     def _transkript(ergebnis: Any) -> str:
-        # Liest den Text aus dem fertigen Stapelergebnis. Infomaniak legt ihn
-        # dort nicht als Abbildung ab, sondern als Zeichenkette, die ihrerseits
-        # JSON trägt: {"text": " …"}. Ohne das zweite Parsen wäre das Transkript
-        # diese Zeichenkette samt Klammern und Feldnamen.
+        # Liest den Text aus dem fertigen Stapelergebnis. Das `data`-Feld ist
+        # dort nie eine Abbildung, sondern stets eine Zeichenkette — und weil
+        # das Absenden INFOMANIAK_ANTWORTFORMAT mitschickt, ist sie bereits das
+        # Transkript und wird unverändert durchgereicht. Was ohne diesen
+        # Parameter zurückkäme und hier nicht gelesen werden darf, steht dort.
 
         if not isinstance(ergebnis, str):
             raise TranskriptionsAnbieterfehler(
-                "Das fertige Stapelergebnis trug keine Zeichenkette."
-            )
-        try:
-            inhalt: Any = json.loads(ergebnis)
-        except ValueError as exc:
-            raise TranskriptionsAnbieterfehler(
-                "Das fertige Stapelergebnis war kein lesbares JSON."
-            ) from exc
-        text: Any = inhalt.get("text") if isinstance(inhalt, dict) else None
-        if not isinstance(text, str):
-            raise TranskriptionsAnbieterfehler(
                 "Das fertige Stapelergebnis trug keinen Text."
             )
-        return text
+        return ergebnis
 
     @staticmethod
     def _nutzlast(anfrage: Callable[[], Any]) -> Any:

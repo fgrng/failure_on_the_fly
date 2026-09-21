@@ -9,6 +9,7 @@ from openai import APIConnectionError
 
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
+    INFOMANIAK_ANTWORTFORMAT,
     INFOMANIAK_INTERVALL_SEKUNDEN,
     MINDEST_ANFRAGEFRIST_SEKUNDEN,
     PLATZHALTER_TRANSKRIPT,
@@ -229,11 +230,18 @@ def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
     )
 
 
-# Der am echten Konto beobachtete Text — der führende Leerraum stammt vom
-# Anbieter und wird bewusst nicht abgeschnitten. Im Stapelobjekt steht er als
-# JSON-kodierte Zeichenkette, nicht als Abbildung.
-_BEOBACHTETES_TRANSKRIPT: str = " Vielen Dank."
-_BEOBACHTETES_ERGEBNIS: str = json.dumps({"text": _BEOBACHTETES_TRANSKRIPT})
+# Der am echten Konto beobachtete Text. Mit dem abgesendeten
+# INFOMANIAK_ANTWORTFORMAT steht er unverändert im `data`-Feld des Stapels:
+# eine schlichte Zeichenkette mit `\n` zwischen den Zeilen, keine Abbildung
+# und kein JSON. Der abschließende Zeilenumbruch stammt vom Anbieter.
+_BEOBACHTETES_TRANSKRIPT: str = "Vielen Dank.\nVielen Dank.\nVielen Dank.\n"
+
+# Dieselbe Äußerung, wie derselbe Endpunkt sie **ohne** den Parameter abgelegt
+# hätte: eine JSON-kodierte Zeichenkette. Diese Gestalt darf nie als Transkript
+# durchgereicht werden — sie trägt Klammern und Feldnamen.
+_ERGEBNIS_OHNE_ANTWORTFORMAT: str = json.dumps(
+    {"text": " Vielen Dank. Vielen Dank. Vielen Dank."}
+)
 
 
 def _absende_antwort() -> Mock:
@@ -258,16 +266,17 @@ def _laufender_stapel() -> Mock:
     )
 
 
-def _fertiger_stapel(data: object = _BEOBACHTETES_ERGEBNIS) -> Mock:
+def _fertiger_stapel(data: object = _BEOBACHTETES_TRANSKRIPT) -> Mock:
     # Das Stapelobjekt eines fertigen Auftrags, Feld für Feld wie am echten
-    # Konto beobachtet.
+    # Konto beobachtet. Die Endung `.txt` in `file_name` gehört zum
+    # abgesendeten Antwortformat — ohne den Parameter stünde dort `.json`.
 
     return _antwort(
         {
             "status": "success",
             "url": "https://api.infomaniak.com/1/ai/4711/results/b-1/download",
-            "file_name": "transcription_b-1.json",
-            "file_size": 51,
+            "file_name": "transcription_b-1.txt",
+            "file_size": 39,
             "data": data,
         }
     )
@@ -295,6 +304,39 @@ def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
         "https://api.infomaniak.com/1/ai/4711/results/b-1",
         timeout=ANY,
     )
+
+
+def test_infomaniak_transkription_bindet_das_transkript_an_das_antwortformat() -> None:
+    """Der Text im Stapel ist nur deshalb roh lesbar, weil wir das Format senden.
+
+    Fiele `response_format` weg, legte derselbe Endpunkt in `data` eine
+    JSON-kodierte Zeichenkette ab — die dann ungeprüft als Transkript
+    durchgereicht würde, samt Klammern und Feldnamen. Der Test hält beide
+    Enden der Kopplung fest: den gesendeten Parameter und das, was ohne ihn
+    käme und hier nicht als Transkript gelten darf.
+    """
+
+    audio = b"aufgenommene-audiobytes"
+    client = Mock()
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _fertiger_stapel()
+
+    _infomaniak_transkription(client).transkribieren(audio)
+
+    assert client.post.call_args.kwargs["data"]["response_format"] == (
+        INFOMANIAK_ANTWORTFORMAT
+    )
+    assert INFOMANIAK_ANTWORTFORMAT == "text"
+
+    # Und so sähe der Schaden aus, wenn der Parameter fiele: Derselbe Adapter
+    # gäbe die JSON-Hülle unbesehen als Transkript aus. Der Adapter erkennt das
+    # nicht — er darf es nicht müssen, solange das Absenden das Format nennt.
+    client.get.return_value = _fertiger_stapel(_ERGEBNIS_OHNE_ANTWORTFORMAT)
+
+    durchgereicht: str = _infomaniak_transkription(client).transkribieren(audio)
+
+    assert durchgereicht == _ERGEBNIS_OHNE_ANTWORTFORMAT
+    assert durchgereicht.startswith('{"text"')
 
 
 def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> None:
@@ -387,7 +429,7 @@ def test_infomaniak_transkription_kennzeichnet_ein_leeres_ergebnis() -> None:
 
     client = Mock()
     client.post.return_value = _absende_antwort()
-    client.get.return_value = _fertiger_stapel('{"text": "  "}')
+    client.get.return_value = _fertiger_stapel("  \n")
 
     with pytest.raises(LeeresTranskript):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
@@ -396,9 +438,9 @@ def test_infomaniak_transkription_kennzeichnet_ein_leeres_ergebnis() -> None:
 @pytest.mark.parametrize(
     "data",
     [
-        pytest.param("kein JSON", id="unlesbare-zeichenkette"),
-        pytest.param('{"segments": []}', id="json-ohne-textfeld"),
         pytest.param({"text": "Wie hast du gerechnet?"}, id="abbildung-statt-text"),
+        pytest.param(None, id="fertig-ohne-daten"),
+        pytest.param(42, id="zahl-statt-text"),
     ],
 )
 def test_infomaniak_transkription_meldet_ein_unlesbares_ergebnis(data: object) -> None:
