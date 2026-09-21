@@ -110,12 +110,31 @@ def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     return vignette
 
 
-def _finales_item_anlegen(konto: Konto, wortlaut: str) -> FragebogenItem:
+def _finales_item_anlegen(
+    konto: Konto,
+    wortlaut: str,
+    typ: str = FragebogenItem.Typ.FREITEXT,
+) -> FragebogenItem:
     """Legt eine einbindbare finale Item-Fassung an."""
 
-    item: FragebogenItem = FragebogenItem.objects.anlegen(konto, wortlaut=wortlaut)
+    item: FragebogenItem = FragebogenItem.objects.anlegen(
+        konto, typ=typ, wortlaut=wortlaut
+    )
     item.finalisieren()
     return item
+
+
+def _item_zuordnen(
+    erhebung: Erhebung,
+    item: FragebogenItem,
+    andockpunkt: str,
+    position: int,
+) -> Erhebungsitem:
+    """Bindet eine Item-Fassung an einen Andockpunkt der Erhebung."""
+
+    return Erhebungsitem.objects.create(
+        erhebung=erhebung, item=item, andockpunkt=andockpunkt, position=position
+    )
 
 
 class ErhebungenForschendenRollenTests(TestCase):
@@ -2198,20 +2217,23 @@ class ErhebungsExportTests(TestCase):
         freitext_item: FragebogenItem = _finales_item_anlegen(
             ada, "Was ist Ihnen aufgefallen?"
         )
-        likert_item: FragebogenItem = FragebogenItem.objects.anlegen(
-            ada, typ=FragebogenItem.Typ.LIKERT, wortlaut="Ich fühlte mich sicher."
+        likert_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Ich fühlte mich sicher.", typ=FragebogenItem.Typ.LIKERT
         )
-        likert_item.finalisieren()
-        zuordnungen: dict[tuple[str, int], Erhebungsitem] = {
-            (andockpunkt, position): Erhebungsitem.objects.create(
-                erhebung=erhebung,
-                item=item,
-                andockpunkt=andockpunkt,
-                position=position,
-            )
-            for andockpunkt in Erhebungsitem.Andockpunkt.values
-            for position, item in ((1, freitext_item), (2, likert_item))
-        }
+        # Dasselbe Paar an beiden Andockpunkten: erst »item_id« plus
+        # »andockpunkt« macht eine Antwortzeile eindeutig lesbar.
+        freitext_nach_sitzung: Erhebungsitem = _item_zuordnen(
+            erhebung, freitext_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 1
+        )
+        likert_nach_sitzung: Erhebungsitem = _item_zuordnen(
+            erhebung, likert_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 2
+        )
+        freitext_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, freitext_item, Erhebungsitem.Andockpunkt.AM_ENDE, 1
+        )
+        likert_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, likert_item, Erhebungsitem.Andockpunkt.AM_ENDE, 2
+        )
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
@@ -2233,44 +2255,45 @@ class ErhebungsExportTests(TestCase):
         ItemAntwort.objects.create(
             itemblock=block_nach_sitzung,
             erhebungsbindung=bindung,
-            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.NACH_SITZUNG, 1)],
+            erhebungsitem=freitext_nach_sitzung,
             sitzung=sitzung,
             freitext="Zeile eins\nZeile zwei",
         )
         ItemAntwort.objects.create(
             itemblock=block_nach_sitzung,
             erhebungsbindung=bindung,
-            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.NACH_SITZUNG, 2)],
+            erhebungsitem=likert_nach_sitzung,
             sitzung=sitzung,
             likert_stufe=5,
         )
         ItemAntwort.objects.create(
             itemblock=block_am_ende,
             erhebungsbindung=bindung,
-            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.AM_ENDE, 1)],
+            erhebungsitem=freitext_am_ende,
             freitext="",
         )
         # Vorgelegt, aber nicht beantwortet: beide Wertspalten bleiben leer.
         ItemAntwort.objects.create(
             itemblock=block_am_ende,
             erhebungsbindung=bindung,
-            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.AM_ENDE, 2)],
+            erhebungsitem=likert_am_ende,
         )
         fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
         fremde_bindung: Erhebungsbindung = _laufende_bindung(
             fremde_erhebung, "9999-9999"
         )
-        ItemAntwort.objects.create(
-            itemblock=Itemblock.objects.create(
-                erhebungsbindung=fremde_bindung,
-                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-            ),
+        fremder_block: Itemblock = Itemblock.objects.create(
             erhebungsbindung=fremde_bindung,
-            erhebungsitem=Erhebungsitem.objects.create(
-                erhebung=fremde_erhebung,
-                item=freitext_item,
-                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-                position=1,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        ItemAntwort.objects.create(
+            itemblock=fremder_block,
+            erhebungsbindung=fremde_bindung,
+            erhebungsitem=_item_zuordnen(
+                fremde_erhebung,
+                freitext_item,
+                Erhebungsitem.Andockpunkt.AM_ENDE,
+                1,
             ),
             freitext="Gehört nicht in diesen Export.",
         )

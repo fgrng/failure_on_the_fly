@@ -262,8 +262,8 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 ),
             ),
         )
-        # Auch eine Antwortzeile ohne beide Werte bleibt erhalten: sie trennt
-        # »vorgelegt, nicht beantwortet« von »nie vorgelegt« (ADR-0008).
+        # Antwortzeilen ohne Werte werden nicht herausgefiltert: erst sie
+        # trennen »vorgelegt, nicht beantwortet« von »nie vorgelegt« (ADR-0041).
         antworten: QuerySet[ItemAntwort] = (
             ItemAntwort.objects.filter(erhebungsbindung__stichprobe__erhebung=erhebung)
             .select_related("erhebungsbindung", "erhebungsitem__item")
