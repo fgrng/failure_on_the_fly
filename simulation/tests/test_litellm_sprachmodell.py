@@ -96,8 +96,10 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
 
 
 @pytest.mark.parametrize("feldname", ["reasoning_content", "thinking"])
-def test_litellm_adapter_uebergeht_native_reasoning_felder(feldname: str) -> None:
-    """Native Reasoning-Felder des Anbieters bleiben folgenlos: Sie werden nicht gelesen."""
+def test_litellm_adapter_reicht_native_reasoning_felder_nicht_durch(
+    feldname: str,
+) -> None:
+    """Eine native Reasoning-Spur des Anbieters erreicht die Antwort nicht (ADR-0005)."""
 
     completion = Mock(
         return_value=SimpleNamespace(

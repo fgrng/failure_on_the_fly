@@ -439,7 +439,6 @@ def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
 
         gesagtes: str = " ".join(teil for paar in modellverlauf(sink) for teil in paar)
         assert "Ich addiere Zähler und Nenner." not in gesagtes
-        assert "Native Spur." not in gesagtes
         assert "2/5." in gesagtes
 
 

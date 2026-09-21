@@ -1982,13 +1982,13 @@ class ErhebungsExportTests(TestCase):
                     "diagnosen.csv",
                 }.issubset(zip_datei.namelist())
             )
-            schritt_reader: csv.DictReader = csv.DictReader(
+            schritt_leser: csv.DictReader[str] = csv.DictReader(
                 TextIOWrapper(
                     zip_datei.open("gespraechsschritte.csv"), encoding="utf-8"
                 )
             )
-            schritte: list[dict[str, str]] = list(schritt_reader)
-            kopfzeile: list[str] = list(schritt_reader.fieldnames or [])
+            schritte: list[dict[str, str]] = list(schritt_leser)
+            kopfzeile: list[str] = list(schritt_leser.fieldnames or [])
             fehlversuche: list[dict[str, str]] = list(
                 csv.DictReader(
                     TextIOWrapper(zip_datei.open("fehlversuche.csv"), encoding="utf-8")
