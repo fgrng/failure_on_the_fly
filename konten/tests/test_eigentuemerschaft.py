@@ -107,3 +107,16 @@ def test_kreis_meldet_ob_mehr_als_eine_eigentuemerin_eingetragen_ist() -> None:
     training.eigentuemerinnen.add(grace)
 
     assert training.hat_mehrere_eigentuemerinnen
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
+def test_anlegen_traegt_ohne_weitere_angaben_genau_eine_eigentuemerin_ein(
+    modell: type[Model],
+) -> None:
+    """Anlegen trägt das übergebene Konto als einzige Eigentümerin ein."""
+    ada: Konto = Konto.objects.create_user(username="ada")
+
+    bestand: EigentuemerKreis = modell.objects.anlegen(ada)
+
+    assert list(bestand.eigentuemerinnen.all()) == [ada]

@@ -91,7 +91,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
@@ -116,7 +116,7 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     vignette: Vignette = _finale_vignette_anlegen(konto)
     item: FragebogenItem = _finales_item_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
@@ -154,10 +154,8 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche",
-        eigentuemerin=konto,
-        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(3)]
     for vignette in vignetten:
@@ -192,7 +190,7 @@ def test_kommandos_bleiben_beim_zweiten_aufruf_bei_ihrem_ergebnis() -> None:
     """Vorlegen, Erledigen und Abschließen sind wiederholbar ohne Nebenwirkung."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     item: FragebogenItem = _finales_item_anlegen(konto)
     Erhebungsitem.objects.create(
         erhebung=erhebung,
@@ -224,7 +222,7 @@ def test_block_ohne_items_am_andockpunkt_entsteht_nicht() -> None:
     """Ohne Items an einem Andockpunkt legt das Vorlegen nichts an."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
     assert block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE) is None

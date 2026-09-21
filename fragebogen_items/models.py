@@ -38,7 +38,8 @@ class LikertSkalenpol(models.TextChoices):
 
 
 class FragebogenItemHistorieQuerySet(
-    EigentuemerKreisQuerySet, models.QuerySet["FragebogenItemHistorie"]
+    EigentuemerKreisQuerySet["FragebogenItemHistorie"],
+    models.QuerySet["FragebogenItemHistorie"],
 ):
     """Abfragen über Fragebogen-Item-Historien."""
 
@@ -118,8 +119,7 @@ class FragebogenItemManager(models.Manager.from_queryset(FragebogenItemQuerySet)
         wortlaut: str = "",
     ) -> "FragebogenItem":
         """Legt einen Entwurf mit Historie für die anlegende Person an."""
-        historie: FragebogenItemHistorie = FragebogenItemHistorie.objects.create()
-        historie.eigentuemerinnen.add(konto)
+        historie: FragebogenItemHistorie = FragebogenItemHistorie.objects.anlegen(konto)
         return self._erstellen(historie=historie, typ=typ, wortlaut=wortlaut)
 
 

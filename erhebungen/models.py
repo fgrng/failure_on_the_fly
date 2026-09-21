@@ -3,7 +3,6 @@
 from datetime import datetime
 from random import Random
 from secrets import choice, randbits
-from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
@@ -14,27 +13,11 @@ from django.utils import timezone
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
 
-if TYPE_CHECKING:
-    from konten.models import Konto
 
-
-class ErhebungQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Erhebung"]):
+class ErhebungQuerySet(
+    EigentuemerKreisQuerySet["Erhebung"], models.QuerySet["Erhebung"]
+):
     """Abfragen über Erhebungen."""
-
-    def anlegen(self, konto: "Konto", **kwargs: object) -> "Erhebung":
-        """Legt eine Erhebung an und trägt ihre erste Eigentümerin ein."""
-        erhebung: Erhebung = super().create(**kwargs)
-        erhebung.eigentuemerinnen.add(konto)
-        return erhebung
-
-    def create(self, **kwargs: object) -> "Erhebung":
-        """Übernimmt die frühere Anlegeform nur mit einer Eigentümerin."""
-        eigentuemerin: object | None = kwargs.pop("eigentuemerin", None)
-        if eigentuemerin is None:
-            raise ValidationError("Aktive Erhebungen brauchen eine Eigentümerin.")
-        erhebung: Erhebung = super().create(**kwargs)
-        erhebung.eigentuemerinnen.add(eigentuemerin)
-        return erhebung
 
     def update(self, **kwargs: object) -> int:
         """Hält finale Designs und Statuswechsel an den Lebenszyklus-Methoden."""

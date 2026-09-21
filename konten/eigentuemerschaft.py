@@ -10,8 +10,14 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-class EigentuemerKreisQuerySet:
-    """Die Sichtbarkeitsregel des Eigentümer-Kreises für jedes Bestands-QuerySet."""
+class EigentuemerKreisQuerySet[Bestand: "EigentuemerKreis"]:
+    """Sichtbarkeit und Anlegen des Eigentümer-Kreises für jedes Bestands-QuerySet."""
+
+    def anlegen(self, konto: "Konto", **kwargs: object) -> Bestand:
+        """Legt einen Bestand an und trägt das Konto als erste Eigentümerin ein."""
+        bestand: Bestand = self.create(**kwargs)
+        bestand.eigentuemerinnen.add(konto)
+        return bestand
 
     def sichtbar_fuer(self, konto: "Konto") -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""

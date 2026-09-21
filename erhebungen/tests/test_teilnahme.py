@@ -40,9 +40,9 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung: Erhebung = Erhebung.objects.create(
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(
+            Konto.objects.create_user(username="ada"),
             name="Brüche",
-            eigentuemerin=Konto.objects.create_user(username="ada"),
             einwilligungstext="Ich willige in die Teilnahme ein.",
             instruktionstext="Fragen Sie gezielt nach dem Rechenweg.",
         )
@@ -948,8 +948,8 @@ class ErhebungsteilnahmeTests(TestCase):
             parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.create(
-            name="Fehlschlag", eigentuemerin=self.erhebung.eigentuemerinnen.get()
+        self.erhebung = Erhebung.objects.anlegen(
+            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(
@@ -985,9 +985,8 @@ class ErhebungsteilnahmeTests(TestCase):
             parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.create(
-            name="Fehlschlag",
-            eigentuemerin=self.erhebung.eigentuemerinnen.get(),
+        self.erhebung = Erhebung.objects.anlegen(
+            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(
@@ -1065,9 +1064,8 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.create(
-            name="Datenspur",
-            eigentuemerin=self.erhebung.eigentuemerinnen.get(),
+        self.erhebung = Erhebung.objects.anlegen(
+            self.erhebung.eigentuemerinnen.get(), name="Datenspur"
         )
         self.erhebung.finalisieren()
         self.stichprobe = Stichprobe.objects.create(

@@ -31,7 +31,7 @@ from vignetten.models import Vignette
 def _erhebungsbindung_anlegen(konto: Konto, teilnahme: Teilnahme) -> Erhebungsbindung:
     """Erstellt eine Erhebungsbindung mit der kleinsten gültigen Umgebung."""
 
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
         beginn=timezone.now(),
@@ -64,14 +64,6 @@ def _finale_vignette_anlegen(konto: Konto) -> Vignette:
     vignette.save()
     vignette.finalisieren()
     return vignette
-
-
-@pytest.mark.django_db
-def test_aktive_erhebung_braucht_beim_anlegen_eine_eigentuemerin() -> None:
-    """Nur archivierte Erhebungen dürfen ihren Eigentümerinnen-Kreis verlieren."""
-
-    with pytest.raises(ValidationError, match="Eigentümerin"):
-        Erhebung.objects.create(name="Brüche")
 
 
 @pytest.mark.django_db
@@ -192,8 +184,8 @@ def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
-    eigene: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
-    Erhebung.objects.create(name="Addition", eigentuemerin=grace)
+    eigene: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    Erhebung.objects.anlegen(grace, name="Addition")
 
     assert list(Erhebung.objects.sichtbar_fuer(ada)) == [eigene]
 
@@ -218,9 +210,8 @@ def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
     administratorin: Konto = Konto.objects.create_user(
         username="admin", is_superuser=True
     )
-    fremde: Erhebung = Erhebung.objects.create(
-        name="Addition",
-        eigentuemerin=Konto.objects.create_user(username="grace"),
+    fremde: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="grace"), name="Addition"
     )
 
     assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [fremde]
@@ -231,7 +222,7 @@ def test_erhebung_haelt_finale_vignetten_in_fester_reihenfolge() -> None:
     """Eine feste Erhebung bewahrt ihre finalen Vignetten eindeutig geordnet."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     erste: Vignette = _finale_vignette_anlegen(konto)
@@ -250,7 +241,7 @@ def test_erhebungsvignette_lehnt_entwurf_auch_per_bulk_insert_ab() -> None:
     """Die Mitgliedschaft schützt die Finale-Invariante auch vor Bulk-Inserts."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     entwurf: Vignette = Vignette.objects.anlegen(ada)
@@ -267,7 +258,7 @@ def test_erhebungsvignette_lehnt_fremde_finale_fassung_ab() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     fremde_finale: Vignette = _finale_vignette_anlegen(grace)
@@ -315,10 +306,8 @@ def test_zufaellige_erhebung_hat_keine_vignettenpositionen() -> None:
     """Eine zufällige Reihenfolge speichert an der Mitgliedschaft keine Position."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche",
-        eigentuemerin=ada,
-        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
@@ -333,10 +322,8 @@ def test_zufaellige_erhebung_nimmt_finale_vignetten_ohne_position_auf() -> None:
     """Eine zufällige Reihenfolge bindet finale Vignetten ohne Position ein."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche",
-        eigentuemerin=ada,
-        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
@@ -352,7 +339,7 @@ def test_erhebungsvignette_bewahrt_die_menge_je_erhebung_eindeutig() -> None:
     """Eine finale Vignetten-Fassung ist nur einmal Mitglied derselben Erhebung."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     finale: Vignette = _finale_vignette_anlegen(ada)
@@ -369,7 +356,7 @@ def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
     """Die Zuordnung, nicht die Fassung, ist je Andockpunkt eindeutig."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     item: FragebogenItem = FragebogenItem.objects.anlegen(
         ada, wortlaut="Wie sicher fühlten Sie sich?"
     )
@@ -562,7 +549,7 @@ def test_itemposition_ist_je_andockpunkt_eindeutig() -> None:
     """Gleiche Positionen sind nur in unterschiedlichen Andockpunkten zulässig."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     erstes_item: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Erstes")
     zweites_item: FragebogenItem = FragebogenItem.objects.anlegen(
         ada, wortlaut="Zweites"
@@ -602,7 +589,7 @@ def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     entwurf: FragebogenItem = FragebogenItem.objects.anlegen(ada, wortlaut="Entwurf")
     fremdes_item: FragebogenItem = FragebogenItem.objects.anlegen(
         grace, wortlaut="Fremd"
@@ -640,7 +627,7 @@ def test_feste_reihenfolge_hat_keine_doppelte_position() -> None:
     """Eine feste Reihenfolge ordnet jeder Position genau eine Vignette zu."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     erste: Vignette = _finale_vignette_anlegen(ada)
@@ -759,8 +746,8 @@ def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None
 def test_finalisieren_pinnt_die_aktive_modell_konfiguration() -> None:
     """Finalisieren friert die aktive Modell-Konfiguration an der Erhebung ein."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -777,8 +764,8 @@ def test_finalisieren_pinnt_die_aktive_modell_konfiguration() -> None:
 def test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration() -> None:
     """Ein zulässiger Rückweg macht das Design wieder bearbeitbar und pinnt neu."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     erste: ModellKonfiguration = ModellKonfiguration.objects.create(
         anbieter=Anbieter.OPENROUTER,
@@ -805,8 +792,8 @@ def test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration() 
 def test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt() -> None:
     """Eine aktive Stichprobe hält die finale Erhebung fest."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -827,8 +814,8 @@ def test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt() -> None:
 def test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt() -> None:
     """Eine laufende Stichprobe verhindert das Archivieren ihrer Erhebung."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -850,8 +837,8 @@ def test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt() -> None:
 def test_archivieren_akzeptiert_nur_finale_erhebungen() -> None:
     """Ein Entwurf folgt beim Archivieren seinem Lebenszyklus-Guard."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
 
     with pytest.raises(ValidationError, match="Nur finale Erhebungen"):
@@ -862,8 +849,8 @@ def test_archivieren_akzeptiert_nur_finale_erhebungen() -> None:
 def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
     """Eine archivierte Erhebung kann mit ihrem unveränderten Design zurückkehren."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -901,8 +888,8 @@ def test_eigentuemerlose_erhebung_kann_nicht_entarchiviert_werden() -> None:
 def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
     """Finale Erhebungen können weder still geändert noch gelöscht werden."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -962,8 +949,8 @@ def test_laufende_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
 def test_archivierte_erhebung_ist_auch_per_bulk_update_eingefroren() -> None:
     """Archivierte Erhebungen behalten ihr finales Design unverändert."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         sprachmodell="fake"
@@ -980,8 +967,8 @@ def test_archivierte_erhebung_ist_auch_per_bulk_update_eingefroren() -> None:
 def test_stichprobe_archivieren_schaltet_nur_ueber_ihre_lebenszyklus_methode() -> None:
     """Eine Stichprobe wird logisch statt physisch aus der Arbeit genommen."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -998,8 +985,8 @@ def test_stichprobe_archivieren_schaltet_nur_ueber_ihre_lebenszyklus_methode() -
 def test_stichprobe_laesst_sich_nicht_per_bulk_update_archivieren() -> None:
     """Die Archivierungs-Guards einer Stichprobe sind nicht umgehbar."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -1015,8 +1002,8 @@ def test_stichprobe_laesst_sich_nicht_per_bulk_update_archivieren() -> None:
 def test_erhebungsbindung_verbindet_stichprobe_mit_genau_einer_teilnahme() -> None:
     """Eine Erhebungsbindung ist die einzige Erhebungszuordnung einer Teilnahme."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -1038,8 +1025,8 @@ def test_erhebungsbindung_verbindet_stichprobe_mit_genau_einer_teilnahme() -> No
 def test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens() -> None:
     """Neue Erhebungsteilnahmen erhalten unterscheidbare Tokens ohne 0, 1, I oder O."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -1061,8 +1048,8 @@ def test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens() -> None:
 def test_anlegen_wiederholt_token_nach_kollision() -> None:
     """Eine vorhandene Tokenfolge wird nie einer zweiten Teilnahme zugeordnet."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -1088,8 +1075,8 @@ def test_anlegen_wiederholt_token_nach_kollision() -> None:
 def test_unfertige_teilnahme_verfaellt_nach_ende_des_erhebungszeitraums() -> None:
     """Eine noch nicht beendete Teilnahme kann nach dem Fenster nicht fortgesetzt werden."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,
@@ -1124,8 +1111,8 @@ def test_phase_leitet_sich_aus_zeitraum_und_systemzeit_ab(
 ) -> None:
     """Eine Stichprobe ist vor, während oder nach ihrem Erhebungszeitraum."""
 
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche", eigentuemerin=Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung,

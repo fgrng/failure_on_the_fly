@@ -47,9 +47,7 @@ class ErhebungsTranskriptionTests(TestCase):
             lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
             gepinnter_kern=kern,
         )
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Audioerhebung", eigentuemerin=forscherin
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(forscherin, name="Audioerhebung")
         erhebung.finalisieren()
         self.stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
