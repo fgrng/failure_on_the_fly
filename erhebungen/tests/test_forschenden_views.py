@@ -16,6 +16,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from config.tests.dokumentation import REPO_ROOT
 from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
@@ -1421,6 +1422,19 @@ class ErhebungenArchivierenTests(TestCase):
         self.assertEqual(self.erhebung.status, Erhebung.Status.ARCHIVIERT)
 
 
+def _dateien_aus_adr_0029() -> list[str]:
+    """Liefert die Dateinamen aus der Kontrakttabelle des Export-ADR."""
+    tabelle: str = (
+        (REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md")
+        .read_text()
+        .split("## Dateiformat")[1]
+        .split("\n## ")[0]
+    )
+    return [
+        zeile.split("`")[1] for zeile in tabelle.splitlines() if zeile.startswith("| `")
+    ]
+
+
 class ErhebungsExportTests(TestCase):
     """Forschende laden die minimale relationale Datenspur als ZIP herunter."""
 
@@ -2391,6 +2405,23 @@ class ErhebungsExportTests(TestCase):
 
         self.assertContains(detail, reverse("erhebungen:export", args=[erhebung.pk]))
         self.assertEqual(export.status_code, 200)
+
+    def test_die_dateiliste_folgt_dem_kontrakt_aus_adr_0029(self) -> None:
+        """Der veröffentlichte Kontrakt nennt genau die gelieferten Dateien."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Kontrakt")
+        self.client.force_login(ada)
+
+        export: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(export.content)) as zip_datei:
+            self.assertEqual(
+                sorted(zip_datei.namelist()), sorted(_dateien_aus_adr_0029())
+            )
 
 
 class ErhebungenGesperrteItemzuordnungTests(TestCase):

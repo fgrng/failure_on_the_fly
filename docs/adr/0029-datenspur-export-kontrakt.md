@@ -48,7 +48,7 @@ Diagnose führt den Modus noch nicht; das behandelt #239.
 
 ## Dateiformat
 
-Der ZIP-Download enthält **elf Dateien**, auch wenn eine von ihnen keine
+Der ZIP-Download enthält **vierzehn Dateien**, auch wenn eine von ihnen keine
 Datenzeilen hat; sie enthält dann dennoch ihre Kopfzeile. Alle CSVs folgen RFC
 4180: Sie verwenden Kommas, UTF-8 ohne BOM und doppelte Anführungszeichen;
 Zeilenumbrüche innerhalb von Zellen bleiben erhalten. Wahrheitswerte erscheinen
@@ -98,6 +98,41 @@ Die Transkriptions-Konfiguration erscheint gar nicht im Export (ADR-0026): Die
 Transkription ist eine Deployment-Entscheidung der Betreiber:in, keine
 Eigenschaft der Datenspur.
 
+## Der Fragebogen im Export
+
+Drei Tabellen tragen den Fragebogen-Teil einer Erhebung: `itembloecke.csv` je
+vorgelegtem Block, `fragebogen_items.csv` mit dem vollen Wortlaut der
+tatsächlich vorgelegten Item-Fassungen und `likert_skala.csv` mit der globalen
+Kodierung.
+
+**`likert_stufe` steigt mit der Zustimmung**, ebenso `stufe` in
+`likert_skala.csv` — es ist dieselbe Zahl. 1 ist »Stimme gar nicht zu«, 6 ist
+»Stimme voll zu«. Aus einer nackten Zahl in der CSV ist die Richtung nicht
+erkennbar, und eine still umgedrehte Skala ist der klassische
+Auswertungsfehler; deshalb liegt die Kodierung als eigene Tabelle im ZIP und
+nicht nur im Quellcode. Die Pole gelten global und stehen deshalb nicht als
+Eigenschaft an jeder Item-Fassung.
+
+**Der Erledigt-Marker sitzt am Itemblock**, nicht an der Antwortzeile
+(ADR-0041). Erst `vorgelegt_am` und `erledigt_am` am Block trennen »vorgelegt
+und bewusst leer abgeschickt« von »vorgelegt, aber abgebrochen« und von »nie
+vorgelegt« — Fragebogen-Items sind freiwillig (ADR-0008), aus den Werten allein
+folgt das nicht. Den Marker je Antwortzeile mitzuführen, wiederholte denselben
+Zeitstempel *n*-fach je Block und ebnete ein, was dieser Kontrakt getrennt
+hält; die Antwortzeile bleibt reine Datenspur.
+
+**Die Item-Historie läuft nicht mit, auch nicht als bloße ID.** Bei
+`vignettenfassungen.csv` steht `historie_id` als reiner Gruppierungsschlüssel,
+weil Vignetten gezogen werden und die Ziehung auf die Linie verweist. Items
+werden nicht gezogen: Die Historie hätte in der Auswertung keinen Referenten,
+und die Tabelle selbst bleibt nach der Regel oben ohnehin draußen.
+
+**Diese Erweiterung ist rein additiv.** Zu den ursprünglich elf Dateien sind
+Tabellen ausschließlich hinzugefügt worden. Keine bestehende Datei, Spalte oder
+Spaltenreihenfolge ändert sich, bestehende Analyseskripte brechen nicht — die
+Regel oben, dass Formatänderungen ab der ersten ausgelieferten Erhebung nicht
+mehr rückwirkend sind, ist damit gewahrt.
+
 ## Erwogene Optionen
 
 - **Wide-Export mit einer Zeile je Teilnahme oder Sitzung** — verworfen. Er
@@ -107,6 +142,12 @@ Eigenschaft der Datenspur.
   nicht mehr von einer erfolgreichen, inhaltsleeren Modellantwort.
 - **Historien mit Eigentümerinnen exportieren** — verworfen. Sie würden die
   Pseudonymität des Forschungsdatensatzes brechen.
+- **Die Likert-Kodierung als Kommentarzeile in der Antwortdatei** — verworfen.
+  RFC 4180 kennt keine Kommentare; jeder Parser stolperte darüber.
+- **Die Likert-Kodierung als Liesmich-Datei im ZIP** — verworfen. Sie wäre das
+  einzige nicht maschinenlesbare Artefakt im Download und ließe sich nicht
+  joinen. Die eigene kleine Tabelle folgt stattdessen dem long-relationalen
+  Prinzip.
 
 ## Folgen
 
