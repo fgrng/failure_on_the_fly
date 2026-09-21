@@ -14,7 +14,9 @@ from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
 
 
-class ErhebungQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Erhebung"]):
+class ErhebungQuerySet(
+    EigentuemerKreisQuerySet["Erhebung"], models.QuerySet["Erhebung"]
+):
     """Abfragen über Erhebungen."""
 
     def update(self, **kwargs: object) -> int:

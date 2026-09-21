@@ -1,6 +1,6 @@
 """Der Eigentümer-Kreis, den alle bestandstragenden Modelle gemeinsam tragen."""
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
 from django.db import models
 
@@ -10,12 +10,12 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-class EigentuemerKreisQuerySet:
+class EigentuemerKreisQuerySet[Bestand: "EigentuemerKreis"]:
     """Sichtbarkeit und Anlegen des Eigentümer-Kreises für jedes Bestands-QuerySet."""
 
-    def anlegen(self, konto: "Konto", **kwargs: object) -> Any:
+    def anlegen(self, konto: "Konto", **kwargs: object) -> Bestand:
         """Legt einen Bestand an und trägt das Konto als erste Eigentümerin ein."""
-        bestand = self.create(**kwargs)
+        bestand: Bestand = self.create(**kwargs)
         bestand.eigentuemerinnen.add(konto)
         return bestand
 

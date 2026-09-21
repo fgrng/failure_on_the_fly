@@ -38,7 +38,8 @@ class LikertSkalenpol(models.TextChoices):
 
 
 class FragebogenItemHistorieQuerySet(
-    EigentuemerKreisQuerySet, models.QuerySet["FragebogenItemHistorie"]
+    EigentuemerKreisQuerySet["FragebogenItemHistorie"],
+    models.QuerySet["FragebogenItemHistorie"],
 ):
     """Abfragen über Fragebogen-Item-Historien."""
 

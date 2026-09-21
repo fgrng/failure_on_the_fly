@@ -114,9 +114,9 @@ def test_kreis_meldet_ob_mehr_als_eine_eigentuemerin_eingetragen_ist() -> None:
 def test_anlegen_traegt_ohne_weitere_angaben_genau_eine_eigentuemerin_ein(
     modell: type[Model],
 ) -> None:
-    """Jeder Bestand entsteht auf demselben Weg — ohne modellspezifische Fabrik."""
+    """Anlegen trägt das übergebene Konto als einzige Eigentümerin ein."""
     ada: Konto = Konto.objects.create_user(username="ada")
 
-    bestand = modell.objects.anlegen(ada)
+    bestand: EigentuemerKreis = modell.objects.anlegen(ada)
 
     assert list(bestand.eigentuemerinnen.all()) == [ada]

@@ -100,7 +100,7 @@ def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
 
 
 class VignettenhistorieQuerySet(
-    EigentuemerKreisQuerySet, models.QuerySet["Vignettenhistorie"]
+    EigentuemerKreisQuerySet["Vignettenhistorie"], models.QuerySet["Vignettenhistorie"]
 ):
     """Abfragen über Vignettenhistorien."""
 

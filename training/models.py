@@ -7,12 +7,15 @@ from django.db.models.signals import m2m_changed, post_save
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
 
+
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
 )
 
 
-class TrainingQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Training"]):
+class TrainingQuerySet(
+    EigentuemerKreisQuerySet["Training"], models.QuerySet["Training"]
+):
     """Abfragen über Trainings."""
 
     def update(self, **kwargs: object) -> int:
