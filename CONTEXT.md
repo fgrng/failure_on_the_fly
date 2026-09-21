@@ -167,7 +167,7 @@ _Avoid_: gelöscht, deaktiviert, zurückgezogen
 **Historie**:
 Das Objekt, das die sequenziell entstandenen Fassungen eines versionierten Artefakts zusammenfasst. Sie bleibt linear und trägt höchstens einen Entwurf. Entsteht automatisch und wird erst ab der zweiten Fassung sichtbar und benennbar.
 
-Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt eine oder mehrere gleichrangige Eigentümer:innen (Ko-Autorschaft) und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** kennt ebenfalls Ko-Autorschaft, ist aber nicht als Ganzes archivierbar. Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0035) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
+Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt einen Eigentümer-Kreis und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** trägt ebenfalls einen Eigentümer-Kreis, ist aber nicht als Ganzes archivierbar. Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0035) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Was die drei teilen, ist der Zustandsautomat, nicht die Ausstattung.
 _Avoid_: Familie, Reihe, Strang, Lineage
 
 ## Anlässe für Sitzungen
@@ -227,20 +227,24 @@ _Avoid_: Fragebogenseite, Block, Formular
 
 ## Rollen
 
+**Eigentümer-Kreis**:
+Die Menge gleichrangiger Konten, denen ein fachlicher Bestand gehört: eine Vignettenhistorie, eine Fragebogen-Item-Historie, ein Training oder eine Erhebung. Eigentümerschaft ist uniform und alles-oder-nichts je Objekt; bei Vignette und Fragebogen-Item hängt der Kreis an der Historie, bei Training und Erhebung am Objekt selbst (ADR-0032, ADR-0037). Ein Bestand ist sichtbar für seinen Kreis und die Administration, für niemanden sonst. Ein aktiver Bestand hat mindestens ein Mitglied; **Austritt** ist das Verlassen des Kreises und für das letzte Mitglied gesperrt. Eine Übertragung gibt es nicht, nur Aufnehmen und Austreten. **Ko-Autorschaft** ist der Weg in den Kreis, kein Synonym: Wer aufgenommen wird, ist Ko-Autor:in und damit Mitglied (ADR-0022).
+_Avoid_: Ko-Eigentümerin, Besitzerin, Inhaberin, Owner
+
 **Teilnehmer:in**:
 Wer Sitzungen führt und diagnostiziert. In einer Erhebung pseudonym über ein Teilnahme-Token, im Training über ein Nutzerkonto.
 _Avoid_: Proband, Nutzer, Studierende
 
 **Autor:in**:
-Wer Vignetten anlegt und pflegt. Sieht und bearbeitet ausschließlich die Vignetten, an denen sie Ko-Eigentümerin ist — die eigenen und die mit ihr geteilten. Wählt den Simulationskern nicht aus, kann einen Entwurf aber auf den aktuellsten Kern vorspulen.
+Wer Vignetten anlegt und pflegt. Sieht und bearbeitet ausschließlich die Vignetten, deren Eigentümer-Kreis sie angehört. Wählt den Simulationskern nicht aus, kann einen Entwurf aber auf den aktuellsten Kern vorspulen.
 _Avoid_: Vignettenautor, Redakteur
 
 **Ausbilder:in**:
-Wer Trainings zusammenstellt, an denen die Person Eigentümerin ist, und die Sitzungen ihrer Trainingsteilnehmenden namentlich einsieht.
+Wer Trainings zusammenstellt, deren Eigentümer-Kreis die Person angehört, und die Sitzungen ihrer Trainingsteilnehmenden namentlich einsieht.
 _Avoid_: Dozent, Lehrender, Trainer
 
 **Forschende:r**:
-Wer Erhebungen zusammenstellt, an denen die Person Eigentümerin ist, ihren Ablauf steuert und die Datenspur exportiert.
+Wer Erhebungen zusammenstellt, deren Eigentümer-Kreis die Person angehört, ihren Ablauf steuert und die Datenspur exportiert.
 _Avoid_: Wissenschaftler, Studienleiter
 
 **Administrator:in**:
