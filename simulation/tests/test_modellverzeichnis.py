@@ -13,10 +13,10 @@ from simulation.modellverzeichnis import (
     AnbieterAntwortetFormwidrig,
     AnbieterLehntAb,
     AnbieterNichtErreichbar,
+    InfomaniakVerzeichnis,
     KeineModellliste,
     Modellvorschlag,
     Naht,
-    InfomaniakVerzeichnis,
     OpenRouterVerzeichnis,
     modellverzeichnis,
 )

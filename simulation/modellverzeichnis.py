@@ -5,6 +5,7 @@ Instanz bleibt der Probelauf (ADR-0014), die einzige Prüfung am Modellnamen
 seine Anbieterbindung (ADR-0036).
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
@@ -69,13 +70,50 @@ class Modellverzeichnis(Protocol):
         """Liefert die alphabetisch sortierten Vorschläge dieser Naht."""
 
 
+def _datenliste(
+    client: Any,
+    url: str,
+    anbieter: str,
+    params: dict[str, str] | None = None,
+    ablehnungshinweis: str = "",
+) -> list[Any]:
+    # Holt eine Modellliste und schält sie aus ihrem »data«-Umschlag. Beide
+    # Anbieter antworten in derselben Form und scheitern auf dieselben Weisen;
+    # nur die Klarnamen und der Hinweis in den Meldungen unterscheiden sich.
+
+    formwidrig: str = f"{anbieter} hat keine lesbare Modellliste geliefert."
+    try:
+        antwort: Any = (
+            client.get(url) if params is None else client.get(url, params=params)
+        )
+        antwort.raise_for_status()
+        nutzlast: Any = antwort.json()
+    except httpx.TransportError as exc:
+        raise AnbieterNichtErreichbar(f"{anbieter} ist nicht erreichbar.") from exc
+    except httpx.HTTPStatusError as exc:
+        raise AnbieterLehntAb(
+            f"{anbieter} hat die Anfrage nach seinen Modellen "
+            f"abgelehnt{ablehnungshinweis}."
+        ) from exc
+    except Exception as exc:
+        raise AnbieterAntwortetFormwidrig(formwidrig) from exc
+    eintraege: Any = nutzlast.get("data") if isinstance(nutzlast, dict) else None
+    if not isinstance(eintraege, list):
+        raise AnbieterAntwortetFormwidrig(formwidrig)
+    return eintraege
+
+
+def _alphabetisch(vorschlaege: Iterable[Modellvorschlag]) -> list[Modellvorschlag]:
+    # Die Sortierung liegt vor der Oberfläche, nicht in ihr.
+
+    return sorted(vorschlaege, key=lambda vorschlag: vorschlag.anzeige.casefold())
+
+
 # Welche Abfrage die jeweilige Naht bei OpenRouter beantwortet. Ohne Filter
 # stünden an der Sprachmodell-Naht auch Modelle ohne Structured Output.
 _OPENROUTER_ABFRAGE: dict[str, dict[str, str]] = {
     Naht.SPRACHMODELL: {"supported_parameters": "structured_outputs"},
 }
-
-_OPENROUTER_FORMWIDRIG: str = "OpenRouter hat keine lesbare Modellliste geliefert."
 
 
 class OpenRouterVerzeichnis:
@@ -90,30 +128,10 @@ class OpenRouterVerzeichnis:
         abfrage: dict[str, str] | None = _OPENROUTER_ABFRAGE.get(naht)
         if abfrage is None:
             raise KeineModellliste("Für diese Naht führt OpenRouter keine Modellliste.")
-        return sorted(
-            (self._vorschlag(eintrag) for eintrag in self._eintraege(abfrage)),
-            key=lambda vorschlag: vorschlag.anzeige.casefold(),
+        eintraege: list[Any] = _datenliste(
+            self.client, OPENROUTER_MODELLE_URL, "OpenRouter", params=abfrage
         )
-
-    def _eintraege(self, abfrage: dict[str, str]) -> list[Any]:
-        # Holt die Modellliste und schält sie aus ihrem Umschlag.
-
-        try:
-            antwort: Any = self.client.get(OPENROUTER_MODELLE_URL, params=abfrage)
-            antwort.raise_for_status()
-            nutzlast: Any = antwort.json()
-        except httpx.TransportError as exc:
-            raise AnbieterNichtErreichbar("OpenRouter ist nicht erreichbar.") from exc
-        except httpx.HTTPStatusError as exc:
-            raise AnbieterLehntAb(
-                "OpenRouter hat die Anfrage nach seinen Modellen abgelehnt."
-            ) from exc
-        except Exception as exc:
-            raise AnbieterAntwortetFormwidrig(_OPENROUTER_FORMWIDRIG) from exc
-        eintraege: Any = nutzlast.get("data") if isinstance(nutzlast, dict) else None
-        if not isinstance(eintraege, list):
-            raise AnbieterAntwortetFormwidrig(_OPENROUTER_FORMWIDRIG)
-        return eintraege
+        return _alphabetisch(self._vorschlag(eintrag) for eintrag in eintraege)
 
     @staticmethod
     def _vorschlag(eintrag: Any) -> Modellvorschlag:
@@ -139,7 +157,9 @@ _INFOMANIAK_MODELLTYP: dict[str, str] = {
     Naht.SPRACHMODELL: "llm",
 }
 
-_INFOMANIAK_FORMWIDRIG: str = "Infomaniak hat keine lesbare Modellliste geliefert."
+# Infomaniak weist ein untaugliches Token mit »401« ab; die Meldung benennt
+# den häufigsten Grund, statt die nackte Ablehnung weiterzureichen.
+_INFOMANIAK_ABLEHNUNGSHINWEIS: str = " — meist liegt das am Token"
 
 
 class InfomaniakVerzeichnis:
@@ -154,35 +174,17 @@ class InfomaniakVerzeichnis:
         typ: str | None = _INFOMANIAK_MODELLTYP.get(naht)
         if typ is None:
             raise KeineModellliste("Für diese Naht führt Infomaniak keine Modellliste.")
-        return sorted(
-            (
-                self._vorschlag(eintrag)
-                for eintrag in self._eintraege()
-                if isinstance(eintrag, dict) and eintrag.get("type") == typ
-            ),
-            key=lambda vorschlag: vorschlag.anzeige.casefold(),
+        eintraege: list[Any] = _datenliste(
+            self.client,
+            INFOMANIAK_MODELLE_URL,
+            "Infomaniak",
+            ablehnungshinweis=_INFOMANIAK_ABLEHNUNGSHINWEIS,
         )
-
-    def _eintraege(self) -> list[Any]:
-        # Holt die kontoweite Liste und schält sie aus dem v1-Umschlag.
-
-        try:
-            antwort: Any = self.client.get(INFOMANIAK_MODELLE_URL)
-            antwort.raise_for_status()
-            nutzlast: Any = antwort.json()
-        except httpx.TransportError as exc:
-            raise AnbieterNichtErreichbar("Infomaniak ist nicht erreichbar.") from exc
-        except httpx.HTTPStatusError as exc:
-            raise AnbieterLehntAb(
-                "Infomaniak hat die Anfrage nach seinen Modellen abgelehnt — "
-                "meist liegt das am Token."
-            ) from exc
-        except Exception as exc:
-            raise AnbieterAntwortetFormwidrig(_INFOMANIAK_FORMWIDRIG) from exc
-        eintraege: Any = nutzlast.get("data") if isinstance(nutzlast, dict) else None
-        if not isinstance(eintraege, list):
-            raise AnbieterAntwortetFormwidrig(_INFOMANIAK_FORMWIDRIG)
-        return eintraege
+        return _alphabetisch(
+            self._vorschlag(eintrag)
+            for eintrag in eintraege
+            if isinstance(eintrag, dict) and eintrag.get("type") == typ
+        )
 
     @staticmethod
     def _vorschlag(eintrag: dict[str, Any]) -> Modellvorschlag:
