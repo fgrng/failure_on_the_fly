@@ -15,6 +15,7 @@ from erhebungen.models import (
     Erhebungsitem,
     Erhebungsvignette,
     ItemAntwort,
+    Itemblock,
     Stichprobe,
     Vignettenposition,
 )
@@ -477,6 +478,62 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.assertIsNotNone(Erhebungsbindung.objects.get().abgeschlossen_am)
 
+    def test_offener_abschluss_block_ueberlebt_den_browserwechsel(self) -> None:
+        """Ein offener Block wird erneut vorgelegt, ein erledigter nicht mehr."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.client.get(block_url)
+        itemantwort = ItemAntwort.objects.get()
+
+        zweiter_browser = Client()
+        offener_block = zweiter_browser.get(block_url)
+
+        self.assertContains(offener_block, "Wie war die Sitzung?")
+
+        self.client.post(block_url, {"antwort": itemantwort.pk, "weiter": "ja"})
+        dritter_browser = Client()
+        erledigter_block = dritter_browser.get(block_url)
+
+        self.assertRedirects(
+            erledigter_block,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+
+    def test_leer_abgeschickter_abschluss_block_gilt_als_erledigt(self) -> None:
+        """Die bewusste Entscheidung, nichts zu antworten, beendet den Block."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        bindung = self._laufende_sitzung_starten()
+        self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.client.get(block_url)
+
+        self.client.post(
+            block_url, {"antwort": ItemAntwort.objects.get().pk, "weiter": "ja"}
+        )
+
+        self.assertIsNotNone(Itemblock.objects.get().erledigt_am)
+        self.assertIsNone(ItemAntwort.objects.get().freitext)
+        self.assertEqual(
+            self.client.get(
+                reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+            ).status_code,
+            200,
+        )
+        self.assertIsNotNone(Erhebungsbindung.objects.get().abgeschlossen_am)
+
     def test_abschluss_block_wird_mit_demselben_token_wiederaufgenommen(self) -> None:
         """Das Teilnahme-Token stellt vorgelegte Item-Antworten wieder her."""
 
@@ -565,7 +622,7 @@ class ErhebungsteilnahmeTests(TestCase):
             bindung,
             Erhebungsitem.Andockpunkt.NACH_SITZUNG,
             Sitzung.objects.get(),
-        )[0]
+        ).antwortzeilen()[0]
 
         antwort = self.client.post(
             reverse("erhebungen:itemblock", args=[bindung.token]),

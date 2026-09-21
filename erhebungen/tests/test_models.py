@@ -17,6 +17,7 @@ from erhebungen.models import (
     Erhebungsitem,
     Erhebungsvignette,
     ItemAntwort,
+    Itemblock,
     Stichprobe,
     Vignettenposition,
 )
@@ -401,10 +402,43 @@ def test_erhebungsitem_darf_an_beide_andockpunkte_aber_je_nur_einmal() -> None:
 
 
 @pytest.mark.django_db
-def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig() -> (
-    None
-):
-    """Die partielle Eindeutigkeit schützt auch die NULL-Sitzung."""
+def test_abschlussantwort_ist_je_block_eindeutig_und_nonresponse_ist_gueltig() -> None:
+    """Die Eindeutigkeit der Antwortzeilen hängt am vorgelegten Itemblock."""
+
+    ada = Konto.objects.create_user(username="ada")
+    bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
+    item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war es?")
+    item.finalisieren()
+    erhebungsitem = Erhebungsitem.objects.create(
+        erhebung=bindung.stichprobe.erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+    block = Itemblock.objects.create(
+        erhebungsbindung=bindung,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+    )
+
+    ItemAntwort.objects.create(
+        itemblock=block, erhebungsbindung=bindung, erhebungsitem=erhebungsitem
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ItemAntwort.objects.bulk_create(
+            [
+                ItemAntwort(
+                    itemblock=block,
+                    erhebungsbindung=bindung,
+                    erhebungsitem=erhebungsitem,
+                )
+            ]
+        )
+
+
+@pytest.mark.django_db
+def test_itemantwort_braucht_ihren_itemblock() -> None:
+    """Ohne vorgelegten Block entsteht keine Antwortzeile."""
 
     ada = Konto.objects.create_user(username="ada")
     bindung = _erhebungsbindung_anlegen(ada, Teilnahme.objects.create())
@@ -417,11 +451,9 @@ def test_abschlussantwort_ist_je_teilnahme_eindeutig_und_nonresponse_ist_gueltig
         position=1,
     )
 
-    ItemAntwort.objects.create(erhebungsbindung=bindung, erhebungsitem=erhebungsitem)
-
     with pytest.raises(IntegrityError), transaction.atomic():
-        ItemAntwort.objects.bulk_create(
-            [ItemAntwort(erhebungsbindung=bindung, erhebungsitem=erhebungsitem)]
+        ItemAntwort.objects.create(
+            erhebungsbindung=bindung, erhebungsitem=erhebungsitem
         )
 
 
@@ -440,10 +472,16 @@ def test_itemantwort_erlaubt_hoechstens_eine_wertspalte() -> None:
         position=1,
     )
 
+    block = Itemblock.objects.create(
+        erhebungsbindung=bindung,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+    )
+
     with pytest.raises(IntegrityError), transaction.atomic():
         ItemAntwort.objects.bulk_create(
             [
                 ItemAntwort(
+                    itemblock=block,
                     erhebungsbindung=bindung,
                     erhebungsitem=erhebungsitem,
                     freitext="Hilfreich",

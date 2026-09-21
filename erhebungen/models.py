@@ -619,9 +619,64 @@ class Vignettenposition(models.Model):
         ]
 
 
+class Itemblock(models.Model):
+    """Die einem Andockpunkt entsprechenden Items, wie sie vorgelegt wurden."""
+
+    erhebungsbindung: models.ForeignKey = models.ForeignKey(
+        Erhebungsbindung, on_delete=models.CASCADE, related_name="itembloecke"
+    )
+    andockpunkt: models.CharField = models.CharField(
+        max_length=13, choices=Erhebungsitem.Andockpunkt
+    )
+    sitzung: models.ForeignKey = models.ForeignKey(
+        "sitzungen.Sitzung", null=True, blank=True, on_delete=models.CASCADE
+    )
+    vorgelegt_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    erledigt_am: models.DateTimeField = models.DateTimeField(null=True, blank=True)
+
+    def antwortzeilen(self) -> list["ItemAntwort"]:
+        """Liefert die Antwortzeilen des Blocks in der Reihenfolge der Items."""
+
+        return list(
+            self.antworten.select_related("erhebungsitem__item").order_by(
+                "erhebungsitem__position"
+            )
+        )
+
+    class Meta:
+        """Hält je Andockpunkt genau einen Block und bindet ihn an seine Sitzung."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "sitzung"],
+                condition=models.Q(sitzung__isnull=False),
+                name="erhebungen_block_je_sitzung_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["erhebungsbindung", "andockpunkt"],
+                condition=models.Q(sitzung__isnull=True),
+                name="erhebungen_block_am_ende_eindeutig",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                    sitzung__isnull=True,
+                )
+                | models.Q(
+                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                    sitzung__isnull=False,
+                ),
+                name="erhebungen_block_sitzung_passt_zum_andockpunkt",
+            ),
+        ]
+
+
 class ItemAntwort(models.Model):
     """Eine freiwillige Antwort auf ein vorgelegtes Erhebungsitem."""
 
+    itemblock: models.ForeignKey = models.ForeignKey(
+        Itemblock, on_delete=models.CASCADE, related_name="antworten"
+    )
     erhebungsbindung: models.ForeignKey = models.ForeignKey(
         Erhebungsbindung, on_delete=models.CASCADE, related_name="itemantworten"
     )
@@ -676,14 +731,8 @@ class ItemAntwort(models.Model):
 
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
-                fields=["erhebungsbindung", "erhebungsitem", "sitzung"],
-                condition=models.Q(sitzung__isnull=False),
-                name="erhebungen_antwort_je_sitzung_eindeutig",
-            ),
-            models.UniqueConstraint(
-                fields=["erhebungsbindung", "erhebungsitem"],
-                condition=models.Q(sitzung__isnull=True),
-                name="erhebungen_antwort_am_ende_eindeutig",
+                fields=["itemblock", "erhebungsitem"],
+                name="erhebungen_antwort_je_block_eindeutig",
             ),
             models.CheckConstraint(
                 condition=models.Q(freitext__isnull=True)

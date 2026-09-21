@@ -3,13 +3,22 @@
 import pytest
 from django.utils import timezone
 
-from erhebungen.ablauf import block_vorlegen, naechster_schritt
+from erhebungen.ablauf import (
+    Ende,
+    NaechsteVignette,
+    OffenerAbschlussblock,
+    bindung_abschliessen,
+    block_erledigen,
+    block_vorlegen,
+    naechster_schritt,
+)
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
     ItemAntwort,
+    Itemblock,
     Stichprobe,
     Vignettenziehung,
 )
@@ -70,7 +79,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         token="2345-6789",
     )
 
-    assert naechster_schritt(bindung) == erste
+    assert naechster_schritt(bindung) == NaechsteVignette(erste)
 
     Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
@@ -79,7 +88,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    assert naechster_schritt(bindung) == zweite
+    assert naechster_schritt(bindung) == NaechsteVignette(zweite)
 
     Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
@@ -88,7 +97,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    assert naechster_schritt(bindung) is None
+    assert naechster_schritt(bindung) == Ende()
 
 
 @pytest.mark.django_db
@@ -122,16 +131,17 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    block = naechster_schritt(bindung)
+    assert naechster_schritt(bindung) == OffenerAbschlussblock()
 
-    assert block.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
-    assert list(block.items) == [zugehoerigkeit]
-    assert block.sitzung is None
+    erste_vorlage = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+    zweite_vorlage = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
 
-    erste_vorlage = block_vorlegen(bindung, block.andockpunkt, block.sitzung)
-    zweite_vorlage = block_vorlegen(bindung, block.andockpunkt, block.sitzung)
-
+    assert erste_vorlage is not None
     assert zweite_vorlage == erste_vorlage
+    assert erste_vorlage.sitzung is None
+    assert [antwort.erhebungsitem for antwort in erste_vorlage.antwortzeilen()] == [
+        zugehoerigkeit
+    ]
     assert ItemAntwort.objects.count() == 1
 
 
@@ -173,3 +183,60 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         erste_bindung.vignettenziehungen.values_list("vignette_id", flat=True)
     ) == list(zweite_bindung.vignettenziehungen.values_list("vignette_id", flat=True))
     assert Vignettenziehung.objects.filter(erhebungsbindung=erste_bindung).count() == 3
+
+
+@pytest.mark.django_db
+def test_kommandos_bleiben_beim_zweiten_aufruf_bei_ihrem_ergebnis() -> None:
+    """Vorlegen, Erledigen und Abschließen sind wiederholbar ohne Nebenwirkung."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    item: FragebogenItem = _finales_item_anlegen(konto)
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+        stichprobe=Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        ),
+        teilnahme=Teilnahme.objects.create(),
+        token="2345-6789",
+    )
+
+    block = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+    assert block is not None
+    block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+    block_erledigen(block)
+    erledigt_am = block.erledigt_am
+    block_erledigen(block)
+    bindung_abschliessen(bindung)
+    abgeschlossen_am = bindung.abgeschlossen_am
+    bindung_abschliessen(bindung)
+
+    assert Itemblock.objects.count() == 1
+    assert ItemAntwort.objects.count() == 1
+    assert block.erledigt_am == erledigt_am
+    assert bindung.abgeschlossen_am == abgeschlossen_am
+    assert naechster_schritt(bindung) == Ende()
+
+
+@pytest.mark.django_db
+def test_block_ohne_items_am_andockpunkt_entsteht_nicht() -> None:
+    """Ohne Items an einem Andockpunkt legt das Vorlegen nichts an."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+        stichprobe=Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        ),
+        teilnahme=Teilnahme.objects.create(),
+        token="2345-6789",
+    )
+
+    assert block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE) is None
+    assert Itemblock.objects.count() == 0
+    assert naechster_schritt(bindung) == Ende()

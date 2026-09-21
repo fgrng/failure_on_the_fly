@@ -29,7 +29,14 @@ from konten.navigation import (
     rolle_oder_administration,
 )
 
-from .ablauf import Itemblock, block_vorlegen, naechster_schritt
+from .ablauf import (
+    NaechsteVignette,
+    OffenerAbschlussblock,
+    bindung_abschliessen,
+    block_erledigen,
+    block_vorlegen,
+    naechster_schritt,
+)
 from .export import datenspur_zip
 from .models import (
     Erhebung,
@@ -37,6 +44,7 @@ from .models import (
     Erhebungsitem,
     Erhebungsvignette,
     ItemAntwort,
+    Itemblock,
     Stichprobe,
     Vignettenposition,
 )
@@ -57,7 +65,6 @@ from sitzungen.views import (
 from vignetten.models import Vignette
 
 _TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
-_ABSCHLUSS_FREIGABEN_SESSION_KEY: str = "erhebung_abschluss_freigaben"
 _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY: str = "erhebung_sitzungsblock_sitzungen"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
@@ -771,8 +778,6 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
         _sitzungsblock_besuch_vergessen(request, bindung.token)
-        if bindung.abgeschlossen_am is not None:
-            return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
         sitzungen = Sitzung.objects.filter(teilnahme=bindung.teilnahme)
         if sitzungen.filter(status=Sitzung.Status.LAUFEND).exists():
             return redirect("erhebungen:gespraech", token=bindung.token)
@@ -850,9 +855,9 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 
 def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> bool:
     schritt = naechster_schritt(bindung)
-    if not isinstance(schritt, Vignette):
+    if not isinstance(schritt, NaechsteVignette):
         return False
-    vignette: Vignette = schritt
+    vignette: Vignette = schritt.vignette
     kern: Simulationskern | None = vignette.gepinnter_kern
     modell_konfiguration: ModellKonfiguration | None = erhebung.modell_konfiguration
     if kern is None or modell_konfiguration is None:
@@ -874,7 +879,7 @@ def _weiter_nach_der_letzten_vignette(bindung: Erhebungsbindung) -> HttpResponse
     """Leitet zum Abschluss-Block oder zum Abschluss der Erhebung weiter."""
 
     teilnahme_link: UUID = bindung.stichprobe.teilnahme_link
-    if isinstance(naechster_schritt(bindung), Itemblock):
+    if isinstance(naechster_schritt(bindung), OffenerAbschlussblock):
         return redirect("erhebungen:itemblock", token=bindung.token)
     return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
 
@@ -998,11 +1003,12 @@ def _sitzungsblock_rendern(
 ) -> str:
     # Rendert die Item-Antwortzeilen unter einer beendeten Sitzung.
 
-    antworten: list[ItemAntwort] = block_vorlegen(
+    block: Itemblock | None = block_vorlegen(
         bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
     )
-    if not antworten:
+    if block is None:
         return ""
+    antworten: list[ItemAntwort] = block.antwortzeilen()
     sitzungen: dict[str, int] = request.session.get(
         _SITZUNGSBLOCK_SITZUNGEN_SESSION_KEY, {}
     )
@@ -1054,14 +1060,12 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             status=Sitzung.Status.LAUFEND,
         ).exists():
             return redirect("erhebungen:gespraech", token=bindung.token)
-        schritt = naechster_schritt(bindung)
-        if not isinstance(schritt, Itemblock):
+        abschlussblock: Itemblock | None = None
+        if isinstance(naechster_schritt(bindung), OffenerAbschlussblock):
+            abschlussblock = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+        if abschlussblock is None:
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
-        antworten = block_vorlegen(
-            bindung=bindung,
-            andockpunkt=schritt.andockpunkt,
-            sitzung=schritt.sitzung,
-        )
+        antworten = abschlussblock.antwortzeilen()
     else:
         try:
             antwort_ids = {
@@ -1126,20 +1130,10 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
                 for antwort in antworten
             ):
                 return HttpResponseBadRequest("Unbekannter Abschluss-Block.")
-            freigaben: list[str] = request.session.get(
-                _ABSCHLUSS_FREIGABEN_SESSION_KEY, []
-            )
-            if token not in freigaben:
-                freigaben.append(token)
-                request.session[_ABSCHLUSS_FREIGABEN_SESSION_KEY] = freigaben
+            block_erledigen(antworten[0].itemblock)
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
         if ist_htmx and antworten:
-            bezugsantwort = antworten[0]
-            antworten = block_vorlegen(
-                bindung,
-                bezugsantwort.erhebungsitem.andockpunkt,
-                bezugsantwort.sitzung,
-            )
+            antworten = antworten[0].itemblock.antwortzeilen()
     template = (
         "erhebungen/includes/itemblock_form.html"
         if ist_htmx
@@ -1161,17 +1155,11 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
     schritt = naechster_schritt(bindung)
-    freigaben: list[str] = request.session.get(_ABSCHLUSS_FREIGABEN_SESSION_KEY, [])
-    if isinstance(schritt, Vignette):
+    if isinstance(schritt, NaechsteVignette):
         return redirect("erhebungen:spielen", teilnahme_link=teilnahme_link)
-    if isinstance(schritt, Itemblock) and bindung.token not in freigaben:
+    if isinstance(schritt, OffenerAbschlussblock):
         return redirect("erhebungen:itemblock", token=bindung.token)
-    if bindung.abgeschlossen_am is None:
-        bindung.abgeschlossen_am = timezone.now()
-        bindung.save(update_fields=["abgeschlossen_am"])
-    if bindung.token in freigaben:
-        freigaben.remove(bindung.token)
-        request.session[_ABSCHLUSS_FREIGABEN_SESSION_KEY] = freigaben
+    bindung_abschliessen(bindung)
     return render(
         request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung}
     )
