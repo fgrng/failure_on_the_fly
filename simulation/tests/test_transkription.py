@@ -1,5 +1,6 @@
 """Transkription an ihrer austauschbaren Anbieter-Naht."""
 
+import json
 from unittest.mock import ANY, Mock, patch
 
 import httpx
@@ -228,14 +229,21 @@ def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
     )
 
 
-def _absenden() -> Mock:
+# Der am echten Konto beobachtete Text — der führende Leerraum stammt vom
+# Anbieter und wird bewusst nicht abgeschnitten. Im Stapelobjekt steht er als
+# JSON-kodierte Zeichenkette, nicht als Abbildung.
+_BEOBACHTETES_TRANSKRIPT: str = " Vielen Dank."
+_BEOBACHTETES_ERGEBNIS: str = json.dumps({"text": _BEOBACHTETES_TRANSKRIPT})
+
+
+def _absende_antwort() -> Mock:
     # Die am echten Konto beobachtete Antwort des Absendens: kein Umschlag,
     # nur die Stapelkennung.
 
     return _antwort({"batch_id": "b-1"})
 
 
-def _laufend() -> Mock:
+def _laufender_stapel() -> Mock:
     # Das Stapelobjekt eines noch laufenden Auftrags, Feld für Feld wie am
     # echten Konto beobachtet.
 
@@ -250,9 +258,9 @@ def _laufend() -> Mock:
     )
 
 
-def _fertig(data: object = '{"text": " Vielen Dank."}') -> Mock:
-    # Das Stapelobjekt eines fertigen Auftrags. `data` trägt den Text als
-    # JSON-kodierte Zeichenkette, nicht als Abbildung.
+def _fertiger_stapel(data: object = _BEOBACHTETES_ERGEBNIS) -> Mock:
+    # Das Stapelobjekt eines fertigen Auftrags, Feld für Feld wie am echten
+    # Konto beobachtet.
 
     return _antwort(
         {
@@ -270,10 +278,13 @@ def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
 
     audio = b"aufgenommene-audiobytes"
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.return_value = _fertig()
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _fertiger_stapel()
 
-    assert _infomaniak_transkription(client).transkribieren(audio) == " Vielen Dank."
+    assert (
+        _infomaniak_transkription(client).transkribieren(audio)
+        == _BEOBACHTETES_TRANSKRIPT
+    )
     client.post.assert_called_once_with(
         "https://api.infomaniak.com/1/ai/4711/openai/audio/transcriptions",
         data={"model": "whisper", "language": "de", "response_format": "text"},
@@ -290,8 +301,12 @@ def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> 
     """Der laufende Zustand führt zur nächsten Abfrage, der fertige zum Text."""
 
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.side_effect = [_laufend(), _laufend(), _fertig()]
+    client.post.return_value = _absende_antwort()
+    client.get.side_effect = [
+        _laufender_stapel(),
+        _laufender_stapel(),
+        _fertiger_stapel(),
+    ]
     uhr = _Uhr()
 
     with (
@@ -302,7 +317,7 @@ def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> 
             b"aufgenommene-audiobytes"
         )
 
-    assert text == " Vielen Dank."
+    assert text == _BEOBACHTETES_TRANSKRIPT
     assert client.get.call_count == 3
     assert uhr.jetzt == 2 * INFOMANIAK_INTERVALL_SEKUNDEN
 
@@ -313,8 +328,8 @@ def test_infomaniak_transkription_endet_nach_dem_budget_statt_endlos_zu_fragen()
     """Ein nie fertig werdendes Ergebnis terminiert als Anbieterfehler."""
 
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.return_value = _laufend()
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _laufender_stapel()
     uhr = _Uhr()
 
     with (
@@ -336,8 +351,8 @@ def test_infomaniak_transkription_begrenzt_jede_anfrage_auf_die_restzeit() -> No
     """Auch eine hängende Einzelanfrage kann das Gesamtbudget nicht sprengen."""
 
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.return_value = _laufend()
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _laufender_stapel()
     uhr = _Uhr()
 
     with (
@@ -360,7 +375,7 @@ def test_infomaniak_transkription_reicht_einen_gemeldeten_fehlschlag_weiter() ->
     """Ein gescheiterter Stapel ist ein Anbieterfehler, kein leeres Transkript."""
 
     client = Mock()
-    client.post.return_value = _absenden()
+    client.post.return_value = _absende_antwort()
     client.get.return_value = _antwort({"status": "error", "data": None})
 
     with pytest.raises(TranskriptionsAnbieterfehler):
@@ -371,8 +386,8 @@ def test_infomaniak_transkription_kennzeichnet_ein_leeres_ergebnis() -> None:
     """Ein fertiges, aber leeres Transkript bleibt vom Anbieterfehler unterscheidbar."""
 
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.return_value = _fertig('{"text": "  "}')
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _fertiger_stapel('{"text": "  "}')
 
     with pytest.raises(LeeresTranskript):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
@@ -390,8 +405,8 @@ def test_infomaniak_transkription_meldet_ein_unlesbares_ergebnis(data: object) -
     """Was nicht als Transkript lesbar ist, wird nicht als Transkript ausgegeben."""
 
     client = Mock()
-    client.post.return_value = _absenden()
-    client.get.return_value = _fertig(data)
+    client.post.return_value = _absende_antwort()
+    client.get.return_value = _fertiger_stapel(data)
 
     with pytest.raises(TranskriptionsAnbieterfehler):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
@@ -401,7 +416,7 @@ def test_infomaniak_transkription_wartet_bei_einem_unlesbaren_stand_weiter() -> 
     """Ein Stand, der keine Zeichenkette ist, läuft ins Budget statt zu brechen."""
 
     client = Mock()
-    client.post.return_value = _absenden()
+    client.post.return_value = _absende_antwort()
     client.get.return_value = _antwort({"status": ["unbekannt"], "data": None})
     uhr = _Uhr()
 
@@ -417,7 +432,7 @@ def test_infomaniak_transkription_meldet_eine_unbekannte_stapelkennung() -> None
     """Infomaniak weist eine fremde Kennung mit 403 ab; das ist ein Anbieterfehler."""
 
     client = Mock()
-    client.post.return_value = _absenden()
+    client.post.return_value = _absende_antwort()
     abgewiesen = Mock()
     abgewiesen.raise_for_status.side_effect = httpx.HTTPStatusError(
         "access_result_forbidden",

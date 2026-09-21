@@ -233,7 +233,10 @@ class InfomaniakTranskription:
         # Ergebnisroute trägt selbst ein `data`-Feld, aber kein `result` — an
         # `data` allein geschält, gäbe die Heuristik dessen Inhalt statt des
         # Stapels zurück.
-        if isinstance(nutzlast, dict) and {"result", "data"} <= nutzlast.keys():
+        umschlagen: bool = (
+            isinstance(nutzlast, dict) and "result" in nutzlast and "data" in nutzlast
+        )
+        if umschlagen:
             return nutzlast["data"]
         return nutzlast
 
