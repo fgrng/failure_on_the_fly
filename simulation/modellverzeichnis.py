@@ -21,6 +21,11 @@ OPENROUTER_MODELLE_URL: str = (
     f"{ANBIETER_PROFIL[Anbieter.OPENROUTER].standard_basis_url}/models"
 )
 
+# Die kontoweite Liste Infomaniaks. Sie steht bewusst nicht am Profil: Dessen
+# Basis-URL trägt die Produktkennung und ist beim Anlegen einer Fassung noch
+# nicht getippt, diese Route dagegen kommt ohne sie aus.
+INFOMANIAK_MODELLE_URL: str = "https://api.infomaniak.com/1/ai/models"
+
 
 class Naht(StrEnum):
     """Die Naht, für die Modelle vorgeschlagen werden."""
@@ -127,6 +132,75 @@ class OpenRouterVerzeichnis:
         )
 
 
+# Welcher Modelltyp Infomaniaks Liste die jeweilige Naht bedient. Ohne Filter
+# stünden an der Sprachmodell-Naht auch Embedding-, Reranker-, Bild- und
+# Transkriptionsmodelle. Nach Structured Output lässt sich hier nicht filtern.
+_INFOMANIAK_MODELLTYP: dict[str, str] = {
+    Naht.SPRACHMODELL: "llm",
+}
+
+_INFOMANIAK_FORMWIDRIG: str = "Infomaniak hat keine lesbare Modellliste geliefert."
+
+
+class InfomaniakVerzeichnis:
+    """Liest Infomaniaks kontoweite Modellliste über den eingesetzten Client."""
+
+    def __init__(self, client: Any) -> None:
+        self.client: Any = client
+
+    def vorschlaege(self, naht: str) -> list[Modellvorschlag]:
+        """Liefert die Modelle dieser Naht, alphabetisch nach Modellnamen."""
+
+        typ: str | None = _INFOMANIAK_MODELLTYP.get(naht)
+        if typ is None:
+            raise KeineModellliste("Für diese Naht führt Infomaniak keine Modellliste.")
+        return sorted(
+            (
+                self._vorschlag(eintrag)
+                for eintrag in self._eintraege()
+                if isinstance(eintrag, dict) and eintrag.get("type") == typ
+            ),
+            key=lambda vorschlag: vorschlag.anzeige.casefold(),
+        )
+
+    def _eintraege(self) -> list[Any]:
+        # Holt die kontoweite Liste und schält sie aus dem v1-Umschlag.
+
+        try:
+            antwort: Any = self.client.get(INFOMANIAK_MODELLE_URL)
+            antwort.raise_for_status()
+            nutzlast: Any = antwort.json()
+        except httpx.TransportError as exc:
+            raise AnbieterNichtErreichbar("Infomaniak ist nicht erreichbar.") from exc
+        except httpx.HTTPStatusError as exc:
+            raise AnbieterLehntAb(
+                "Infomaniak hat die Anfrage nach seinen Modellen abgelehnt — "
+                "meist liegt das am Token."
+            ) from exc
+        except Exception as exc:
+            raise AnbieterAntwortetFormwidrig(_INFOMANIAK_FORMWIDRIG) from exc
+        eintraege: Any = nutzlast.get("data") if isinstance(nutzlast, dict) else None
+        if not isinstance(eintraege, list):
+            raise AnbieterAntwortetFormwidrig(_INFOMANIAK_FORMWIDRIG)
+        return eintraege
+
+    @staticmethod
+    def _vorschlag(eintrag: dict[str, Any]) -> Modellvorschlag:
+        # Bildet den Vorschlag aus »name«: Die »id« ist eine bedeutungslose
+        # Ganzzahl und taucht in keinem Feld des Tripels auf.
+
+        modellname: Any = eintrag.get("name")
+        if not isinstance(modellname, str) or not modellname:
+            raise AnbieterAntwortetFormwidrig(
+                "Infomaniak hat einen Eintrag ohne Modellnamen geliefert."
+            )
+        return Modellvorschlag(
+            wert=f"{ANBIETER_PROFIL[Anbieter.INFOMANIAK].praefix}{modellname}",
+            modellname=modellname,
+            anzeige=modellname,
+        )
+
+
 def modellverzeichnis(anbieter: str, token: str) -> Modellverzeichnis:
     """Bildet zum Anbieter sein Verzeichnis samt HTTP-Client.
 
@@ -134,10 +208,23 @@ def modellverzeichnis(anbieter: str, token: str) -> Modellverzeichnis:
     kennt kein Netz, sondern nur den Client, den es bekommt.
     """
 
-    if anbieter != Anbieter.OPENROUTER:
-        raise KeineModellliste(
-            f"Für den Anbieter »{anbieter}« gibt es keine Modellliste."
-        )
-    # OpenRouters Liste ist öffentlich: Das getippte Token bleibt im Formular,
-    # der Client trägt bewusst keinen Authorization-Kopf.
-    return OpenRouterVerzeichnis(httpx.Client(timeout=MODELLLISTE_BUDGET_SEKUNDEN))
+    match anbieter:
+        case Anbieter.OPENROUTER:
+            # OpenRouters Liste ist öffentlich: Das getippte Token bleibt im
+            # Formular, der Client trägt bewusst keinen Authorization-Kopf.
+            return OpenRouterVerzeichnis(
+                httpx.Client(timeout=MODELLLISTE_BUDGET_SEKUNDEN)
+            )
+        case Anbieter.INFOMANIAK:
+            # Infomaniaks Liste hängt allein am getippten Token: Beim Anlegen
+            # einer Fassung gibt es weder ein gespeichertes noch eine Basis-URL.
+            return InfomaniakVerzeichnis(
+                httpx.Client(
+                    timeout=MODELLLISTE_BUDGET_SEKUNDEN,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+            )
+        case _:
+            raise KeineModellliste(
+                f"Für den Anbieter »{anbieter}« gibt es keine Modellliste."
+            )

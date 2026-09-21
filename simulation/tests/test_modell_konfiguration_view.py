@@ -16,6 +16,7 @@ from simulation.models import (
     ModellKonfiguration,
 )
 from simulation.modellverzeichnis import (
+    INFOMANIAK_MODELLE_URL,
     AnbieterNichtErreichbar,
     Modellvorschlag,
     Naht,
@@ -474,6 +475,24 @@ class ModellvorschlaegeEndpunktTests(TestCase):
             )
 
         self.assertContains(response, f"getElementById('{feld}')")
+
+    def test_holt_infomaniaks_liste_allein_mit_dem_getippten_token(self) -> None:
+        """Beim Anlegen gibt es weder gespeichertes Token noch Basis-URL (ADR-0036)."""
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
+            httpx_client.return_value.get.return_value.json.return_value = {
+                "result": "success",
+                "data": [{"id": 4711, "name": "swiss-ai/Apertus", "type": "llm"}],
+            }
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter=Anbieter.INFOMANIAK),
+            )
+
+        httpx_client.return_value.get.assert_called_once_with(INFOMANIAK_MODELLE_URL)
+        self.assertEqual(ModellKonfiguration.objects.count(), 0)
+        self.assertContains(response, "openai/swiss-ai/Apertus")
+        self.assertNotContains(response, TOKEN)
 
     def test_meldet_den_anbieter_fake_ohne_netzaufruf(self) -> None:
         """Beim Anbieter »fake« gibt es nichts abzurufen."""

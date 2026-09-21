@@ -8,6 +8,7 @@ import pytest
 
 from simulation.models import Anbieter
 from simulation.modellverzeichnis import (
+    INFOMANIAK_MODELLE_URL,
     OPENROUTER_MODELLE_URL,
     AnbieterAntwortetFormwidrig,
     AnbieterLehntAb,
@@ -15,6 +16,7 @@ from simulation.modellverzeichnis import (
     KeineModellliste,
     Modellvorschlag,
     Naht,
+    InfomaniakVerzeichnis,
     OpenRouterVerzeichnis,
     modellverzeichnis,
 )
@@ -162,3 +164,189 @@ def test_fabrik_meldet_einen_anbieter_ohne_liste() -> None:
 
     with pytest.raises(KeineModellliste):
         modellverzeichnis(Anbieter.FAKE, "")
+
+
+def _infomaniak_liste(*eintraege: dict[str, Any]) -> dict[str, Any]:
+    # Baut den v1-Umschlag, in dem Infomaniak seine kontoweite Liste führt.
+
+    return {"result": "success", "data": list(eintraege)}
+
+
+def _infomaniak_eintrag(name: str, typ: str = "llm", **felder: Any) -> dict[str, Any]:
+    # Baut einen Eintrag, wie ihn »GET /1/ai/models« liefert.
+
+    return {"id": 4711, "name": name, "type": typ, **felder}
+
+
+def test_infomaniak_fragt_die_kontoweite_liste_ohne_produktkennung() -> None:
+    """Die kontoweite Liste hängt allein am Token, nicht an der Basis-URL."""
+
+    client = _client(_infomaniak_liste())
+
+    InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
+
+    client.get.assert_called_once_with(INFOMANIAK_MODELLE_URL)
+
+
+def test_infomaniak_bildet_den_vorschlag_aus_dem_modellnamen() -> None:
+    """Modellname und Anzeige sind der Name; der Wert trägt das Präfix."""
+
+    client = _client(
+        _infomaniak_liste(_infomaniak_eintrag("swiss-ai/Apertus-v1.5-70B"))
+    )
+
+    assert InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL) == [
+        Modellvorschlag(
+            wert="openai/swiss-ai/Apertus-v1.5-70B",
+            modellname="swiss-ai/Apertus-v1.5-70B",
+            anzeige="swiss-ai/Apertus-v1.5-70B",
+        )
+    ]
+
+
+def test_infomaniak_zeigt_nur_die_sprachmodelle() -> None:
+    """Embedding-, Reranker-, Bild- und Transkriptionsmodelle sind keine Sprachmodelle."""
+
+    client = _client(
+        _infomaniak_liste(
+            _infomaniak_eintrag("mistralai/Ministral-3-14B-Instruct-2512"),
+            _infomaniak_eintrag("whisper", typ="stt"),
+            _infomaniak_eintrag("bge-multilingual-gemma2", typ="embedding"),
+            _infomaniak_eintrag("bge-reranker-v2-m3", typ="reranker"),
+            _infomaniak_eintrag("flux", typ="image"),
+        )
+    )
+
+    assert [
+        vorschlag.modellname
+        for vorschlag in InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
+    ] == ["mistralai/Ministral-3-14B-Instruct-2512"]
+
+
+def test_infomaniak_traegt_die_numerische_kennung_in_keinem_feld() -> None:
+    """Die »id« ist kein Modellname, und Modellnamen sind voller Ziffern."""
+
+    client = _client(
+        _infomaniak_liste(
+            {"id": 4711, "name": "Qwen/Qwen3.5-122B-A10B-FP8", "type": "llm"}
+        )
+    )
+
+    vorschlag: Modellvorschlag = InfomaniakVerzeichnis(client).vorschlaege(
+        Naht.SPRACHMODELL
+    )[0]
+
+    assert "4711" not in (vorschlag.wert + vorschlag.modellname + vorschlag.anzeige)
+
+
+def test_infomaniak_nimmt_noch_nicht_verfuegbare_modelle_auf() -> None:
+    """Der Verfügbarkeitsstatus trügt: »coming_soon«-Modelle antworten."""
+
+    client = _client(
+        _infomaniak_liste(
+            _infomaniak_eintrag("swiss-ai/Apertus-v1.5-70B", info_status="coming_soon")
+        )
+    )
+
+    assert len(InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)) == 1
+
+
+def test_infomaniak_nimmt_beta_modelle_ungekennzeichnet_auf() -> None:
+    """Ein Kennzeichen, das nur ein Anbieter füllt, gehört nicht in die Vorschlagsform."""
+
+    client = _client(
+        _infomaniak_liste(
+            _infomaniak_eintrag("moonshotai/Kimi-K2.6", meta={"is_beta": True})
+        )
+    )
+
+    assert InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL) == [
+        Modellvorschlag(
+            wert="openai/moonshotai/Kimi-K2.6",
+            modellname="moonshotai/Kimi-K2.6",
+            anzeige="moonshotai/Kimi-K2.6",
+        )
+    ]
+
+
+def test_infomaniak_sortiert_alphabetisch_nach_der_anzeige() -> None:
+    """Die Sortierung liegt vor der Oberfläche, nicht in ihr."""
+
+    client = _client(
+        _infomaniak_liste(
+            _infomaniak_eintrag("swiss-ai/Apertus-v1.5-70B"),
+            _infomaniak_eintrag("google/gemma-4-31B-it"),
+            _infomaniak_eintrag("Qwen/Qwen3.5-122B-A10B-FP8"),
+        )
+    )
+
+    assert [
+        vorschlag.anzeige
+        for vorschlag in InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
+    ] == [
+        "google/gemma-4-31B-it",
+        "Qwen/Qwen3.5-122B-A10B-FP8",
+        "swiss-ai/Apertus-v1.5-70B",
+    ]
+
+
+def test_infomaniak_meldet_ein_abgelehntes_token_verstaendlich() -> None:
+    """Ein falsches Token wird mit »401« abgewiesen und benannt, nicht durchgereicht."""
+
+    client = Mock()
+    client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "401",
+        request=httpx.Request("GET", INFOMANIAK_MODELLE_URL),
+        response=httpx.Response(401),
+    )
+
+    with pytest.raises(AnbieterLehntAb, match="Token"):
+        InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
+
+
+def test_infomaniak_meldet_einen_nicht_erreichbaren_anbieter() -> None:
+    """Ein Netzfehler wird benannt, nicht durchgereicht."""
+
+    client = Mock()
+    client.get.side_effect = httpx.ConnectError("kein Netz")
+
+    with pytest.raises(AnbieterNichtErreichbar):
+        InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
+
+
+@pytest.mark.parametrize(
+    "nutzlast",
+    [
+        "keine Liste",
+        {"result": "error", "error": {"code": "not_authorized"}},
+        _infomaniak_liste(_infomaniak_eintrag("")),
+        _infomaniak_liste({"id": 4711, "type": "llm"}),
+    ],
+)
+def test_infomaniak_meldet_eine_formwidrige_antwort(nutzlast: Any) -> None:
+    """Eine Antwort ohne brauchbare Modellnamen ist ein benannter Fehler."""
+
+    with pytest.raises(AnbieterAntwortetFormwidrig):
+        InfomaniakVerzeichnis(_client(nutzlast)).vorschlaege(Naht.SPRACHMODELL)
+
+
+def test_infomaniak_meldet_eine_naht_ohne_liste() -> None:
+    """Eine Naht, für die es keinen Modelltyp gibt, scheitert vor dem Netzaufruf."""
+
+    client = _client(_infomaniak_liste())
+
+    with pytest.raises(KeineModellliste):
+        InfomaniakVerzeichnis(client).vorschlaege("transkription")
+
+    client.get.assert_not_called()
+
+
+def test_fabrik_bildet_das_infomaniak_verzeichnis_mit_dem_getippten_token() -> None:
+    """Das getippte Feld ist die einzige Quelle: Es gibt keine gespeicherte Fassung."""
+
+    verzeichnis: InfomaniakVerzeichnis = modellverzeichnis(
+        Anbieter.INFOMANIAK, "ik-geheimnis"
+    )
+
+    assert isinstance(verzeichnis, InfomaniakVerzeichnis)
+    assert verzeichnis.client.headers["authorization"] == "Bearer ik-geheimnis"
