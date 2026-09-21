@@ -22,7 +22,7 @@ def test_adr_0029_nennt_die_ausgelieferte_dateizahl() -> None:
     """Die Dateizahl im Kontrakt ist die des gebauten ZIP."""
     dateiformat: str = adr_abschnitt("Dateiformat")
 
-    assert "**vierzehn Dateien**" in dateiformat
+    assert "**fünfzehn Dateien**" in dateiformat
     assert "elf Dateien" not in dateiformat
 
 
@@ -33,6 +33,9 @@ def test_adr_0029_listet_die_fragebogen_tabellen_mit_ihren_spalten() -> None:
     for zeile in (
         "| `itembloecke.csv` | `id`, `teilnahme_token`, `andockpunkt`, "
         "`sitzung_id`, `vorgelegt_am`, `erledigt_am` |",
+        "| `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `item_id`, "
+        "`item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, "
+        "`likert_stufe` |",
         "| `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |",
         "| `likert_skala.csv` | `stufe`, `pol` |",
     ):

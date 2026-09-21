@@ -23,6 +23,7 @@ from erhebungen.models import (
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Itemblock,
     Stichprobe,
     Vignettenposition,
@@ -110,12 +111,31 @@ def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     return vignette
 
 
-def _finales_item_anlegen(konto: Konto, wortlaut: str) -> FragebogenItem:
+def _finales_item_anlegen(
+    konto: Konto,
+    wortlaut: str,
+    typ: str = FragebogenItem.Typ.FREITEXT,
+) -> FragebogenItem:
     """Legt eine einbindbare finale Item-Fassung an."""
 
-    item: FragebogenItem = FragebogenItem.objects.anlegen(konto, wortlaut=wortlaut)
+    item: FragebogenItem = FragebogenItem.objects.anlegen(
+        konto, typ=typ, wortlaut=wortlaut
+    )
     item.finalisieren()
     return item
+
+
+def _item_zuordnen(
+    erhebung: Erhebung,
+    item: FragebogenItem,
+    andockpunkt: str,
+    position: int,
+) -> Erhebungsitem:
+    """Bindet eine Item-Fassung an einen Andockpunkt der Erhebung."""
+
+    return Erhebungsitem.objects.create(
+        erhebung=erhebung, item=item, andockpunkt=andockpunkt, position=position
+    )
 
 
 class ErhebungenForschendenRollenTests(TestCase):
@@ -1466,6 +1486,7 @@ class ErhebungsExportTests(TestCase):
                     "fehlversuche.csv",
                     "fragebogen_items.csv",
                     "gespraechsschritte.csv",
+                    "item_antworten.csv",
                     "itembloecke.csv",
                     "likert_skala.csv",
                     "modellkonfigurationen.csv",
@@ -2186,6 +2207,184 @@ class ErhebungsExportTests(TestCase):
             1,
         )
 
+    def test_exportiert_item_antworten_mit_erhaltener_null_semantik(self) -> None:
+        """Die Antwortdatei trennt »nicht beantwortet« von »leer abgeschickt«."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        freitext_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Was ist Ihnen aufgefallen?"
+        )
+        likert_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Ich fühlte mich sicher.", typ=FragebogenItem.Typ.LIKERT
+        )
+        # Dasselbe Paar an beiden Andockpunkten: erst »item_id« plus
+        # »andockpunkt« macht eine Antwortzeile eindeutig lesbar.
+        freitext_nach_sitzung: Erhebungsitem = _item_zuordnen(
+            erhebung, freitext_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 1
+        )
+        likert_nach_sitzung: Erhebungsitem = _item_zuordnen(
+            erhebung, likert_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 2
+        )
+        freitext_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, freitext_item, Erhebungsitem.Andockpunkt.AM_ENDE, 1
+        )
+        likert_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, likert_item, Erhebungsitem.Andockpunkt.AM_ENDE, 2
+        )
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        block_nach_sitzung: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            sitzung=sitzung,
+        )
+        block_am_ende: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung, andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_nach_sitzung,
+            erhebungsbindung=bindung,
+            erhebungsitem=freitext_nach_sitzung,
+            sitzung=sitzung,
+            freitext="Zeile eins\nZeile zwei",
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_nach_sitzung,
+            erhebungsbindung=bindung,
+            erhebungsitem=likert_nach_sitzung,
+            sitzung=sitzung,
+            likert_stufe=5,
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_am_ende,
+            erhebungsbindung=bindung,
+            erhebungsitem=freitext_am_ende,
+            freitext="",
+        )
+        # Vorgelegt, aber nicht beantwortet: beide Wertspalten bleiben leer.
+        ItemAntwort.objects.create(
+            itemblock=block_am_ende,
+            erhebungsbindung=bindung,
+            erhebungsitem=likert_am_ende,
+        )
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
+        fremde_bindung: Erhebungsbindung = _laufende_bindung(
+            fremde_erhebung, "9999-9999"
+        )
+        fremder_block: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=fremde_bindung,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        )
+        ItemAntwort.objects.create(
+            itemblock=fremder_block,
+            erhebungsbindung=fremde_bindung,
+            erhebungsitem=_item_zuordnen(
+                fremde_erhebung,
+                freitext_item,
+                Erhebungsitem.Andockpunkt.AM_ENDE,
+                1,
+            ),
+            freitext="Gehört nicht in diesen Export.",
+        )
+        self.client.force_login(ada)
+
+        with CaptureQueriesContext(connection) as abfragen:
+            response: HttpResponse = self.client.get(
+                reverse("erhebungen:export", args=[erhebung.pk])
+            )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            antwort_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("item_antworten.csv"), encoding="utf-8")
+            )
+            antworten: list[dict[str, str]] = list(antwort_leser)
+            kopfzeile: list[str] = list(antwort_leser.fieldnames or [])
+
+        self.assertEqual(
+            kopfzeile,
+            [
+                "itemblock_id",
+                "teilnahme_token",
+                "item_id",
+                "item_typ",
+                "andockpunkt",
+                "sitzung_id",
+                "position",
+                "freitext",
+                "likert_stufe",
+            ],
+        )
+        self.assertEqual(
+            antworten,
+            [
+                {
+                    "itemblock_id": str(block_nach_sitzung.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(freitext_item.pk),
+                    "item_typ": "freitext",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(sitzung.pk),
+                    "position": "1",
+                    "freitext": "Zeile eins\nZeile zwei",
+                    "likert_stufe": "NA",
+                },
+                {
+                    "itemblock_id": str(block_nach_sitzung.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(likert_item.pk),
+                    "item_typ": "likert",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(sitzung.pk),
+                    "position": "2",
+                    "freitext": "NA",
+                    "likert_stufe": "5",
+                },
+                {
+                    "itemblock_id": str(block_am_ende.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(freitext_item.pk),
+                    "item_typ": "freitext",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "position": "1",
+                    "freitext": "",
+                    "likert_stufe": "NA",
+                },
+                {
+                    "itemblock_id": str(block_am_ende.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(likert_item.pk),
+                    "item_typ": "likert",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "position": "2",
+                    "freitext": "NA",
+                    "likert_stufe": "NA",
+                },
+            ],
+        )
+        # Vier Antwortzeilen, eine Abfrage: der Export zerfällt nicht in N+1.
+        self.assertEqual(
+            sum(
+                1
+                for abfrage in abfragen.captured_queries
+                if "erhebungen_itemantwort" in abfrage["sql"]
+            ),
+            1,
+        )
+
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
 
@@ -2234,6 +2433,7 @@ class ErhebungsExportTests(TestCase):
                 "fehlversuche.csv",
                 "diagnosen.csv",
                 "itembloecke.csv",
+                "item_antworten.csv",
                 "vignettenfassungen.csv",
                 "simulationskerne.csv",
                 "modellkonfigurationen.csv",

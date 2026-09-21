@@ -48,7 +48,7 @@ Diagnose führt den Modus noch nicht; das behandelt #239.
 
 ## Dateiformat
 
-Der ZIP-Download enthält **vierzehn Dateien**, auch wenn eine von ihnen keine
+Der ZIP-Download enthält **fünfzehn Dateien**, auch wenn eine von ihnen keine
 Datenzeilen hat; sie enthält dann dennoch ihre Kopfzeile. Alle CSVs folgen RFC
 4180: Sie verwenden Kommas, UTF-8 ohne BOM und doppelte Anführungszeichen;
 Zeilenumbrüche innerhalb von Zellen bleiben erhalten. Wahrheitswerte erscheinen
@@ -67,6 +67,7 @@ Pfade statt als Inhalt.
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
 | `itembloecke.csv` | `id`, `teilnahme_token`, `andockpunkt`, `sitzung_id`, `vorgelegt_am`, `erledigt_am` |
+| `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
 | `modellkonfigurationen.csv` | `id`, `anbieter`, `sprachmodell`, `parameter` |
@@ -100,10 +101,10 @@ Eigenschaft der Datenspur.
 
 ## Der Fragebogen im Export
 
-Drei Tabellen tragen den Fragebogen-Teil einer Erhebung: `itembloecke.csv` je
-vorgelegtem Block, `fragebogen_items.csv` mit dem vollen Wortlaut der
-tatsächlich vorgelegten Item-Fassungen und `likert_skala.csv` mit der globalen
-Kodierung.
+Vier Tabellen tragen den Fragebogen-Teil einer Erhebung: `itembloecke.csv` je
+vorgelegtem Block, `item_antworten.csv` je vorgelegtem Item,
+`fragebogen_items.csv` mit dem vollen Wortlaut der tatsächlich vorgelegten
+Item-Fassungen und `likert_skala.csv` mit der globalen Kodierung.
 
 **`likert_stufe` steigt mit der Zustimmung**, ebenso `stufe` in
 `likert_skala.csv` — es ist dieselbe Zahl. 1 ist »Stimme gar nicht zu«, 6 ist
