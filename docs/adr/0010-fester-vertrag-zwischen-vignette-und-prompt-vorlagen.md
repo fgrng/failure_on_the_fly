@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0041
 ---
 
 # Fester Vertrag zwischen Vignette und Prompt-Vorlagen

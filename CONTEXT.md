@@ -114,7 +114,7 @@ Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Pr
 _Avoid_: Prompt, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
 
 **Prompt-Vorlage**:
-Eine der Textvorlagen einer Kern-Fassung — System-Prompt, User-Prompt sowie die drei Abschnitte der Rahmenhandlung —, aus der je Sitzung oder Gesprächsschritt der konkrete Text entsteht. Vorlagensprache ist `string.Template` (ADR-0020). Ihre **Platzhalter** (`$name`) sind benannte Leerstellen, die beim Rendern mit Vignetteninhalten gefüllt werden; welche es gibt, ist ein fester, im Code festgelegter Vertrag zwischen Vignette und Vorlage, den der Kern nicht erweitern kann (ADR-0010). Ein Platzhalter ist kein Positionsmarker: Der Marker `[bild]` steht innerhalb eines Platzhalterwerts (ADR-0030).
+Eine der Textvorlagen einer Kern-Fassung — System-Prompt, User-Prompt sowie die drei Abschnitte der Rahmenhandlung —, aus der je Sitzung oder Gesprächsschritt der konkrete Text entsteht. Vorlagensprache ist `string.Template` (ADR-0020). Ihre **Platzhalter** (`$name`) sind benannte Leerstellen, die beim Rendern mit Vignetteninhalten gefüllt werden; welche es gibt, ist ein fester, im Code festgelegter Vertrag zwischen Vignette und Vorlage, den der Kern nicht erweitern kann (ADR-0041). Ein Platzhalter ist kein Positionsmarker: Der Marker `[bild]` steht innerhalb eines Platzhalterwerts (ADR-0030).
 _Avoid_: Template, Prompt, Variable, Slot
 
 **Denkspur**:
