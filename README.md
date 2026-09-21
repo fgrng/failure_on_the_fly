@@ -207,7 +207,11 @@ Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von 1 »Stimme gar
 nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und die vorgelegten
 Itemblöcke stehen mit ihrem Andockpunkt sowie den Zeitstempeln der Vorlage und
 der Erledigung darin — ein übersprungener Block bleibt so als vorgelegt
-erkennbar.
+erkennbar. Die Antworten selbst liegen als eigene Tabelle bei, eine Zeile je
+vorgelegtem Fragebogen-Item, mit getrennten Spalten für Freitext und
+Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
+Werten erhalten; nur so unterscheidet die Auswertung »freiwillig
+übersprungen« von »nie gesehen«.
 
 ## Fragebogen-Items verwalten
 

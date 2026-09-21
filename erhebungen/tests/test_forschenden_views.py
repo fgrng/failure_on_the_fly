@@ -22,6 +22,7 @@ from erhebungen.models import (
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
+    ItemAntwort,
     Itemblock,
     Stichprobe,
     Vignettenposition,
@@ -1465,6 +1466,7 @@ class ErhebungsExportTests(TestCase):
                     "fehlversuche.csv",
                     "fragebogen_items.csv",
                     "gespraechsschritte.csv",
+                    "item_antworten.csv",
                     "itembloecke.csv",
                     "likert_skala.csv",
                     "modellkonfigurationen.csv",
@@ -2185,6 +2187,180 @@ class ErhebungsExportTests(TestCase):
             1,
         )
 
+    def test_exportiert_item_antworten_mit_erhaltener_null_semantik(self) -> None:
+        """Die Antwortdatei trennt »nicht beantwortet« von »leer abgeschickt«."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        freitext_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Was ist Ihnen aufgefallen?"
+        )
+        likert_item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, typ=FragebogenItem.Typ.LIKERT, wortlaut="Ich fühlte mich sicher."
+        )
+        likert_item.finalisieren()
+        zuordnungen: dict[tuple[str, int], Erhebungsitem] = {
+            (andockpunkt, position): Erhebungsitem.objects.create(
+                erhebung=erhebung,
+                item=item,
+                andockpunkt=andockpunkt,
+                position=position,
+            )
+            for andockpunkt in Erhebungsitem.Andockpunkt.values
+            for position, item in ((1, freitext_item), (2, likert_item))
+        }
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        block_nach_sitzung: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            sitzung=sitzung,
+        )
+        block_am_ende: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung, andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_nach_sitzung,
+            erhebungsbindung=bindung,
+            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.NACH_SITZUNG, 1)],
+            sitzung=sitzung,
+            freitext="Zeile eins\nZeile zwei",
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_nach_sitzung,
+            erhebungsbindung=bindung,
+            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.NACH_SITZUNG, 2)],
+            sitzung=sitzung,
+            likert_stufe=5,
+        )
+        ItemAntwort.objects.create(
+            itemblock=block_am_ende,
+            erhebungsbindung=bindung,
+            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.AM_ENDE, 1)],
+            freitext="",
+        )
+        # Vorgelegt, aber nicht beantwortet: beide Wertspalten bleiben leer.
+        ItemAntwort.objects.create(
+            itemblock=block_am_ende,
+            erhebungsbindung=bindung,
+            erhebungsitem=zuordnungen[(Erhebungsitem.Andockpunkt.AM_ENDE, 2)],
+        )
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
+        fremde_bindung: Erhebungsbindung = _laufende_bindung(
+            fremde_erhebung, "9999-9999"
+        )
+        ItemAntwort.objects.create(
+            itemblock=Itemblock.objects.create(
+                erhebungsbindung=fremde_bindung,
+                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            ),
+            erhebungsbindung=fremde_bindung,
+            erhebungsitem=Erhebungsitem.objects.create(
+                erhebung=fremde_erhebung,
+                item=freitext_item,
+                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                position=1,
+            ),
+            freitext="Gehört nicht in diesen Export.",
+        )
+        self.client.force_login(ada)
+
+        with CaptureQueriesContext(connection) as abfragen:
+            response: HttpResponse = self.client.get(
+                reverse("erhebungen:export", args=[erhebung.pk])
+            )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            antwort_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("item_antworten.csv"), encoding="utf-8")
+            )
+            antworten: list[dict[str, str]] = list(antwort_leser)
+            kopfzeile: list[str] = list(antwort_leser.fieldnames or [])
+
+        self.assertEqual(
+            kopfzeile,
+            [
+                "itemblock_id",
+                "teilnahme_token",
+                "item_id",
+                "item_typ",
+                "andockpunkt",
+                "sitzung_id",
+                "position",
+                "freitext",
+                "likert_stufe",
+            ],
+        )
+        self.assertEqual(
+            antworten,
+            [
+                {
+                    "itemblock_id": str(block_nach_sitzung.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(freitext_item.pk),
+                    "item_typ": "freitext",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(sitzung.pk),
+                    "position": "1",
+                    "freitext": "Zeile eins\nZeile zwei",
+                    "likert_stufe": "NA",
+                },
+                {
+                    "itemblock_id": str(block_nach_sitzung.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(likert_item.pk),
+                    "item_typ": "likert",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(sitzung.pk),
+                    "position": "2",
+                    "freitext": "NA",
+                    "likert_stufe": "5",
+                },
+                {
+                    "itemblock_id": str(block_am_ende.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(freitext_item.pk),
+                    "item_typ": "freitext",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "position": "1",
+                    "freitext": "",
+                    "likert_stufe": "NA",
+                },
+                {
+                    "itemblock_id": str(block_am_ende.pk),
+                    "teilnahme_token": "2345-6789",
+                    "item_id": str(likert_item.pk),
+                    "item_typ": "likert",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "position": "2",
+                    "freitext": "NA",
+                    "likert_stufe": "NA",
+                },
+            ],
+        )
+        # Vier Antwortzeilen, eine Abfrage: der Export zerfällt nicht in N+1.
+        self.assertEqual(
+            sum(
+                1
+                for abfrage in abfragen.captured_queries
+                if "erhebungen_itemantwort" in abfrage["sql"]
+            ),
+            1,
+        )
+
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
 
@@ -2233,6 +2409,7 @@ class ErhebungsExportTests(TestCase):
                 "fehlversuche.csv",
                 "diagnosen.csv",
                 "itembloecke.csv",
+                "item_antworten.csv",
                 "vignettenfassungen.csv",
                 "simulationskerne.csv",
                 "modellkonfigurationen.csv",

@@ -19,6 +19,7 @@ from vignetten.models import Vignette
 from .models import (
     Erhebung,
     Erhebungsbindung,
+    ItemAntwort,
     Itemblock,
     Vignettenposition,
     Vignettenziehung,
@@ -258,6 +259,43 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         block.erledigt_am,
                     )
                     for block in itembloecke
+                ),
+            ),
+        )
+        # Auch eine Antwortzeile ohne beide Werte bleibt erhalten: sie trennt
+        # »vorgelegt, nicht beantwortet« von »nie vorgelegt« (ADR-0008).
+        antworten: QuerySet[ItemAntwort] = (
+            ItemAntwort.objects.filter(erhebungsbindung__stichprobe__erhebung=erhebung)
+            .select_related("erhebungsbindung", "erhebungsitem__item")
+            .order_by("itemblock_id", "erhebungsitem__position", "pk")
+        )
+        zip_datei.writestr(
+            "item_antworten.csv",
+            _csv_inhalt(
+                (
+                    "itemblock_id",
+                    "teilnahme_token",
+                    "item_id",
+                    "item_typ",
+                    "andockpunkt",
+                    "sitzung_id",
+                    "position",
+                    "freitext",
+                    "likert_stufe",
+                ),
+                (
+                    (
+                        antwort.itemblock_id,
+                        antwort.erhebungsbindung.token,
+                        antwort.erhebungsitem.item_id,
+                        antwort.erhebungsitem.item.typ,
+                        antwort.erhebungsitem.andockpunkt,
+                        antwort.sitzung_id,
+                        antwort.erhebungsitem.position,
+                        antwort.freitext,
+                        antwort.likert_stufe,
+                    )
+                    for antwort in antworten
                 ),
             ),
         )
