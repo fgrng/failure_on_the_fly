@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Self
 
-from django.db import models
+from django.db import models, transaction
 
 from konten.navigation import ist_administratorin
 
@@ -51,6 +51,28 @@ class EigentuemerKreis(models.Model):
         Wer keine Stilllegung kennt, erbt dieses Ja.
         """
         return True
+
+    def austreten(self, konto_pk: int) -> bool:
+        """Trägt eine Eigentümerin aus und sagt, ob das geschehen ist.
+
+        Der letzte Platz im Kreis kann nicht geräumt werden, auch nicht bei
+        einem archivierten Bestand: Er wäre entarchiviert aktiv und
+        eigentümerlos. `ist_aktiv()` fragt allein der Konto-Löschpfad.
+
+        Greift die Invariante, passiert schweigend nichts; der Rückgabewert
+        ist das einzige Signal.
+        """
+        # Serialisiert wird über das `atomic()` selbst: Die Verbindungsoption
+        # `transaction_mode: IMMEDIATE` nimmt die Schreibsperre schon beim
+        # BEGIN. Ein `select_for_update()` trüge nichts bei, weil Djangos
+        # SQLite-Backend die Klausel verwirft (`has_select_for_update`).
+        with transaction.atomic():
+            if not self.hat_mehrere_eigentuemerinnen:
+                return False
+            if not self.eigentuemerinnen.filter(pk=konto_pk).exists():
+                return False
+            self.eigentuemerinnen.remove(konto_pk)
+            return True
 
     @property
     def hat_mehrere_eigentuemerinnen(self) -> bool:

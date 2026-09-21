@@ -288,6 +288,27 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.assertRedirects(entfernen, reverse("erhebungen:liste"))
         self.assertEqual(list(erhebung.eigentuemerinnen.all()), [grace])
 
+    def test_nicht_eigentuemerin_loest_keinen_selbst_redirect_aus(self) -> None:
+        """Eine fremde Administration bleibt bei der Erhebung, wenn sie niemanden entfernt."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremde Erhebung")
+        erhebung.eigentuemerinnen.add(grace)
+        self.client.force_login(administratorin)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:koautorin_entfernen", args=[erhebung.pk, administratorin.pk]
+            )
+        )
+
+        self.assertRedirects(response, reverse("erhebungen:detail", args=[erhebung.pk]))
+
     def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
         """Die Bedienung kann eine aktive Erhebung nicht eigentümerlos machen."""
         ada: Konto = get_user_model().objects.create_user(username="ada")

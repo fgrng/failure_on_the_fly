@@ -412,17 +412,17 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_forschende_oder_administratorin_erforderlich
 def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
-    """Entfernt eine Eigentümerin, ohne aktive Erhebungen zu verwaisen."""
+    """Trägt eine Eigentümerin aus dem Kreis der Erhebung aus.
+
+    Wer sich selbst austrägt, landet auf der Erhebungsliste; scheitert der
+    Austritt an der Invariante, bleibt es bei der Detailseite.
+    """
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    with transaction.atomic():
-        erhebung = Erhebung.objects.select_for_update().get(pk=erhebung.pk)
-        if erhebung.eigentuemerinnen.count() > 1:
-            erhebung.eigentuemerinnen.remove(konto_pk)
-            if konto_pk == request.user.pk:
-                return redirect("erhebungen:liste")
+    if erhebung.austreten(konto_pk) and konto_pk == request.user.pk:
+        return redirect("erhebungen:liste")
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 

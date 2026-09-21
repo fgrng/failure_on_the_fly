@@ -452,6 +452,24 @@ class VignetteKoautorschaftViewTests(TestCase):
             reverse("vignetten:detail", args=[vignette.pk]),
         )
 
+    def test_nicht_eigentuemerin_loest_keinen_selbst_redirect_aus(self) -> None:
+        """Eine fremde Administration bleibt bei der Vignette, wenn sie niemanden entfernt."""
+        ada: Konto = _autorin("ada")
+        grace: Konto = _autorin("grace")
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada, grace)
+        self.client.force_login(administratorin)
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "vignetten:koautorin_entfernen", args=[vignette.pk, administratorin.pk]
+            )
+        )
+
+        self.assertRedirects(response, reverse("vignetten:detail", args=[vignette.pk]))
+
     def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Hinzufügen weist GET-Anfragen ab."""
         ada: Konto = _autorin("ada")
