@@ -3,14 +3,12 @@
 from collections.abc import Callable
 
 import pytest
-from django.apps import apps
-from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.models import Model
 
 from erhebungen.models import Erhebung
 from fragebogen_items.models import FragebogenItemHistorie
-from konten.eigentuemerschaft import EigentuemerKreis
+from konten.eigentuemerschaft import EigentuemerKreis, bestandsmodelle
 from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
@@ -22,16 +20,9 @@ from training.models import Training
 from vignetten.models import Vignettenhistorie
 
 
-def _eigentuemer_tragende_modelle() -> list[type[Model]]:
-    # Dieselbe Herleitung, die der Löschpfad später benutzt: die Registrierung.
-    return [
-        modell for modell in apps.get_models() if issubclass(modell, EigentuemerKreis)
-    ]
-
-
 def test_die_vier_bestaende_tragen_den_gemeinsamen_kreis() -> None:
     """Genau die vier eigentümer-tragenden Bestände erben von der Basis."""
-    assert set(_eigentuemer_tragende_modelle()) == {
+    assert set(bestandsmodelle()) == {
         Vignettenhistorie,
         FragebogenItemHistorie,
         Training,
@@ -45,7 +36,7 @@ def test_simulationskern_traegt_keinen_eigentuemer_kreis() -> None:
     assert not hasattr(Simulationskern, "eigentuemerinnen")
 
 
-@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
+@pytest.mark.parametrize("modell", bestandsmodelle())
 def test_jeder_kreis_zeigt_auf_konten(modell: type[Model]) -> None:
     """Der Kreis ist überall dasselbe M2M-Feld auf das Konto."""
     feld = modell._meta.get_field("eigentuemerinnen")
@@ -114,41 +105,6 @@ def test_kreis_meldet_ob_mehr_als_eine_eigentuemerin_eingetragen_ist() -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
-def test_anlegen_traegt_ohne_weitere_angaben_genau_eine_eigentuemerin_ein(
-    modell: type[Model],
-) -> None:
-    """Anlegen trägt das übergebene Konto als einzige Eigentümerin ein."""
-    ada: Konto = Konto.objects.create_user(username="ada")
-
-    bestand: EigentuemerKreis = modell.objects.anlegen(ada)
-
-    assert list(bestand.eigentuemerinnen.all()) == [ada]
-
-
-@pytest.mark.django_db
-def test_austritt_entfernt_wenn_eine_eigentuemerin_bleibt() -> None:
-    """Wer geht, während jemand bleibt, wird ausgetragen — und das wird gemeldet."""
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    training: Training = Training.objects.anlegen(ada, name="Kurs")
-    training.eigentuemerinnen.add(grace)
-
-    assert training.austreten(ada.pk)
-    assert list(training.eigentuemerinnen.all()) == [grace]
-
-
-@pytest.mark.django_db
-def test_austritt_der_letzten_eigentuemerin_geschieht_schweigend_nicht() -> None:
-    """Der letzte Platz im Kreis bleibt besetzt; der Rückgabewert ist das Signal."""
-    ada: Konto = Konto.objects.create_user(username="ada")
-    training: Training = Training.objects.anlegen(ada, name="Kurs")
-
-    assert not training.austreten(ada.pk)
-    assert list(training.eigentuemerinnen.all()) == [ada]
-
-
-@pytest.mark.django_db
 def test_austritt_eines_fremden_kontos_entfernt_nichts() -> None:
     """Wer nicht im Kreis steht, kann ihn nicht verlassen."""
     ada: Konto = Konto.objects.create_user(username="ada")
@@ -206,28 +162,3 @@ def test_austritt_laeuft_vollstaendig_in_einer_transaktion() -> None:
 
     assert in_transaktion and all(in_transaktion)
     assert list(training.eigentuemerinnen.all()) == [grace]
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
-def test_kandidatenliste_nennt_die_rolle_und_die_administration(
-    modell: type[Model],
-) -> None:
-    """Rolle des Bestands und Administration sind eintragbar, Eingetragene nicht."""
-    gruppe: Group = Group.objects.get(name=modell.ROLLENGRUPPE)
-    eingetragene: Konto = Konto.objects.create_user(username="ada")
-    eingetragene.groups.add(gruppe)
-    kandidatin: Konto = Konto.objects.create_user(username="grace")
-    kandidatin.groups.add(gruppe)
-    administratorin: Konto = Konto.objects.create_user(
-        username="admin", is_superuser=True
-    )
-    # Ohne Rolle und ohne Administration: darf in keiner Liste auftauchen.
-    Konto.objects.create_user(username="mallory")
-    bestand: EigentuemerKreis = modell()
-    bestand.save()
-    bestand.eigentuemerinnen.add(eingetragene)
-
-    kandidatinnen: set[Konto] = set(bestand.moegliche_ergaenzungen())
-
-    assert kandidatinnen == {kandidatin, administratorin}

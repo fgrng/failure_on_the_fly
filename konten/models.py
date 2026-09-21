@@ -1,11 +1,10 @@
 """Datenmodelle für Nutzerkonten."""
 
-from django.apps import apps
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.db.models import ProtectedError, Q
 
-from konten.eigentuemerschaft import EigentuemerKreis
+from konten.eigentuemerschaft import bestandsmodelle
 
 
 class KontoQuerySet(models.QuerySet["Konto"]):
@@ -38,16 +37,10 @@ class Konto(AbstractUser):
         keep_parents: bool = False,
     ) -> tuple[int, dict[str, int]]:
         """Verhindert eigentümerlose aktive Bestände."""
-        # Die zu prüfenden Bestände kommen aus Djangos Modellregistrierung
-        # statt aus Importen: So importiert `konten` nicht in die Bestands-Apps
-        # zurück (ADR-0016), und ein künftig hinzukommendes Bestandsmodell ist
-        # am Tag seiner Einführung mitgeschützt.
-        bestandsmodelle: list[type[EigentuemerKreis]] = [
-            modell
-            for modell in apps.get_models()
-            if issubclass(modell, EigentuemerKreis)
-        ]
-        for modell in bestandsmodelle:
+        # Aus der Modellregistrierung, nicht aus Importen: Ein künftig
+        # hinzukommendes Bestandsmodell ist am Tag seiner Einführung
+        # mitgeschützt.
+        for modell in bestandsmodelle():
             for bestand in modell.objects.filter(eigentuemerinnen=self):
                 if bestand.ist_aktiv() and bestand.eigentuemerinnen.count() == 1:
                     raise ProtectedError(modell.LOESCHSPERRE_MELDUNG, [bestand])

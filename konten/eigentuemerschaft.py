@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, Self
 
+from django.apps import apps
 from django.db import models, transaction
 
 from konten.navigation import ist_administratorin
@@ -89,8 +90,8 @@ class EigentuemerKreis(models.Model):
         bereits Eingetragenen.
         """
         # Erst hier importiert: `konten.models` holt sich für den Löschpfad die
-        # Basis aus diesem Modul, ein Modulimport in die Gegenrichtung schlösse
-        # den Kreis.
+        # Bestandsmodelle aus diesem Modul, ein Modulimport in die Gegenrichtung
+        # schlösse den Kreis.
         from konten.models import Konto
 
         return Konto.objects.mit_rolle_oder_administration(self.ROLLENGRUPPE).exclude(
@@ -101,3 +102,15 @@ class EigentuemerKreis(models.Model):
     def hat_mehrere_eigentuemerinnen(self) -> bool:
         """Sagt, ob der Kreis mehr als eine Eigentümerin trägt."""
         return self.eigentuemerinnen.count() > 1
+
+
+def bestandsmodelle() -> list[type[EigentuemerKreis]]:
+    """Liefert jedes registrierte Modell, das einen Eigentümer-Kreis trägt.
+
+    Hergeleitet aus Djangos Modellregistrierung statt aus Importen: So
+    importiert `konten` nicht in die Bestands-Apps zurück (ADR-0016), und ein
+    künftig hinzukommendes Bestandsmodell ist am Tag seiner Einführung dabei.
+    """
+    return [
+        modell for modell in apps.get_models() if issubclass(modell, EigentuemerKreis)
+    ]
