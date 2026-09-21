@@ -53,11 +53,11 @@ Zur ersten Hälfte der offenen Frage — der **Liste**: keine erzwungene Modelll
 
 ### 1.2 Infomaniak
 
-- **Endpunkt:** `POST https://api.infomaniak.com/2/ai/{product_id}/openai/v1/chat/completions`, OpenAI-kompatibel. Die `product_id` stammt aus `GET /1/ai`, die Modellliste aus `GET /2/ai/{product_id}/openai/v1/models` bzw. `GET /1/ai/models` (letzteres markiert Beta-Modelle).
+- **Endpunkt:** `POST https://api.infomaniak.com/2/ai/{product_id}/openai/v1/chat/completions`, OpenAI-kompatibel. Die `product_id` stammt aus `GET /1/ai`, die Modellliste aus `GET /2/ai/{product_id}/openai/v1/models` bzw. `GET /1/ai/models` (letzteres ist die maßgebliche Liste, siehe 4.2).
 - **LiteLLM-Routing:** **kein** eigener LiteLLM-Provider. Der Weg führt über den OpenAI-kompatiblen Pfad: Model-String `openai/<modell>` (z. B. `openai/qwen3`) mit `api_base: https://api.infomaniak.com/2/ai/<product_id>/openai/v1`. Keine Codeänderung an der Naht.
 - **Structured Output:** unterstützt und die **einzige** noch unterstützte Form. Die API-Doku zu `response_format.type` sagt: nur `json_schema` wird derzeit unterstützt, `text` ist das Standardverhalten, `json_object` ist obsolet. `strict: true` wird geführt und verweist auf den OpenAI-Structured-Outputs-Leitfaden. Unser `AUSGABE_SCHEMA` (`denkspur` vor `aeusserung`, `additionalProperties: false`, beide `required`) erfüllt die strict-Teilmenge.
 - **Native Reasoning-Spur:** über `reasoning_effort` steuerbar, laut Doku aber nur als An/Aus (`"none"` schaltet das Denken ab, jeder andere Wert an). Bei den meisten Modellen ist es per Vorgabe an. **Nicht** unterstützt u. a. von `apertus-ai/Apertus-v1.5-70B` und `mistral3`. Das Antwortschema führt `usage.completion_tokens_details.reasoning_tokens`; ob zusätzlich ein Textfeld mit der Spur zurückkommt, geht aus der Doku nicht hervor und ist empirisch zu prüfen.
-- **Modelle:** **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — am **2026-09-21** an einem echten Konto abgerufen (Einzelheiten in 4.2). Die kontoweite Liste führt **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier Sprachmodelle sind als Beta gekennzeichnet, sieben als `coming_soon` — letzteres ist kein Verfügbarkeitskriterium (4.2). Namentlich belegt sind aus der Kontoabfrage u. a. `swiss-ai/Apertus-v1.5-70B` auf dieser Naht und `whisper` auf der Transkriptions-Naht. Die früher hier geführte Liste einer Drittquelle trägt die Modellnamen nicht mehr; sie steht nur noch als Beleg in den Quellen.
+- **Modelle:** **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — am **2026-09-21** an einem echten Konto abgerufen (Einzelheiten in 4.2). Die kontoweite Liste führt **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier Sprachmodelle sind als Beta gekennzeichnet, sieben als `coming_soon` — letzteres ist kein Verfügbarkeitskriterium (4.2). Namentlich belegt sind aus der Kontoabfrage u. a. `swiss-ai/Apertus-v1.5-70B` auf dieser Naht und `whisper` auf der Transkriptions-Naht. Die früher hier geführte Modellliste einer Drittquelle ist damit entbehrlich; die Drittquelle steht nur noch als Beleg in den Quellen.
 - **Datenschutz:** Infomaniak wirbt für die AI Services mit Betrieb in eigenen Schweizer Rechenzentren, „Es werden keine Anfragen gespeichert", „Ihre Prompts werden weder gespeichert noch dazu verwendet, die Modelle zu trainieren oder unsere Dienstleistungen zu verbessern" und voller DSG-/DSGVO-Konformität. Inhaltlich ist das genau die Zusage, die ADR-0026 verlangt. Ob sie **vertraglich** in einem AVV steht, ist HITL zu klären.
 
 ### 1.3 Was der bestehende Code schon trägt
@@ -211,9 +211,9 @@ Der kombinierte Filter wirkt als UND (alle 239 Treffer führen beide Parameter).
 | Modellarten | über `type` getrennt (`llm`, `stt`, Embedding, Reranker, Bild) | Sprachmodelle, Embedding- und Reranker-Modelle in einem Topf, kein Typ |
 | Transkriptionsmodell | enthalten | **gar nicht enthalten** |
 
-Verifizierter Umfang der kontoweiten Liste: **16 Einträge**, davon **8 Sprachmodelle** und **1 Transkriptionsmodell**.
+Verifizierter Umfang der kontoweiten Liste: **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier der Sprachmodelle sind als Beta gekennzeichnet.
 
-**Der Verfügbarkeitsstatus trügt.** Sieben der acht Sprachmodelle sind als `coming_soon` geführt. Ein Testaufruf gegen ein so markiertes Modell wurde am 2026-09-21 regulär beantwortet. Das Feld hinkt der Freischaltung hinterher und taugt deshalb **nicht als Filterkriterium** — wer danach filtert, verbirgt sieben funktionierende Modelle und bietet am Ende genau eines an.
+**Der Verfügbarkeitsstatus trügt.** Sieben der acht Sprachmodelle sind als `coming_soon` geführt. Ein Testaufruf gegen ein so markiertes Modell wurde am 2026-09-21 regulär beantwortet. Das Feld hinkt der Freischaltung hinterher und taugt deshalb **nicht als Filterkriterium** — wer danach filtert, verbirgt sieben Modelle — mindestens eines davon nachweislich funktionsfähig — und bietet am Ende genau eines an.
 
 **Keine Henne-Ei-Ordnung.** Weil die kontoweite Liste ohne `product_id` antwortet, hängt der Abruf **allein am Token** und nicht zusätzlich an der Basis-URL. Das Token genügt; die Endpunktwurzel darf danach folgen.
 
@@ -242,7 +242,7 @@ Das Anbieterfeld aus Abschnitt 3 ist dagegen sehr wohl eine feste Liste — gepr
 
 ## 6. Offene Punkte
 
-### 6.1 Entschieden und verifiziert
+### 6.1 Entschieden (2026-09-18) und verifiziert (2026-09-21)
 
 - **`openai/gpt-4o` wird abgelöst.** Seeds (`seeds/.../entwicklungsdaten_anlegen.py:51`, `seeds/.../workshopdaten_anlegen.py:28`), README (`:266`) und die Bestandsdatensätze stellen auf **OpenRouter** um. Die Anbieterliste bleibt damit bei `fake`, `openrouter`, `infomaniak`; OpenAI-direkt wird nicht aufgenommen.
 - **`openrouter` darf als Transkriptionsanbieter gewählt werden.** `clean()` verbietet die Kombination nicht. Für die Zero-Retention-Zusage ist die **Administrator:in verantwortlich, die die Konfiguration anlegt** — dieselbe Verantwortung, die `TRANSKRIPTION_ZERO_RETENTION` schon heute bezeugt (3.5). Die offene Frage aus 6.2 bleibt damit eine Betriebsfrage, keine Sperre im Code.
@@ -338,5 +338,5 @@ Bei positiver Entscheidung:
 - OpenRouter, [Whisper Large V3](https://openrouter.ai/openai/whisper-large-v3) und `GET /api/v1/models/openai/whisper-large-v3/endpoints` — Modalität `audio->transcription`, Provider DeepInfra/Together/Groq.
 - OpenRouter, `GET /api/v1/models` mit `supported_parameters=structured_outputs[,reasoning]` und `output_modalities=transcription` — ohne Authentifizierung abgefragt und verifiziert; Endpunkt-Varianz an `deepseek/deepseek-v4.1-flash` geprüft.
 - OpenRouter, [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) und [Reasoning Tokens](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) — `zdr`, `data_collection`, `reasoning_details`.
-- [Mastra: Infomaniak-Modellliste](https://mastra.ai/models/providers/infomaniak) — Drittquelle für Modell-IDs und Base-URL; seit der Kontoabfrage (4.2) nur noch Beleg, sie trägt die Modellnamen nicht mehr.
+- [Mastra: Infomaniak-Modellliste](https://mastra.ai/models/providers/infomaniak) — Drittquelle für Modell-IDs und Base-URL; seit der Kontoabfrage (4.2) nur noch Beleg, die Modellnamen im Text stützt sie nicht mehr.
 - LiteLLM 1.80.10, lokal geprüft: `LlmProviders`, `litellm.main.transcription` (nur `azure`/`openai`), `litellm_core_utils/prompt_templates/common_utils.py:1040-1057`.
