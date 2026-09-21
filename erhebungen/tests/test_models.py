@@ -622,6 +622,138 @@ def test_erhebungsitem_schuetzt_finalitaet_eigentum_und_item_fassung() -> None:
         models.Model.delete(eigenes_item)
 
 
+_ZUORDNUNGSARTEN: tuple[str, str] = (
+    "vignettenzugehoerigkeiten",
+    "itemzugehoerigkeiten",
+)
+
+
+def _zuordnung_anlegen(erhebung: Erhebung, konto: Konto, art: str) -> models.Model:
+    """Bindet eine frische finale Fassung der jeweiligen Art in die Erhebung ein."""
+
+    position: int = getattr(erhebung, art).count() + 1
+    if art == "vignettenzugehoerigkeiten":
+        return Erhebungsvignette.objects.create(
+            erhebung=erhebung,
+            vignette=_finale_vignette_anlegen(konto),
+            position=position,
+        )
+    item: FragebogenItem = FragebogenItem.objects.anlegen(
+        konto, wortlaut=f"Wie sicher fühlten Sie sich? ({position})"
+    )
+    item.finalisieren()
+    return Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        position=position,
+    )
+
+
+def _entwurf_mit_zuordnungen(konto: Konto) -> Erhebung:
+    """Legt einen finalisierbaren Entwurf mit je einer Vignette und einem Item an."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    ModellKonfiguration.objects.aktivieren(
+        ModellKonfiguration.objects.create(sprachmodell="fake")
+    )
+    for art in _ZUORDNUNGSARTEN:
+        _zuordnung_anlegen(erhebung, konto, art)
+    return erhebung
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("art", _ZUORDNUNGSARTEN)
+def test_finale_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> None:
+    """Das eingebundene Design einer finalen Erhebung ist auf jedem Weg gesperrt."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+    erhebung.finalisieren()
+    zuordnungen: models.Manager = getattr(erhebung, art)
+    zuordnung: models.Model = zuordnungen.get()
+
+    with pytest.raises(ValidationError, match="eingefroren"):
+        _zuordnung_anlegen(erhebung, ada, art)
+    zuordnung.position = 9
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnung.save()
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.update(position=9)
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.delete()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("art", _ZUORDNUNGSARTEN)
+def test_archivierte_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> None:
+    """Das Ablegen einer Erhebung macht ihr Design nicht wieder angreifbar."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+    erhebung.finalisieren()
+    erhebung.archivieren()
+    zuordnungen: models.Manager = getattr(erhebung, art)
+
+    with pytest.raises(ValidationError, match="eingefroren"):
+        _zuordnung_anlegen(erhebung, ada, art)
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.update(position=9)
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.delete()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("art", _ZUORDNUNGSARTEN)
+def test_entwurf_bleibt_in_seinen_zuordnungen_frei(art: str) -> None:
+    """Vor dem Finalisieren behindert die Sperre das Zusammenstellen nicht."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+    zuordnungen: models.Manager = getattr(erhebung, art)
+
+    zweite: models.Model = _zuordnung_anlegen(erhebung, ada, art)
+    zweite.position = 9
+    zweite.save()
+    zuordnungen.filter(pk=zweite.pk).update(position=8)
+    zuordnungen.filter(pk=zweite.pk).delete()
+
+    assert zuordnungen.count() == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("art", _ZUORDNUNGSARTEN)
+def test_zurueckgezogene_erhebung_erlaubt_zuordnungen_wieder(art: str) -> None:
+    """Der Rückweg in den Entwurf gibt das Design vollständig wieder frei."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+    erhebung.finalisieren()
+    erhebung.zurueckziehen()
+    zuordnungen: models.Manager = getattr(erhebung, art)
+
+    zweite: models.Model = _zuordnung_anlegen(erhebung, ada, art)
+    zuordnungen.filter(pk=zweite.pk).update(position=9)
+    zuordnungen.filter(pk=zweite.pk).delete()
+
+    assert zuordnungen.count() == 1
+
+
+@pytest.mark.django_db
+def test_entwurf_laesst_sich_mitsamt_seinen_zuordnungen_loeschen() -> None:
+    """Die Sperre blockiert den erlaubten Löschpfad samt Kaskade nicht."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+
+    erhebung.delete()
+
+    assert not Erhebungsvignette.objects.exists()
+    assert not Erhebungsitem.objects.exists()
+
+
 @pytest.mark.django_db
 def test_feste_reihenfolge_hat_keine_doppelte_position() -> None:
     """Eine feste Reihenfolge ordnet jeder Position genau eine Vignette zu."""

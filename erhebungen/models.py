@@ -238,7 +238,61 @@ class Erhebung(EigentuemerKreis):
         )
 
 
-class Erhebungsvignette(models.Model):
+_EINGEFROREN_MELDUNG: str = (
+    "Das eingebundene Design finaler Erhebungen ist eingefroren."
+)
+
+
+class ZuordnungQuerySet[Eintrag: "Zuordnung"](models.QuerySet[Eintrag]):
+    """Abfragen über die Zuordnungen einer Erhebung."""
+
+    def update(self, **kwargs: object) -> int:
+        """Ändert gesammelt ausschließlich die Zuordnungen von Entwürfen."""
+
+        self._entwurfsstatus_sicherstellen()
+        return super().update(**kwargs)
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Löscht gesammelt ausschließlich die Zuordnungen von Entwürfen."""
+
+        self._entwurfsstatus_sicherstellen()
+        return super().delete()
+
+    def _entwurfsstatus_sicherstellen(self) -> None:
+        # Weist die Massenoperation ab, sobald sie eine eingefrorene Erhebung trifft.
+
+        if self.exclude(erhebung__status=Erhebung.Status.ENTWURF).exists():
+            raise ValidationError(_EINGEFROREN_MELDUNG)
+
+
+class Zuordnung(models.Model):
+    """Was eine Erhebung in ihr Design einbindet, solange sie Entwurf ist.
+
+    Die Basis trägt die Einfrier-Sperre (ADR-0027) und nichts sonst: Jede Erbin
+    bringt ihr eigenes Feld `erhebung` mit, prüft dessen Status im `clean` und
+    lässt jeden Schreibweg über diese Prüfung laufen.
+    """
+
+    objects: models.Manager["Zuordnung"] = ZuordnungQuerySet.as_manager()
+
+    class Meta:
+        abstract: bool = True
+
+    def _einfriersperre(self) -> dict[str, str]:
+        # Meldet eine Erhebung als Feldfehler, die kein Entwurf mehr ist.
+
+        if self.erhebung.status != Erhebung.Status.ENTWURF:
+            return {"erhebung": _EINGEFROREN_MELDUNG}
+        return {}
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur gültige Erhebungszugehörigkeiten."""
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+
+class Erhebungsvignette(Zuordnung):
     """Die finale Vignetten-Fassung einer Erhebung samt fester Position."""
 
     erhebung: models.ForeignKey = models.ForeignKey(
@@ -254,11 +308,11 @@ class Erhebungsvignette(models.Model):
     )
 
     def clean(self) -> None:
-        """Erlaubt nur eigene finale Fassungen und passende Reihenfolgeangaben."""
+        """Erlaubt nur in Entwürfen eigene finale Fassungen an passender Position."""
 
         from vignetten.models import Vignette
 
-        fehler: dict[str, str] = {}
+        fehler: dict[str, str] = self._einfriersperre()
         if self.vignette.zustand != Vignette.Zustand.FINAL:
             fehler["vignette"] = "Erhebungen können nur finale Vignetten einbinden."
         elif not self.vignette.historie.eigentuemerinnen.filter(
@@ -272,12 +326,6 @@ class Erhebungsvignette(models.Model):
             fehler["position"] = "Zufällige Reihenfolgen haben keine Position."
         if fehler:
             raise ValidationError(fehler)
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Schreibt nur gültige Erhebungszugehörigkeiten."""
-
-        self.clean()
-        super().save(*args, **kwargs)
 
     class Meta:
         """Macht Mitgliedschaft und feste Position je Erhebung eindeutig."""
@@ -296,7 +344,7 @@ class Erhebungsvignette(models.Model):
         ]
 
 
-class Erhebungsitem(models.Model):
+class Erhebungsitem(Zuordnung):
     """Eine finale Item-Fassung einer Erhebung an einem Andockpunkt."""
 
     class Andockpunkt(models.TextChoices):
@@ -317,9 +365,9 @@ class Erhebungsitem(models.Model):
     position: models.PositiveIntegerField = models.PositiveIntegerField()
 
     def clean(self) -> None:
-        """Erlaubt nur finale Fassungen aus dem Eigentümer-Kreis der Erhebung."""
+        """Erlaubt nur in Entwürfen finale Fassungen aus dem Eigentümer-Kreis."""
 
-        fehler: dict[str, str] = {}
+        fehler: dict[str, str] = self._einfriersperre()
         if self.item.zustand != FragebogenItem.Zustand.FINAL:
             fehler["item"] = "Erhebungen können nur finale Items einbinden."
         elif not self.item.historie.eigentuemerinnen.filter(
@@ -328,12 +376,6 @@ class Erhebungsitem(models.Model):
             fehler["item"] = "Erhebungen können nur eigene Items einbinden."
         if fehler:
             raise ValidationError(fehler)
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Schreibt nur gültige Erhebungszugehörigkeiten."""
-
-        self.clean()
-        super().save(*args, **kwargs)
 
     class Meta:
         """Ordnet Items je Andockpunkt eindeutig und stabil."""
