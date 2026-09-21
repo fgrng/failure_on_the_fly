@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.utils import timezone
 
+from simulation.models import ModellKonfiguration, Simulationskern
+from sitzungen.durchlauf import sitzung_starten
 from sitzungen.models import Sitzung
+from sitzungen.sink import DBSink
 from vignetten.models import Vignette
 
 from .models import (
@@ -15,6 +18,7 @@ from .models import (
     Erhebungsitem,
     ItemAntwort,
     Itemblock,
+    Vignettenposition,
     Vignettenziehung,
 )
 
@@ -67,30 +71,76 @@ Schritt = (
 
 
 def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
-    """Liefert den offenen Block, die nächste Vignette oder das Ende.
+    """Beantwortet schreibfrei, wo diese Erhebungsbindung gerade steht.
 
-    Die beiden übrigen Fälle des Schritt-Typs bleiben dem Folgeticket #211
-    vorbehalten; solange bestimmen die Views sie weiterhin selbst.
+    Die Reihenfolge der Fälle ist die des Ablaufs: Eine laufende Sitzung geht
+    ihrem Fragebogen voraus, dieser der nächsten Vignette, und erst danach steht
+    der Abschluss an.
     """
 
-    bindung.vignetten_ziehen()
-    beurteilte_sitzung: Sitzung | None = _sitzung_mit_offenem_block(bindung)
+    if bindung.abgeschlossen_am is not None:
+        return Ende()
+    laufende: Sitzung | None = laufende_sitzung(bindung)
+    if laufende is not None:
+        return LaufendeSitzung(laufende)
+    beurteilte_sitzung: Sitzung | None = _sitzung_ohne_erledigten_block(bindung)
     if beurteilte_sitzung is not None:
         return OffenerSitzungsblock(beurteilte_sitzung)
+    if not bindung.teilnahme.sitzung_set.exists():
+        # Vor der ersten Sitzung steht die Ziehung noch aus, die nächste Vignette
+        # benennt deshalb erst das Kommando, das sie festschreibt.
+        return NochNichtBegonnen()
+    vignette: Vignette | None = _naechste_gezogene_vignette(bindung)
+    if vignette is not None:
+        return NaechsteVignette(vignette)
+    if _abschlussblock_ist_offen(bindung):
+        return OffenerAbschlussblock()
+    return Ende()
+
+
+def laufende_sitzung(bindung: Erhebungsbindung) -> Sitzung | None:
+    """Liefert die noch nicht beendete Sitzung dieser Teilnahme samt Anzeigedaten."""
+
+    return (
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
+        .filter(teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND)
+        .first()
+    )
+
+
+def sitzung_am_zug(bindung: Erhebungsbindung) -> Sitzung | None:
+    """Liefert die Sitzung, die anzuzeigen ist: die laufende oder die beurteilte."""
+
+    match naechster_schritt(bindung):
+        case LaufendeSitzung(sitzung) | OffenerSitzungsblock(sitzung):
+            return sitzung
+        case _:
+            return None
+
+
+def sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
+    """Liefert die Sitzung, deren Fragebogen-Block gerade an der Reihe ist."""
+
+    match naechster_schritt(bindung):
+        case OffenerSitzungsblock(sitzung):
+            return sitzung
+        case _:
+            return None
+
+
+def _naechste_gezogene_vignette(bindung: Erhebungsbindung) -> Vignette | None:
+    # Die erste gezogene Fassung, zu der noch keine Sitzung dieser Teilnahme steht.
+
     gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
     ziehung: Vignettenziehung | None = (
         bindung.vignettenziehungen.select_related("vignette")
         .exclude(vignette_id__in=gespielte_ids)
         .first()
     )
-    if ziehung:
-        return NaechsteVignette(ziehung.vignette)
-    if _abschlussblock_ist_offen(bindung):
-        return OffenerAbschlussblock()
-    return Ende()
+    return ziehung.vignette if ziehung is not None else None
 
 
-def _sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
+def _sitzung_ohne_erledigten_block(bindung: Erhebungsbindung) -> Sitzung | None:
     # Liefert die älteste beendete Sitzung, deren Block noch nicht erledigt ist.
 
     if not _block_kann_offen_sein(bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG):
@@ -129,6 +179,58 @@ def _block_kann_offen_sein(
     return bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
         andockpunkt=andockpunkt
     ).exists()
+
+
+def ziehung_festschreiben(bindung: Erhebungsbindung) -> None:
+    """Schreibt die Vignettenreihenfolge dieser Teilnahme genau einmal fest."""
+
+    with transaction.atomic():
+        _bindung_sperren(bindung)
+        bindung.vignetten_ziehen()
+
+
+def vignette_beginnen(bindung: Erhebungsbindung) -> Sitzung | None:
+    """Beginnt die nächste gezogene Vignette und hält ihre Position fest.
+
+    Läuft bereits eine Sitzung, bleibt es bei ihr; steht keine Vignette mehr an,
+    entsteht keine. Beides macht das Kommando gegen einen zweiten Aufruf — aus
+    einem Reload wie aus einem zweiten Tab — unempfindlich.
+    """
+
+    with transaction.atomic():
+        _bindung_sperren(bindung)
+        ziehung_festschreiben(bindung)
+        match naechster_schritt(bindung):
+            case LaufendeSitzung(sitzung):
+                return sitzung
+            case NochNichtBegonnen() | NaechsteVignette():
+                vignette: Vignette | None = _naechste_gezogene_vignette(bindung)
+                if vignette is None:
+                    return None
+                return _sitzung_beginnen(bindung, vignette)
+            case _:
+                return None
+
+
+def _sitzung_beginnen(bindung: Erhebungsbindung, vignette: Vignette) -> Sitzung:
+    # Startet die persistierte Sitzung und schreibt ihre gezogene Position.
+
+    kern: Simulationskern | None = vignette.gepinnter_kern
+    modell_konfiguration: ModellKonfiguration | None = (
+        bindung.stichprobe.erhebung.modell_konfiguration
+    )
+    if kern is None or modell_konfiguration is None:
+        raise RuntimeError("Erhebungsvignetten brauchen Kern und Modell-Konfiguration.")
+    sink: DBSink = DBSink(bindung.teilnahme)
+    sitzung_starten(sink, vignette, kern, modell_konfiguration)
+    sitzung: Sitzung = sink.sitzung
+    Vignettenposition.objects.create(
+        erhebungsbindung=bindung,
+        sitzung=sitzung,
+        vignette=vignette,
+        position=bindung.vignettenziehungen.get(vignette=vignette).position,
+    )
+    return sitzung
 
 
 def block_vorlegen(
