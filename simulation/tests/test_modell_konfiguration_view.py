@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
+from simulation.forms import ModellKonfigurationForm
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -336,3 +337,28 @@ class ModellKonfigurationFakeTests(TestCase):
 
         self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
         self.assertEqual(ModellKonfiguration.objects.get().parameter, {})
+
+
+class ModellKonfigurationFormularTests(TestCase):
+    """Die Seite nennt ihre Felder namentlich — vollständig und in Formularfolge."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an und holt die Seite."""
+        self.client.force_login(_administratorin())
+        self.response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+    def test_nennt_jedes_feld_des_formulars(self) -> None:
+        """Kein im Formular geführtes Feld fehlt auf der Seite."""
+        for feld in ModellKonfigurationForm().fields:
+            self.assertContains(self.response, f'name="{feld}"')
+
+    def test_haelt_die_reihenfolge_des_formulars(self) -> None:
+        """Die namentliche Aufzählung ordnet die Felder wie das Formular."""
+        koerper: str = self.response.content.decode()
+        stellen: list[int] = [
+            koerper.index(f'name="{feld}"') for feld in ModellKonfigurationForm().fields
+        ]
+
+        self.assertEqual(stellen, sorted(stellen))
