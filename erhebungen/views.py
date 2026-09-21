@@ -48,12 +48,12 @@ from .ablauf import (
     vignette_beginnen,
 )
 from .export import datenspur_zip
+from .forms import ItemblockFormular
 from .models import (
     Erhebung,
     Erhebungsbindung,
     Erhebungsitem,
     Erhebungsvignette,
-    ItemAntwort,
     Itemblock,
     Stichprobe,
 )
@@ -995,7 +995,7 @@ def _sitzungsblock_rendern(
         return ""
     return render_to_string(
         "erhebungen/includes/itemblock_form.html",
-        {"antworten": block.antwortzeilen(), "token": bindung.token},
+        {"formular": ItemblockFormular(block), "token": bindung.token},
         request=request,
     )
 
@@ -1007,8 +1007,26 @@ def _sitzungsblock_ist_offen(bindung: Erhebungsbindung, sitzung_pk: int) -> bool
     return sitzung is not None and sitzung.pk == sitzung_pk
 
 
+def _offener_block(bindung: Erhebungsbindung) -> Itemblock | None:
+    # Fragt den Ablauf, welcher Block gerade offen ist, und legt ihn vor.
+
+    match naechster_schritt(bindung):
+        case OffenerSitzungsblock(sitzung):
+            return block_vorlegen(
+                bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, sitzung
+            )
+        case OffenerAbschlussblock():
+            return block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+        case _:
+            return None
+
+
 def itemblock(request: HttpRequest, token: str) -> HttpResponse:
-    """Zeigt und schreibt die freiwilligen Fragebogen-Items am Ende."""
+    """Zeigt und schreibt die freiwilligen Fragebogen-Items eines Blocks.
+
+    Welcher Block gemeint ist, sagt der Ablauf und nicht das Abgeschickte; das
+    Formular liest die Antwortzeilen dieses Blocks.
+    """
 
     ist_htmx = bool(request.headers.get("HX-Request"))
     if request.method not in {"GET", "POST"}:
@@ -1029,76 +1047,28 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         )
         if abschlussblock is None:
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
-        antworten = abschlussblock.antwortzeilen()
+        formular = ItemblockFormular(abschlussblock)
     else:
-        try:
-            antwort_ids = {
-                int(wert)
-                for wert in request.POST.getlist("antwort")
-                + [
-                    feld.removeprefix("item_")
-                    for feld in request.POST
-                    if feld.startswith("item_")
-                ]
-            }
-        except ValueError:
-            return HttpResponseBadRequest("Unbekannte Item-Antwort.")
-        antworten = list(
-            ItemAntwort.objects.filter(
-                erhebungsbindung=bindung,
-                pk__in=antwort_ids,
+        block: Itemblock | None = _offener_block(bindung)
+        if block is None:
+            return HttpResponseBadRequest("Zu dieser Teilnahme steht kein Block offen.")
+        formular = ItemblockFormular(block, request.POST)
+        if not formular.is_valid():
+            return HttpResponseBadRequest(
+                "Unzulässige Antwort auf ein Fragebogen-Item."
             )
-            .select_related("erhebungsitem__item", "itemblock")
-            .order_by("erhebungsitem__position")
-        )
-        if len(antworten) != len(antwort_ids):
-            return HttpResponseBadRequest("Unbekannte Item-Antwort.")
-        sitzung_ids = {antwort.sitzung_id for antwort in antworten}
-        sitzung_pk: int | None = None
-        if any(pk is not None for pk in sitzung_ids):
-            if len(sitzung_ids) != 1 or None in sitzung_ids:
-                return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
-            sitzung_pk = sitzung_ids.pop()
-            if not _sitzungsblock_ist_offen(bindung, sitzung_pk):
-                return HttpResponseBadRequest("Unbekannter Sitzungs-Block.")
-        for antwort in antworten:
-            feld = f"item_{antwort.pk}"
-            if feld not in request.POST:
-                continue
-            wert = request.POST[feld]
-            if antwort.erhebungsitem.item.typ == FragebogenItem.Typ.LIKERT:
-                if wert and wert not in {"1", "2", "3", "4", "5", "6"}:
-                    return HttpResponseBadRequest(
-                        "Likert-Stufen liegen zwischen 1 und 6."
-                    )
-                antwort.likert_stufe = int(wert) if wert else None
-                antwort.freitext = None
-            else:
-                antwort.freitext = wert or None
-                antwort.likert_stufe = None
-            antwort.clean()
-        with transaction.atomic():
-            for antwort in antworten:
-                if f"item_{antwort.pk}" in request.POST:
-                    antwort.save()
+        formular.speichern()
         if "weiter" in request.POST:
-            if not antwort_ids:
-                return HttpResponseBadRequest("Unbekannter Itemblock.")
-            if sitzung_pk is None and any(
-                antwort.erhebungsitem.andockpunkt != Erhebungsitem.Andockpunkt.AM_ENDE
-                for antwort in antworten
-            ):
-                return HttpResponseBadRequest("Unbekannter Abschluss-Block.")
-            block_erledigen(antworten[0].itemblock)
+            block_erledigen(block)
             return _weiter_im_ablauf(bindung)
-        if ist_htmx and antworten:
-            antworten = antworten[0].itemblock.antwortzeilen()
+        # Ein frisches Formular legt den eben geschriebenen Stand wieder vor.
+        formular = ItemblockFormular(block)
     template = (
         "erhebungen/includes/itemblock_form.html"
         if ist_htmx
         else "erhebungen/itemblock.html"
     )
-    return render(request, template, {"antworten": antworten, "token": token})
+    return render(request, template, {"formular": formular, "token": token})
 
 
 def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:

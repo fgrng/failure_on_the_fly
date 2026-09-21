@@ -2,39 +2,16 @@
     method="post"
     action="{% url 'erhebungen:itemblock' token %}"
     id="itemblock-formular"
+    hx-post="{% url 'erhebungen:itemblock' token %}"
+    hx-trigger="change"
+    hx-target="#itemblock-formular"
+    hx-swap="outerHTML"
 >
     {% csrf_token %}
-    {% for antwort in antworten %}
-        <input type="hidden" name="antwort" value="{{ antwort.pk }}">
+    {% for feld in formular %}
         <fieldset>
-            <legend>{{ antwort.erhebungsitem.item.wortlaut }}</legend>
-            {% if antwort.erhebungsitem.item.typ == "likert" %}
-                {% for stufe in "123456" %}
-                    <label>
-                        <input
-                            type="radio"
-                            name="item_{{ antwort.pk }}"
-                            value="{{ stufe }}"
-                            hx-post="{% url 'erhebungen:itemblock' token %}"
-                            hx-trigger="change"
-                            hx-target="#itemblock-formular"
-                            hx-swap="outerHTML"
-                            hx-params="csrfmiddlewaretoken, item_{{ antwort.pk }}"
-                            {% if antwort.likert_stufe|stringformat:"s" == stufe %}checked{% endif %}
-                        >
-                        {{ stufe }}
-                    </label>
-                {% endfor %}
-            {% else %}
-                <textarea
-                    name="item_{{ antwort.pk }}"
-                    hx-post="{% url 'erhebungen:itemblock' token %}"
-                    hx-trigger="change"
-                    hx-target="#itemblock-formular"
-                    hx-swap="outerHTML"
-                    hx-params="csrfmiddlewaretoken, item_{{ antwort.pk }}"
-                >{{ antwort.freitext|default:"" }}</textarea>
-            {% endif %}
+            <legend>{{ feld.label }}</legend>
+            {{ feld }}
         </fieldset>
     {% endfor %}
     <button type="submit" name="weiter" value="ja">Weiter</button>

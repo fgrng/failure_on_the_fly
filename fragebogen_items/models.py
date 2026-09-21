@@ -26,11 +26,25 @@ class LikertSkalenpol(models.TextChoices):
     STIMME_VOLL_ZU = "Stimme voll zu", "Stimme voll zu"
 
     @classmethod
+    def stufen(cls) -> list[int]:
+        """Liefert die Stufen der globalen Skala, aufsteigend ab 1.
+
+        Die Zahl der Stufen entsteht allein aus der Zahl der deklarierten Pole.
+        """
+        return list(range(1, len(cls) + 1))
+
+    @classmethod
     def fuer_stufe(cls, stufe: int) -> "LikertSkalenpol":
-        """Liefert den globalen Skalenpol einer Stufe von 1 bis 6."""
-        if not 1 <= stufe <= len(cls):
-            raise ValueError("Eine Likert-Stufe liegt zwischen 1 und 6.")
+        """Liefert den globalen Skalenpol einer Stufe der Skala."""
+        if stufe not in cls.stufen():
+            raise ValueError(cls.stufenbereich_meldung())
         return list(cls)[stufe - 1]
+
+    @classmethod
+    def stufenbereich_meldung(cls) -> str:
+        """Benennt den zulässigen Stufenbereich für Fehlermeldungen."""
+        stufen: list[int] = cls.stufen()
+        return f"Likert-Stufen liegen zwischen {stufen[0]} und {stufen[-1]}."
 
     @classmethod
     def stufe_fuer(cls, pol: "LikertSkalenpol") -> int:

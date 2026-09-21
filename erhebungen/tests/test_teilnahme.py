@@ -594,25 +594,23 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.assertEqual(ItemAntwort.objects.count(), 1)
 
-    def test_htmx_interaktion_speichert_nur_eine_itemantwort(self) -> None:
-        """Eine Interaktion übernimmt keine noch unfertige Nachbarantwort."""
+    def test_htmx_interaktion_schickt_den_ganzen_block(self) -> None:
+        """Jede Interaktion schickt den Block; ein leeres Feld bleibt leer."""
 
         self._vignette_anlegen()
         erstes_item = self._abschluss_item_anlegen(wortlaut="Erstes Item")
-        self._abschluss_item_anlegen(wortlaut="Zweites Item", position=2)
+        zweites_item = self._abschluss_item_anlegen(wortlaut="Zweites Item", position=2)
         bindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         block_url = reverse("erhebungen:itemblock", args=[bindung.token])
         block = self.client.get(block_url)
         erste_antwort = ItemAntwort.objects.get(erhebungsitem=erstes_item)
+        zweite_antwort = ItemAntwort.objects.get(erhebungsitem=zweites_item)
 
-        self.assertContains(
-            block,
-            f'hx-params="csrfmiddlewaretoken, item_{erste_antwort.pk}"',
-        )
+        self.assertNotContains(block, "hx-params")
         fragment = self.client.post(
             block_url,
-            {f"item_{erste_antwort.pk}": "Fertig"},
+            {f"item_{erste_antwort.pk}": "Fertig", f"item_{zweite_antwort.pk}": ""},
             headers={"HX-Request": "true"},
         )
 
@@ -626,6 +624,49 @@ class ErhebungsteilnahmeTests(TestCase):
             ),
             ["Fertig", None],
         )
+
+    def test_likert_block_bietet_die_skalenpole_und_speichert_die_stufe(
+        self,
+    ) -> None:
+        """Die Radio-Buttons tragen die globalen Pole, gespeichert wird die Stufe."""
+
+        self._vignette_anlegen()
+        zugehoerigkeit = self._abschluss_item_anlegen(
+            typ=FragebogenItem.Typ.LIKERT, wortlaut="Wie sicher fühlten Sie sich?"
+        )
+        bindung = self._laufende_sitzung_starten()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        block = self.client.get(block_url)
+        itemantwort = ItemAntwort.objects.get(erhebungsitem=zugehoerigkeit)
+
+        self.assertContains(block, "Stimme gar nicht zu")
+        self.assertContains(block, "Stimme voll zu")
+        self.assertNotContains(block, ">6<")
+
+        self.client.post(block_url, {f"item_{itemantwort.pk}": "6"})
+
+        itemantwort.refresh_from_db()
+        self.assertEqual(itemantwort.likert_stufe, 6)
+
+    def test_likert_block_weist_eine_stufe_ausserhalb_der_skala_ab(self) -> None:
+        """Eine Stufe jenseits der Skalenpole schreibt nichts."""
+
+        self._vignette_anlegen()
+        zugehoerigkeit = self._abschluss_item_anlegen(
+            typ=FragebogenItem.Typ.LIKERT, wortlaut="Wie sicher fühlten Sie sich?"
+        )
+        bindung = self._laufende_sitzung_starten()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        block_url = reverse("erhebungen:itemblock", args=[bindung.token])
+        self.client.get(block_url)
+        itemantwort = ItemAntwort.objects.get(erhebungsitem=zugehoerigkeit)
+
+        antwort = self.client.post(block_url, {f"item_{itemantwort.pk}": "7"})
+
+        self.assertEqual(antwort.status_code, 400)
+        itemantwort.refresh_from_db()
+        self.assertIsNone(itemantwort.likert_stufe)
 
     def test_token_endpunkt_sperrt_sitzungsblock_ausserhalb_seines_besuchs(
         self,

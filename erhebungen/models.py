@@ -6,12 +6,17 @@ from secrets import choice, randbits
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
+from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
+
+_LIKERT_STUFEN: list[int] = LikertSkalenpol.stufen()
+_NIEDRIGSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[0]
+_HOECHSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[-1]
 
 
 class ErhebungQuerySet(
@@ -313,8 +318,6 @@ class Erhebungsitem(models.Model):
 
     def clean(self) -> None:
         """Erlaubt nur finale Fassungen aus dem Eigentümer-Kreis der Erhebung."""
-
-        from fragebogen_items.models import FragebogenItem
 
         fehler: dict[str, str] = {}
         if self.item.zustand != FragebogenItem.Zustand.FINAL:
@@ -675,14 +678,17 @@ class ItemAntwort(models.Model):
     )
     freitext: models.TextField = models.TextField(null=True, blank=True)
     likert_stufe: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
-        null=True, blank=True, validators=[MaxValueValidator(6)]
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(_NIEDRIGSTE_LIKERT_STUFE),
+            MaxValueValidator(_HOECHSTE_LIKERT_STUFE),
+        ],
     )
     vorgelegt_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
 
     def clean(self) -> None:
         """Hält Teilnahme, Andockpunkt und Antworttyp konsistent."""
-
-        from fragebogen_items.models import FragebogenItem
 
         fehler: dict[str, str] = {}
         if (
@@ -702,8 +708,8 @@ class ItemAntwort(models.Model):
             fehler["likert_stufe"] = "Likert-Stufen gehören zu Likert-Fragebogen-Items."
         if self.freitext is not None and typ != FragebogenItem.Typ.FREITEXT:
             fehler["freitext"] = "Freitext gehört zu Freitext-Fragebogen-Items."
-        if self.likert_stufe is not None and not 1 <= self.likert_stufe <= 6:
-            fehler["likert_stufe"] = "Likert-Stufen liegen zwischen 1 und 6."
+        if self.likert_stufe is not None and self.likert_stufe not in _LIKERT_STUFEN:
+            fehler["likert_stufe"] = LikertSkalenpol.stufenbereich_meldung()
         if fehler:
             raise ValidationError(fehler)
 
@@ -728,7 +734,10 @@ class ItemAntwort(models.Model):
             ),
             models.CheckConstraint(
                 condition=models.Q(likert_stufe__isnull=True)
-                | models.Q(likert_stufe__gte=1, likert_stufe__lte=6),
+                | models.Q(
+                    likert_stufe__gte=_NIEDRIGSTE_LIKERT_STUFE,
+                    likert_stufe__lte=_HOECHSTE_LIKERT_STUFE,
+                ),
                 name="erhebungen_antwort_likert_gueltig",
             ),
         ]
