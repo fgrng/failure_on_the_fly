@@ -77,16 +77,7 @@
                  x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
                  @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                <div class="vignette-autovervollstaendigung">
-                    {% include "vignetten/includes/form_field.html" with field=form.sprachmodell %}
-                    <button class="button" type="button" x-cloak x-show="anbieter !== 'fake'"
-                            hx-post="{% url 'simulation:modellvorschlaege' %}"
-                            hx-vals='{"naht": "sprachmodell"}'
-                            hx-include="[name='anbieter'], [name='anbieter_token']"
-                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                            hx-target="#modellvorschlaege">Modelle laden</button>
-                    <div id="modellvorschlaege" x-ref="modellvorschlaege"></div>
-                </div>
+                {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
                 {% include "vignetten/includes/form_field.html" with field=form.parameter %}

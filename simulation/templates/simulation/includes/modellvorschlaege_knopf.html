@@ -1,0 +1,15 @@
+{% comment %}
+    Modellfeld, Ladeknopf und die Stelle für die Liste — dieselbe Geste an
+    jeder Naht. Der Knopf liest den Alpine-Zustand »anbieter« der Seite, die
+    diesen Baustein einsetzt: Beim Anbieter »fake« gibt es nichts zu laden.
+{% endcomment %}
+<div class="vignette-autovervollstaendigung">
+    {% include "vignetten/includes/form_field.html" with field=field %}
+    <button class="button" type="button" x-cloak x-show="anbieter !== 'fake'"
+            hx-post="{% url 'simulation:modellvorschlaege' %}"
+            hx-vals='{"naht": "{{ naht }}"}'
+            hx-include="[name='anbieter'], [name='anbieter_token']"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-target="#modellvorschlaege">Modelle laden</button>
+    <div id="modellvorschlaege" x-ref="modellvorschlaege"></div>
+</div>
