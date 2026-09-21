@@ -282,16 +282,12 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt ein sichtbares Training zur Kuratierung."""
     training: Training = _sichtbares_training(request, pk)
-    eigentuemerinnen: list[Konto] = list(training.eigentuemerinnen.all())
     return render(
         request,
         "training/kuratieren.html",
         {
             "training": training,
             "zustand_badge": _zustand_badge(training),
-            "eigentuemerinnen": eigentuemerinnen,
-            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": training.moegliche_ergaenzungen(),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),

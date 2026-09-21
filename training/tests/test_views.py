@@ -119,7 +119,8 @@ class TrainingKuratierenTests(TestCase):
             reverse("training:kuratieren", args=[training.pk])
         )
 
-        self.assertContains(response, "Eigentümerinnen")
+        self.assertContains(response, "Eigentümer:innen")
+        self.assertContains(response, "Eigentümer:in hinzufügen")
         self.assertContains(response, ada.username)
 
     def test_nimmt_nur_eigene_finale_vignetten_auf_und_entfernt_sie_wieder(

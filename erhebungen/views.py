@@ -340,16 +340,12 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             ),
         }
 
-    eigentuemerinnen: list[Konto] = list(erhebung.eigentuemerinnen.all())
     return render(
         request,
         "erhebungen/detail.html",
         {
             "erhebung": erhebung,
             "status_badge": _status_badge(erhebung),
-            "eigentuemerinnen": eigentuemerinnen,
-            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": erhebung.moegliche_ergaenzungen(),
             "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
                 [

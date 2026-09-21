@@ -199,7 +199,8 @@ class VignetteDetailViewTests(TestCase):
             reverse("vignetten:detail", args=[vignette.pk])
         )
 
-        self.assertContains(response, "Ko-Autor:innen")
+        self.assertContains(response, "Eigentümer:innen")
+        self.assertContains(response, "Eigentümer:in hinzufügen")
         self.assertContains(response, ada.username)
 
     def test_rendert_die_rohfelder_des_aufgabenkontexts(self) -> None:
