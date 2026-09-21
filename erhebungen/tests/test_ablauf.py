@@ -70,7 +70,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         token="2345-6789",
     )
 
-    assert naechster_schritt(bindung.teilnahme) == erste
+    assert naechster_schritt(bindung) == erste
 
     Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
@@ -79,7 +79,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    assert naechster_schritt(bindung.teilnahme) == zweite
+    assert naechster_schritt(bindung) == zweite
 
     Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
@@ -88,7 +88,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    assert naechster_schritt(bindung.teilnahme) is None
+    assert naechster_schritt(bindung) is None
 
 
 @pytest.mark.django_db
@@ -122,7 +122,7 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
     )
 
-    block = naechster_schritt(bindung.teilnahme)
+    block = naechster_schritt(bindung)
 
     assert block.andockpunkt == Erhebungsitem.Andockpunkt.AM_ENDE
     assert list(block.items) == [zugehoerigkeit]
@@ -166,8 +166,8 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         randomisierungs_seed=17,
     )
 
-    naechster_schritt(erste_bindung.teilnahme)
-    naechster_schritt(zweite_bindung.teilnahme)
+    naechster_schritt(erste_bindung)
+    naechster_schritt(zweite_bindung)
 
     assert list(
         erste_bindung.vignettenziehungen.values_list("vignette_id", flat=True)

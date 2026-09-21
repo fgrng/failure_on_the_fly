@@ -849,7 +849,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 
 
 def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> bool:
-    schritt = naechster_schritt(bindung.teilnahme)
+    schritt = naechster_schritt(bindung)
     if not isinstance(schritt, Vignette):
         return False
     vignette: Vignette = schritt
@@ -870,12 +870,12 @@ def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> 
     return True
 
 
-def _weiter_nach_der_letzten_vignette(binding: Erhebungsbindung) -> HttpResponse:
+def _weiter_nach_der_letzten_vignette(bindung: Erhebungsbindung) -> HttpResponse:
     """Leitet zum Abschluss-Block oder zum Abschluss der Erhebung weiter."""
 
-    teilnahme_link: UUID = binding.stichprobe.teilnahme_link
-    if isinstance(naechster_schritt(binding.teilnahme), Itemblock):
-        return redirect("erhebungen:itemblock", token=binding.token)
+    teilnahme_link: UUID = bindung.stichprobe.teilnahme_link
+    if isinstance(naechster_schritt(bindung), Itemblock):
+        return redirect("erhebungen:itemblock", token=bindung.token)
     return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
 
 
@@ -1054,7 +1054,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
             status=Sitzung.Status.LAUFEND,
         ).exists():
             return redirect("erhebungen:gespraech", token=bindung.token)
-        schritt = naechster_schritt(bindung.teilnahme)
+        schritt = naechster_schritt(bindung)
         if not isinstance(schritt, Itemblock):
             return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
         antworten = block_vorlegen(
@@ -1160,7 +1160,7 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         status=Sitzung.Status.LAUFEND,
     ).exists():
         return redirect("erhebungen:gespraech", token=bindung.token)
-    schritt = naechster_schritt(bindung.teilnahme)
+    schritt = naechster_schritt(bindung)
     freigaben: list[str] = request.session.get(_ABSCHLUSS_FREIGABEN_SESSION_KEY, [])
     if isinstance(schritt, Vignette):
         return redirect("erhebungen:spielen", teilnahme_link=teilnahme_link)

@@ -1,10 +1,12 @@
-"""Sequenziert die Vignetten einer Erhebungsteilnahme."""
+"""Sequenziert die Vignetten einer Erhebungsbindung."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sitzungen.models import Sitzung, Teilnahme
+from django.db import transaction
+
+from sitzungen.models import Sitzung
 from vignetten.models import Vignette
 
 from .models import Erhebungsbindung, Erhebungsitem, ItemAntwort
@@ -25,8 +27,6 @@ def block_vorlegen(
     sitzung: Sitzung | None = None,
 ) -> list[ItemAntwort]:
     """Legt die Antwortzeilen eines Blocks einmalig an."""
-
-    from django.db import transaction
 
     with transaction.atomic():
         items = bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
@@ -49,13 +49,12 @@ def block_vorlegen(
     )
 
 
-def naechster_schritt(teilnahme: Teilnahme) -> Vignette | Itemblock | None:
+def naechster_schritt(bindung: Erhebungsbindung) -> Vignette | Itemblock | None:
     """Liefert die nächste ungespielte Vignette oder das definierte Ende."""
 
-    bindung = teilnahme.erhebungsbindung
     bindung.vignetten_ziehen()
     ziehungen = bindung.vignettenziehungen.select_related("vignette")
-    gespielte_ids = teilnahme.sitzung_set.values_list("vignette_id", flat=True)
+    gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
     ziehung = ziehungen.exclude(vignette_id__in=gespielte_ids).first()
     if ziehung:
         return ziehung.vignette
@@ -64,8 +63,6 @@ def naechster_schritt(teilnahme: Teilnahme) -> Vignette | Itemblock | None:
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
         ).select_related("item")
     )
-    return (
-        Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items, None)
-        if items and bindung.abgeschlossen_am is None
-        else None
-    )
+    if not items or bindung.abgeschlossen_am is not None:
+        return None
+    return Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items, None)
