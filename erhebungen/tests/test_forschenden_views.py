@@ -250,7 +250,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[erhebung.pk])
         )
-        self.assertContains(detail, "Eigentümerinnen")
+        self.assertContains(detail, "Eigentümer:innen")
         self.assertContains(detail, ada.username)
         self.assertContains(detail, grace.username)
         bearbeiten: HttpResponse = self.client.post(

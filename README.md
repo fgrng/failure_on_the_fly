@@ -21,18 +21,18 @@ Löschbegehren noch nicht festlegt.
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen
 sehen alle. In der Detailansicht lässt sich eine weitere Autorin oder
-Administratorin als Ko-Autorin hinzufügen oder eine vorhandene entfernen. Der
+Administratorin als Eigentümer:in hinzufügen oder eine vorhandene entfernen. Der
 Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
-die verbleibenden Ko-Autor:innen.
+die verbleibenden Eigentümer:innen.
 
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
 Administrator:innen sehen alle. In der Kuratierungsansicht lässt sich eine
-weitere Ausbilderin oder Administratorin als Eigentümerin hinzufügen oder eine
+weitere Ausbilderin oder Administratorin als Eigentümer:in hinzufügen oder eine
 vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
-Eigentümerinnen.
+Eigentümer:innen.
 
 ## Simulationskern
 
@@ -145,7 +145,7 @@ Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
-Eigentümerin eingetragen ist. Eigentümerinnen teilen und übergeben eine Erhebung
+Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung
 über die Detailansicht; auch bei finalen und laufenden Erhebungen bleibt dieser
 Kreis änderbar. Unter einer finalen Erhebung lassen sich
 Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
@@ -177,9 +177,9 @@ sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
 stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
 löschen. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
-Administrator:innen sehen alle Items. Ko-Autor:innen lassen sich direkt an der
+Administrator:innen sehen alle Items. Eigentümer:innen lassen sich direkt an der
 Item-Historie hinzufügen oder entfernen. Der Kreis bleibt dabei immer besetzt;
-die eigene Entfernung übergibt die Historie an die verbleibenden Ko-Autor:innen
+die eigene Entfernung übergibt die Historie an die verbleibenden Eigentümer:innen
 und führt zurück in die Item-Bibliothek.
 Likert-Items verwenden die sechs global festgelegten, nicht editierbaren
 Skalenstufen von 1 = „Stimme gar nicht zu" bis 6 = „Stimme voll zu".

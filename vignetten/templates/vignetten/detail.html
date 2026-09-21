@@ -145,6 +145,7 @@
         </div>
     </section>
 
-    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_id="detail-koautorinnen" koautorinnen_abschnitt_nummer="07" koautorin_hinzufuegen_url="vignetten:koautorin_hinzufuegen" koautorin_entfernen_url="vignetten:koautorin_entfernen" objekt_pk=vignette.pk %}
+    {# Der Kreis hängt an der Historie, die Routen gehen über die Fassung. #}
+    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_nummer="07" koautorin_hinzufuegen_url="vignetten:koautorin_hinzufuegen" koautorin_entfernen_url="vignetten:koautorin_entfernen" kreis=vignette.historie objekt_pk=vignette.pk %}
 </section>
 {% endblock %}

@@ -127,16 +127,12 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
-    eigentuemerinnen: list[Konto] = list(vignette.historie.eigentuemerinnen.all())
     return render(
         request,
         "vignetten/detail.html",
         {
             "vignette": vignette,
             "zustand_badge": _zustand_badge(vignette),
-            "eigentuemerinnen": eigentuemerinnen,
-            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": vignette.historie.moegliche_ergaenzungen(),
         },
     )
 

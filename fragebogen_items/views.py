@@ -107,7 +107,6 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine sichtbare Fragebogen-Item-Fassung."""
     item: FragebogenItem = _sichtbares_item(request, pk)
-    eigentuemerinnen: list[Konto] = list(item.historie.eigentuemerinnen.all())
     return render(
         request,
         "fragebogen_items/detail.html",
@@ -120,9 +119,6 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                 _ist_neueste_nichtarchivierte_fassung(item)
             ),
             "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
-            "eigentuemerinnen": eigentuemerinnen,
-            "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": item.historie.moegliche_ergaenzungen(),
         },
     )
 

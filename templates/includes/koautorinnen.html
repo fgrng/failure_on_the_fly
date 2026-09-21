@@ -1,12 +1,18 @@
-<section class="page-section" aria-labelledby="{{ koautorinnen_abschnitt_id }}">
+{% comment %}
+Der Eigentümer-Kreis eines Bestands. `kreis` ist das Objekt, das den Kreis
+trägt; `objekt_pk` das, worüber die beiden Routen geführt werden. Bei
+Vignette und Fragebogen-Item fallen die beiden auseinander: Die URL geht
+über die Fassung, der Kreis hängt an der Historie.
+{% endcomment %}
+<section class="page-section" aria-labelledby="detail-koautorinnen">
     <div class="page-section__head">
         <b>{{ koautorinnen_abschnitt_nummer }}</b>
-        <div><h2 id="{{ koautorinnen_abschnitt_id }}">{{ eigentuemerinnen_ueberschrift|default:"Ko-Autor:innen" }}</h2></div>
+        <div><h2 id="detail-koautorinnen">Eigentümer:innen</h2></div>
     </div>
     <ul>
-        {% for konto in eigentuemerinnen %}
+        {% for konto in kreis.eigentuemerinnen.all %}
             <li>{{ konto.username }}
-                {% if hat_mehrere_eigentuemerinnen %}
+                {% if kreis.hat_mehrere_eigentuemerinnen %}
                     <form method="post"
                           action="{% url koautorin_entfernen_url objekt_pk konto.pk %}">
                         {% csrf_token %}
@@ -18,11 +24,11 @@
     </ul>
     <form method="post" action="{% url koautorin_hinzufuegen_url objekt_pk %}">
         {% csrf_token %}
-        <label>{{ eigentuemerinnen_feldbeschriftung|default:"Ko-Autor:in" }} <select name="konto">
-            {% for konto in moegliche_koautorinnen %}
+        <label>Eigentümer:in <select name="konto">
+            {% for konto in kreis.moegliche_ergaenzungen %}
                 <option value="{{ konto.pk }}">{{ konto.username }}</option>
             {% endfor %}
         </select></label>
-        <button class="button" type="submit">{{ eigentuemerinnen_hinzufuegen_beschriftung|default:"Ko-Autor:in hinzufügen" }}</button>
+        <button class="button" type="submit">Eigentümer:in hinzufügen</button>
     </form>
 </section>
