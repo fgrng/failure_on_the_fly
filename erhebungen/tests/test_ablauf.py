@@ -35,14 +35,23 @@ from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
+def _finaler_kern() -> Simulationskern:
+    """Liefert den finalen Simulationskern und legt ihn beim ersten Aufruf an."""
+
+    vorhandener: Simulationskern | None = Simulationskern.objects.filter(
+        zustand=Simulationskern.Zustand.FINAL
+    ).first()
+    if vorhandener is not None:
+        return vorhandener
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    return kern
+
+
 def _finale_vignette_anlegen(konto: Konto) -> Vignette:
     """Legt eine für die Erhebung einbindbare Vignetten-Fassung an."""
 
-    if not Simulationskern.objects.filter(
-        zustand=Simulationskern.Zustand.FINAL
-    ).exists():
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
+    _finaler_kern()  # Vignette.objects.anlegen pinnt den aktuellen finalen Kern.
     vignette: Vignette = Vignette.objects.anlegen(konto)
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
     vignette.lernauftrag_text = "Addiere die Brüche."
@@ -68,6 +77,17 @@ def _finales_item_anlegen(konto: Konto) -> FragebogenItem:
     item = FragebogenItem.objects.anlegen(konto, wortlaut="Wie war die Sitzung?")
     item.finalisieren()
     return item
+
+
+def _spielbare_erhebung_anlegen(konto: Konto) -> Erhebung:
+    """Legt eine finale Erhebung an, deren Sitzungen sich starten lassen."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    ModellKonfiguration.objects.aktivieren(
+        ModellKonfiguration.objects.create(sprachmodell="fake")
+    )
+    erhebung.finalisieren()
+    return erhebung
 
 
 def _bindung_anlegen(erhebung: Erhebung) -> Erhebungsbindung:
@@ -104,8 +124,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     """Der Ablauf folgt der konfigurierten Ordnung und endet nach allen Sitzungen."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
+    kern: Simulationskern = _finaler_kern()
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
@@ -130,8 +149,7 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
     """Am Ende folgt ein Block aus den zugeordneten Abschluss-Items."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
+    kern: Simulationskern = _finaler_kern()
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     vignette: Vignette = _finale_vignette_anlegen(konto)
     item: FragebogenItem = _finales_item_anlegen(konto)
@@ -169,8 +187,6 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
     """Die Datenspur hält die einmal gezogene Zufallsreihenfolge fest."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
     erhebung: Erhebung = Erhebung.objects.anlegen(
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
@@ -252,8 +268,7 @@ def test_beendete_sitzung_stellt_ihren_block_vor_die_naechste_vignette() -> None
     """Der Block einer beendeten Sitzung bleibt offen, bis er erledigt ist."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
+    kern: Simulationskern = _finaler_kern()
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
@@ -326,11 +341,7 @@ def test_vignette_beginnen_schreibt_ziehung_sitzung_und_position() -> None:
     """Das Kommando beginnt die nächste gezogene Vignette an ihrer Position."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
-    ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
-    )
-    erhebung.finalisieren()
+    erhebung: Erhebung = _spielbare_erhebung_anlegen(konto)
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
@@ -359,11 +370,7 @@ def test_zwei_aufrufe_beginnen_keine_zweite_sitzung() -> None:
     """Der zweite Aufruf bleibt bei der laufenden Sitzung der Erhebungsbindung."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
-    ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
-    )
-    erhebung.finalisieren()
+    erhebung: Erhebung = _spielbare_erhebung_anlegen(konto)
     erste: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)

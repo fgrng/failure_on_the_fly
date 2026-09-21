@@ -8,7 +8,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from erhebungen.ablauf import block_vorlegen, vignette_beginnen
+from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -104,28 +104,20 @@ class ErhebungsteilnahmeTests(TestCase):
     def _laufende_sitzung_starten(
         self, *, audioverarbeitung_eingewilligt: str = "nein"
     ) -> Erhebungsbindung:
-        """Stellt eine laufende Sitzung über die Ablauf-Kommandos her, ohne HTTP-Runde."""
+        """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
 
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(self.stichprobe)
-        bindung.teilnahme.einwilligung_erteilt = True
-        bindung.teilnahme.audioverarbeitung_eingewilligt = (
-            audioverarbeitung_eingewilligt == "ja"
+        self.client.get(self.url)
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {
+                "einwilligung": "ja",
+                "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
+            },
         )
-        bindung.teilnahme.save(
-            update_fields=["einwilligung_erteilt", "audioverarbeitung_eingewilligt"]
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
-        vignette_beginnen(bindung)
-        self._token_hinterlegen(self.client, bindung)
-        return bindung
-
-    def _token_hinterlegen(self, browser: Client, bindung: Erhebungsbindung) -> None:
-        # In der Browser-Session steht nur die Zuordnung Teilnahme-Link zu Token.
-
-        session = browser.session
-        session["erhebung_teilnahme_tokens"] = {
-            str(self.stichprobe.teilnahme_link): bindung.token
-        }
-        session.save()
+        return Erhebungsbindung.objects.get()
 
     def _abschluss_item_anlegen(
         self,

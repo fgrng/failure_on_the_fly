@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.db.models import QuerySet
 from django.utils import timezone
 
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -84,7 +83,7 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
     laufende: Sitzung | None = laufende_sitzung(bindung)
     if laufende is not None:
         return LaufendeSitzung(laufende)
-    beurteilte_sitzung: Sitzung | None = _sitzung_mit_offenem_block(bindung)
+    beurteilte_sitzung: Sitzung | None = _sitzung_ohne_erledigten_block(bindung)
     if beurteilte_sitzung is not None:
         return OffenerSitzungsblock(beurteilte_sitzung)
     if not bindung.teilnahme.sitzung_set.exists():
@@ -102,7 +101,11 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
 def laufende_sitzung(bindung: Erhebungsbindung) -> Sitzung | None:
     """Liefert die noch nicht beendete Sitzung dieser Teilnahme samt Anzeigedaten."""
 
-    return _sitzungen(bindung).filter(status=Sitzung.Status.LAUFEND).first()
+    return (
+        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
+        .filter(teilnahme=bindung.teilnahme, status=Sitzung.Status.LAUFEND)
+        .first()
+    )
 
 
 def sitzung_am_zug(bindung: Erhebungsbindung) -> Sitzung | None:
@@ -134,18 +137,10 @@ def _naechste_gezogene_vignette(bindung: Erhebungsbindung) -> Vignette | None:
         .exclude(vignette_id__in=gespielte_ids)
         .first()
     )
-    return ziehung.vignette if ziehung else None
+    return ziehung.vignette if ziehung is not None else None
 
 
-def _sitzungen(bindung: Erhebungsbindung) -> QuerySet[Sitzung]:
-    # Die Sitzungen dieser Teilnahme mit den Bezügen, die ihre Anzeige braucht.
-
-    return Sitzung.objects.select_related(
-        "vignette", "simulationskern", "teilnahme"
-    ).filter(teilnahme=bindung.teilnahme)
-
-
-def _sitzung_mit_offenem_block(bindung: Erhebungsbindung) -> Sitzung | None:
+def _sitzung_ohne_erledigten_block(bindung: Erhebungsbindung) -> Sitzung | None:
     # Liefert die älteste beendete Sitzung, deren Block noch nicht erledigt ist.
 
     if not _block_kann_offen_sein(bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG):
@@ -210,11 +205,11 @@ def vignette_beginnen(bindung: Erhebungsbindung) -> Sitzung | None:
                 return sitzung
             case NochNichtBegonnen() | NaechsteVignette():
                 vignette: Vignette | None = _naechste_gezogene_vignette(bindung)
+                if vignette is None:
+                    return None
+                return _sitzung_beginnen(bindung, vignette)
             case _:
                 return None
-        if vignette is None:
-            return None
-        return _sitzung_beginnen(bindung, vignette)
 
 
 def _sitzung_beginnen(bindung: Erhebungsbindung, vignette: Vignette) -> Sitzung:
