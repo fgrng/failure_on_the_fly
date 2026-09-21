@@ -133,14 +133,6 @@ def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
     return get_object_or_404(Erhebung.objects.sichtbar_fuer(request.user), pk=pk)
 
 
-def _moegliche_ko_forschende(erhebung: Erhebung) -> QuerySet[Konto]:
-    """Liefert berechtigte Konten außerhalb des Eigentümer-Kreises."""
-
-    return Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE).exclude(
-        erhebung=erhebung
-    )
-
-
 def _eigene_finalen_vignetten(request: HttpRequest) -> QuerySet[Vignette]:
     """Liefert einbindbare Fassungen aus dem Eigentümer-Kreis der Forschenden."""
 
@@ -357,7 +349,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "status_badge": _status_badge(erhebung),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": _moegliche_ko_forschende(erhebung),
+            "moegliche_koautorinnen": erhebung.moegliche_ergaenzungen(),
             "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
                 [
@@ -403,7 +395,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     konto: Konto = get_object_or_404(
-        _moegliche_ko_forschende(erhebung), pk=request.POST.get("konto")
+        erhebung.moegliche_ergaenzungen(), pk=request.POST.get("konto")
     )
     erhebung.eigentuemerinnen.add(konto)
     return redirect("erhebungen:detail", pk=erhebung.pk)

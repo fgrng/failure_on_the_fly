@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import pytest
 from django.apps import apps
+from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.models import Model
 
@@ -205,3 +206,28 @@ def test_austritt_laeuft_vollstaendig_in_einer_transaktion() -> None:
 
     assert in_transaktion and all(in_transaktion)
     assert list(training.eigentuemerinnen.all()) == [grace]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
+def test_kandidatenliste_nennt_die_rolle_und_die_administration(
+    modell: type[Model],
+) -> None:
+    """Rolle des Bestands und Administration sind eintragbar, Eingetragene nicht."""
+    gruppe: Group = Group.objects.get(name=modell.ROLLENGRUPPE)
+    eingetragene: Konto = Konto.objects.create_user(username="ada")
+    eingetragene.groups.add(gruppe)
+    kandidatin: Konto = Konto.objects.create_user(username="grace")
+    kandidatin.groups.add(gruppe)
+    administratorin: Konto = Konto.objects.create_user(
+        username="admin", is_superuser=True
+    )
+    # Ohne Rolle und ohne Administration: darf in keiner Liste auftauchen.
+    Konto.objects.create_user(username="mallory")
+    bestand: EigentuemerKreis = modell()
+    bestand.save()
+    bestand.eigentuemerinnen.add(eingetragene)
+
+    kandidatinnen: set[Konto] = set(bestand.moegliche_ergaenzungen())
+
+    assert kandidatinnen == {kandidatin, administratorin}

@@ -1,25 +1,23 @@
 """Der Eigentümer-Kreis, den alle bestandstragenden Modelle gemeinsam tragen."""
 
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from django.db import models, transaction
 
+from konten.models import Konto
 from konten.navigation import ist_administratorin
-
-if TYPE_CHECKING:
-    from konten.models import Konto
 
 
 class EigentuemerKreisQuerySet[Bestand: "EigentuemerKreis"]:
     """Sichtbarkeit und Anlegen des Eigentümer-Kreises für jedes Bestands-QuerySet."""
 
-    def anlegen(self, konto: "Konto", **kwargs: object) -> Bestand:
+    def anlegen(self, konto: Konto, **kwargs: object) -> Bestand:
         """Legt einen Bestand an und trägt das Konto als erste Eigentümerin ein."""
         bestand: Bestand = self.create(**kwargs)
         bestand.eigentuemerinnen.add(konto)
         return bestand
 
-    def sichtbar_fuer(self, konto: "Konto") -> Self:
+    def sichtbar_fuer(self, konto: Konto) -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
@@ -73,6 +71,16 @@ class EigentuemerKreis(models.Model):
                 return False
             self.eigentuemerinnen.remove(konto_pk)
             return True
+
+    def moegliche_ergaenzungen(self) -> models.QuerySet[Konto]:
+        """Liefert die Konten, die in diesen Kreis aufgenommen werden können.
+
+        Das sind die Trägerinnen der Rollengruppe samt Administration, ohne die
+        bereits Eingetragenen.
+        """
+        return Konto.objects.mit_rolle_oder_administration(self.ROLLENGRUPPE).exclude(
+            pk__in=self.eigentuemerinnen.values("pk")
+        )
 
     @property
     def hat_mehrere_eigentuemerinnen(self) -> bool:
