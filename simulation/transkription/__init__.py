@@ -1,5 +1,6 @@
 """Naht zur Audio-Transkription und ihr deterministischer Testadapter."""
 
+import json
 import time
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
@@ -25,11 +26,17 @@ MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 # Abstand zwischen zwei Abfragen des Stapelergebnisses bei Infomaniak.
 INFOMANIAK_INTERVALL_SEKUNDEN: float = 2.0
 
-# Infomaniak meldet den Stand eines Stapels als Zeichenkette. Die Namen stammen
-# aus der Anbieterdokumentation und sind um die üblichen Schreibweisen ergänzt,
-# weil die Verifikation am echten Konto (#193) noch aussteht. Alles, was hier
+# Infomaniak meldet den Stand eines Stapels als Zeichenkette. Alles, was hier
 # nicht steht, gilt als »noch nicht fertig« — ein unbekannter Name läuft damit
 # ins Budget statt in ein falsches Ergebnis.
+#
+# Am echten Konto verifiziert (#232) sind `success` als fertiger und `pending`
+# als laufender Zustand; die übrigen Namen stammen aus der Anbieterdokumentation
+# und den üblichen Schreibweisen. Der gescheiterte Zustand bleibt unverifiziert:
+# Eine unbrauchbare Datei wird schon beim Absenden mit 422 abgewiesen und wird
+# nie ein Stapel, ein scheiterender Stapel ließ sich deshalb nicht provozieren.
+# Trägt der Anbieter einen anderen Namen, läuft ein gescheiterter Stapel ins
+# volle Budget, statt sofort zu scheitern.
 INFOMANIAK_FERTIG: frozenset[str] = frozenset({"success", "succeeded", "done"})
 INFOMANIAK_GESCHEITERT: frozenset[str] = frozenset({"error", "failed", "canceled"})
 
@@ -187,15 +194,27 @@ class InfomaniakTranskription:
 
     @staticmethod
     def _transkript(ergebnis: Any) -> str:
-        # Liest den Text aus dem fertigen Stapelergebnis.
+        # Liest den Text aus dem fertigen Stapelergebnis. Infomaniak legt ihn
+        # dort nicht als Abbildung ab, sondern als Zeichenkette, die ihrerseits
+        # JSON trägt: {"text": " …"}. Ohne das zweite Parsen wäre das Transkript
+        # diese Zeichenkette samt Klammern und Feldnamen.
 
-        if isinstance(ergebnis, dict):
-            ergebnis = ergebnis.get("text")
         if not isinstance(ergebnis, str):
+            raise TranskriptionsAnbieterfehler(
+                "Das fertige Stapelergebnis trug keine Zeichenkette."
+            )
+        try:
+            inhalt: Any = json.loads(ergebnis)
+        except ValueError as exc:
+            raise TranskriptionsAnbieterfehler(
+                "Das fertige Stapelergebnis war kein lesbares JSON."
+            ) from exc
+        text: Any = inhalt.get("text") if isinstance(inhalt, dict) else None
+        if not isinstance(text, str):
             raise TranskriptionsAnbieterfehler(
                 "Das fertige Stapelergebnis trug keinen Text."
             )
-        return ergebnis
+        return text
 
     @staticmethod
     def _nutzlast(anfrage: Callable[[], Any]) -> Any:
@@ -210,7 +229,11 @@ class InfomaniakTranskription:
         except Exception as exc:
             raise TranskriptionsAnbieterfehler from exc
         # Die API der Version 1 umschlägt ihre Nutzlast mit {"result", "data"}.
-        if isinstance(nutzlast, dict) and "data" in nutzlast:
+        # Erkennbar ist der Umschlag nur am Paar: Das Stapelobjekt der
+        # Ergebnisroute trägt selbst ein `data`-Feld, aber kein `result` — an
+        # `data` allein geschält, gäbe die Heuristik dessen Inhalt statt des
+        # Stapels zurück.
+        if isinstance(nutzlast, dict) and {"result", "data"} <= nutzlast.keys():
             return nutzlast["data"]
         return nutzlast
 
