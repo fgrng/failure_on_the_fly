@@ -91,10 +91,11 @@ laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
 Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie
 nicht —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die
 Endpunktwurzel der Transkription, die bei diesem Anbieter unter einer anderen
-API-Version liegt als die des Sprachmodells. Der eingesetzte Wert trägt hier bei beiden Anbietern
-kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern reicht den Namen roh
-an die Route des Anbieters durch. Abgefragt wird mit dem getippten Token; bei
-`infomaniak` ist es dafür auch dann nötig, wenn schon eines hinterlegt ist.
+API-Version liegt als die des Sprachmodells. Der eingesetzte Wert trägt hier
+bei beiden Anbietern kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern
+reicht den Namen roh an die Route des Anbieters durch. Abgefragt wird mit dem
+getippten Token; bei `infomaniak` ist es dafür auch dann nötig, wenn schon
+eines hinterlegt ist.
 Ob überhaupt transkribiert wird, entscheidet weiterhin die Instanz über
 `TRANSKRIPTION_ZERO_RETENTION` in der Umgebung — die Zusage der Betreiber:in
 gehört nicht in dasselbe Formular wie die Anbieterwahl.

@@ -246,13 +246,13 @@ _FELD_BASIS_URL: str = "id_anbieter_basis_url"
 
 
 def _abgeleitete_wurzel(
-    verzeichnis: Modellverzeichnis | None, naht: str, getippte: str
+    verzeichnis: Modellverzeichnis, naht: str, getippte: str
 ) -> str:
     # Die abgeleitete Endpunktwurzel ergänzt ein leeres Feld und überschreibt
     # nie eine getippte Angabe. Scheitert allein diese Abfrage, bleiben die
     # Modellvorschläge stehen: Der eine Teil reißt den anderen nicht mit.
 
-    if verzeichnis is None or getippte:
+    if getippte:
         return ""
     try:
         return verzeichnis.basis_url(naht)
@@ -267,13 +267,14 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
 
     Das Token kommt aus dem Formular, geht an das Verzeichnis und sonst
     nirgendwohin: Es steht weder in der Antwort noch in einem Protokoll. Eine
-    Gebärde der Administrator:in, zwei Felder — und wo die Wurzel ausbleibt,
+    Geste der Administrator:in, zwei Felder — und wo die Wurzel ausbleibt,
     bleiben die Vorschläge trotzdem.
     """
     naht: str = request.POST.get("naht", "")
-    verzeichnis: Modellverzeichnis | None
+    verzeichnis: Modellverzeichnis
     vorschlaege: list[Modellvorschlag]
     fehler: str
+    wurzel: str = ""
     try:
         verzeichnis = modellverzeichnis(
             request.POST.get("anbieter", ""),
@@ -281,8 +282,10 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
         )
         vorschlaege = verzeichnis.vorschlaege(naht)
         fehler = ""
+        wurzel = _abgeleitete_wurzel(
+            verzeichnis, naht, request.POST.get("anbieter_basis_url", "")
+        )
     except Modellverzeichnisfehler as modellfehler:
-        verzeichnis = None
         vorschlaege = []
         fehler = str(modellfehler)
     return render(
@@ -292,9 +295,7 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
             "vorschlaege": vorschlaege,
             "fehler": fehler,
             "feld": _FELD_JE_NAHT.get(naht, ""),
-            "wurzel": _abgeleitete_wurzel(
-                verzeichnis, naht, request.POST.get("anbieter_basis_url", "")
-            ),
+            "wurzel": wurzel,
             "wurzelfeld": _FELD_BASIS_URL,
         },
     )

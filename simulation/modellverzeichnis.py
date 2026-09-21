@@ -199,8 +199,8 @@ _INFOMANIAK_MODELLTYP: dict[str, str] = {
 # liegen unter verschiedenen API-Versionen und mit verschiedenem Pfadrest
 # (Recherche 2026-09-21). Deshalb steht die Gestalt hier, bei der Naht.
 _INFOMANIAK_WURZEL: dict[str, str] = {
-    Naht.SPRACHMODELL: INFOMANIAK_WIRT + "/2/ai/{produkt}/openai/v1",
-    Naht.TRANSKRIPTION: INFOMANIAK_WIRT + "/1/ai/{produkt}/openai",
+    Naht.SPRACHMODELL: f"{INFOMANIAK_WIRT}/2/ai/{{produkt}}/openai/v1",
+    Naht.TRANSKRIPTION: f"{INFOMANIAK_WIRT}/1/ai/{{produkt}}/openai",
 }
 
 # Infomaniak weist ein untaugliches Token mit »401« ab; die Meldung benennt
@@ -220,12 +220,7 @@ class InfomaniakVerzeichnis:
         typ: str | None = _INFOMANIAK_MODELLTYP.get(naht)
         if typ is None:
             raise KeineModellliste("Für diese Naht führt Infomaniak keine Modellliste.")
-        eintraege: list[Any] = _datenliste(
-            self.client,
-            INFOMANIAK_MODELLE_URL,
-            "Infomaniak",
-            ablehnungshinweis=_INFOMANIAK_ABLEHNUNGSHINWEIS,
-        )
+        eintraege: list[Any] = self._daten(INFOMANIAK_MODELLE_URL)
         praefix: str = _praefix(Anbieter.INFOMANIAK, naht)
         return _alphabetisch(
             self._vorschlag(eintrag, praefix)
@@ -244,18 +239,32 @@ class InfomaniakVerzeichnis:
         gestalt: str | None = _INFOMANIAK_WURZEL.get(naht)
         if gestalt is None:
             return ""
-        produkte: list[Any] = _datenliste(
+        kennung: str = self._einzige_produktkennung()
+        return gestalt.format(produkt=kennung) if kennung else ""
+
+    def _daten(self, url: str) -> list[Any]:
+        # Holt eine der beiden kontoweiten Routen. Sie antworten in derselben
+        # Form und scheitern auf dieselben Weisen; nur die Route unterscheidet
+        # sie.
+
+        return _datenliste(
             self.client,
-            INFOMANIAK_PRODUKT_URL,
+            url,
             "Infomaniak",
             ablehnungshinweis=_INFOMANIAK_ABLEHNUNGSHINWEIS,
         )
+
+    def _einzige_produktkennung(self) -> str:
+        # Liest die Kennung, wenn das Konto genau ein AI-Produkt führt, und
+        # sonst nichts. Leer heißt: Es gibt nichts eindeutig Abzuleitendes.
+
+        produkte: list[Any] = self._daten(INFOMANIAK_PRODUKT_URL)
         if len(produkte) != 1 or not isinstance(produkte[0], dict):
             return ""
         kennung: Any = produkte[0].get("product_id")
-        if not isinstance(kennung, int | str) or not str(kennung):
+        if not isinstance(kennung, int | str):
             return ""
-        return gestalt.format(produkt=kennung)
+        return str(kennung)
 
     @staticmethod
     def _vorschlag(eintrag: dict[str, Any], praefix: str) -> Modellvorschlag:

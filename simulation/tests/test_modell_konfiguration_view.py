@@ -396,7 +396,7 @@ WURZEL: str = "https://api.infomaniak.com/2/ai/314159/openai/v1"
 
 
 def _abrufdaten(**werte: object) -> dict[str, object]:
-    """Liefert den Beutel, den der Knopf »Modelle laden« mitschickt."""
+    """Liefert den Beutel, den der Ladeknopf mitschickt."""
     return {
         "anbieter": Anbieter.OPENROUTER,
         "naht": Naht.SPRACHMODELL,
