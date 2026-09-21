@@ -2,6 +2,7 @@
 
 import pytest
 from django.apps import apps
+from django.contrib.auth.models import Group
 from django.db.models import Model
 
 from erhebungen.models import Erhebung
@@ -107,3 +108,29 @@ def test_kreis_meldet_ob_mehr_als_eine_eigentuemerin_eingetragen_ist() -> None:
     training.eigentuemerinnen.add(grace)
 
     assert training.hat_mehrere_eigentuemerinnen
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("modell", _eigentuemer_tragende_modelle())
+def test_kandidatenliste_nennt_die_rolle_und_die_administration(
+    modell: type[Model],
+) -> None:
+    """Rolle des Bestands und Administration sind eintragbar, Eingetragene nicht."""
+    gruppe: Group = Group.objects.get(name=modell.ROLLENGRUPPE)
+    eingetragene: Konto = Konto.objects.create_user(username="ada")
+    eingetragene.groups.add(gruppe)
+    kandidatin: Konto = Konto.objects.create_user(username="grace")
+    kandidatin.groups.add(gruppe)
+    administratorin: Konto = Konto.objects.create_user(
+        username="admin", is_superuser=True
+    )
+    fremde: Konto = Konto.objects.create_user(username="mallory")
+    bestand = modell()
+    bestand.save()
+    bestand.eigentuemerinnen.add(eingetragene)
+
+    kandidatinnen = set(bestand.moegliche_ergaenzungen())
+
+    assert kandidatinnen == {kandidatin, administratorin}
+    assert eingetragene not in kandidatinnen
+    assert fremde not in kandidatinnen

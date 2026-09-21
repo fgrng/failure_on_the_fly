@@ -122,11 +122,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": (
-                Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE).exclude(
-                    fragebogenitemhistorie=item.historie
-                )
-            ),
+            "moegliche_koautorinnen": item.historie.moegliche_ergaenzungen(),
         },
     )
 
@@ -211,8 +207,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     item: FragebogenItem = _sichtbares_item(request, pk)
     konto: Konto = get_object_or_404(
-        Konto.objects.mit_rolle_oder_administration(FORSCHENDE_GRUPPE),
-        pk=request.POST.get("konto"),
+        item.historie.moegliche_ergaenzungen(), pk=request.POST.get("konto")
     )
     item.historie.eigentuemerinnen.add(konto)
     return redirect("fragebogen_items:detail", pk=item.pk)

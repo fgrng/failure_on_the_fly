@@ -481,6 +481,17 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
             html=True,
         )
 
+    def test_hinzufuegen_weist_eine_bereits_eingetragene_ab(self) -> None:
+        """Die Aufnahme prüft gegen dieselbe Menge, die das Auswahlfeld zeigt."""
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            {"konto": self.ada.pk},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_hinzufuegen_gibt_koautorin_bibliothekszugriff(self) -> None:
         """Eine hinzugefügte Ko-Autorin sieht die Item-Linie in ihrer Bibliothek."""
         self.client.force_login(self.ada)

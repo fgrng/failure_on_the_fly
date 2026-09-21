@@ -5,14 +5,13 @@ from typing import Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from konten.models import Konto
 from konten.navigation import (
-    AUTORIN_GRUPPE,
     autorin_erforderlich as _autorin_erforderlich,
 )
 
@@ -59,13 +58,6 @@ def _sichtbare_vignette_laden(request: HttpRequest, pk: int) -> Vignette:
     return get_object_or_404(
         Vignette.objects.sichtbar_fuer(request.user),
         pk=pk,
-    )
-
-
-def _moegliche_koautorinnen(historie: Vignettenhistorie) -> models.QuerySet[Konto]:
-    """Liefert Autorinnen und Administratorinnen außerhalb des Eigentümer-Kreises."""
-    return Konto.objects.mit_rolle_oder_administration(AUTORIN_GRUPPE).exclude(
-        vignettenhistorie=historie
     )
 
 
@@ -145,7 +137,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "zustand_badge": _zustand_badge(vignette),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": _moegliche_koautorinnen(vignette.historie),
+            "moegliche_koautorinnen": vignette.historie.moegliche_ergaenzungen(),
         },
     )
 
@@ -158,7 +150,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
     konto: Konto = get_object_or_404(
-        _moegliche_koautorinnen(vignette.historie), pk=request.POST.get("konto")
+        vignette.historie.moegliche_ergaenzungen(), pk=request.POST.get("konto")
     )
     vignette.historie.eigentuemerinnen.add(konto)
     return redirect("vignetten:detail", pk=vignette.pk)

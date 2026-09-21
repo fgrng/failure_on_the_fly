@@ -77,13 +77,6 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
 
 
-def _moegliche_koautorinnen(training: Training) -> QuerySet[Konto]:
-    """Liefert Ausbilderinnen und Administration außerhalb des Eigentümer-Kreises."""
-    return Konto.objects.mit_rolle_oder_administration(AUSBILDERIN_GRUPPE).exclude(
-        training=training
-    )
-
-
 def _veroeffentlichtes_training(pk: int) -> Training:
     """Lädt ein Training, das im offenen Katalog sichtbar ist."""
     return get_object_or_404(Training.objects.veroeffentlicht(), pk=pk)
@@ -298,7 +291,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
             "zustand_badge": _zustand_badge(training),
             "eigentuemerinnen": eigentuemerinnen,
             "hat_mehrere_eigentuemerinnen": len(eigentuemerinnen) > 1,
-            "moegliche_koautorinnen": _moegliche_koautorinnen(training),
+            "moegliche_koautorinnen": training.moegliche_ergaenzungen(),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
@@ -314,7 +307,7 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
     konto: Konto = get_object_or_404(
-        _moegliche_koautorinnen(training), pk=request.POST.get("konto")
+        training.moegliche_ergaenzungen(), pk=request.POST.get("konto")
     )
     training.eigentuemerinnen.add(konto)
     return redirect("training:kuratieren", pk=training.pk)

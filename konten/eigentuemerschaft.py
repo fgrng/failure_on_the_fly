@@ -46,6 +46,18 @@ class EigentuemerKreis(models.Model):
         """
         return True
 
+    def moegliche_ergaenzungen(self) -> "models.QuerySet[Konto]":
+        """Liefert die Konten, die in diesen Kreis aufgenommen werden können.
+
+        Das sind die Trägerinnen der Rollengruppe samt Administration, ohne die
+        bereits Eingetragenen.
+        """
+        from konten.models import Konto
+
+        return Konto.objects.mit_rolle_oder_administration(self.ROLLENGRUPPE).exclude(
+            pk__in=self.eigentuemerinnen.values("pk")
+        )
+
     @property
     def hat_mehrere_eigentuemerinnen(self) -> bool:
         """Sagt, ob der Kreis mehr als eine Eigentümerin trägt."""
