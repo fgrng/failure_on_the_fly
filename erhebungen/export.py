@@ -11,11 +11,18 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
+from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
 from vignetten.models import Vignette
 
-from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
+from .models import (
+    Erhebung,
+    Erhebungsbindung,
+    Erhebungsitem,
+    Vignettenposition,
+    Vignettenziehung,
+)
 
 
 def _zellenwert(wert: Any) -> str | int | bool:
@@ -331,6 +338,26 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         json.dumps(konfiguration.parameter, ensure_ascii=False),
                     )
                     for konfiguration in konfigurationen
+                ),
+            ),
+        )
+        vorgelegte_items: QuerySet[FragebogenItem] = FragebogenItem.objects.filter(
+            pk__in=Erhebungsitem.objects.filter(erhebung=erhebung).values("item_id")
+        ).order_by("pk")
+        zip_datei.writestr(
+            "fragebogen_items.csv",
+            _csv_inhalt(
+                ("id", "typ", "wortlaut"),
+                ((item.pk, item.typ, item.wortlaut) for item in vorgelegte_items),
+            ),
+        )
+        zip_datei.writestr(
+            "likert_skala.csv",
+            _csv_inhalt(
+                ("stufe", "pol"),
+                (
+                    (LikertSkalenpol.stufe_fuer(pol), pol.value)
+                    for pol in LikertSkalenpol
                 ),
             ),
         )

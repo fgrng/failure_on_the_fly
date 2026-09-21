@@ -9,8 +9,10 @@ from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import connection
 from django.http import HttpResponse
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1439,7 +1441,9 @@ class ErhebungsExportTests(TestCase):
                     "diagnosen.csv",
                     "erhebung.csv",
                     "fehlversuche.csv",
+                    "fragebogen_items.csv",
                     "gespraechsschritte.csv",
+                    "likert_skala.csv",
                     "modellkonfigurationen.csv",
                     "simulationskerne.csv",
                     "sitzungen.csv",
@@ -2101,6 +2105,12 @@ class ErhebungsExportTests(TestCase):
             export["Content-Disposition"],
             r'^attachment; filename="erhebung-\d+-leerer-entwurf-\d{8}T\d{6}Z.zip"$',
         )
+        # Die Kopfzeile steht auch ohne Datenzeile; die Erhebung selbst und die
+        # global festgelegte Likert-Kodierung hängen nicht am Datenbestand.
+        zeilen_ohne_datenbestand: dict[str, int] = {
+            "erhebung.csv": 2,
+            "likert_skala.csv": 7,
+        }
         with ZipFile(BytesIO(export.content)) as zip_datei:
             for dateiname in (
                 "erhebung.csv",
@@ -2114,14 +2124,122 @@ class ErhebungsExportTests(TestCase):
                 "vignettenfassungen.csv",
                 "simulationskerne.csv",
                 "modellkonfigurationen.csv",
+                "fragebogen_items.csv",
+                "likert_skala.csv",
             ):
                 with TextIOWrapper(
                     zip_datei.open(dateiname), encoding="utf-8"
                 ) as csv_datei:
                     self.assertEqual(
                         len(list(csv.reader(csv_datei))),
-                        2 if dateiname == "erhebung.csv" else 1,
+                        zeilen_ohne_datenbestand.get(dateiname, 1),
                     )
+
+    def test_exportiert_codebook_der_vorgelegten_items_und_der_likert_skala(
+        self,
+    ) -> None:
+        """Die Nachschlagetabellen machen den Fragebogen-Teil interpretierbar."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        beidseitiges_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Zeile eins\nZeile zwei"
+        )
+        likert_item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, typ=FragebogenItem.Typ.LIKERT, wortlaut="Ich fühlte mich sicher."
+        )
+        likert_item.finalisieren()
+        _finales_item_anlegen(ada, "Nicht zugeordnet")
+        Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=beidseitiges_item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=1,
+        )
+        Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=beidseitiges_item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            position=1,
+        )
+        Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=likert_item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            position=2,
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            item_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("fragebogen_items.csv"), encoding="utf-8")
+            )
+            items: list[dict[str, str]] = list(item_leser)
+            item_kopfzeile: list[str] = list(item_leser.fieldnames or [])
+            skala_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("likert_skala.csv"), encoding="utf-8")
+            )
+            stufen: list[dict[str, str]] = list(skala_leser)
+            skala_kopfzeile: list[str] = list(skala_leser.fieldnames or [])
+            item_inhalt: str = zip_datei.read("fragebogen_items.csv").decode("utf-8")
+
+        self.assertEqual(item_kopfzeile, ["id", "typ", "wortlaut"])
+        self.assertEqual(
+            items,
+            [
+                {
+                    "id": str(beidseitiges_item.pk),
+                    "typ": "freitext",
+                    "wortlaut": "Zeile eins\nZeile zwei",
+                },
+                {
+                    "id": str(likert_item.pk),
+                    "typ": "likert",
+                    "wortlaut": "Ich fühlte mich sicher.",
+                },
+            ],
+        )
+        self.assertNotIn("historie", item_inhalt)
+        self.assertNotIn("ada", item_inhalt)
+        self.assertEqual(skala_kopfzeile, ["stufe", "pol"])
+        self.assertEqual(
+            stufen,
+            [
+                {"stufe": "1", "pol": "Stimme gar nicht zu"},
+                {"stufe": "2", "pol": "Stimme nicht zu"},
+                {"stufe": "3", "pol": "Stimme eher nicht zu"},
+                {"stufe": "4", "pol": "Stimme eher zu"},
+                {"stufe": "5", "pol": "Stimme zu"},
+                {"stufe": "6", "pol": "Stimme voll zu"},
+            ],
+        )
+
+    def test_codebook_der_items_bleibt_bei_mehr_items_abfragezahlgleich(self) -> None:
+        """Die neue Tabelle zerlegt den Export nicht in N+1-Abfragen."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        for position in range(1, 4):
+            Erhebungsitem.objects.create(
+                erhebung=erhebung,
+                item=_finales_item_anlegen(ada, f"Item {position}"),
+                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                position=position,
+            )
+        self.client.force_login(ada)
+        with CaptureQueriesContext(connection) as mit_drei_items:
+            self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
+        erhebung.itemzugehoerigkeiten.exclude(position=1).delete()
+        with CaptureQueriesContext(connection) as mit_einem_item:
+            self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
+
+        self.assertEqual(len(mit_drei_items), len(mit_einem_item))
 
     def test_detail_zeigt_export_mit_stichprobe_auch_nach_archivierung(self) -> None:
         """Der Daten-Download folgt dem Datenbestand statt dem Erhebungsstatus."""
