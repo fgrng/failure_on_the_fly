@@ -298,7 +298,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_ausbilderin_erforderlich
 def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+    """Nimmt eine weitere Ausbilder:in in den Eigentümer-Kreis auf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)

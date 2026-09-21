@@ -140,7 +140,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @_autorin_erforderlich
 def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+    """Nimmt eine weitere Autor:in in den Eigentümer-Kreis auf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)

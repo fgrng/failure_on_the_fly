@@ -1,8 +1,5 @@
 """Die Routen des Eigentümer-Kreises heißen in allen Bestands-Apps gleich (Spec #207).
 
-Der Wächter hält fest, was Ticket #224 hergestellt hat: dieselben zwei
-URL-Namen und dasselbe Pfadsegment über alle eigentümer-tragenden Apps hinweg.
-
 Die zu prüfenden Apps kommen wie im Vertragstest der Modelle aus
 `bestandsmodelle()` — ein künftiges fünftes Bestandsmodell läuft damit ohne
 Zutun mit, statt still aus der Reihe zu fallen. Dass der URL-Namespace einer
