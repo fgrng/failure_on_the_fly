@@ -1,25 +1,18 @@
 ---
-status: amended
-amended-by: [ADR-0036, ADR-0038]
+status: accepted
 ---
 
 # Transkription läuft über einen externen Auftragsverarbeiter mit Zero-Retention
 
-> **Nachgeführt durch ADR-0036 und ADR-0038:** Welche Anbieter zulässig sind
-> und wo die Anbieterbindung liegt, ist dort entschieden: OpenRouter und
-> Infomaniak, Zugangsdaten an der Konfiguration. „Azure OpenAI Whisper" unten
-> ist ein Beispiel von damals, keine Festlegung. Die Zero-Retention-Pflicht,
-> die Einwilligung und die Probelauf-Ausnahme gelten unverändert.
-
 ADR-0007 macht die Spracheingabe zum primären Eingabeweg und verlangt, dass das Audio **unmittelbar in ein Transkript überführt und verworfen** wird, weil die Stimme ein biometrisches, personenbezogenes Datum ist und die in ADR-0006 gebaute Pseudonymität nicht unterlaufen darf. ADR-0007 lässt offen, **wo** transkribiert wird. Diese Entscheidung schließt die Lücke: Die Transkription läuft über eine **externe API**.
 
-Damit erhält ein Dritter das biometrische Datum — auch wenn wir es nicht speichern. Das ist nur zulässig unter einem **Auftragsverarbeitungsvertrag (AVV)** mit vertraglich zugesichertem **Zero-Retention**: Der Anbieter speichert das Audio nicht, nutzt es nicht zum Training und gibt es nicht weiter. Praktisch heißt das in der EU meist Azure OpenAI Whisper statt OpenAI-Direkt. Fehlt eine solche Zusicherung, ist die externe Transkription **nicht** zulässig; dann bleibt nur clientseitige oder selbst gehostete Transkription.
+Damit erhält ein Dritter das biometrische Datum — auch wenn wir es nicht speichern. Das ist nur zulässig unter einem **Auftragsverarbeitungsvertrag (AVV)** mit vertraglich zugesichertem **Zero-Retention**: Der Anbieter speichert das Audio nicht, nutzt es nicht zum Training und gibt es nicht weiter. Welche Anbieter zulässig sind und wo die Anbieterbindung liegt, entscheiden ADR-0036 und ADR-0038. Fehlt eine solche Zusicherung, ist die externe Transkription **nicht** zulässig; dann bleibt nur clientseitige oder selbst gehostete Transkription.
 
 Die Teilnehmer:in **willigt im Teilnahmefluss ein**, dass ihr Audio zur Transkription an diesen Auftragsverarbeiter geht. Ohne Einwilligung steht ausschließlich die Tastatureingabe zur Verfügung. Der Transport ist verschlüsselt; serverseitig wird das Audio nicht über den Transkriptions-Request hinaus gehalten (ADR-0007).
 
 Der **Probelauf** ist von der Einwilligungsstufe ausgenommen. Dort spricht die angemeldete Autor:in über ihr eigenes Material — nicht die pseudonyme Teilnehmer:in, deren Schutz aus ADR-0006 diese Stufe überhaupt trägt. Ein Probelauf ist schreibfrei und hat weder Teilnahme noch Sitzung, die einwilligen könnten; die Spracheingabe steht deshalb ohne vorgeschalteten Einwilligungsschritt bereit. Das Zero-Retention-Tor gilt unverändert auch hier: Ohne die vertragliche Zusicherung transkribiert auch der Probelauf nicht.
 
-## Nachtrag: Bei OpenRouter trägt die Zusage die Betreiber:in
+## Bei OpenRouter trägt die Zusage die Betreiber:in
 
 Die Anwendung lässt für die Transkription neben Infomaniak auch **OpenRouter**
 zu. Für dessen Transkriptionsroute lässt sich die Zero-Retention-Zusage
@@ -38,7 +31,7 @@ im Aufruf. Damit wird das Tor dieser ADR von einer **technischen** zu einer
 **Absenkung des Schutzniveaus**.
 
 `TRANSKRIPTION_ZERO_RETENTION` bleibt das eine Tor, hinter dem jede externe
-Transkription steht. Es bedeutet nach diesem Nachtrag: Die Betreiber:in erklärt,
+Transkription steht. Es bedeutet: Die Betreiber:in erklärt,
 dass für den in der Transkriptions-Konfiguration gewählten Anbieter eine
 Zero-Retention-Zusage vorliegt. Fehlt sie, bleibt der Schalter aus.
 
