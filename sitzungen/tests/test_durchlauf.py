@@ -73,6 +73,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         {
             "reihenfolge": 1,
             "eingabe": "Wie hast du gerechnet?",
+            "eingabemodus": "getippt",
             "denkspur": "Ich addiere.",
             "aeusserung": "2/5.",
             "fehlversuche": [
@@ -235,7 +236,12 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, kern, konfiguration)
         gespraechsschritt_ausfuehren(
-            sink, vignette, kern, konfiguration, eingabe="Warum?"
+            sink,
+            vignette,
+            kern,
+            konfiguration,
+            eingabe="Warum?",
+            eingabemodus="transkribiert",
         )
 
     db_schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
@@ -243,6 +249,7 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
         {
             "reihenfolge": db_schritt.reihenfolge,
             "eingabe": db_schritt.eingabe,
+            "eingabemodus": db_schritt.eingabemodus,
             "denkspur": db_schritt.denkspur,
             "aeusserung": db_schritt.aeusserung,
             "fehlversuche": list(

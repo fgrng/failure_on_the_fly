@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung
+from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
 from training.models import Training
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -165,6 +165,23 @@ class TrainingssitzungTests(TestCase):
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_trainingssitzung_fuehrt_den_eingabemodus_mit(self) -> None:
+        """Training folgt der Erhebung: Der Modus kommt aus dem Formular (Spec: #122)."""
+
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
+        )
+
+        self.client.post(
+            reverse("training:gespraech"),
+            {"eingabe": "Wie rechnest du?", "eingabemodus": "transkribiert"},
+        )
+
+        self.assertEqual(
+            Gespraechsschritt.objects.get().eingabemodus,
+            Eingabemodus.TRANSKRIBIERT,
+        )
 
     def test_schrittbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
         """Auch ein ausgeschöpftes Schrittbudget schließt erst mit Diagnose ab."""

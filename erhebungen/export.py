@@ -180,6 +180,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     "denkspur",
                     "aeusserung",
                     "erstellt_am",
+                    "eingabemodus",
                 ),
                 (
                     (
@@ -190,6 +191,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         schritt.denkspur,
                         schritt.aeusserung,
                         schritt.erstellt_am,
+                        schritt.eingabemodus,
                     )
                     for schritt in gespraechsschritte
                 ),

@@ -23,7 +23,13 @@ from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import FakeSprachmodell
-from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
+from sitzungen.models import (
+    Eingabemodus,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -1140,6 +1146,74 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertIsNone(schritt.aeusserung)
         self.assertEqual(
             Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3
+        )
+
+    def test_eingabemodus_kommt_aus_dem_formular_und_faellt_tolerant_zurueck(
+        self,
+    ) -> None:
+        """Der Modus reist im POST: fehlend oder unbekannt heißt getippt (Spec: #122)."""
+
+        self._vignette_anlegen(budget_wert=9)
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        ohne_feld: HttpResponse = self.client.post(
+            gespraech_url, {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(
+            gespraech_url,
+            {"eingabe": "Und warum?", "eingabemodus": "transkribiert"},
+        )
+        unbekannt: HttpResponse = self.client.post(
+            gespraech_url,
+            {"eingabe": "Wirklich?", "eingabemodus": "gepfiffen"},
+        )
+
+        self.assertEqual(ohne_feld.status_code, 200)
+        self.assertEqual(unbekannt.status_code, 200)
+        self.assertEqual(
+            [
+                schritt.eingabemodus
+                for schritt in Gespraechsschritt.objects.order_by("reihenfolge")
+            ],
+            [
+                Eingabemodus.GETIPPT,
+                Eingabemodus.TRANSKRIBIERT,
+                Eingabemodus.GETIPPT,
+            ],
+        )
+
+    def test_antwortloser_schritt_traegt_den_eingabemodus(self) -> None:
+        """Auch der Abbruchschritt nach ADR-0011 behält die Herkunft seiner Eingabe."""
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung = Erhebung.objects.anlegen(
+            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
+        )
+        self.erhebung.finalisieren()
+        self.stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        self.url = reverse(
+            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
+        )
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        self.client.post(
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            {"eingabe": "Wie rechnest du?", "eingabemodus": "transkribiert"},
+        )
+
+        self.assertEqual(
+            Gespraechsschritt.objects.get().eingabemodus,
+            Eingabemodus.TRANSKRIBIERT,
         )
 
     def test_vorzeitiges_gespraechsende_zeigt_den_debrief(self) -> None:

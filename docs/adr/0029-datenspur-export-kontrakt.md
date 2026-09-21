@@ -36,9 +36,15 @@ Eigentümerinnen Klarnamen und gehören deshalb nicht in den pseudonymen
 Datensatz. Die Historie bleibt allein als Gruppierungsschlüssel der verwendeten
 Fassungen erhalten.
 
-Transkribierte Eingaben sind im Export derzeit nicht erkennbar: Nach der
-Transkription wird nur ihr Text als gewöhnliche Eingabe gespeichert. Diese
-bekannte Grenze wird in #122 behandelt und blockiert den Export nicht.
+Jeder Gesprächsschritt trägt in `eingabemodus`, woher sein abgeschickter Text
+stammt: `getippt`, `transkribiert` oder `gemischt`. Der Wert ist nie leer und
+nie `NA`. Er beschreibt die Herkunft des Textes, nicht seine Bearbeitung — ein
+Vergleich zwischen Rohtranskript und abgeschickter Fassung findet nicht statt,
+und das Rohtranskript wird nicht aufbewahrt. Bestimmt wird er im Browser der
+Teilnehmer:in: Er taugt zur Varianzkontrolle in der Auswertung, nicht als
+fälschungssicherer Nachweis. Gesprächsschritte aus der Zeit vor seiner
+Einführung tragen den Startwert `getippt`, ohne dass er dort erhoben wurde. Die
+Diagnose führt den Modus noch nicht; das behandelt #239.
 
 ## Dateiformat
 
@@ -57,7 +63,7 @@ Pfade statt als Inhalt.
 | `teilnahmen.csv` | `token`, `stichprobe_id`, `einwilligung_erteilt`, `audioverarbeitung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
 | `vignettenziehungen.csv` | `token`, `vignette_id`, `position` |
 | `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am` |
-| `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am` |
+| `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |

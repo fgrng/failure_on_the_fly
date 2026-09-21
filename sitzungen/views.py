@@ -28,7 +28,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.models import Gespraechsschritt, Sitzung
+from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import (
     DBSink,
     GespraechsschrittDaten,
@@ -108,6 +108,7 @@ def _gespraech_anzeigen(
     kern: Simulationskern,
     schritte: list[GespraechsschrittDaten],
     erneute_eingabe: str | None = None,
+    erneuter_eingabemodus: str = Eingabemodus.GETIPPT,
 ) -> HttpResponse:
     """Rendert das Diagnosegespräch mit seinem bisherigen Verlauf."""
 
@@ -119,6 +120,7 @@ def _gespraech_anzeigen(
         ist_probelauf=True,
         navigation=_sitzungsnavigation(),
         erneute_eingabe=erneute_eingabe,
+        erneuter_eingabemodus=erneuter_eingabemodus,
         spracheingabe_verfuegbar=True,
     )
 
@@ -267,15 +269,21 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
     )
     eingabe: str = request.POST["eingabe"]
+    eingabemodus: Eingabemodus = Eingabemodus.aus_formular(
+        request.POST.get("eingabemodus")
+    )
     ausgang: Ausgang = gespraechsschritt_ausfuehren(
         sink,
         vignette,
         kern,
         modell_konfiguration,
         eingabe,
+        eingabemodus,
     )
     if ausgang is Ausgang.GESCHEITERT:
-        return _gespraech_anzeigen(request, vignette, kern, schritte, eingabe)
+        return _gespraech_anzeigen(
+            request, vignette, kern, schritte, eingabe, eingabemodus
+        )
     if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return _debrief_anzeigen(request, vignette, kern, schritte)
     return _gespraech_anzeigen(request, vignette, kern, schritte)
@@ -491,6 +499,7 @@ def persistiertes_gespraech(
         sitzung.simulationskern,
         sitzung.modell_konfiguration,
         request.POST["eingabe"],
+        Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
     )
     if ausgang is Ausgang.GESCHEITERT:
         return persistierten_fehler_anzeigen(

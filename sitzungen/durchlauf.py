@@ -11,7 +11,7 @@ from django.shortcuts import render
 
 from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Gespraechsschritt, Sitzung
+from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from vignetten.models import Vignette, rahmen_platzhalter
 
@@ -66,6 +66,7 @@ def gespraechsschritt_ausfuehren(
     simulationskern: Simulationskern,
     modell_konfiguration: ModellKonfiguration,
     eingabe: str,
+    eingabemodus: str = Eingabemodus.GETIPPT,
 ) -> Ausgang:
     """Führt den einen Gesprächsschritt aller drei Anlässe aus und meldet seinen Ausgang.
 
@@ -90,12 +91,14 @@ def gespraechsschritt_ausfuehren(
     if antwortversuch.antwort is None:
         sink.gescheiterten_schritt_behandeln(
             eingabe=eingabe,
+            eingabemodus=eingabemodus,
             fehlversuche=fehlversuche,
         )
         sink.zeitbudget_fortsetzen()
         return Ausgang.GESCHEITERT
     sink.gespraechsschritt_anhaengen(
         eingabe=eingabe,
+        eingabemodus=eingabemodus,
         denkspur=antwortversuch.antwort.denkspur,
         aeusserung=antwortversuch.antwort.aeusserung,
         fehlversuche=fehlversuche,
@@ -154,6 +157,7 @@ def sitzung_anzeigen(
     ist_probelauf: bool,
     navigation: Sitzungsnavigation,
     erneute_eingabe: str | None = None,
+    erneuter_eingabemodus: str = Eingabemodus.GETIPPT,
     ist_gescheitert: bool = False,
     zeigt_debrief: bool = False,
     ist_lesend: bool = False,
@@ -172,6 +176,7 @@ def sitzung_anzeigen(
         "gespraechsschritte": gespraechsschritte,
         "ist_probelauf": ist_probelauf,
         "erneute_eingabe": erneute_eingabe,
+        "erneuter_eingabemodus": erneuter_eingabemodus,
         "ist_gescheitert": ist_gescheitert,
         "debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,

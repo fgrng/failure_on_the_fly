@@ -97,6 +97,10 @@ _Avoid_: Bot, Agent, KI-Schüler, Avatar
 Ein Austauschpaar aus einer Eingabe der Teilnehmer:in und der darauffolgenden Antwort der simulierten Schüler:in. Enthält intern noch die Denkspur der simulierten Schüler:in und eventuelle Fehlversuche. Scheitert der Antwortversuch endgültig, bleibt der Gesprächsschritt ohne Antwort bestehen: Er trägt die Fehlversuche und dokumentiert damit den Abbruch der Sitzung.
 _Avoid_: Nachricht, Turn, Zug
 
+**Eingabemodus**:
+Woher der abgeschickte Text einer freien Eingabe stammt: **getippt**, **transkribiert** (ausschließlich aus Aufnahmen) oder **gemischt** (getippter und transkribierter Anteil im selben Text). Er beschreibt die Herkunft des Textes, nicht eine Bearbeitung: »gemischt« heißt nicht »nachträglich überarbeitet«, und ob eine Teilnehmer:in ihr Transkript vor dem Absenden geändert hat, hält das System nirgends fest. Im Browser bestimmt und darum kein fälschungssicherer Nachweis, sondern eine Kovariate für die Auswertung; er geht mit der Datenspur in den Export (ADR-0029). In der Gesprächseingabe entsteht »gemischt« nicht, weil das Transkript dort schreibgeschützt und sofort abgeschickt wird.
+_Avoid_: bearbeitet, redigiert, Eingabeart, Modalität, Input-Modus
+
 **Debrief**:
 Der Abschnitt der Rahmenhandlung, in dem die erfahrene Lehrperson nach dem Diagnosegespräch um die Diagnose bittet. Er beendet jede regulär abgeschlossene Sitzung und erreicht keinen Prompt.
 _Avoid_: Nachbesprechung, Reflexion, Auswertung

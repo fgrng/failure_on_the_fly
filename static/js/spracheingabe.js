@@ -68,6 +68,9 @@
                 if (automatischAbsenden) {
                     eingabe.readOnly = true;
                     eingabe.value = ergebnis.text;
+                    // Das Feld ist schreibgeschützt und geht sofort raus: hier
+                    // entsteht nie ein gemischter Text.
+                    if (formular.elements.eingabemodus) formular.elements.eingabemodus.value = "transkribiert";
                 } else {
                     textAnhaengen(eingabe, ergebnis.text);
                     if (tastatureingabe) tastatureingabe.required = false;
