@@ -463,6 +463,18 @@ class ModellvorschlaegeEndpunktTests(TestCase):
 
         self.assertContains(response, "OpenRouter ist nicht erreichbar.")
 
+    def test_setzt_den_vorschlag_in_das_feld_des_formulars(self) -> None:
+        """Die Naht nennt das Feld, das das Formular für das Sprachmodell rendert."""
+        feld: str = ModellKonfigurationForm()["sprachmodell"].auto_id
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"), _abrufdaten()
+            )
+
+        self.assertContains(response, f"getElementById('{feld}')")
+
     def test_meldet_den_anbieter_fake_ohne_netzaufruf(self) -> None:
         """Beim Anbieter »fake« gibt es nichts abzurufen."""
         with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
