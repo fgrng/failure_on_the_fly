@@ -2,6 +2,8 @@
 
 > **Nachtrag 2026-09-21** ([#174](https://github.com/fgrng/failure_on_the_fly/issues/174)): Die unter Abschnitt 7 angedachte Streichung der nativen Reasoning-Spur ist entschieden und umgesetzt. Alles, was dieser Text über sie sagt — insbesondere der Codebefund in Abschnitt 1.3 —, beschreibt den Stand vom 2026-09-18 und gilt nicht mehr. Maßgeblich sind ADR-0005 und ADR-0016.
 
+> **Nachtrag 2026-09-21** ([#226](https://github.com/fgrng/failure_on_the_fly/issues/226)): Infomaniaks Modellliste ist inzwischen an einem echten Konto abgerufen. Die Abschnitte 1.2 und 4.2 sind auf diesen verifizierten Stand gebracht; der frühere Vorbehalt »kein Konto vorhanden« und die Modellnamen aus der Drittquelle sind ersetzt. Die Empfehlung aus 4.3 — Autovervollständigung ja, harte Prüfung nein — bleibt davon unberührt.
+
 Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die offene Frage »Zulässige Anbieter und Modelle« aus `docs/open-questions.md`:
 
 > Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
@@ -21,7 +23,7 @@ Auf der Sprachmodell-Naht ist **kein Codeänderungsbedarf**: der bestehende `Lit
 
 Die **Zugangsdaten wandern in die Konfiguration**, in eine benannte Feldgruppe `anbieter`, `anbieter_basis_url`, `anbieter_token` mit fester Anbieterauswahl — und zwar in **zwei getrennte Objekte**, eines je Naht (Abschnitt 3). Damit lässt sich das Sprachmodell über OpenRouter und die Transkription über Infomaniak fahren; nebenbei lösen sich Infomaniaks zwei verschiedene Endpunktwurzeln und die Frage der Schlüsselrotation.
 
-Beide Anbieter liefern ihre Modellliste per API — OpenRouter **öffentlich und nach Structured Output filterbar**, Infomaniak nur mit Token. Das trägt eine Autovervollständigung im Formular, aber keine harte Prüfung (Abschnitt 4).
+Beide Anbieter liefern ihre Modellliste per API — OpenRouter **öffentlich und nach Structured Output filterbar**, Infomaniak nur mit Token, dafür kontoweit und ohne `product_id`. Das trägt eine Autovervollständigung im Formular, aber keine harte Prüfung (Abschnitt 4).
 
 Zur ersten Hälfte der offenen Frage — der **Liste**: keine erzwungene Modellliste (bestätigt #165), stattdessen zwei Betriebs-Tore und ein Rauchtest über den Probelauf.
 
@@ -55,7 +57,7 @@ Zur ersten Hälfte der offenen Frage — der **Liste**: keine erzwungene Modelll
 - **LiteLLM-Routing:** **kein** eigener LiteLLM-Provider. Der Weg führt über den OpenAI-kompatiblen Pfad: Model-String `openai/<modell>` (z. B. `openai/qwen3`) mit `api_base: https://api.infomaniak.com/2/ai/<product_id>/openai/v1`. Keine Codeänderung an der Naht.
 - **Structured Output:** unterstützt und die **einzige** noch unterstützte Form. Die API-Doku zu `response_format.type` sagt: nur `json_schema` wird derzeit unterstützt, `text` ist das Standardverhalten, `json_object` ist obsolet. `strict: true` wird geführt und verweist auf den OpenAI-Structured-Outputs-Leitfaden. Unser `AUSGABE_SCHEMA` (`denkspur` vor `aeusserung`, `additionalProperties: false`, beide `required`) erfüllt die strict-Teilmenge.
 - **Native Reasoning-Spur:** über `reasoning_effort` steuerbar, laut Doku aber nur als An/Aus (`"none"` schaltet das Denken ab, jeder andere Wert an). Bei den meisten Modellen ist es per Vorgabe an. **Nicht** unterstützt u. a. von `apertus-ai/Apertus-v1.5-70B` und `mistral3`. Das Antwortschema führt `usage.completion_tokens_details.reasoning_tokens`; ob zusätzlich ein Textfeld mit der Spur zurückkommt, geht aus der Doku nicht hervor und ist empirisch zu prüfen.
-- **Modelle:** Die API-Doku nennt als Beispiele `qwen3`, `swiss-ai/Apertus-70B-Instruct-2509`, `Qwen/Qwen3-VL-235B-A22B-Instruct`. Eine Drittquelle listet zehn Modelle, darunter `Qwen/Qwen3.5-122B-A10B-FP8`, `Qwen/Qwen3.5-397B-A17B-FP8`, `swiss-ai/Apertus-v1.5-70B`, `moonshotai/Kimi-K2.6`, `mistral-ai/Mistral-Small-4-119B-2603`, `google/gemma-4-31B-it`, `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` sowie zwei Embedding-Modelle. **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — das steht aus, weil kein Infomaniak-Konto vorliegt.
+- **Modelle:** **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — am **2026-09-21** an einem echten Konto abgerufen (Einzelheiten in 4.2). Die kontoweite Liste führt **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier Sprachmodelle sind als Beta gekennzeichnet, sieben als `coming_soon` — letzteres ist kein Verfügbarkeitskriterium (4.2). Namentlich belegt sind aus der Kontoabfrage u. a. `swiss-ai/Apertus-v1.5-70B` auf dieser Naht und `whisper` auf der Transkriptions-Naht. Die früher hier geführte Liste einer Drittquelle trägt die Modellnamen nicht mehr; sie steht nur noch als Beleg in den Quellen.
 - **Datenschutz:** Infomaniak wirbt für die AI Services mit Betrieb in eigenen Schweizer Rechenzentren, „Es werden keine Anfragen gespeichert", „Ihre Prompts werden weder gespeichert noch dazu verwendet, die Modelle zu trainieren oder unsere Dienstleistungen zu verbessern" und voller DSG-/DSGVO-Konformität. Inhaltlich ist das genau die Zusage, die ADR-0026 verlangt. Ob sie **vertraglich** in einem AVV steht, ist HITL zu klären.
 
 ### 1.3 Was der bestehende Code schon trägt
@@ -196,13 +198,28 @@ Der kombinierte Filter wirkt als UND (alle 239 Treffer führen beide Parameter).
 
 **Wichtiger Vorbehalt gegen eine harte Prüfung:** `supported_parameters` auf Modellebene ist die Vereinigung über alle Provider-Endpunkte. Verifiziertes Gegenbeispiel: `deepseek/deepseek-v4.1-flash` steht in der `structured_outputs`-Liste, aber drei seiner acht Endpunkte (Relace, DeepSeek, StreamLake) können es nicht. Eine Prüfung gegen diese Liste sagt also nur „mindestens ein Endpunkt kann es" — das Routing kann trotzdem auf einem anderen landen. **`require_parameters: true` bleibt deshalb zwingend**, auch bei geprüftem Modellnamen.
 
-### 4.2 Infomaniak: nur mit Token
+### 4.2 Infomaniak: mit Token, aber ohne `product_id`
 
-`GET https://api.infomaniak.com/1/ai/models` verlangt Authentifizierung (verifiziert: `401 not_authorized` ohne Schlüssel); dasselbe gilt für `GET /2/ai/{product_id}/openai/v1/models`. Eine Liste ohne Zugangsdaten gibt es nicht. Da das Token künftig an der Modell-Konfiguration liegt (Abschnitt 3), ist das lösbar — aber mit einer Henne-Ei-Ordnung: erst Anbieter, Basis-URL und Token eintragen, dann die Modellliste abrufen.
+`GET https://api.infomaniak.com/1/ai/models` verlangt Authentifizierung (verifiziert: `401 not_authorized` ohne Schlüssel); dasselbe gilt für `GET /2/ai/{product_id}/openai/v1/models`. Eine Liste ohne Zugangsdaten gibt es nicht. Beide Abrufe sind am **2026-09-21 an einem echten Konto verifiziert**; der frühere Vorbehalt, mangels Konto sei die Liste unüberprüfbar, ist damit erledigt.
+
+**Zwei Listen, und sie sind nicht gleichwertig.**
+
+| | kontoweit `GET /1/ai/models` | OpenAI-kompatibel `GET /2/ai/{product_id}/openai/v1/models` |
+|---|---|---|
+| `product_id` nötig | **nein** | ja |
+| Je Eintrag | Typ, Klarname, Version, Beta-Kennung | praktisch nur die ID |
+| Modellarten | über `type` getrennt (`llm`, `stt`, Embedding, Reranker, Bild) | Sprachmodelle, Embedding- und Reranker-Modelle in einem Topf, kein Typ |
+| Transkriptionsmodell | enthalten | **gar nicht enthalten** |
+
+Verifizierter Umfang der kontoweiten Liste: **16 Einträge**, davon **8 Sprachmodelle** und **1 Transkriptionsmodell**.
+
+**Der Verfügbarkeitsstatus trügt.** Sieben der acht Sprachmodelle sind als `coming_soon` geführt. Ein Testaufruf gegen ein so markiertes Modell wurde am 2026-09-21 regulär beantwortet. Das Feld hinkt der Freischaltung hinterher und taugt deshalb **nicht als Filterkriterium** — wer danach filtert, verbirgt sieben funktionierende Modelle und bietet am Ende genau eines an.
+
+**Keine Henne-Ei-Ordnung.** Weil die kontoweite Liste ohne `product_id` antwortet, hängt der Abruf **allein am Token** und nicht zusätzlich an der Basis-URL. Das Token genügt; die Endpunktwurzel darf danach folgen.
 
 ### 4.3 Empfehlung: Autovervollständigung ja, harte Prüfung nein
 
-- **Autovervollständigung**: sinnvoll und billig. Bei OpenRouter direkt beim Tippen gegen die öffentliche, gefilterte Liste; bei Infomaniak erst nach dem Speichern von Token und Basis-URL, also im Bearbeiten-Schritt. Beides mit kurzem Cache, damit das Formular nicht bei jedem Tastendruck über das Netz geht.
+- **Autovervollständigung**: sinnvoll und billig. Bei OpenRouter direkt beim Tippen gegen die öffentliche, gefilterte Liste; bei Infomaniak gegen die kontoweite Liste, sobald ein Token vorliegt — die Basis-URL mit der `product_id` braucht sie nicht (4.2). Beides mit kurzem Cache, damit das Formular nicht bei jedem Tastendruck über das Netz geht.
 - **Harte Prüfung**: nicht empfohlen. Sie macht das Anlegen einer Konfiguration von der Erreichbarkeit einer fremden API abhängig — und schlägt genau dann fehl, wenn man sie am dringendsten braucht: bei einer Störung. Dazu der Vorbehalt aus 4.1, der ihr bei OpenRouter ohnehin die Schärfe nimmt. Wird ein Modellname falsch geschrieben, meldet der Probelauf das beim ersten Aufruf.
 - **Kompromiss, falls doch gewünscht**: eine **Warnung** im Formular („dieses Modell steht bei OpenRouter nicht in der Liste der Modelle mit Structured Output"), die das Speichern nicht blockiert. Das gibt den Hinweis, ohne den Betrieb an eine fremde API zu koppeln.
 
@@ -225,10 +242,11 @@ Das Anbieterfeld aus Abschnitt 3 ist dagegen sehr wohl eine feste Liste — gepr
 
 ## 6. Offene Punkte
 
-### 6.1 Entschieden (2026-09-18)
+### 6.1 Entschieden und verifiziert
 
 - **`openai/gpt-4o` wird abgelöst.** Seeds (`seeds/.../entwicklungsdaten_anlegen.py:51`, `seeds/.../workshopdaten_anlegen.py:28`), README (`:266`) und die Bestandsdatensätze stellen auf **OpenRouter** um. Die Anbieterliste bleibt damit bei `fake`, `openrouter`, `infomaniak`; OpenAI-direkt wird nicht aufgenommen.
 - **`openrouter` darf als Transkriptionsanbieter gewählt werden.** `clean()` verbietet die Kombination nicht. Für die Zero-Retention-Zusage ist die **Administrator:in verantwortlich, die die Konfiguration anlegt** — dieselbe Verantwortung, die `TRANSKRIPTION_ZERO_RETENTION` schon heute bezeugt (3.5). Die offene Frage aus 6.2 bleibt damit eine Betriebsfrage, keine Sperre im Code.
+- **Infomaniaks Modellliste liegt vor (2026-09-21).** `GET /1/ai/models` ist mit gültigem Kontotoken abgerufen; Umfang, Typfeld und Verfügbarkeitsstatus stehen in 4.2. Damit ist der frühere offene Punkt geschlossen. Die Anschlussfrage, welche Infomaniak-Modelle Structured Output *und* Reasoning zugleich liefern, ist mit dem Wegfall der nativen Spur ([#174](https://github.com/fgrng/failure_on_the_fly/issues/174), Nachtrag oben) gegenstandslos.
 - **Die Repo-Abhängigkeiten werden umprogrammiert.** Sie sind in [#169](https://github.com/fgrng/failure_on_the_fly/issues/169) skizziert und werden dort genauer geplant; der Editor entsteht ebenfalls dort.
 
 ### 6.2 Vertragliche Klärungen (HITL)
@@ -238,13 +256,11 @@ Keine Sperre im Code — sie liegen in der Verantwortung der Betreiber:in (6.1).
 - **Greifen `zdr`/`data_collection` auf OpenRouters Transkriptionsroute?** Ohne Antwort ist die Transkription über OpenRouter nach ADR-0026 nicht freizugeben. Bei OpenRouter zu erfragen.
 - **AVV und Verarbeitungsort bei OpenRouter.** Ohne Klärung bleibt OpenRouter auf Training und Probelauf beschränkt.
 - **AVV bei Infomaniak.** Die öffentliche Zusage deckt ADR-0026 inhaltlich; das Papier fehlt.
-- **Verbindliche Modellliste von Infomaniak** über `GET /1/ai/models` mit Token — samt der Frage, welche Modelle Structured Output *und* Reasoning zugleich liefern. Für OpenRouter ist diese zweite Hälfte der offenen Frage mit 4.1 beantwortet (239 Modelle können beides); für Infomaniak bleibt sie offen — und wird gegenstandslos, falls die native Spur nach Abschnitt 7 fällt.
-- **Empirische Prüfung**, ob Infomaniak eine native Reasoning-Spur als Text zurückgibt oder nur `reasoning_tokens` zählt.
 - **Verschlüsselung von `anbieter_token` at rest** — eigene Entscheidung, nicht Teil dieser Frage.
 
 ### 6.3 Ungeprüft geblieben
 
-- **Native Reasoning-Spur bei Infomaniak** — ob ein Textfeld zurückkommt oder nur `reasoning_tokens` gezählt werden, ließ sich ohne Konto nicht feststellen.
+- **Native Reasoning-Spur bei Infomaniak** — ob ein Textfeld zurückkommt oder nur `reasoning_tokens` gezählt werden, wurde nicht erprobt; mit dem Wegfall der nativen Spur (#174) gegenstandslos.
 - **Infomaniaks Transkriptions-Polling** — Antwortform und Zeitverhalten von `GET /1/ai/{product_id}/results/{batch_id}` sind nur aus der Doku bekannt, nicht erprobt. Der Timeout des Adapters lässt sich erst danach sinnvoll wählen.
 - **Dateigrößengrenze** des Infomaniak-`file`-Parameters (»Max length« in Kilobyte) — anbieter- bzw. produktabhängig, nicht dokumentiert.
 
@@ -315,12 +331,12 @@ Bei positiver Entscheidung:
 
 - Infomaniak, [Create chat completion (`POST /2/ai/{product_id}/openai/v1/chat/completions`)](https://developer.infomaniak.com/docs/api/post/2/ai/%7Bproduct_id%7D/openai/v1/chat/completions) — `response_format`, `reasoning_effort`, `model`, Antwortschema.
 - Infomaniak, [Create transcription (`POST /1/ai/{product_id}/openai/audio/transcriptions`)](https://developer.infomaniak.com/docs/api/post/1/ai/%7Bproduct_id%7D/openai/audio/transcriptions) — asynchrones Verhalten, `batch_id`, Formate, Sprachen.
-- Infomaniak, [List models (`GET /1/ai/models`)](https://developer.infomaniak.com/docs/api/get/1/ai/models).
+- Infomaniak, [List models (`GET /1/ai/models`)](https://developer.infomaniak.com/docs/api/get/1/ai/models) — am 2026-09-21 mit gültigem Kontotoken abgefragt und verifiziert (16 Einträge, `type`-Feld, Beta- und `coming_soon`-Kennung); dazu `GET /2/ai/{product_id}/openai/v1/models` zum Vergleich und ein Chat-Aufruf gegen ein als `coming_soon` geführtes Modell.
 - Infomaniak, [AI Tools – Produktseite](https://www.infomaniak.com/de/hosting/ai-tools) — Schweizer Rechenzentren, keine Speicherung von Anfragen, kein Training auf Prompts, DSG/DSGVO.
 - OpenRouter, [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs) — Unterstützung je Endpunkt, `require_parameters`.
 - OpenRouter, [Speech-to-Text](https://openrouter.ai/docs/guides/overview/multimodal/stt) — `/api/v1/audio/transcriptions`, Formate, 25-MB-/60-s-Grenzen, Hinweis zu nicht angewandten Routing-Präferenzen.
 - OpenRouter, [Whisper Large V3](https://openrouter.ai/openai/whisper-large-v3) und `GET /api/v1/models/openai/whisper-large-v3/endpoints` — Modalität `audio->transcription`, Provider DeepInfra/Together/Groq.
 - OpenRouter, `GET /api/v1/models` mit `supported_parameters=structured_outputs[,reasoning]` und `output_modalities=transcription` — ohne Authentifizierung abgefragt und verifiziert; Endpunkt-Varianz an `deepseek/deepseek-v4.1-flash` geprüft.
 - OpenRouter, [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) und [Reasoning Tokens](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) — `zdr`, `data_collection`, `reasoning_details`.
-- [Mastra: Infomaniak-Modellliste](https://mastra.ai/models/providers/infomaniak) — Drittquelle für Modell-IDs und Base-URL.
+- [Mastra: Infomaniak-Modellliste](https://mastra.ai/models/providers/infomaniak) — Drittquelle für Modell-IDs und Base-URL; seit der Kontoabfrage (4.2) nur noch Beleg, sie trägt die Modellnamen nicht mehr.
 - LiteLLM 1.80.10, lokal geprüft: `LlmProviders`, `litellm.main.transcription` (nur `azure`/`openai`), `litellm_core_utils/prompt_templates/common_utils.py:1040-1057`.
