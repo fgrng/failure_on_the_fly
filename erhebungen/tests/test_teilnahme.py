@@ -125,6 +125,27 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         return Erhebungsbindung.objects.get()
 
+    def _scheiternde_erhebung_einrichten(self) -> None:
+        # Ersetzt Erhebung, Stichprobe und Link durch einen stets scheiternden Aufbau.
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        self.erhebung = Erhebung.objects.anlegen(
+            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
+        )
+        self.erhebung.finalisieren()
+        self.stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        self.url = reverse(
+            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
+        )
+
     def _abschluss_item_anlegen(
         self,
         *,
@@ -1078,23 +1099,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_modellversagen_zeigt_den_sitzungsblock(self) -> None:
         """Ein gescheitertes Diagnosegespräch trägt seine Itemzeilen nach einem Schritt."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.anlegen(
-            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
-        )
-        self.erhebung.finalisieren()
-        self.stichprobe = Stichprobe.objects.create(
-            erhebung=self.erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now() + timedelta(days=1),
-        )
-        self.url = reverse(
-            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
-        )
+        self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
@@ -1115,23 +1120,7 @@ class ErhebungsteilnahmeTests(TestCase):
     ) -> None:
         """Ein Modellfehler beendet die Erhebungssitzung lesbar und persistent."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.anlegen(
-            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
-        )
-        self.erhebung.finalisieren()
-        self.stichprobe = Stichprobe.objects.create(
-            erhebung=self.erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now() + timedelta(days=1),
-        )
-        self.url = reverse(
-            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
-        )
+        self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
@@ -1186,23 +1175,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_antwortloser_schritt_traegt_den_eingabemodus(self) -> None:
         """Auch der Abbruchschritt nach ADR-0011 behält die Herkunft seiner Eingabe."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={"skript": [{"fehler": "anbieterfehler"}] * 3},
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.erhebung = Erhebung.objects.anlegen(
-            self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
-        )
-        self.erhebung.finalisieren()
-        self.stichprobe = Stichprobe.objects.create(
-            erhebung=self.erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now() + timedelta(days=1),
-        )
-        self.url = reverse(
-            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
-        )
+        self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
