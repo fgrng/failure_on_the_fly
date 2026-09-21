@@ -26,16 +26,12 @@ MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 INFOMANIAK_INTERVALL_SEKUNDEN: float = 2.0
 
 # Infomaniak richtet die Gestalt des Stapelergebnisses nach diesem Parameter des
-# Absendens — er ist deshalb bedeutungstragend und nicht kosmetisch:
-#
-# - mit "text" (so senden wir) ist `data` die schlichte Transkriptzeichenkette,
-#   Zeilen durch `\n` getrennt, und `file_name` endet auf `.txt`;
-# - ohne ihn ist `data` stattdessen eine JSON-kodierte Zeichenkette der Form
-#   {"text": "…"} und `file_name` endet auf `.json`.
-#
-# Wer ihn streicht oder ändert, bekäme von `_transkript` also ein JSON-Fragment
-# samt Klammern und Feldnamen als Transkript. Am echten Konto verifiziert
-# (#232); ein Test hält die Kopplung fest.
+# Absendens; er ist deshalb bedeutungstragend und nicht kosmetisch. Mit "text"
+# ist `data` die schlichte Transkriptzeichenkette, Zeilen durch `\n` getrennt,
+# und `file_name` endet auf `.txt`. Ohne ihn stünde dort eine JSON-kodierte
+# Zeichenkette der Form {"text": "…"}, die `_transkript` samt Klammern und
+# Feldnamen als Transkript durchreichte. Am echten Konto verifiziert (#232);
+# ein Test hält die Kopplung fest.
 INFOMANIAK_ANTWORTFORMAT: str = "text"
 
 # Infomaniak meldet den Stand eines Stapels als Zeichenkette. Alles, was hier
@@ -206,11 +202,9 @@ class InfomaniakTranskription:
 
     @staticmethod
     def _transkript(ergebnis: Any) -> str:
-        # Liest den Text aus dem fertigen Stapelergebnis. Das `data`-Feld ist
-        # dort nie eine Abbildung, sondern stets eine Zeichenkette — und weil
-        # das Absenden INFOMANIAK_ANTWORTFORMAT mitschickt, ist sie bereits das
-        # Transkript und wird unverändert durchgereicht. Was ohne diesen
-        # Parameter zurückkäme und hier nicht gelesen werden darf, steht dort.
+        # Liest den Text aus dem fertigen Stapelergebnis. Weil das Absenden
+        # INFOMANIAK_ANTWORTFORMAT mitschickt, ist `data` bereits das rohe
+        # Transkript und wird unverändert durchgereicht.
 
         if not isinstance(ergebnis, str):
             raise TranskriptionsAnbieterfehler(
@@ -235,10 +229,7 @@ class InfomaniakTranskription:
         # Ergebnisroute trägt selbst ein `data`-Feld, aber kein `result` — an
         # `data` allein geschält, gäbe die Heuristik dessen Inhalt statt des
         # Stapels zurück.
-        umschlagen: bool = (
-            isinstance(nutzlast, dict) and "result" in nutzlast and "data" in nutzlast
-        )
-        if umschlagen:
+        if isinstance(nutzlast, dict) and "result" in nutzlast and "data" in nutzlast:
             return nutzlast["data"]
         return nutzlast
 

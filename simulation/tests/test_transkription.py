@@ -232,13 +232,12 @@ def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
 
 # Der am echten Konto beobachtete Text. Mit dem abgesendeten
 # INFOMANIAK_ANTWORTFORMAT steht er unverändert im `data`-Feld des Stapels:
-# eine schlichte Zeichenkette mit `\n` zwischen den Zeilen, keine Abbildung
-# und kein JSON. Der abschließende Zeilenumbruch stammt vom Anbieter.
+# eine schlichte Zeichenkette mit `\n` zwischen den Zeilen, keine Abbildung und
+# kein JSON. Der abschließende Zeilenumbruch stammt vom Anbieter.
 _BEOBACHTETES_TRANSKRIPT: str = "Vielen Dank.\nVielen Dank.\nVielen Dank.\n"
 
-# Dieselbe Äußerung, wie derselbe Endpunkt sie **ohne** den Parameter abgelegt
-# hätte: eine JSON-kodierte Zeichenkette. Diese Gestalt darf nie als Transkript
-# durchgereicht werden — sie trägt Klammern und Feldnamen.
+# Dieselbe Äußerung, wie derselbe Endpunkt sie ohne den Parameter abgelegt
+# hätte: eine JSON-kodierte Zeichenkette.
 _ERGEBNIS_OHNE_ANTWORTFORMAT: str = json.dumps(
     {"text": " Vielen Dank. Vielen Dank. Vielen Dank."}
 )
@@ -268,8 +267,8 @@ def _laufender_stapel() -> Mock:
 
 def _fertiger_stapel(data: object = _BEOBACHTETES_TRANSKRIPT) -> Mock:
     # Das Stapelobjekt eines fertigen Auftrags, Feld für Feld wie am echten
-    # Konto beobachtet. Die Endung `.txt` in `file_name` gehört zum
-    # abgesendeten Antwortformat — ohne den Parameter stünde dort `.json`.
+    # Konto beobachtet. Die Endung `.txt` in `file_name` gehört zum abgesendeten
+    # Antwortformat — ohne den Parameter stünde dort `.json`.
 
     return _antwort(
         {
@@ -306,37 +305,39 @@ def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
     )
 
 
-def test_infomaniak_transkription_bindet_das_transkript_an_das_antwortformat() -> None:
-    """Der Text im Stapel ist nur deshalb roh lesbar, weil wir das Format senden.
+def test_infomaniak_transkription_sendet_das_vereinbarte_antwortformat() -> None:
+    """Das Absenden nennt das Format, an dem die Gestalt des Ergebnisses hängt."""
 
-    Fiele `response_format` weg, legte derselbe Endpunkt in `data` eine
-    JSON-kodierte Zeichenkette ab — die dann ungeprüft als Transkript
-    durchgereicht würde, samt Klammern und Feldnamen. Der Test hält beide
-    Enden der Kopplung fest: den gesendeten Parameter und das, was ohne ihn
-    käme und hier nicht als Transkript gelten darf.
-    """
-
-    audio = b"aufgenommene-audiobytes"
     client = Mock()
     client.post.return_value = _absende_antwort()
     client.get.return_value = _fertiger_stapel()
 
-    _infomaniak_transkription(client).transkribieren(audio)
+    _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
     assert client.post.call_args.kwargs["data"]["response_format"] == (
         INFOMANIAK_ANTWORTFORMAT
     )
     assert INFOMANIAK_ANTWORTFORMAT == "text"
 
-    # Und so sähe der Schaden aus, wenn der Parameter fiele: Derselbe Adapter
-    # gäbe die JSON-Hülle unbesehen als Transkript aus. Der Adapter erkennt das
-    # nicht — er darf es nicht müssen, solange das Absenden das Format nennt.
+
+def test_infomaniak_transkription_reicht_den_stapeltext_ungeprueft_durch() -> None:
+    """Der Adapter liest `data` nicht, er gibt es aus — so sähe der Schaden aus.
+
+    Fiele `response_format` weg, legte derselbe Endpunkt in `data` eine
+    JSON-kodierte Zeichenkette ab, die derselbe Adapter unbesehen als
+    Transkript ausgäbe, samt Klammern und Feldnamen. Er erkennt das nicht —
+    er darf es nicht müssen, solange das Absenden das Format nennt.
+    """
+
+    client = Mock()
+    client.post.return_value = _absende_antwort()
     client.get.return_value = _fertiger_stapel(_ERGEBNIS_OHNE_ANTWORTFORMAT)
 
-    durchgereicht: str = _infomaniak_transkription(client).transkribieren(audio)
+    durchgereicht: str = _infomaniak_transkription(client).transkribieren(
+        b"aufgenommene-audiobytes"
+    )
 
     assert durchgereicht == _ERGEBNIS_OHNE_ANTWORTFORMAT
-    assert durchgereicht.startswith('{"text"')
 
 
 def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> None:
