@@ -870,12 +870,12 @@ def _naechste_sitzung_starten(bindung: Erhebungsbindung, erhebung: Erhebung) -> 
     return True
 
 
-def _weiter_nach_der_letzten_vignette(binding: Erhebungsbindung) -> HttpResponse:
+def _weiter_nach_der_letzten_vignette(bindung: Erhebungsbindung) -> HttpResponse:
     """Leitet zum Abschluss-Block oder zum Abschluss der Erhebung weiter."""
 
-    teilnahme_link: UUID = binding.stichprobe.teilnahme_link
-    if isinstance(naechster_schritt(binding), Itemblock):
-        return redirect("erhebungen:itemblock", token=binding.token)
+    teilnahme_link: UUID = bindung.stichprobe.teilnahme_link
+    if isinstance(naechster_schritt(bindung), Itemblock):
+        return redirect("erhebungen:itemblock", token=bindung.token)
     return redirect("erhebungen:abschluss", teilnahme_link=teilnahme_link)
 
 

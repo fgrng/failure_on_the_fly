@@ -1,8 +1,10 @@
-"""Sequenziert die Vignetten einer Erhebungsteilnahme."""
+"""Sequenziert die Vignetten einer Erhebungsbindung."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from django.db import transaction
 
 from sitzungen.models import Sitzung
 from vignetten.models import Vignette
@@ -25,8 +27,6 @@ def block_vorlegen(
     sitzung: Sitzung | None = None,
 ) -> list[ItemAntwort]:
     """Legt die Antwortzeilen eines Blocks einmalig an."""
-
-    from django.db import transaction
 
     with transaction.atomic():
         items = bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
@@ -63,8 +63,6 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Vignette | Itemblock | None:
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
         ).select_related("item")
     )
-    return (
-        Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items, None)
-        if items and bindung.abgeschlossen_am is None
-        else None
-    )
+    if not items or bindung.abgeschlossen_am is not None:
+        return None
+    return Itemblock(Erhebungsitem.Andockpunkt.AM_ENDE, items, None)
