@@ -651,7 +651,7 @@ def _zuordnung_anlegen(erhebung: Erhebung, konto: Konto, art: str) -> models.Mod
 
 
 def _entwurf_mit_zuordnungen(konto: Konto) -> Erhebung:
-    """Legt einen Entwurf an, der je eine Vignette und ein Item eingebunden hat."""
+    """Legt einen finalisierbaren Entwurf mit je einer Vignette und einem Item an."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     kern: Simulationskern = Simulationskern.objects.anlegen()
@@ -672,7 +672,8 @@ def test_finale_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> None:
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
     erhebung.finalisieren()
-    zuordnung: models.Model = getattr(erhebung, art).get()
+    zuordnungen: models.Manager = getattr(erhebung, art)
+    zuordnung: models.Model = zuordnungen.get()
 
     with pytest.raises(ValidationError, match="eingefroren"):
         _zuordnung_anlegen(erhebung, ada, art)
@@ -680,9 +681,9 @@ def test_finale_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> None:
     with pytest.raises(ValidationError, match="eingefroren"):
         zuordnung.save()
     with pytest.raises(ValidationError, match="eingefroren"):
-        getattr(erhebung, art).update(position=9)
+        zuordnungen.update(position=9)
     with pytest.raises(ValidationError, match="eingefroren"):
-        getattr(erhebung, art).delete()
+        zuordnungen.delete()
 
 
 @pytest.mark.django_db
@@ -694,13 +695,14 @@ def test_archivierte_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> Non
     erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
     erhebung.finalisieren()
     erhebung.archivieren()
+    zuordnungen: models.Manager = getattr(erhebung, art)
 
     with pytest.raises(ValidationError, match="eingefroren"):
         _zuordnung_anlegen(erhebung, ada, art)
     with pytest.raises(ValidationError, match="eingefroren"):
-        getattr(erhebung, art).update(position=9)
+        zuordnungen.update(position=9)
     with pytest.raises(ValidationError, match="eingefroren"):
-        getattr(erhebung, art).delete()
+        zuordnungen.delete()
 
 
 @pytest.mark.django_db
@@ -710,14 +712,15 @@ def test_entwurf_bleibt_in_seinen_zuordnungen_frei(art: str) -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
+    zuordnungen: models.Manager = getattr(erhebung, art)
 
     zweite: models.Model = _zuordnung_anlegen(erhebung, ada, art)
     zweite.position = 9
     zweite.save()
-    getattr(erhebung, art).filter(pk=zweite.pk).update(position=8)
-    getattr(erhebung, art).filter(pk=zweite.pk).delete()
+    zuordnungen.filter(pk=zweite.pk).update(position=8)
+    zuordnungen.filter(pk=zweite.pk).delete()
 
-    assert getattr(erhebung, art).count() == 1
+    assert zuordnungen.count() == 1
 
 
 @pytest.mark.django_db
@@ -729,12 +732,13 @@ def test_zurueckgezogene_erhebung_erlaubt_zuordnungen_wieder(art: str) -> None:
     erhebung: Erhebung = _entwurf_mit_zuordnungen(ada)
     erhebung.finalisieren()
     erhebung.zurueckziehen()
+    zuordnungen: models.Manager = getattr(erhebung, art)
 
     zweite: models.Model = _zuordnung_anlegen(erhebung, ada, art)
-    getattr(erhebung, art).filter(pk=zweite.pk).update(position=9)
-    getattr(erhebung, art).filter(pk=zweite.pk).delete()
+    zuordnungen.filter(pk=zweite.pk).update(position=9)
+    zuordnungen.filter(pk=zweite.pk).delete()
 
-    assert getattr(erhebung, art).count() == 1
+    assert zuordnungen.count() == 1
 
 
 @pytest.mark.django_db
