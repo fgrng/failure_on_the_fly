@@ -36,9 +36,10 @@ Andockpunkten verschwindet — sie war nie eine Aussage über den Fachbereich.
 
 ## Die drei Nachführungen
 
-**Ein allgemeiner Ablauf-Schritt als Objekt wird eingeführt.** `naechster_schritt`
-liefert einen geschlossenen Typ über sechs Fälle: noch nicht begonnen, laufende
-Sitzung, nächste Vignette, offener Sitzungs-Block, offener Abschluss-Block, Ende.
+**Ein allgemeiner Ablauf-Schritt als Objekt wird eingeführt.**
+`erhebungen.ablauf.naechster_schritt(erhebungsbindung)` liefert einen
+geschlossenen Typ über sechs Fälle: noch nicht begonnen, laufende Sitzung,
+nächste Vignette, offener Sitzungs-Block, offener Abschluss-Block, Ende.
 ADR-0016 hatte ihn abgelehnt, weil der Sitzungs-Block ohnehin nicht darin
 vorkommen konnte; ein Typ über die halbe Wahrheit wäre teurer gewesen als eine
 Union aus Vignette, Block und Ende. Mit dem Marker sind die Fälle erschöpfend,
