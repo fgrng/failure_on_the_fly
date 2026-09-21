@@ -16,13 +16,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
 from vignetten.models import Vignette
 
-from .models import (
-    Erhebung,
-    Erhebungsbindung,
-    Erhebungsitem,
-    Vignettenposition,
-    Vignettenziehung,
-)
+from .models import Erhebung, Erhebungsbindung, Vignettenposition, Vignettenziehung
 
 
 def _zellenwert(wert: Any) -> str | int | bool:
@@ -342,7 +336,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             ),
         )
         vorgelegte_items: QuerySet[FragebogenItem] = FragebogenItem.objects.filter(
-            pk__in=Erhebungsitem.objects.filter(erhebung=erhebung).values("item_id")
+            pk__in=erhebung.itemzugehoerigkeiten.values("item_id")
         ).order_by("pk")
         zip_datei.writestr(
             "fragebogen_items.csv",

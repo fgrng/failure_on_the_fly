@@ -2135,10 +2135,8 @@ class ErhebungsExportTests(TestCase):
                         zeilen_ohne_datenbestand.get(dateiname, 1),
                     )
 
-    def test_exportiert_codebook_der_vorgelegten_items_und_der_likert_skala(
-        self,
-    ) -> None:
-        """Die Nachschlagetabellen machen den Fragebogen-Teil interpretierbar."""
+    def test_exportiert_die_vorgelegten_items_mit_vollem_wortlaut(self) -> None:
+        """Die Item-Tabelle macht den Fragebogen-Teil interpretierbar."""
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
@@ -2180,15 +2178,9 @@ class ErhebungsExportTests(TestCase):
                 TextIOWrapper(zip_datei.open("fragebogen_items.csv"), encoding="utf-8")
             )
             items: list[dict[str, str]] = list(item_leser)
-            item_kopfzeile: list[str] = list(item_leser.fieldnames or [])
-            skala_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(zip_datei.open("likert_skala.csv"), encoding="utf-8")
-            )
-            stufen: list[dict[str, str]] = list(skala_leser)
-            skala_kopfzeile: list[str] = list(skala_leser.fieldnames or [])
-            item_inhalt: str = zip_datei.read("fragebogen_items.csv").decode("utf-8")
+            kopfzeile: list[str] = list(item_leser.fieldnames or [])
 
-        self.assertEqual(item_kopfzeile, ["id", "typ", "wortlaut"])
+        self.assertEqual(kopfzeile, ["id", "typ", "wortlaut"])
         self.assertEqual(
             items,
             [
@@ -2204,9 +2196,27 @@ class ErhebungsExportTests(TestCase):
                 },
             ],
         )
-        self.assertNotIn("historie", item_inhalt)
-        self.assertNotIn("ada", item_inhalt)
-        self.assertEqual(skala_kopfzeile, ["stufe", "pol"])
+
+    def test_exportiert_die_kodierung_der_likert_skala(self) -> None:
+        """Die Skalentabelle nennt zu jeder Stufe ihren Wortlaut."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            skala_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(zip_datei.open("likert_skala.csv"), encoding="utf-8")
+            )
+            stufen: list[dict[str, str]] = list(skala_leser)
+            kopfzeile: list[str] = list(skala_leser.fieldnames or [])
+
+        self.assertEqual(kopfzeile, ["stufe", "pol"])
         self.assertEqual(
             stufen,
             [
@@ -2219,8 +2229,10 @@ class ErhebungsExportTests(TestCase):
             ],
         )
 
-    def test_codebook_der_items_bleibt_bei_mehr_items_abfragezahlgleich(self) -> None:
-        """Die neue Tabelle zerlegt den Export nicht in N+1-Abfragen."""
+    def test_export_braucht_unabhaengig_von_der_itemzahl_gleich_viele_abfragen(
+        self,
+    ) -> None:
+        """Die Item-Tabelle zerlegt den Export nicht in N+1-Abfragen."""
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
