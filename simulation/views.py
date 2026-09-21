@@ -234,7 +234,10 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
 
 # Welches Formularfeld ein gewählter Vorschlag füllt. Die Naht entscheidet es,
 # nicht die Anfrage: Ein von außen genannter Feldname stünde in der Antwort.
-_FELD_JE_NAHT: dict[str, str] = {Naht.SPRACHMODELL: "id_sprachmodell"}
+_FELD_JE_NAHT: dict[str, str] = {
+    Naht.SPRACHMODELL: "id_sprachmodell",
+    Naht.TRANSKRIPTION: "id_transkriptionsmodell",
+}
 
 
 @administratorin_erforderlich

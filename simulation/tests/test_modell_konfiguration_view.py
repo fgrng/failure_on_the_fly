@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from konten.models import Konto
-from simulation.forms import ModellKonfigurationForm
+from simulation.forms import ModellKonfigurationForm, TranskriptionsKonfigurationForm
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -474,6 +474,26 @@ class ModellvorschlaegeEndpunktTests(TestCase):
                 reverse("simulation:modellvorschlaege"), _abrufdaten()
             )
 
+        self.assertContains(response, f"getElementById('{feld}')")
+
+    def test_setzt_den_vorschlag_der_transkription_in_ihr_eigenes_feld(self) -> None:
+        """Dieselbe Naht nennt das Feld; die zweite Seite bekommt keinen zweiten Weg."""
+        feld: str = TranskriptionsKonfigurationForm()["transkriptionsmodell"].auto_id
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [
+                Modellvorschlag(
+                    wert="openai/whisper-large-v3",
+                    modellname="openai/whisper-large-v3",
+                    anzeige="OpenAI: Whisper Large v3",
+                )
+            ]
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(naht=Naht.TRANSKRIPTION),
+            )
+
+        verzeichnis.return_value.vorschlaege.assert_called_once_with(Naht.TRANSKRIPTION)
         self.assertContains(response, f"getElementById('{feld}')")
 
     def test_holt_infomaniaks_liste_allein_mit_dem_getippten_token(self) -> None:

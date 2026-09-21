@@ -97,6 +97,34 @@ def test_openrouter_sortiert_alphabetisch_nach_der_anzeige() -> None:
     ]
 
 
+def test_openrouter_fragt_die_transkriptionsmodelle_ueber_die_modalitaet() -> None:
+    """Ohne den Modalitätsfilter erschiene kein einziges Transkriptionsmodell."""
+
+    client = _client(_liste())
+
+    OpenRouterVerzeichnis(client).vorschlaege(Naht.TRANSKRIPTION)
+
+    client.get.assert_called_once_with(
+        OPENROUTER_MODELLE_URL, params={"output_modalities": "transcription"}
+    )
+
+
+def test_openrouter_setzt_an_der_transkription_kein_praefix() -> None:
+    """Diese Naht läuft nicht über LiteLLM; ein Präfix wäre ein unbekanntes Modell."""
+
+    client = _client(
+        _liste({"id": "openai/whisper-large-v3", "name": "OpenAI: Whisper Large v3"})
+    )
+
+    assert OpenRouterVerzeichnis(client).vorschlaege(Naht.TRANSKRIPTION) == [
+        Modellvorschlag(
+            wert="openai/whisper-large-v3",
+            modellname="openai/whisper-large-v3",
+            anzeige="OpenAI: Whisper Large v3",
+        )
+    ]
+
+
 def test_openrouter_meldet_einen_nicht_erreichbaren_anbieter() -> None:
     """Ein Netzfehler wird benannt, nicht durchgereicht."""
 
@@ -143,7 +171,7 @@ def test_openrouter_meldet_eine_naht_ohne_liste() -> None:
     client = _client(_liste())
 
     with pytest.raises(KeineModellliste):
-        OpenRouterVerzeichnis(client).vorschlaege("transkription")
+        OpenRouterVerzeichnis(client).vorschlaege("bildmodell")
 
     client.get.assert_not_called()
 
@@ -290,6 +318,24 @@ def test_infomaniak_sortiert_alphabetisch_nach_der_anzeige() -> None:
     ]
 
 
+def test_infomaniak_zeigt_an_der_transkription_nur_das_stt_modell() -> None:
+    """Kein Sprach-, Embedding-, Reranker- oder Bildmodell transkribiert."""
+
+    client = _client(
+        _infomaniak_liste(
+            _infomaniak_eintrag("mistralai/Ministral-3-14B-Instruct-2512"),
+            _infomaniak_eintrag("whisper", typ="stt"),
+            _infomaniak_eintrag("bge-multilingual-gemma2", typ="embedding"),
+            _infomaniak_eintrag("bge-reranker-v2-m3", typ="reranker"),
+            _infomaniak_eintrag("flux", typ="image"),
+        )
+    )
+
+    assert InfomaniakVerzeichnis(client).vorschlaege(Naht.TRANSKRIPTION) == [
+        Modellvorschlag(wert="whisper", modellname="whisper", anzeige="whisper")
+    ]
+
+
 def test_infomaniak_meldet_ein_abgelehntes_token_verstaendlich() -> None:
     """Ein falsches Token wird mit »401« abgewiesen und benannt, nicht durchgereicht."""
 
@@ -336,7 +382,7 @@ def test_infomaniak_meldet_eine_naht_ohne_liste() -> None:
     client = _client(_infomaniak_liste())
 
     with pytest.raises(KeineModellliste):
-        InfomaniakVerzeichnis(client).vorschlaege("transkription")
+        InfomaniakVerzeichnis(client).vorschlaege("bildmodell")
 
     client.get.assert_not_called()
 

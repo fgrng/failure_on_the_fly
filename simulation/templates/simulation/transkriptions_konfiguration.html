@@ -18,7 +18,15 @@
         </div>
     </header>
 
-    <form method="post">
+    {% comment %}
+        Der Anbieter steht im Alpine-Zustand, weil zwei Dinge an ihm hängen:
+        Beim Anbieter »fake« gibt es nichts zu laden, und ein Wechsel darf keine
+        Liste des vorigen Anbieters stehen lassen. Er sitzt am Formular, weil
+        Anbieterfeld und Modellfeld in zwei Abschnitten stehen.
+    {% endcomment %}
+    <form method="post"
+          x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
+          @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
         {% csrf_token %}
         {{ form.non_field_errors }}
 
@@ -46,7 +54,16 @@
                 <b>02</b><span><h2>Modell und Sprache</h2><small>Was die Aufnahme in Text überführt und in welcher Sprache</small></span>
             </header>
             <div class="system-page-field-list">
-                {% include "vignetten/includes/form_field.html" with field=form.transkriptionsmodell %}
+                <div class="vignette-autovervollstaendigung">
+                    {% include "vignetten/includes/form_field.html" with field=form.transkriptionsmodell %}
+                    <button class="button" type="button" x-cloak x-show="anbieter !== 'fake'"
+                            hx-post="{% url 'simulation:modellvorschlaege' %}"
+                            hx-vals='{"naht": "transkription"}'
+                            hx-include="[name='anbieter'], [name='anbieter_token']"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            hx-target="#modellvorschlaege">Modelle laden</button>
+                    <div id="modellvorschlaege" x-ref="modellvorschlaege"></div>
+                </div>
                 {% include "vignetten/includes/form_field.html" with field=form.sprache %}
             </div>
         </section>

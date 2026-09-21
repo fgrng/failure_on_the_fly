@@ -82,6 +82,13 @@ Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau eine
 Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
 anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
 (ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
+Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle laden“ wie an der
+Sprachmodell-Naht: bei `openrouter` die Modelle mit Transkriptions-Modalität —
+in der ungefilterten Modellliste erscheinen sie nicht —, bei `infomaniak` das
+eine Modell vom Typ `stt`. Der eingesetzte Wert trägt hier bei beiden Anbietern
+kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern reicht den Namen roh
+an die Route des Anbieters durch. Abgefragt wird mit dem getippten Token; bei
+`infomaniak` ist es dafür auch dann nötig, wenn schon eines hinterlegt ist.
 Ob überhaupt transkribiert wird, entscheidet weiterhin die Instanz über
 `TRANSKRIPTION_ZERO_RETENTION` in der Umgebung — die Zusage der Betreiber:in
 gehört nicht in dasselbe Formular wie die Anbieterwahl.

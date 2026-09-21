@@ -1,5 +1,7 @@
 """Anbieterbindung, Maskierung und die blaue Seite der Transkription."""
 
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -253,6 +255,43 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
             '<a href="/system/transkription/" aria-current="page">Transkriptions-Konfiguration</a>',
             html=False,
         )
+
+
+class TranskriptionsKonfigurationVorschlaegeTests(TestCase):
+    """Der Knopf steht neben dem Modellfeld und holt beim Rendern nichts."""
+
+    def setUp(self) -> None:
+        """Meldet die Administratorin an."""
+        self.client.force_login(_administratorin("linus"))
+
+    def test_traegt_den_knopf_neben_dem_transkriptionsmodell(self) -> None:
+        """Derselbe Endpunkt wie an der Sprachmodell-Naht, dieselbe Geste."""
+        response: HttpResponse = self.client.get(reverse(SEITE))
+
+        self.assertContains(response, "Modelle laden")
+        self.assertContains(
+            response, f'hx-post="{reverse("simulation:modellvorschlaege")}"'
+        )
+        self.assertContains(response, '"naht": "transkription"')
+
+    def test_verbirgt_den_knopf_beim_anbieter_fake(self) -> None:
+        """Ohne echten Anbieter gibt es nichts zu laden."""
+        response: HttpResponse = self.client.get(reverse(SEITE))
+
+        self.assertContains(response, "anbieter !== 'fake'")
+
+    def test_holt_beim_rendern_keine_modellliste(self) -> None:
+        """Eine Systemseite rendert ohne Netzaufruf."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            self.client.get(reverse(SEITE))
+
+        verzeichnis.assert_not_called()
+
+    def test_leert_die_liste_beim_anbieterwechsel(self) -> None:
+        """Kein Vorschlag des vorigen Anbieters bleibt stehen."""
+        response: HttpResponse = self.client.get(reverse(SEITE))
+
+        self.assertContains(response, "$refs.modellvorschlaege.innerHTML = ''")
 
 
 class TranskriptionsKonfigurationWirkungTests(TestCase):

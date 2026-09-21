@@ -32,6 +32,7 @@ class Naht(StrEnum):
     """Die Naht, für die Modelle vorgeschlagen werden."""
 
     SPRACHMODELL = "sprachmodell"
+    TRANSKRIPTION = "transkription"
 
 
 @dataclass(frozen=True)
@@ -109,10 +110,26 @@ def _alphabetisch(vorschlaege: Iterable[Modellvorschlag]) -> list[Modellvorschla
     return sorted(vorschlaege, key=lambda vorschlag: vorschlag.anzeige.casefold())
 
 
+# An welcher Naht der eingesetzte Wert das Anbieterpräfix trägt. Die
+# Sprachmodell-Naht läuft über LiteLLM, das die Anbieterbindung am Namen liest
+# (ADR-0036); die Transkription reicht den Namen roh an die Route des Anbieters
+# durch, wo ein Präfix ein unbekanntes Modell wäre.
+_NAHT_MIT_PRAEFIX: frozenset[str] = frozenset({Naht.SPRACHMODELL})
+
+
+def _praefix(anbieter: Anbieter, naht: str) -> str:
+    # Liefert das Präfix, das der Wert dieser Naht bei diesem Anbieter trägt.
+
+    return ANBIETER_PROFIL[anbieter].praefix if naht in _NAHT_MIT_PRAEFIX else ""
+
+
 # Welche Abfrage die jeweilige Naht bei OpenRouter beantwortet. Ohne Filter
-# stünden an der Sprachmodell-Naht auch Modelle ohne Structured Output.
+# stünden an der Sprachmodell-Naht auch Modelle ohne Structured Output — und an
+# der Transkriptions-Naht gar keines: Die Transkriptionsmodelle erscheinen in
+# der ungefilterten Liste nicht (Recherche 2026-09-18).
 _OPENROUTER_ABFRAGE: dict[str, dict[str, str]] = {
     Naht.SPRACHMODELL: {"supported_parameters": "structured_outputs"},
+    Naht.TRANSKRIPTION: {"output_modalities": "transcription"},
 }
 
 
@@ -131,11 +148,12 @@ class OpenRouterVerzeichnis:
         eintraege: list[Any] = _datenliste(
             self.client, OPENROUTER_MODELLE_URL, "OpenRouter", params=abfrage
         )
-        return _alphabetisch(self._vorschlag(eintrag) for eintrag in eintraege)
+        praefix: str = _praefix(Anbieter.OPENROUTER, naht)
+        return _alphabetisch(self._vorschlag(eintrag, praefix) for eintrag in eintraege)
 
     @staticmethod
-    def _vorschlag(eintrag: Any) -> Modellvorschlag:
-        # Bildet den fertigen Wert aus Modell-ID und dem Präfix des Profils.
+    def _vorschlag(eintrag: Any, praefix: str) -> Modellvorschlag:
+        # Bildet den fertigen Wert aus Modell-ID und dem Präfix der Naht.
 
         modellname: Any = eintrag.get("id") if isinstance(eintrag, dict) else None
         if not isinstance(modellname, str) or not modellname:
@@ -144,7 +162,7 @@ class OpenRouterVerzeichnis:
             )
         anzeige: Any = eintrag.get("name")
         return Modellvorschlag(
-            wert=f"{ANBIETER_PROFIL[Anbieter.OPENROUTER].praefix}{modellname}",
+            wert=f"{praefix}{modellname}",
             modellname=modellname,
             anzeige=anzeige if isinstance(anzeige, str) and anzeige else modellname,
         )
@@ -155,6 +173,7 @@ class OpenRouterVerzeichnis:
 # Transkriptionsmodelle. Nach Structured Output lässt sich hier nicht filtern.
 _INFOMANIAK_MODELLTYP: dict[str, str] = {
     Naht.SPRACHMODELL: "llm",
+    Naht.TRANSKRIPTION: "stt",
 }
 
 # Infomaniak weist ein untaugliches Token mit »401« ab; die Meldung benennt
@@ -180,14 +199,15 @@ class InfomaniakVerzeichnis:
             "Infomaniak",
             ablehnungshinweis=_INFOMANIAK_ABLEHNUNGSHINWEIS,
         )
+        praefix: str = _praefix(Anbieter.INFOMANIAK, naht)
         return _alphabetisch(
-            self._vorschlag(eintrag)
+            self._vorschlag(eintrag, praefix)
             for eintrag in eintraege
             if isinstance(eintrag, dict) and eintrag.get("type") == typ
         )
 
     @staticmethod
-    def _vorschlag(eintrag: dict[str, Any]) -> Modellvorschlag:
+    def _vorschlag(eintrag: dict[str, Any], praefix: str) -> Modellvorschlag:
         # Bildet den Vorschlag aus »name«: Die »id« ist eine bedeutungslose
         # Ganzzahl und taucht in keinem Feld des Tripels auf.
 
@@ -197,7 +217,7 @@ class InfomaniakVerzeichnis:
                 "Infomaniak hat einen Eintrag ohne Modellnamen geliefert."
             )
         return Modellvorschlag(
-            wert=f"{ANBIETER_PROFIL[Anbieter.INFOMANIAK].praefix}{modellname}",
+            wert=f"{praefix}{modellname}",
             modellname=modellname,
             anzeige=modellname,
         )
