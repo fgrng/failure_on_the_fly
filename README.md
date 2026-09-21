@@ -196,7 +196,10 @@ Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
 Fehlversuche und Diagnosen. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
 Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
-interpretierbar bleibt.
+interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe: Die der Erhebung
+zugeordneten Fragebogen-Items liegen mit ihrem vollen Wortlaut bei, und eine
+eigene Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von 1 »Stimme
+gar nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt.
 
 ## Fragebogen-Items verwalten
 
