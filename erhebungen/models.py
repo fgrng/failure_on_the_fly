@@ -238,6 +238,33 @@ class Erhebung(EigentuemerKreis):
         )
 
 
+_EINGEFROREN_MELDUNG: str = (
+    "Das eingebundene Design finaler Erhebungen ist eingefroren."
+)
+
+
+class ZuordnungQuerySet(models.QuerySet):
+    """Abfragen über die Zuordnungen einer Erhebung."""
+
+    def update(self, **kwargs: object) -> int:
+        """Ändert gesammelt ausschließlich die Zuordnungen von Entwürfen."""
+
+        self._entwurfsstatus_sicherstellen()
+        return super().update(**kwargs)
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Löscht gesammelt ausschließlich die Zuordnungen von Entwürfen."""
+
+        self._entwurfsstatus_sicherstellen()
+        return super().delete()
+
+    def _entwurfsstatus_sicherstellen(self) -> None:
+        # Weist die Massenoperation ab, sobald sie eine eingefrorene Erhebung trifft.
+
+        if self.exclude(erhebung__status=Erhebung.Status.ENTWURF).exists():
+            raise ValidationError(_EINGEFROREN_MELDUNG)
+
+
 class Erhebungsvignette(models.Model):
     """Die finale Vignetten-Fassung einer Erhebung samt fester Position."""
 
@@ -253,12 +280,16 @@ class Erhebungsvignette(models.Model):
         null=True, blank=True
     )
 
+    objects: models.Manager["Erhebungsvignette"] = ZuordnungQuerySet.as_manager()
+
     def clean(self) -> None:
-        """Erlaubt nur eigene finale Fassungen und passende Reihenfolgeangaben."""
+        """Erlaubt nur in Entwürfen eigene finale Fassungen an passender Position."""
 
         from vignetten.models import Vignette
 
         fehler: dict[str, str] = {}
+        if self.erhebung.status != Erhebung.Status.ENTWURF:
+            fehler["erhebung"] = _EINGEFROREN_MELDUNG
         if self.vignette.zustand != Vignette.Zustand.FINAL:
             fehler["vignette"] = "Erhebungen können nur finale Vignetten einbinden."
         elif not self.vignette.historie.eigentuemerinnen.filter(
@@ -316,10 +347,14 @@ class Erhebungsitem(models.Model):
     andockpunkt: models.CharField = models.CharField(max_length=13, choices=Andockpunkt)
     position: models.PositiveIntegerField = models.PositiveIntegerField()
 
+    objects: models.Manager["Erhebungsitem"] = ZuordnungQuerySet.as_manager()
+
     def clean(self) -> None:
-        """Erlaubt nur finale Fassungen aus dem Eigentümer-Kreis der Erhebung."""
+        """Erlaubt nur in Entwürfen finale Fassungen aus dem Eigentümer-Kreis."""
 
         fehler: dict[str, str] = {}
+        if self.erhebung.status != Erhebung.Status.ENTWURF:
+            fehler["erhebung"] = _EINGEFROREN_MELDUNG
         if self.item.zustand != FragebogenItem.Zustand.FINAL:
             fehler["item"] = "Erhebungen können nur finale Items einbinden."
         elif not self.item.historie.eigentuemerinnen.filter(

@@ -28,6 +28,9 @@ neu. `archiviert` ist ebenfalls kein physisches Löschen und kann zurück zu
 - Die folgenden Lebenszyklus-Methoden bewachen die reversiblen Übergänge; es
   gibt keine Historie und keinen Fassungsklon.
 - Das eingebundene Design einer finalen Erhebung darf nicht still geändert
-  werden.
+  werden. Durchgesetzt wird das an den beiden Zuordnungsmodellen selbst: Sie
+  weisen Anlegen, Ändern und Löschen ab, sobald ihre Erhebung kein Entwurf mehr
+  ist. Die gleichlautenden Prüfungen der Views bleiben daneben bestehen; sie
+  sind Benutzerführung, nicht Durchsetzung, und sind darum keine Dopplung.
 - Stichproben und Datenspur entscheiden, wann ein Rückweg nicht mehr zulässig
   ist.
