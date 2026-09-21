@@ -223,7 +223,7 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": grace.pk},
         )
 
@@ -245,7 +245,7 @@ class TrainingKoautorschaftTests(TestCase):
         training: Training = Training.objects.anlegen(ada, name="Brüche")
         self.client.force_login(ada)
         self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": grace.pk},
         )
         self.client.force_login(grace)
@@ -266,7 +266,7 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+            reverse("training:eigentuemerin_entfernen", args=[training.pk, ada.pk])
         )
 
         self.assertRedirects(response, reverse("training:liste"))
@@ -284,7 +284,7 @@ class TrainingKoautorschaftTests(TestCase):
         training: Training = Training.objects.anlegen(grace, name="Brüche")
         self.client.force_login(grace)
         self.client.post(
-            reverse("training:koautorin_entfernen", args=[training.pk, grace.pk])
+            reverse("training:eigentuemerin_entfernen", args=[training.pk, grace.pk])
         )
         self.assertContains(
             self.client.get(reverse("training:kuratieren", args=[training.pk])),
@@ -300,7 +300,7 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": ohne_rolle.pk},
         )
 
@@ -324,7 +324,7 @@ class TrainingKoautorschaftTests(TestCase):
             html=True,
         )
         self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": administratorin.pk},
         )
         self.client.force_login(administratorin)
@@ -345,11 +345,11 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": grace.pk},
         )
         self.client.post(
-            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+            reverse("training:eigentuemerin_entfernen", args=[training.pk, ada.pk])
         )
 
         self.client.force_login(grace)
@@ -372,11 +372,11 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(administratorin)
 
         self.client.post(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk]),
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
             {"konto": ada.pk},
         )
         response: HttpResponse = self.client.post(
-            reverse("training:koautorin_entfernen", args=[training.pk, grace.pk])
+            reverse("training:eigentuemerin_entfernen", args=[training.pk, grace.pk])
         )
 
         self.assertRedirects(
@@ -405,7 +405,8 @@ class TrainingKoautorschaftTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse(
-                "training:koautorin_entfernen", args=[training.pk, administratorin.pk]
+                "training:eigentuemerin_entfernen",
+                args=[training.pk, administratorin.pk],
             )
         )
 
@@ -413,7 +414,7 @@ class TrainingKoautorschaftTests(TestCase):
             response, reverse("training:kuratieren", args=[training.pk])
         )
 
-    def test_koautorin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
+    def test_eigentuemerin_hinzufuegen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Hinzufügen weist GET-Anfragen ab."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
@@ -421,11 +422,11 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.get(
-            reverse("training:koautorin_hinzufuegen", args=[training.pk])
+            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk])
         )
         self.assertEqual(hinzufuegen.status_code, 405)
 
-    def test_koautorin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
+    def test_eigentuemerin_entfernen_ist_nur_per_post_erreichbar(self) -> None:
         """Das Entfernen weist GET-Anfragen ab."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
@@ -433,7 +434,7 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(ada)
 
         entfernen: HttpResponse = self.client.get(
-            reverse("training:koautorin_entfernen", args=[training.pk, ada.pk])
+            reverse("training:eigentuemerin_entfernen", args=[training.pk, ada.pk])
         )
 
         self.assertEqual(entfernen.status_code, 405)

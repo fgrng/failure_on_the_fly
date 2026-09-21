@@ -139,8 +139,8 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_autorin_erforderlich
-def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Nimmt eine weitere Autor:in in den Eigentümer-Kreis auf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
@@ -153,7 +153,9 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_autorin_erforderlich
-def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
+def eigentuemerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis der Vignettenhistorie aus.
 
     Wer sich selbst austrägt, landet auf der Vignettenliste; scheitert der

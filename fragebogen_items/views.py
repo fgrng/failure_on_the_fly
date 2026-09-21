@@ -197,7 +197,7 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Teilt eine sichtbare Item-Historie mit einer weiteren Forschenden."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -235,7 +235,9 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
+def eigentuemerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis der Item-Historie aus.
 
     Wer sich selbst austrägt, landet in der Item-Bibliothek; scheitert der

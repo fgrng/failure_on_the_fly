@@ -486,7 +486,7 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         self.client.force_login(self.ada)
 
         response: HttpResponse = self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.ada.pk},
         )
 
@@ -496,7 +496,7 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         """Eine hinzugefügte Ko-Autorin sieht die Item-Linie in ihrer Bibliothek."""
         self.client.force_login(self.ada)
         self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.grace.pk},
         )
         self.client.force_login(self.grace)
@@ -509,7 +509,7 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         """Eine Ko-Autorin darf die sichtbare Item-Linie gleichrangig pflegen."""
         self.client.force_login(self.ada)
         self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.grace.pk},
         )
         self.client.force_login(self.grace)
@@ -532,12 +532,14 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
                 reverse("fragebogen_items:finalisieren", args=[self.item.pk])
             ),
             self.client.post(
-                reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+                reverse(
+                    "fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]
+                ),
                 {"konto": self.grace.pk},
             ),
             self.client.post(
                 reverse(
-                    "fragebogen_items:koautorin_entfernen",
+                    "fragebogen_items:eigentuemerin_entfernen",
                     args=[self.item.pk, self.ada.pk],
                 )
             ),
@@ -549,13 +551,13 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         """Wer sich austrägt, landet nicht auf einer Seite ohne Zugriff."""
         self.client.force_login(self.ada)
         self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.grace.pk},
         )
 
         response: HttpResponse = self.client.post(
             reverse(
-                "fragebogen_items:koautorin_entfernen",
+                "fragebogen_items:eigentuemerin_entfernen",
                 args=[self.item.pk, self.ada.pk],
             )
         )
@@ -569,7 +571,7 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse(
-                "fragebogen_items:koautorin_entfernen",
+                "fragebogen_items:eigentuemerin_entfernen",
                 args=[self.item.pk, self.ada.pk],
             )
         )
@@ -586,14 +588,14 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         )
         self.client.force_login(self.ada)
         self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.grace.pk},
         )
         self.client.force_login(administratorin)
 
         response: HttpResponse = self.client.post(
             reverse(
-                "fragebogen_items:koautorin_entfernen",
+                "fragebogen_items:eigentuemerin_entfernen",
                 args=[self.item.pk, administratorin.pk],
             )
         )
@@ -606,12 +608,12 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
         """Eine entfernte Ko-Autorin sieht die Item-Linie nicht mehr."""
         self.client.force_login(self.ada)
         self.client.post(
-            reverse("fragebogen_items:koautorin_hinzufuegen", args=[self.item.pk]),
+            reverse("fragebogen_items:eigentuemerin_hinzufuegen", args=[self.item.pk]),
             {"konto": self.grace.pk},
         )
         self.client.post(
             reverse(
-                "fragebogen_items:koautorin_entfernen",
+                "fragebogen_items:eigentuemerin_entfernen",
                 args=[self.item.pk, self.grace.pk],
             )
         )

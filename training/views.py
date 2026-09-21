@@ -297,8 +297,8 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_ausbilderin_erforderlich
-def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Ko-Autorin in den Eigentümer-Kreis auf."""
+def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Nimmt eine weitere Ausbilder:in in den Eigentümer-Kreis auf."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
@@ -311,7 +311,9 @@ def koautorin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_ausbilderin_erforderlich
-def koautorin_entfernen(request: HttpRequest, pk: int, konto_pk: int) -> HttpResponse:
+def eigentuemerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
     """Trägt eine Eigentümerin aus dem Kreis des Trainings aus.
 
     Wer sich selbst austrägt, landet auf der Trainingsliste; scheitert der

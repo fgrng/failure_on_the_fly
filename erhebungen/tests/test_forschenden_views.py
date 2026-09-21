@@ -238,7 +238,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.post(
-            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            reverse("erhebungen:eigentuemerin_hinzufuegen", args=[erhebung.pk]),
             {"konto": grace.pk},
         )
 
@@ -282,7 +282,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.client.force_login(ada)
 
         entfernen: HttpResponse = self.client.post(
-            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, ada.pk])
+            reverse("erhebungen:eigentuemerin_entfernen", args=[erhebung.pk, ada.pk])
         )
 
         self.assertRedirects(entfernen, reverse("erhebungen:liste"))
@@ -303,7 +303,8 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse(
-                "erhebungen:koautorin_entfernen", args=[erhebung.pk, administratorin.pk]
+                "erhebungen:eigentuemerin_entfernen",
+                args=[erhebung.pk, administratorin.pk],
             )
         )
 
@@ -317,7 +318,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.client.force_login(ada)
 
         self.client.post(
-            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, ada.pk])
+            reverse("erhebungen:eigentuemerin_entfernen", args=[erhebung.pk, ada.pk])
         )
 
         self.assertEqual(list(erhebung.eigentuemerinnen.all()), [ada])
@@ -331,7 +332,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.post(
-            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            reverse("erhebungen:eigentuemerin_hinzufuegen", args=[erhebung.pk]),
             {"konto": ohne_rolle.pk},
         )
 
@@ -357,15 +358,15 @@ class ErhebungenKoForschendenViewTests(TestCase):
             html=True,
         )
         self.client.post(
-            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            reverse("erhebungen:eigentuemerin_hinzufuegen", args=[erhebung.pk]),
             {"konto": ada.pk},
         )
         self.client.post(
-            reverse("erhebungen:koautorin_hinzufuegen", args=[erhebung.pk]),
+            reverse("erhebungen:eigentuemerin_hinzufuegen", args=[erhebung.pk]),
             {"konto": administratorin.pk},
         )
         entfernen: HttpResponse = self.client.post(
-            reverse("erhebungen:koautorin_entfernen", args=[erhebung.pk, grace.pk])
+            reverse("erhebungen:eigentuemerin_entfernen", args=[erhebung.pk, grace.pk])
         )
 
         self.assertRedirects(
