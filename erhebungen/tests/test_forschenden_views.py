@@ -2088,6 +2088,10 @@ class ErhebungsExportTests(TestCase):
             },
         )
         self.assertEqual(
+            diagnose_kopfzeile,
+            ["sitzung_id", "text", "erstellt_am", "eingabemodus"],
+        )
+        self.assertEqual(
             [
                 {name: wert for name, wert in diagnose.items() if name != "erstellt_am"}
                 for diagnose in diagnosen
@@ -2099,10 +2103,6 @@ class ErhebungsExportTests(TestCase):
                     "eingabemodus": "gemischt",
                 }
             ],
-        )
-        self.assertEqual(
-            diagnose_kopfzeile,
-            ["sitzung_id", "text", "erstellt_am", "eingabemodus"],
         )
         self.assertRegex(
             diagnosen[0]["erstellt_am"],

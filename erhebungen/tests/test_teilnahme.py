@@ -1250,38 +1250,39 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(antwort.status_code, 302)
         self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GEMISCHT)
 
-    def test_diagnose_ohne_modusfeld_und_mit_unbekanntem_wert_ist_getippt(self) -> None:
-        """Fehlend oder unbekannt heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
+    def test_diagnose_ohne_modusfeld_ist_getippt(self) -> None:
+        """Ein fehlendes Modusfeld heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
 
-        self._vignette_anlegen(position=1)
-        self._vignette_anlegen(position=2)
+        self._vignette_anlegen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
-        ohne_feld: HttpResponse = self.client.post(
+
+        antwort: HttpResponse = self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
         )
 
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GETIPPT)
+
+    def test_diagnose_mit_unbekanntem_modus_ist_getippt(self) -> None:
+        """Ein unbekannter Modus heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
+
+        self._vignette_anlegen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
-        zweite_sitzung: Sitzung = Sitzung.objects.order_by("pk").last()
-        unbekannt: HttpResponse = self.client.post(
+
+        antwort: HttpResponse = self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
             {
-                "diagnose": "Noch ein Bruchfehler",
-                "sitzung_pk": zweite_sitzung.pk,
+                "diagnose": "Bruchfehler",
+                "sitzung_pk": Sitzung.objects.get().pk,
                 "eingabemodus": "gepfiffen",
             },
         )
 
-        self.assertEqual(ohne_feld.status_code, 302)
-        self.assertEqual(unbekannt.status_code, 302)
-        self.assertEqual(
-            [
-                diagnose.eingabemodus
-                for diagnose in Diagnose.objects.order_by("sitzung_id")
-            ],
-            [Eingabemodus.GETIPPT, Eingabemodus.GETIPPT],
-        )
+        self.assertEqual(antwort.status_code, 302)
+        self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GETIPPT)
 
     def test_diagnoseformular_traegt_das_versteckte_modusfeld(self) -> None:
         """Ohne JavaScript bleibt der Modus auf dem Startwert des Formulars."""

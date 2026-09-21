@@ -36,7 +36,7 @@ Eigentümerinnen Klarnamen und gehören deshalb nicht in den pseudonymen
 Datensatz. Die Historie bleibt allein als Gruppierungsschlüssel der verwendeten
 Fassungen erhalten.
 
-Jeder Gesprächsschritt und jede Diagnose trägt in `eingabemodus`, woher der
+Jeder Gesprächsschritt und jede Diagnose tragen in `eingabemodus`, woher der
 abgeschickte Text stammt: `getippt`, `transkribiert` oder `gemischt`. Der Wert
 ist nie leer und nie `NA`. Er beschreibt die Herkunft des Textes, nicht seine
 Bearbeitung — ein Vergleich zwischen Rohtranskript und abgeschickter Fassung

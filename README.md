@@ -195,13 +195,13 @@ und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerkt
-dabei ihren Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
+Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
+dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
 zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
-ist damit eine Angabe für die Auswertung, kein Nachweis. Die verwendeten Vignettenfassungen,
-Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
-Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
-interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe: Die der Erhebung
+ist damit eine Angabe für die Auswertung, kein Nachweis. Die verwendeten
+Vignettenfassungen, Simulationskern-Fassungen und Modell-Konfigurationen liegen
+mit ihrem vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
+Datenbankzugriff interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe: Die der Erhebung
 zugeordneten Fragebogen-Items liegen mit ihrem vollen Wortlaut bei, eine eigene
 Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von 1 »Stimme gar
 nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und die vorgelegten
