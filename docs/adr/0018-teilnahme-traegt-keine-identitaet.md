@@ -1,8 +1,14 @@
 ---
-status: accepted
+status: amended
+amended-by: ["#235"]
 ---
 
 # Die Teilnahme trägt keine Identität; Bindung und Pseudonymität liegen getrennt
+
+> **Nachgeführt durch #235:** Eine App `datenspuren` gab es nie. Der Export
+> der Datenspur lebt in `erhebungen/export.py`. Wo unten `datenspuren`
+> steht, ist dieser Export gemeint: Er liest je Datenspur eine Teilnahme und
+> joint genau eine Erhebungsbindung.
 
 Die **Teilnahme** ist genau ein Objekt, so wie `CONTEXT.md` sie definiert: die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind. Sie trägt ihre Identität und ihre Sitzungen — und sonst nichts. Weder Training noch Stichprobe, weder Nutzerkonto noch Teilnahme-Token.
 
