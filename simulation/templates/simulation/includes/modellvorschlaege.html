@@ -2,6 +2,14 @@
     Die geladene Vorschlagsliste: ein Vorschlag, keine Prüfung. Sie lebt für
     sich, damit HTMX sie austauschen und Alpine sie danach beleben kann.
 {% endcomment %}
+{% if wurzel %}
+    {% comment %}
+        Die abgeleitete Endpunktwurzel füllt ihr Feld schon beim Laden: eine
+        Geste der Administrator:in, zwei gefüllte Felder. Sie steht nur hier,
+        wenn das Feld leer war — überschrieben wird nichts.
+    {% endcomment %}
+    <span x-init="document.getElementById('{{ wurzelfeld|escapejs }}').value = '{{ wurzel|escapejs }}'"></span>
+{% endif %}
 {% if fehler %}
     <p class="modellvorschlaege__fehler" role="status">{{ fehler }}</p>
 {% else %}

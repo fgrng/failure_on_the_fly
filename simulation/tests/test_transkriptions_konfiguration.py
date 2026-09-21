@@ -268,7 +268,7 @@ class TranskriptionsKonfigurationVorschlaegeTests(TestCase):
         """Derselbe Endpunkt wie an der Sprachmodell-Naht, dieselbe Geste."""
         response: HttpResponse = self.client.get(reverse(SEITE))
 
-        self.assertContains(response, "Modelle laden")
+        self.assertContains(response, "Modelle und Basis-URL laden")
         self.assertContains(
             response, f'hx-post="{reverse("simulation:modellvorschlaege")}"'
         )

@@ -19,6 +19,7 @@ from .forms import (
     TranskriptionsKonfigurationForm,
 )
 from .modellverzeichnis import (
+    Modellverzeichnis,
     Modellverzeichnisfehler,
     Modellvorschlag,
     Naht,
@@ -239,25 +240,49 @@ _FELD_JE_NAHT: dict[str, str] = {
     Naht.TRANSKRIPTION: "id_transkriptionsmodell",
 }
 
+# Das Feld der Basis-URL heißt auf beiden Seiten gleich; es hängt an der
+# Anbieter-Feldgruppe und nicht an der Naht.
+_FELD_BASIS_URL: str = "id_anbieter_basis_url"
+
+
+def _abgeleitete_wurzel(
+    verzeichnis: Modellverzeichnis | None, naht: str, getippte: str
+) -> str:
+    # Die abgeleitete Endpunktwurzel ergänzt ein leeres Feld und überschreibt
+    # nie eine getippte Angabe. Scheitert allein diese Abfrage, bleiben die
+    # Modellvorschläge stehen: Der eine Teil reißt den anderen nicht mit.
+
+    if verzeichnis is None or getippte:
+        return ""
+    try:
+        return verzeichnis.basis_url(naht)
+    except Modellverzeichnisfehler:
+        return ""
+
 
 @administratorin_erforderlich
 @require_POST
 def modellvorschlaege(request: HttpRequest) -> HttpResponse:
-    """Liefert die Vorschlagsliste zu Anbieter, Naht und getipptem Token.
+    """Liefert Vorschlagsliste und abgeleitete Wurzel zu Anbieter und Naht.
 
     Das Token kommt aus dem Formular, geht an das Verzeichnis und sonst
-    nirgendwohin: Es steht weder in der Antwort noch in einem Protokoll.
+    nirgendwohin: Es steht weder in der Antwort noch in einem Protokoll. Eine
+    Gebärde der Administrator:in, zwei Felder — und wo die Wurzel ausbleibt,
+    bleiben die Vorschläge trotzdem.
     """
     naht: str = request.POST.get("naht", "")
+    verzeichnis: Modellverzeichnis | None
     vorschlaege: list[Modellvorschlag]
     fehler: str
     try:
-        vorschlaege = modellverzeichnis(
+        verzeichnis = modellverzeichnis(
             request.POST.get("anbieter", ""),
             request.POST.get("anbieter_token", ""),
-        ).vorschlaege(naht)
+        )
+        vorschlaege = verzeichnis.vorschlaege(naht)
         fehler = ""
     except Modellverzeichnisfehler as modellfehler:
+        verzeichnis = None
         vorschlaege = []
         fehler = str(modellfehler)
     return render(
@@ -267,6 +292,10 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
             "vorschlaege": vorschlaege,
             "fehler": fehler,
             "feld": _FELD_JE_NAHT.get(naht, ""),
+            "wurzel": _abgeleitete_wurzel(
+                verzeichnis, naht, request.POST.get("anbieter_basis_url", "")
+            ),
+            "wurzelfeld": _FELD_BASIS_URL,
         },
     )
 

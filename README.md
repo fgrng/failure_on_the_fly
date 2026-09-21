@@ -58,12 +58,16 @@ Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` �
 der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
 Modellverhaltens auf, bei `fake` ausschließlich das Skript. Neben dem
-Sprachmodell schlägt der Knopf „Modelle laden“ die Modelle des gewählten
-Anbieters vor: bei `openrouter` die mit Structured Output, bei `infomaniak`
-die Sprachmodelle des Kontos, für die das getippte Token genügt — weder eine
-gespeicherte Fassung noch die Basis-URL sind dafür nötig. Die Liste wird nur
-auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie nicht kennt, ist
-weiterhin eintragbar.
+Sprachmodell schlägt der Knopf „Modelle und Basis-URL laden“ die Modelle des
+gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
+`infomaniak` die Sprachmodelle des Kontos, für die das getippte Token genügt —
+weder eine gespeicherte Fassung noch die Basis-URL sind dafür nötig. Bei
+`infomaniak` füllt derselbe Druck zusätzlich die Basis-URL: Aus der
+Produktabfrage des Kontos entsteht die Endpunktwurzel des Sprachmodells. Sie
+entsteht nur bei genau einem AI-Produkt — ein geratenes wäre schlimmer als ein
+leeres Feld — und überschreibt nie eine schon getippte Angabe. Die Liste wird
+nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie nicht kennt,
+ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
 Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
 Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
 genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
@@ -82,10 +86,12 @@ Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau eine
 Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
 anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
 (ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
-Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle laden“ wie an der
-Sprachmodell-Naht: bei `openrouter` die Modelle mit Transkriptions-Modalität —
-in der ungefilterten Modellliste erscheinen sie nicht —, bei `infomaniak` das
-eine Modell vom Typ `stt`. Der eingesetzte Wert trägt hier bei beiden Anbietern
+Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und Basis-URL
+laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
+Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie
+nicht —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die
+Endpunktwurzel der Transkription, die bei diesem Anbieter unter einer anderen
+API-Version liegt als die des Sprachmodells. Der eingesetzte Wert trägt hier bei beiden Anbietern
 kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern reicht den Namen roh
 an die Route des Anbieters durch. Abgefragt wird mit dem getippten Token; bei
 `infomaniak` ist es dafür auch dann nötig, wenn schon eines hinterlegt ist.

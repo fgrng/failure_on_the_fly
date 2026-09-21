@@ -17,6 +17,7 @@ from simulation.models import (
 )
 from simulation.modellverzeichnis import (
     INFOMANIAK_MODELLE_URL,
+    OPENROUTER_MODELLE_URL,
     AnbieterNichtErreichbar,
     Modellvorschlag,
     Naht,
@@ -391,6 +392,9 @@ def _vorschlag(anzeige: str = "Anthropic: Claude Opus") -> Modellvorschlag:
     )
 
 
+WURZEL: str = "https://api.infomaniak.com/2/ai/314159/openai/v1"
+
+
 def _abrufdaten(**werte: object) -> dict[str, object]:
     """Liefert den Beutel, den der Knopf »Modelle laden« mitschickt."""
     return {
@@ -502,7 +506,7 @@ class ModellvorschlaegeEndpunktTests(TestCase):
                 _abrufdaten(anbieter=Anbieter.INFOMANIAK),
             )
 
-        httpx_client.return_value.get.assert_called_once_with(INFOMANIAK_MODELLE_URL)
+        httpx_client.return_value.get.assert_any_call(INFOMANIAK_MODELLE_URL)
         self.assertEqual(ModellKonfiguration.objects.count(), 0)
         self.assertContains(response, "openai/swiss-ai/Apertus")
         self.assertNotContains(response, TOKEN)
@@ -517,6 +521,97 @@ class ModellvorschlaegeEndpunktTests(TestCase):
 
         httpx_client.assert_not_called()
         self.assertContains(response, "keine Modellliste")
+
+    def test_fuellt_bei_infomaniak_die_leere_basis_url_in_derselben_geste(self) -> None:
+        """Ein Druck, zwei Felder: Modellliste und Produktabfrage in einem Zug."""
+        feld: str = ModellKonfigurationForm()["anbieter_basis_url"].auto_id
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+            verzeichnis.return_value.basis_url.return_value = WURZEL
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter=Anbieter.INFOMANIAK, anbieter_basis_url=""),
+            )
+
+        verzeichnis.return_value.basis_url.assert_called_once_with(Naht.SPRACHMODELL)
+        self.assertContains(response, f"getElementById('{feld}').value = '{WURZEL}'")
+        self.assertContains(response, "Anthropic: Claude Opus")
+
+    def test_ueberschreibt_eine_getippte_basis_url_nicht(self) -> None:
+        """Eine bewusst abweichende Angabe bleibt erhalten."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+            verzeichnis.return_value.basis_url.return_value = WURZEL
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(
+                    anbieter=Anbieter.INFOMANIAK,
+                    anbieter_basis_url="https://eigene.wurzel/v1",
+                ),
+            )
+
+        verzeichnis.return_value.basis_url.assert_not_called()
+        self.assertNotContains(response, WURZEL)
+        self.assertContains(response, "Anthropic: Claude Opus")
+
+    def test_haelt_die_vorschlaege_wenn_allein_die_produktabfrage_scheitert(
+        self,
+    ) -> None:
+        """Der eine Teil reißt den anderen nicht mit."""
+        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+            verzeichnis.return_value.vorschlaege.return_value = [_vorschlag()]
+            verzeichnis.return_value.basis_url.side_effect = AnbieterNichtErreichbar(
+                "Infomaniak ist nicht erreichbar."
+            )
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter=Anbieter.INFOMANIAK, anbieter_basis_url=""),
+            )
+
+        self.assertContains(response, "Anthropic: Claude Opus")
+        self.assertNotContains(response, "anbieter_basis_url")
+
+    def test_fragt_bei_openrouter_kein_produkt_ab(self) -> None:
+        """Dort ist die Basis-URL optional und hat ihre Vorgabe am Profil."""
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
+            httpx_client.return_value.get.return_value.json.return_value = {"data": []}
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter_basis_url=""),
+            )
+
+        httpx_client.return_value.get.assert_called_once_with(
+            OPENROUTER_MODELLE_URL,
+            params={"supported_parameters": "structured_outputs"},
+        )
+        self.assertNotContains(response, "anbieter_basis_url")
+
+    def test_traegt_den_kontoklarnamen_der_produktabfrage_nicht(self) -> None:
+        """Der Klarname steht neben der Kennung und erreicht keine Oberfläche."""
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
+            httpx_client.return_value.get.return_value.json.return_value = {
+                "result": "success",
+                "data": [
+                    {
+                        "product_name": "Ai-Tools",
+                        "product_id": 314159,
+                        "account_name": "Frida Musterfrau",
+                        "status": "ok",
+                    }
+                ],
+            }
+
+            response: HttpResponse = self.client.post(
+                reverse("simulation:modellvorschlaege"),
+                _abrufdaten(anbieter=Anbieter.INFOMANIAK, anbieter_basis_url=""),
+            )
+
+        self.assertNotContains(response, "Frida")
+        self.assertContains(response, "314159")
 
 
 class ModellvorschlaegeSeitenTests(TestCase):
@@ -535,10 +630,16 @@ class ModellvorschlaegeSeitenTests(TestCase):
         """Der Knopf ist der einzige Auslöser des Abrufs."""
         response: HttpResponse = self._seite()
 
-        self.assertContains(response, "Modelle laden")
+        self.assertContains(response, "Modelle und Basis-URL laden")
         self.assertContains(
             response, f'hx-post="{reverse("simulation:modellvorschlaege")}"'
         )
+
+    def test_schickt_die_getippte_basis_url_mit(self) -> None:
+        """Nur so kann der Abruf ein gefülltes Feld unangetastet lassen."""
+        response: HttpResponse = self._seite()
+
+        self.assertContains(response, "[name='anbieter_basis_url']")
 
     def test_verbirgt_den_knopf_beim_anbieter_fake(self) -> None:
         """Ohne echten Anbieter gibt es keinen Knopf."""

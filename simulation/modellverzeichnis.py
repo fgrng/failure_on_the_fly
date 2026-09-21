@@ -22,10 +22,16 @@ OPENROUTER_MODELLE_URL: str = (
     f"{ANBIETER_PROFIL[Anbieter.OPENROUTER].standard_basis_url}/models"
 )
 
+INFOMANIAK_WIRT: str = "https://api.infomaniak.com"
+
 # Die kontoweite Liste Infomaniaks. Sie steht bewusst nicht am Profil: Dessen
 # Basis-URL trägt die Produktkennung und ist beim Anlegen einer Fassung noch
 # nicht getippt, diese Route dagegen kommt ohne sie aus.
-INFOMANIAK_MODELLE_URL: str = "https://api.infomaniak.com/1/ai/models"
+INFOMANIAK_MODELLE_URL: str = f"{INFOMANIAK_WIRT}/1/ai/models"
+
+# Die Produktabfrage. Sie liefert die Kennung, aus der sich die Endpunktwurzel
+# bildet — und hängt wie die Modellliste allein am Token.
+INFOMANIAK_PRODUKT_URL: str = f"{INFOMANIAK_WIRT}/1/ai"
 
 
 class Naht(StrEnum):
@@ -65,10 +71,17 @@ class AnbieterAntwortetFormwidrig(Modellverzeichnisfehler):
 
 
 class Modellverzeichnis(Protocol):
-    """Liefert zu einer Naht die Vorschlagsliste eines Anbieters."""
+    """Liefert zu einer Naht die Vorschläge eines Anbieters."""
 
     def vorschlaege(self, naht: str) -> list[Modellvorschlag]:
         """Liefert die alphabetisch sortierten Vorschläge dieser Naht."""
+
+    def basis_url(self, naht: str) -> str:
+        """Liefert die abgeleitete Endpunktwurzel dieser Naht.
+
+        Leer, wo der Anbieter keine Ableitung kennt oder wo sich aus seiner
+        Antwort keine eindeutige bilden lässt: Das Feld bleibt dann leer.
+        """
 
 
 def _datenliste(
@@ -151,6 +164,11 @@ class OpenRouterVerzeichnis:
         praefix: str = _praefix(Anbieter.OPENROUTER, naht)
         return _alphabetisch(self._vorschlag(eintrag, praefix) for eintrag in eintraege)
 
+    def basis_url(self, naht: str) -> str:
+        """Leitet nichts ab: Die Basis-URL ist hier optional und vorbelegt."""
+
+        return ""
+
     @staticmethod
     def _vorschlag(eintrag: Any, praefix: str) -> Modellvorschlag:
         # Bildet den fertigen Wert aus Modell-ID und dem Präfix der Naht.
@@ -174,6 +192,15 @@ class OpenRouterVerzeichnis:
 _INFOMANIAK_MODELLTYP: dict[str, str] = {
     Naht.SPRACHMODELL: "llm",
     Naht.TRANSKRIPTION: "stt",
+}
+
+# Welche Gestalt die Endpunktwurzel der jeweiligen Naht hat. Sie hängt bei
+# diesem Anbieter nicht am Anbieter allein: Sprachmodell und Transkription
+# liegen unter verschiedenen API-Versionen und mit verschiedenem Pfadrest
+# (Recherche 2026-09-21). Deshalb steht die Gestalt hier, bei der Naht.
+_INFOMANIAK_WURZEL: dict[str, str] = {
+    Naht.SPRACHMODELL: INFOMANIAK_WIRT + "/2/ai/{produkt}/openai/v1",
+    Naht.TRANSKRIPTION: INFOMANIAK_WIRT + "/1/ai/{produkt}/openai",
 }
 
 # Infomaniak weist ein untaugliches Token mit »401« ab; die Meldung benennt
@@ -205,6 +232,30 @@ class InfomaniakVerzeichnis:
             for eintrag in eintraege
             if isinstance(eintrag, dict) and eintrag.get("type") == typ
         )
+
+    def basis_url(self, naht: str) -> str:
+        """Bildet die Endpunktwurzel dieser Naht aus der Produktkennung.
+
+        Nur ein einziges Produkt ergibt eine Wurzel: Ein geratenes wäre
+        schlimmer als ein leeres Feld. Der Klarname des Kontos, den dieselbe
+        Antwort führt, wird nicht gelesen.
+        """
+
+        gestalt: str | None = _INFOMANIAK_WURZEL.get(naht)
+        if gestalt is None:
+            return ""
+        produkte: list[Any] = _datenliste(
+            self.client,
+            INFOMANIAK_PRODUKT_URL,
+            "Infomaniak",
+            ablehnungshinweis=_INFOMANIAK_ABLEHNUNGSHINWEIS,
+        )
+        if len(produkte) != 1 or not isinstance(produkte[0], dict):
+            return ""
+        kennung: Any = produkte[0].get("product_id")
+        if not isinstance(kennung, int | str) or not str(kennung):
+            return ""
+        return gestalt.format(produkt=kennung)
 
     @staticmethod
     def _vorschlag(eintrag: dict[str, Any], praefix: str) -> Modellvorschlag:

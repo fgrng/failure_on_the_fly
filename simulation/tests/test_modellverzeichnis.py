@@ -9,6 +9,7 @@ import pytest
 from simulation.models import Anbieter
 from simulation.modellverzeichnis import (
     INFOMANIAK_MODELLE_URL,
+    INFOMANIAK_PRODUKT_URL,
     OPENROUTER_MODELLE_URL,
     AnbieterAntwortetFormwidrig,
     AnbieterLehntAb,
@@ -396,3 +397,110 @@ def test_fabrik_bildet_das_infomaniak_verzeichnis_mit_dem_getippten_token() -> N
 
     assert isinstance(verzeichnis, InfomaniakVerzeichnis)
     assert verzeichnis.client.headers["authorization"] == "Bearer ik-geheimnis"
+
+
+def _produktliste(*eintraege: dict[str, Any]) -> dict[str, Any]:
+    # Baut die Antwortform, in der »GET /1/ai« die Produkte des Kontos führt.
+
+    return {"result": "success", "data": list(eintraege)}
+
+
+def _produkt(**felder: Any) -> dict[str, Any]:
+    # Baut einen Produkteintrag, wie ihn die Produktabfrage liefert.
+
+    return {
+        "product_name": "Ai-Tools",
+        "product_id": 314159,
+        "account_name": "Frida Musterfrau",
+        "status": "ok",
+        **felder,
+    }
+
+
+def test_infomaniak_bildet_die_sprachmodell_wurzel_aus_der_produktkennung() -> None:
+    """Die Wurzel des Sprachmodells liegt unter der zweiten API-Version."""
+
+    client = _client(_produktliste(_produkt()))
+
+    assert (
+        InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL)
+        == "https://api.infomaniak.com/2/ai/314159/openai/v1"
+    )
+    client.get.assert_called_once_with(INFOMANIAK_PRODUKT_URL)
+
+
+def test_infomaniak_bildet_die_transkriptions_wurzel_unter_eigener_gestalt() -> None:
+    """Dieselbe Kennung, andere API-Version und anderer Pfadrest."""
+
+    client = _client(_produktliste(_produkt()))
+
+    assert (
+        InfomaniakVerzeichnis(client).basis_url(Naht.TRANSKRIPTION)
+        == "https://api.infomaniak.com/1/ai/314159/openai"
+    )
+
+
+def test_infomaniak_leitet_bei_mehreren_produkten_keine_wurzel_ab() -> None:
+    """Ein geratenes Produkt wäre schlimmer als ein leeres Feld."""
+
+    client = _client(_produktliste(_produkt(), _produkt(product_id=271828)))
+
+    assert InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL) == ""
+
+
+def test_infomaniak_leitet_ohne_produkt_keine_wurzel_ab() -> None:
+    """Ohne Produkt gibt es keine Kennung, aus der sich etwas bilden ließe."""
+
+    client = _client(_produktliste())
+
+    assert InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL) == ""
+
+
+def test_infomaniak_leitet_ohne_kennung_keine_wurzel_ab() -> None:
+    """Ein Produkteintrag ohne Kennung lässt das Feld unangetastet."""
+
+    client = _client(_produktliste({"product_name": "Ai-Tools", "status": "ok"}))
+
+    assert InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL) == ""
+
+
+def test_infomaniak_traegt_den_kontoklarnamen_nicht_in_die_wurzel() -> None:
+    """Der Klarname steht neben der Kennung und darf keine Oberfläche erreichen."""
+
+    client = _client(_produktliste(_produkt()))
+
+    assert "Frida" not in InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL)
+
+
+def test_infomaniak_meldet_eine_abgelehnte_produktabfrage() -> None:
+    """Auch diese Abfrage hängt am Token und benennt ihre Ablehnung."""
+
+    client = Mock()
+    client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "401",
+        request=httpx.Request("GET", INFOMANIAK_PRODUKT_URL),
+        response=httpx.Response(401),
+    )
+
+    with pytest.raises(AnbieterLehntAb, match="Token"):
+        InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL)
+
+
+def test_infomaniak_leitet_fuer_eine_naht_ohne_gestalt_nichts_ab() -> None:
+    """Ohne bekannte Gestalt gibt es keine Wurzel und keinen Netzaufruf."""
+
+    client = _client(_produktliste(_produkt()))
+
+    assert InfomaniakVerzeichnis(client).basis_url("bildmodell") == ""
+
+    client.get.assert_not_called()
+
+
+def test_openrouter_leitet_keine_wurzel_ab() -> None:
+    """Dort ist die Basis-URL optional und hat eine Vorgabe am Anbieterprofil."""
+
+    client = _client(_liste())
+
+    assert OpenRouterVerzeichnis(client).basis_url(Naht.SPRACHMODELL) == ""
+
+    client.get.assert_not_called()
