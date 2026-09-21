@@ -126,7 +126,10 @@ freiwilligen Fragebogen-Items am Andockpunkt `am Ende` als eigene Seite. Jede
 Item-Antwort wird sofort gespeichert, und auch übersprungene Fragebogen-Items
 bleiben als vorgelegt dokumentiert. Ein noch nicht abgeschickter Fragebogen —
 nach einer Sitzung ebenso wie am Ende — wird auch in einem anderen Browser
-erneut vorgelegt; ein abgeschickter nicht mehr. Anschließend endet die Teilnahme
+erneut vorgelegt; ein abgeschickter nicht mehr. Der gesamte Fortschritt hängt am
+Teilnahme-Token und nicht am Browser: Ein Aufruf setzt die Teilnahme genau dort
+fort, wo sie steht — bei der Instruktion, im laufenden Gespräch, beim offenen
+Fragebogen oder bei der nächsten Vignette. Anschließend endet die Teilnahme
 mit dem Abschlusstext.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
 kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,

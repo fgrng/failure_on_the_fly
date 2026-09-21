@@ -8,7 +8,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from erhebungen.ablauf import block_vorlegen
+from erhebungen.ablauf import block_vorlegen, vignette_beginnen
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -104,20 +104,28 @@ class ErhebungsteilnahmeTests(TestCase):
     def _laufende_sitzung_starten(
         self, *, audioverarbeitung_eingewilligt: str = "nein"
     ) -> Erhebungsbindung:
-        """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
+        """Stellt eine laufende Sitzung über die Ablauf-Kommandos her, ohne HTTP-Runde."""
 
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {
-                "einwilligung": "ja",
-                "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
-            },
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(self.stichprobe)
+        bindung.teilnahme.einwilligung_erteilt = True
+        bindung.teilnahme.audioverarbeitung_eingewilligt = (
+            audioverarbeitung_eingewilligt == "ja"
         )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        bindung.teilnahme.save(
+            update_fields=["einwilligung_erteilt", "audioverarbeitung_eingewilligt"]
         )
-        return Erhebungsbindung.objects.get()
+        vignette_beginnen(bindung)
+        self._token_hinterlegen(self.client, bindung)
+        return bindung
+
+    def _token_hinterlegen(self, browser: Client, bindung: Erhebungsbindung) -> None:
+        # In der Browser-Session steht nur die Zuordnung Teilnahme-Link zu Token.
+
+        session = browser.session
+        session["erhebung_teilnahme_tokens"] = {
+            str(self.stichprobe.teilnahme_link): bindung.token
+        }
+        session.save()
 
     def _abschluss_item_anlegen(
         self,
@@ -697,9 +705,10 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertRedirects(
             antwort,
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link]),
+            reverse("erhebungen:gespraech", args=[bindung.token]),
             fetch_redirect_response=False,
         )
+        self.assertEqual(Sitzung.objects.count(), 2)
         bindung.refresh_from_db()
         self.assertIsNone(bindung.abgeschlossen_am)
 
@@ -928,6 +937,94 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(spaete_antwort.status_code, 200)
         itemantwort.refresh_from_db()
         self.assertEqual(itemantwort.freitext, "Doch nicht")
+
+    def test_teilnahme_kommt_ueber_gewechselte_browser_zu_ende(self) -> None:
+        """Jeder Schritt lässt sich in einem frischen Browser fortsetzen."""
+
+        self._vignette_anlegen()
+        self._vignette_anlegen(position=2)
+        self._fragebogen_item_nach_sitzung_anlegen("Wie war die Sitzung?")
+        self._abschluss_item_anlegen(wortlaut="Wie war die Erhebung?")
+
+        einstieg: Client = Client()
+        einstieg.get(self.url)
+        einstieg.post(
+            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        einstieg.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        erste_sitzung: Sitzung = Sitzung.objects.get()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        block_url: str = reverse("erhebungen:itemblock", args=[bindung.token])
+
+        debrief: HttpResponse = Client().post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": erste_sitzung.pk},
+        )
+        self.assertContains(debrief, "Wie war die Sitzung?")
+
+        erste_blockantwort: ItemAntwort = ItemAntwort.objects.get(sitzung=erste_sitzung)
+        zur_zweiten_vignette: HttpResponse = Client().post(
+            block_url,
+            {
+                "antwort": erste_blockantwort.pk,
+                f"item_{erste_blockantwort.pk}": "Hilfreich",
+                "weiter": "ja",
+            },
+        )
+        self.assertRedirects(
+            zur_zweiten_vignette, gespraech_url, fetch_redirect_response=False
+        )
+        zweite_sitzung: Sitzung = Sitzung.objects.exclude(pk=erste_sitzung.pk).get()
+
+        abbruch: HttpResponse = Client().post(
+            reverse("erhebungen:abbrechen", args=[bindung.token])
+        )
+        self.assertContains(abbruch, "Wie war die Sitzung?")
+
+        zweite_blockantwort: ItemAntwort = ItemAntwort.objects.get(
+            sitzung=zweite_sitzung
+        )
+        zum_abschlussblock: HttpResponse = Client().post(
+            block_url, {"antwort": zweite_blockantwort.pk, "weiter": "ja"}
+        )
+        self.assertRedirects(
+            zum_abschlussblock, block_url, fetch_redirect_response=False
+        )
+
+        letzter: Client = Client()
+        self.assertContains(letzter.get(block_url), "Wie war die Erhebung?")
+        abschlussantwort: ItemAntwort = ItemAntwort.objects.get(sitzung__isnull=True)
+        ende: HttpResponse = letzter.post(
+            block_url,
+            {
+                "antwort": abschlussantwort.pk,
+                f"item_{abschlussantwort.pk}": "Aufschlussreich",
+                "weiter": "ja",
+            },
+        )
+
+        self.assertRedirects(
+            ende, reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung.refresh_from_db()
+        self.assertIsNotNone(bindung.abgeschlossen_am)
+        self.assertEqual(Erhebungsbindung.objects.count(), 1)
+        self.assertEqual(
+            list(
+                Itemblock.objects.filter(erledigt_am__isnull=True).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [],
+        )
+        self.assertEqual(
+            [antwort.freitext for antwort in ItemAntwort.objects.order_by("pk")],
+            ["Hilfreich", None, "Aufschlussreich"],
+        )
 
     def test_offener_sitzungsblock_ueberlebt_den_browserwechsel(self) -> None:
         """Ein anderer Browser bekommt den offenen Block, den erledigten nicht."""

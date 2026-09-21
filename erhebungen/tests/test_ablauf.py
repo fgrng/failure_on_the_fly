@@ -5,13 +5,17 @@ from django.utils import timezone
 
 from erhebungen.ablauf import (
     Ende,
+    LaufendeSitzung,
     NaechsteVignette,
+    NochNichtBegonnen,
     OffenerAbschlussblock,
     OffenerSitzungsblock,
     bindung_abschliessen,
     block_erledigen,
     block_vorlegen,
     naechster_schritt,
+    vignette_beginnen,
+    ziehung_festschreiben,
 )
 from erhebungen.models import (
     Erhebung,
@@ -21,6 +25,7 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
+    Vignettenposition,
     Vignettenziehung,
 )
 from konten.models import Konto
@@ -33,6 +38,11 @@ from vignetten.models import Vignette
 def _finale_vignette_anlegen(konto: Konto) -> Vignette:
     """Legt eine für die Erhebung einbindbare Vignetten-Fassung an."""
 
+    if not Simulationskern.objects.filter(
+        zustand=Simulationskern.Zustand.FINAL
+    ).exists():
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
     vignette: Vignette = Vignette.objects.anlegen(konto)
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
     vignette.lernauftrag_text = "Addiere die Brüche."
@@ -73,7 +83,10 @@ def _bindung_anlegen(erhebung: Erhebung) -> Erhebungsbindung:
 
 
 def _sitzung_anlegen(
-    bindung: Erhebungsbindung, vignette: Vignette, kern: Simulationskern
+    bindung: Erhebungsbindung,
+    vignette: Vignette,
+    kern: Simulationskern,
+    status: str = Sitzung.Status.ABGESCHLOSSEN,
 ) -> Sitzung:
     """Hält eine gespielte Vignettensitzung dieser Teilnahme fest."""
 
@@ -82,6 +95,7 @@ def _sitzung_anlegen(
         vignette=vignette,
         simulationskern=kern,
         modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+        status=status,
     )
 
 
@@ -98,8 +112,9 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+    ziehung_festschreiben(bindung)
 
-    assert naechster_schritt(bindung) == NaechsteVignette(erste)
+    assert naechster_schritt(bindung) == NochNichtBegonnen()
 
     _sitzung_anlegen(bindung, erste, kern)
 
@@ -128,6 +143,7 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
         position=1,
     )
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+    ziehung_festschreiben(bindung)
     _sitzung_anlegen(bindung, vignette, kern)
 
     assert naechster_schritt(bindung) == OffenerAbschlussblock()
@@ -177,8 +193,8 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         randomisierungs_seed=17,
     )
 
-    naechster_schritt(erste_bindung)
-    naechster_schritt(zweite_bindung)
+    ziehung_festschreiben(erste_bindung)
+    ziehung_festschreiben(zweite_bindung)
 
     assert list(
         erste_bindung.vignettenziehungen.values_list("vignette_id", flat=True)
@@ -228,7 +244,7 @@ def test_block_ohne_items_am_andockpunkt_entsteht_nicht() -> None:
 
     assert block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE) is None
     assert Itemblock.objects.count() == 0
-    assert naechster_schritt(bindung) == Ende()
+    assert naechster_schritt(bindung) == NochNichtBegonnen()
 
 
 @pytest.mark.django_db
@@ -251,9 +267,12 @@ def test_beendete_sitzung_stellt_ihren_block_vor_die_naechste_vignette() -> None
         position=1,
     )
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
-    sitzung: Sitzung = _sitzung_anlegen(bindung, erste, kern)
+    ziehung_festschreiben(bindung)
+    sitzung: Sitzung = _sitzung_anlegen(
+        bindung, erste, kern, status=Sitzung.Status.LAUFEND
+    )
 
-    assert naechster_schritt(bindung) == NaechsteVignette(zweite)
+    assert naechster_schritt(bindung) == LaufendeSitzung(sitzung)
 
     sitzung.status = Sitzung.Status.ABGESCHLOSSEN
     sitzung.save(update_fields=["status"])
@@ -270,3 +289,119 @@ def test_beendete_sitzung_stellt_ihren_block_vor_die_naechste_vignette() -> None
     block_erledigen(block)
 
     assert naechster_schritt(bindung) == NaechsteVignette(zweite)
+
+
+@pytest.mark.django_db
+def test_abfrage_nach_dem_naechsten_schritt_schreibt_keine_zeile() -> None:
+    """Die Frage nach der Position materialisiert keine Forschungsdaten."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
+    )
+    vignette: Vignette = _finale_vignette_anlegen(konto)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
+    item: FragebogenItem = _finales_item_anlegen(konto)
+    Erhebungsitem.objects.create(
+        erhebung=erhebung,
+        item=item,
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        position=1,
+    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+
+    assert naechster_schritt(bindung) == NochNichtBegonnen()
+
+    bindung.refresh_from_db()
+    assert bindung.randomisierungs_seed is None
+    assert Vignettenziehung.objects.count() == 0
+    assert Vignettenposition.objects.count() == 0
+    assert Itemblock.objects.count() == 0
+    assert ItemAntwort.objects.count() == 0
+    assert Sitzung.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_vignette_beginnen_schreibt_ziehung_sitzung_und_position() -> None:
+    """Das Kommando beginnt die nächste gezogene Vignette an ihrer Position."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    ModellKonfiguration.objects.aktivieren(
+        ModellKonfiguration.objects.create(sprachmodell="fake")
+    )
+    erhebung.finalisieren()
+    erste: Vignette = _finale_vignette_anlegen(konto)
+    zweite: Vignette = _finale_vignette_anlegen(konto)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+
+    sitzung: Sitzung | None = vignette_beginnen(bindung)
+
+    assert sitzung is not None
+    assert sitzung.vignette == erste
+    assert naechster_schritt(bindung) == LaufendeSitzung(sitzung)
+    assert list(bindung.vignettenziehungen.values_list("vignette_id", "position")) == [
+        (erste.pk, 1),
+        (zweite.pk, 2),
+    ]
+    position: Vignettenposition = Vignettenposition.objects.get()
+    assert (position.sitzung, position.vignette, position.position) == (
+        sitzung,
+        erste,
+        1,
+    )
+
+
+@pytest.mark.django_db
+def test_zwei_aufrufe_beginnen_keine_zweite_sitzung() -> None:
+    """Der zweite Aufruf bleibt bei der laufenden Sitzung der Erhebungsbindung."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    ModellKonfiguration.objects.aktivieren(
+        ModellKonfiguration.objects.create(sprachmodell="fake")
+    )
+    erhebung.finalisieren()
+    erste: Vignette = _finale_vignette_anlegen(konto)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+
+    erste_sitzung: Sitzung | None = vignette_beginnen(bindung)
+    zweite_sitzung: Sitzung | None = vignette_beginnen(bindung)
+
+    assert erste_sitzung == zweite_sitzung
+    assert Sitzung.objects.count() == 1
+    assert Vignettenposition.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_ziehung_bleibt_nach_dem_ersten_festschreiben_unveraendert() -> None:
+    """Die Randomisierungsreihenfolge entsteht genau einmal."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
+    )
+    for _ in range(4):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=_finale_vignette_anlegen(konto)
+        )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+
+    ziehung_festschreiben(bindung)
+    gezogen: list[tuple[int, int]] = list(
+        bindung.vignettenziehungen.values_list("vignette_id", "position")
+    )
+    bindung.refresh_from_db()
+    seed: int | None = bindung.randomisierungs_seed
+    ziehung_festschreiben(bindung)
+
+    bindung.refresh_from_db()
+    assert bindung.randomisierungs_seed == seed
+    assert (
+        list(bindung.vignettenziehungen.values_list("vignette_id", "position"))
+        == gezogen
+    )
+    assert Vignettenziehung.objects.count() == 4
