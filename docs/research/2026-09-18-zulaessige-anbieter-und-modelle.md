@@ -1,5 +1,7 @@
 # Zulässige Anbieter und Modelle: OpenRouter und Infomaniak
 
+> **Nachtrag 2026-09-21** ([#174](https://github.com/fgrng/failure_on_the_fly/issues/174)): Die unter Abschnitt 7 angedachte Streichung der nativen Reasoning-Spur ist entschieden und umgesetzt. Alles, was dieser Text über sie sagt — insbesondere der Codebefund in Abschnitt 1.3 —, beschreibt den Stand vom 2026-09-18 und gilt nicht mehr. Maßgeblich sind ADR-0005 und ADR-0016.
+
 Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die offene Frage »Zulässige Anbieter und Modelle« aus `docs/open-questions.md`:
 
 > Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.

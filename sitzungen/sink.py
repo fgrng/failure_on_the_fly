@@ -37,7 +37,6 @@ class GespraechsschrittDaten(TypedDict):
     eingabe: str
     denkspur: str | None
     aeusserung: str | None
-    native_reasoning_spur: str | None
     fehlversuche: list[FehlversuchDaten]
 
 
@@ -64,7 +63,6 @@ class SitzungSink(Protocol):
         eingabe: str,
         denkspur: str,
         aeusserung: str,
-        native_reasoning_spur: str | None,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Bewahrt einen geglückten Gesprächsschritt auf."""
@@ -144,7 +142,6 @@ class DBSink:
         eingabe: str,
         denkspur: str,
         aeusserung: str,
-        native_reasoning_spur: str | None,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Schreibt einen geglückten Schritt und seine Fehlversuche atomar."""
@@ -155,7 +152,6 @@ class DBSink:
                 eingabe=eingabe,
                 denkspur=denkspur,
                 aeusserung=aeusserung,
-                native_reasoning_spur=native_reasoning_spur,
                 reihenfolge=self._naechste_reihenfolge(),
             )
             Fehlversuch.objects.bulk_create(
@@ -356,7 +352,6 @@ class ScratchSink:
         eingabe: str,
         denkspur: str,
         aeusserung: str,
-        native_reasoning_spur: str | None,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
         """Hängt den geglückten Schritt in gemeinsamer Speicherform an."""
@@ -367,7 +362,6 @@ class ScratchSink:
                 "eingabe": eingabe,
                 "denkspur": denkspur,
                 "aeusserung": aeusserung,
-                "native_reasoning_spur": native_reasoning_spur,
                 "fehlversuche": fehlversuche,
             }
         )

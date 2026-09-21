@@ -112,7 +112,6 @@ class Gespraechsschritt(models.Model):
     eingabe: models.TextField = models.TextField()
     denkspur: models.TextField = models.TextField(null=True, blank=True)
     aeusserung: models.TextField = models.TextField(null=True, blank=True)
-    native_reasoning_spur: models.TextField = models.TextField(null=True, blank=True)
     reihenfolge: models.PositiveIntegerField = models.PositiveIntegerField()
 
     objects: GespraechsschrittManager = GespraechsschrittManager()

@@ -98,7 +98,6 @@ def gespraechsschritt_ausfuehren(
         eingabe=eingabe,
         denkspur=antwortversuch.antwort.denkspur,
         aeusserung=antwortversuch.antwort.aeusserung,
-        native_reasoning_spur=antwortversuch.native_reasoning_spur,
         fehlversuche=fehlversuche,
     )
     if sink.budget_erschoepft(vignette):

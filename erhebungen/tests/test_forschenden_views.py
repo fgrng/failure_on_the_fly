@@ -1917,7 +1917,6 @@ class ErhebungsExportTests(TestCase):
             eingabe="Warum?",
             denkspur="Zeile eins\nZeile zwei",
             aeusserung="Antwort eins\nAntwort zwei",
-            native_reasoning_spur=None,
         )
         Fehlversuch.objects.create(
             gespraechsschritt=erfolgreicher_schritt,
@@ -1983,13 +1982,13 @@ class ErhebungsExportTests(TestCase):
                     "diagnosen.csv",
                 }.issubset(zip_datei.namelist())
             )
-            schritte: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("gespraechsschritte.csv"), encoding="utf-8"
-                    )
+            schritt_leser: csv.DictReader[str] = csv.DictReader(
+                TextIOWrapper(
+                    zip_datei.open("gespraechsschritte.csv"), encoding="utf-8"
                 )
             )
+            schritte: list[dict[str, str]] = list(schritt_leser)
+            kopfzeile: list[str] = list(schritt_leser.fieldnames or [])
             fehlversuche: list[dict[str, str]] = list(
                 csv.DictReader(
                     TextIOWrapper(zip_datei.open("fehlversuche.csv"), encoding="utf-8")
@@ -2001,6 +2000,18 @@ class ErhebungsExportTests(TestCase):
                 )
             )
 
+        self.assertEqual(
+            kopfzeile,
+            [
+                "id",
+                "sitzung_id",
+                "reihenfolge",
+                "eingabe",
+                "denkspur",
+                "aeusserung",
+                "erstellt_am",
+            ],
+        )
         self.assertEqual(
             [
                 {name: wert for name, wert in schritt.items() if name != "erstellt_am"}
@@ -2014,7 +2025,6 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Warum?",
                     "denkspur": "Zeile eins\nZeile zwei",
                     "aeusserung": "Antwort eins\nAntwort zwei",
-                    "native_reasoning_spur": "NA",
                 },
                 {
                     "id": str(leerer_schritt.pk),
@@ -2023,7 +2033,6 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Bitte knapp.",
                     "denkspur": "",
                     "aeusserung": "",
-                    "native_reasoning_spur": "NA",
                 },
                 {
                     "id": str(abbruchschritt.pk),
@@ -2032,7 +2041,6 @@ class ErhebungsExportTests(TestCase):
                     "eingabe": "Noch einmal?",
                     "denkspur": "NA",
                     "aeusserung": "NA",
-                    "native_reasoning_spur": "NA",
                 },
             ],
         )

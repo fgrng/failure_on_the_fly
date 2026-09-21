@@ -40,7 +40,6 @@ def test_antwort_versuchen_liefert_denkspur_und_aeusserung_des_fakes() -> None:
 
     assert antwortversuch.antwort.denkspur == "Ich addiere Zähler und Nenner."
     assert antwortversuch.antwort.aeusserung == "2/5."
-    assert antwortversuch.native_reasoning_spur is None
     assert antwortversuch.fehlversuche == []
 
 
@@ -109,31 +108,6 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
         "Anbieterfehler"
     ] * MAX_VERSUCHE
-
-
-def test_antwort_versuchen_gibt_native_reasoning_spur_durch() -> None:
-    """Native Anbieter-Spuren bleiben von der Denkspur getrennt."""
-
-    antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {
-                        "denkspur": "Ich addiere.",
-                        "aeusserung": "2/5.",
-                        "native_reasoning_spur": "native Spur",
-                    }
-                ]
-            },
-        ),
-        verlauf=[],
-        eingabe="Wie hast du gerechnet?",
-    )
-
-    assert antwortversuch.native_reasoning_spur == "native Spur"
 
 
 def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
