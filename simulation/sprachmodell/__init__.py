@@ -80,8 +80,8 @@ class Sprachmodell(Protocol):
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
-    ) -> tuple[Antwort, str | None]:
-        """Liefert eine strukturierte Antwort und optionale native Reasoning-Spur."""
+    ) -> Antwort:
+        """Liefert die geparste Antwort: Nichts reist am Ausgabeschema vorbei."""
 
 
 class FakeSprachmodell:
@@ -99,7 +99,7 @@ class FakeSprachmodell:
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
-    ) -> tuple[Antwort, str | None]:
+    ) -> Antwort:
         """Verbraucht genau einen Eintrag des Fake-Skripts."""
 
         type(self).letzte_anfragen.append(
@@ -126,12 +126,7 @@ class FakeSprachmodell:
             antwort.aeusserung, str
         ):
             raise Formatbruch(str(eintrag.get("rohantwort", "")))
-        native_reasoning_spur: object = eintrag.get("native_reasoning_spur")
-        if native_reasoning_spur is not None and not isinstance(
-            native_reasoning_spur, str
-        ):
-            raise Formatbruch(str(eintrag.get("rohantwort", "")))
-        return antwort, native_reasoning_spur
+        return antwort
 
 
 class LiteLLMSprachmodell:
@@ -154,8 +149,8 @@ class LiteLLMSprachmodell:
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
-    ) -> tuple[Antwort, str | None]:
-        """Fordert eine JSON-Ausgabe an und trennt die native Reasoning-Spur ab."""
+    ) -> Antwort:
+        """Fordert eine JSON-Ausgabe an und gibt allein die geparste Antwort zurück."""
 
         try:
             modellantwort = self.completion(
@@ -208,12 +203,4 @@ class LiteLLMSprachmodell:
             antwort.aeusserung, str
         ):
             raise Formatbruch(rohantwort)
-
-        native_reasoning_spur: object = getattr(nachricht, "reasoning_content", None)
-        if native_reasoning_spur is None:
-            native_reasoning_spur = getattr(nachricht, "thinking", None)
-        if native_reasoning_spur is not None and not isinstance(
-            native_reasoning_spur, str
-        ):
-            raise Formatbruch(rohantwort)
-        return antwort, native_reasoning_spur
+        return antwort

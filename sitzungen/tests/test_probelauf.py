@@ -292,7 +292,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 "eingabe": "Wie rechnest du?",
                 "denkspur": "Mia addiert Zähler und Nenner.",
                 "aeusserung": "Ich addiere einfach alles.",
-                "native_reasoning_spur": None,
                 "fehlversuche": [],
             }
         ]
@@ -406,7 +405,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                     {
                         "denkspur": "Mia addiert Zähler und Nenner.",
                         "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                        "native_reasoning_spur": "native erste Spur",
                     },
                 ]
             },
@@ -431,7 +429,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             erste_antwort, "Ich rechne eins plus eins und zwei plus drei."
         )
         self.assertContains(erste_antwort, "Mia addiert Zähler und Nenner.")
-        self.assertContains(erste_antwort, "native erste Spur")
 
         zweite_antwort: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
@@ -448,7 +445,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                     "eingabe": "Wie rechnest du?",
                     "denkspur": "Mia addiert Zähler und Nenner.",
                     "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    "native_reasoning_spur": "native erste Spur",
                     "fehlversuche": [],
                 },
                 {
@@ -456,7 +452,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                     "eingabe": "Und warum?",
                     "denkspur": "Mia addiert Zähler und Nenner.",
                     "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    "native_reasoning_spur": "native erste Spur",
                     "fehlversuche": [],
                 },
             ],
@@ -598,30 +593,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             "Ich addiere einfach alles.",
         )
         self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
-
-    def test_native_reasoning_spur_fehlt_ohne_anbieterwert(self) -> None:
-        """Die native Spur ist ein optionaler Zusatz zur immer sichtbaren Denkspur."""
-
-        self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {
-                        "denkspur": "Mia addiert Zähler und Nenner.",
-                        "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    }
-                ]
-            },
-        )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-
-        response: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
-        )
-
-        self.assertContains(response, "Denkspur ansehen")
-        self.assertNotContains(response, "Native Reasoning-Spur:")
 
     def test_modellverlauf_traegt_beide_gespraechsseiten(self) -> None:
         """Beide Gesprächsseiten reisen als native Rollen zum Modell."""

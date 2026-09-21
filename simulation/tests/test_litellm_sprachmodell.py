@@ -10,6 +10,7 @@ from simulation import antwort_versuchen
 from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import (
     AUSGABE_SCHEMA,
+    Antwort,
     ContentFilter,
     Formatbruch,
     LiteLLMSprachmodell,
@@ -17,9 +18,7 @@ from simulation.sprachmodell import (
 from vignetten.models import Vignette
 
 
-def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_durch() -> (
-    None
-):
+def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
     """Der Modell-String routet LiteLLM, ohne dass ein Anbieterzweig entsteht."""
 
     completion = Mock(
@@ -27,21 +26,19 @@ def test_litellm_adapter_reicht_konfiguration_schema_und_native_reasoning_spur_d
             choices=[
                 SimpleNamespace(
                     message=SimpleNamespace(
-                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}',
-                        reasoning_content="native Reasoning-Spur",
+                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}'
                     )
                 )
             ]
         )
     )
 
-    antwort, native_reasoning_spur = LiteLLMSprachmodell(
+    antwort = LiteLLMSprachmodell(
         "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
     ).antworten("System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA)
 
     assert antwort.denkspur == "Ich addiere."
     assert antwort.aeusserung == "2/5."
-    assert native_reasoning_spur == "native Reasoning-Spur"
     completion.assert_called_once_with(
         model="anthropic/claude-opus-4-8",
         messages=[
@@ -98,8 +95,9 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
     ]
 
 
-def test_litellm_adapter_zieht_native_reasoning_spur_aus_thinking() -> None:
-    """Auch eine als `thinking` gelieferte native Reasoning-Spur wird erkannt."""
+@pytest.mark.parametrize("feldname", ["reasoning_content", "thinking"])
+def test_litellm_adapter_uebergeht_native_reasoning_felder(feldname: str) -> None:
+    """Native Reasoning-Felder des Anbieters bleiben folgenlos: Sie werden nicht gelesen."""
 
     completion = Mock(
         return_value=SimpleNamespace(
@@ -107,19 +105,18 @@ def test_litellm_adapter_zieht_native_reasoning_spur_aus_thinking() -> None:
                 SimpleNamespace(
                     message=SimpleNamespace(
                         content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}',
-                        reasoning_content=None,
-                        thinking="native Reasoning-Spur",
+                        **{feldname: "native Reasoning-Spur"},
                     )
                 )
             ]
         )
     )
 
-    _, native_reasoning_spur = LiteLLMSprachmodell(
-        "openai/gpt-test", {}, completion
-    ).antworten("System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA)
+    antwort = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
+        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA
+    )
 
-    assert native_reasoning_spur == "native Reasoning-Spur"
+    assert antwort == Antwort(denkspur="Ich addiere.", aeusserung="2/5.")
 
 
 def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> None:
@@ -130,8 +127,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
             choices=[
                 SimpleNamespace(
                     message=SimpleNamespace(
-                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}',
-                        reasoning_content="native Reasoning-Spur",
+                        content='{"denkspur": "Ich addiere.", "aeusserung": "2/5."}'
                     )
                 )
             ]
@@ -153,7 +149,6 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
         )
 
     assert antwortversuch.antwort is not None
-    assert antwortversuch.native_reasoning_spur == "native Reasoning-Spur"
     assert completion.call_args.kwargs["model"] == "openrouter/openai/gpt-test"
     assert completion.call_args.kwargs["max_tokens"] == 100
 

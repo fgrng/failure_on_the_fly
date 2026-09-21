@@ -75,7 +75,6 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
             "eingabe": "Wie hast du gerechnet?",
             "denkspur": "Ich addiere.",
             "aeusserung": "2/5.",
-            "native_reasoning_spur": None,
             "fehlversuche": [
                 {"grund": "Formatbruch", "rohantwort": "keine JSON-Antwort"}
             ],
@@ -85,14 +84,13 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 
 @pytest.mark.django_db
 def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
-    """Ein geglückter Gesprächsschritt steht sofort samt Denk- und nativer Reasoning-Spur in der DB."""
+    """Ein geglückter Gesprächsschritt steht sofort samt seiner Denkspur in der DB."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [
             {
                 "denkspur": "Ich addiere Zähler und Nenner.",
                 "aeusserung": "2/5.",
-                "native_reasoning_spur": "Native Spur.",
             }
         ]
     )
@@ -116,7 +114,6 @@ def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
             "eingabe",
             "denkspur",
             "aeusserung",
-            "native_reasoning_spur",
         )
     ) == [
         {
@@ -124,7 +121,6 @@ def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
             "eingabe": "Wie hast du gerechnet?",
             "denkspur": "Ich addiere Zähler und Nenner.",
             "aeusserung": "2/5.",
-            "native_reasoning_spur": "Native Spur.",
         }
     ]
 
@@ -230,7 +226,6 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
             {
                 "denkspur": "Meine Regel.",
                 "aeusserung": "2/5.",
-                "native_reasoning_spur": "Native Spur.",
             },
         ]
     )
@@ -250,7 +245,6 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
             "eingabe": db_schritt.eingabe,
             "denkspur": db_schritt.denkspur,
             "aeusserung": db_schritt.aeusserung,
-            "native_reasoning_spur": db_schritt.native_reasoning_spur,
             "fehlversuche": list(
                 Fehlversuch.objects.filter(gespraechsschritt=db_schritt).values(
                     "grund", "rohantwort"
@@ -431,7 +425,6 @@ def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
             {
                 "denkspur": "Ich addiere Zähler und Nenner.",
                 "aeusserung": "2/5.",
-                "native_reasoning_spur": "Native Spur.",
             }
         ]
     )

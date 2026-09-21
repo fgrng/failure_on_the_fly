@@ -1003,7 +1003,6 @@ class ErhebungsteilnahmeTests(TestCase):
                     {
                         "denkspur": "Geheime Regel.",
                         "aeusserung": "Ich addiere.",
-                        "native_reasoning_spur": "Anbieter-Spur.",
                     },
                 ]
             },
@@ -1044,7 +1043,6 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(schritt.eingabe, "Wie rechnest du?")
         self.assertEqual(schritt.aeusserung, "Ich addiere.")
         self.assertEqual(schritt.denkspur, "Geheime Regel.")
-        self.assertEqual(schritt.native_reasoning_spur, "Anbieter-Spur.")
         fehlversuch: Fehlversuch = Fehlversuch.objects.get(gespraechsschritt=schritt)
         self.assertEqual(fehlversuch.grund, "Formatbruch")
         self.assertEqual(fehlversuch.rohantwort, "{unvollständig")

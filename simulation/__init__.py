@@ -46,7 +46,6 @@ class Antwortversuch:
     """Das flüchtige Ergebnis von höchstens drei Modellaufrufen."""
 
     antwort: Antwort | None
-    native_reasoning_spur: str | None
     fehlversuche: list[Fehlversuch]
 
 
@@ -91,7 +90,7 @@ def antwort_versuchen(
 
     for _ in range(MAX_VERSUCHE):
         try:
-            antwort, native_reasoning_spur = sprachmodell.antworten(
+            antwort: Antwort = sprachmodell.antworten(
                 system_prompt,
                 user_prompt,
                 verlauf,
@@ -105,8 +104,8 @@ def antwort_versuchen(
         except ContentFilter as exc:
             fehlversuche.append(Fehlversuch("Content-Filter", exc.rohantwort))
         else:
-            return Antwortversuch(antwort, native_reasoning_spur, fehlversuche)
-    return Antwortversuch(None, None, fehlversuche)
+            return Antwortversuch(antwort, fehlversuche)
+    return Antwortversuch(None, fehlversuche)
 
 
 def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmodell:
