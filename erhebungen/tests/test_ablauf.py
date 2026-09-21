@@ -59,6 +59,31 @@ def _finales_item_anlegen(konto: Konto) -> FragebogenItem:
     return item
 
 
+def _bindung_anlegen(erhebung: Erhebung) -> Erhebungsbindung:
+    """Bindet eine frische Teilnahme an eine eigene Stichprobe der Erhebung."""
+
+    return Erhebungsbindung.objects.create(
+        stichprobe=Stichprobe.objects.create(
+            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
+        ),
+        teilnahme=Teilnahme.objects.create(),
+        token="2345-6789",
+    )
+
+
+def _sitzung_anlegen(
+    bindung: Erhebungsbindung, vignette: Vignette, kern: Simulationskern
+) -> Sitzung:
+    """Hält eine gespielte Vignettensitzung dieser Teilnahme fest."""
+
+    return Sitzung.objects.create(
+        teilnahme=bindung.teilnahme,
+        vignette=vignette,
+        simulationskern=kern,
+        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+    )
+
+
 @pytest.mark.django_db
 def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() -> None:
     """Der Ablauf folgt der konfigurierten Ordnung und endet nach allen Sitzungen."""
@@ -71,31 +96,15 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     zweite: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=Stichprobe.objects.create(
-            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
-        ),
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
-    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
     assert naechster_schritt(bindung) == NaechsteVignette(erste)
 
-    Sitzung.objects.create(
-        teilnahme=bindung.teilnahme,
-        vignette=erste,
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
-    )
+    _sitzung_anlegen(bindung, erste, kern)
 
     assert naechster_schritt(bindung) == NaechsteVignette(zweite)
 
-    Sitzung.objects.create(
-        teilnahme=bindung.teilnahme,
-        vignette=zweite,
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
-    )
+    _sitzung_anlegen(bindung, zweite, kern)
 
     assert naechster_schritt(bindung) == Ende()
 
@@ -117,24 +126,17 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
         andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
         position=1,
     )
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=Stichprobe.objects.create(
-            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
-        ),
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
-    )
-    Sitzung.objects.create(
-        teilnahme=bindung.teilnahme,
-        vignette=vignette,
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
-    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+    _sitzung_anlegen(bindung, vignette, kern)
 
     assert naechster_schritt(bindung) == OffenerAbschlussblock()
 
-    erste_vorlage = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
-    zweite_vorlage = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+    erste_vorlage: Itemblock | None = block_vorlegen(
+        bindung, Erhebungsitem.Andockpunkt.AM_ENDE
+    )
+    zweite_vorlage: Itemblock | None = block_vorlegen(
+        bindung, Erhebungsitem.Andockpunkt.AM_ENDE
+    )
 
     assert erste_vorlage is not None
     assert zweite_vorlage == erste_vorlage
@@ -198,15 +200,9 @@ def test_kommandos_bleiben_beim_zweiten_aufruf_bei_ihrem_ergebnis() -> None:
         andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
         position=1,
     )
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=Stichprobe.objects.create(
-            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
-        ),
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
-    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
-    block = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
+    block: Itemblock | None = block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
     assert block is not None
     block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE)
     block_erledigen(block)
@@ -229,13 +225,7 @@ def test_block_ohne_items_am_andockpunkt_entsteht_nicht() -> None:
 
     konto: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=Stichprobe.objects.create(
-            erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
-        ),
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
-    )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
     assert block_vorlegen(bindung, Erhebungsitem.Andockpunkt.AM_ENDE) is None
     assert Itemblock.objects.count() == 0

@@ -10,7 +10,13 @@ from django.utils import timezone
 from sitzungen.models import Sitzung
 from vignetten.models import Vignette
 
-from .models import Erhebungsbindung, Erhebungsitem, ItemAntwort, Itemblock
+from .models import (
+    Erhebungsbindung,
+    Erhebungsitem,
+    ItemAntwort,
+    Itemblock,
+    Vignettenziehung,
+)
 
 
 @dataclass(frozen=True)
@@ -69,7 +75,7 @@ def naechster_schritt(bindung: Erhebungsbindung) -> Schritt:
 
     bindung.vignetten_ziehen()
     gespielte_ids = bindung.teilnahme.sitzung_set.values_list("vignette_id", flat=True)
-    ziehung = (
+    ziehung: Vignettenziehung | None = (
         bindung.vignettenziehungen.select_related("vignette")
         .exclude(vignette_id__in=gespielte_ids)
         .first()
@@ -90,7 +96,7 @@ def _abschlussblock_ist_offen(bindung: Erhebungsbindung) -> bool:
         andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
     ).exists():
         return False
-    block = bindung.itembloecke.filter(
+    block: Itemblock | None = bindung.itembloecke.filter(
         andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
     ).first()
     return block is None or block.erledigt_am is None
@@ -107,13 +113,13 @@ def block_vorlegen(
     ``None``.
     """
 
-    erhebungsitems = list(
+    erhebungsitems: list[Erhebungsitem] = list(
         bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(andockpunkt=andockpunkt)
     )
     if not erhebungsitems:
         return None
     with transaction.atomic():
-        _gesperrte_bindung(bindung)
+        _bindung_sperren(bindung)
         block, _ = Itemblock.objects.get_or_create(
             erhebungsbindung=bindung,
             andockpunkt=andockpunkt,
@@ -132,7 +138,7 @@ def block_erledigen(block: Itemblock) -> None:
     """Hält fest, dass dieser Block abgeschickt wurde — auch leer."""
 
     with transaction.atomic():
-        _gesperrte_bindung(block.erhebungsbindung)
+        _bindung_sperren(block.erhebungsbindung)
         Itemblock.objects.filter(pk=block.pk, erledigt_am__isnull=True).update(
             erledigt_am=timezone.now()
         )
@@ -143,14 +149,15 @@ def bindung_abschliessen(bindung: Erhebungsbindung) -> None:
     """Hält fest, dass diese Teilnahme fertig ist."""
 
     with transaction.atomic():
-        _gesperrte_bindung(bindung)
+        _bindung_sperren(bindung)
         Erhebungsbindung.objects.filter(
             pk=bindung.pk, abgeschlossen_am__isnull=True
         ).update(abgeschlossen_am=timezone.now())
         bindung.refresh_from_db(fields=["abgeschlossen_am"])
 
 
-def _gesperrte_bindung(bindung: Erhebungsbindung) -> Erhebungsbindung:
-    # Serialisiert die Fortschritts-Kommandos derselben Teilnahme.
+def _bindung_sperren(bindung: Erhebungsbindung) -> None:
+    # Hält die Bindungszeile bis zum Ende der Transaktion und serialisiert so die
+    # Fortschritts-Kommandos derselben Teilnahme.
 
-    return Erhebungsbindung.objects.select_for_update().get(pk=bindung.pk)
+    Erhebungsbindung.objects.select_for_update().get(pk=bindung.pk)

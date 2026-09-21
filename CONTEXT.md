@@ -217,6 +217,10 @@ _Avoid_: Antwort, Fragebogen-Antwort, Response
 Die Stelle im Ablauf einer Erhebung, an der ein Fragebogen-Item erhoben wird: nach jeder Vignettensitzung oder am Ende nach allen Vignettensitzungen.
 _Avoid_: Zeitpunkt, Trigger, Position
 
+**Itemblock**:
+Die Fragebogen-Items eines Andockpunkts, wie sie einer Teilnahme tatsächlich vorgelegt wurden. Er hält fest, wann er vorgelegt und wann er abgeschickt wurde — auch ohne einzige Antwort — und trägt die Item-Antworten. Je Vignettensitzung und je Erhebungsbindung am Ende entsteht höchstens einer.
+_Avoid_: Fragebogenseite, Block, Formular
+
 ## Rollen
 
 **Teilnehmer:in**:

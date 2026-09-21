@@ -1084,7 +1084,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
                 erhebungsbindung=bindung,
                 pk__in=antwort_ids,
             )
-            .select_related("erhebungsitem__item")
+            .select_related("erhebungsitem__item", "itemblock")
             .order_by("erhebungsitem__position")
         )
         if len(antworten) != len(antwort_ids):
