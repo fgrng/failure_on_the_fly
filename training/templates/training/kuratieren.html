@@ -93,7 +93,6 @@
         </div>
     </section>
 
-    {# Der Kreis hängt am Objekt selbst, das auch die Routen führt. #}
-    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_id="detail-koautorinnen" koautorinnen_abschnitt_nummer="03" koautorin_hinzufuegen_url="training:koautorin_hinzufuegen" koautorin_entfernen_url="training:koautorin_entfernen" kreis=training objekt_pk=training.pk %}
+    {% include "includes/koautorinnen.html" with koautorinnen_abschnitt_nummer="03" koautorin_hinzufuegen_url="training:koautorin_hinzufuegen" koautorin_entfernen_url="training:koautorin_entfernen" kreis=training objekt_pk=training.pk %}
 </section>
 {% endblock %}

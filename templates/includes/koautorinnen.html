@@ -4,10 +4,10 @@ trägt; `objekt_pk` das, worüber die beiden Routen geführt werden. Bei
 Vignette und Fragebogen-Item fallen die beiden auseinander: Die URL geht
 über die Fassung, der Kreis hängt an der Historie.
 {% endcomment %}
-<section class="page-section" aria-labelledby="{{ koautorinnen_abschnitt_id }}">
+<section class="page-section" aria-labelledby="detail-koautorinnen">
     <div class="page-section__head">
         <b>{{ koautorinnen_abschnitt_nummer }}</b>
-        <div><h2 id="{{ koautorinnen_abschnitt_id }}">Eigentümer:innen</h2></div>
+        <div><h2 id="detail-koautorinnen">Eigentümer:innen</h2></div>
     </div>
     <ul>
         {% for konto in kreis.eigentuemerinnen.all %}
