@@ -13,7 +13,8 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from konten.navigation import ist_administratorin
+from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
+from konten.navigation import AUTORIN_GRUPPE
 from simulation.models import Simulationskern
 
 
@@ -98,26 +99,27 @@ def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
     ).delete()
 
 
-class VignettenhistorieQuerySet(models.QuerySet["Vignettenhistorie"]):
+class VignettenhistorieQuerySet(
+    EigentuemerKreisQuerySet, models.QuerySet["Vignettenhistorie"]
+):
     """Abfragen über Vignettenhistorien."""
 
-    def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Vignettenhistorie"]:
-        """Liefert eigene Historien oder alle für die Administration."""
-        if ist_administratorin(konto):
-            return self
-        return self.filter(eigentuemerinnen=konto)
 
-
-class Vignettenhistorie(models.Model):
+class Vignettenhistorie(EigentuemerKreis):
     """Die gemeinsame, eigentümerinnengetragene Linie einer Vignette."""
+
+    ROLLENGRUPPE: str = AUTORIN_GRUPPE
 
     name: models.CharField = models.CharField(max_length=255, blank=True, default="")
     archiviert: models.BooleanField = models.BooleanField(default=False)
-    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     objects: models.Manager["Vignettenhistorie"] = (
         VignettenhistorieQuerySet.as_manager()
     )
+
+    def ist_aktiv(self) -> bool:
+        """Eine archivierte Historie ist stillgelegt."""
+        return not self.archiviert
 
 
 class VignetteQuerySet(models.QuerySet["Vignette"]):

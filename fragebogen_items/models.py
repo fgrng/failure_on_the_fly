@@ -7,7 +7,8 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from konten.navigation import ist_administratorin
+from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
+from konten.navigation import FORSCHENDE_GRUPPE
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -36,23 +37,18 @@ class LikertSkalenpol(models.TextChoices):
         return list(cls).index(pol) + 1
 
 
-class FragebogenItemHistorieQuerySet(models.QuerySet["FragebogenItemHistorie"]):
+class FragebogenItemHistorieQuerySet(
+    EigentuemerKreisQuerySet, models.QuerySet["FragebogenItemHistorie"]
+):
     """Abfragen über Fragebogen-Item-Historien."""
 
-    def sichtbar_fuer(
-        self, konto: "Konto"
-    ) -> models.QuerySet["FragebogenItemHistorie"]:
-        """Liefert eigene Historien oder alle für die Administration."""
-        if ist_administratorin(konto):
-            return self
-        return self.filter(eigentuemerinnen=konto)
 
-
-class FragebogenItemHistorie(models.Model):
+class FragebogenItemHistorie(EigentuemerKreis):
     """Die gemeinsame, eigentümerinnengetragene Linie eines Items."""
 
+    ROLLENGRUPPE: str = FORSCHENDE_GRUPPE
+
     name: models.CharField = models.CharField(max_length=255, blank=True, default="")
-    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     objects: models.Manager["FragebogenItemHistorie"] = (
         FragebogenItemHistorieQuerySet.as_manager()

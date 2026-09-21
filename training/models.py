@@ -6,7 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import m2m_changed, post_save
 
-from konten.navigation import ist_administratorin
+from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
+from konten.navigation import AUSBILDERIN_GRUPPE
 
 if TYPE_CHECKING:
     from konten.models import Konto
@@ -17,7 +18,7 @@ _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
 )
 
 
-class TrainingQuerySet(models.QuerySet["Training"]):
+class TrainingQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Training"]):
     """Abfragen über Trainings."""
 
     def anlegen(self, konto: "Konto", **kwargs: object) -> "Training":
@@ -32,19 +33,15 @@ class TrainingQuerySet(models.QuerySet["Training"]):
             raise RuntimeError(_ZUSTANDSWECHSEL_FEHLERMELDUNG)
         return super().update(**kwargs)
 
-    def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
-        """Liefert eigene Trainings oder alle für die Administration."""
-        if ist_administratorin(konto):
-            return self
-        return self.filter(eigentuemerinnen=konto)
-
     def veroeffentlicht(self) -> models.QuerySet["Training"]:
         """Liefert die für Teilnehmende sichtbaren Trainings."""
         return self.filter(zustand=Training.Zustand.VEROEFFENTLICHT)
 
 
-class Training(models.Model):
+class Training(EigentuemerKreis):
     """Ein von einem Eigentümerinnen-Kreis kuratierter Satz finaler Vignetten."""
+
+    ROLLENGRUPPE: str = AUSBILDERIN_GRUPPE
 
     class Zustand(models.TextChoices):
         """Die Zustände eines Trainings."""
@@ -53,7 +50,6 @@ class Training(models.Model):
         VEROEFFENTLICHT: tuple[str, str] = "veröffentlicht", "Veröffentlicht"
 
     name: models.CharField = models.CharField(max_length=255)
-    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
     zustand: models.CharField = models.CharField(
         max_length=14,
         choices=Zustand,

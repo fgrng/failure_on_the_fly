@@ -11,13 +11,14 @@ from django.core.validators import MaxValueValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
-from konten.navigation import ist_administratorin
+from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
+from konten.navigation import FORSCHENDE_GRUPPE
 
 if TYPE_CHECKING:
     from konten.models import Konto
 
 
-class ErhebungQuerySet(models.QuerySet["Erhebung"]):
+class ErhebungQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Erhebung"]):
     """Abfragen über Erhebungen."""
 
     def anlegen(self, konto: "Konto", **kwargs: object) -> "Erhebung":
@@ -53,15 +54,11 @@ class ErhebungQuerySet(models.QuerySet["Erhebung"]):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete()
 
-    def sichtbar_fuer(self, konto: "Konto") -> models.QuerySet["Erhebung"]:
-        """Liefert eigene Erhebungen oder alle für die Administration."""
-        if ist_administratorin(konto):
-            return self
-        return self.filter(eigentuemerinnen=konto)
 
-
-class Erhebung(models.Model):
+class Erhebung(EigentuemerKreis):
     """Ein Untersuchungsdesign eines Eigentümerinnen-Kreises."""
+
+    ROLLENGRUPPE: str = FORSCHENDE_GRUPPE
 
     class Status(models.TextChoices):
         """Die Zustände einer Erhebung."""
@@ -77,7 +74,6 @@ class Erhebung(models.Model):
         ZUFAELLIG: tuple[str, str] = "zufällig", "Zufällige Reihenfolge"
 
     name: models.CharField = models.CharField(max_length=255)
-    eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
     status: models.CharField = models.CharField(
         max_length=10, choices=Status, default=Status.ENTWURF
     )
@@ -98,6 +94,10 @@ class Erhebung(models.Model):
     )
 
     objects: models.Manager["Erhebung"] = ErhebungQuerySet.as_manager()
+
+    def ist_aktiv(self) -> bool:
+        """Eine archivierte Erhebung ist stillgelegt."""
+        return self.status != self.Status.ARCHIVIERT
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Schützt Lebenszyklus und eingefrorene finale Designs."""
