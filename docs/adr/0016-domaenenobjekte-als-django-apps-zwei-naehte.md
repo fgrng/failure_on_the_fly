@@ -1,8 +1,19 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0041]
 ---
 
 # Domänenobjekte als Django-Apps, ein azyklischer Graph, genau zwei Nähte
+
+> **Nachgeführt durch ADR-0041:** Drei Aussagen dieses Textes gelten nicht mehr,
+> alle drei außerhalb der unten als bindend markierten Liste: Ein allgemeiner
+> Ablauf-Schritt als Objekt wird doch eingeführt, der Itemblock bekommt doch eine
+> Tabelle, und der Sitzungs-Block ist doch aus der Datenbank rekonstruierbar —
+> sobald sein Erledigt-Marker existiert. Der Grund, aus dem hier anders
+> entschieden wurde, war die Freiwilligkeit der Fragebogen-Items: Sie macht
+> „nicht ausgefüllt" und „bewusst leer gelassen" ununterscheidbar. Bindend
+> bleiben der Schnitt entlang der Domänenobjekte, die Azyklizität samt
+> Kantenrichtung und die Zahl der Nähte; eine dritte Naht kommt nicht hinzu.
 
 Die Module des Projekts werden entlang der **Domänenobjekte aus `CONTEXT.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 
