@@ -38,7 +38,7 @@ class ErhebungsteilnahmeTests(TestCase):
     """Teilnahmen entstehen ausschließlich über den Teilnahme-Link."""
 
     def setUp(self) -> None:
-        """Legt eine finale Erhebung mit laufender Stichprobe an."""
+        """Legt den Entwurf an, den jeder Test um sein Design ergänzt."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
@@ -53,6 +53,11 @@ class ErhebungsteilnahmeTests(TestCase):
             einwilligungstext="Ich willige in die Teilnahme ein.",
             instruktionstext="Fragen Sie gezielt nach dem Rechenweg.",
         )
+        self.kern: Simulationskern | None = None
+
+    def _erhebung_fertigstellen(self) -> None:
+        """Finalisiert das zusammengestellte Design und öffnet seine Stichprobe."""
+
         self.erhebung.finalisieren()
         self.stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=self.erhebung,
@@ -62,7 +67,6 @@ class ErhebungsteilnahmeTests(TestCase):
         self.url: str = reverse(
             "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
         )
-        self.kern: Simulationskern | None = None
 
     def _vignette_anlegen(
         self,
@@ -127,7 +131,7 @@ class ErhebungsteilnahmeTests(TestCase):
         return Erhebungsbindung.objects.get()
 
     def _scheiternde_erhebung_einrichten(self) -> None:
-        # Ersetzt Erhebung, Stichprobe und Link durch einen stets scheiternden Aufbau.
+        # Ersetzt den Entwurf durch einen, dessen Sitzungen stets scheitern.
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake",
@@ -136,15 +140,6 @@ class ErhebungsteilnahmeTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung = Erhebung.objects.anlegen(
             self.erhebung.eigentuemerinnen.get(), name="Fehlschlag"
-        )
-        self.erhebung.finalisieren()
-        self.stichprobe = Stichprobe.objects.create(
-            erhebung=self.erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now() + timedelta(days=1),
-        )
-        self.url = reverse(
-            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
         )
 
     def _abschluss_item_anlegen(
@@ -191,6 +186,7 @@ class ErhebungsteilnahmeTests(TestCase):
     ) -> None:
         """Ohne Einwilligung führt der erste Link-Aufruf zum Einwilligungstor."""
 
+        self._erhebung_fertigstellen()
         erste_antwort: HttpResponse = self.client.get(self.url)
         erste_bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
 
@@ -211,6 +207,7 @@ class ErhebungsteilnahmeTests(TestCase):
     ) -> None:
         """Dieselbe pseudonyme Teilnahme setzt nach Zustimmung bei der Instruktion fort."""
 
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
@@ -236,6 +233,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_einwilligung_holt_die_getrennte_audioentscheidung_ein(self) -> None:
         """Teilnahme und Audioverarbeitung bleiben zwei unabhängige Zustimmungen."""
 
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         einwilligung_url: str = reverse(
             "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
@@ -265,6 +263,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Eine Audiozusage schaltet die Aufnahme in beiden Eingabephasen frei."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten(
             audioverarbeitung_eingewilligt="ja"
         )
@@ -281,6 +280,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_audioentscheidung_laesst_sich_nicht_ueberschreiben(self) -> None:
         """Eine einmal erfasste Audioentscheidung bleibt Teil der Datenspur."""
 
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         einwilligung_url: str = reverse(
             "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
@@ -303,6 +303,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_einwilligung_und_instruktion_zeigen_die_erhebungstexte(self) -> None:
         """Die Teilnahme informiert vor dem Spiel über Zustimmung und Begrenzung."""
 
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
 
         einwilligung: HttpResponse = self.client.get(
@@ -325,6 +326,7 @@ class ErhebungsteilnahmeTests(TestCase):
     ) -> None:
         """Die Stichprobe lässt vor und nach ihrem Fenster keinen Ablauf zu."""
 
+        self._erhebung_fertigstellen()
         self.stichprobe.beginn = timezone.now() + timedelta(days=1)
         self.stichprobe.ende = timezone.now() + timedelta(days=2)
         self.stichprobe.save(update_fields=["beginn", "ende"])
@@ -346,6 +348,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_archivierte_stichprobe_ist_fuer_teilnahmen_gesperrt(self) -> None:
         """Eine archivierte Stichprobe sammelt auch im Zeitfenster keine Daten."""
 
+        self._erhebung_fertigstellen()
         self.stichprobe.archivieren()
 
         self.assertEqual(self.client.get(self.url).status_code, 403)
@@ -354,6 +357,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_neuer_browser_erzeugt_eine_neue_leere_teilnahme(self) -> None:
         """Ohne gespeichertes Token wird keine bestehende Teilnahme wiederverwendet."""
 
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         erster_browser: Erhebungsbindung = Erhebungsbindung.objects.get()
         anderer_browser: Client = Client()
@@ -377,7 +381,7 @@ class ErhebungsteilnahmeTests(TestCase):
         vignette: Vignette = self._vignette_anlegen()
         kern: Simulationskern = vignette.gepinnter_kern
         kern.bearbeiten().finalisieren()
-
+        self._erhebung_fertigstellen()
         self._laufende_sitzung_starten()
 
         sitzung: Sitzung = Sitzung.objects.get()
@@ -391,7 +395,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""
 
         self._vignette_anlegen()
-
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
@@ -439,6 +443,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         erste: Vignette = self._vignette_anlegen()
         zweite: Vignette = self._vignette_anlegen(position=2)
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
@@ -469,6 +474,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         zugehoerigkeit = self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         antwort = self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -511,6 +517,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -540,6 +547,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -567,6 +575,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -601,6 +610,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen()
         erstes_item = self._abschluss_item_anlegen(wortlaut="Erstes Item")
         zweites_item = self._abschluss_item_anlegen(wortlaut="Zweites Item", position=2)
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         block_url = reverse("erhebungen:itemblock", args=[bindung.token])
@@ -635,6 +645,7 @@ class ErhebungsteilnahmeTests(TestCase):
         zugehoerigkeit = self._abschluss_item_anlegen(
             typ=FragebogenItem.Typ.LIKERT, wortlaut="Wie sicher fühlten Sie sich?"
         )
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         block_url = reverse("erhebungen:itemblock", args=[bindung.token])
@@ -657,6 +668,7 @@ class ErhebungsteilnahmeTests(TestCase):
         zugehoerigkeit = self._abschluss_item_anlegen(
             typ=FragebogenItem.Typ.LIKERT, wortlaut="Wie sicher fühlten Sie sich?"
         )
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         block_url = reverse("erhebungen:itemblock", args=[bindung.token])
@@ -686,6 +698,7 @@ class ErhebungsteilnahmeTests(TestCase):
             andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
             position=1,
         )
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         itemantwort = block_vorlegen(
             bindung,
@@ -710,6 +723,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         block_url = reverse("erhebungen:itemblock", args=[bindung.token])
@@ -736,6 +750,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
         self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
         bindung = self._laufende_sitzung_starten()
 
         itemblock = self.client.get(
@@ -778,6 +793,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
@@ -814,6 +830,7 @@ class ErhebungsteilnahmeTests(TestCase):
             budget_typ=Vignette.BudgetTyp.ZEIT,
             budget_wert=5,
         )
+        self._erhebung_fertigstellen()
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
@@ -841,6 +858,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -858,6 +876,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen("Wie hilfreich war das Gespräch?")
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -880,6 +899,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen(position=2)
         self._fragebogen_item_nach_sitzung_anlegen()
         self._abschluss_item_anlegen(wortlaut="Wie war die Erhebung?")
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -948,6 +968,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -965,6 +986,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
         self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -1006,6 +1028,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen(position=2)
         self._fragebogen_item_nach_sitzung_anlegen("Wie war die Sitzung?")
         self._abschluss_item_anlegen(wortlaut="Wie war die Erhebung?")
+        self._erhebung_fertigstellen()
 
         einstieg: Client = Client()
         einstieg.get(self.url)
@@ -1092,6 +1115,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(
             reverse("erhebungen:debrief", args=[bindung.token]),
@@ -1128,6 +1152,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -1144,6 +1169,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
         self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         anfragen_vorher: int = len(FakeSprachmodell.letzte_anfragen)
 
@@ -1164,6 +1190,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -1185,6 +1212,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Der Modus reist im POST: fehlend oder unbekannt heißt getippt (Spec: #122)."""
 
         self._vignette_anlegen(budget_wert=9)
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
 
@@ -1219,6 +1247,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         self.client.post(
@@ -1235,6 +1264,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Die Diagnose liest den Modus wie die Gesprächseingabe (Spec: #122)."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
 
@@ -1254,6 +1284,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein fehlendes Modusfeld heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
 
@@ -1269,6 +1300,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein unbekannter Modus heißt getippt, ohne die Anfrage abzuweisen (Spec: #122)."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.client.post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
 
@@ -1288,6 +1320,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ohne JavaScript bleibt der Modus auf dem Startwert des Formulars."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         debrief: HttpResponse = self.client.post(
@@ -1304,6 +1337,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein freiwilliges Ende führt bei laufender Sitzung in den Debrief."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         antwort: HttpResponse = self.client.post(
@@ -1317,6 +1351,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Ein abgelaufenes Fenster sperrt die laufende Sitzung ohne Kulanz."""
 
         self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
         self.stichprobe.save(update_fields=["ende"])
@@ -1354,16 +1389,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self.erhebung = Erhebung.objects.anlegen(
             self.erhebung.eigentuemerinnen.get(), name="Datenspur"
         )
-        self.erhebung.finalisieren()
-        self.stichprobe = Stichprobe.objects.create(
-            erhebung=self.erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now() + timedelta(days=1),
-        )
-        self.url = reverse(
-            "erhebungen:teilnehmen", args=[self.stichprobe.teilnahme_link]
-        )
         vignette: Vignette = self._vignette_anlegen()
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
 
         self.client.post(
@@ -1401,6 +1428,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self._vignette_anlegen()
         self._vignette_anlegen(position=2)
+        self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
         self.stichprobe.ende = timezone.now() - timedelta(seconds=1)

@@ -79,14 +79,13 @@ def _finales_item_anlegen(konto: Konto) -> FragebogenItem:
     return item
 
 
-def _spielbare_erhebung_anlegen(konto: Konto) -> Erhebung:
-    """Legt eine finale Erhebung an, deren Sitzungen sich starten lassen."""
+def _spielbarer_entwurf_anlegen(konto: Konto) -> Erhebung:
+    """Legt den Entwurf an, dessen Sitzungen sich nach dem Finalisieren starten lassen."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     ModellKonfiguration.objects.aktivieren(
         ModellKonfiguration.objects.create(sprachmodell="fake")
     )
-    erhebung.finalisieren()
     return erhebung
 
 
@@ -341,11 +340,12 @@ def test_vignette_beginnen_schreibt_ziehung_sitzung_und_position() -> None:
     """Das Kommando beginnt die nächste gezogene Vignette an ihrer Position."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = _spielbare_erhebung_anlegen(konto)
+    erhebung: Erhebung = _spielbarer_entwurf_anlegen(konto)
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
+    erhebung.finalisieren()
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
     sitzung: Sitzung | None = vignette_beginnen(bindung)
@@ -370,9 +370,10 @@ def test_zwei_aufrufe_beginnen_keine_zweite_sitzung() -> None:
     """Der zweite Aufruf bleibt bei der laufenden Sitzung der Erhebungsbindung."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = _spielbare_erhebung_anlegen(konto)
+    erhebung: Erhebung = _spielbarer_entwurf_anlegen(konto)
     erste: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
+    erhebung.finalisieren()
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
     erste_sitzung: Sitzung | None = vignette_beginnen(bindung)
