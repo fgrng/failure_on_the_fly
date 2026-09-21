@@ -37,9 +37,6 @@ class Modellvorschlag:
     anzeige: str
 
 
-_FORMWIDRIG: str = "OpenRouter hat keine lesbare Modellliste geliefert."
-
-
 class Modellverzeichnisfehler(Exception):
     """Die Vorschlagsliste ließ sich nicht bilden."""
 
@@ -63,7 +60,7 @@ class AnbieterAntwortetFormwidrig(Modellverzeichnisfehler):
 class Modellverzeichnis(Protocol):
     """Liefert zu einer Naht die Vorschlagsliste eines Anbieters."""
 
-    def vorschlaege(self, naht: str) -> list["Modellvorschlag"]:
+    def vorschlaege(self, naht: str) -> list[Modellvorschlag]:
         """Liefert die alphabetisch sortierten Vorschläge dieser Naht."""
 
 
@@ -72,6 +69,8 @@ class Modellverzeichnis(Protocol):
 _OPENROUTER_ABFRAGE: dict[str, dict[str, str]] = {
     Naht.SPRACHMODELL: {"supported_parameters": "structured_outputs"},
 }
+
+_OPENROUTER_FORMWIDRIG: str = "OpenRouter hat keine lesbare Modellliste geliefert."
 
 
 class OpenRouterVerzeichnis:
@@ -83,12 +82,9 @@ class OpenRouterVerzeichnis:
     def vorschlaege(self, naht: str) -> list[Modellvorschlag]:
         """Liefert die Modelle dieser Naht, alphabetisch nach Klarnamen."""
 
-        try:
-            abfrage: dict[str, str] = _OPENROUTER_ABFRAGE[naht]
-        except KeyError as exc:
-            raise KeineModellliste(
-                "Für diese Naht führt OpenRouter keine Modellliste."
-            ) from exc
+        abfrage: dict[str, str] | None = _OPENROUTER_ABFRAGE.get(naht)
+        if abfrage is None:
+            raise KeineModellliste("Für diese Naht führt OpenRouter keine Modellliste.")
         return sorted(
             (self._vorschlag(eintrag) for eintrag in self._eintraege(abfrage)),
             key=lambda vorschlag: vorschlag.anzeige.casefold(),
@@ -108,10 +104,10 @@ class OpenRouterVerzeichnis:
                 "OpenRouter hat die Anfrage nach seinen Modellen abgelehnt."
             ) from exc
         except Exception as exc:
-            raise AnbieterAntwortetFormwidrig(_FORMWIDRIG) from exc
+            raise AnbieterAntwortetFormwidrig(_OPENROUTER_FORMWIDRIG) from exc
         eintraege: Any = nutzlast.get("data") if isinstance(nutzlast, dict) else None
         if not isinstance(eintraege, list):
-            raise AnbieterAntwortetFormwidrig(_FORMWIDRIG)
+            raise AnbieterAntwortetFormwidrig(_OPENROUTER_FORMWIDRIG)
         return eintraege
 
     @staticmethod

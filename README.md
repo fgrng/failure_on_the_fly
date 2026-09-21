@@ -57,7 +57,10 @@ Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/
 Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —,
 der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
-Modellverhaltens auf, bei `fake` ausschließlich das Skript.
+Modellverhaltens auf, bei `fake` ausschließlich das Skript. Beim Anbieter
+`openrouter` schlägt der Knopf „Modelle laden“ neben dem Sprachmodell die
+Modelle mit Structured Output vor; die Liste wird nur auf Druck geholt und
+bleibt ein Vorschlag — ein Name, den sie nicht kennt, ist weiterhin eintragbar.
 Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
 Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
 genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —

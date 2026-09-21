@@ -246,14 +246,16 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
     nirgendwohin: Es steht weder in der Antwort noch in einem Protokoll.
     """
     naht: str = request.POST.get("naht", "")
-    vorschlaege: list[Modellvorschlag] = []
-    fehler: str = ""
+    vorschlaege: list[Modellvorschlag]
+    fehler: str
     try:
         vorschlaege = modellverzeichnis(
             request.POST.get("anbieter", ""),
             request.POST.get("anbieter_token", ""),
         ).vorschlaege(naht)
+        fehler = ""
     except Modellverzeichnisfehler as modellfehler:
+        vorschlaege = []
         fehler = str(modellfehler)
     return render(
         request,
