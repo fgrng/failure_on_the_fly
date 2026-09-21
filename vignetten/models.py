@@ -566,7 +566,7 @@ class Vignette(models.Model):
                 "Zum Finalisieren fehlt ein gepinnter Simulationskern."
             )
         # Ein überholter Pin bleibt absichtlich zulässig: Gespielt wird, worauf
-        # gepinnt wurde (ADR-0003). Die Detailansicht weist darauf hin
+        # gepinnt wurde (ADR-0040). Die Detailansicht weist darauf hin
         # (kern_pin_ueberholt), Vorspulen bleibt eine Wahl der Autor:in.
 
         self.finalisiert_am = timezone.now()
@@ -578,7 +578,7 @@ class Vignette(models.Model):
     class Meta:
         """Datenbankinvarianten der Vignettenfassung."""
 
-        # Absichtlich eigenständig gegenüber simulation (ADR-0017): Die
+        # Absichtlich eigenständig gegenüber simulation (ADR-0040): Die
         # Vignette besitzt eigene Inhalte, Eigentümerschaft und Kern-Pin.
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(

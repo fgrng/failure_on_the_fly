@@ -91,8 +91,8 @@ unter `/system/transkription/` bearbeitet — mit denselben Anbieterfeldern wie 
 Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und das
 Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau eine
 Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
-anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
-(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
+anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert.
+Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
 Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und Basis-URL
 laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
 Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie

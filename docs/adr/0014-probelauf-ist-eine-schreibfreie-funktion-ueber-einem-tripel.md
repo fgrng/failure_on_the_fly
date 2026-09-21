@@ -11,7 +11,7 @@ Ein **Probelauf** ist eine schreibfreie Sitzung über einem Tripel aus **Vignett
 
 Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegespräch, Debrief und Diagnosefeld. Ablauf und Ansicht sind identisch mit denen einer Sitzung; der einzige Unterschied ist die Persistierung. Die Autor:in sieht, was die Teilnehmer:in sehen wird, plus die Denkspur, die diese nie sieht. Auch die Diagnose wird nicht persistiert.
 
-## Consequences
+## Folgen
 
 - `CONTEXT.md` definiert die Diagnose als etwas, das „erfasst, nicht bewertet" wird (ADR-0009). Im Probelauf wird sie **weder** erfasst noch bewertet: Sie wird eingegeben, damit die Autor:in den Debrief so erlebt wie die Teilnehmer:in, und dann verworfen. Das „erfasst" von ADR-0009 grenzt gegen *bewerten* ab, nicht gegen *verwerfen*, und gilt für Sitzungen einer Teilnahme.
 

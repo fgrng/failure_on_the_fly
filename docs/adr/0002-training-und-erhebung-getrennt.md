@@ -8,12 +8,12 @@ Training und Erhebung bündeln beide eine Auswahl von Vignetten und erzeugen bei
 
 Gemeinsam ist beiden das **Rückgrat der Datenspur**: Teilnahme → Sitzung. Dieses wird geteilt, der Behälter nicht.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Ein Objekt mit Modus-Flag** — verworfen: die Unterschiede sind strukturell, nicht kosmetisch.
 - **Vollständig getrennte Modelle inkl. eigener Sitzungs-Typen** — verworfen: Forschende und Ausbilder:innen wollen dieselbe Auswertungseinheit.
 
-## Consequences
+## Folgen
 
 - Eine gewisse Duplikation (beide brauchen „Menge finaler Vignetten", Teilnahme, Statusverwaltung) wird bewusst in Kauf genommen.
 - Ob Training und Erhebung technisch einen gemeinsamen Elterntyp erhalten, bleibt eine Implementierungsfrage. Begrifflich bleiben es zwei Wörter.

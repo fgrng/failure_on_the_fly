@@ -27,15 +27,14 @@ apps/
   vignetten/         Vignette, Vignettenhistorie
   sitzungen/         Teilnahme, Sitzung, Gesprächsschritt, Fehlversuch, Diagnose
   training/          Training, Trainingsbindung
-  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Ablauf, Item-Zuordnung, Item-Antwort
-  datenspuren/       Datenspur
+  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Ablauf, Item-Zuordnung, Item-Antwort, Export der Datenspur
 ```
 
 `sitzungen` heißt nicht `sessions`, weil `django.contrib.sessions` diesen App-Label bereits belegt.
 
 ## Der Graph ist azyklisch, und die Richtung ist eine Aussage
 
-`training` und `erhebungen` zeigen auf `sitzungen`; `sitzungen` zeigt auf `vignetten` und `simulation` (die defensive Protokollierung der verwendeten Fassungen aus ADR-0003); `vignetten` zeigt auf `simulation` (der gepinnte Kern aus ADR-0004). `erhebungen` besitzt zusätzlich den Ablauf, der seine Erhebungsbindungen und die daraus entstehenden Sitzungen sequenziert. `fragebogen_items` ist ein **Blatt**: die Item-Bibliothek weiß nicht, wer ihre Items beantwortet. `datenspuren` ist das gegenüberliegende Blatt: Es kennt alles, und nichts kennt es.
+`training` und `erhebungen` zeigen auf `sitzungen`; `sitzungen` zeigt auf `vignetten` und `simulation` (die defensive Protokollierung der verwendeten Fassungen aus ADR-0003); `vignetten` zeigt auf `simulation` (der gepinnte Kern aus ADR-0004). `erhebungen` besitzt zusätzlich den Ablauf, der seine Erhebungsbindungen und die daraus entstehenden Sitzungen sequenziert. `fragebogen_items` ist ein **Blatt**: die Item-Bibliothek weiß nicht, wer ihre Items beantwortet. `erhebungen` ist die gegenüberliegende Wurzel: Sein Export der Datenspur (`erhebungen/export.py`) kennt alles, und nichts kennt `erhebungen`. Alle Bestands-Apps zeigen auf `konten`, das dort den Eigentümer-Kreis als Basis stellt; `konten` zeigt auf keine von ihnen (ADR-0037).
 
 Daraus folgt, was `sitzungen` **nicht** darf: Es kennt weder Training noch Erhebung. Eine Sitzung ist laut Glossar die atomare Auswertungseinheit; ein `sitzungen`, das seine beiden Aufrufer kennt, wäre es nicht mehr.
 
@@ -73,21 +72,21 @@ Bindend sind der Schnitt entlang der Domänenobjekte, die Azyklizität samt Kant
 
 Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst. Für die Ablage gilt dabei: **Die Views eines Anlasses liegen bei der App dieses Anlasses** — die Trainings-Views bei `training`, die Erhebungs-Views bei `erhebungen`, die Probelauf-Views bei `sitzungen`, jede mit ihren eigenen Routen. Das folgt aus der Kantenrichtung: Views, die `sitzungen` für einen seiner Aufrufer hielte, zwängen es, diesen Aufrufer zu kennen.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Ein framework-freier Domänenkern mit Ports und Adaptern** — verworfen. Er verlangt Repository-Interfaces, hinter denen genau ein Adapter steht. Die Testbarkeit, die er verspricht, liefert `pytest-django` mit einer Datenbank billiger.
 - **Eine App je Persona** (`teilnahme`, `autorenschaft`, `forschung`, `verwaltung`) — verworfen. Vignette und Sitzung würden von mehreren Apps geteilt und landeten in einem `shared`, das den eigentlichen Schnitt trüge. Rollen sind Sichten auf Objekte, keine Objekte.
 - **Englische App-Namen mit einer Übersetzungstabelle im Glossar** — verworfen. Die Tabelle wäre ein zweites, stillschweigend driftendes Glossar, und die _Avoid_-Listen aus `CONTEXT.md` verlören im Code ihre Kraft.
 - **Der Ablauf liegt in den Views von `training` und `erhebungen`** — verworfen. Er wäre nur über HTTP testbar, und die gezogene Randomisierungsreihenfolge hätte keinen Ort außerhalb einer View, obwohl sie zur Datenspur gehört.
 
-## Consequences
+## Folgen
 
 - Der Ablauf führt implizit das Konzept eines Ablauf-Schritts ein: `erhebungen.ablauf.naechster_schritt(teilnahme)` liefert eine Vignette, den berechneten Abschluss-Block oder das Ende. Der Block hat **keine Tabelle**; seine Antwortzeilen sind Datenspur, kein Ablaufmarker. Instruktion, Einwilligungstext, Start- und Endseite sind Textfelder an der Erhebung, die der Ablauf an den Rändern ausliefert, ohne sie als Schritte auszugeben. Dasselbe gilt für den Hinweis, **dass** das Gespräch begrenzt ist, den ADR-0012 verlangt. Ein allgemeiner Ablauf-Schritt als Objekt wird nicht eingeführt.
 - **Antwortversuch** ist ein neuer Begriff und nicht dasselbe wie ein Gesprächsschritt: Er ist flüchtig, er darf scheitern, und er trägt die Fehlversuche mit sich, die ein Gesprächsschritt neben sich stellt. Er enthält auch keine Eingabe — die liegt beim Aufruf bereits vor. Er erzeugt die zweite Hälfte eines Gesprächsschritts, nicht den Gesprächsschritt.
 - Der Antwortversuch ist **nicht** die Rückgabe der Sprachmodell-Naht. Zwischen beiden sitzt die begrenzte Wiederholung aus ADR-0011: Ein Antwortversuch fasst *n* Modellrückgaben zusammen, von denen *n−1* als Fehlversuche verworfen wurden. Dass die Wiederholung in `simulation` liegt und nicht hinter der Naht, ist der Grund, warum der deterministische Fake die Fehlversuch-Schreibbahn überhaupt prüfen kann.
 - Die App heißt `fragebogen_items` und nicht `fragebogen`, weil sie den Fragebogen gerade **nicht** enthält: Er ist laut ADR-0008 der Sammelbegriff für die Items *einer Erhebung* samt ihren Andockpunkten, und Zuordnung, Andockpunkt, Reihenfolge und Item-Antwort liegen alle in `erhebungen`. Ein `fragebogen/`, in dem kein Fragebogen wohnt, schickte jede Suche an den falschen Ort. `items` schied aus, weil das Glossar den Begriff unter _Avoid_ führt.
-- **Naht** ist ein neuer Begriff und steht im Glossar unter _Architektur_. Er ist kein Domänenbegriff, sondern ein Architekturbegriff — der einzige, den dieses ADR einführt.
+- **Naht** ist ein Architekturbegriff, kein Domänenbegriff, und steht deshalb nicht im Glossar, sondern ist hier definiert: eine Stelle, an der Verhalten ausgetauscht werden kann, ohne den umgebenden Code zu ändern. Sie wird nur eingezogen, wo mindestens zwei Adapter tatsächlich existieren. Vermeide: Seam, Port, Interface, Abstraktionsschicht.
 - Deutsche Bezeichner stehen neben Djangos englischem Vokabular (`models.py`, `ForeignKey`, `objects`). Die Grenze verläuft sauber: Was aus dem Glossar stammt, heißt deutsch; was aus dem Framework stammt, bleibt englisch. Gemischte Bezeichner wie `vignette_set` entstehen dort, wo Django sie erzeugt, und werden nicht bekämpft.
 - Eine neue Leerstelle im Vertrag zwischen Vignette und Prompt-Vorlagen (ADR-0010) berührt `vignetten` und `simulation`, aber keine dritte App.
 - Views und Templates liegen je App (`apps/vignetten/templates/vignetten/`); `templates/base.html` bleibt global. Tests liegen je App und teilen nichts (ADR-0017). Beides folgt aus dem Schnitt, ist aber nicht selbst gegrillt worden.
-- `datenspuren` darf als einziges Modul quer durch alle anderen lesen. Das ist der Preis dafür, dass die Datenspur eine Teilnahme vollständig abbildet, und der Grund, warum es ein Blatt bleiben muss.
+- Der Export der Datenspur in `erhebungen` darf als einzige Stelle quer durch alle anderen Apps lesen. Das ist der Preis dafür, dass die Datenspur eine Teilnahme vollständig abbildet, und der Grund, warum `erhebungen` eine Wurzel bleiben muss, auf die keine App zeigt.

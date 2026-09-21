@@ -33,7 +33,7 @@ Die Sichtbarkeit ist bewusst gestaffelt:
 - **Forschende:r:** immer, als Teil der Datenspur und des Exports.
 - **Ausbilder:in:** im Rahmen der Sitzungseinsicht ihres eigenen Trainings.
 
-## Consequences
+## Folgen
 
 - Die Vignette braucht eine **Arbeitsheft-Bildbeschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Menschen und speist, an der Bildposition zusammen mit dem Arbeitsheft-Text, das Reasoning.
 - Der didaktisch reizvolle Gedanke, Trainingsteilnehmenden nachträglich zu zeigen, „wie die Simulation gedacht hat", ist verworfen.

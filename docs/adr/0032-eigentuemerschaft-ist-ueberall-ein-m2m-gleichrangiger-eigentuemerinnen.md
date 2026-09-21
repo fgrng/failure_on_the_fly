@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0039
 ---
 
 # Eigentümerschaft ist überall ein M2M gleichrangiger Eigentümerinnen

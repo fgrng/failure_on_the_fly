@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0040
 ---
 
 # Der Lebenszyklus wird je versioniertem Artefakt eigenständig implementiert
@@ -20,13 +21,13 @@ Von duplizierten Feldern zu einer abstrakten Basisklasse zu wechseln, ist in Dja
 
 Wir wählen deshalb die Option, die am wenigsten voraussetzt. Wenn sich in einem Jahr zeigt, dass die drei Lebenszyklen tatsächlich identisch geblieben sind, wird die Basis gezogen. Wenn nicht, war es richtig, sie nie gezogen zu haben.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Abstrakte Basismodelle in einer `versioning`-App, drei erbende Apps** — verworfen, siehe oben. Sie setzt voraus, dass die drei Lebenszyklen gleich bleiben; das wissen wir heute nicht.
 - **Eine konkrete Fassungstabelle mit `GenericForeignKey`** — verworfen. Sie kauft polymorphen Zugriff für den Export mit dem Verlust echter Fremdschlüssel, schwächerer Integrität in der Datenbank und einer schwer umkehrbaren Datenmigration.
 - **Duplizierte Modelle, aber ein gemeinsamer, parametrisierter Testvertrag über die beiden Invarianten** — verworfen. Er hätte die Drift-Gefahr gedämpft, ohne den Produktivcode zu koppeln; die Entscheidung fiel bewusst für vollständige Unabhängigkeit, einschließlich der Tests.
 
-## Consequences
+## Folgen
 
 - Die zwei Invarianten sind an drei Stellen implementiert und können auseinanderlaufen. Ein Fehler im Entarchivieren, der in `vignetten` gefunden und behoben wird, bleibt in `fragebogen_items` liegen. Das trifft die Reproduzierbarkeit, also Leitprinzip 1, und ist der bewusst gezahlte Preis.
 - Drei fast identische Modelldateien, die sich in Details unterscheiden, sind für spätere Leser — Mensch wie Agent — mehrdeutig: Eine Abweichung könnte Absicht oder Versehen sein. Wer eine Abweichung einführt, sollte sie kommentieren.

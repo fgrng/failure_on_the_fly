@@ -66,7 +66,7 @@ an seine Stelle treten die komponierten Platzhalter `$lernauftrag` und
   die Umschreibung des Standardkerns und die Anpassung der Tests wird
   Kompatibilitätsballast im Code vermieden.
 
-## Consequences
+## Folgen
 
 - Das Vignettenmodell ist die alleinige Quelle der Wahrheit für die
   Marker-Zerlegung und Umhüllung.

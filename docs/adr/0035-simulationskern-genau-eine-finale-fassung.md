@@ -59,7 +59,7 @@ Reproduzierbarkeit aus ADR-0003 — gespielt wird, worauf gepinnt wurde — und
 hält Vorspulen als Wahl der Autor:in, nicht als Bedingung (ADR-0004). Die
 Detailansicht weist darauf mit einem statischen Hinweis hin.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Ein vierter Zustand `ÜBERHOLT` bzw. ein Unterscheidungsfeld**, um *überholt*
   von *absichtlich archiviert* zu trennen — verworfen. Der Begriff wäre nur
@@ -90,7 +90,7 @@ Detailansicht weist darauf mit einem statischen Hinweis hin.
   Indizes; ein Index kostet nichts, sichert künftige Schreibwege ab, und ihn zu
   entfernen wäre eine weitere Migration plus ein weiterer Formbruch.
 
-## Consequences
+## Folgen
 
 - Die Administration verliert das Zurücknehmen einer Fassung als Geste. Was
   bleibt, ist das Ersetzen durch eine neue Fassung — die Linie wächst immer nach

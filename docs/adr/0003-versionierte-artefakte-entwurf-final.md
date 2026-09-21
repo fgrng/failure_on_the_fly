@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0040
 ---
 
 # Versionierte Artefakte: Entwurf → final, gruppiert durch eine Historie, ohne „veröffentlicht"
@@ -33,7 +34,7 @@ Die Asymmetrie zwischen Training und Erhebung folgt derselben Linie wie das Aust
 
 **Archivierung ist umkehrbar**, solange sie keine Verzweigung erzeugt. Wurde die archivierte Fassung inzwischen dadurch überholt, dass aus einer ihrer Vorgängerinnen eine neue finale Fassung entstanden ist, bliebe sie nach dem Entarchivieren als Schwester mit derselben Vorgängerin zurück — das ist ausgeschlossen. Gelöschte Entwürfe kehren nie zurück. Für den Simulationskern gilt stattdessen ADR-0035.
 
-## Consequences
+## Folgen
 
 - Autor:innen zahlen mit einem Entwurf/Final-Zyklus; dafür ist „welche Fassung lief in Erhebung X?" trivial beantwortbar.
 - Das Wort **Vignette** bezeichnet die konkrete Fassung, nicht die Identität über Fassungen hinweg — Letztere heißt **Vignettenhistorie**. Diese Benennung folgt dem Sprachgebrauch: „Vignette" ist das, was man anlegt, spielt und einbindet.

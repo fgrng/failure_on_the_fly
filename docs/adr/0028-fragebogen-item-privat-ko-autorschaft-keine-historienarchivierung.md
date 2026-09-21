@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: [ADR-0039, ADR-0040]
 ---
 
 # Das Fragebogen-Item ist privat mit Ko-Autorschaft, seine Historie aber nicht als Ganzes archivierbar
@@ -22,14 +23,14 @@ typischerweise zwei oder drei Fassungen. Ihr Bulk-Archivieren fiele mit dem
 Archivieren der Spitze zusammen und verdient kein eigenes Verb (YAGNI).
 Einzelne finale Item-Fassungen bleiben nach ADR-0003 archivierbar.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Geteilte Bibliothek ohne Eigentümerschaft** — verworfen. Sie ließe
   Vignette, Simulationskern und Fragebogen-Item als die drei versionierten
   Artefakte formal auseinanderlaufen und leugnete die Autorschaft am
   Forschungsinstrument.
 
-## Consequences
+## Folgen
 
 - Die Item-Bibliothek bleibt für den Eigentümer-Kreis privat; eine
   Ko-Autorin kann die gemeinsame Item-Linie sehen, pflegen und in ihrer
