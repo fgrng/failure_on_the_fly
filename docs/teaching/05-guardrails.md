@@ -125,7 +125,6 @@ Der Gespraechsverlauf wird als native Konversationsnachrichten aufgebaut
 
 **Was *nicht* im Kontext steht:**
 - Denkspur (ADR-0005)
-- Native Reasoning-Spur
 - Fehlversuche
 
 **Warum das wichtig ist:**

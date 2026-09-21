@@ -94,7 +94,7 @@ Die vom Simulationskern gesteuerte Gesprächspartnerin, die das Fehlermuster ihr
 _Avoid_: Bot, Agent, KI-Schüler, Avatar
 
 **Gesprächsschritt**:
-Ein Austauschpaar aus einer Eingabe der Teilnehmer:in und der darauffolgenden Antwort der simulierten Schüler:in. Enthält intern noch die Denkspur der simulierten Schüler:in, eine etwaige native Reasoning-Spur und eventuelle Fehlversuche. Scheitert der Antwortversuch endgültig, bleibt der Gesprächsschritt ohne Antwort bestehen: Er trägt die Fehlversuche und dokumentiert damit den Abbruch der Sitzung.
+Ein Austauschpaar aus einer Eingabe der Teilnehmer:in und der darauffolgenden Antwort der simulierten Schüler:in. Enthält intern noch die Denkspur der simulierten Schüler:in und eventuelle Fehlversuche. Scheitert der Antwortversuch endgültig, bleibt der Gesprächsschritt ohne Antwort bestehen: Er trägt die Fehlversuche und dokumentiert damit den Abbruch der Sitzung.
 _Avoid_: Nachricht, Turn, Zug
 
 **Debrief**:
@@ -129,18 +129,14 @@ _Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint ein
 
 **Denkspur**:
 Das interne Reasoning der simulierten Schüler:in, das zu jeder ihrer Antworten entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Der Simulationskern verlangt sie; sie gehört zur Rolle.
-_Avoid_: Chain-of-Thought, Reasoning, Gedankengang
-
-**Native Reasoning-Spur**:
-Das vom Sprachmodell selbst erzeugte Reasoning, das manche Modell-Konfigurationen neben der Antwort ausliefern. Sie stammt vom Modell, nicht von der simulierten Schüler:in, und ist deshalb nicht die Denkspur: Wo die Denkspur zur Rolle gehört und immer entsteht, gehört sie zur Modell-Konfiguration und fehlt, wenn diese sie nicht liefert. Sie wird, wenn vorhanden, am Gesprächsschritt aufbewahrt und ist Teil der Datenspur.
-_Avoid_: Reasoning-Tokens, Thinking, Denkspur
+_Avoid_: Chain-of-Thought, Reasoning, Gedankengang, native Reasoning-Spur — das vom Modell selbst erzeugte Reasoning wird nicht aufbewahrt (ADR-0005).
 
 **Fehlversuch**:
 Eine verworfene Antwort der simulierten Schüler:in samt ihrem Grund. Sie war nie Teil des Diagnosegesprächs und steht deshalb neben dem Transkript, nicht darin. Sie wird am Gesprächsschritt aufbewahrt, zu dem ihr Antwortversuch gehörte.
 _Avoid_: Fehler, Retry, Exception
 
 **Antwortversuch**:
-Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwort der simulierten Schüler:in zu erzeugen. Er setzt begrenzt oft an; jedes misslungene Ansetzen ist ein Fehlversuch. Er trägt, was dabei entsteht: die sichtbare Äußerung, die Denkspur, die angefallenen Fehlversuche und eine etwaige native Reasoning-Spur. Er ist flüchtig und wird selbst nicht gespeichert. Aus ihm und der vorausgegangenen Eingabe entsteht ein Gesprächsschritt — mit Antwort, wenn er glückt; ohne Antwort, wenn er endgültig scheitert. Im zweiten Fall endet die Sitzung im Abbruch.
+Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwort der simulierten Schüler:in zu erzeugen. Er setzt begrenzt oft an; jedes misslungene Ansetzen ist ein Fehlversuch. Er trägt, was dabei entsteht: die sichtbare Äußerung, die Denkspur und die angefallenen Fehlversuche. Er ist flüchtig und wird selbst nicht gespeichert. Aus ihm und der vorausgegangenen Eingabe entsteht ein Gesprächsschritt — mit Antwort, wenn er glückt; ohne Antwort, wenn er endgültig scheitert. Im zweiten Fall endet die Sitzung im Abbruch.
 _Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
 
 **Gesprächsbudget**:
@@ -201,7 +197,7 @@ Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und 
 _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 
 **Datenspur**:
-Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, native Reasoning-Spuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur und werden nicht exportiert.
+Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur und werden nicht exportiert.
 _Avoid_: Logs, Rohdaten, Protokoll
 
 ## Fragebögen

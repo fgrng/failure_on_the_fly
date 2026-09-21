@@ -69,7 +69,6 @@ weil sie die Interaktion von Teilnehmer:in und Simulation einschliesst.
 FailureOnTheFly speichert fuer jede Sitzung:
 - Das vollstaendige Transkript
 - Die Denkspur zu jeder Antwort
-- Etwaige native Reasoning-Spuren
 - Etwaige Fehlversuche mit Grund und Rohantwort
 - Die verwendete Vignettenfassung, Kern-Fassung und
   Modell-Konfiguration

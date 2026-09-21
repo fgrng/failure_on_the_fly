@@ -10,9 +10,13 @@ Die **Denkspur** — das interne Reasoning der simulierten Schüler:in — entst
 
 Jeder Modellaufruf liefert ein strukturiertes Objekt, dessen Schema das Reasoning-Feld **vor** dem Äußerungsfeld führt — die Reihenfolge im Schema ist es, die das Reasoning tatsächlich vor der Äußerung entstehen lässt. Das gilt für **jede** Modell-Konfiguration, auch für Reasoning-Modelle.
 
-Liefert das Modell zusätzlich eine **native Reasoning-Spur**, wird sie als optionales Feld am **Gesprächsschritt** aufbewahrt — neben der Denkspur, nie als sie. Sie steht damit im selben Objekt wie Eingabe, Denkspur und Äußerung, und nicht in der Fehlversuch-Schreibbahn aus ADR-0011: Sie gehört zu einer geglückten Antwort, nicht zu einer verworfenen.
+Eine **native Reasoning-Spur** des Anbieters wird **nicht** aufbewahrt. Drei Gründe: Native Reasoning-Spuren sind bei mehreren Anbietern nur zusammengefasst abrufbar und damit Ausgabe eines zweiten, unbekannten Modells. Sie sind nicht steuerbar — wir können sie nicht bitten, aus der Regel des Fehlermusters zu argumentieren. Und ihre Herkunft hinge an der Modell-Konfiguration, die sich aus Betriebsgründen ändert; das Artefakt würde seinen Charakter bei einem Betriebsvorgang wechseln.
 
-Drei Gründe: Native Reasoning-Spuren sind bei mehreren Anbietern nur zusammengefasst abrufbar und damit Ausgabe eines zweiten, unbekannten Modells. Sie sind nicht steuerbar — wir können sie nicht bitten, aus der Regel des Fehlermusters zu argumentieren. Und ihre Herkunft hinge an der Modell-Konfiguration, die sich aus Betriebsgründen ändert; die Denkspur würde ihren Charakter bei einem Betriebsvorgang wechseln.
+Damit wäre sie kein auswertbares Forschungsdatum: Eine Spalte, die zwischen zwei Modell-Konfigurationen derselben Erhebung Verschiedenes bedeutet, trägt genau den Vergleich nicht, für den man sie ziehen wollte. Sie fiele überdies bei etlichen Modellen im Structured-Output-Modus stillschweigend weg und wäre dann nicht von „das Modell hat nicht nachgedacht" zu unterscheiden. Die Naht zum Sprachmodell gibt deshalb allein das geparste Objekt zurück; es reist nichts am Schema vorbei.
+
+## Ein Schemawechsel verlangt eine neue finale Kern-Fassung
+
+Das Ausgabeschema ist eine Code-Konstante, die Beschreibung dazu steht im versionierten Text des Simulationskerns — und eine finale Kern-Fassung ist unveränderlich. Eine Schemaänderung gälte sofort für alle Fassungen, auch für solche, deren Ausgabebeschreibung noch das alte Schema erklärt; das Ergebnis wäre keine erkennbar gebrochene Antwort, sondern stille Qualitätsminderung. Eine Änderung am Ausgabeschema ist deshalb nur zusammen mit einer neuen finalen Kern-Fassung zulässig. Altfassungen bleiben dabei bewusst beim alten Schema zurück.
 
 ## Die Denkspur fließt nicht in den Kontext zurück
 
@@ -33,5 +37,5 @@ Die Sichtbarkeit ist bewusst gestaffelt:
 
 - Die Vignette braucht eine **Arbeitsheft-Bildbeschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Menschen und speist, an der Bildposition zusammen mit dem Arbeitsheft-Text, das Reasoning.
 - Der didaktisch reizvolle Gedanke, Trainingsteilnehmenden nachträglich zu zeigen, „wie die Simulation gedacht hat", ist verworfen.
-- Die Menge der zulässigen Anbieter und Modelle ist auf solche eingeschränkt, die Structured Output beherrschen. Ob ein Modell Structured Output und natives Reasoning zugleich zulässt, ist bei der Implementierung je Anbieter zu prüfen.
+- Die Menge der zulässigen Anbieter und Modelle ist auf solche eingeschränkt, die Structured Output beherrschen. Weitere Anforderungen an das Modell gibt es nicht; ob es daneben natives Reasoning führt, ist gleichgültig.
 - Weil die Denkspur nicht in den Kontext zurückfließt, bleibt der Kontext klein und die Denkspur ein reines Ausgabeprodukt.

@@ -5,7 +5,9 @@ status: accepted
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
-Analyseskripte und bereits ausgegebene Datensätze brechen. Er liefert einen
+Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
+ausgelieferten Erhebung sind Formatänderungen deshalb nicht mehr rückwirkend;
+sie brauchen dann einen eigenen Vorgang. Er liefert einen
 ZIP-Download mit relationalen CSV-Dateien nach RFC 4180. Jede Entität hat eine
 eigene Tabelle; es gibt keinen Wide-Pivot und kein Einebnen. Das Pivotieren
 bleibt der Forschenden und ihrer Auswertungssoftware überlassen.
@@ -55,7 +57,7 @@ Pfade statt als Inhalt.
 | `teilnahmen.csv` | `token`, `stichprobe_id`, `einwilligung_erteilt`, `audioverarbeitung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
 | `vignettenziehungen.csv` | `token`, `vignette_id`, `position` |
 | `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am` |
-| `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `native_reasoning_spur`, `erstellt_am` |
+| `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
