@@ -7,16 +7,20 @@ from typing import Any, Protocol
 import httpx
 from openai import APIConnectionError, OpenAI
 
-from simulation.models import Anbieter, TranskriptionsKonfiguration
+from simulation.models import ANBIETER_PROFIL, Anbieter, TranskriptionsKonfiguration
 
 PLATZHALTER_TRANSKRIPT: str = "Dies ist ein Platzhalter-Transkript."
 
 # Wie lange eine Aufnahme höchstens unterwegs sein darf — bei beiden Anbietern
-# gleich: als Timeout des synchronen Aufrufs, als Gesamtbudget des Pollings. Die
-# 120 s lassen 60 s Luft zum Worker-Timeout des Deployments (180 s, README),
-# sodass ein hängender Anbieter einen sauberen Fehlerstatus erzeugt statt eines
-# getöteten Workers.
+# gleich: als Timeout des synchronen Aufrufs, als Gesamtbudget des Pollings
+# einschließlich jeder einzelnen Anfrage darin. Die 120 s lassen 60 s Luft zum
+# Worker-Timeout des Deployments (180 s, README), sodass ein hängender Anbieter
+# einen sauberen Fehlerstatus erzeugt statt eines getöteten Workers.
 TRANSKRIPTION_BUDGET_SEKUNDEN: float = 120.0
+
+# Eine Anfrage, deren Budget schon aufgebraucht ist, bekommt noch diese Frist,
+# damit sie sauber scheitert, statt mit einem Timeout von null zu hängen.
+MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 
 # Abstand zwischen zwei Abfragen des Stapelergebnisses bei Infomaniak.
 INFOMANIAK_INTERVALL_SEKUNDEN: float = 2.0
@@ -114,9 +118,9 @@ class InfomaniakTranskription:
         """Sendet die Aufnahme ab und holt ihr Ergebnis innerhalb des Budgets."""
 
         frist: float = time.monotonic() + TRANSKRIPTION_BUDGET_SEKUNDEN
-        kennung: str = self._absenden(audio)
+        kennung: str = self._absenden(audio, frist)
         while True:
-            text: str | None = self._abholen(kennung)
+            text: str | None = self._abholen(kennung, frist)
             if text is not None:
                 if not text.strip():
                     raise LeeresTranskript
@@ -127,7 +131,14 @@ class InfomaniakTranskription:
                 )
             time.sleep(INFOMANIAK_INTERVALL_SEKUNDEN)
 
-    def _absenden(self, audio: bytes) -> str:
+    @staticmethod
+    def _restzeit(frist: float) -> float:
+        # Begrenzt jede einzelne Anfrage auf das, was vom Budget noch übrig ist,
+        # damit auch eine hängende Anfrage das Gesamtbudget nicht sprengt.
+
+        return max(frist - time.monotonic(), MINDEST_ANFRAGEFRIST_SEKUNDEN)
+
+    def _absenden(self, audio: bytes, frist: float) -> str:
         # Liefert die Stapelkennung, unter der das Ergebnis abzuholen ist.
 
         nutzlast: Any = self._nutzlast(
@@ -139,6 +150,7 @@ class InfomaniakTranskription:
                     "response_format": "text",
                 },
                 files={"file": ("aufnahme.webm", audio, "audio/webm")},
+                timeout=self._restzeit(frist),
             )
         )
         kennung: Any = nutzlast.get("batch_id") if isinstance(nutzlast, dict) else None
@@ -146,14 +158,17 @@ class InfomaniakTranskription:
             raise TranskriptionsAnbieterfehler("Infomaniak nannte keine Stapelkennung.")
         return kennung
 
-    def _abholen(self, kennung: str) -> str | None:
+    def _abholen(self, kennung: str, frist: float) -> str | None:
         # Liefert das Transkript, oder None, solange der Stapel noch läuft.
 
         # Die Ergebnisroute liegt neben der OpenAI-kompatiblen Wurzel, nicht
         # unter ihr: .../1/ai/<product_id>/results/<batch_id>.
         wurzel: str = self.basis_url.removesuffix("/openai")
         nutzlast: Any = self._nutzlast(
-            lambda: self.client.get(f"{wurzel}/results/{kennung}")
+            lambda: self.client.get(
+                f"{wurzel}/results/{kennung}",
+                timeout=self._restzeit(frist),
+            )
         )
         if not isinstance(nutzlast, dict):
             raise TranskriptionsAnbieterfehler(
@@ -228,8 +243,12 @@ def transkriptions_anbieter() -> Transkription:
     # OpenRouter spricht die OpenAI-Route.
     return OpenAITranskription(
         OpenAI(
-            # Ohne eigene Endpunktwurzel bleibt die Vorgabe des Clients stehen.
-            base_url=konfiguration.anbieter_basis_url or None,
+            # Ohne eigene Endpunktwurzel gilt die von OpenRouter — nie die des
+            # Clients, sonst ginge das OpenRouter-Token an OpenAI.
+            base_url=(
+                konfiguration.anbieter_basis_url
+                or ANBIETER_PROFIL[Anbieter.OPENROUTER].standard_basis_url
+            ),
             # Das Token steht ausschließlich in der Konfiguration; ein leeres
             # fällt bewusst nicht auf OPENAI_API_KEY aus der Umgebung zurück.
             api_key=konfiguration.anbieter_token,

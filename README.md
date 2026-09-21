@@ -280,7 +280,7 @@ Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_
 
 4. **Dienst einrichten** in `~/etc/services.d/failure-on-the-fly.ini`. Das
    großzügige Timeout ist nötig, weil ein Gesprächsschritt synchron auf das
-   Sprachmodell wartet:
+   Sprachmodell wartet und eine Transkription bis zu 120 s unterwegs sein darf:
 
    ```
    [program:failure-on-the-fly]

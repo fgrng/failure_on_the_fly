@@ -1,7 +1,6 @@
 """Transkription an ihrer austauschbaren Anbieter-Naht."""
 
-import itertools
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import httpx
 import pytest
@@ -10,6 +9,7 @@ from openai import APIConnectionError
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
     INFOMANIAK_INTERVALL_SEKUNDEN,
+    MINDEST_ANFRAGEFRIST_SEKUNDEN,
     PLATZHALTER_TRANSKRIPT,
     TRANSKRIPTION_BUDGET_SEKUNDEN,
     AnbieterNichtErreichbar,
@@ -176,6 +176,38 @@ def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguratio
     assert anbieter.sprache == "fr"
 
 
+@pytest.mark.django_db
+def test_anbieterfunktion_gibt_openrouter_ohne_eigene_wurzel_die_vorgabe() -> None:
+    """Ein OpenRouter-Token darf nie an die Vorgabe des Clients (OpenAI) gehen."""
+
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+    konfiguration.anbieter = Anbieter.OPENROUTER
+    konfiguration.anbieter_token = "geheimes-token"
+    konfiguration.transkriptionsmodell = "whisper-large-v3"
+    konfiguration.save()
+
+    with patch("simulation.transkription.OpenAI") as openai:
+        transkriptions_anbieter()
+
+    assert openai.call_args.kwargs["base_url"] == "https://openrouter.ai/api/v1"
+
+
+class _Uhr:
+    # Eine Uhr, die nur beim Schlafen vorrückt: Die Zahl der Abfragen hängt
+    # damit am Intervall, nicht daran, wie oft der Adapter auf die Uhr sieht.
+
+    def __init__(self) -> None:
+        self.jetzt: float = 0.0
+
+    def monotonic(self) -> float:
+        return self.jetzt
+
+    def sleep(self, sekunden: float) -> None:
+        self.jetzt += sekunden
+
+
 def _antwort(nutzlast: object) -> Mock:
     # Bildet eine httpx-Antwort nach: JSON-Körper und ein Statuswächter.
 
@@ -213,9 +245,11 @@ def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
         "https://api.infomaniak.com/1/ai/4711/openai/audio/transcriptions",
         data={"model": "whisper", "language": "de", "response_format": "text"},
         files={"file": ("aufnahme.webm", audio, "audio/webm")},
+        timeout=ANY,
     )
     client.get.assert_called_once_with(
-        "https://api.infomaniak.com/1/ai/4711/results/b-1"
+        "https://api.infomaniak.com/1/ai/4711/results/b-1",
+        timeout=ANY,
     )
 
 
@@ -227,21 +261,45 @@ def test_infomaniak_transkription_endet_nach_dem_budget_statt_endlos_zu_fragen()
     client = Mock()
     client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
     client.get.return_value = _antwort({"data": {"status": "pending"}})
-    # Die Uhr springt je Abfrage um das Intervall weiter; der Schlaf entfällt.
-    uhr = itertools.count(0.0, INFOMANIAK_INTERVALL_SEKUNDEN)
+    uhr = _Uhr()
 
     with (
-        patch("simulation.transkription.time.sleep") as schlafen,
-        patch("simulation.transkription.time.monotonic", lambda: next(uhr)),
+        patch("simulation.transkription.time.sleep", uhr.sleep),
+        patch("simulation.transkription.time.monotonic", uhr.monotonic),
         pytest.raises(TranskriptionsAnbieterfehler),
     ):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
-    erwartete_abfragen = int(
-        TRANSKRIPTION_BUDGET_SEKUNDEN / INFOMANIAK_INTERVALL_SEKUNDEN
+    # Eine Abfrage sofort, dann eine je Intervall, bis das Budget erreicht ist.
+    erwartete_abfragen = (
+        int(TRANSKRIPTION_BUDGET_SEKUNDEN / INFOMANIAK_INTERVALL_SEKUNDEN) + 1
     )
     assert client.get.call_count == erwartete_abfragen
-    schlafen.assert_called_with(INFOMANIAK_INTERVALL_SEKUNDEN)
+    assert uhr.jetzt == TRANSKRIPTION_BUDGET_SEKUNDEN
+
+
+def test_infomaniak_transkription_begrenzt_jede_anfrage_auf_die_restzeit() -> None:
+    """Auch eine hängende Einzelanfrage kann das Gesamtbudget nicht sprengen."""
+
+    client = Mock()
+    client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
+    client.get.return_value = _antwort({"data": {"status": "pending"}})
+    uhr = _Uhr()
+
+    with (
+        patch("simulation.transkription.time.sleep", uhr.sleep),
+        patch("simulation.transkription.time.monotonic", uhr.monotonic),
+        pytest.raises(TranskriptionsAnbieterfehler),
+    ):
+        _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
+
+    # Das Absenden darf das ganze Budget nutzen, jede Abfrage nur den Rest —
+    # bis zur Mindestfrist, mit der die letzte noch sauber scheitert.
+    assert client.post.call_args.kwargs["timeout"] == TRANSKRIPTION_BUDGET_SEKUNDEN
+    fristen = [aufruf.kwargs["timeout"] for aufruf in client.get.call_args_list]
+    assert fristen == sorted(fristen, reverse=True)
+    assert fristen[0] == TRANSKRIPTION_BUDGET_SEKUNDEN
+    assert fristen[-1] == MINDEST_ANFRAGEFRIST_SEKUNDEN
 
 
 def test_infomaniak_transkription_reicht_einen_gemeldeten_fehlschlag_weiter() -> None:
@@ -272,11 +330,11 @@ def test_infomaniak_transkription_wartet_bei_einem_unlesbaren_stand_weiter() -> 
     client = Mock()
     client.post.return_value = _antwort({"data": {"batch_id": "b-1"}})
     client.get.return_value = _antwort({"data": {"status": ["unbekannt"]}})
-    uhr = itertools.count(0.0, INFOMANIAK_INTERVALL_SEKUNDEN)
+    uhr = _Uhr()
 
     with (
-        patch("simulation.transkription.time.sleep"),
-        patch("simulation.transkription.time.monotonic", lambda: next(uhr)),
+        patch("simulation.transkription.time.sleep", uhr.sleep),
+        patch("simulation.transkription.time.monotonic", uhr.monotonic),
         pytest.raises(TranskriptionsAnbieterfehler),
     ):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")

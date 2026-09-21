@@ -1,5 +1,6 @@
 """Datenmodell des Simulationskerns."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from string import Template
 
@@ -366,11 +367,6 @@ class Anbieter(models.TextChoices):
 
 # Der Anbieter `fake` bedient genau ein Modell, das seinen Namen trägt.
 FAKE_MODELLNAME: str = "fake"
-# Das Präfix, mit dem LiteLLM einen Modellnamen zum Anbieter routet.
-ANBIETER_PRAEFIX: dict[str, str] = {
-    Anbieter.OPENROUTER: "openrouter/",
-    Anbieter.INFOMANIAK: "openai/",
-}
 MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
     {
         "temperature",
@@ -392,27 +388,95 @@ FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript"})
 TOKEN_MASKE: str = "•" * 8
 # Erst ab dieser Länge geben vier sichtbare Zeichen nicht das halbe Token preis.
 TOKEN_ERKENNBAR_AB: int = 12
+TOKEN_SICHTBARE_ZEICHEN: int = 4
 
 
-def erlaubte_stellschrauben(anbieter: str) -> frozenset[str]:
-    """Liefert die Allowlist der Parameter, die dieser Anbieter kennt."""
+@dataclass(frozen=True)
+class Anbieterprofil:
+    """Was ein Anbieter von seiner Konfiguration verlangt und was er ihr vorgibt."""
 
-    if anbieter == Anbieter.FAKE:
-        return FAKE_STELLSCHRAUBEN
-    return MIKRO_STELLSCHRAUBEN
+    # Das Präfix, mit dem LiteLLM einen Modellnamen zum Anbieter routet.
+    praefix: str
+    # Ob der Anbieter nur an der Wurzel des eigenen Kontos antwortet.
+    braucht_basis_url: bool
+    # Die Endpunktwurzel, die ohne eigene Angabe gilt; leer, wenn es keine gibt.
+    standard_basis_url: str
+    # Die Allowlist der Parameter, die dieser Anbieter kennt.
+    stellschrauben: frozenset[str]
 
 
-def _zugangsfehler(anbieter: str, token: str, basis_url: str) -> dict[str, str]:
-    # Prüft die Zugangsdaten, die jeder echte Anbieter gleichermaßen verlangt.
+ANBIETER_PROFIL: dict[str, Anbieterprofil] = {
+    Anbieter.FAKE: Anbieterprofil(
+        praefix="",
+        braucht_basis_url=False,
+        standard_basis_url="",
+        stellschrauben=FAKE_STELLSCHRAUBEN,
+    ),
+    Anbieter.OPENROUTER: Anbieterprofil(
+        praefix="openrouter/",
+        braucht_basis_url=False,
+        standard_basis_url="https://openrouter.ai/api/v1",
+        stellschrauben=MIKRO_STELLSCHRAUBEN,
+    ),
+    Anbieter.INFOMANIAK: Anbieterprofil(
+        praefix="openai/",
+        braucht_basis_url=True,
+        standard_basis_url="",
+        stellschrauben=MIKRO_STELLSCHRAUBEN,
+    ),
+}
 
-    fehler: dict[str, str] = {}
-    if not token:
-        fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
-    if anbieter == Anbieter.INFOMANIAK and not basis_url:
-        fehler["anbieter_basis_url"] = (
-            "Infomaniak antwortet nur an der Wurzel des eigenen Kontos."
-        )
-    return fehler
+
+class AnbieterFeldgruppe(models.Model):
+    """Die Anbieter-Feldgruppe, die beide Konfigurationen gleichermaßen tragen."""
+
+    anbieter: models.CharField = models.CharField(
+        max_length=10,
+        choices=Anbieter,
+        default=Anbieter.FAKE,
+    )
+    anbieter_basis_url: models.URLField = models.URLField(blank=True, default="")
+    anbieter_token: models.CharField = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    class Meta:
+        abstract: bool = True
+
+    @property
+    def anbieter_token_maskiert(self) -> str:
+        """Liefert den einzigen Wert des Tokens, der eine Ansicht erreichen darf."""
+
+        if not self.anbieter_token:
+            return ""
+        if len(self.anbieter_token) < TOKEN_ERKENNBAR_AB:
+            return TOKEN_MASKE
+        return TOKEN_MASKE + self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]
+
+    def _zugangsfehler(self) -> dict[str, str]:
+        # Prüft Endpunkt und Token gegen das Profil des gewählten Anbieters.
+
+        fehler: dict[str, str] = {}
+        if self.anbieter == Anbieter.FAKE:
+            if self.anbieter_basis_url:
+                fehler["anbieter_basis_url"] = (
+                    "Der Anbieter »fake« hat keinen Endpunkt."
+                )
+            if self.anbieter_token:
+                fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
+            return fehler
+        if not self.anbieter_token:
+            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+        if (
+            ANBIETER_PROFIL[self.anbieter].braucht_basis_url
+            and not self.anbieter_basis_url
+        ):
+            fehler["anbieter_basis_url"] = (
+                "Dieser Anbieter antwortet nur an der Wurzel des eigenen Kontos."
+            )
+        return fehler
 
 
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
@@ -447,34 +511,13 @@ class ModellKonfigurationManager(
         return konfiguration
 
 
-class ModellKonfiguration(models.Model):
+class ModellKonfiguration(AnbieterFeldgruppe):
     """Unveränderliche Konfiguration eines Sprachmodells."""
 
-    anbieter: models.CharField = models.CharField(
-        max_length=10,
-        choices=Anbieter,
-        default=Anbieter.FAKE,
-    )
-    anbieter_basis_url: models.URLField = models.URLField(blank=True, default="")
-    anbieter_token: models.CharField = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-    )
     sprachmodell: models.CharField = models.CharField(max_length=255)
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
 
     objects: ModellKonfigurationManager = ModellKonfigurationManager()
-
-    @property
-    def anbieter_token_maskiert(self) -> str:
-        """Liefert den einzigen Wert des Tokens, der eine Ansicht erreichen darf."""
-
-        if not self.anbieter_token:
-            return ""
-        if len(self.anbieter_token) < TOKEN_ERKENNBAR_AB:
-            return TOKEN_MASKE
-        return f"{TOKEN_MASKE}{self.anbieter_token[-4:]}"
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Verhindert jede Mutation und prüft die Konfiguration beim Anlegen."""
@@ -492,47 +535,33 @@ class ModellKonfiguration(models.Model):
         if self.anbieter not in Anbieter.values:
             return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
         fehler: dict[str, str] = {
-            **self._bindungsfehler(),
+            **self._zugangsfehler(),
+            **self._modellnamenfehler(),
             **self._parameter_fehler(),
         }
         if fehler:
             raise ValidationError(fehler)
 
-    def _bindungsfehler(self) -> dict[str, str]:
-        # Prüft Modellname und Zugangsdaten gegen die Erwartungen des Anbieters.
+    def _modellnamenfehler(self) -> dict[str, str]:
+        # Prüft den Modellnamen gegen das Routing des gewählten Anbieters.
 
         if self.anbieter == Anbieter.FAKE:
-            return self._fake_bindungsfehler()
-        fehler: dict[str, str] = _zugangsfehler(
-            self.anbieter,
-            self.anbieter_token,
-            self.anbieter_basis_url,
-        )
-        praefix: str = ANBIETER_PRAEFIX[self.anbieter]
+            if self.sprachmodell != FAKE_MODELLNAME:
+                return {
+                    "sprachmodell": "Der Anbieter »fake« bedient nur das Modell »fake«."
+                }
+            return {}
+        praefix: str = ANBIETER_PROFIL[self.anbieter].praefix
         if not self.sprachmodell.startswith(praefix):
-            fehler["sprachmodell"] = f"Dieser Anbieter verlangt das Präfix »{praefix}«."
-        return fehler
-
-    def _fake_bindungsfehler(self) -> dict[str, str]:
-        # Der deterministische Adapter hat weder Endpunkt noch Zugangsdaten.
-
-        fehler: dict[str, str] = {}
-        if self.sprachmodell != FAKE_MODELLNAME:
-            fehler["sprachmodell"] = (
-                "Der Anbieter »fake« bedient nur das Modell »fake«."
-            )
-        if self.anbieter_basis_url:
-            fehler["anbieter_basis_url"] = "Der Anbieter »fake« hat keinen Endpunkt."
-        if self.anbieter_token:
-            fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
-        return fehler
+            return {"sprachmodell": f"Dieser Anbieter verlangt das Präfix »{praefix}«."}
+        return {}
 
     def _parameter_fehler(self) -> dict[str, str]:
         # Prüft die Parameter gegen die Allowlist des gewählten Anbieters.
 
         if not isinstance(self.parameter, dict):
             return {"parameter": "Parameter sind ein Objekt aus Schlüsseln und Werten."}
-        erlaubt: frozenset[str] = erlaubte_stellschrauben(self.anbieter)
+        erlaubt: frozenset[str] = ANBIETER_PROFIL[self.anbieter].stellschrauben
         ueberzaehlig: list[str] = sorted(set(self.parameter) - erlaubt)
         if ueberzaehlig:
             return {
@@ -566,12 +595,6 @@ class AktiveModellKonfiguration(models.Model):
         ]
 
 
-# Ein hinterlegtes Token bleibt an der Oberfläche nur an seinen letzten
-# Zeichen wiedererkennbar.
-TOKEN_MASKE: str = "•" * 8
-TOKEN_SICHTBARE_ZEICHEN: int = 4
-
-
 class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
     """Zugang zur einzigen Transkriptions-Konfiguration."""
 
@@ -582,7 +605,7 @@ class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfigura
         return konfiguration
 
 
-class TranskriptionsKonfiguration(models.Model):
+class TranskriptionsKonfiguration(AnbieterFeldgruppe):
     """Der einzige, veränderliche Anbieterzugang der Transkription.
 
     Anders als die Modell-Konfiguration wird sie nicht gepinnt und nicht
@@ -594,17 +617,6 @@ class TranskriptionsKonfiguration(models.Model):
         default=1,
         editable=False,
     )
-    anbieter: models.CharField = models.CharField(
-        max_length=10,
-        choices=Anbieter,
-        default=Anbieter.FAKE,
-    )
-    anbieter_basis_url: models.URLField = models.URLField(blank=True, default="")
-    anbieter_token: models.CharField = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-    )
     transkriptionsmodell: models.CharField = models.CharField(
         max_length=255,
         blank=True,
@@ -614,28 +626,14 @@ class TranskriptionsKonfiguration(models.Model):
 
     objects: TranskriptionsKonfigurationManager = TranskriptionsKonfigurationManager()
 
-    @property
-    def token_maskiert(self) -> str:
-        """Zeigt wiedererkennbar an, welches Token hinterlegt ist."""
-
-        if not self.anbieter_token:
-            return ""
-        if len(self.anbieter_token) <= TOKEN_SICHTBARE_ZEICHEN:
-            # Ein kurzes Token verriete sich sonst vollständig.
-            return TOKEN_MASKE
-        return TOKEN_MASKE + self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]
-
     def clean(self) -> None:
         """Bindet Modellname und Zugangsdaten an den gewählten Anbieter."""
 
-        if self.anbieter == Anbieter.FAKE:
-            return  # Der Platzhalter-Adapter hat weder Endpunkt noch Modell.
-        fehler: dict[str, str] = _zugangsfehler(
-            self.anbieter,
-            self.anbieter_token,
-            self.anbieter_basis_url,
-        )
-        if not self.transkriptionsmodell:
+        if self.anbieter not in Anbieter.values:
+            return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
+        fehler: dict[str, str] = self._zugangsfehler()
+        # Der Platzhalter-Adapter braucht kein Modell; jeder echte Anbieter schon.
+        if self.anbieter != Anbieter.FAKE and not self.transkriptionsmodell:
             fehler["transkriptionsmodell"] = (
                 "Ohne Modellnamen weiß der Anbieter nicht, was er laden soll."
             )

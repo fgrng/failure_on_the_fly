@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Transkription{% endblock %}
+{% block title %}Transkriptions-Konfiguration{% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
@@ -13,7 +13,7 @@
     <header class="page-head">
         <div>
             <p>System</p>
-            <h1>Transkription</h1>
+            <h1>Transkriptions-Konfiguration</h1>
             <span>Der eine Anbieterzugang der Spracheingabe. Eine Änderung wirkt bei der nächsten Aufnahme.</span>
         </div>
     </header>
@@ -32,8 +32,8 @@
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
                 <p class="system-page-empty">
                     Hinterlegtes Token:
-                    {% if konfiguration.token_maskiert %}
-                        <code>{{ konfiguration.token_maskiert }}</code>
+                    {% if konfiguration.anbieter_token_maskiert %}
+                        <code>{{ konfiguration.anbieter_token_maskiert }}</code>
                     {% else %}
                         keines.
                     {% endif %}
@@ -65,7 +65,7 @@
         </section>
 
         <div class="vignette-form-actions">
-            <button class="button" type="submit">Transkription speichern</button>
+            <button class="button" type="submit">Transkriptions-Konfiguration speichern</button>
         </div>
     </form>
 </section>

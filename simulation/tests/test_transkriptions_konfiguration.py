@@ -89,8 +89,8 @@ def test_maskierung_zeigt_die_letzten_vier_zeichen() -> None:
         anbieter_token="sk-or-supergeheim1234"
     )
 
-    assert konfiguration.token_maskiert.endswith("1234")
-    assert "supergeheim" not in konfiguration.token_maskiert
+    assert konfiguration.anbieter_token_maskiert.endswith("1234")
+    assert "supergeheim" not in konfiguration.anbieter_token_maskiert
 
 
 def test_maskierung_eines_sehr_kurzen_tokens_zeigt_nur_punkte() -> None:
@@ -100,13 +100,13 @@ def test_maskierung_eines_sehr_kurzen_tokens_zeigt_nur_punkte() -> None:
         anbieter_token="kurz"
     )
 
-    assert "kurz" not in konfiguration.token_maskiert
+    assert "kurz" not in konfiguration.anbieter_token_maskiert
 
 
 def test_maskierung_ohne_token_bleibt_leer() -> None:
     """Ohne hinterlegtes Token gibt es nichts zu maskieren."""
 
-    assert TranskriptionsKonfiguration().token_maskiert == ""
+    assert TranskriptionsKonfiguration().anbieter_token_maskiert == ""
 
 
 class TranskriptionsKonfigurationRollenTests(TestCase):
@@ -152,7 +152,7 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
             self.assertContains(response, f'name="{feld}"')
 
     def test_zeigt_die_sprache_mit_der_vorgabe_deutsch(self) -> None:
-        """Whisper soll bei kurzen deutschen Äußerungen nicht raten müssen."""
+        """Die Transkription soll bei kurzen deutschen Äußerungen nicht raten müssen."""
         response: HttpResponse = self.client.get(reverse(SEITE))
 
         self.assertContains(response, 'value="de"')
@@ -250,7 +250,7 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
 
         self.assertContains(
             response,
-            '<a href="/system/transkription/" aria-current="page">Transkription</a>',
+            '<a href="/system/transkription/" aria-current="page">Transkriptions-Konfiguration</a>',
             html=False,
         )
 

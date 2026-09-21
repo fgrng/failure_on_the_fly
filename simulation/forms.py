@@ -1,8 +1,9 @@
-"""Formulare der Systemverwaltung: Simulationskern und Transkription."""
+"""Formulare der Simulation: Kern-Entwurf, Modell- und Transkriptions-Konfiguration."""
 
 from django.forms import ModelForm, PasswordInput
 
 from .models import (
+    ANBIETER_PROFIL,
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
@@ -10,7 +11,6 @@ from .models import (
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
-    erlaubte_stellschrauben,
 )
 
 _RAHMEN_FELDER: dict[str, str] = {
@@ -67,8 +67,8 @@ class SimulationskernForm(ModelForm):
 
 def _stellschrauben_hinweis() -> str:
     """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
-    echte: str = ", ".join(sorted(erlaubte_stellschrauben(Anbieter.OPENROUTER)))
-    fake: str = ", ".join(sorted(erlaubte_stellschrauben(Anbieter.FAKE)))
+    echte: str = ", ".join(sorted(ANBIETER_PROFIL[Anbieter.OPENROUTER].stellschrauben))
+    fake: str = ", ".join(sorted(ANBIETER_PROFIL[Anbieter.FAKE].stellschrauben))
     return f"Erlaubt sind bei echten Anbietern: {echte}. Beim Anbieter »fake«: {fake}."
 
 
@@ -140,7 +140,10 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "sprache": "Sprache",
         }
         help_texts: dict[str, str] = {
-            "anbieter_basis_url": "Bei Infomaniak die Wurzel des eigenen Kontos.",
+            "anbieter_basis_url": (
+                "Bei Infomaniak die Wurzel des eigenen Kontos; bei OpenRouter "
+                "leer lassen für die Vorgabe https://openrouter.ai/api/v1."
+            ),
             "anbieter_token": "Leer lassen behält das hinterlegte Token.",
             "sprache": "Sprachkürzel, damit die Transkription nicht raten muss.",
         }
