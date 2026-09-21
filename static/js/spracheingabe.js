@@ -49,6 +49,9 @@
         const textAnhaengen = (ziel, text) => {
             ziel.value += `${ziel.value ? "\n" : ""}${text}`;
         };
+        const modusSetzen = (modus) => {
+            if (formular.elements.eingabemodus) formular.elements.eingabemodus.value = modus;
+        };
         const transkribieren = async () => {
             zustand(grenzeErreicht
                 ? "Die maximale Aufnahmelänge ist erreicht. Ihre Aufnahme wird transkribiert."
@@ -69,7 +72,7 @@
                     eingabe.readOnly = true;
                     eingabe.value = ergebnis.text;
                     // Schreibgeschützt und sofort abgeschickt: hier entsteht kein gemischter Text.
-                    if (formular.elements.eingabemodus) formular.elements.eingabemodus.value = "transkribiert";
+                    modusSetzen("transkribiert");
                 } else {
                     textAnhaengen(eingabe, ergebnis.text);
                     if (tastatureingabe) tastatureingabe.required = false;
@@ -121,8 +124,17 @@
             }
         };
 
+        // Nur vor dem Anhängen bestimmbar: danach steht das Transkript im
+        // getippten Feld und beide Anteile sind nicht mehr trennbar.
+        const herkunftDesTextes = () => {
+            if (!eingabe.value.trim()) return "getippt";
+            if (!tastatureingabe.value.trim()) return "transkribiert";
+            return "gemischt";
+        };
+
         if (tastatureingabe) {
             formular.addEventListener("submit", () => {
+                modusSetzen(herkunftDesTextes());
                 textAnhaengen(tastatureingabe, eingabe.value);
             });
         }

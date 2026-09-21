@@ -195,23 +195,23 @@ und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt vermerkt dabei seinen
-Eingabemodus: ob die Eingabe getippt oder eingesprochen wurde. Der Wert wird im
-Browser der Teilnehmer:in bestimmt und ist damit eine Angabe für die Auswertung,
-kein Nachweis. Die verwendeten Vignettenfassungen,
-Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem vollständigen
-Inhalt als eigene Tabellen bei, damit der Export ohne Datenbankzugriff
-interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe: Die der Erhebung
-zugeordneten Fragebogen-Items liegen mit ihrem vollen Wortlaut bei, eine eigene
-Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von 1 »Stimme gar
-nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und die vorgelegten
-Itemblöcke stehen mit ihrem Andockpunkt sowie den Zeitstempeln der Vorlage und
-der Erledigung darin — ein übersprungener Block bleibt so als vorgelegt
-erkennbar. Die Antworten selbst liegen als eigene Tabelle bei, eine Zeile je
-vorgelegtem Fragebogen-Item, mit getrennten Spalten für Freitext und
+Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
+dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
+zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
+ist damit eine Angabe für die Auswertung, kein Nachweis. Die verwendeten
+Vignettenfassungen, Simulationskern-Fassungen und Modell-Konfigurationen liegen
+mit ihrem vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
+Datenbankzugriff interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe:
+Die der Erhebung zugeordneten Fragebogen-Items liegen mit ihrem vollen Wortlaut
+bei, eine eigene Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von
+1 »Stimme gar nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und
+die vorgelegten Itemblöcke stehen mit ihrem Andockpunkt sowie den Zeitstempeln
+der Vorlage und der Erledigung darin — ein übersprungener Block bleibt so als
+vorgelegt erkennbar. Die Antworten selbst liegen als eigene Tabelle bei, eine
+Zeile je vorgelegtem Fragebogen-Item, mit getrennten Spalten für Freitext und
 Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
-Werten erhalten; nur so unterscheidet die Auswertung »freiwillig
-übersprungen« von »nie gesehen«.
+Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen«
+von »nie gesehen«.
 
 ## Fragebogen-Items verwalten
 

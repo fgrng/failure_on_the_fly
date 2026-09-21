@@ -63,7 +63,7 @@ from sitzungen.durchlauf import (
     sitzung_abbrechen,
     sitzung_beenden,
 )
-from sitzungen.models import Sitzung
+from sitzungen.models import Eingabemodus, Sitzung
 from sitzungen.sink import DBSink
 from sitzungen.views import (
     persistiertes_gespraech,
@@ -972,7 +972,10 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status != Sitzung.Status.LAUFEND:
             return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
-        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(
+            request.POST["diagnose"],
+            eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
+        )
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistierten_debrief_anzeigen(

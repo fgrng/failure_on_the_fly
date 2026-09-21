@@ -182,3 +182,8 @@ class Diagnose(models.Model):
         on_delete=models.CASCADE,
     )
     text: models.TextField = models.TextField()
+    eingabemodus: models.CharField = models.CharField(
+        max_length=13,
+        choices=Eingabemodus,
+        default=Eingabemodus.GETIPPT,
+    )

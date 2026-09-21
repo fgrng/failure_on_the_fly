@@ -12,6 +12,7 @@
         <label for="diagnose">Was ist Ihnen aufgefallen?</label>
         <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
         <textarea id="diagnose-transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
+        <input type="hidden" name="eingabemodus" value="getippt">
         <button class="button" type="submit">{{ navigation.bezeichnung }} beenden</button>
     </form>
     {% if spracheingabe_verfuegbar %}

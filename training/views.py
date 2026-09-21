@@ -29,7 +29,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.models import Sitzung
+from sitzungen.models import Eingabemodus, Sitzung
 from sitzungen.sink import DBSink
 from sitzungen.views import (
     persistierten_debrief_anzeigen,
@@ -566,7 +566,10 @@ def debrief(request: HttpRequest) -> HttpResponse:
             )
         if sitzung.status != Sitzung.Status.LAUFEND:
             return _zur_auswahl_zurueckkehren(request, sitzung)
-        DBSink.fuer_sitzung(sitzung).diagnose_setzen(request.POST["diagnose"])
+        DBSink.fuer_sitzung(sitzung).diagnose_setzen(
+            request.POST["diagnose"],
+            eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
+        )
     return _zur_auswahl_zurueckkehren(request, sitzung)
 
 

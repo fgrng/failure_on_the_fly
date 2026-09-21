@@ -36,15 +36,17 @@ Eigentümerinnen Klarnamen und gehören deshalb nicht in den pseudonymen
 Datensatz. Die Historie bleibt allein als Gruppierungsschlüssel der verwendeten
 Fassungen erhalten.
 
-Jeder Gesprächsschritt trägt in `eingabemodus`, woher sein abgeschickter Text
-stammt: `getippt`, `transkribiert` oder `gemischt`. Der Wert ist nie leer und
-nie `NA`. Er beschreibt die Herkunft des Textes, nicht seine Bearbeitung — ein
-Vergleich zwischen Rohtranskript und abgeschickter Fassung findet nicht statt,
-und das Rohtranskript wird nicht aufbewahrt. Bestimmt wird er im Browser der
-Teilnehmer:in: Er taugt zur Varianzkontrolle in der Auswertung, nicht als
-fälschungssicherer Nachweis. Gesprächsschritte aus der Zeit vor seiner
-Einführung tragen den Startwert `getippt`, ohne dass er dort erhoben wurde. Die
-Diagnose führt den Modus noch nicht; das behandelt #239.
+Jeder Gesprächsschritt und jede Diagnose tragen in `eingabemodus`, woher der
+abgeschickte Text stammt: `getippt`, `transkribiert` oder `gemischt`. Der Wert
+ist nie leer und nie `NA`. Er beschreibt die Herkunft des Textes, nicht seine
+Bearbeitung — ein Vergleich zwischen Rohtranskript und abgeschickter Fassung
+findet nicht statt, und das Rohtranskript wird nicht aufbewahrt. Bestimmt wird
+er im Browser der Teilnehmer:in: Er taugt zur Varianzkontrolle in der
+Auswertung, nicht als fälschungssicherer Nachweis. Zeilen aus der Zeit vor
+seiner Einführung tragen den Startwert `getippt`, ohne dass er dort erhoben
+wurde. `gemischt` entsteht allein an der Diagnose: Nur dort hängt das
+Spracheingabe-Skript das Transkript an die Tastatureingabe an, statt sie zu
+ersetzen und sofort abzuschicken.
 
 ## Dateiformat
 
@@ -65,7 +67,7 @@ Pfade statt als Inhalt.
 | `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am` |
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
-| `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am` |
+| `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am`, `eingabemodus` |
 | `itembloecke.csv` | `id`, `teilnahme_token`, `andockpunkt`, `sitzung_id`, `vorgelegt_am`, `erledigt_am` |
 | `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |

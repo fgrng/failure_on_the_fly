@@ -183,6 +183,19 @@ class TrainingssitzungTests(TestCase):
             Eingabemodus.TRANSKRIBIERT,
         )
 
+    def test_trainingsdiagnose_fuehrt_den_eingabemodus_mit(self) -> None:
+        """Training folgt der Erhebung auch an der Diagnose (Spec: #122)."""
+
+        self._sitzung_starten([])
+        self.client.post(reverse("training:gespraech_beenden"))
+
+        self.client.post(
+            reverse("training:debrief"),
+            {"diagnose": "Bruchfehler", "eingabemodus": "gemischt"},
+        )
+
+        self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GEMISCHT)
+
     def test_schrittbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
         """Auch ein ausgeschöpftes Schrittbudget schließt erst mit Diagnose ab."""
         self._sitzung_starten(
