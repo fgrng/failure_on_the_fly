@@ -1,5 +1,6 @@
 """Datenmodelle für Fragebogen-Items und ihre Historien."""
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -48,12 +49,24 @@ class FragebogenItemHistorie(EigentuemerKreis):
     """Die gemeinsame, eigentümerinnengetragene Linie eines Items."""
 
     ROLLENGRUPPE: str = FORSCHENDE_GRUPPE
+    LOESCHSPERRE_MELDUNG: str = (
+        "Fragebogen-Item-Historien brauchen mindestens eine Eigentümerin; bitte "
+        "tragen Sie vorher eine Nachfolgerin ein."
+    )
 
     name: models.CharField = models.CharField(max_length=255, blank=True, default="")
 
     objects: models.Manager["FragebogenItemHistorie"] = (
         FragebogenItemHistorieQuerySet.as_manager()
     )
+
+
+def _fassungslose_historien_entfernen(historie_ids: Iterable[int]) -> None:
+    # Eine Historie ohne Fassung trägt weder Namen noch sichtbaren Bestand und
+    # blockiert sonst unsichtbar das Löschen ihres Kontos (konten.Konto.delete).
+    FragebogenItemHistorie.objects.filter(
+        pk__in=set(historie_ids), fragebogenitem__isnull=True
+    ).delete()
 
 
 class FragebogenItemQuerySet(models.QuerySet["FragebogenItem"]):
@@ -79,11 +92,17 @@ class FragebogenItemQuerySet(models.QuerySet["FragebogenItem"]):
             "Fragebogen-Items dürfen nicht per Massenupdate geändert werden."
         )
 
+    @transaction.atomic
     def delete(self) -> tuple[int, dict[str, int]]:
         """Löscht gesammelt ausschließlich Entwürfe."""
         if self.exclude(zustand=FragebogenItem.Zustand.ENTWURF).exists():
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete()
+        betroffene_historien: list[int] = list(
+            self.values_list("historie_id", flat=True)
+        )
+        ergebnis: tuple[int, dict[str, int]] = super().delete()
+        _fassungslose_historien_entfernen(betroffene_historien)
+        return ergebnis
 
     def sichtbar_fuer(self, konto: "Konto") -> "FragebogenItemQuerySet":
         """Liefert Fassungen aus den für ein Konto sichtbaren Historien."""
@@ -199,11 +218,15 @@ class FragebogenItem(models.Model):
         finally:
             del self._wechselt_zustand
 
+    @transaction.atomic
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
         if not self._hat_gespeicherten_zustand(self.Zustand.ENTWURF):
             raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete(*args, **kwargs)
+        historie_id: int = self.historie_id
+        ergebnis: tuple[int, dict[str, int]] = super().delete(*args, **kwargs)
+        _fassungslose_historien_entfernen([historie_id])
+        return ergebnis
 
     @transaction.atomic
     def bearbeiten(self) -> "FragebogenItem":

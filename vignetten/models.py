@@ -109,6 +109,10 @@ class Vignettenhistorie(EigentuemerKreis):
     """Die gemeinsame, eigentümerinnengetragene Linie einer Vignette."""
 
     ROLLENGRUPPE: str = AUTORIN_GRUPPE
+    LOESCHSPERRE_MELDUNG: str = (
+        "Aktive Vignettenhistorien brauchen mindestens eine Eigentümerin; bitte "
+        "tragen Sie vorher eine Nachfolgerin ein."
+    )
 
     name: models.CharField = models.CharField(max_length=255, blank=True, default="")
     archiviert: models.BooleanField = models.BooleanField(default=False)

@@ -1,8 +1,11 @@
 """Datenmodelle für Nutzerkonten."""
 
+from django.apps import apps
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.db.models import ProtectedError, Q
+
+from konten.eigentuemerschaft import EigentuemerKreis
 
 
 class KontoQuerySet(models.QuerySet["Konto"]):
@@ -34,36 +37,19 @@ class Konto(AbstractUser):
         using: str | None = None,
         keep_parents: bool = False,
     ) -> tuple[int, dict[str, int]]:
-        """Verhindert eigentümerlose aktive Objekte."""
-        from erhebungen.models import Erhebung
-        from training.models import Training
-        from vignetten.models import Vignettenhistorie
-
-        for historie in Vignettenhistorie.objects.filter(
-            archiviert=False, eigentuemerinnen=self
-        ):
-            if historie.eigentuemerinnen.count() == 1:
-                raise ProtectedError(
-                    "Aktive Vignettenhistorien brauchen mindestens eine Eigentümerin.",
-                    [historie],
-                )
-
-        for training in Training.objects.filter(eigentuemerinnen=self):
-            if training.eigentuemerinnen.count() == 1:
-                raise ProtectedError(
-                    "Trainings brauchen mindestens eine Eigentümerin; bitte "
-                    "übertragen Sie das Training vorher.",
-                    [training],
-                )
-
-        for erhebung in Erhebung.objects.exclude(
-            status=Erhebung.Status.ARCHIVIERT
-        ).filter(eigentuemerinnen=self):
-            if erhebung.eigentuemerinnen.count() == 1:
-                raise ProtectedError(
-                    "Aktive Erhebungen brauchen mindestens eine Eigentümerin; bitte "
-                    "übertragen Sie die Erhebung vorher.",
-                    [erhebung],
-                )
+        """Verhindert eigentümerlose aktive Bestände."""
+        # Die zu prüfenden Bestände kommen aus Djangos Modellregistrierung
+        # statt aus Importen: So importiert `konten` nicht in die Bestands-Apps
+        # zurück (ADR-0016), und ein künftig hinzukommendes Bestandsmodell ist
+        # am Tag seiner Einführung mitgeschützt.
+        bestandsmodelle: list[type[EigentuemerKreis]] = [
+            modell
+            for modell in apps.get_models()
+            if issubclass(modell, EigentuemerKreis)
+        ]
+        for modell in bestandsmodelle:
+            for bestand in modell.objects.filter(eigentuemerinnen=self):
+                if bestand.ist_aktiv() and bestand.eigentuemerinnen.count() == 1:
+                    raise ProtectedError(modell.LOESCHSPERRE_MELDUNG, [bestand])
 
         return super().delete(using=using, keep_parents=keep_parents)

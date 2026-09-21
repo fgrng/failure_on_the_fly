@@ -300,6 +300,42 @@ class FragebogenItemLebenszyklusTests(TestCase):
         with self.assertRaises(ValidationError):
             finale.delete()
 
+    def test_loeschen_der_letzten_fassung_raeumt_die_historie_ab(self) -> None:
+        """Eine fassungslose Historie blockiert sonst unsichtbar das Kontolöschen."""
+        konto = get_user_model().objects.create_user(username="ada")
+        entwurf = FragebogenItem.objects.anlegen(konto)
+        historie_pk = entwurf.historie_id
+
+        entwurf.delete()
+
+        self.assertFalse(FragebogenItemHistorie.objects.filter(pk=historie_pk).exists())
+
+    def test_loeschen_einer_fassung_neben_anderen_erhaelt_die_historie(self) -> None:
+        """Solange eine Fassung bleibt, trägt die Historie weiter ihren Bestand."""
+        konto = get_user_model().objects.create_user(username="ada")
+        finale = FragebogenItem.objects.anlegen(konto, wortlaut="Was fiel auf?")
+        finale.finalisieren()
+        entwurf = finale.bearbeiten()
+
+        entwurf.delete()
+
+        self.assertTrue(
+            FragebogenItemHistorie.objects.filter(pk=finale.historie_id).exists()
+        )
+
+    def test_massenloeschung_raeumt_leer_gewordene_historien_ab(self) -> None:
+        """Auch der QuerySet-Weg hinterlässt keine fassungslose Historie."""
+        konto = get_user_model().objects.create_user(username="ada")
+        historien = [
+            FragebogenItem.objects.anlegen(konto).historie_id for _ in range(2)
+        ]
+
+        FragebogenItem.objects.filter(zustand=FragebogenItem.Zustand.ENTWURF).delete()
+
+        self.assertFalse(
+            FragebogenItemHistorie.objects.filter(pk__in=historien).exists()
+        )
+
 
 class FragebogenItemSchreibnahtTests(TestCase):
     """Massenschreibwege umgehen die Modell-Naht nicht."""

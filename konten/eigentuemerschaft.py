@@ -1,23 +1,25 @@
 """Der Eigentümer-Kreis, den alle bestandstragenden Modelle gemeinsam tragen."""
 
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from django.db import models, transaction
 
-from konten.models import Konto
 from konten.navigation import ist_administratorin
+
+if TYPE_CHECKING:
+    from konten.models import Konto
 
 
 class EigentuemerKreisQuerySet[Bestand: "EigentuemerKreis"]:
     """Sichtbarkeit und Anlegen des Eigentümer-Kreises für jedes Bestands-QuerySet."""
 
-    def anlegen(self, konto: Konto, **kwargs: object) -> Bestand:
+    def anlegen(self, konto: "Konto", **kwargs: object) -> Bestand:
         """Legt einen Bestand an und trägt das Konto als erste Eigentümerin ein."""
         bestand: Bestand = self.create(**kwargs)
         bestand.eigentuemerinnen.add(konto)
         return bestand
 
-    def sichtbar_fuer(self, konto: Konto) -> Self:
+    def sichtbar_fuer(self, konto: "Konto") -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""
         if ist_administratorin(konto):
             return self
@@ -37,6 +39,14 @@ class EigentuemerKreis(models.Model):
     # Tür, kein Systemzustand: Ein Rollenentzug lässt eine bestehende
     # Eigentümerschaft unberührt, sonst verwaisten Bestände.
     ROLLENGRUPPE: str
+
+    # Was das Konto-Löschen meldet, wenn dieser Bestand im Weg steht. Jede
+    # Erbin schreibt ihren Bestand aus; abgeleitet wird nichts, denn Djangos
+    # `verbose_name` ergäbe »fragebogen item historie«.
+    LOESCHSPERRE_MELDUNG: str = (
+        "Dieser Bestand braucht mindestens eine Eigentümerin; bitte tragen "
+        "Sie vorher eine Nachfolgerin ein."
+    )
 
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
@@ -72,12 +82,17 @@ class EigentuemerKreis(models.Model):
             self.eigentuemerinnen.remove(konto_pk)
             return True
 
-    def moegliche_ergaenzungen(self) -> models.QuerySet[Konto]:
+    def moegliche_ergaenzungen(self) -> "models.QuerySet[Konto]":
         """Liefert die Konten, die in diesen Kreis aufgenommen werden können.
 
         Das sind die Trägerinnen der Rollengruppe samt Administration, ohne die
         bereits Eingetragenen.
         """
+        # Erst hier importiert: `konten.models` holt sich für den Löschpfad die
+        # Basis aus diesem Modul, ein Modulimport in die Gegenrichtung schlösse
+        # den Kreis.
+        from konten.models import Konto
+
         return Konto.objects.mit_rolle_oder_administration(self.ROLLENGRUPPE).exclude(
             pk__in=self.eigentuemerinnen.values("pk")
         )

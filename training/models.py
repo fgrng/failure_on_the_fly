@@ -33,6 +33,10 @@ class Training(EigentuemerKreis):
     """Ein von einem Eigentümerinnen-Kreis kuratierter Satz finaler Vignetten."""
 
     ROLLENGRUPPE: str = AUSBILDERIN_GRUPPE
+    LOESCHSPERRE_MELDUNG: str = (
+        "Trainings brauchen mindestens eine Eigentümerin; bitte tragen Sie "
+        "vorher eine Nachfolgerin ein."
+    )
 
     class Zustand(models.TextChoices):
         """Die Zustände eines Trainings."""

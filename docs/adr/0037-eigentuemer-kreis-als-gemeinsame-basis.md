@@ -90,9 +90,11 @@ Training hält ADR-0032 das ausdrücklich fest.
 über Djangos **Modellregistrierung** (`apps.get_models()`) und nimmt jedes
 registrierte Modell, das von `EigentuemerKreis` erbt. Ein Bestand blockiert die
 Löschung, wenn `ist_aktiv()` wahr ist und das zu löschende Konto seine einzige
-Eigentümerin ist; die `ProtectedError`-Meldung wird aus dem `verbose_name` des
-blockierenden Modells abgeleitet und behält den Hinweis, vorher eine
-Nachfolgerin einzutragen.
+Eigentümerin ist; die `ProtectedError`-Meldung steht als
+`LOESCHSPERRE_MELDUNG` am blockierenden Modell und behält den Hinweis, vorher
+eine Nachfolgerin einzutragen. Sie wird nicht aus dem `verbose_name`
+abgeleitet — der ergäbe »fragebogen item historie«; jede Erbin schreibt ihren
+Bestand deshalb selbst aus, die Basis hält nur einen neutralen Fallback.
 
 Das ist **bewusste Django-Introspektion, kein Trick**. Es wird hier und im Code
 benannt, weil eine Registry-Iteration sonst als Zauberei gelesen wird. Sie kauft
