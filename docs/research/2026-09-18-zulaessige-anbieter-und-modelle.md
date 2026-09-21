@@ -55,9 +55,24 @@ Zur ersten Hälfte der offenen Frage — der **Liste**: keine erzwungene Modelll
 
 - **Endpunkt:** `POST https://api.infomaniak.com/2/ai/{product_id}/openai/v1/chat/completions`, OpenAI-kompatibel. Die `product_id` stammt aus `GET /1/ai`, die Modellliste aus `GET /2/ai/{product_id}/openai/v1/models` bzw. `GET /1/ai/models` (letzteres ist die maßgebliche Liste, siehe 4.2).
 - **LiteLLM-Routing:** **kein** eigener LiteLLM-Provider. Der Weg führt über den OpenAI-kompatiblen Pfad: Model-String `openai/<modell>` (z. B. `openai/qwen3`) mit `api_base: https://api.infomaniak.com/2/ai/<product_id>/openai/v1`. Keine Codeänderung an der Naht.
-- **Structured Output:** unterstützt und die **einzige** noch unterstützte Form. Die API-Doku zu `response_format.type` sagt: nur `json_schema` wird derzeit unterstützt, `text` ist das Standardverhalten, `json_object` ist obsolet. `strict: true` wird geführt und verweist auf den OpenAI-Structured-Outputs-Leitfaden. Unser `AUSGABE_SCHEMA` (`denkspur` vor `aeusserung`, `additionalProperties: false`, beide `required`) erfüllt die strict-Teilmenge.
+- **Structured Output:** unterstützt und die **einzige** noch unterstützte Form. Die API-Doku zu `response_format.type` sagt: nur `json_schema` wird derzeit unterstützt, `text` ist das Standardverhalten, `json_object` ist obsolet. `strict: true` wird geführt und verweist auf den OpenAI-Structured-Outputs-Leitfaden. Unser `AUSGABE_SCHEMA` (`denkspur` vor `aeusserung`, `additionalProperties: false`, beide `required`) erfüllt die strict-Teilmenge. **Am 2026-09-21 empirisch bestätigt**: Ein Aufruf mit genau diesem Schema als `response_format` vom Typ `json_schema` und `strict: true` liefert bei `mistralai/Ministral-3-14B-Instruct-2512` wie bei `swiss-ai/Apertus-v1.5-70B` jeweils `finish_reason: stop` und valides JSON mit exakt den zwei Schemafeldern. ADR-0005 trägt damit bei diesem Anbieter nachweislich — und nicht nur laut Doku.
 - **Native Reasoning-Spur:** über `reasoning_effort` steuerbar, laut Doku aber nur als An/Aus (`"none"` schaltet das Denken ab, jeder andere Wert an). Bei den meisten Modellen ist es per Vorgabe an. **Nicht** unterstützt u. a. von `apertus-ai/Apertus-v1.5-70B` und `mistral3`. Das Antwortschema führt `usage.completion_tokens_details.reasoning_tokens`; ob zusätzlich ein Textfeld mit der Spur zurückkommt, geht aus der Doku nicht hervor und ist empirisch zu prüfen.
-- **Modelle:** **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — am **2026-09-21** an einem echten Konto abgerufen (Einzelheiten in 4.2). Die kontoweite Liste führt **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier Sprachmodelle sind als Beta gekennzeichnet, sieben als `coming_soon` — letzteres ist kein Verfügbarkeitskriterium (4.2). Namentlich belegt sind aus der Kontoabfrage u. a. `swiss-ai/Apertus-v1.5-70B` auf dieser Naht und `whisper` auf der Transkriptions-Naht. Die früher hier geführte Modellliste einer Drittquelle ist damit entbehrlich; die Drittquelle steht nur noch als Beleg in den Quellen.
+- **Modelle:** **Verbindlich ist allein `GET /1/ai/models`** mit gültigem Token — am **2026-09-21** an einem echten Konto abgerufen (Einzelheiten in 4.2). Die kontoweite Liste führt **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier Sprachmodelle sind als Beta gekennzeichnet, sieben als `coming_soon` — letzteres ist kein Verfügbarkeitskriterium (4.2). Die früher hier geführte Modellliste einer Drittquelle ist damit entbehrlich; die Drittquelle steht nur noch als Beleg in den Quellen.
+
+  Die acht Sprachmodelle der Kontoabfrage, alphabetisch:
+
+  | Modellname | `max_token_input` | Beta | `info_status` |
+  |---|---|---|---|
+  | `Qwen/Qwen3.5-122B-A10B-FP8` | 200000 | nein | `coming_soon` |
+  | `Qwen/Qwen3.5-397B-A17B-FP8` | 200000 | ja | `coming_soon` |
+  | `google/gemma-4-31B-it` | 100000 | nein | `coming_soon` |
+  | `mistralai/Ministral-3-14B-Instruct-2512` | 100000 | nein | `ready` |
+  | `mistralai/Mistral-Small-4-119B-2603` | 256000 | nein | `coming_soon` |
+  | `moonshotai/Kimi-K2.6` | 256000 | ja | `coming_soon` |
+  | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` | 1000000 | ja | `coming_soon` |
+  | `swiss-ai/Apertus-v1.5-70B` | 100000 | ja | `coming_soon` |
+
+  Das eine Transkriptionsmodell ist `whisper` (`info_status: "ready"`, `version: "3.0"`, `description: "Whisper V3"`) — der einzige Eintrag der ganzen Liste, dessen `description` sich vom `name` unterscheidet. Die übrigen sieben Einträge sind drei Embedding-Modelle (`Qwen/Qwen3-Embedding-8B`, `bge_multilingual_gemma2`, `mini_lm_l12_v2`), zwei Reranker (`BAAI/bge-reranker-v2-m3`, `Qwen/Qwen3-Reranker-0.6B`) und zwei Bildmodelle (`flux`, `photomaker`).
 - **Datenschutz:** Infomaniak wirbt für die AI Services mit Betrieb in eigenen Schweizer Rechenzentren, „Es werden keine Anfragen gespeichert", „Ihre Prompts werden weder gespeichert noch dazu verwendet, die Modelle zu trainieren oder unsere Dienstleistungen zu verbessern" und voller DSG-/DSGVO-Konformität. Inhaltlich ist das genau die Zusage, die ADR-0026 verlangt. Ob sie **vertraglich** in einem AVV steht, ist HITL zu klären.
 
 ### 1.3 Was der bestehende Code schon trägt
@@ -213,7 +228,7 @@ Der kombinierte Filter wirkt als UND (alle 239 Treffer führen beide Parameter).
 
 Verifizierter Umfang der kontoweiten Liste: **16 Einträge**, davon **8 Sprachmodelle** (`type: "llm"`) und **1 Transkriptionsmodell** (`type: "stt"`); der Rest sind Embedding-, Reranker- und Bildmodelle. Vier der Sprachmodelle sind als Beta gekennzeichnet.
 
-**Der Verfügbarkeitsstatus trügt.** Sieben der acht Sprachmodelle sind als `coming_soon` geführt. Ein Testaufruf gegen ein so markiertes Modell wurde am 2026-09-21 regulär beantwortet. Das Feld hinkt der Freischaltung hinterher und taugt deshalb **nicht als Filterkriterium** — wer danach filtert, verbirgt sieben Modelle — mindestens eines davon nachweislich funktionsfähig — und bietet am Ende genau eines an.
+**Der Verfügbarkeitsstatus trügt.** Sieben der acht Sprachmodelle sind als `coming_soon` geführt. Ein Testaufruf gegen ein so markiertes Modell wurde am 2026-09-21 regulär beantwortet. Das Feld hinkt der Freischaltung hinterher und taugt deshalb **nicht als Filterkriterium** — wer danach filtert, verbirgt sieben Modelle — mindestens eines davon nachweislich funktionsfähig — und bietet am Ende genau eines an. Schärfer noch: Das geprüfte Modell (`swiss-ai/Apertus-v1.5-70B`) ist **zugleich** als Beta und als `coming_soon` geführt und beherrscht Structured Output vollständig (1.2). Der Status sagt also nicht nur nichts über die Erreichbarkeit, sondern auch nichts über den Funktionsumfang.
 
 **Keine Henne-Ei-Ordnung.** Weil die kontoweite Liste ohne `product_id` antwortet, hängt der Abruf **allein am Token** und nicht zusätzlich an der Basis-URL. Das Token genügt; die Endpunktwurzel darf danach folgen.
 
