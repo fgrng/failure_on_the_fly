@@ -1,0 +1,31 @@
+{% comment %}
+    Die geladene Vorschlagsliste: ein Vorschlag, keine Prüfung. Sie lebt für
+    sich, damit HTMX sie austauschen und Alpine sie danach beleben kann.
+{% endcomment %}
+{% if fehler %}
+    <p class="modellvorschlaege__fehler" role="status">{{ fehler }}</p>
+{% else %}
+    <div class="modellvorschlaege" x-data="{
+            suche: '',
+            passt(eintrag) {
+                const suchbegriff = this.suche.trim().toLocaleLowerCase();
+                const gesucht = eintrag.dataset.anzeige + ' ' + eintrag.dataset.modellname;
+                return !suchbegriff || gesucht.toLocaleLowerCase().includes(suchbegriff);
+            },
+            einsetzen(wert) {
+                document.getElementById('{{ feld|escapejs }}').value = wert;
+                this.suche = '';
+            },
+        }">
+        <input type="search" x-model="suche" placeholder="Modell suchen" aria-label="Modell suchen">
+        <ul class="vignette-vorschlaege modellvorschlaege__liste" role="listbox">
+            {% for vorschlag in vorschlaege %}
+                <li x-show="passt($el)" data-anzeige="{{ vorschlag.anzeige }}" data-modellname="{{ vorschlag.modellname }}">
+                    <button type="button" data-wert="{{ vorschlag.wert }}" @click="einsetzen($el.dataset.wert)">{{ vorschlag.anzeige }}</button>
+                </li>
+            {% empty %}
+                <li class="system-page-empty">Dieser Anbieter führt hier kein Modell.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}

@@ -62,3 +62,12 @@
     color: var(--color-text-muted);
     font-size: .75rem;
 }
+
+/* Die geladene Modellliste: ein Vorschlag neben dem Feld, kein zweites Formular. */
+.modellvorschlaege input[type="search"] { width: 100%; margin-top: var(--space-1); }
+.modellvorschlaege__liste { max-height: 18rem; overflow-y: auto; }
+.modellvorschlaege__fehler {
+    margin: var(--space-1) 0 0;
+    color: var(--color-danger);
+    font-size: .78rem;
+}
