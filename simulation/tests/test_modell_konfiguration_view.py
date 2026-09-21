@@ -38,6 +38,11 @@ def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
     )
 
 
+def _formularfelder() -> list[str]:
+    """Liefert die Feldnamen in der Reihenfolge, die das Formular führt."""
+    return list(ModellKonfigurationForm().fields)
+
+
 def _anlegedaten(**werte: object) -> dict[str, object]:
     """Liefert einen gültigen Formularbeutel, geändert um die Testwerte."""
     return {
@@ -343,22 +348,27 @@ class ModellKonfigurationFormularTests(TestCase):
     """Die Seite nennt ihre Felder namentlich — vollständig und in Formularfolge."""
 
     def setUp(self) -> None:
-        """Meldet eine Administratorin an und holt die Seite."""
+        """Meldet eine Administratorin an."""
         self.client.force_login(_administratorin())
-        self.response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration")
-        )
 
     def test_nennt_jedes_feld_des_formulars(self) -> None:
         """Kein im Formular geführtes Feld fehlt auf der Seite."""
-        for feld in ModellKonfigurationForm().fields:
-            self.assertContains(self.response, f'name="{feld}"')
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        for feld in _formularfelder():
+            self.assertContains(response, f'name="{feld}"')
 
     def test_haelt_die_reihenfolge_des_formulars(self) -> None:
         """Die namentliche Aufzählung ordnet die Felder wie das Formular."""
-        koerper: str = self.response.content.decode()
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+        koerper: str = response.content.decode()
+
         stellen: list[int] = [
-            koerper.index(f'name="{feld}"') for feld in ModellKonfigurationForm().fields
+            koerper.index(f'name="{feld}"') for feld in _formularfelder()
         ]
 
         self.assertEqual(stellen, sorted(stellen))
