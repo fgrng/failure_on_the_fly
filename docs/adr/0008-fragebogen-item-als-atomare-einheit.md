@@ -10,7 +10,7 @@ Es gibt genau **zwei Andockpunkte**: *nach jeder Vignettensitzung* oder *am Ende
 
 Dieselbe Item-Fassung darf an beide Andockpunkte gebunden sein, je Andockpunkt aber höchstens einmal; die Zuordnung ist ihre Identität.
 
-## Consequences
+## Folgen
 
 - Der „Fragebogen-Editor" aus der Vision pflegt die Item-Bibliothek und deren Zuordnung zu Erhebungen, kein Fragebogen-Objekt.
 - Items sind versionierte Artefakte (ADR-0003): Der Wortlaut eines einmal eingesetzten Items kann nicht nachträglich mutieren.

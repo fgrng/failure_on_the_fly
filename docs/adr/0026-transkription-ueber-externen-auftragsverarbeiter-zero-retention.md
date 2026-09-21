@@ -1,8 +1,15 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0036, ADR-0038]
 ---
 
 # Transkription läuft über einen externen Auftragsverarbeiter mit Zero-Retention
+
+> **Nachgeführt durch ADR-0036 und ADR-0038:** Welche Anbieter zulässig sind
+> und wo die Anbieterbindung liegt, ist dort entschieden: OpenRouter und
+> Infomaniak, Zugangsdaten an der Konfiguration. „Azure OpenAI Whisper" unten
+> ist ein Beispiel von damals, keine Festlegung. Die Zero-Retention-Pflicht,
+> die Einwilligung und die Probelauf-Ausnahme gelten unverändert.
 
 ADR-0007 macht die Spracheingabe zum primären Eingabeweg und verlangt, dass das Audio **unmittelbar in ein Transkript überführt und verworfen** wird, weil die Stimme ein biometrisches, personenbezogenes Datum ist und die in ADR-0006 gebaute Pseudonymität nicht unterlaufen darf. ADR-0007 lässt offen, **wo** transkribiert wird. Diese Entscheidung schließt die Lücke: Die Transkription läuft über eine **externe API**.
 
@@ -27,7 +34,7 @@ Zulässigkeit hängt weiterhin an einer zugesicherten Zero-Retention, aber wer s
 sicherstellt, ist die Betreiber:in bei der Wahl des Anbieters — nicht ein Schalter
 im Aufruf. Damit wird das Tor dieser ADR von einer **technischen** zu einer
 **organisatorischen** Kontrolle. Das ist dieselbe Bewegung, die unten unter
-„Consequences" bereits für die Pseudonymität beschrieben ist, und es ist eine
+„Folgen" bereits für die Pseudonymität beschrieben ist, und es ist eine
 **Absenkung des Schutzniveaus**.
 
 `TRANSKRIPTION_ZERO_RETENTION` bleibt das eine Tor, hinter dem jede externe
@@ -35,7 +42,7 @@ Transkription steht. Es bedeutet nach diesem Nachtrag: Die Betreiber:in erklärt
 dass für den in der Transkriptions-Konfiguration gewählten Anbieter eine
 Zero-Retention-Zusage vorliegt. Fehlt sie, bleibt der Schalter aus.
 
-## Consequences
+## Folgen
 
 - Die Pseudonymität aus ADR-0006 hält **vertraglich**, nicht mehr **technisch**: Sie ruht auf dem AVV und der Zero-Retention-Zusage des Auftragsverarbeiters statt darauf, dass das biometrische Datum den kontrollierten Raum nie verlässt. Das ist eine bewusste Absenkung des Schutzniveaus zugunsten von Qualität und Umsetzbarkeit.
 - Wechselt der Anbieter oder fällt die Zero-Retention-Zusage weg, ist diese Entscheidung neu zu prüfen. Clientseitige (WASM) oder selbst gehostete Transkription bleiben die Rückfalloptionen und würden den Schutz wieder technisch verankern.

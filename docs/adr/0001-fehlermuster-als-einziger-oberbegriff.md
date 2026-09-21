@@ -8,7 +8,7 @@ Fachdidaktisch unterscheidet man die *Fehlvorstellung* (ein fehlerhaftes mentale
 
 Das Fehlermuster ist außerdem **kein eigenständig wiederverwendbares Katalogobjekt**, sondern lebt in genau einer Vignette. Fehlermuster sind an Fach, Thema und Klassenstufe gebunden und im operativen Betrieb nicht von ihrer Aufgabe zu trennen.
 
-## Consequences
+## Folgen
 
 - Die in der Vision genannte „fachübergreifende Bibliothek dokumentierter Fehlvorstellungen" ist ein **emergentes Nebenprodukt** (Filtern und Durchsuchen von Vignetten über ihre Metadaten), kein eigenes Aggregat und kein Produktziel.
 - Fachdidaktisch geschulte Leser:innen werden die Konflation der beiden Begriffe hinterfragen. Sie ist bewusst und betrifft nur das Modell, nicht die fachliche Beschreibung innerhalb einer Vignette.

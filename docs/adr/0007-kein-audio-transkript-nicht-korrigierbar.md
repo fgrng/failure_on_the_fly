@@ -10,7 +10,7 @@ Das Transkript ist **nicht korrigierbar**: Es wird direkt als Eingabe abgeschick
 
 Die simulierte Schüler:in antwortet **in Textform**; es gibt keine Sprachausgabe.
 
-## Consequences
+## Folgen
 
 - Forschende, die Audio auswerten wollen, brauchen eine bewusste, separat einzuwilligende Erweiterung. Das ist ausdrücklich nicht der Default.
 - Die gemessene Größe ist diagnostische Gesprächsführung *einschließlich* der Reibung durch Spracherkennung. Wer stattdessen reine Diagnosequalität messen will, nutzt die Texteingabe.

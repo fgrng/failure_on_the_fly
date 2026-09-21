@@ -22,7 +22,7 @@ Die **Erhebung** pinnt die aktive Modell-Konfiguration bei ihrer Aktivierung. Da
 
 Der Kern kann diesen Pin nicht tragen: Die Modell-Konfiguration hängt ausdrücklich **nicht** an der Vignette, weil sie eine Betriebsgröße ist (ADR-0004). Ohne Pin an der Erhebung würde sie beim Sitzungsstart aufgelöst, und eine Administrator:in könnte mitten in einer laufenden Erhebung das Modell wechseln, weil der Anbieter das alte abkündigt oder es zu teuer wird. Die ersten dreißig Teilnahmen liefen dann auf einem Modell, die letzten zwanzig auf einem anderen. Die Datenspur wüsste es, aber die Erhebung wäre zerschnitten.
 
-## Consequences
+## Folgen
 
 - Wird ein Modell abgekündigt, während eine Erhebung läuft, muss jemand eingreifen und die Erhebung umstellen oder abschließen. Ein sichtbarer, entscheidbarer Vorgang statt eines stillen Bruchs.
 - Die Frage „welche Konfigurationen gab es je?" bleibt beantwortbar, und zwei Sitzungen sind über Fremdschlüssel vergleichbar statt über einen Textvergleich eingebetteter Werte.

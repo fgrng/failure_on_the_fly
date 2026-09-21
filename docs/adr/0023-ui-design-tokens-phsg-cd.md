@@ -22,14 +22,14 @@ Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folg
 - **Vorerst nur Light Mode.** Dark Mode ist nicht ausgeschlossen, aber nicht Teil dieser Entscheidung.
 - **Logo, Bildwelt, PHSG-Pattern: bewusst weggelassen.** Logo ausgeklammert; Kampagnenbilder und Pattern erfordern Freigabe der Stabsstelle Marketing und Kommunikation; ein Tool-UI braucht keine Bildwelt.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Muted-Text `#666666` (CD-Zusammenfassung) vs. Grayscale-700 `#6f7170` (Option A)** — gewählt: **A**. `#666666` ist im offiziellen neuen Farbsystem gar nicht enthalten; es ist der als „altes CD, unverändert" geführte Alt-Wert. `#6f7170` bleibt vollständig in der aktuellen Grauton-Skala. Der etwas geringere Kontrast (~4,7:1 statt ~5,7:1 auf Weiss) ist vertretbar, da Muted-Text nur Sekundärinfo trägt.
 - **Lesetext `#666666` gemäss CD vs. `#383836`** — gewählt: `#383836`. In einem Formular-/Tabellen-Tool ist `#666` als Primärtext auf Dauer zu schwach.
 - **Self-hosted Assets vs. Google-Fonts-/unpkg-CDN** — gewählt: self-hosted. Passt zum Datenschutz-Anspruch eines Forschungsinstruments mit Pseudonymisierung und Einzelinstanz-Deployment; keine Fremd-Requests bei jedem Seitenaufruf.
 - **Möglichst starke Angleichung an die PHSG-Website vs. eigenständiges Tool-UI** — gewählt: eigenständig, CD-konform. Grossflächige Marketing-Farbflächen schaden der Lesbarkeit datendichter Ansichten.
 
-## Consequences
+## Folgen
 
 - Neue Feature-UIs verwenden ausschliesslich die semantischen Tokens, nicht direkt Farb-Hex-Werte oder die `--phsg-*`-Primitive.
 - Direkte Kinder des Hauptbereichs belegen standardmässig alle acht Spalten; schmalere Darstellungen wählen ihren Spaltenbereich ausdrücklich.

@@ -21,12 +21,12 @@ Mit zwei Bindungstabellen ist sie **nicht ausdrückbar**: Keine Tabelle hat eine
 
 Nebenwirkung, die den Ausschlag mitgibt: Alle Fremdschlüssel zeigen nun von `training` und `erhebungen` nach `sitzungen`. `sitzungen` importiert keine seiner beiden Aufrufer-Apps, und der Import-Zyklus, den eine XOR-Teilnahme erzeugt hätte, entsteht nicht.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Eine Teilnahme-Tabelle mit `training`, `stichprobe`, `nutzerkonto`, `token` als nullbaren Spalten und zwei korrelierten Check-Constraints** — verworfen. Die Pseudonymität hinge an den Constraints, und `sitzungen` müsste `training` und `erhebungen` kennen.
 - **Zwei Teilnahme-Modelle, je eines in `training` und `erhebungen`** — verworfen. Die Pseudonymität wäre strukturell, aber der Begriff Teilnahme aus dem Glossar hätte kein Gegenstück im Code; die Sitzung bräuchte zwei nullbare Fremdschlüssel, und `datenspuren` zwei Pfade durch ein und dieselbe Aufzeichnung.
 
-## Consequences
+## Folgen
 
 - `datenspuren` liest je Datenspur eine Teilnahme und joint genau eine Bindung. Welche, sagt ihm die Erhebung, aus der es exportiert; Trainings werden nicht exportiert.
 - Eine Teilnahme ohne Bindung ist technisch möglich und fachlich unsinnig. Sie entsteht nur, wenn Teilnahme und Bindung nicht in derselben Transaktion angelegt werden. Das ist eine Regel des Codes, nicht des Schemas.

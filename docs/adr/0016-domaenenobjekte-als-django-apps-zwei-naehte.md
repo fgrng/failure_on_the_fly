@@ -1,8 +1,18 @@
 ---
-status: accepted
+status: amended
+amended-by: ["#235"]
 ---
 
 # Domänenobjekte als Django-Apps, ein azyklischer Graph, genau zwei Nähte
+
+> **Nachgeführt durch #235:** Eine App `datenspuren` gab es nie. Der Export
+> der Datenspur lebt in `erhebungen/export.py`; `erhebungen` ist damit das
+> Modul, das quer durch die anderen liest, und der Satz unter „Folgen" gilt
+> für dieses Modul. Außerdem ist **Naht** seit #235 kein Glossareintrag mehr,
+> sondern hier definiert: eine Stelle, an der Verhalten ausgetauscht werden
+> kann, ohne den umgebenden Code zu ändern; sie wird nur eingezogen, wo
+> mindestens zwei Adapter tatsächlich existieren. Vermeide: Seam, Port,
+> Interface, Abstraktionsschicht.
 
 Die Module des Projekts werden entlang der **Domänenobjekte aus `CONTEXT.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 
@@ -62,14 +72,14 @@ Bindend sind der Schnitt entlang der Domänenobjekte, die Azyklizität samt Kant
 
 Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates und Tests. Sie folgen aus dem Glossar und dürfen während der Implementierung mit Begründung im Commit angepasst werden, solange der Schnitt erhalten bleibt. Dieses ADR wird dann nachgeführt, nicht abgelöst. Für die Ablage gilt dabei: **Die Views eines Anlasses liegen bei der App dieses Anlasses** — die Trainings-Views bei `training`, die Erhebungs-Views bei `erhebungen`, die Probelauf-Views bei `sitzungen`, jede mit ihren eigenen Routen. Das folgt aus der Kantenrichtung: Views, die `sitzungen` für einen seiner Aufrufer hielte, zwängen es, diesen Aufrufer zu kennen.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Ein framework-freier Domänenkern mit Ports und Adaptern** — verworfen. Er verlangt Repository-Interfaces, hinter denen genau ein Adapter steht. Die Testbarkeit, die er verspricht, liefert `pytest-django` mit einer Datenbank billiger.
 - **Eine App je Persona** (`teilnahme`, `autorenschaft`, `forschung`, `verwaltung`) — verworfen. Vignette und Sitzung würden von mehreren Apps geteilt und landeten in einem `shared`, das den eigentlichen Schnitt trüge. Rollen sind Sichten auf Objekte, keine Objekte.
 - **Englische App-Namen mit einer Übersetzungstabelle im Glossar** — verworfen. Die Tabelle wäre ein zweites, stillschweigend driftendes Glossar, und die _Avoid_-Listen aus `CONTEXT.md` verlören im Code ihre Kraft.
 - **Der Ablauf liegt in den Views von `training` und `erhebungen`** — verworfen. Er wäre nur über HTTP testbar, und die gezogene Randomisierungsreihenfolge hätte keinen Ort außerhalb einer View, obwohl sie zur Datenspur gehört.
 
-## Consequences
+## Folgen
 
 - Der Ablauf führt implizit das Konzept eines Ablauf-Schritts ein: `erhebungen.ablauf.naechster_schritt(teilnahme)` liefert eine Vignette, den berechneten Abschluss-Block oder das Ende. Der Block hat **keine Tabelle**; seine Antwortzeilen sind Datenspur, kein Ablaufmarker. Instruktion, Einwilligungstext, Start- und Endseite sind Textfelder an der Erhebung, die der Ablauf an den Rändern ausliefert, ohne sie als Schritte auszugeben. Dasselbe gilt für den Hinweis, **dass** das Gespräch begrenzt ist, den ADR-0012 verlangt. Ein allgemeiner Ablauf-Schritt als Objekt wird nicht eingeführt.
 - **Antwortversuch** ist ein neuer Begriff und nicht dasselbe wie ein Gesprächsschritt: Er ist flüchtig, er darf scheitern, und er trägt die Fehlversuche mit sich, die ein Gesprächsschritt neben sich stellt. Er enthält auch keine Eingabe — die liegt beim Aufruf bereits vor. Er erzeugt die zweite Hälfte eines Gesprächsschritts, nicht den Gesprächsschritt.

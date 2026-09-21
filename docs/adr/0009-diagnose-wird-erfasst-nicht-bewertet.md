@@ -10,7 +10,7 @@ Die Vignette trägt optional eine **Referenzdiagnose**. Sie ist eine fachdidakti
 
 Damit trägt die Referenzdiagnose auch keinen Bewertungsschlüssel. Falls Scoring je gebaut wird, ist sie ein möglicher Ausgangspunkt, aber kein zugesagter.
 
-## Consequences
+## Folgen
 
 - Automatisches Scoring diagnostischer Freitexte ist forschungsmethodisch heikel und bleibt bewusst außen vor.
 - Die Diagnose ist Bestandteil der **Sitzung**, nicht ein Fragebogen-Item. Fragebogen-Items sind frei gestaltbar und beziehen sich oft auf ganz anderes (Angaben zur Person, Wahrnehmung der Simulation, Akzeptanz des Werkzeugs).

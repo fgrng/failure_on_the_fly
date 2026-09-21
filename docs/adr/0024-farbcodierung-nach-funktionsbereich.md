@@ -1,8 +1,15 @@
 ---
-status: accepted
+status: amended
+amended-by: ["#168"]
 ---
 
 # Farbcodierung nach Funktionsbereich
+
+> **Nachgeführt durch #168:** Die Verwaltung des Simulationskerns (Fassungen
+> anlegen, finalisieren) liegt im System-Bereich und ist **blau**; nur die
+> lesende Kern-Ansicht für Autor:innen bleibt **gelb**. Die Zuordnung unter
+> „Festlegungen" und „Folgen", der Kern wandere vollständig nach Gelb, gilt
+> so nicht mehr.
 
 Erweitert `docs/adr/0023`. Dort ist die Sekundärpalette (Grün, Mint, Blau, Rot, Violett, Gelb × Light/Bright/Dark/Deep) als Primitiv-Token angelegt, aber **ungenutzt** — „bis Kategorie-Kacheln o. Ä. gebaut werden". Diese Entscheidung belegt die Palette: Jeder große Funktionsbereich der Anwendung erhält eine eigene Farbfamilie, damit Teilnehmende, Autor:innen, Forschende und Administrator:innen auf einen Blick erkennen, in welchem Bereich sie sich befinden.
 
@@ -19,13 +26,13 @@ Erweitert `docs/adr/0023`. Dort ist die Sekundärpalette (Grün, Mint, Blau, Rot
 - **Anwendung der Töne.** Wie in ADR-0023: farbige Kacheln/Header aus den **Dark**-Tönen mit weisser Schrift, ruhige Flächen/Badges aus den **Light**-Tönen.
 - **Sonderregel Gelb.** Bei Gelb trägt nur der **Deep**-Ton sicheren Kontrast mit weisser Schrift; `Dark` (#967231) erreicht auf Weiss nur ~3:1. Für Gelb gilt darum abweichend: **dunkle Schrift auf hellem Gelb** statt „Dark-Ton + weiss".
 
-## Considered Options
+## Erwogene Optionen
 
 - **Rot als Bereichsfarbe (System) vs. Rot als reine Warnfarbe** — gewählt: **Warnfarbe**, System auf **Blau**. Rot ist konventionell die Farbe für Fehler und destruktive Aktionen. Als zugleich flächige Bereichsfarbe würde es das Signal „Achtung, gefährlich" verwässern. Blau war ohnehin die einzige noch freie Sekundärfamilie.
 - **Bereichsfarbe als lokaler Akzent (Buttons/Links) vs. nur Chrome tönen** — gewählt: **nur Chrome**. Durchgängig eingefärbte Bedienelemente je Bereich kosten Konsistenz und scheitern am Kontrast — Gelb ist als Button-/Link-Farbe praktisch untauglich. Grün als einzige Interaktionsfarbe bleibt überall gleich lesbar.
 - **Blau als Reserve halten vs. für System nutzen** — gewählt: **nutzen**. Das Freimachen von Rot als Warnfarbe verlangte eine Ersatzfarbe für den System-Bereich; Blau ist dafür naheliegend (technisch-neutrale Konnotation).
 
-## Consequences
+## Folgen
 
 - **Verfeinerte Zuordnung gegenüber der ersten Fassung.** Die **Trainings** wandern vom Autoren-Bereich (Gelb) in den Teilnahme-/Übungs-Bereich (**Grün**), weil Katalog, Trainingsstart und Sitzung ein zusammenhängendes Übungserlebnis bilden. Der **Simulationskern** wandert vom System-Bereich (Blau) in den Autoren-/Entwicklungs-Bereich (**Gelb**), weil er zum Aufbau der Simulationsinhalte gehört. **Modell-Konfiguration** und **Administration** bleiben System (Blau). Die Sidebar-Navigation (`static/css/navigation.css`, `templates/includes/sidebar.html`) setzt genau diese Zuordnung um.
 - Die Sekundärpalette aus ADR-0023 ist damit nicht mehr ungenutzt. `static/css/tokens.css` erhält semantische Bereichs-Tokens (z. B. `--color-area-authoring-*`, `--color-area-research-*`, `--color-area-system-*`), abgeleitet aus den `--phsg-*`-Primitiven — Feature-UIs verwenden diese Tokens, nicht direkt Hex-Werte.
