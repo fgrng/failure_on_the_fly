@@ -61,22 +61,20 @@ Modellverhaltens auf, bei `fake` ausschließlich das Skript. Neben dem
 Sprachmodell schlägt der Knopf „Modelle und Basis-URL laden“ die Modelle des
 gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
 `infomaniak` die Sprachmodelle des Kontos. Die beiden unterscheiden sich darin,
-was der Abruf verlangt — `openrouter` beantwortet seine Modellliste öffentlich,
-ganz ohne Zugangsdaten; `infomaniak` erst gegen das im Formular eingetippte
-Token, das dafür nicht gespeichert sein muss: weder eine gespeicherte Fassung
-noch die Basis-URL sind nötig. Bei `fake` erscheint der Knopf nicht; dieser
-Anbieter telefoniert nicht nach außen, es findet kein Abruf statt. Bei
-`infomaniak` füllt derselbe Druck zusätzlich die Basis-URL: Aus der
+was der Abruf verlangt: `openrouter` beantwortet seine Modellliste öffentlich,
+ganz ohne Zugangsdaten, `infomaniak` erst gegen das im Formular eingetippte
+Token — weder eine gespeicherte Fassung noch die Basis-URL sind dafür nötig.
+Bei `fake` erscheint der Knopf nicht; dieser Anbieter telefoniert nicht nach
+außen. Bei `infomaniak` füllt derselbe Druck zusätzlich die Basis-URL: Aus der
 Produktabfrage des Kontos entsteht die Endpunktwurzel des Sprachmodells. Sie
 entsteht nur bei genau einem AI-Produkt — ein geratenes wäre schlimmer als ein
-leeres Feld — und überschreibt nie eine schon getippte Angabe: Ein bereits
-gefülltes Feld bleibt unangetastet. Die Liste wird nur auf Druck geholt und
-bleibt ein Vorschlag — ein Name, den sie nicht kennt, ist weiterhin eintragbar,
-und die eingesetzte Wurzel ist frei überschreibbar. Der Vorschlag trifft keine
-Aussage darüber, ob ein Modell taugt: Was die Liste führt, kann an dieser Naht
-trotzdem scheitern, und was sie nicht führt, kann laufen. Die prüfende Instanz
-bleibt der Probelauf — er ist es, der ein untaugliches Modell entlarvt, bevor
-es eine Erhebung erreicht.
+leeres Feld — und überschreibt nie eine schon getippte Angabe. Die Liste wird
+nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie nicht kennt,
+ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
+Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste führt, kann an
+dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
+prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
+bevor es eine Erhebung erreicht.
 Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
 Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
 genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
@@ -102,9 +100,9 @@ nicht —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die
 Endpunktwurzel der Transkription, die bei diesem Anbieter unter einer anderen
 API-Version liegt als die des Sprachmodells. Der eingesetzte Wert trägt hier
 bei beiden Anbietern kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern
-reicht den Namen roh an die Route des Anbieters durch. Abgefragt wird mit dem
-getippten Token; bei `infomaniak` ist es dafür auch dann nötig, wenn schon
-eines hinterlegt ist.
+reicht den Namen roh an die Route des Anbieters durch. Abgefragt wird wie an der
+Sprachmodell-Naht: `openrouter` ohne Zugangsdaten, `infomaniak` gegen das
+getippte Token — auch dann, wenn schon eines hinterlegt ist.
 Ob überhaupt transkribiert wird, entscheidet weiterhin die Instanz über
 `TRANSKRIPTION_ZERO_RETENTION` in der Umgebung — die Zusage der Betreiber:in
 gehört nicht in dasselbe Formular wie die Anbieterwahl.
