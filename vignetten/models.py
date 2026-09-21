@@ -189,8 +189,7 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         kern: Simulationskern = Simulationskern.objects.filter(
             zustand=Simulationskern.Zustand.FINAL
         ).latest("finalisiert_am", "pk")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        historie.eigentuemerinnen.add(konto)
+        historie: Vignettenhistorie = Vignettenhistorie.objects.anlegen(konto)
         return self._erstellen(
             historie=historie, gepinnter_kern=kern, **zufaellige_akteure()
         )

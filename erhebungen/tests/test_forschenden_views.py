@@ -101,7 +101,7 @@ class ErhebungenForschendenRollenTests(TestCase):
     ) -> None:
         """Die Erhebungs-UI ist von der öffentlichen Teilnahme getrennt geschützt."""
         konto: Konto = get_user_model().objects.create_user(username="grace")
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+        erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
         self.client.force_login(konto)
 
         for url in (
@@ -122,7 +122,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        Erhebung.objects.create(name="Fremde Erhebung", eigentuemerin=grace)
+        Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
         self.client.force_login(ada)
 
         angelegt: HttpResponse = self.client.post(
@@ -145,14 +145,10 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
-        Erhebung.objects.create(name="Noch Entwurf", eigentuemerin=ada)
-        finale: Erhebung = Erhebung.objects.create(
-            name="Schon final", eigentuemerin=ada
-        )
+        Erhebung.objects.anlegen(ada, name="Noch Entwurf")
+        finale: Erhebung = Erhebung.objects.anlegen(ada, name="Schon final")
         finale.finalisieren()
-        abgelegte: Erhebung = Erhebung.objects.create(
-            name="Längst abgelegt", eigentuemerin=ada
-        )
+        abgelegte: Erhebung = Erhebung.objects.anlegen(ada, name="Längst abgelegt")
         abgelegte.finalisieren()
         abgelegte.archivieren()
         self.client.force_login(ada)
@@ -169,9 +165,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
     def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
         """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Fremde Erhebung", eigentuemerin=grace
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
         administratorin: Konto = get_user_model().objects.create_user(username="ada")
         administratorin.is_superuser = True
         administratorin.save()
@@ -189,16 +183,16 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
         """Legt eine Forschende mit einem Entwurf an."""
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.entwurf: Erhebung = Erhebung.objects.create(
-            name="Eigener Entwurf", eigentuemerin=self.ada
+        self.entwurf: Erhebung = Erhebung.objects.anlegen(
+            self.ada, name="Eigener Entwurf"
         )
         self.client.force_login(self.ada)
 
     def test_fremde_erhebung_ist_nicht_erreichbar(self) -> None:
         """Andere Eigentümerinnen erhalten keine Information über eine Erhebung."""
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_erhebung: Erhebung = Erhebung.objects.create(
-            name="Fremde Erhebung", eigentuemerin=grace
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(
+            grace, name="Fremde Erhebung"
         )
 
         response: HttpResponse = self.client.get(
@@ -218,9 +212,7 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
         geloescht: HttpResponse = self.client.post(
             reverse("erhebungen:loeschen", args=[self.entwurf.pk])
         )
-        finale: Erhebung = Erhebung.objects.create(
-            name="Finale Erhebung", eigentuemerin=self.ada
-        )
+        finale: Erhebung = Erhebung.objects.anlegen(self.ada, name="Finale Erhebung")
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             sprachmodell="fake"
         )
@@ -242,9 +234,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         grace.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Geteilte Erhebung", eigentuemerin=ada
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.post(
@@ -280,9 +270,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         grace.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Laufende Erhebung", eigentuemerin=ada
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Laufende Erhebung")
         ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
         erhebung.finalisieren()
         Stichprobe.objects.create(
@@ -304,9 +292,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         """Die Bedienung kann eine aktive Erhebung nicht eigentümerlos machen."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Geschützte Erhebung", eigentuemerin=ada
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geschützte Erhebung")
         self.client.force_login(ada)
 
         self.client.post(
@@ -320,9 +306,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Geschützte Erhebung", eigentuemerin=ada
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geschützte Erhebung")
         self.client.force_login(ada)
 
         hinzufuegen: HttpResponse = self.client.post(
@@ -343,9 +327,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
         administratorin: Konto = get_user_model().objects.create_user(
             username="linus", is_superuser=True
         )
-        erhebung: Erhebung = Erhebung.objects.create(
-            name="Fremde Erhebung", eigentuemerin=grace
-        )
+        erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
         self.client.force_login(administratorin)
 
         self.assertContains(
@@ -379,9 +361,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=self.ada
-        )
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         self.eigene_finale: Vignette = _finale_vignette_anlegen(self.ada, "Mathematik")
@@ -989,9 +969,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_erhebung: Erhebung = Erhebung.objects.create(
-            name="Fremd", eigentuemerin=grace
-        )
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
 
         final_entfernen: HttpResponse = self.client.post(
             reverse(
@@ -1052,9 +1030,7 @@ class ErhebungsansichtAnbieterTests(TestCase):
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
         self.konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
-        self.erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=self.ada
-        )
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         self.erhebung.finalisieren()
         self.client.force_login(self.ada)
 
@@ -1089,9 +1065,7 @@ class ErhebungenFinalisierenTests(TestCase):
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=self.ada
-        )
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         self.konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.force_login(self.ada)
@@ -1166,9 +1140,7 @@ class StichprobenAnlegenTests(TestCase):
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=self.ada
-        )
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
@@ -1228,11 +1200,9 @@ class StichprobenAnlegenTests(TestCase):
     def test_laesst_stichproben_nur_auf_eigenen_finalen_erhebungen_an(self) -> None:
         """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""
 
-        entwurf: Erhebung = Erhebung.objects.create(
-            name="Entwurf", eigentuemerin=self.ada
-        )
+        entwurf: Erhebung = Erhebung.objects.anlegen(self.ada, name="Entwurf")
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde: Erhebung = Erhebung.objects.create(name="Fremd", eigentuemerin=grace)
+        fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
         zeitraum: dict[str, str] = {
             "beginn": "2026-08-01T09:00",
             "ende": "2026-08-31T17:00",
@@ -1271,9 +1241,7 @@ class ErhebungenArchivierenTests(TestCase):
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
         self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.create(
-            name="Brüche", eigentuemerin=self.ada
-        )
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
@@ -1417,9 +1385,9 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(
+        erhebung: Erhebung = Erhebung.objects.anlegen(
+            ada,
             name="Brüche & Zahlen",
-            eigentuemerin=ada,
             instruktionstext="Zeile eins\nZeile zwei",
             einwilligungstext="",
         )
@@ -1498,7 +1466,7 @@ class ErhebungsExportTests(TestCase):
             "erstes-modell", parameter={"temperature": 0.2}
         )
         ModellKonfiguration.objects.aktivieren(erste_konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         erhebung.finalisieren()
         zweite_konfiguration: ModellKonfiguration = _forschungskonfiguration(
             "zweites-modell", parameter={"temperature": 0.7}
@@ -1720,7 +1688,7 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         erhebung.finalisieren()
         self.client.force_login(ada)
 
@@ -1765,7 +1733,7 @@ class ErhebungsExportTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         erhebung.finalisieren()
         self.client.force_login(ada)
 
@@ -1785,7 +1753,7 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         erhebung.finalisieren()
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
@@ -1887,7 +1855,7 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         erhebung.finalisieren()
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
@@ -2087,11 +2055,9 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         grace.groups.add(Group.objects.get(name="Forschende:r"))
-        entwurf: Erhebung = Erhebung.objects.create(
-            name="Leerer Entwurf", eigentuemerin=ada
-        )
-        fremde_erhebung: Erhebung = Erhebung.objects.create(
-            name="Fremde Erhebung", eigentuemerin=grace
+        entwurf: Erhebung = Erhebung.objects.anlegen(ada, name="Leerer Entwurf")
+        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(
+            grace, name="Fremde Erhebung"
         )
         self.client.force_login(ada)
 
@@ -2142,7 +2108,7 @@ class ErhebungsExportTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration)
-        erhebung: Erhebung = Erhebung.objects.create(name="Archiv", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Archiv")
         erhebung.finalisieren()
         Stichprobe.objects.create(
             erhebung=erhebung,
@@ -2173,7 +2139,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         nach_sitzung_zwei: FragebogenItem = _finales_item_anlegen(
             ada, "Nach Sitzung zwei"
         )
@@ -2231,7 +2197,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=ada)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(sprachmodell="fake")
         )

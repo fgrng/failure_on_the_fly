@@ -1,6 +1,6 @@
 """Der Eigentümer-Kreis, den alle bestandstragenden Modelle gemeinsam tragen."""
 
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from django.db import models
 
@@ -11,7 +11,13 @@ if TYPE_CHECKING:
 
 
 class EigentuemerKreisQuerySet:
-    """Die Sichtbarkeitsregel des Eigentümer-Kreises für jedes Bestands-QuerySet."""
+    """Sichtbarkeit und Anlegen des Eigentümer-Kreises für jedes Bestands-QuerySet."""
+
+    def anlegen(self, konto: "Konto", **kwargs: object) -> Any:
+        """Legt einen Bestand an und trägt das Konto als erste Eigentümerin ein."""
+        bestand = self.create(**kwargs)
+        bestand.eigentuemerinnen.add(konto)
+        return bestand
 
     def sichtbar_fuer(self, konto: "Konto") -> Self:
         """Liefert eigene Bestände oder alle für die Administration."""

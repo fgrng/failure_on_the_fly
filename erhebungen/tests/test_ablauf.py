@@ -57,7 +57,7 @@ def test_feste_reihenfolge_setzt_mit_der_naechsten_ungespielten_vignette_fort() 
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     erste: Vignette = _finale_vignette_anlegen(konto)
     zweite: Vignette = _finale_vignette_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
@@ -98,7 +98,7 @@ def test_ablauf_liefert_nach_den_vignetten_den_geordneten_abschluss_block() -> N
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(name="Brüche", eigentuemerin=konto)
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     vignette: Vignette = _finale_vignette_anlegen(konto)
     item: FragebogenItem = _finales_item_anlegen(konto)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
@@ -142,10 +142,8 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
     konto: Konto = Konto.objects.create_user(username="ada")
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
-    erhebung: Erhebung = Erhebung.objects.create(
-        name="Brüche",
-        eigentuemerin=konto,
-        randomisierung=Erhebung.Randomisierung.ZUFAELLIG,
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(3)]
     for vignette in vignetten:

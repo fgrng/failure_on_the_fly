@@ -1,17 +1,11 @@
 """Datenmodelle für kuratierte Trainings."""
 
-from typing import TYPE_CHECKING
-
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import m2m_changed, post_save
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
-
-if TYPE_CHECKING:
-    from konten.models import Konto
-
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
@@ -20,12 +14,6 @@ _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
 
 class TrainingQuerySet(EigentuemerKreisQuerySet, models.QuerySet["Training"]):
     """Abfragen über Trainings."""
-
-    def anlegen(self, konto: "Konto", **kwargs: object) -> "Training":
-        """Legt ein Training an und trägt dessen erste Eigentümerin ein."""
-        training: Training = self.create(**kwargs)
-        training.eigentuemerinnen.add(konto)
-        return training
 
     def update(self, **kwargs: object) -> int:
         """Hält Zustandswechsel an der Lebenszyklus-Naht."""
