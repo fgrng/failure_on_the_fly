@@ -139,8 +139,7 @@
 }
 
 .sidebar-token strong {
-    /* Feste Laufweite, damit das eindeutige Token-Alphabet ablesbar bleibt. */
-    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    font-family: var(--font-mono);
     font-size: 1rem;
     letter-spacing: .08em;
     word-break: break-all;

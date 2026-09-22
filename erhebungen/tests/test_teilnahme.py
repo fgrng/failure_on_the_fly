@@ -228,16 +228,19 @@ class ErhebungsteilnahmeTests(TestCase):
         # Prüft den systemseitigen Pflicht-Baustein unter dem Abschlusstext.
 
         seite: str = antwort.content.decode()
-        self.assertIn(token, seite)
         self.assertIn(self.erhebung.abschlusstext, seite)
+        self.assertIn("section-abschrift", seite)
         self.assertLess(
             seite.index(self.erhebung.abschlusstext),
             seite.index("section-abschrift"),
-            "Der Hinweis steht über dem Abschlusstext der Forschenden.",
+            "Der Hinweis steht nicht unter dem Abschlusstext der Forschenden.",
         )
-        self.assertIn("Abschrift", seite)
-        self.assertIn("Ohne dieses Token", seite)
-        self.assertIn(f'href="{reverse("training:abschriften")}"', seite)
+        # Ab der Überschrift gelesen, damit das Token der Seitenleiste nicht
+        # für den Pflicht-Baustein einspringt.
+        baustein: str = seite[seite.index("section-abschrift") :]
+        self.assertIn(token, baustein)
+        self.assertIn("Ohne dieses Token", baustein)
+        self.assertIn(f'href="{reverse("training:abschriften")}"', baustein)
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
@@ -484,15 +487,13 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:debrief", args=[bindung.token]),
             {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
         )
-        self.assertRedirects(
-            abschluss_antwort,
-            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
-        )
         abschluss_url: str = reverse(
             "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
         )
-        abschluss: HttpResponse = self.client.get(abschluss_url)
-        self._abschlussseite_erklaert_die_abschrift(abschluss, bindung.token)
+        self.assertRedirects(abschluss_antwort, abschluss_url)
+        self._abschlussseite_erklaert_die_abschrift(
+            self.client.get(abschluss_url), bindung.token
+        )
         # Wer die Seite neu lädt, findet Token und Hinweis unverändert wieder.
         self._abschlussseite_erklaert_die_abschrift(
             self.client.get(abschluss_url), bindung.token

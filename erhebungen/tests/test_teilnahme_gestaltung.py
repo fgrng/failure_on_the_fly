@@ -34,12 +34,15 @@ class _Feld:
 
 
 _FORMULAR: tuple[_Feld, ...] = (_Feld(),)
+# Das Token steht in der URL der Folgeseite ("token") und im Kontextprozessor
+# der Seitenleiste ("teilnahme_token"); beide Wege zeigen auf dieselbe Teilnahme.
+_TOKEN: str = "ABCD-1234"
 _KONTEXT: dict[str, object] = {
     "erhebung": _ERHEBUNG,
     "stichprobe": _STICHPROBE,
     "formular": _FORMULAR,
-    "token": "ABCD-1234",
-    "teilnahme_token": "ABCD-1234",
+    "token": _TOKEN,
+    "teilnahme_token": _TOKEN,
 }
 _SEITEN: tuple[str, ...] = (
     "erhebungen/einwilligung.html",

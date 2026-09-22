@@ -92,6 +92,8 @@
     /* ---- Typografie ---- */
     --font-heading: "Platypi", Georgia, serif;
     --font-body: "Albert Sans", system-ui, sans-serif;
+    /* Feste Laufweite, damit das eindeutige Token-Alphabet ablesbar bleibt. */
+    --font-mono: ui-monospace, "SFMono-Regular", "Consolas", monospace;
 
     /* ---- Spacing: 8-px-Abstandsraster ---- */
     --space-1: 8px;
