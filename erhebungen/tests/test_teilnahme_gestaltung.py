@@ -6,6 +6,7 @@ werden dafür ohne Datenbank gerendert — ihre Inhalte und ihr Verhalten prüfe
 die HTTP-Tests in `test_teilnahme.py`.
 """
 
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -51,6 +52,8 @@ _FORMULARSEITEN: tuple[str, ...] = (
     "erhebungen/itemblock.html",
 )
 _TEILVORLAGE: str = "erhebungen/includes/itemblock_form.html"
+_BESCHRIFTUNGSVERWEIS: re.Pattern[str] = re.compile(r'aria-labelledby="([^"]+)"')
+_KNOPF: re.Pattern[str] = re.compile(r"<button[^>]*>")
 
 
 def _gerendert(vorlage: str) -> str:
@@ -91,18 +94,22 @@ class TeilnahmeseitenGestaltungTests(SimpleTestCase):
         for vorlage in _SEITEN:
             with self.subTest(vorlage=vorlage):
                 seite: str = _gerendert(vorlage)
+                verweise: list[str] = _BESCHRIFTUNGSVERWEIS.findall(seite)
 
-                self.assertIn("aria-labelledby=", seite)
+                self.assertTrue(verweise, "Die Seite beschriftet keinen Abschnitt.")
+                for verweis in verweise:
+                    self.assertIn(f'id="{verweis}"', seite)
 
     def test_formularseiten_verwenden_die_vorhandenen_knopfklassen(self) -> None:
         """Knöpfe tragen die gemeinsame Knopfklasse statt nackter Vorgaben."""
 
         for vorlage in _FORMULARSEITEN:
             with self.subTest(vorlage=vorlage):
-                seite: str = _gerendert(vorlage)
+                knoepfe: list[str] = _KNOPF.findall(_gerendert(vorlage))
 
-                self.assertIn('class="button"', seite)
-                self.assertNotIn("<button type=", seite)
+                self.assertTrue(knoepfe, "Die Seite zeigt keinen Knopf.")
+                for knopf in knoepfe:
+                    self.assertIn('class="button"', knopf)
 
     def test_keine_teilnahmeseite_fuehrt_eigene_farbwerte_ein(self) -> None:
         """Farben kommen aus den semantischen Tokens, nicht aus der Vorlage."""
@@ -131,4 +138,4 @@ class TeilnahmeseitenGestaltungTests(SimpleTestCase):
 
         self.assertIn("<fieldset", teilvorlage)
         self.assertIn("<legend", teilvorlage)
-        self.assertIn("Wie war die Sitzung?", teilvorlage)
+        self.assertIn(_Feld.label, teilvorlage)
