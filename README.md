@@ -175,7 +175,9 @@ später eine Abschrift der eigenen Sitzungen ins Nutzerkonto holen lässt und
 dass es ohne das Token keine Abschrift gibt, samt Link auf die Token-Eingabe.
 Ein erneuter Aufruf der Abschlussseite zeigt beides wieder.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
-kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,
+kann ohne Diagnose abgebrochen werden. Ist die Diagnose abgegeben, bleibt sie im
+Debrief sichtbar, lässt sich aber nicht mehr ändern; hängt an der Sitzung ein
+Fragebogenblock, erscheint er darunter als eigener Abschnitt. Scheitert ein Antwortversuch endgültig,
 bleibt der Gesprächsschritt ohne Antwort erhalten.
 Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetzbar.
 

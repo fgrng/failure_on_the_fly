@@ -246,8 +246,23 @@
 .sitzung-aktion-link { border: 0; background: transparent; color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer; }
 .sitzung-aktion-link--ruhig { color: var(--color-text-muted); font-weight: 500; }
 
-.diagnose { margin-top: var(--space-4); }
-.diagnose .button { margin-top: var(--space-2); }
+/* Dasselbe Raster wie im Gespräch, erweitert um das Transkriptfeld darunter. */
+.diagnose {
+    grid-template-areas:
+        "beschriftung beschriftung"
+        "eingabe      senden"
+        "eingabe      aufnahme"
+        "transkript   transkript"
+        "hinweis      hinweis";
+}
+
+.diagnose__transkript { grid-area: transkript; padding: var(--space-2); border-radius: 14px; }
+
+/* Abgegeben heißt endgültig - nicht "bitte warten" wie im Gespräch. */
+.diagnose :disabled { cursor: not-allowed; }
+
+/* Der Fragebogenblock hängt als eigener Abschnitt unter der Sitzung. */
+.sitzung-anhang > .form { margin-top: var(--space-4); }
 
 @media (max-width: 1050px) {
     .sitzung-seite { grid-column: 1 / -1; }

@@ -7,5 +7,13 @@
     {% include "sitzungen/includes/sitzung_debrief.html" %}
 {% endif %}
 {% if anhang %}
-    {{ anhang|safe }}
+    {# Der Anhang hängt unter der Sitzung; nach einem vollen Seitenwechsel steht man sonst wieder oben und übersieht ihn. #}
+    <section id="sitzung-anhang" class="sitzung-abschnitt sitzung-anhang" aria-labelledby="sitzung-anhang-titel">
+        <header class="sitzung-abschnitt-kopf">
+            <span>Erhebung · Fragebogen</span>
+            <h1 id="sitzung-anhang-titel">Fragen zu dieser Sitzung</h1>
+        </header>
+        {{ anhang|safe }}
+    </section>
+    <script>document.getElementById("sitzung-anhang").scrollIntoView({block: "start"});</script>
 {% endif %}

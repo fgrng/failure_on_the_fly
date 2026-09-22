@@ -29,7 +29,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
+from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import (
     DBSink,
     GespraechsschrittDaten,
@@ -394,6 +394,11 @@ def persistierten_debrief_anzeigen(
 ) -> HttpResponse:
     # Rendert den Debrief einer persistierten Sitzung.
 
+    # Liegt die Diagnose bereits vor, zeigt das Formular sie nur noch an:
+    # Sie ist je Sitzung einmalig und darf sich nicht nachträglich ändern.
+    abgegebene_diagnose: str | None = (
+        Diagnose.objects.filter(sitzung=sitzung).values_list("text", flat=True).first()
+    )
     return sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
@@ -405,6 +410,7 @@ def persistierten_debrief_anzeigen(
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sitzung.pk,
         anhang=anhang,
+        abgegebene_diagnose=abgegebene_diagnose,
     )
 
 

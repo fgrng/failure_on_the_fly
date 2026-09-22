@@ -6,16 +6,19 @@
     </header>
     <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell einer Lehrperson am Tisch im Gespräch, Gesicht bewusst unausgeformt; auf dem Tisch zwei Kaffeebecher und Notizblätter." width="800" height="800" loading="lazy" decoding="async">
     <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
-    <form id="diagnose-formular" class="diagnose" method="post" action="{{ navigation.debrief_url }}">
-        {% csrf_token %}
-        {% if sitzung_pk %}<input type="hidden" name="sitzung_pk" value="{{ sitzung_pk }}">{% endif %}
-        <label for="diagnose">Was ist Ihnen aufgefallen?</label>
-        <textarea id="diagnose" name="diagnose" rows="4" required></textarea>
-        <textarea id="diagnose-transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
-        <input type="hidden" name="eingabemodus" value="getippt">
-        <button class="button" type="submit">{{ navigation.bezeichnung }} beenden</button>
-    </form>
-    {% if spracheingabe_verfuegbar %}
-        {% include "sitzungen/includes/spracheingabe.html" with formular_id="diagnose-formular" eingabe_id="diagnose-transkript" tastatureingabe_id="diagnose" transkription_url=navigation.transkription_url automatisch_absenden="false" aufnahme_titel="Diagnose aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn dieser Teil Ihrer Diagnose vollständig ist." %}
-    {% endif %}
+    {# Dieselbe Hülle wie die Gesprächseingabe: Die Diagnose erbt deren Raster. #}
+    <div class="gespraechseingabe">
+        <form id="diagnose-formular" class="gespraechseingabe__formular diagnose" method="post" action="{{ navigation.debrief_url }}">
+            {% csrf_token %}
+            {% if sitzung_pk %}<input type="hidden" name="sitzung_pk" value="{{ sitzung_pk }}">{% endif %}
+            <label for="diagnose">Was ist Ihnen aufgefallen?</label>
+            <textarea id="diagnose" name="diagnose" rows="4" required{% if abgegebene_diagnose %} readonly{% endif %}>{{ abgegebene_diagnose|default:"" }}</textarea>
+            <textarea id="diagnose-transkript" class="diagnose__transkript" rows="4" readonly hidden aria-label="Aufgenommene Teile Ihrer Diagnose"></textarea>
+            <input type="hidden" name="eingabemodus" value="getippt">
+            <button class="button gespraechseingabe__senden" type="submit"{% if abgegebene_diagnose %} disabled{% endif %}>Diagnose abgeben</button>
+            {% if spracheingabe_verfuegbar %}
+                {% include "sitzungen/includes/spracheingabe.html" with formular_id="diagnose-formular" eingabe_id="diagnose-transkript" tastatureingabe_id="diagnose" transkription_url=navigation.transkription_url automatisch_absenden="false" aufnahme_titel="Diagnose aufnehmen" aufnahme_hinweis="Optional: Starten Sie die Spracheingabe und beenden Sie sie, wenn dieser Teil Ihrer Diagnose vollständig ist." deaktiviert=abgegebene_diagnose deaktiviert_hinweis="Ihre Diagnose ist abgegeben und lässt sich nicht mehr ändern." %}
+            {% endif %}
+        </form>
+    </div>
 </section>

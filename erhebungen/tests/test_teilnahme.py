@@ -1076,6 +1076,24 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(itemantwort.sitzung_id, Sitzung.objects.get().pk)
         self.assertIsNone(itemantwort.freitext)
 
+    def test_abgegebene_diagnose_ist_im_debrief_gesperrt(self) -> None:
+        """Neben dem Fragebogenblock bleibt die Diagnose sichtbar, aber unveränderlich."""
+
+        self._vignette_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+
+        inhalt: str = antwort.content.decode()
+        self.assertIn("Bruchfehler</textarea>", inhalt)
+        self.assertIn('name="diagnose" rows="4" required readonly', inhalt)
+        self.assertIn('type="submit" disabled>Diagnose abgeben', inhalt)
+
     def test_zwei_vignetten_fuehren_ueber_ihre_bloecke_zum_abschluss(self) -> None:
         """Die Blockfolge reicht über zwei Sitzungen bis zum Abschluss."""
 

@@ -175,6 +175,7 @@ def sitzung_anzeigen(
     spracheingabe_verfuegbar: bool = False,
     sitzung_pk: int | None = None,
     anhang: str | None = None,
+    abgegebene_diagnose: str | None = None,
 ) -> HttpResponse:
     """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
 
@@ -197,6 +198,7 @@ def sitzung_anzeigen(
         "navigation": navigation,
         "sitzung_pk": sitzung_pk,
         "anhang": anhang,
+        "abgegebene_diagnose": abgegebene_diagnose,
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
