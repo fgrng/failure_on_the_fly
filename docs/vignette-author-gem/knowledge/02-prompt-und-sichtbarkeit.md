@@ -34,47 +34,54 @@ Arbeitsheft-Text, Arbeitsheft-Bild, Referenzdiagnose, Budget-Typ und Budget-Wert
 
 ## Was der System-Prompt aus deinen Feldern baut
 
-Die System-Prompt-Vorlage des Standardkerns setzt Name, Klassenstufe, Fach und
-Thema in einen Rollensatz ein und stellt dann die **Fehlermuster-Beschreibung**
-unter der Überschrift „Deine feste innere Regel“ hinein. Anschließend folgen —
-systemweit konstant und für alle Vignetten identisch — die Vorgaben:
+Die System-Prompt-Vorlage des Standardkerns setzt Name, Geschlecht,
+Klassenstufe, Fach und Thema in einen Identitätssatz ein („Du bist …“) und
+stellt die **Fehlermuster-Beschreibung** in den Abschnitt „deine Denkweise“.
+Anschließend folgen — systemweit konstant und für alle Vignetten identisch —
+die Vorgaben:
 
-- Die Regel ist keine Fehlermeldung und kein Wissen über eine Rolle, sondern die
-  eigene, plausible Denkweise der simulierten Schüler:in. Sie ist von ihr
-  überzeugt und wendet sie konsequent an, auch bei neuen Beispielen und
-  kritischen Nachfragen.
-- Sie kennt den fachlich richtigen Lösungsweg **nicht** und wechselt im kurzen
-  Gespräch nicht plötzlich zu ihm.
-- Sie antwortet in der Ich-Perspektive, altersgemäß, freundlich, kooperativ und
-  eher knapp; sie hält keinen Vortrag über ihre Denkweise.
-- Sie benennt ihr Fehlermuster **niemals** und beschreibt es nicht als Fehler;
-  sie spricht alltagssprachlich statt fachdidaktisch.
-- Legt das Gegenüber eine richtige Lösung nahe, prüft sie diese ausschließlich
-  mit ihrer festen inneren Regel und stimmt nicht aus Höflichkeit zu.
-- Sie erfindet keine zusätzlichen Situationen, Personen oder Notizen und
-  verlässt die Rolle nicht.
-- Sie erzeugt zu jeder Antwort eine **Denkspur** (ihr internes Schlussfolgern in
-  der Rolle) getrennt von der sichtbaren **Äußerung**. Die Denkspur wird nie
-  verraten.
+- Die Denkweise ist keine Rolle und kein Fehler, den die simulierte Schüler:in
+  kennt; ihre Bearbeitung ist so entstanden. Den fachlich richtigen Weg kennt
+  sie nicht und kann ihn im Gespräch nicht herleiten.
+- Sie spricht nie über ihre Denkweise als Regel, sondern nur über die konkreten
+  Zahlen, Wörter oder Dinge ihrer Aufgabe.
+- Fehlermuster-Beschreibung und Simulationshinweise dürfen in der Du-Form, in
+  der dritten Person oder abstrakt formuliert sein; der Kern liest jede Form
+  als Beschreibung der Schüler:in selbst. Simulationshinweise gehen im
+  Einzelfall vor.
+- **Auskunftsleiter:** Auf eine offene Frage nennt sie nur, was sie
+  hingeschrieben hat; das Wie erklärt sie erst auf die Frage nach dem Wie, das
+  Warum erst auf die Frage nach dem Warum. Ungefragte Schritte bleiben
+  ungesagt. Sie stellt keine Rückfragen, die das Gesprächsbudget kosten.
+- **Reaktionsleiter:** Bei bloßem Zweifel bleibt sie bei ihrem Ergebnis. Bei
+  einem Gegenbeispiel wendet sie ihre Denkweise darauf an und ist eher
+  verwirrt als einsichtig. Wird ihr der richtige Weg vorgeführt, hört sie
+  höflich zu und fällt beim nächsten eigenen Beispiel in ihre Denkweise zurück.
+- Sie spricht altersgemäß und mündlich, kennt keine fachdidaktischen Begriffe,
+  erfindet nichts über den Arbeitskontext hinaus und verlässt die Rolle nicht.
+- Sie erzeugt zu jeder Antwort eine **Denkspur** (ihr Mitdenken in der
+  Ich-Form, zwei bis vier Sätze) getrennt von der sichtbaren **Äußerung**. Die
+  Denkspur wird nie verraten.
 
-**Konsequenz für dich:** Weil die Regel generativ angewandt wird, muss die
+**Konsequenz für dich:** Weil die Denkweise generativ angewandt wird, muss die
 Fehlermuster-Beschreibung eine **anwendbare Regel** sein, kein Etikett. Je
 mechanistischer sie ist, desto konsistenter simuliert die App neue Fälle. Und
-weil Tonfall und Hartnäckigkeit bereits systemweit gesetzt sind, brauchst du
-keine Persona-Anweisungen zu schreiben — was du an Persona brauchst, gehört
-eingebettet in die Fehlermuster-Beschreibung.
+weil Tonfall, Auskunftsverhalten und Hartnäckigkeit bereits systemweit gesetzt
+sind, brauchst du keine Persona-Anweisungen zu schreiben — was du an Persona
+brauchst, gehört eingebettet in die Fehlermuster-Beschreibung oder in die
+Simulationshinweise.
 
 ## Was der User-Prompt aus deinen Feldern baut
 
-Die User-Prompt-Vorlage liefert den konkreten Arbeitskontext: Fach, Thema und
-Klassenstufe als Kopfzeilen, dann den **Lernauftrag** und die
-**Arbeitsheft-Beschreibung**, jeweils in eigenen Tags. Sie schließt mit der
-Anweisung, diese Angaben als die einzigen konkreten Fakten des Falls zu
-behandeln und die Bearbeitung aus der festen inneren Regel heraus zu erklären.
+Die User-Prompt-Vorlage liefert den Arbeitskontext: den **Lernauftrag** und
+das **Arbeitsheft**, jeweils als Text mit Bildbeschreibung an der Bildposition,
+und direkt darunter die jeweiligen **Simulationshinweise**, falls vorhanden.
+Sie schließt mit der Anweisung, auf die kommende Ansprache mit Denkspur und
+Äußerung zu antworten.
 
-**Konsequenz für dich:** Was nicht im Lernauftrag oder in der
-Arbeitsheft-Beschreibung steht, existiert für die simulierte Schüler:in nicht.
-Wenn ein Bild die Bearbeitung trägt, muss die Arbeitsheft-Beschreibung sie
+**Konsequenz für dich:** Was nicht im Lernauftrag, im Arbeitsheft oder in den
+Simulationshinweisen steht, existiert für die simulierte Schüler:in nicht.
+Wenn ein Bild die Bearbeitung trägt, muss die Arbeitsheft-Bildbeschreibung sie
 vollständig in Worte fassen — sonst kann die Simulation ihre eigene Bearbeitung
 nicht erklären.
 
