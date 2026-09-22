@@ -226,17 +226,17 @@
                                     <th scope="col">Phase</th>
                                     <th scope="col">Teilnahmen</th>
                                     <th scope="col">Link</th>
-                                    <th scope="col">Aktion</th>
+                                    <th scope="col" class="table__action">Aktion</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for stichprobe in stichproben %}
                                     <tr>
                                         <td>{{ stichprobe.beginn }} – {{ stichprobe.ende }}</td>
-                                        <td>{{ stichprobe.phase }}</td>
+                                        <td>{{ stichprobe.phase.label }}{% if stichprobe.archiviert %} <span class="badge badge--archived">Archiviert</span>{% endif %}</td>
                                         <td>{{ stichprobe.teilnahmezahl }}</td>
                                         <td><input type="text" value="{{ stichprobe.teilnahme_url }}" readonly style="width: 100%;"></td>
-                                        <td>
+                                        <td class="table__action">
                                             {% if not stichprobe.archiviert and not stichprobe.traegt_daten %}
                                                 <form method="post" action="{% url 'erhebungen:stichprobe_archivieren' erhebung.pk stichprobe.pk %}">
                                                     {% csrf_token %}

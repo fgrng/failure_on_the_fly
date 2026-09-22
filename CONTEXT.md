@@ -203,7 +203,7 @@ Ein von einem Eigentümer-Kreis der Forschenden zusammengestelltes Untersuchungs
 _Avoid_: Studie, Umfrage, Survey, Experiment
 
 **Stichprobe**:
-Eine organisatorische Untergruppe einer Erhebung, die einen eigenen Teilnahme-Link trägt und die über ihn entstandenen Teilnahmen bündelt. Sie dient der Gruppenstruktur im Export, nicht einer eigenen experimentellen Bedingung. Ihr Archivieren hat eine zweite Bedeutung: Aus einer archivierten Stichprobe — wie aus einer archivierten Erhebung — lässt sich keine Abschrift mehr holen.
+Eine organisatorische Untergruppe einer Erhebung, die einen eigenen Teilnahme-Link trägt und die über ihn entstandenen Teilnahmen bündelt. Sie dient der Gruppenstruktur im Export, nicht einer eigenen experimentellen Bedingung. Ihr Archivieren hat eine zweite Bedeutung: Aus einer archivierten Stichprobe — wie aus einer archivierten Erhebung — lässt sich keine Abschrift mehr holen. Ihre **Phase** ist nichts Gespeichertes, sondern die Lage ihres Zeitraums zur Systemzeit: _geplant_ (noch nicht offen), _läuft_ (Teilnahme möglich) oder _abgeschlossen_ (geschlossen; erst jetzt ist eine Abschrift zu holen).
 _Avoid_: Gruppe, Bedingung, Kohorte, Arm
 
 **Teilnahme-Link**:

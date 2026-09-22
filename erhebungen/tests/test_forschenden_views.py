@@ -1315,9 +1315,34 @@ class StichprobenAnlegenTests(TestCase):
         )
 
         self.assertContains(detail, '<th scope="col">Phase</th>')
-        self.assertContains(detail, "<td>laufend</td>")
+        self.assertContains(detail, "<td>Läuft</td>")
         self.assertContains(detail, '<th scope="col">Teilnahmen</th>')
         self.assertContains(detail, "<td>1</td>")
+
+    def test_zeichnet_archivierte_stichproben_in_der_phasenspalte_aus(self) -> None:
+        """Eine archivierte Stichprobe trägt ihren Zustand neben der Phase."""
+
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=2),
+            ende=timezone.now() - timedelta(days=1),
+        )
+
+        offen: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertNotContains(offen, "Archiviert<")
+
+        stichprobe.archivieren()
+
+        archiviert: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(
+            archiviert,
+            '<td>Abgeschlossen <span class="badge badge--archived">Archiviert</span></td>',
+            html=True,
+        )
 
     def test_laesst_stichproben_nur_auf_eigenen_finalen_erhebungen_an(self) -> None:
         """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""

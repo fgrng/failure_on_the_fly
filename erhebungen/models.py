@@ -411,9 +411,9 @@ class Stichprobe(models.Model):
     class Phase(models.TextChoices):
         """Die aus dem Erhebungszeitraum abgeleiteten Phasen."""
 
-        VOR: tuple[str, str] = "vor", "Vor"
-        LAUFEND: tuple[str, str] = "laufend", "Laufend"
-        NACH: tuple[str, str] = "nach", "Nach"
+        VOR: tuple[str, str] = "vor", "Geplant"
+        LAUFEND: tuple[str, str] = "laufend", "Läuft"
+        NACH: tuple[str, str] = "nach", "Abgeschlossen"
 
     erhebung: models.ForeignKey = models.ForeignKey(Erhebung, on_delete=models.PROTECT)
     beginn: models.DateTimeField = models.DateTimeField()
