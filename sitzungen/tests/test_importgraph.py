@@ -1,4 +1,9 @@
-"""Kontrakttest zur Kantenrichtung aus ADR-0016."""
+"""Kontrakttest zur Kantenrichtung aus ADR-0016.
+
+Die Apps liegen nebeneinander unter der Projektwurzel; ihre Quellen werden
+gelesen, nicht geladen. Ein `import erhebungen` in dieser Datei wäre selbst die
+Kante, die der erste Test verbietet.
+"""
 
 import ast
 from pathlib import Path
@@ -8,11 +13,6 @@ from django.test import SimpleTestCase
 import sitzungen
 
 _PROJEKTWURZEL: Path = Path(sitzungen.__file__).parent.parent
-"""Die Apps liegen nebeneinander; geprüfte Apps werden nicht importiert.
-
-Ein `import erhebungen` in dieser Datei wäre selbst die Kante, die der erste
-Test verbietet — die Quellen werden gelesen, nicht geladen.
-"""
 
 
 def _absolut_importierte_module(baum: ast.Module) -> set[str]:
@@ -33,7 +33,7 @@ def _absolut_importierte_module(baum: ast.Module) -> set[str]:
     return module
 
 
-def _quellen(app: str, mit_tests: bool) -> list[Path]:
+def _quellen(app: str, *, mit_tests: bool) -> list[Path]:
     # Sammelt die Dateien einer App; die Wurzel wird gelesen, nicht importiert.
 
     wurzel: Path = _PROJEKTWURZEL / app
@@ -45,7 +45,7 @@ def _quellen(app: str, mit_tests: bool) -> list[Path]:
     ]
 
 
-def _verstoesse(dateien: list[Path], verbotene_apps: frozenset[str]) -> list[str]:
+def _verstoesse(dateien: list[Path], *verbotene_apps: str) -> list[str]:
     # Nennt jede Datei, die eine der verbotenen Apps importiert.
 
     gefunden: list[str] = []
@@ -64,9 +64,7 @@ class ImportgraphTests(SimpleTestCase):
         """Auch ein funktionslokaler Import wäre eine Kante zum Aufrufer."""
         quellen: list[Path] = _quellen("sitzungen", mit_tests=True)
 
-        self.assertEqual(
-            _verstoesse(quellen, frozenset({"training", "erhebungen"})), []
-        )
+        self.assertEqual(_verstoesse(quellen, "training", "erhebungen"), [])
 
     def test_erhebungen_importiert_training_nicht(self) -> None:
         """`erhebungen` darf nichts von Konten wissen (ADR-0006, ADR-0043).
@@ -78,4 +76,4 @@ class ImportgraphTests(SimpleTestCase):
         """
         quellen: list[Path] = _quellen("erhebungen", mit_tests=False)
 
-        self.assertEqual(_verstoesse(quellen, frozenset({"training"})), [])
+        self.assertEqual(_verstoesse(quellen, "training"), [])

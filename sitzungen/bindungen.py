@@ -25,7 +25,11 @@ UNVERTRAEGLICHE_BINDUNG: str = (
 
 
 class Bindung(models.Model):
-    """Basis jeder Bindung, die eine Teilnahme an ihren Kontext hängt."""
+    """Basis jeder Bindung, die eine Teilnahme an ihren Kontext hängt.
+
+    Eine Unterklasse hält ihre Teilnahme im 1:1-Feld `teilnahme` und sagt mit
+    `KONTO_TRAGEND`, auf welcher Seite der Trennung sie steht.
+    """
 
     KONTO_TRAGEND: bool
     """Sagt, ob diese Bindung ein Nutzerkonto hält — sonst hält sie ein Token."""
@@ -35,7 +39,6 @@ class Bindung(models.Model):
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Weist eine Bindung ab, die die Trennung aufhöbe."""
-
         if self._state.adding:
             self._pruefe_bindungsart()
         super().save(*args, **kwargs)
@@ -44,22 +47,20 @@ class Bindung(models.Model):
         # Fragt je fremder Bindungsart eine Zeile ab, nicht je Bindung: Die
         # Teilnahme kennt ihre Bindungen nur über deren Rückbeziehungen.
 
-        for bindungsart in _fremde_bindungsarten(type(self)):
-            if bindungsart.objects.filter(teilnahme_id=self.teilnahme_id).exists():
+        for fremde_art in self._fremde_bindungsarten():
+            if fremde_art.objects.filter(teilnahme_id=self.teilnahme_id).exists():
                 raise ValidationError(UNVERTRAEGLICHE_BINDUNG)
 
+    @classmethod
+    def _fremde_bindungsarten(cls) -> Iterator[type["Bindung"]]:
+        # Liefert die Bindungen, die dieselbe Teilnahme auf der anderen Seite
+        # der Trennung binden — gefunden über die Rückbeziehungen der Teilnahme.
 
-def _fremde_bindungsarten(bindungsart: type[Bindung]) -> Iterator[type[Bindung]]:
-    # Liefert die Bindungen, die dieselbe Teilnahme auf der anderen Seite der
-    # Trennung binden — gefunden über die Rückbeziehungen der Teilnahme.
-
-    teilnahme: type[models.Model] = bindungsart._meta.get_field(
-        "teilnahme"
-    ).related_model
-    for beziehung in teilnahme._meta.related_objects:
-        andere: type[models.Model] = beziehung.related_model
-        if (
-            issubclass(andere, Bindung)
-            and andere.KONTO_TRAGEND != bindungsart.KONTO_TRAGEND
-        ):
-            yield andere
+        teilnahme: type[models.Model] = cls._meta.get_field("teilnahme").related_model
+        for beziehung in teilnahme._meta.related_objects:
+            andere: type[models.Model] = beziehung.related_model
+            if (
+                issubclass(andere, Bindung)
+                and andere.KONTO_TRAGEND != cls.KONTO_TRAGEND
+            ):
+                yield andere
