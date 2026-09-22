@@ -1111,3 +1111,25 @@ class VignetteBearbeitenTests(TestCase):
 
         with self.assertRaisesMessage(ValidationError, "Zustandswechsel"):
             entwurf.save(update_fields=["zustand"])
+
+
+class VignetteGespraechsbudgetTests(TestCase):
+    """Die Vignette sagt, ob ihr Gesprächsbudget eine Uhr trägt."""
+
+    def test_zeitbudget_traegt_eine_uhr(self) -> None:
+        """Bei Zeitbegrenzung misst die Uhr den Zug der Teilnehmer:in."""
+        vignette: Vignette = Vignette(budget_typ=Vignette.BudgetTyp.ZEIT)
+
+        self.assertTrue(vignette.uhr_laeuft)
+
+    def test_schrittbudget_traegt_keine_uhr(self) -> None:
+        """Ein schrittbasiertes Budget zählt Schritte, es misst keine Zeit."""
+        vignette: Vignette = Vignette(budget_typ=Vignette.BudgetTyp.SCHRITTE)
+
+        self.assertFalse(vignette.uhr_laeuft)
+
+    def test_entwurf_ohne_budget_typ_traegt_eine_uhr(self) -> None:
+        """Erst das schrittbasierte Maß hält die Uhr an, nicht schon sein Fehlen."""
+        vignette: Vignette = Vignette()
+
+        self.assertTrue(vignette.uhr_laeuft)

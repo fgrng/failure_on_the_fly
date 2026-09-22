@@ -7,7 +7,7 @@ status: accepted
 > **Nachgeführt durch ADR-0042 (Uhr an der Sitzung persistiert):** Eine Aussage
 > dieses Textes wurde missverstanden, nicht widerrufen. »Der Teilnehmer:in wird
 > der Budgetstand nicht angezeigt« meint die Darstellung, nicht die Lebensdauer:
-> Die verbrauchte Zeit und der Startpunkt der laufenden Spanne sind seither
+> Die verbrauchte Zeit und der Startpunkt der offenen Spanne sind seither
 > Felder der Sitzung statt der Browser-Session, und die Zeitquelle ist die
 > Wanduhr statt `monotonic()`. Unverändert bleibt alles Weitere — das Budget
 > gehört der Vignette, die Uhr pausiert beim Absenden, es erscheint keine Uhr
@@ -19,12 +19,15 @@ Das **Gesprächsbudget** ist ein Feld der Vignette. Es wird mit ihr finalisiert 
 
 Bei einem Budget vom Typ Zeitbegrenzung hält die Uhr beim Absenden an und läuft weiter, sobald die Antwort steht. Gemessen wird, was gemessen werden soll: die Zeit, die die angehende Lehrperson für ihre diagnostischen Entscheidungen aufwendet. Modelllatenz schwankt zwischen Teilnehmenden und über den Tag; sie ins Budget zu ziehen hieße, sie in die Daten zu ziehen. Aus demselben Grund kosten Fehlversuche (ADR-0011) keine Budgetzeit.
 
+Diese Bedingung ist wörtlich zu nehmen: Bei schrittbasiertem Budget läuft überhaupt keine Uhr. Dort wird nicht gemessen und pausiert, sondern gar nicht erst angesetzt — die Null einer solchen Sitzung ist die Abwesenheit einer Messung, kein gemessener Wert. Was eine Sitzung verbraucht hat, ist beim einen Typ eine Zahl von Schritten und beim anderen eine Zahl von Sekunden; beides nebeneinander zu führen, hieße eine Größe zu erheben, die für die Auswertung dieser Vignette keine Bedeutung hat.
+
 ## Das Budget ist unsichtbar, und das Gespräch darf früher enden
 
 Der Teilnehmer:in wird der Budgetstand nicht angezeigt — für keinen der beiden Typen. Sie darf das Gespräch aber **jederzeit vorzeitig beenden** und in den Debrief gehen; das Budget ist eine Obergrenze, kein Soll. Erschöpft sich das Budget während eines laufenden Gesprächsschritts, wird dieser **zu Ende geführt**; eine abgeschnittene Antwort wäre ein beschädigter Datenpunkt. Danach folgt der Debrief.
 
 ## Consequences
 
+- Der Datenspur-Export trägt für eine Sitzung mit schrittbasiertem Budget deshalb eine echte Null in der verbrauchten Zeit (ADR-0029), und es entsteht dort auch kein Spannenstart, der später aufgeräumt werden müsste.
 - Die tatsächlich verbrauchten Gesprächsschritte beziehungsweise die verbrauchte Zeit sind selbst eine Größe der Datenspur — sie sagen etwas über diagnostische Ökonomie. Unter einem Zwang, das Budget auszuschöpfen, wären sie konstant und wertlos.
 - Wer nach drei Zügen fertig ist, kann abkürzen; wer keine Lust mehr hat, ebenfalls. Ein zu früh beendetes Gespräch sieht in den Daten aus wie ein effizientes. Das lässt sich nicht am Budget reparieren, nur an der Instruktion — und die Diagnose zeigt, wer etwas erkannt hat.
 - Beim Zeitbudget endet das Gespräch für die Teilnehmer:in unangekündigt. Die Instruktion einer Erhebung sollte ankündigen, **dass** das Gespräch begrenzt ist, nicht wie stark.

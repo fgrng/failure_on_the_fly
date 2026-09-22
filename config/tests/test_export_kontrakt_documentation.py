@@ -61,7 +61,7 @@ def test_adr_0029_liest_die_verbrauchte_zeit_am_budget_typ_ohne_spannenstart() -
     for klausel in (
         "in Sekunden",
         "nur zusammen mit dem Budget-Typ",
-        "Der Startpunkt der laufenden Spanne erscheint nicht",
+        "Der Startpunkt der offenen Spanne erscheint nicht",
     ):
         assert klausel in adr
 
@@ -145,7 +145,7 @@ def test_readme_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
     abschnitt: str = readme_abschnitt("Erhebungen verwalten")
 
     for klausel in (
-        "verbrauchte Gesprächszeit in Sekunden",
+        "verbrauchte Zeit in Sekunden",
         "schrittbasiertem Budget bleibt sie bei null",
     ):
         assert klausel in abschnitt

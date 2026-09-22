@@ -1001,6 +1001,32 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(debrief, "Debrief")
         self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 7)
 
+    def test_schrittbudget_laesst_die_uhr_der_sitzung_stehen(self) -> None:
+        """Ein durchgespieltes Schrittbudget bucht keine Sekunden (ADR-0012)."""
+
+        self._vignette_anlegen(
+            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            budget_wert=2,
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        # Zwischen Anzeige und Absenden liegen 40 s. Bei einem Zeitbudget waeren
+        # sie gebucht; hier laeuft keine Uhr, die sie buchen koennte.
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 50, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 50, tzinfo=UTC),
+            ],
+        ):
+            self.client.get(gespraech_url)
+            self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 0.0)
+
     def test_erschoepfte_zeit_fuehrt_den_schritt_zu_ende_und_zeigt_den_debrief(
         self,
     ) -> None:

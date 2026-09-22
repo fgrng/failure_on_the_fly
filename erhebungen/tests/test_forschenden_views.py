@@ -1942,7 +1942,7 @@ class ErhebungsExportTests(TestCase):
             },
         )
 
-    def test_exportiert_die_verbrauchte_zeit_ohne_die_laufende_spanne(self) -> None:
+    def test_exportiert_die_verbrauchte_zeit_ohne_die_offene_spanne(self) -> None:
         """Die verbrauchte Zeit ist Datenspur (ADR-0012), der Spannenstart nicht."""
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
@@ -1957,9 +1957,11 @@ class ErhebungsExportTests(TestCase):
             ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
         )
         schrittvignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
-        for token, vignette, verbraucht in (
-            ("2345-6781", zeitvignette, 417.5),
-            ("2345-6782", schrittvignette, 0.0),
+        # Nur die Zeitsitzung traegt eine offene Spanne: Bei schrittbasiertem
+        # Budget laeuft nach ADR-0012 keine Uhr, die eine ansetzen koennte.
+        for token, vignette, verbraucht, offene_spanne in (
+            ("2345-6781", zeitvignette, 417.5, timezone.now()),
+            ("2345-6782", schrittvignette, 0.0, None),
         ):
             bindung: Erhebungsbindung = _laufende_bindung(erhebung, token)
             sitzung: Sitzung = Sitzung.objects.create(
@@ -1968,7 +1970,7 @@ class ErhebungsExportTests(TestCase):
                 simulationskern=kern,
                 modell_konfiguration=konfiguration,
                 verbrauchte_zeit=verbraucht,
-                offene_spanne_seit=timezone.now(),
+                offene_spanne_seit=offene_spanne,
             )
             Vignettenposition.objects.create(
                 teilnahme=bindung.teilnahme,

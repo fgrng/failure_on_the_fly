@@ -101,10 +101,10 @@ Die Transkriptions-Konfiguration erscheint gar nicht im Export (ADR-0026): Die
 Transkription ist eine Deployment-Entscheidung der Betreiber:in, keine
 Eigenschaft der Datenspur.
 
-## Die verbrauchte Gesprächszeit im Export
+## Die verbrauchte Zeit im Export
 
 `sitzungen.csv` trägt in `verbrauchte_zeit` die tatsächlich verbrauchte
-Gesprächszeit der Sitzung in Sekunden — derselben Einheit, in der `budget_wert`
+Zeit der Sitzung in Sekunden — derselben Einheit, in der `budget_wert`
 einer Vignettenfassung mit `budget_typ` `zeit` bemessen ist. Die verbrauchte
 Zeit ist nach ADR-0012 selbst eine Größe der Datenspur: Sie sagt etwas über
 diagnostische Ökonomie aus, und genau dafür ist das Budget eine Obergrenze und
@@ -113,9 +113,12 @@ werden.
 
 **Die Spalte ist nur zusammen mit dem Budget-Typ der Vignettenfassung zu
 lesen.** Für Sitzungen einer Vignette mit schrittbasiertem Budget bleibt sie
-bei null — dort läuft keine Uhr, die Null ist kein gemessener Wert.
+bei null: Dort läuft nach ADR-0012 überhaupt keine Uhr, die Null ist also die
+Abwesenheit einer Messung und kein gemessener Wert. Wer über Sitzungen beider
+Budget-Typen hinweg mittelt, ohne den Typ zu berücksichtigen, mittelt Nullen
+ein, die nie gemessen wurden.
 
-**Der Startpunkt der laufenden Spanne erscheint nicht.** Er ist interne
+**Der Startpunkt der offenen Spanne erscheint nicht.** Er ist interne
 Buchführung der Uhr und über das Ende einer Sitzung hinaus bedeutungslos.
 
 ## Der Fragebogen im Export

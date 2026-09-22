@@ -368,6 +368,11 @@ class Vignette(models.Model):
         )
 
     @property
+    def uhr_laeuft(self) -> bool:
+        """Gibt zurück, ob das Gesprächsbudget dieser Fassung eine Uhr trägt."""
+        return self.budget_typ != self.BudgetTyp.SCHRITTE
+
+    @property
     def kern_pin_ueberholt(self) -> bool:
         """Gibt zurück, ob der gepinnte Kern von einer neueren Fassung überholt wurde."""
         return (

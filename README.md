@@ -235,7 +235,7 @@ Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
 dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
 zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
 ist damit eine Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile
-nennt die verbrauchte Gesprächszeit in Sekunden; bei einer Vignette mit
+nennt die verbrauchte Zeit in Sekunden; bei einer Vignette mit
 schrittbasiertem Budget bleibt sie bei null, der Wert ist also zusammen mit dem
 Budget-Typ der Vignettenfassung zu lesen. Die verwendeten
 Vignettenfassungen, Simulationskern-Fassungen und Modell-Konfigurationen liegen

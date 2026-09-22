@@ -47,7 +47,7 @@ def _verbrauchte_zeit(sink: ScratchSink | DBSink) -> float:
     # Liest den Speichervertrag beider Adapter für die Uhrenparität.
 
     if isinstance(sink, ScratchSink):
-        return sink.session["probelauf"]["verbrauchte_zeit"]
+        return sink.session["probelauf"].get("verbrauchte_zeit", 0.0)
     sink.sitzung.refresh_from_db(fields=["verbrauchte_zeit"])
     return sink.sitzung.verbrauchte_zeit
 
@@ -350,6 +350,44 @@ def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
             fehlversuche=[],
         )
         assert _verbrauchte_zeit(sink) == 10.0
+
+
+@pytest.mark.django_db
+def test_schrittbudget_laesst_die_uhr_in_beiden_sinks_stehen() -> None:
+    """Ein schrittbasiertes Budget zählt Schritte, es bucht keine Sekunden."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 3
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create()),
+    ):
+        sitzung_starten(sink, vignette, konfiguration)
+
+        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 5, tzinfo=UTC))
+
+        assert _verbrauchte_zeit(sink) == 0.0
+
+
+@pytest.mark.django_db
+def test_schrittbudget_setzt_keine_offene_spanne() -> None:
+    """Ohne Uhr gibt es auch keinen Spannenstart, der gebucht werden könnte."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 3
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+    sink: DBSink = DBSink(Teilnahme.objects.create())
+    sitzung_starten(sink, vignette, konfiguration)
+
+    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+
+    sink.sitzung.refresh_from_db(fields=["offene_spanne_seit"])
+    assert sink.sitzung.offene_spanne_seit is None
 
 
 @pytest.mark.django_db

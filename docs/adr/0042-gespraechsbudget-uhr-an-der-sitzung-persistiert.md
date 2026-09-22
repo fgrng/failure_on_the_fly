@@ -5,7 +5,7 @@ status: accepted
 # Die Uhr des Gesprächsbudgets wird an der Sitzung persistiert
 
 Die verbrauchte Zeit eines zeitbegrenzten Gesprächsbudgets und der Startpunkt
-der laufenden Spanne sind **Felder der Sitzung**. Sie leben nicht mehr in der
+der offenen Spanne sind **Felder der Sitzung**. Sie leben nicht mehr in der
 Browser-Session, und die Zeitquelle ist die Wanduhr, nicht `monotonic()`.
 
 ADR-0012 bleibt in der Sache unangetastet: Das Budget gehört weiter der
@@ -66,7 +66,7 @@ Budgets sind in Minuten bemessen, nicht in Millisekunden. Ein um Sekunden
 verstellter Bezugspunkt ändert an einer Obergrenze nichts, ein bedeutungsloser
 Bezugspunkt alles.
 
-Das betrifft auch den Probelauf: Er misst seine Gesprächszeit über dieselbe
+Das betrifft auch den Probelauf: Er misst seine verbrauchte Zeit über dieselbe
 Quelle, bleibt aber schreibfrei und in der Browser-Session (ADR-0014). Die
 Zeitquelle ist eine Frage der Bedeutung, die Persistierung eine der Rolle.
 
@@ -74,7 +74,7 @@ Zeitquelle ist eine Frage der Bedeutung, die Persistierung eine der Rolle.
 
 Beim Wiedereinstieg steht die Frage, was mit der Zeit seit dem letzten
 Schreibpunkt geschieht. Entschieden ist: **Jeder erneute Aufruf der
-Gesprächsseite setzt die laufende Uhr neu an; die bereits verbrauchte Zeit
+Gesprächsseite setzt die offene Spanne neu an; die bereits verbrauchte Zeit
 bleibt erhalten.** Es wird weder geschätzt noch etwas Akkumuliertes verworfen.
 
 Der Preis steht auf der Seite der Teilnehmer:in: Wer vor dem Absenden neu lädt,
@@ -87,7 +87,7 @@ verlängert die Denkzeit, er beendet kein Gespräch.
 
 ## Konsequenzen
 
-- Die verbrauchte Gesprächszeit steht in der Datenbank und nimmt damit den Weg
+- Die verbrauchte Zeit steht in der Datenbank und nimmt damit den Weg
   in den Export (ADR-0029). Sie ist ohnehin eine Größe der Datenspur; bisher
   war sie es nur auf dem Papier.
 - Ein Browserwechsel, ein Fensterschluss und eine verfallene Session kosten

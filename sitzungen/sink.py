@@ -255,6 +255,8 @@ class DBSink:
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der Teilnehmerin neu an."""
 
+        if not self._sitzung.vignette.uhr_laeuft:
+            return
         budgetstand: Budgetstand = self._budgetstand_laden()
         budgetstand.zug_beginnen(jetzt)
         self._budgetstand_speichern(budgetstand)
@@ -262,6 +264,8 @@ class DBSink:
     def zug_beenden(self, jetzt: datetime) -> None:
         """Bucht die offene Spanne vor einem Modellaufruf."""
 
+        if not self._sitzung.vignette.uhr_laeuft:
+            return
         budgetstand: Budgetstand = self._budgetstand_laden()
         budgetstand.zug_beenden(jetzt)
         self._budgetstand_speichern(budgetstand)
@@ -431,13 +435,15 @@ class ScratchSink:
     def _vignette(self) -> Vignette:
         # Holt die beim Start gepinnte Vignette nur für die Budgetentscheidung.
 
-        if hasattr(self, "_gestartete_vignette"):
-            return self._gestartete_vignette
-        return Vignette.objects.get(pk=self.vignette_pk)
+        if not hasattr(self, "_gestartete_vignette"):
+            self._gestartete_vignette = Vignette.objects.get(pk=self.vignette_pk)
+        return self._gestartete_vignette
 
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der Autorin neu an."""
 
+        if not self._vignette.uhr_laeuft:
+            return
         budgetstand: Budgetstand = self._budgetstand_laden()
         budgetstand.zug_beginnen(jetzt)
         self._budgetstand_speichern(budgetstand)
@@ -445,6 +451,8 @@ class ScratchSink:
     def zug_beenden(self, jetzt: datetime) -> None:
         """Bucht die offene Spanne vor einem Modellaufruf."""
 
+        if not self._vignette.uhr_laeuft:
+            return
         budgetstand: Budgetstand = self._budgetstand_laden()
         budgetstand.zug_beenden(jetzt)
         self._budgetstand_speichern(budgetstand)
