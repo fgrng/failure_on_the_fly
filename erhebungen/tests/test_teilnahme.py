@@ -1,6 +1,6 @@
 """HTTP-Tests für den pseudonymen Erhebungszugang."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from django.http import HttpResponse
@@ -855,7 +855,14 @@ class ErhebungsteilnahmeTests(TestCase):
         session["training_verbrauchte_zeit"] = 999.0
         session.save()
 
-        with patch("sitzungen.sink.monotonic", side_effect=[10.0, 11.0, 11.0]):
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+            ],
+        ):
             self.client.get(gespraech_url)
             antwort: HttpResponse = self.client.post(
                 gespraech_url, {"eingabe": "Wie rechnest du?"}

@@ -1,7 +1,8 @@
 """Naht für die Ziele eines Sitzungslaufs."""
 
 from collections.abc import Iterable, MutableMapping
-from time import monotonic
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol, TypedDict, cast
 
 from django.db import transaction
@@ -42,6 +43,41 @@ class GespraechsschrittDaten(TypedDict):
     fehlversuche: list[FehlversuchDaten]
 
 
+@dataclass
+class Budgetstand:
+    """Der speicherlose Verbrauch eines Gesprächsbudgets."""
+
+    verbrauchte_zeit: float = 0.0
+    geglueckte_schritte: int = 0
+    offene_spanne_seit: datetime | None = None
+
+    def zug_beginnen(self, jetzt: datetime) -> None:
+        """Setzt die offene Spanne eines neu angezeigten Zuges neu an."""
+
+        self.offene_spanne_seit = jetzt
+
+    def zug_beenden(self, jetzt: datetime) -> None:
+        """Bucht die offene Spanne und hält die Uhr an."""
+
+        if self.offene_spanne_seit is not None:
+            self.verbrauchte_zeit += (jetzt - self.offene_spanne_seit).total_seconds()
+            self.offene_spanne_seit = None
+
+    def gespraechsschritt_anhaengen(self) -> None:
+        """Zählt einen erfolgreich zu Ende geführten Gesprächsschritt."""
+
+        self.geglueckte_schritte += 1
+
+    def ist_erschoepft(self, budget_typ: str, budget_wert: int | None) -> bool:
+        """Prüft die eine Budgetgrenze nach ihrem aktiven Maß."""
+
+        if budget_wert is None:
+            return False
+        if budget_typ == Vignette.BudgetTyp.SCHRITTE:
+            return self.geglueckte_schritte >= budget_wert
+        return self.verbrauchte_zeit >= budget_wert
+
+
 class SitzungSink(Protocol):
     """Das Ziel, an das der Lauf einer Sitzung seine Ergebnisse übergibt."""
 
@@ -67,8 +103,8 @@ class SitzungSink(Protocol):
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
-    ) -> None:
-        """Bewahrt einen geglückten Gesprächsschritt auf."""
+    ) -> bool:
+        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung."""
 
     def gescheiterten_schritt_behandeln(
         self,
@@ -87,21 +123,11 @@ class SitzungSink(Protocol):
     def status_setzen(self, status: Sitzung.Status) -> None:
         """Setzt den Lebenszyklusstatus der Sitzung."""
 
-    @property
-    def verbrauchte_zeit(self) -> float:
-        """Liefert die während der Züge verbrauchte Zeit in Sekunden."""
+    def zug_beginnen(self, jetzt: datetime) -> None:
+        """Setzt die offene Spanne der angezeigten Gesprächsseite neu an."""
 
-    def budget_erschoepft(self, vignette: Vignette) -> bool:
-        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
-
-    def gespraechsende_vermerken(self) -> None:
-        """Hält fest, dass das erschöpfte Budget das Diagnosegespräch beendet hat."""
-
-    def zeitbudget_fortsetzen(self) -> None:
-        """Startet die Uhr, wenn die teilnehmende Person wieder eine Eingabe verfassen kann."""
-
-    def zeitbudget_anhalten(self) -> None:
-        """Hält die Uhr für Modellaufruf und Fehlversuche an."""
+    def zug_beenden(self, jetzt: datetime) -> None:
+        """Bucht die offene Spanne vor Modellaufruf oder Sitzungsende."""
 
 
 class DBSink:
@@ -153,9 +179,10 @@ class DBSink:
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
-    ) -> None:
+    ) -> bool:
         """Schreibt einen geglückten Schritt und seine Fehlversuche atomar."""
 
+        budgetstand: Budgetstand = self._budgetstand_laden()
         with transaction.atomic():
             schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
                 sitzung=self._sitzung,
@@ -171,6 +198,11 @@ class DBSink:
                     for fehlversuch in fehlversuche
                 ]
             )
+        budgetstand.gespraechsschritt_anhaengen()
+        self._budgetstand_speichern(budgetstand)
+        return budgetstand.ist_erschoepft(
+            self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
+        )
 
     def gescheiterten_schritt_behandeln(
         self,
@@ -234,55 +266,51 @@ class DBSink:
 
         return f"sitzung_{self._sitzung.pk}_{name}"
 
-    def budget_erschoepft(self, vignette: Vignette) -> bool:
-        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
+    def zug_beginnen(self, jetzt: datetime) -> None:
+        """Setzt die offene Spanne der Teilnehmerin neu an."""
 
-        if vignette.budget_wert is None:
-            return False
-        if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-            return self.gespraechsschritte.count() >= vignette.budget_wert
-        return self.verbrauchte_zeit >= vignette.budget_wert
+        budgetstand: Budgetstand = self._budgetstand_laden()
+        budgetstand.zug_beginnen(jetzt)
+        self._budgetstand_speichern(budgetstand)
 
-    def gespraechsende_vermerken(self) -> None:
-        """Lässt die Sitzung laufen: Erst die Diagnose schließt sie ab (ADR-0009)."""
+    def zug_beenden(self, jetzt: datetime) -> None:
+        """Bucht die offene Spanne vor einem Modellaufruf."""
 
-    @property
-    def verbrauchte_zeit(self) -> float:
-        """Liefert die verbrauchte Zeit aus der Session."""
+        budgetstand: Budgetstand = self._budgetstand_laden()
+        budgetstand.zug_beenden(jetzt)
+        self._budgetstand_speichern(budgetstand)
 
-        return cast(
-            float,
-            self.session.get(
-                self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL), 0.0
+    def _budgetstand_laden(self) -> Budgetstand:
+        # Holt den pro Sitzung isolierten Zustand aus der Browser-Session.
+
+        startzeit: str | None = self.session.get(
+            self._zeitbudget_schluessel(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
+        )
+        return Budgetstand(
+            verbrauchte_zeit=cast(
+                float,
+                self.session.get(
+                    self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL), 0.0
+                ),
             ),
+            geglueckte_schritte=self.gespraechsschritte.count(),
+            offene_spanne_seit=datetime.fromisoformat(startzeit)
+            if startzeit is not None
+            else None,
         )
 
-    def zeitbudget_fortsetzen(self) -> None:
-        """Startet die unsichtbare Uhr ausschließlich während des Teilnahmezugs."""
+    def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
+        # Legt den Speichervertrag des DB-Sinks fest, bis #245 ihn an die Sitzung zieht.
 
+        self.session[self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL)] = (
+            budgetstand.verbrauchte_zeit
+        )
         schluessel: str = self._zeitbudget_schluessel(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
-        if (
-            self._sitzung.vignette.budget_typ == Vignette.BudgetTyp.ZEIT
-            and schluessel not in self.session
-        ):
-            self.session[schluessel] = monotonic()
-            self._als_geaendert_markieren()
-
-    def zeitbudget_anhalten(self) -> None:
-        """Hält die Uhr vor Modellaufruf und schreibt die verbrauchte Zeit fort."""
-
-        schluessel_startzeit: str = self._zeitbudget_schluessel(
-            _ZEIT_LAEUFT_SEIT_SCHLUESSEL
-        )
-        startzeit: float | None = self.session.pop(schluessel_startzeit, None)
-        if startzeit is not None:
-            schluessel_verbraucht: str = self._zeitbudget_schluessel(
-                _VERBRAUCHTE_ZEIT_SCHLUESSEL
-            )
-            self.session[schluessel_verbraucht] = self.verbrauchte_zeit + (
-                monotonic() - startzeit
-            )
-            self._als_geaendert_markieren()
+        if budgetstand.offene_spanne_seit is None:
+            self.session.pop(schluessel, None)
+        else:
+            self.session[schluessel] = budgetstand.offene_spanne_seit.isoformat()
+        self._als_geaendert_markieren()
 
     def _als_geaendert_markieren(self) -> None:
         # Markiert Session-Änderungen für Django als speicherwürdig.
@@ -313,6 +341,7 @@ class ScratchSink:
     ) -> None:
         """Initialisiert den verworfenen Sitzungszustand in der Session."""
 
+        self._gestartete_vignette: Vignette = vignette
         self.session[_PROBELAUF_SESSION_SCHLUESSEL] = {
             "vignette_pk": vignette.pk,
             "kern_pk": simulationskern.pk,
@@ -374,9 +403,10 @@ class ScratchSink:
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
-    ) -> None:
+    ) -> bool:
         """Hängt den geglückten Schritt in gemeinsamer Speicherform an."""
 
+        budgetstand: Budgetstand = self._budgetstand_laden()
         self.gespraechsschritte.append(
             {
                 "reihenfolge": len(self.gespraechsschritte) + 1,
@@ -387,7 +417,14 @@ class ScratchSink:
                 "fehlversuche": fehlversuche,
             }
         )
-        self._als_geaendert_markieren()
+        budgetstand.gespraechsschritt_anhaengen()
+        self._budgetstand_speichern(budgetstand)
+        erschoepft: bool = budgetstand.ist_erschoepft(
+            self._vignette.budget_typ, self._vignette.budget_wert
+        )
+        if erschoepft:
+            self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        return erschoepft
 
     def gescheiterten_schritt_behandeln(
         self,
@@ -420,51 +457,59 @@ class ScratchSink:
         self._zustand["status"] = status
         self._als_geaendert_markieren()
 
-    def gespraechsende_vermerken(self) -> None:
-        """Schließt den Probelauf ab, den keine gespeicherte Diagnose beenden wird."""
-
-        self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
-
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""
 
         self._zustand["freie_auswahl"] = True
         self._als_geaendert_markieren()
 
-    def budget_erschoepft(self, vignette: Vignette) -> bool:
-        """Meldet, ob erfolgreiche Schritte oder Nutzungszeit das Budget aufbrauchen."""
-
-        if vignette.budget_wert is None:
-            return False
-        if vignette.budget_typ == Vignette.BudgetTyp.SCHRITTE:
-            return len(self.gespraechsschritte) >= vignette.budget_wert
-        return self.verbrauchte_zeit >= vignette.budget_wert
-
     @property
-    def verbrauchte_zeit(self) -> float:
-        """Liefert die allein während des Autorinnenzugs gemessene Zeit."""
+    def _vignette(self) -> Vignette:
+        # Holt die beim Start gepinnte Vignette nur für die Budgetentscheidung.
 
-        return cast(float, self._zustand.get(_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0))
+        if hasattr(self, "_gestartete_vignette"):
+            return self._gestartete_vignette
+        return Vignette.objects.get(pk=self.vignette_pk)
 
-    def zeitbudget_fortsetzen(self) -> None:
-        """Startet die Uhr, wenn die Autorin wieder eine Eingabe verfassen kann."""
+    def zug_beginnen(self, jetzt: datetime) -> None:
+        """Setzt die offene Spanne der Autorin neu an."""
 
-        if (
-            _VERBRAUCHTE_ZEIT_SCHLUESSEL in self._zustand
-            and _ZEIT_LAEUFT_SEIT_SCHLUESSEL not in self._zustand
-        ):
-            self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = monotonic()
-            self._als_geaendert_markieren()
+        budgetstand: Budgetstand = self._budgetstand_laden()
+        budgetstand.zug_beginnen(jetzt)
+        self._budgetstand_speichern(budgetstand)
 
-    def zeitbudget_anhalten(self) -> None:
-        """Hält die Uhr für Modellaufruf und Fehlversuche an."""
+    def zug_beenden(self, jetzt: datetime) -> None:
+        """Bucht die offene Spanne vor einem Modellaufruf."""
 
-        startzeit: float | None = self._zustand.pop(_ZEIT_LAEUFT_SEIT_SCHLUESSEL, None)
-        if startzeit is not None:
-            self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = self.verbrauchte_zeit + (
-                monotonic() - startzeit
+        budgetstand: Budgetstand = self._budgetstand_laden()
+        budgetstand.zug_beenden(jetzt)
+        self._budgetstand_speichern(budgetstand)
+
+    def _budgetstand_laden(self) -> Budgetstand:
+        # Liest die für den Probelauf eingebettete Speicherform.
+
+        startzeit: str | None = self._zustand.get(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
+        return Budgetstand(
+            verbrauchte_zeit=cast(
+                float, self._zustand.get(_VERBRAUCHTE_ZEIT_SCHLUESSEL, 0.0)
+            ),
+            geglueckte_schritte=len(self.gespraechsschritte),
+            offene_spanne_seit=datetime.fromisoformat(startzeit)
+            if startzeit is not None
+            else None,
+        )
+
+    def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
+        # Hält den Probelauf weiter vollständig in der Browser-Session.
+
+        self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = budgetstand.verbrauchte_zeit
+        if budgetstand.offene_spanne_seit is None:
+            self._zustand.pop(_ZEIT_LAEUFT_SEIT_SCHLUESSEL, None)
+        else:
+            self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = (
+                budgetstand.offene_spanne_seit.isoformat()
             )
-            self._als_geaendert_markieren()
+        self._als_geaendert_markieren()
 
     def verwerfen(self) -> None:
         """Entfernt den vollständigen Probelaufzustand aus der Session."""

@@ -1,5 +1,7 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+from datetime import UTC, datetime
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
@@ -97,15 +99,12 @@ class ProbelaufStartTests(TestCase):
         )
         self.assertContains(gespraech, "Ihre nächste Frage")
         session = self.client.session
+        self.assertEqual(session["probelauf"]["vignette_pk"], self.entwurf.pk)
+        self.assertEqual(session["probelauf"]["kern_pk"], self.kern.pk)
         self.assertEqual(
-            session["probelauf"],
-            {
-                "vignette_pk": self.entwurf.pk,
-                "kern_pk": self.kern.pk,
-                "modell_konfiguration_pk": self.konfiguration.pk,
-                "gespraechsschritte": [],
-            },
+            session["probelauf"]["modell_konfiguration_pk"], self.konfiguration.pk
         )
+        self.assertEqual(session["probelauf"]["gespraechsschritte"], [])
 
     def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
         """Der Probelauf rendert mit den beim Anlegen gesetzten Akteuren."""
@@ -544,7 +543,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch("sitzungen.sink.monotonic", side_effect=[10, 14, 114]):
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
+            ],
+        ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_gespraech"),
@@ -567,7 +573,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch("sitzungen.sink.monotonic", side_effect=[10, 14, 114]):
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
+            ],
+        ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_gespraech"),
@@ -587,7 +600,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch("sitzungen.sink.monotonic", side_effect=[10, 15]):
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 15, tzinfo=UTC),
+            ],
+        ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_gespraech"),
