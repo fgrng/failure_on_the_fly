@@ -289,7 +289,16 @@ Administration, der Simulationskern und die Modell-Konfiguration.
    uv run python manage.py createsuperuser
    ```
 
-2. **Simulationskern initialisieren**, falls noch keine finale Fassung existiert:
+2. **Simulationskern anlegen**, falls noch keine Fassung existiert. Unter
+   `/system/kern/verwalten/` stehen dafür zwei Knöpfe: *Neuen Entwurf anlegen*
+   legt eine leere erste Fassung an, *Standardkern als Entwurf anlegen* füllt
+   sie mit den mitgelieferten Vorlagen. Beide erzeugen einen **Entwurf** — er
+   wird erst spielbar, wenn Sie ihn auf derselben Seite finalisieren; dazwischen
+   können Sie die Vorlagen unter *Bearbeiten* an Ihre Instanz anpassen.
+
+   Für eine unbeaufsichtigte Einrichtung ohne Anmeldung gibt es denselben Weg
+   als Befehl. Er legt den Standardkern an und finalisiert ihn in einem Schritt;
+   ein wiederholter Aufruf ändert nichts:
 
    ```bash
    uv run python manage.py kern_initialisieren

@@ -38,13 +38,14 @@ Eigentümer:innen.
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
 aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
-kein finaler Kern vorhanden, weist die Ansicht auf `manage.py kern_initialisieren`
-hin. Administrator:innen erhalten unter `/system/kern/verwalten/` außerdem den
-Überblick über den Entwurf, die finale Fassung und die eingeklappten archivierten
-Kern-Fassungen. Sie ziehen aus der finalen Fassung einen Entwurf, bearbeiten dessen
-Vorlagen auf einer eigenen Seite, finalisieren ihn oder verwerfen ihn wieder. Der
-Kern trägt zu jedem Zeitpunkt genau eine finale Fassung: Das Finalisieren archiviert
-die bisherige. Archivierte Fassungen bleiben eingeklappt lesbar, tragen aber keine
+kein finaler Kern vorhanden, stellt die Ansicht das nur fest. Administrator:innen
+erhalten unter `/system/kern/verwalten/` außerdem den Überblick über den Entwurf, die
+finale Fassung und die eingeklappten archivierten Kern-Fassungen. Solange es überhaupt
+keine Fassung gibt, legen sie die erste dort als Entwurf an — leer oder aus den
+mitgelieferten Vorlagen. Danach ziehen sie aus der finalen Fassung einen Entwurf,
+bearbeiten dessen Vorlagen auf einer eigenen Seite, finalisieren ihn oder verwerfen ihn
+wieder. Der Kern trägt zu jedem Zeitpunkt genau eine finale Fassung: Das Finalisieren
+archiviert die bisherige. Archivierte Fassungen bleiben eingeklappt lesbar, tragen aber keine
 Aktionen mehr; eine misslungene Fassung wird nicht zurückgenommen, sondern durch eine
 neue ersetzt. Das Überholen trifft laufende Sitzungen nicht, und Vignettenentwürfe
 auf der bisherigen Fassung bleiben finalisierbar und spielbar. Ihre Detailansicht

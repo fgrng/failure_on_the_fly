@@ -27,8 +27,19 @@
         <h2>Finale Fassung</h2>
         {% include "simulation/includes/kern_fassung.html" with simulationskern=finale_fassung %}
         {% include "simulation/includes/kern_fassung_aktionen.html" with simulationskern=finale_fassung %}
-    {% else %}
-        <p class="system-page-empty">Noch nicht initialisiert. Führen Sie <code>manage.py kern_initialisieren</code> aus.</p>
+    {% elif kern_fehlt %}
+        <h2>Noch kein Simulationskern</h2>
+        <p class="system-page-empty">Legen Sie die erste Fassung als Entwurf an — leer oder aus den mitgelieferten Vorlagen.</p>
+        <div class="page-actions">
+            <form method="post" action="{% url 'simulation:kern_anlegen' %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Neuen Entwurf anlegen</button>
+            </form>
+            <form method="post" action="{% url 'simulation:kern_anlegen_standard' %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Standardkern als Entwurf anlegen</button>
+            </form>
+        </div>
     {% endif %}
 
     {% if archivierte_fassungen %}

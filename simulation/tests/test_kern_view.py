@@ -17,6 +17,7 @@ from simulation.models import (
     ModellKonfiguration,
     Simulationskern,
 )
+from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
 def _autorin(username: str) -> Konto:
@@ -153,21 +154,23 @@ class SimulationskernLeereAnsichtTests(TestCase):
         """Legt ein Konto an, ohne einen Kern zu initialisieren."""
         self.konto: Konto = _autorin("ada")
 
-    def test_zeigt_initialisierungshinweis_ohne_finalen_kern(self) -> None:
+    def test_stellt_den_leeren_kern_nur_fest(self) -> None:
         """Eine noch leere Installation bleibt lesbar statt mit 500 zu scheitern."""
         self.client.force_login(self.konto)
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertContains(response, "Noch nicht initialisiert")
+        self.assertContains(response, "Noch keine Rahmenhandlung vorhanden.")
+        self.assertContains(response, "Noch keine Prompt-Vorlagen vorhanden.")
 
-    def test_zeigt_den_initialisierungsbefehl_ohne_finalen_kern(self) -> None:
-        """Eine leere Installation nennt den nötigen Initialisierungsbefehl."""
+    def test_verweist_autorinnen_nicht_auf_die_verwaltung(self) -> None:
+        """Die Leseansicht nennt keine Geste, die der Autorin verwehrt ist."""
         self.client.force_login(self.konto)
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertContains(response, "manage.py kern_initialisieren")
+        self.assertNotContains(response, "manage.py")
+        self.assertNotContains(response, reverse("simulation:kern_anlegen"))
 
     def test_zeigt_fehlende_aktive_modellkonfiguration(self) -> None:
         """Ohne aktiven Zeiger erklärt die Ansicht die fehlende Konfiguration."""
@@ -234,6 +237,87 @@ class SimulationskernRollenTests(TestCase):
         administratorin.save()
         self.client.force_login(administratorin)
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 200)
+
+
+class SimulationskernAnlegenTests(TestCase):
+    """Die leere Instanz legt ihre erste Kern-Fassung aus der App heraus an."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an einer Instanz ohne Kern-Fassung an."""
+        self.client.force_login(_administratorin("linus"))
+
+    def test_leerzustand_zeigt_beide_anlege_gesten(self) -> None:
+        """Ohne jede Fassung bietet die Verwaltung den leeren und den Standardweg."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, reverse("simulation:kern_anlegen_standard"))
+        self.assertContains(response, "Neuen Entwurf anlegen")
+        self.assertContains(response, "Standardkern als Entwurf anlegen")
+
+    def test_legt_einen_leeren_entwurf_an(self) -> None:
+        """Der leere Weg erzeugt genau einen Entwurf ohne Vorlagentexte."""
+        response: HttpResponse = self.client.post(reverse("simulation:kern_anlegen"))
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        entwurf: Simulationskern = Simulationskern.objects.get()
+        self.assertEqual(entwurf.zustand, Simulationskern.Zustand.ENTWURF)
+        self.assertEqual(entwurf.system_prompt_vorlage, "")
+        self.assertEqual(entwurf.rahmenhandlung_debrief, "")
+
+    def test_legt_einen_entwurf_aus_den_standardvorlagen_an(self) -> None:
+        """Der Standardweg erzeugt einen Entwurf mit den kanonischen Vorlagen."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:kern_anlegen_standard")
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        entwurf: Simulationskern = Simulationskern.objects.get()
+        self.assertEqual(entwurf.zustand, Simulationskern.Zustand.ENTWURF)
+        for feldname, vorlage in STANDARDKERN_VORLAGEN.items():
+            self.assertEqual(getattr(entwurf, feldname), vorlage)
+
+    def test_legt_keine_zweite_fassung_an_und_erklaert_die_ablehnung(self) -> None:
+        """Eine bereits angelegte Linie nimmt keine zweite erste Fassung an."""
+        Simulationskern.objects.anlegen(system_prompt_vorlage="Erster Prompt")
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:kern_anlegen"), follow=True
+        )
+
+        self.assertEqual(Simulationskern.objects.count(), 1)
+        self.assertContains(response, "Der Simulationskern wurde bereits angelegt.")
+
+    def test_verbirgt_die_gesten_neben_einem_entwurf(self) -> None:
+        """Nach der ersten Fassung führt der Weg zu Entwürfen über den Lebenszyklus."""
+        Simulationskern.objects.anlegen(system_prompt_vorlage="Erster Prompt")
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertNotContains(response, reverse("simulation:kern_anlegen"))
+
+    def test_verbirgt_die_gesten_neben_einer_finalen_fassung(self) -> None:
+        """Die Anzeige folgt derselben Bedingung wie die Anlege-Naht."""
+        erste: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="Erster Prompt"
+        )
+        erste.finalisieren()
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertNotContains(response, reverse("simulation:kern_anlegen"))
+
+    def test_gesten_sind_post_und_administratorinnen_vorbehalten(self) -> None:
+        """Die Anlege-Routen weisen GET und Autorinnen ohne Adminrolle ab."""
+        urls: tuple[str, ...] = (
+            reverse("simulation:kern_anlegen"),
+            reverse("simulation:kern_anlegen_standard"),
+        )
+
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 405)
+        self.client.force_login(_autorin("ada"))
+        for url in urls:
+            self.assertEqual(self.client.post(url).status_code, 403)
 
 
 class SimulationskernVerwaltungTests(TestCase):

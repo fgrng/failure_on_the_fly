@@ -34,6 +34,7 @@ from .models import (
     Simulationskern,
     TranskriptionsKonfiguration,
 )
+from .standardkern import STANDARDKERN_VORLAGEN
 
 
 def _finale_fassung() -> Simulationskern | None:
@@ -133,9 +134,30 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             ).first(),
             "finale_fassung": _finale_fassung(),
             "archivierte_fassungen": _archivierte_fassungen(),
+            # Dieselbe Bedingung, die die Anlege-Naht prüft: Nur solange die
+            # Historie leer ist, nimmt sie eine erste Fassung an.
+            "kern_fehlt": not Simulationskern.objects.exists(),
             **_kern_kontext(),
         },
     )
+
+
+@administratorin_erforderlich
+@require_POST
+def kern_anlegen(request: HttpRequest, *, mit_vorlage: bool) -> HttpResponse:
+    """Legt die erste Kern-Fassung als Entwurf an — leer oder aus der Vorlage.
+
+    Welcher Inhalt entsteht, entscheidet die Route und nicht die Anfrage. Die
+    Naht selbst lehnt jede zweite erste Fassung ab; die Ablehnung erreicht die
+    Administratorin als Meldung auf der Übersicht.
+    """
+    try:
+        Simulationskern.objects.anlegen(
+            **(STANDARDKERN_VORLAGEN if mit_vorlage else {})
+        )
+    except ValueError as error:
+        messages.error(request, str(error))
+    return redirect("simulation:kern_verwalten")
 
 
 @administratorin_erforderlich
