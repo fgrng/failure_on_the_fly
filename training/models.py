@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
@@ -172,4 +172,29 @@ post_save.connect(
     _archivierte_vignette_aus_trainings_entfernen,
     sender="vignetten.Vignette",
     dispatch_uid="training.archivierte_vignette_aus_trainings_entfernen",
+)
+
+
+def _teilnahme_der_abschrift_mitnehmen(
+    sender: type[models.Model],
+    instance: models.Model,
+    **kwargs: object,
+) -> None:
+    """Nimmt beim Entfernen einer Abschrift ihre Teilnahme und alle Kopien mit.
+
+    Das Signal und nicht das Kommando ist der Ort dafür: Die Abschrift hängt mit
+    `CASCADE` am Konto, ihre Zeile verschwindet also auch auf Wegen, die
+    `abschrift_loeschen` nie durchlaufen. Ohne diesen Empfänger blieben dabei
+    Teilnahme, Sitzungen, Transkripte und Diagnosen verwaist stehen.
+    """
+
+    from .abschriften import teilnahme_einer_abschrift_raeumen
+
+    teilnahme_einer_abschrift_raeumen(instance.teilnahme)
+
+
+post_delete.connect(
+    _teilnahme_der_abschrift_mitnehmen,
+    sender=Abschrift,
+    dispatch_uid="training.teilnahme_der_abschrift_mitnehmen",
 )

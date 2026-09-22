@@ -222,8 +222,9 @@ def _eigene_abschrift(request: HttpRequest, pk: int) -> Abschrift:
 def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     # Bereitet die kopierten Sitzungen zum Lesen auf. Die gespielte Folge steht
     # in der Vignettenposition; eine Sitzung ohne Position — die der Import
-    # zulässt — hängt sich hinten an. Die Denkspur bleibt hier wie im Template
-    # außen vor (ADR-0005).
+    # zulässt — hängt sich hinten an. Die Gesprächsschritte gehen vollständig in
+    # den Kontext, Denkspur eingeschlossen: Die Sichtbarkeitszusage aus ADR-0005
+    # hängt am Template, das die Denkspur nicht ausgibt.
 
     gespielte_folge: QuerySet[Sitzung] = (
         Sitzung.objects.filter(teilnahme=abschrift.teilnahme)

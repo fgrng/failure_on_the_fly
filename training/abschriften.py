@@ -50,16 +50,25 @@ def abschrift_holen(konto: Konto, token: str) -> Abschrift:
 def abschrift_loeschen(abschrift: Abschrift) -> None:
     """Entfernt eine Abschrift samt ihrer Teilnahme und allem Kopierten.
 
-    Gelöscht wird über die Teilnahme: Ihre Kaskade nimmt Sitzungen,
-    Gesprächsschritte, Diagnosen, Positionen und die Abschrift selbst mit. Nur
-    die Fehlversuche hängen geschützt an ihrem Schritt und gehen voraus. Die
-    Erhebungsdaten kennt dieser Weg nicht und rührt sie darum nicht an.
+    Gelöscht wird die Abschrift; ihre Teilnahme nimmt das `post_delete`-Signal
+    in `training.models` mit. Über dasselbe Signal räumt auch die Kaskade einer
+    Konto-Löschung auf, die diesen Einstiegspunkt nicht durchläuft.
     """
 
-    Fehlversuch.objects.filter(
-        gespraechsschritt__sitzung__teilnahme=abschrift.teilnahme
-    ).delete()
-    abschrift.teilnahme.delete()
+    abschrift.delete()
+
+
+def teilnahme_einer_abschrift_raeumen(teilnahme: Teilnahme) -> None:
+    """Löscht die Teilnahme einer entfernten Abschrift mit allem Kopierten.
+
+    Die Kaskade der Teilnahme nimmt Sitzungen, Gesprächsschritte, Diagnosen und
+    Positionen mit. Nur die Fehlversuche hängen mit `PROTECT` an ihrem Schritt
+    und gehen voraus. Die Erhebungsdaten kennt dieser Weg nicht und rührt sie
+    darum nicht an.
+    """
+
+    Fehlversuch.objects.filter(gespraechsschritt__sitzung__teilnahme=teilnahme).delete()
+    teilnahme.delete()
 
 
 def _holbare_bindung(token: str) -> Erhebungsbindung:

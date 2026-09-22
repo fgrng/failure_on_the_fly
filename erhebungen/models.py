@@ -13,7 +13,7 @@ from django.utils import timezone
 from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
-from sitzungen.bindungen import Bindung
+from sitzungen.bindungen import Bindung, BindungQuerySet
 
 _LIKERT_STUFEN: list[int] = LikertSkalenpol.stufen()
 _NIEDRIGSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[0]
@@ -495,8 +495,13 @@ def _teilnahme_token() -> str:
     )
 
 
-class ErhebungsbindungManager(models.Manager["Erhebungsbindung"]):
-    """Legt pseudonyme Bindungen mit kollisionsfreien Tokens an."""
+class ErhebungsbindungManager(models.Manager.from_queryset(BindungQuerySet)):
+    """Legt pseudonyme Bindungen mit kollisionsfreien Tokens an.
+
+    Steht auf dem `BindungQuerySet`, damit die Erhebungsbindung den Schutz
+    der Mengen-Schreibwege nicht verliert, nur weil sie einen eigenen
+    Manager braucht.
+    """
 
     def anlegen(self, stichprobe: Stichprobe) -> "Erhebungsbindung":
         """Erstellt die Teilnahme und versucht bei einer Tokenkollision erneut."""

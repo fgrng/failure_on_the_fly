@@ -14,7 +14,7 @@
         <div>
             <p>Meine Abschriften</p>
             <h1>{{ abschrift.erhebungsname }}</h1>
-            <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. Ihre Mitschrift — nur Sie lesen sie.</span>
+            <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. Ihre Abschrift — nur Sie lesen sie.</span>
         </div>
         <a class="button button--secondary" href="{% url 'training:abschriften' %}">Zurück zur Liste</a>
     </header>

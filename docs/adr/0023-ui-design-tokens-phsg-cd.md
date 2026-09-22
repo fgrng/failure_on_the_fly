@@ -15,7 +15,7 @@ Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folg
   - Flächen: Weiss `#ffffff`, Muted `#f5f7f6` (Grayscale-050), Rahmen `#d8dad9` (Grayscale-200).
   - Footer = Deep-Mint `#1c3e37`, Text darauf weiss.
   - Text auf Farbflächen stets weiss; farbige Boxen/Kacheln später aus den **Dark**-Tönen der Sekundärpalette.
-- **Typografie.** Platypi (Serif) für Überschriften, Albert Sans (Sans-Serif) für alles andere — beides **self-hosted** (`static/fonts/`, `static/css/fonts.css`), kein Google-Fonts-Request.
+- **Typografie.** Platypi (Serif) für Überschriften, Albert Sans (Sans-Serif) für alles andere — beides **self-hosted** (`static/fonts/`, `static/css/fonts.css`), kein Google-Fonts-Request. Dazu ein drittes Familien-Token `--font-mono` als reiner **System-Stack** (`ui-monospace, "SFMono-Regular", "Consolas", monospace`) für Zeichenfolgen, die Zeichen für Zeichen abgelesen und abgetippt werden — heute das Teilnahme-Token, dessen eindeutiges Alphabet nur bei fester Laufweite verwechslungsfrei bleibt. Die Self-Hosting-Festlegung bleibt unberührt, weil dafür keine Schriftdatei bezogen wird.
 - **Abstände.** Ein 8-px-Abstandsraster als `--space-1 … --space-8` (8px-Schritte). Es gilt für `gap`, `margin`, `padding` und positionierende Abstände; optische Masse wie Rahmenbreiten, Radien, Schriftgrössen und Fokus-Offsets folgen ihm nicht.
 - **Seitenraster.** Der Hauptbereich rechts der Navigation ist bis 1440 px breit und verwendet acht gleich breite Spalten mit 24 px Abstand. Standardseiten belegen alle acht Spalten. Unterhalb von 1050 px wird der Hauptbereich einspaltig. Die Navigation liegt ausserhalb dieses Rasters.
 - **Frontend-Libs.** htmx und Alpine werden **lokal ausgeliefert** (`static/js/`) statt per CDN — gleiche Datenschutz-Begründung wie bei den Fonts.
@@ -35,4 +35,5 @@ Die Nutzer-Oberfläche soll dem Corporate Design der PHSG (Guidelines 2026) folg
 - Direkte Kinder des Hauptbereichs belegen standardmässig alle acht Spalten; schmalere Darstellungen wählen ihren Spaltenbereich ausdrücklich.
 - Die Sekundärpalette ist als Primitiv-Tokens angelegt, aber ungenutzt, bis Kategorie-Kacheln o. Ä. gebaut werden (dann Dark-Töne, weisse Schrift). — Inzwischen belegt durch `docs/adr/0024` (Farbcodierung nach Funktionsbereich).
 - Font- und Lib-Dateien liegen im Repo unter `static/`; bei Updates müssen sie neu bezogen werden (keine automatische CDN-Aktualisierung).
+- Feste Laufweite ist der Zeichen-für-Zeichen-Lesbarkeit vorbehalten (Token, Codes); Fliesstext, Tabellen und Transkripte bleiben bei `--font-body`.
 - Dark Mode müsste die semantischen Tokens pro Theme überschreiben — die Trennung Primitiv/semantisch ist darauf vorbereitet.

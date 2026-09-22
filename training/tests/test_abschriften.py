@@ -613,7 +613,7 @@ def test_loeschen_entfernt_abschrift_teilnahme_und_kopierte_sitzungen(
 
 @pytest.mark.django_db
 def test_loeschen_laesst_die_erhebungsdaten_unberuehrt(client: Client) -> None:
-    """Die Forschungsdaten überstehen das Löschen der Mitschrift vollständig."""
+    """Die Forschungsdaten überstehen das Löschen der Abschrift vollständig."""
 
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
     abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
@@ -622,6 +622,54 @@ def test_loeschen_laesst_die_erhebungsdaten_unberuehrt(client: Client) -> None:
     client.force_login(teilnehmerin)
 
     client.post(reverse("training:abschrift_loeschen", args=[abschrift.pk]))
+
+    assert Erhebungsbindung.objects.values().get(pk=bindung.pk) == vorher
+    assert Sitzung.objects.filter(teilnahme=bindung.teilnahme).count() == 2
+    assert (
+        Gespraechsschritt.objects.filter(sitzung__teilnahme=bindung.teilnahme).count()
+        == 2
+    )
+    assert Diagnose.objects.filter(sitzung__teilnahme=bindung.teilnahme).count() == 1
+    assert bindung.teilnahme.vignettenpositionen.count() == 2
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_nimmt_die_abschrift_mit_allem_kopierten_mit() -> None:
+    """Auch ohne den Löschweg der Ansicht bleibt nichts Kopiertes zurück.
+
+    Die Abschrift hängt mit `CASCADE` am Konto; ohne den Signalempfänger
+    verschwände nur ihre Zeile und die Transkripte überlebten das Konto.
+    """
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    teilnahme_pk: int = abschrift.teilnahme_id
+
+    teilnehmerin.delete()
+
+    assert not Abschrift.objects.filter(pk=abschrift.pk).exists()
+    assert not Teilnahme.objects.filter(pk=teilnahme_pk).exists()
+    assert not Sitzung.objects.filter(teilnahme_id=teilnahme_pk).exists()
+    assert not Gespraechsschritt.objects.filter(
+        sitzung__teilnahme_id=teilnahme_pk
+    ).exists()
+    assert not Diagnose.objects.filter(sitzung__teilnahme_id=teilnahme_pk).exists()
+    assert not Fehlversuch.objects.filter(
+        gespraechsschritt__sitzung__teilnahme_id=teilnahme_pk
+    ).exists()
+    assert not Vignettenposition.objects.filter(teilnahme_id=teilnahme_pk).exists()
+
+
+@pytest.mark.django_db
+def test_konto_loeschen_laesst_die_erhebungsdaten_unberuehrt() -> None:
+    """Die Kaskade des Kontos endet an der Abschrift, nicht am Forschungsdatum."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+    vorher: dict[str, object] = Erhebungsbindung.objects.values().get(pk=bindung.pk)
+
+    teilnehmerin.delete()
 
     assert Erhebungsbindung.objects.values().get(pk=bindung.pk) == vorher
     assert Sitzung.objects.filter(teilnahme=bindung.teilnahme).count() == 2
