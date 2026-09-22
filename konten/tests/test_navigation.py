@@ -145,8 +145,10 @@ class SidebarNavigationTests(TestCase):
     """Die Sidebar verwendet ausschließlich die berechneten Booleans."""
 
     def _sidebar_fuer(self, *rollen: str, is_superuser: bool = False) -> str:
+        # Eigener Kontoname je Aufruf, damit ein Test mehrere Rollen nacheinander
+        # durch dieselbe Sidebar schicken kann.
         konto: Konto = get_user_model().objects.create_user(
-            username="ada", is_superuser=is_superuser
+            username=f"ada{Konto.objects.count()}", is_superuser=is_superuser
         )
         konto.groups.add(*Group.objects.filter(name__in=rollen))
         self.client.force_login(konto)
@@ -186,8 +188,6 @@ class SidebarNavigationTests(TestCase):
         """Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0043)."""
         for rollen in ([], ["Autor:in"], ["Ausbilder:in"], ["Forschende:r"]):
             with self.subTest(rollen=rollen):
-                Konto.objects.all().delete()
-
                 self.assertIn("Meine Abschriften", self._sidebar_fuer(*rollen))
 
     def test_forschende_sieht_forschungsbereich(self) -> None:

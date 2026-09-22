@@ -29,7 +29,7 @@
                         <a href="{% url 'training:historie' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "historie" %} aria-current="page"{% endif %}>Meine Trainings</a>
                     {% endif %}
                     {% if zeige_abschriften %}
-                    <a href="{% url 'training:abschriften' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "abschriften" %} aria-current="page"{% endif %}>Meine Abschriften</a>
+                        <a href="{% url 'training:abschriften' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "abschriften" %} aria-current="page"{% endif %}>Meine Abschriften</a>
                     {% endif %}
                 </div>
             </section>

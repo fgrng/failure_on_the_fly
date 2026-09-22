@@ -73,7 +73,7 @@ administratorin_erforderlich = rolle_erforderlich(ist_administratorin)
 
 
 def navigation(request: HttpRequest) -> dict[str, bool]:
-    """Stellt der Sidebar die ausschließlich rollenbasierten Sichtbarkeiten bereit."""
+    """Stellt der Sidebar jede Sichtbarkeit als fertig berechnetes Boolean bereit."""
     if not request.user.is_authenticated:
         return {
             "zeige_entwicklung": False,
@@ -91,8 +91,7 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
         "zeige_ausbildung_kuratieren": administration or AUSBILDERIN_GRUPPE in rollen,
         "zeige_teilnahme": not rollen and not administration,
         # Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0043): Wer ein
-        # Teilnahme-Token hat, holt sie sich — unabhängig davon, wozu das Konto
-        # sonst berechtigt ist.
+        # Teilnahme-Token hat, holt sie sich — unabhängig von den Rollen des Kontos.
         "zeige_abschriften": True,
         "zeige_forschung": administration or FORSCHENDE_GRUPPE in rollen,
         "zeige_system": administration,
