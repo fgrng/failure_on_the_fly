@@ -36,7 +36,7 @@
         };
         const zuruecksetzen = () => {
             steuerung.disabled = false;
-            steuerung.textContent = "Aufnahme starten";
+            steuerung.textContent = "Spracheingabe starten";
             steuerung.setAttribute("aria-pressed", "false");
         };
         const aufnahme_deaktivieren = (text) => {
@@ -116,9 +116,9 @@
                 });
                 recorder.addEventListener("stop", transkribieren, { once: true });
                 recorder.start(AUFNAHME_ZEITSCHEIBE_MS);
-                steuerung.textContent = "Aufnahme beenden";
+                steuerung.textContent = "Spracheingabe beenden";
                 steuerung.setAttribute("aria-pressed", "true");
-                zustand("Aufnahme läuft. Beenden Sie die Aufnahme, wenn sie vollständig ist.", true);
+                zustand("Die Spracheingabe läuft. Beenden Sie sie, wenn Ihre Eingabe vollständig ist.", true);
             } catch {
                 mikrofon_verweigert();
             }

@@ -335,8 +335,8 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:gespraech_beenden", args=[bindung.token])
         )
 
-        self.assertContains(gespraech, "Aufnahme starten")
-        self.assertContains(debrief, "Aufnahme starten")
+        self.assertContains(gespraech, "Spracheingabe starten")
+        self.assertContains(debrief, "Spracheingabe starten")
 
     def test_audioentscheidung_laesst_sich_nicht_ueberschreiben(self) -> None:
         """Eine einmal erfasste Audioentscheidung bleibt Teil der Datenspur."""

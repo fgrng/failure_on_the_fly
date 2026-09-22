@@ -86,7 +86,7 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Addiere zwei Brüche.")
         self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")
         self.assertContains(self.start_response, "Ihre nächste Frage")
-        self.assertContains(self.start_response, "Aufnahme starten")
+        self.assertContains(self.start_response, "Spracheingabe starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
 
     def test_training_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
@@ -115,7 +115,7 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten([], audioverarbeitung_eingewilligt=False)
 
         self.assertContains(self.start_response, "Ihre nächste Frage")
-        self.assertNotContains(self.start_response, "Aufnahme starten")
+        self.assertNotContains(self.start_response, "Spracheingabe starten")
 
     def test_debrief_ohne_audioeinwilligung_zeigt_nur_tastatureingabe(self) -> None:
         """Auch die Diagnose bleibt ohne Einwilligung per Tastatur abschließbar."""
@@ -124,7 +124,7 @@ class TrainingssitzungTests(TestCase):
         debrief: HttpResponse = self.client.post(reverse("training:gespraech_beenden"))
 
         self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
-        self.assertNotContains(debrief, "Aufnahme starten")
+        self.assertNotContains(debrief, "Spracheingabe starten")
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:
         """Ein answerless Schritt zeigt den Fehler und lässt keine Diagnose mehr zu."""
@@ -281,7 +281,7 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(response, "Ich addiere alles.")
         self.assertContains(response, "Debrief")
         self.assertNotContains(response, "Ihre nächste Frage")
-        self.assertNotContains(response, "Aufnahme starten")
+        self.assertNotContains(response, "Spracheingabe starten")
 
     def test_vergangene_sitzung_anderer_konten_nicht_einsehbar(self) -> None:
         """Fremde Sitzungen bleiben durch 404 geschützt."""
