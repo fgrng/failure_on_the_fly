@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Abschrift: {{ abschrift.erhebungsname }}{% endblock %}
+
+{% block extra_head %}
+    {# Die Gesprächsblasen des Transkripts stehen in sitzung.css. #}
+    <link rel="stylesheet" href="{% static 'css/sitzung.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Meine Abschriften</p>
+            <h1>{{ abschrift.erhebungsname }}</h1>
+            <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. Ihre Mitschrift — nur Sie lesen sie.</span>
+        </div>
+        <a class="button button--secondary" href="{% url 'training:abschriften' %}">Zurück zur Liste</a>
+    </header>
+
+    {% for sitzung in sitzungen %}
+        <section class="page-section" aria-labelledby="section-sitzung-{{ forloop.counter }}">
+            <header class="page-section__head">
+                <b>{{ forloop.counter|stringformat:"02d" }}</b><span>
+                    <h2 id="section-sitzung-{{ forloop.counter }}">{{ sitzung.name }}</h2><small>Ausgang: {{ sitzung.status }}</small>
+                </span>
+                <span class="badge badge--{{ sitzung.status_badge }}">{{ sitzung.status }}</span>
+            </header>
+
+            <div class="diagnosegespraech-verlauf" aria-label="Mein Diagnosegespräch">
+                {% for schritt in sitzung.gespraechsschritte %}
+                    <article class="gespraechsschritt">
+                        <div class="gespraechsschritt__eingabe">
+                            <span>Sie</span>
+                            <p>{{ schritt.eingabe }}</p>
+                        </div>
+                        {% if schritt.aeusserung %}
+                            <div class="gespraechsschritt__aeusserung">
+                                <span>Schüler:in</span>
+                                <p>{{ schritt.aeusserung }}</p>
+                            </div>
+                        {% endif %}
+                    </article>
+                {% empty %}
+                    <p>In dieser Sitzung wurde kein Gesprächsschritt festgehalten.</p>
+                {% endfor %}
+            </div>
+
+            <h3>Ihre Diagnose</h3>
+            {% if sitzung.diagnose %}
+                <p>{{ sitzung.diagnose.text }}</p>
+            {% else %}
+                <p>Diese Sitzung endete ohne Diagnose.</p>
+            {% endif %}
+        </section>
+    {% empty %}
+        <p>Diese Abschrift enthält keine Sitzung.</p>
+    {% endfor %}
+
+    <form method="post" action="{% url 'training:abschrift_loeschen' abschrift.pk %}">
+        {% csrf_token %}
+        <button class="button button--secondary" type="submit">Abschrift löschen</button>
+    </form>
+</section>
+{% endblock %}

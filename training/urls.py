@@ -15,6 +15,12 @@ urlpatterns: list[URLPattern] = [
     path("eigene/", views.liste, name="liste"),
     path("historie/", views.historie, name="historie"),
     path("abschriften/", views.abschriften, name="abschriften"),
+    path("abschriften/<int:pk>/", views.abschrift_ansehen, name="abschrift"),
+    path(
+        "abschriften/<int:pk>/loeschen/",
+        views.abschrift_entfernen,
+        name="abschrift_loeschen",
+    ),
     path("anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.kuratieren, name="kuratieren"),
     path(

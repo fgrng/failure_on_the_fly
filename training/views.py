@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, QuerySet
+from django.db.models import Count, F, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -40,7 +40,7 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_holen
+from .abschriften import abschrift_holen, abschrift_loeschen
 from .models import Abschrift, Training, Trainingsbindung
 
 
@@ -209,6 +209,52 @@ def abschriften(request: HttpRequest) -> HttpResponse:
         "-importiert_am"
     )
     return render(request, "training/abschriften.html", {"abschriften": eigene})
+
+
+def _eigene_abschrift(request: HttpRequest, pk: int) -> Abschrift:
+    """Lädt eine Abschrift des eingeloggten Kontos; jede fremde ist unbekannt."""
+
+    return get_object_or_404(
+        Abschrift.objects.filter(konto=request.user).select_related("teilnahme"), pk=pk
+    )
+
+
+@login_required
+def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt eine eigene Abschrift lesend in der gespielten Reihenfolge.
+
+    Der Pfad ist ein eigener: Die Trainings-Sitzungsansichten laden über die
+    Trainingsbindung und kennen Abschriften darum nicht.
+    """
+
+    abschrift: Abschrift = _eigene_abschrift(request, pk)
+    sitzungen: list[dict[str, object]] = [
+        {
+            "name": sitzung.vignette.historie.name or sitzung.vignette.fach,
+            "status": sitzung.get_status_display(),
+            "status_badge": _sitzung_status_badge(sitzung.status),
+            "gespraechsschritte": sitzung.gespraechsschritte,
+            "diagnose": getattr(sitzung, "diagnose", None),
+        }
+        for sitzung in Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
+        .select_related("vignette__historie", "diagnose")
+        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+    ]
+    return render(
+        request,
+        "training/abschrift.html",
+        {"abschrift": abschrift, "sitzungen": sitzungen},
+    )
+
+
+@login_required
+def abschrift_entfernen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Löscht eine eigene Abschrift mit ihrer Teilnahme und den Kopien."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    abschrift_loeschen(_eigene_abschrift(request, pk))
+    return redirect("training:abschriften")
 
 
 @login_required

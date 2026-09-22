@@ -30,6 +30,7 @@
                 <tr>
                     <th scope="col">Erhebung</th>
                     <th scope="col">Importiert am</th>
+                    <th scope="col">Aktion</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,10 +38,11 @@
                     <tr>
                         <td>{{ abschrift.erhebungsname }}</td>
                         <td>{{ abschrift.importiert_am|date:"d.m.Y H:i" }}</td>
+                        <td><a class="button" href="{% url 'training:abschrift' abschrift.pk %}">Lesen</a></td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="2" class="table__empty">Noch keine Abschrift geholt.</td>
+                        <td colspan="3" class="table__empty">Noch keine Abschrift geholt.</td>
                     </tr>
                 {% endfor %}
             </tbody>

@@ -186,6 +186,14 @@ wiederholbar; jede Wiederholung erzeugt eine weitere Abschrift. Unbrauchbare
 Tokens werden ohne Angabe eines Grundes abgelehnt. Die Liste zeigt je Abschrift
 den Namen der Erhebung und den Importzeitpunkt — nicht die Spielzeit der
 Erhebung.
+Von der Liste führt jede Abschrift in eine eigene, nur lesende Ansicht: die
+gespielten Vignetten in der Reihenfolge ihrer Vignettenposition, je Vignette das
+Transkript des Diagnosegesprächs, den Ausgang der Sitzung und die eigene
+Diagnose. Die Denkspur der simulierten Schüler:in erscheint auch hier nicht; es
+gibt weder Eingabefeld noch Sitzungsnavigation. Abschriften sind kontoprivat —
+eine fremde ist nicht erreichbar. Aus der Ansicht heraus lässt sich die Abschrift
+löschen; dabei verschwinden ihre Teilnahme und die kopierten Sitzungen, während
+die Daten der Erhebung unberührt bleiben.
 
 ## Erhebungen verwalten
 

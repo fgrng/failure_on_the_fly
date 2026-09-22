@@ -45,11 +45,14 @@ def _finaler_kern() -> Simulationskern:
     return kern
 
 
-def _finale_vignette_anlegen(konto: Konto) -> Vignette:
+def _finale_vignette_anlegen(konto: Konto, name: str = "") -> Vignette:
     """Legt eine für die Erhebung einbindbare Vignetten-Fassung an."""
 
     _finaler_kern()  # Vignette.objects.anlegen pinnt den aktuellen finalen Kern.
     vignette: Vignette = Vignette.objects.anlegen(konto)
+    if name:
+        vignette.historie.name = name
+        vignette.historie.save(update_fields=["name"])
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
     vignette.lernauftrag_text = "Addiere die Brüche."
     vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
@@ -412,3 +415,199 @@ def test_abschrift_zaehlt_nicht_zur_trainingshistorie(client: Client) -> None:
     antwort: HttpResponse = client.get(reverse("training:historie"))
 
     assert "Brüche im Herbst" not in antwort.content.decode()
+
+
+def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
+    """Holt eine Abschrift, deren gespielte Folge der Anlagereihenfolge widerspricht.
+
+    Die zuerst angelegte Sitzung wurde als zweite gespielt; so belegt ein
+    Reihenfolgetest die Vignettenposition und nicht den Zufall der Schlüssel.
+    """
+
+    forschende: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = _erhebung_anlegen(forschende)
+    bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
+    spaeter: Vignette = erhebung.vignetten.get()
+    spaeter.historie.name = "Danach gespielt"
+    spaeter.historie.save(update_fields=["name"])
+    Vignettenposition.objects.filter(teilnahme=bindung.teilnahme).update(position=2)
+    zuerst: Sitzung = Sitzung.objects.create(
+        teilnahme=bindung.teilnahme,
+        vignette=_finale_vignette_anlegen(forschende, name="Zuerst gespielt"),
+        simulationskern=_finaler_kern(),
+        modell_konfiguration=ModellKonfiguration.objects.aktive(),
+        status=Sitzung.Status.ABGEBROCHEN,
+    )
+    Gespraechsschritt.objects.create(
+        sitzung=zuerst,
+        eingabe="Wie bist du vorgegangen?",
+        denkspur="Geheime zweite Denkspur.",
+        aeusserung="Ich habe geraten.",
+        reihenfolge=1,
+    )
+    Vignettenposition.objects.create(
+        teilnahme=bindung.teilnahme,
+        sitzung=zuerst,
+        vignette=zuerst.vignette,
+        position=1,
+    )
+    return abschrift_holen(konto, bindung.token)
+
+
+@pytest.mark.django_db
+def test_ansicht_zeigt_die_vignetten_in_der_gespielten_reihenfolge(
+    client: Client,
+) -> None:
+    """Die Abschrift folgt der Vignettenposition, nicht der Anlagereihenfolge."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    client.force_login(teilnehmerin)
+
+    inhalt: str = client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+    assert inhalt.index("Zuerst gespielt") < inhalt.index("Danach gespielt")
+
+
+@pytest.mark.django_db
+def test_ansicht_zeigt_transkript_ausgang_und_eigene_diagnose(client: Client) -> None:
+    """Je Vignette erscheinen Gesprächsverlauf, Ausgang und eigene Diagnose."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    client.force_login(teilnehmerin)
+
+    inhalt: str = client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+    assert "Wie hast du gerechnet?" in inhalt
+    assert "Ich habe oben und unten zusammengezählt." in inhalt
+    assert "Zähler und Nenner addiert." in inhalt
+    assert "Abgeschlossen" in inhalt
+    assert "Abgebrochen" in inhalt
+
+
+@pytest.mark.django_db
+def test_ansicht_verschweigt_die_denkspur(client: Client) -> None:
+    """ADR-0005 gilt auch nachträglich und auch im Trainingsbereich."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    client.force_login(teilnehmerin)
+
+    inhalt: str = client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+    assert "Ich addiere Zähler und Nenner." not in inhalt
+    assert "Geheime zweite Denkspur." not in inhalt
+    assert "Denkspur" not in inhalt
+
+
+@pytest.mark.django_db
+def test_ansicht_bietet_keine_eingabe_und_keine_sitzungsnavigation(
+    client: Client,
+) -> None:
+    """Die Abschrift wird gelesen, nicht gespielt — nur das Löschen ist ein Knopf."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    client.force_login(teilnehmerin)
+
+    inhalt: str = client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+    assert "<textarea" not in inhalt
+    assert reverse("training:gespraech") not in inhalt
+    assert reverse("training:debrief") not in inhalt
+    assert reverse("training:abbrechen") not in inhalt
+    assert reverse("training:transkription") not in inhalt
+    assert 'type="text"' not in inhalt
+
+
+@pytest.mark.django_db
+def test_fremde_abschrift_ist_nicht_erreichbar(client: Client) -> None:
+    """Abschriften sind kontoprivat."""
+
+    fremde: Konto = Konto.objects.create_user(username="linus")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(fremde)
+    client.force_login(Konto.objects.create_user(username="grace"))
+    url: str = reverse("training:abschrift", args=[abschrift.pk])
+
+    assert client.get(url).status_code == 404
+    assert (
+        client.post(
+            reverse("training:abschrift_loeschen", args=[abschrift.pk])
+        ).status_code
+        == 404
+    )
+    assert Abschrift.objects.filter(pk=abschrift.pk).exists()
+
+
+@pytest.mark.django_db
+def test_trainings_sitzungsansicht_zeigt_abschriften_nicht(client: Client) -> None:
+    """Die bestehenden Sitzungsansichten laden über die Trainingsbindung."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    kopie: Sitzung = Sitzung.objects.filter(teilnahme=abschrift.teilnahme).first()
+    client.force_login(teilnehmerin)
+
+    antwort: HttpResponse = client.get(
+        reverse("training:sitzung_ansehen", args=[kopie.pk])
+    )
+
+    assert antwort.status_code == 404
+
+
+@pytest.mark.django_db
+def test_loeschen_entfernt_abschrift_teilnahme_und_kopierte_sitzungen(
+    client: Client,
+) -> None:
+    """Aus der Ansicht heraus verschwindet die Abschrift mit allem Kopierten."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    teilnahme_pk: int = abschrift.teilnahme_id
+    client.force_login(teilnehmerin)
+
+    antwort: HttpResponse = client.post(
+        reverse("training:abschrift_loeschen", args=[abschrift.pk]), follow=True
+    )
+
+    assert antwort.redirect_chain[-1][0] == reverse("training:abschriften")
+    assert not Abschrift.objects.filter(pk=abschrift.pk).exists()
+    assert not Teilnahme.objects.filter(pk=teilnahme_pk).exists()
+    assert not Sitzung.objects.filter(teilnahme_id=teilnahme_pk).exists()
+    assert not Gespraechsschritt.objects.filter(
+        sitzung__teilnahme_id=teilnahme_pk
+    ).exists()
+    assert not Fehlversuch.objects.filter(
+        gespraechsschritt__sitzung__teilnahme_id=teilnahme_pk
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_loeschen_laesst_die_erhebungsdaten_unberuehrt(client: Client) -> None:
+    """Die Forschungsdaten überstehen das Löschen der Mitschrift vollständig."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+    vorher: dict[str, object] = Erhebungsbindung.objects.values().get(pk=bindung.pk)
+    client.force_login(teilnehmerin)
+
+    client.post(reverse("training:abschrift_loeschen", args=[abschrift.pk]))
+
+    assert Erhebungsbindung.objects.values().get(pk=bindung.pk) == vorher
+    assert Sitzung.objects.filter(teilnahme=bindung.teilnahme).count() == 2
+    assert (
+        Gespraechsschritt.objects.filter(sitzung__teilnahme=bindung.teilnahme).count()
+        == 2
+    )
+    assert Diagnose.objects.filter(sitzung__teilnahme=bindung.teilnahme).count() == 1
+    assert bindung.teilnahme.vignettenpositionen.count() == 2

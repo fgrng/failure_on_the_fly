@@ -46,6 +46,22 @@ def abschrift_holen(konto: Konto, token: str) -> Abschrift:
     return abschrift
 
 
+@transaction.atomic
+def abschrift_loeschen(abschrift: Abschrift) -> None:
+    """Entfernt eine Abschrift samt ihrer Teilnahme und allem Kopierten.
+
+    Gelöscht wird über die Teilnahme: Ihre Kaskade nimmt Sitzungen,
+    Gesprächsschritte, Diagnosen, Positionen und die Abschrift selbst mit. Nur
+    die Fehlversuche hängen geschützt an ihrem Schritt und gehen voraus. Die
+    Erhebungsdaten kennt dieser Weg nicht und rührt sie darum nicht an.
+    """
+
+    Fehlversuch.objects.filter(
+        gespraechsschritt__sitzung__teilnahme=abschrift.teilnahme
+    ).delete()
+    abschrift.teilnahme.delete()
+
+
 def _holbare_bindung(token: str) -> Erhebungsbindung:
     # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen und
     # nichts archiviert ist. Jeder andere Ausgang ist dieselbe Ablehnung.
