@@ -543,18 +543,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with (
-            patch(
-                "sitzungen.views._jetzt",
-                return_value=datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-            ),
-            patch(
-                "sitzungen.durchlauf._jetzt",
-                side_effect=[
-                    datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                    datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-                ],
-            ),
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
+            ],
         ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(
@@ -578,18 +573,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with (
-            patch(
-                "sitzungen.views._jetzt",
-                return_value=datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-            ),
-            patch(
-                "sitzungen.durchlauf._jetzt",
-                side_effect=[
-                    datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                    datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-                ],
-            ),
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
+            ],
         ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(
@@ -610,15 +600,12 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with (
-            patch(
-                "sitzungen.views._jetzt",
-                return_value=datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-            ),
-            patch(
-                "sitzungen.durchlauf._jetzt",
-                return_value=datetime(2026, 9, 22, 10, 0, 15, tzinfo=UTC),
-            ),
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 15, tzinfo=UTC),
+            ],
         ):
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             response: HttpResponse = self.client.post(

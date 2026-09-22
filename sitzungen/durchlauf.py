@@ -18,7 +18,7 @@ from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from vignetten.models import Vignette, rahmen_platzhalter
 
 
-def _jetzt() -> datetime:
+def jetzt() -> datetime:
     """Liefert die Wanduhr für Übergänge des Budgetstands."""
 
     return timezone.now()
@@ -84,7 +84,7 @@ def gespraechsschritt_ausfuehren(
     der Sink hinter der Naht — nicht dieser Ablauf.
     """
 
-    sink.zug_beenden(_jetzt())
+    sink.zug_beenden(jetzt())
     antwortversuch: Antwortversuch = antwort_versuchen(
         vignette,
         simulationskern,
@@ -119,13 +119,13 @@ def gespraechsschritt_ausfuehren(
 def sitzung_beenden(sink: SitzungSink) -> None:
     """Hält die Uhr an und bereitet das Erreichen des Debriefs vor."""
 
-    sink.zug_beenden(_jetzt())
+    sink.zug_beenden(jetzt())
 
 
 def sitzung_abbrechen(sink: SitzungSink) -> None:
     """Hält die Uhr an und markiert die Sitzung als abgebrochen."""
 
-    sink.zug_beenden(_jetzt())
+    sink.zug_beenden(jetzt())
     sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
 
 

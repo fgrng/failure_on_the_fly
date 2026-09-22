@@ -1,7 +1,6 @@
 """Views für Probeläufe und die Bausteine persistierter Sitzungen ihrer Aufrufer."""
 
 from collections.abc import Callable
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
@@ -12,7 +11,6 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
 
 from konten.navigation import ist_administratorin
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -22,6 +20,7 @@ from simulation.transkription import (
     Transkription,
     TranskriptionsAnbieterfehler,
 )
+from sitzungen import durchlauf
 from sitzungen.durchlauf import (
     Ausgang,
     Sitzungsnavigation,
@@ -38,12 +37,6 @@ from sitzungen.sink import (
     probelauf_laeuft,
 )
 from vignetten.models import Vignette
-
-
-def _jetzt() -> datetime:
-    """Liefert die Wanduhr für Übergänge des Budgetstands."""
-
-    return timezone.now()
 
 
 if TYPE_CHECKING:
@@ -272,7 +265,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         return _gespeicherten_debrief_anzeigen(request, sink)
     vignette, kern = _probelauf_vignette_und_kern(request, sink)
     if request.method == "GET":
-        sink.zug_beginnen(_jetzt())
+        sink.zug_beginnen(durchlauf.jetzt())
         return _gespraech_anzeigen(request, vignette, kern, schritte)
     modell_konfiguration: ModellKonfiguration = get_object_or_404(
         ModellKonfiguration.objects.all(), pk=sink.modell_konfiguration_pk
@@ -290,13 +283,13 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
         eingabemodus,
     )
     if ausgang is Ausgang.GESCHEITERT:
-        sink.zug_beginnen(_jetzt())
+        sink.zug_beginnen(durchlauf.jetzt())
         return _gespraech_anzeigen(
             request, vignette, kern, schritte, eingabe, eingabemodus
         )
     if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return _debrief_anzeigen(request, vignette, kern, schritte)
-    sink.zug_beginnen(_jetzt())
+    sink.zug_beginnen(durchlauf.jetzt())
     return _gespraech_anzeigen(request, vignette, kern, schritte)
 
 
@@ -500,7 +493,7 @@ def persistiertes_gespraech(
         )
     sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
     if request.method == "GET":
-        sink.zug_beginnen(_jetzt())
+        sink.zug_beginnen(durchlauf.jetzt())
         return _persistiertes_gespraech_anzeigen(
             request, sitzung, schritte, navigation=navigation
         )
@@ -518,7 +511,7 @@ def persistiertes_gespraech(
         )
     if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
-    sink.zug_beginnen(_jetzt())
+    sink.zug_beginnen(durchlauf.jetzt())
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,

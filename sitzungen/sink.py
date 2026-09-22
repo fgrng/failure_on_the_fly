@@ -417,7 +417,6 @@ class ScratchSink:
                 "fehlversuche": fehlversuche,
             }
         )
-        self._als_geaendert_markieren()
         budgetstand.gespraechsschritt_anhaengen()
         self._budgetstand_speichern(budgetstand)
         erschoepft: bool = budgetstand.ist_erschoepft(

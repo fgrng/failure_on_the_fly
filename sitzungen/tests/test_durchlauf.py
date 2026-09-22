@@ -387,7 +387,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
     monkeypatch.setattr(
-        "sitzungen.durchlauf._jetzt",
+        "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 7, tzinfo=UTC),
     )
     for sink, session in (
@@ -415,7 +415,7 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
     session: SessionStore = SessionStore()
     sink: DBSink = DBSink(Teilnahme.objects.create(), session=session)
     monkeypatch.setattr(
-        "sitzungen.durchlauf._jetzt",
+        "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 3, tzinfo=UTC),
     )
     sitzung_starten(sink, vignette, kern, konfiguration)

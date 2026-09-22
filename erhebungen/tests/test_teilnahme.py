@@ -855,18 +855,13 @@ class ErhebungsteilnahmeTests(TestCase):
         session["training_verbrauchte_zeit"] = 999.0
         session.save()
 
-        with (
-            patch(
-                "sitzungen.views._jetzt",
-                return_value=datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-            ),
-            patch(
-                "sitzungen.durchlauf._jetzt",
-                side_effect=[
-                    datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-                    datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-                ],
-            ),
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+            ],
         ):
             self.client.get(gespraech_url)
             antwort: HttpResponse = self.client.post(
