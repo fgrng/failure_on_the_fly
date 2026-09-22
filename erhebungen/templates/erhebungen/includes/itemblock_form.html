@@ -1,4 +1,6 @@
+{# Die Klassen sitzen in dieser Teilvorlage, weil htmx sie per outerHTML tauscht. #}
 <form
+    class="form"
     method="post"
     action="{% url 'erhebungen:itemblock' token %}"
     id="itemblock-formular"
@@ -9,10 +11,12 @@
 >
     {% csrf_token %}
     {% for feld in formular %}
-        <fieldset>
+        <fieldset class="page-fieldset page-choices">
             <legend>{{ feld.label }}</legend>
             {{ feld }}
         </fieldset>
     {% endfor %}
-    <button type="submit" name="weiter" value="ja">Weiter</button>
+    <div class="vignette-form-actions">
+        <button class="button" type="submit" name="weiter" value="ja">Weiter</button>
+    </div>
 </form>
