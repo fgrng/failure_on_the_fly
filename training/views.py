@@ -219,6 +219,31 @@ def _eigene_abschrift(request: HttpRequest, pk: int) -> Abschrift:
     )
 
 
+def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
+    # Bereitet die kopierten Sitzungen zum Lesen auf. Die gespielte Folge steht
+    # in der Vignettenposition; eine Sitzung ohne Position — die der Import
+    # zulässt — hängt sich hinten an. Die Denkspur bleibt hier wie im Template
+    # außen vor (ADR-0005).
+
+    gespielte_folge: QuerySet[Sitzung] = (
+        Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
+        .select_related("vignette__historie", "diagnose")
+        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+    )
+    return [
+        {
+            "name": sitzung.vignette.historie.name or sitzung.vignette.fach,
+            "status": sitzung.get_status_display(),
+            "status_badge": _sitzung_status_badge(sitzung.status),
+            "gespraechsschritte": sitzung.gespraechsschritte,
+            # Eine Sitzung ohne Diagnose hat die Rückwärts-1:1 nicht; ihr
+            # Zugriff wirft AttributeError.
+            "diagnose": getattr(sitzung, "diagnose", None),
+        }
+        for sitzung in gespielte_folge
+    ]
+
+
 @login_required
 def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt eine eigene Abschrift lesend in der gespielten Reihenfolge.
@@ -228,22 +253,10 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
-    sitzungen: list[dict[str, object]] = [
-        {
-            "name": sitzung.vignette.historie.name or sitzung.vignette.fach,
-            "status": sitzung.get_status_display(),
-            "status_badge": _sitzung_status_badge(sitzung.status),
-            "gespraechsschritte": sitzung.gespraechsschritte,
-            "diagnose": getattr(sitzung, "diagnose", None),
-        }
-        for sitzung in Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
-        .select_related("vignette__historie", "diagnose")
-        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
-    ]
     return render(
         request,
         "training/abschrift.html",
-        {"abschrift": abschrift, "sitzungen": sitzungen},
+        {"abschrift": abschrift, "sitzungen": _gelesene_sitzungen(abschrift)},
     )
 
 

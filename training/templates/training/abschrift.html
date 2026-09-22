@@ -60,7 +60,7 @@
 
     <form method="post" action="{% url 'training:abschrift_loeschen' abschrift.pk %}">
         {% csrf_token %}
-        <button class="button button--secondary" type="submit">Abschrift löschen</button>
+        <button class="button button--danger" type="submit">Abschrift löschen</button>
     </form>
 </section>
 {% endblock %}

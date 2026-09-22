@@ -46,7 +46,11 @@ def _finaler_kern() -> Simulationskern:
 
 
 def _finale_vignette_anlegen(konto: Konto, name: str = "") -> Vignette:
-    """Legt eine für die Erhebung einbindbare Vignetten-Fassung an."""
+    """Legt eine für die Erhebung einbindbare Vignetten-Fassung an.
+
+    Ein übergebener Name geht an die Historie: So lassen sich mehrere Fassungen
+    im gerenderten Text auseinanderhalten.
+    """
 
     _finaler_kern()  # Vignette.objects.anlegen pinnt den aktuellen finalen Kern.
     vignette: Vignette = Vignette.objects.anlegen(konto)
@@ -454,34 +458,62 @@ def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
     return abschrift_holen(konto, bindung.token)
 
 
+def _gelesene_ansicht(client: Client) -> str:
+    """Holt eine Abschrift ins Konto einer Teilnehmerin und liest ihre Ansicht.
+
+    Die Ansichtstests unterscheiden sich nur darin, was sie im Text suchen.
+    """
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    client.force_login(teilnehmerin)
+    return client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+
 @pytest.mark.django_db
 def test_ansicht_zeigt_die_vignetten_in_der_gespielten_reihenfolge(
     client: Client,
 ) -> None:
     """Die Abschrift folgt der Vignettenposition, nicht der Anlagereihenfolge."""
 
+    inhalt: str = _gelesene_ansicht(client)
+
+    assert inhalt.index("Zuerst gespielt") < inhalt.index("Danach gespielt")
+
+
+@pytest.mark.django_db
+def test_ansicht_zeigt_auch_eine_sitzung_ohne_vignettenposition(
+    client: Client,
+) -> None:
+    """Der Import lässt Sitzungen ohne Position zu; die Ansicht verliert keine."""
+
+    forschende: Konto = Konto.objects.create_user(username="ada")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
+    bindung: Erhebungsbindung = _gespielte_teilnahme(_erhebung_anlegen(forschende))
+    Sitzung.objects.create(
+        teilnahme=bindung.teilnahme,
+        vignette=_finale_vignette_anlegen(forschende, name="Ohne Position"),
+        simulationskern=_finaler_kern(),
+        modell_konfiguration=ModellKonfiguration.objects.aktive(),
+        status=Sitzung.Status.ABGEBROCHEN,
+    )
+    abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
     client.force_login(teilnehmerin)
 
     inhalt: str = client.get(
         reverse("training:abschrift", args=[abschrift.pk])
     ).content.decode()
 
-    assert inhalt.index("Zuerst gespielt") < inhalt.index("Danach gespielt")
+    assert "Ohne Position" in inhalt
 
 
 @pytest.mark.django_db
 def test_ansicht_zeigt_transkript_ausgang_und_eigene_diagnose(client: Client) -> None:
     """Je Vignette erscheinen Gesprächsverlauf, Ausgang und eigene Diagnose."""
 
-    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
-    client.force_login(teilnehmerin)
-
-    inhalt: str = client.get(
-        reverse("training:abschrift", args=[abschrift.pk])
-    ).content.decode()
+    inhalt: str = _gelesene_ansicht(client)
 
     assert "Wie hast du gerechnet?" in inhalt
     assert "Ich habe oben und unten zusammengezählt." in inhalt
@@ -494,13 +526,7 @@ def test_ansicht_zeigt_transkript_ausgang_und_eigene_diagnose(client: Client) ->
 def test_ansicht_verschweigt_die_denkspur(client: Client) -> None:
     """ADR-0005 gilt auch nachträglich und auch im Trainingsbereich."""
 
-    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
-    client.force_login(teilnehmerin)
-
-    inhalt: str = client.get(
-        reverse("training:abschrift", args=[abschrift.pk])
-    ).content.decode()
+    inhalt: str = _gelesene_ansicht(client)
 
     assert "Ich addiere Zähler und Nenner." not in inhalt
     assert "Geheime zweite Denkspur." not in inhalt
@@ -513,13 +539,7 @@ def test_ansicht_bietet_keine_eingabe_und_keine_sitzungsnavigation(
 ) -> None:
     """Die Abschrift wird gelesen, nicht gespielt — nur das Löschen ist ein Knopf."""
 
-    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
-    client.force_login(teilnehmerin)
-
-    inhalt: str = client.get(
-        reverse("training:abschrift", args=[abschrift.pk])
-    ).content.decode()
+    inhalt: str = _gelesene_ansicht(client)
 
     assert "<textarea" not in inhalt
     assert reverse("training:gespraech") not in inhalt
@@ -554,7 +574,7 @@ def test_trainings_sitzungsansicht_zeigt_abschriften_nicht(client: Client) -> No
 
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
     abschrift: Abschrift = _abschrift_mit_zwei_sitzungen(teilnehmerin)
-    kopie: Sitzung = Sitzung.objects.filter(teilnahme=abschrift.teilnahme).first()
+    kopie: Sitzung = abschrift.teilnahme.sitzung_set.earliest("pk")
     client.force_login(teilnehmerin)
 
     antwort: HttpResponse = client.get(
