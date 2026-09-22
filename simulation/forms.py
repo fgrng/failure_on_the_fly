@@ -13,6 +13,13 @@ from .models import (
     TranskriptionsKonfiguration,
 )
 
+# Das Feld heißt an beiden Nähten gleich und wird an beiden gleich gefüllt —
+# also steht an beiden derselbe Hinweis.
+BASIS_URL_HINWEIS: str = (
+    "Die Endpunktwurzel des Anbieters. Bei Infomaniak füllt der Ladeknopf sie; "
+    "bei OpenRouter leer lassen für die Vorgabe https://openrouter.ai/api/v1."
+)
+
 _RAHMEN_FELDER: dict[str, str] = {
     "rahmenhandlung_einleitung": "Hospitationseinleitung",
     "rahmenhandlung_gespraechseinleitung": "Gesprächseinleitung",
@@ -79,24 +86,29 @@ class ModellKonfigurationForm(ModelForm):
         """Beschränkt das Formular auf die Felder einer neuen Fassung."""
 
         model: type[ModellKonfiguration] = ModellKonfiguration
+        # Die Reihenfolge der Eingabe, nicht die des Modells: Das Token steht
+        # beim Anbieter, weil der Ladeknopf der Modellliste es braucht.
         fields: list[str] = [
             "anbieter",
-            "sprachmodell",
-            "anbieter_basis_url",
             "anbieter_token",
+            "anbieter_basis_url",
+            "sprachmodell",
             "parameter",
         ]
         labels: dict[str, str] = {
             "anbieter": "Anbieter",
-            "sprachmodell": "Sprachmodell",
-            "anbieter_basis_url": "Basis-URL",
             "anbieter_token": "Token",
+            "anbieter_basis_url": "Basis-URL",
+            "sprachmodell": "Sprachmodell",
             "parameter": "Parameter",
         }
         help_texts: dict[str, str] = {
+            "anbieter_token": (
+                "Der Ladeknopf unten braucht es. Wird gespeichert, aber nie "
+                "wieder angezeigt."
+            ),
+            "anbieter_basis_url": BASIS_URL_HINWEIS,
             "sprachmodell": "Mit dem Präfix des gewählten Anbieters.",
-            "anbieter_basis_url": "Die Endpunktwurzel des Anbieters.",
-            "anbieter_token": "Wird gespeichert, aber nie wieder angezeigt.",
         }
         # Write-only: Der gesetzte Wert wird nie zurückgerendert — bei einem
         # Formularfehler ebenso wenig wie nach dem Speichern.
@@ -125,26 +137,29 @@ class TranskriptionsKonfigurationForm(ModelForm):
         """Führt die Felder der Konfiguration; das Token gibt sie nie zurück."""
 
         model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
+        # Dieselbe Eingabefolge wie in der Modell-Konfiguration: Das Token
+        # steht beim Anbieter, weil der Ladeknopf der Modellliste es braucht.
         fields: list[str] = [
             "anbieter",
-            "anbieter_basis_url",
             "anbieter_token",
+            "anbieter_basis_url",
             "transkriptionsmodell",
             "sprache",
         ]
         labels: dict[str, str] = {
             "anbieter": "Anbieter",
+            "anbieter_token": "Token",
             "anbieter_basis_url": "Basis-URL",
-            "anbieter_token": "Zugangstoken",
             "transkriptionsmodell": "Transkriptionsmodell",
             "sprache": "Sprache",
         }
         help_texts: dict[str, str] = {
-            "anbieter_basis_url": (
-                "Bei Infomaniak die Wurzel des eigenen Kontos; bei OpenRouter "
-                "leer lassen für die Vorgabe https://openrouter.ai/api/v1."
+            "anbieter_token": (
+                "Der Ladeknopf unten braucht es. Leer lassen behält das "
+                "hinterlegte Token."
             ),
-            "anbieter_token": "Leer lassen behält das hinterlegte Token.",
+            "anbieter_basis_url": BASIS_URL_HINWEIS,
+            "transkriptionsmodell": "Mit dem Präfix des gewählten Anbieters.",
             "sprache": "Sprachkürzel, damit die Transkription nicht raten muss.",
         }
         widgets: dict[str, PasswordInput] = {

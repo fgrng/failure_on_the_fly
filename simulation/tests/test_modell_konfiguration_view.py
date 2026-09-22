@@ -647,6 +647,14 @@ class ModellvorschlaegeSeitenTests(TestCase):
 
         self.assertContains(response, "anbieter !== 'fake'")
 
+    def test_stellt_das_token_vor_das_sprachmodell(self) -> None:
+        """Der Ladeknopf braucht das Token, also steht es beim Anbieter."""
+        seite: str = self._seite().content.decode()
+
+        self.assertLess(
+            seite.index('name="anbieter_token"'), seite.index('name="sprachmodell"')
+        )
+
     def test_holt_beim_rendern_keine_modellliste(self) -> None:
         """Eine Systemseite rendert ohne Netzaufruf."""
         with patch("simulation.views.modellverzeichnis") as verzeichnis:

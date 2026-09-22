@@ -22,7 +22,9 @@
             },
             einsetzen(wert) {
                 document.getElementById('{{ feld|escapejs }}').value = wert;
-                this.suche = '';
+                // Die Wahl ist getroffen: Die Liste liegt über den Feldern
+                // darunter und räumt sie deshalb sofort wieder frei.
+                this.$refs.modellvorschlaege.innerHTML = '';
             },
         }">
         <input type="search" x-model="suche" placeholder="Modell suchen" aria-label="Modell suchen">

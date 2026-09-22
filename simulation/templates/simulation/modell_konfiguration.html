@@ -43,7 +43,7 @@
                     <dl class="field-grid">
                         <div><dt>Anbieter</dt><dd>{{ konfiguration.anbieter }}</dd></div>
                         <div><dt>Basis-URL</dt><dd>{{ konfiguration.anbieter_basis_url|default:"—" }}</dd></div>
-                        <div><dt>Token</dt><dd>{{ konfiguration.anbieter_token_maskiert|default:"Kein Token hinterlegt" }}</dd></div>
+                        <div><dt>Token</dt><dd>{{ konfiguration.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
                         <div><dt>Parameter</dt><dd><pre>{{ konfiguration.parameter }}</pre></dd></div>
                     </dl>
                     {% if not konfiguration.ist_aktiv %}
@@ -77,9 +77,9 @@
                  x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
                  @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
                 {% include "vignetten/includes/form_field.html" with field=form.parameter %}
             </div>
             <div class="vignette-form-actions">

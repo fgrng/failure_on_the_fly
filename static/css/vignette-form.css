@@ -20,6 +20,8 @@
 .vignette-field .errorlist { margin: var(--space-1) 0 0; padding: 0; color: var(--color-danger); font-size: .78rem; list-style: none; }
 
 .vignette-autovervollstaendigung { position: relative; }
+/* Der Ladeknopf ist eine eigene Geste und klebt deshalb nicht am Feld. */
+.vignette-autovervollstaendigung > .button { margin-top: var(--space-2); }
 [x-cloak] { display: none !important; }
 .vignette-vorschlaege {
     position: absolute;

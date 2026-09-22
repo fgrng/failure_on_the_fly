@@ -293,6 +293,15 @@ class TranskriptionsKonfigurationVorschlaegeTests(TestCase):
 
         self.assertContains(response, "$refs.modellvorschlaege.innerHTML = ''")
 
+    def test_stellt_das_token_vor_das_transkriptionsmodell(self) -> None:
+        """Dieselbe Eingabefolge wie in der Modell-Konfiguration."""
+        seite: str = self.client.get(reverse(SEITE)).content.decode()
+
+        self.assertLess(
+            seite.index('name="anbieter_token"'),
+            seite.index('name="transkriptionsmodell"'),
+        )
+
 
 class TranskriptionsKonfigurationWirkungTests(TestCase):
     """Eine geänderte Konfiguration greift ohne Neustart."""
