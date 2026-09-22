@@ -22,14 +22,13 @@
         </header>
         <div class="page-field">
             <p class="prose">{{ erhebung.instruktionstext }}</p>
-            <p>Das Diagnosegespräch ist begrenzt.</p>
         </div>
     </section>
 
     <form class="form" method="post" action="{% url 'erhebungen:spielen' teilnahme_link=stichprobe.teilnahme_link %}">
         {% csrf_token %}
         <div class="vignette-form-actions">
-            <button class="button" type="submit">Vignette beginnen</button>
+            <button class="button" type="submit">Weiter</button>
         </div>
     </form>
 </section>

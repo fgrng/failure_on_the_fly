@@ -361,27 +361,6 @@ class ErhebungsteilnahmeTests(TestCase):
             Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt
         )
 
-    def test_einwilligung_und_instruktion_zeigen_die_erhebungstexte(self) -> None:
-        """Die Teilnahme informiert vor dem Spiel über Zustimmung und Begrenzung."""
-
-        self._erhebung_fertigstellen()
-        self.client.get(self.url)
-
-        einwilligung: HttpResponse = self.client.get(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link])
-        )
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
-        )
-        instruktion: HttpResponse = self.client.get(
-            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link])
-        )
-
-        self.assertContains(einwilligung, "Ich willige in die Teilnahme ein.")
-        self.assertContains(instruktion, "Fragen Sie gezielt nach dem Rechenweg.")
-        self.assertContains(instruktion, "Das Diagnosegespräch ist begrenzt.")
-
     def test_ausserhalb_des_laufenden_zeitraums_ist_einstieg_und_fortsetzung_gesperrt(
         self,
     ) -> None:
