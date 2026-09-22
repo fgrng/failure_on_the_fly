@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.utils import timezone
 
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration
 from sitzungen.durchlauf import sitzung_starten
 from sitzungen.models import Sitzung
 from sitzungen.sink import DBSink
@@ -215,14 +215,13 @@ def vignette_beginnen(bindung: Erhebungsbindung) -> Sitzung | None:
 def _sitzung_beginnen(bindung: Erhebungsbindung, vignette: Vignette) -> Sitzung:
     # Startet die persistierte Sitzung und schreibt ihre gezogene Position.
 
-    kern: Simulationskern | None = vignette.gepinnter_kern
     modell_konfiguration: ModellKonfiguration | None = (
         bindung.stichprobe.erhebung.modell_konfiguration
     )
-    if kern is None or modell_konfiguration is None:
-        raise RuntimeError("Erhebungsvignetten brauchen Kern und Modell-Konfiguration.")
+    if modell_konfiguration is None:
+        raise RuntimeError("Erhebungsvignetten brauchen eine Modell-Konfiguration.")
     sink: DBSink = DBSink(bindung.teilnahme)
-    sitzung_starten(sink, vignette, kern, modell_konfiguration)
+    sitzung_starten(sink, vignette, modell_konfiguration)
     sitzung: Sitzung = sink.sitzung
     Vignettenposition.objects.create(
         erhebungsbindung=bindung,

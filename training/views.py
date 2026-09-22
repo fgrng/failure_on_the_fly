@@ -483,16 +483,11 @@ def _sitzung_starten(
     """Bindet das Konto atomar und startet die Sitzung über den DB-Sink."""
 
     with transaction.atomic():
-        kern: Simulationskern | None = vignette.gepinnter_kern
-        if kern is None:
-            raise RuntimeError(
-                "Trainingsvignetten brauchen einen gepinnten Simulationskern."
-            )
+        kern: Simulationskern = vignette.gepinnter_kern
         sink: DBSink = DBSink(bindung.teilnahme)
         sitzung_starten(
             sink,
             vignette,
-            kern,
             ModellKonfiguration.objects.aktive(),
         )
     request.session["training_sitzung_pk"] = sink.sitzung.pk

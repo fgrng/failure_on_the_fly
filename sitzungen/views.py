@@ -167,7 +167,10 @@ def _probelauf_starten(
     # Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung.
 
     sink: ScratchSink = ScratchSink(request.session)
-    sitzung_starten(sink, vignette, kern, modell_konfiguration)
+    if freie_auswahl:
+        sitzung_starten(sink, vignette, modell_konfiguration, simulationskern=kern)
+    else:
+        sitzung_starten(sink, vignette, modell_konfiguration)
     if freie_auswahl:
         sink.freie_auswahl_setzen()
     return sitzung_anzeigen(
@@ -201,9 +204,7 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
         _eigene_vignetten(request.user).select_related("gepinnter_kern"),
         pk=pk,
     )
-    kern: Simulationskern | None = vignette.gepinnter_kern
-    if kern is None:
-        raise RuntimeError("Probeläufe brauchen einen gepinnten Simulationskern.")
+    kern: Simulationskern = vignette.gepinnter_kern
     modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
     return _probelauf_starten(request, vignette, kern, modell_konfiguration)
 

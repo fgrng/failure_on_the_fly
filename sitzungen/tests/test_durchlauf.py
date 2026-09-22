@@ -51,6 +51,20 @@ def _verbrauchte_zeit(sink: ScratchSink | DBSink, session: SessionStore) -> floa
     return session[f"sitzung_{sink.sitzung.pk}_verbrauchte_zeit"]
 
 
+@pytest.mark.django_db
+def test_sitzung_starten_lehnt_vignette_ohne_gepinnten_kern_ab() -> None:
+    """Ohne Pin entsteht keine persistierte Sitzung."""
+
+    vignette, _, konfiguration = _persistierbares_tripel([])
+    vignette.gepinnter_kern = None
+    vignette.save(update_fields=["gepinnter_kern"])
+
+    with pytest.raises(RuntimeError, match="gepinnten Simulationskern"):
+        sitzung_starten(DBSink(Teilnahme.objects.create()), vignette, konfiguration)
+
+    assert not Sitzung.objects.exists()
+
+
 def test_budgetstand_bucht_nur_die_offene_spanne_und_prueft_budget() -> None:
     """Der Budgetstand zählt Züge und Zeit unabhängig von seinem Speicherort."""
 
@@ -85,7 +99,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         },
     )
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     gespraechsschritt_ausfuehren(
         sink,
         vignette,
@@ -122,7 +136,7 @@ def test_db_sink_persistiert_einen_erfolgreichen_gespraechsschritt() -> None:
     )
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     assert Sitzung.objects.count() == 1
     gespraechsschritt_ausfuehren(
         sink,
@@ -163,7 +177,7 @@ def test_db_sink_haengt_fehlversuche_neben_den_erfolgreichen_schritt() -> None:
     )
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, eingabe="Warum?")
 
     schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
@@ -184,7 +198,7 @@ def test_db_sink_persistiert_answerless_schritt_und_gescheiterten_status() -> No
     )
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, eingabe="Warum?")
 
     sitzung: Sitzung = Sitzung.objects.get()
@@ -201,7 +215,7 @@ def test_db_sink_diagnose_schliesst_die_sitzung_ab() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel([])
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     sink.diagnose_setzen("Zähler und Nenner werden addiert.")
 
     sitzung: Sitzung = Sitzung.objects.get()
@@ -221,7 +235,7 @@ def test_scratch_und_db_sink_schliessen_mit_diagnose_gleich_ab() -> None:
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         sink.diagnose_setzen("Zähler und Nenner werden addiert.")
 
     assert scratch.session["probelauf"]["status"] == Sitzung.Status.ABGESCHLOSSEN
@@ -235,7 +249,7 @@ def test_db_sink_aktives_abbrechen_setzt_den_eigenen_status() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel([])
     sink: DBSink = DBSink(Teilnahme.objects.create())
 
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
 
     assert Sitzung.objects.get().status == Sitzung.Status.ABGEBROCHEN
@@ -259,7 +273,7 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         gespraechsschritt_ausfuehren(
             sink,
             vignette,
@@ -302,7 +316,7 @@ def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
         (DBSink(Teilnahme.objects.create()), SessionStore()),
     ):
         sink.session = session
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
 
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 5, tzinfo=UTC))
@@ -333,7 +347,7 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> N
         (DBSink(Teilnahme.objects.create()), SessionStore()),
     ):
         sink.session = session
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 1, tzinfo=UTC))
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC))
@@ -365,7 +379,7 @@ def test_scratch_und_db_sink_pruefen_schrittbudget_paritaetisch() -> None:
         ScratchSink(SessionStore()),
         DBSink(Teilnahme.objects.create(), session=SessionStore()),
     ):
-        sitzung_starten(sink, vignette_schritte, kern, konfiguration)
+        sitzung_starten(sink, vignette_schritte, konfiguration)
         assert sink.gespraechsschritt_anhaengen(
             eingabe="Warum?",
             eingabemodus="getippt",
@@ -395,7 +409,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
         (DBSink(Teilnahme.objects.create()), SessionStore()),
     ):
         sink.session = session
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sitzung_beenden(sink)
         assert _verbrauchte_zeit(sink, session) == 7.0
@@ -418,7 +432,7 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
         "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 3, tzinfo=UTC),
     )
-    sitzung_starten(sink, vignette, kern, konfiguration)
+    sitzung_starten(sink, vignette, konfiguration)
     sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
     sitzung_abbrechen(sink)
 
@@ -437,7 +451,7 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         gespraechsschritt_ausfuehren(
             sink, vignette, kern, konfiguration, eingabe="Warum?"
         )
@@ -469,7 +483,7 @@ def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         gespraechsschritt_ausfuehren(
             sink, vignette, kern, konfiguration, eingabe="Warum?"
         )
@@ -490,7 +504,7 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         gespraechsschritt_ausfuehren(
             sink, vignette, kern, konfiguration, eingabe="Warum?"
         )
@@ -512,7 +526,7 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
     datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
 
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
 
         ausgang: Ausgang = gespraechsschritt_ausfuehren(
             sink, vignette, kern, konfiguration, eingabe="Warum?"
@@ -535,7 +549,7 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
 
     ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         ausgaenge.append(
             gespraechsschritt_ausfuehren(
                 sink, vignette, kern, konfiguration, eingabe="Warum?"
@@ -565,7 +579,7 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
 
     ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, kern, konfiguration)
+        sitzung_starten(sink, vignette, konfiguration)
         ausgaenge.append(
             gespraechsschritt_ausfuehren(
                 sink, vignette, kern, konfiguration, eingabe="Warum?"

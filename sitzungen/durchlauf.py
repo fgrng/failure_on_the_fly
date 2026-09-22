@@ -27,10 +27,16 @@ def jetzt() -> datetime:
 def sitzung_starten(
     sink: SitzungSink,
     vignette: Vignette,
-    simulationskern: Simulationskern,
     modell_konfiguration: ModellKonfiguration,
+    *,
+    simulationskern: Simulationskern | None = None,
 ) -> None:
-    """Beginnt die Sitzung bei ihrem übergebenen Ziel."""
+    """Beginnt die Sitzung bei ihrem übergebenen Ziel und Kern."""
+
+    if simulationskern is None:
+        simulationskern = vignette.gepinnter_kern
+    if simulationskern is None:
+        raise RuntimeError("Sitzungen brauchen einen gepinnten Simulationskern.")
 
     sink.sitzung_starten(vignette, simulationskern, modell_konfiguration)
 
