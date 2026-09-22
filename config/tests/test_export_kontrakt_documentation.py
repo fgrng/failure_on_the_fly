@@ -43,15 +43,20 @@ def test_adr_0029_listet_die_fragebogen_tabellen_mit_ihren_spalten() -> None:
 
 
 def test_adr_0029_fuehrt_die_verbrauchte_zeit_in_der_sitzungszeile() -> None:
-    """Die Sitzungszeile trägt die verbrauchte Zeit, nicht den Spannenstart."""
+    """Die Sitzungszeile führt die verbrauchte Zeit als letzte Spalte."""
     dateiformat: str = adr_abschnitt("Dateiformat")
-    adr: str = adr_text()
 
     assert (
         "| `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, "
         "`simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, "
         "`verbrauchte_zeit` |" in dateiformat
     )
+
+
+def test_adr_0029_liest_die_verbrauchte_zeit_am_budget_typ_ohne_spannenstart() -> None:
+    """Der Kontrakt bindet die Spalte an den Budget-Typ und lässt den Start weg."""
+    adr: str = adr_text()
+
     assert "`offene_spanne_seit`" not in adr
     for klausel in (
         "in Sekunden",
@@ -59,17 +64,6 @@ def test_adr_0029_fuehrt_die_verbrauchte_zeit_in_der_sitzungszeile() -> None:
         "Der Startpunkt der laufenden Spanne erscheint nicht",
     ):
         assert klausel in adr
-
-
-def test_readme_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
-    """Der Download-Absatz erklärt, wie die verbrauchte Zeit zu lesen ist."""
-    abschnitt: str = readme_abschnitt("Erhebungen verwalten")
-
-    for klausel in (
-        "verbrauchte Gesprächszeit in Sekunden",
-        "schrittbasiertem Budget bleibt sie bei null",
-    ):
-        assert klausel in abschnitt
 
 
 def test_adr_0029_haelt_die_kodierungsrichtung_der_likert_skala_fest() -> None:
@@ -142,5 +136,16 @@ def test_readme_beschreibt_die_fragebogen_tabellen_des_downloads() -> None:
         "Kodierung der Likert-Skala",
         "1 »Stimme gar nicht zu« bis 6 »Stimme voll zu«",
         "Itemblöcke",
+    ):
+        assert klausel in abschnitt
+
+
+def test_readme_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
+    """Der Download-Absatz erklärt, wie die verbrauchte Zeit zu lesen ist."""
+    abschnitt: str = readme_abschnitt("Erhebungen verwalten")
+
+    for klausel in (
+        "verbrauchte Gesprächszeit in Sekunden",
+        "schrittbasiertem Budget bleibt sie bei null",
     ):
         assert klausel in abschnitt

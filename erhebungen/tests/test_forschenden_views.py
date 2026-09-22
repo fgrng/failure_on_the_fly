@@ -1939,10 +1939,11 @@ class ErhebungsExportTests(TestCase):
             ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
         )
         schrittvignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
-        for nummer, (vignette, verbraucht) in enumerate(
-            ((zeitvignette, 417.5), (schrittvignette, 0.0)), start=1
+        for token, vignette, verbraucht in (
+            ("2345-6781", zeitvignette, 417.5),
+            ("2345-6782", schrittvignette, 0.0),
         ):
-            bindung: Erhebungsbindung = _laufende_bindung(erhebung, f"2345-678{nummer}")
+            bindung: Erhebungsbindung = _laufende_bindung(erhebung, token)
             sitzung: Sitzung = Sitzung.objects.create(
                 teilnahme=bindung.teilnahme,
                 vignette=vignette,
@@ -1964,21 +1965,17 @@ class ErhebungsExportTests(TestCase):
         )
 
         with ZipFile(BytesIO(response.content)) as zip_datei:
-            with TextIOWrapper(
-                zip_datei.open("sitzungen.csv"), encoding="utf-8"
-            ) as csv_datei:
-                leser: csv.DictReader = csv.DictReader(csv_datei)
-                zeilen: dict[str, dict[str, str]] = {
-                    zeile["vignette_id"]: zeile for zeile in leser
-                }
-                spalten: list[str] = list(leser.fieldnames or [])
+            leser: csv.DictReader = csv.DictReader(
+                TextIOWrapper(zip_datei.open("sitzungen.csv"), encoding="utf-8")
+            )
+            verbrauchte_zeiten: dict[str, str] = {
+                zeile["vignette_id"]: zeile["verbrauchte_zeit"] for zeile in leser
+            }
+            spalten: list[str] = list(leser.fieldnames or [])
 
         self.assertNotIn("offene_spanne_seit", spalten)
         self.assertEqual(
-            {
-                vignette_id: zeile["verbrauchte_zeit"]
-                for vignette_id, zeile in zeilen.items()
-            },
+            verbrauchte_zeiten,
             {str(zeitvignette.pk): "417.5", str(schrittvignette.pk): "0.0"},
         )
 
