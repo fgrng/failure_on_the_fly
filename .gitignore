@@ -1,9 +1,19 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
-db.sqlite3
+.pytest_cache/
+.ruff_cache/
+
+# Lokale Konfiguration und Laufzeitdaten
+.env
+db.sqlite3*
 staticfiles/
 media/
-.env
-.DS_Store
+
+# Agent-Werkzeuge (lokal)
+.claude/settings.local.json
 .claude/worktrees/
+
+# System
+.DS_Store
