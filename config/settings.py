@@ -101,6 +101,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "konten.navigation.navigation",
+                "erhebungen.navigation.teilnahme_token",
             ],
         },
     },

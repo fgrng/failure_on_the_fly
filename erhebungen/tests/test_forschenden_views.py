@@ -28,6 +28,7 @@ from erhebungen.models import (
     Stichprobe,
     Vignettenziehung,
 )
+from erhebungen.teilnahme_session import TEILNAHME_TOKENS_SESSION_KEY
 from fragebogen_items.models import FragebogenItem
 from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from sitzungen.models import (
@@ -211,6 +212,23 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(liste, "badge--archived")
         self.assertNotContains(liste, "badge--entwurf")
         self.assertNotContains(liste, "badge--archiviert")
+
+    def test_liste_zeigt_kein_teilnahme_token_aus_der_browsersession(self) -> None:
+        """Ein selbst getesteter Teilnahme-Link spielt kein Token in die Sidebar."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.client.force_login(ada)
+        sitzung = self.client.session
+        sitzung[TEILNAHME_TOKENS_SESSION_KEY] = {
+            "4f1c0f0e-0000-4000-8000-000000000000": "ABCD-2345"
+        }
+        sitzung.save()
+
+        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
+
+        self.assertNotContains(liste, "ABCD-2345")
+        self.assertContains(liste, "sidebar-account")
 
     def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
         """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""

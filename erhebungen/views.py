@@ -57,6 +57,11 @@ from .models import (
     Itemblock,
     Stichprobe,
 )
+from .teilnahme_session import (
+    token_aus_session,
+    token_in_session_speichern,
+    tokens_im_browser,
+)
 from fragebogen_items.models import FragebogenItem
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
@@ -71,7 +76,6 @@ from sitzungen.views import (
 )
 from vignetten.models import Vignette
 
-_TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
@@ -769,9 +773,7 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None:
         bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
-        tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
-        tokens[str(teilnahme_link)] = bindung.token
-        request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
+        _bindung_in_session_speichern(request, bindung)
     if bindung.teilnahme.einwilligung_erteilt:
         return _weiter_im_ablauf(bindung)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
@@ -897,14 +899,13 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
     sitzung_pk: str | None = request.POST.get("sitzung_pk")
     if sitzung_pk is None:
         raise PermissionDenied
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
     jetzt: datetime = timezone.now()
     sitzung: Sitzung | None = (
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
         .filter(
             pk=sitzung_pk,
             status=Sitzung.Status.LAUFEND,
-            teilnahme__erhebungsbindung__token__in=tokens.values(),
+            teilnahme__erhebungsbindung__token__in=tokens_im_browser(request),
             teilnahme__erhebungsbindung__stichprobe__beginn__lte=jetzt,
             teilnahme__erhebungsbindung__stichprobe__ende__gte=jetzt,
         )
@@ -1095,8 +1096,7 @@ def _bindung_aus_session(
 ) -> Erhebungsbindung | None:
     """Lädt die zur Stichprobe passende Bindung des aktuellen Browsers."""
 
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
-    token: str | None = tokens.get(str(stichprobe.teilnahme_link))
+    token: str | None = token_aus_session(request, stichprobe.teilnahme_link)
     if token is None:
         return None
     return (
@@ -1114,11 +1114,9 @@ def _bindung_in_session_speichern(
 ) -> None:
     """Bindet einen tokenbasierten Wiedereinstieg an den aktuellen Browser."""
 
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
-    teilnahme_link = str(bindung.stichprobe.teilnahme_link)
-    if tokens.get(teilnahme_link) != bindung.token:
-        tokens[teilnahme_link] = bindung.token
-        request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
+    token_in_session_speichern(
+        request, bindung.stichprobe.teilnahme_link, bindung.token
+    )
 
 
 def _laufende_bindung(token: str) -> Erhebungsbindung:
