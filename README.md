@@ -162,8 +162,9 @@ Fragebogen oder bei der nächsten Vignette. Anschließend endet die Teilnahme
 mit dem Abschlusstext.
 Damit das Token jederzeit ablesbar ist, zeigt die Seitenleiste es auf allen
 Teilnahmeseiten — von der Einwilligung über Instruktion, Diagnosegespräch und
-Debrief bis zu den Fragebogenseiten — an der Stelle, an der sonst Konto oder
-Anmeldelink stehen, in fester Laufweite und mit der Bitte, es zu notieren.
+Debrief bis zu Fragebogen- und Abschlussseite — an der Stelle, an der sonst
+Konto oder Anmeldelink stehen, in fester Laufweite und mit der Bitte, es zu
+notieren.
 Während einer Teilnahme erscheinen dort weder Kontoblock noch Anmeldelink, auch
 nicht bei nebenbei angemeldetem Konto; in Forschenden-Ansichten erscheint
 umgekehrt kein Teilnahme-Token.

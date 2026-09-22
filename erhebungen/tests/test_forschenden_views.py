@@ -18,7 +18,6 @@ from django.utils import timezone
 
 from config.tests.dokumentation import exportdateien_aus_adr_0029
 from konten.models import Konto
-from erhebungen.navigation import TEILNAHME_TOKENS_SESSION_KEY
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -29,6 +28,7 @@ from erhebungen.models import (
     Stichprobe,
     Vignettenziehung,
 )
+from erhebungen.teilnahme_session import TEILNAHME_TOKENS_SESSION_KEY
 from fragebogen_items.models import FragebogenItem
 from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from sitzungen.models import (
