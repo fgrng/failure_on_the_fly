@@ -28,6 +28,7 @@
                         <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>
                         <a href="{% url 'training:historie' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "historie" %} aria-current="page"{% endif %}>Meine Trainings</a>
                     {% endif %}
+                    <a href="{% url 'training:abschriften' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "abschriften" %} aria-current="page"{% endif %}>Meine Abschriften</a>
                 </div>
             </section>
         {% endif %}

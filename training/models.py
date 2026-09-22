@@ -102,6 +102,23 @@ class Trainingsbindung(models.Model):
         ]
 
 
+class Abschrift(models.Model):
+    """Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme.
+
+    Sie hält den Namen der Erhebung als Text: Ein Fremdschlüssel dorthin wäre
+    der Rückzeiger, den die Abschrift gerade nicht haben darf.
+    """
+
+    teilnahme: models.OneToOneField = models.OneToOneField(
+        "sitzungen.Teilnahme", on_delete=models.CASCADE
+    )
+    konto: models.ForeignKey = models.ForeignKey(
+        "konten.Konto", on_delete=models.CASCADE
+    )
+    erhebungsname: models.CharField = models.CharField(max_length=255)
+    importiert_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+
+
 def _pruefe_finale_vignetten(
     sender: type[models.Model],
     instance: models.Model,

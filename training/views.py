@@ -1,7 +1,8 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, QuerySet
 from django.http import (
@@ -39,7 +40,8 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .models import Training, Trainingsbindung
+from .abschriften import abschrift_holen
+from .models import Abschrift, Training, Trainingsbindung
 
 
 _ausbilderin_oder_administratorin = rolle_oder_administration(AUSBILDERIN_GRUPPE)
@@ -190,6 +192,27 @@ def historie(request: HttpRequest) -> HttpResponse:
         request,
         "training/historie.html",
         {"trainings": trainings},
+    )
+
+
+@login_required
+def abschriften(request: HttpRequest) -> HttpResponse:
+    """Nimmt ein Teilnahme-Token entgegen und listet die geholten Abschriften."""
+
+    if request.method == "POST":
+        try:
+            abschrift_holen(request.user, request.POST.get("token", ""))
+        except ValidationError as ablehnung:
+            messages.error(request, ablehnung.message)
+        return redirect("training:abschriften")
+    return render(
+        request,
+        "training/abschriften.html",
+        {
+            "abschriften": Abschrift.objects.filter(konto=request.user).order_by(
+                "-importiert_am"
+            )
+        },
     )
 
 

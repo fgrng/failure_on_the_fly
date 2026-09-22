@@ -183,8 +183,12 @@ Die schreibfreie Sitzung über einem frei zusammengestellten Tripel aus Vignette
 _Avoid_: Vorschau, Testlauf, Preview
 
 **Teilnahme**:
-Die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind.
+Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, genau einer Erhebung oder genau einer Abschrift zusammengefasst sind. Die Teilnahme einer Abschrift ist ein Behälter für kopierte Sitzungen und **keine zweite Teilnahme derselben Person** — sie wird nirgends mitgezählt.
 _Avoid_: Durchlauf, Session, Sitzung
+
+**Abschrift**:
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie ist die persönliche Mitschrift der Teilnehmer:in und ausdrücklich kein Forschungsdatum (ADR-0043).
+_Avoid_: Export, Kopie, Mitschrift, Transkriptarchiv
 
 **Training**:
 Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items; Zugang über die Navigation mit Nutzerkonto.
@@ -195,7 +199,7 @@ Ein von einem Eigentümer-Kreis der Forschenden zusammengestelltes Untersuchungs
 _Avoid_: Studie, Umfrage, Survey, Experiment
 
 **Stichprobe**:
-Eine organisatorische Untergruppe einer Erhebung, die einen eigenen Teilnahme-Link trägt und die über ihn entstandenen Teilnahmen bündelt. Sie dient der Gruppenstruktur im Export, nicht einer eigenen experimentellen Bedingung.
+Eine organisatorische Untergruppe einer Erhebung, die einen eigenen Teilnahme-Link trägt und die über ihn entstandenen Teilnahmen bündelt. Sie dient der Gruppenstruktur im Export, nicht einer eigenen experimentellen Bedingung. Ihr Archivieren hat eine zweite Bedeutung: Aus einer archivierten Stichprobe — wie aus einer archivierten Erhebung — lässt sich keine Abschrift mehr holen.
 _Avoid_: Gruppe, Bedingung, Kohorte, Arm
 
 **Teilnahme-Link**:

@@ -165,6 +165,20 @@ kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,
 bleibt der Gesprächsschritt ohne Antwort erhalten.
 Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetzbar.
 
+## Abschriften holen
+
+Unter `/training/abschriften/` gibt jedes eingeloggte Konto ein Teilnahme-Token
+ein und holt damit eine abgeschlossene Erhebungsteilnahme als **Abschrift** in
+das eigene Konto: Die Sitzungen werden unter eine eigene, neue Teilnahme kopiert;
+Fragebogen-Antworten bleiben bei der Erhebung. Die Erhebungsdaten selbst bleiben
+unberührt, es wird kein Token gespeichert und keine Verknüpfung zwischen Konto
+und Teilnahme festgehalten. Der Import gelingt unabhängig vom Teilnahmefenster,
+solange weder Stichprobe noch Erhebung archiviert sind, und ist beliebig oft
+wiederholbar; jede Wiederholung erzeugt eine weitere Abschrift. Unbrauchbare
+Tokens werden ohne Angabe eines Grundes abgelehnt. Die Liste zeigt je Abschrift
+den Namen der Erhebung und den Importzeitpunkt — nicht die Spielzeit der
+Erhebung.
+
 ## Erhebungen verwalten
 
 Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` die
