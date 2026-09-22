@@ -43,12 +43,13 @@ def _persistierbares_tripel(
     )
 
 
-def _verbrauchte_zeit(sink: ScratchSink | DBSink, session: SessionStore) -> float:
+def _verbrauchte_zeit(sink: ScratchSink | DBSink) -> float:
     # Liest den Speichervertrag beider Adapter für die Uhrenparität.
 
     if isinstance(sink, ScratchSink):
-        return session["probelauf"]["verbrauchte_zeit"]
-    return session[f"sitzung_{sink.sitzung.pk}_verbrauchte_zeit"]
+        return sink.session["probelauf"]["verbrauchte_zeit"]
+    sink.sitzung.refresh_from_db(fields=["verbrauchte_zeit"])
+    return sink.sitzung.verbrauchte_zeit
 
 
 @pytest.mark.django_db
@@ -305,6 +306,23 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
 
 
 @pytest.mark.django_db
+def test_zeitbudget_ist_von_jeder_anderen_sitzung_getrennt() -> None:
+    """Der Zeitstand hängt an seiner Sitzungszeile und an keiner zweiten."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    sink: DBSink = DBSink(Teilnahme.objects.create())
+    anderer_sink: DBSink = DBSink(Teilnahme.objects.create())
+    sitzung_starten(sink, vignette, konfiguration)
+    sitzung_starten(anderer_sink, vignette, konfiguration)
+
+    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+    sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
+
+    assert _verbrauchte_zeit(sink) == 4.0
+    assert _verbrauchte_zeit(anderer_sink) == 0.0
+
+
+@pytest.mark.django_db
 def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
     """Beide Sink-Adapter führen denselben Budgetstand über explizite Zeitpunkte."""
 
@@ -313,11 +331,10 @@ def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
     vignette.budget_wert = 10
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    for sink, session in (
-        (ScratchSink(SessionStore()), SessionStore()),
-        (DBSink(Teilnahme.objects.create()), SessionStore()),
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create()),
     ):
-        sink.session = session
         sitzung_starten(sink, vignette, konfiguration)
 
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
@@ -332,7 +349,7 @@ def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
             aeusserung="",
             fehlversuche=[],
         )
-        assert _verbrauchte_zeit(sink, session) == 10.0
+        assert _verbrauchte_zeit(sink) == 10.0
 
 
 @pytest.mark.django_db
@@ -344,11 +361,10 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> N
     vignette.budget_wert = 3
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    for sink, session in (
-        (ScratchSink(SessionStore()), SessionStore()),
-        (DBSink(Teilnahme.objects.create()), SessionStore()),
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create()),
     ):
-        sink.session = session
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 1, tzinfo=UTC))
@@ -363,7 +379,7 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> N
             aeusserung="",
             fehlversuche=[],
         )
-        assert _verbrauchte_zeit(sink, session) == 3.0
+        assert _verbrauchte_zeit(sink) == 3.0
 
 
 @pytest.mark.django_db
@@ -379,7 +395,7 @@ def test_scratch_und_db_sink_pruefen_schrittbudget_paritaetisch() -> None:
 
     for sink in (
         ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create(), session=SessionStore()),
+        DBSink(Teilnahme.objects.create()),
     ):
         sitzung_starten(sink, vignette_schritte, konfiguration)
         assert sink.gespraechsschritt_anhaengen(
@@ -406,15 +422,14 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
         "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 7, tzinfo=UTC),
     )
-    for sink, session in (
-        (ScratchSink(SessionStore()), SessionStore()),
-        (DBSink(Teilnahme.objects.create()), SessionStore()),
+    for sink in (
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create()),
     ):
-        sink.session = session
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sitzung_beenden(sink)
-        assert _verbrauchte_zeit(sink, session) == 7.0
+        assert _verbrauchte_zeit(sink) == 7.0
 
 
 @pytest.mark.django_db
@@ -428,8 +443,7 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
     vignette.budget_wert = 10
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    session: SessionStore = SessionStore()
-    sink: DBSink = DBSink(Teilnahme.objects.create(), session=session)
+    sink: DBSink = DBSink(Teilnahme.objects.create())
     monkeypatch.setattr(
         "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 3, tzinfo=UTC),
@@ -438,7 +452,7 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
     sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
     sitzung_abbrechen(sink)
 
-    assert _verbrauchte_zeit(sink, session) == 3.0
+    assert _verbrauchte_zeit(sink) == 3.0
     assert Sitzung.objects.get().status == Sitzung.Status.ABGEBROCHEN
 
 
@@ -525,7 +539,7 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
     )
 
     scratch: ScratchSink = ScratchSink(SessionStore())
-    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
         sitzung_starten(sink, vignette, konfiguration)
@@ -547,7 +561,7 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
         [{"fehler": "anbieterfehler"}] * 3
     )
     scratch: ScratchSink = ScratchSink(SessionStore())
-    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):
@@ -577,7 +591,7 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     vignette.budget_wert = 1
     vignette.save(update_fields=["budget_typ", "budget_wert"])
     scratch: ScratchSink = ScratchSink(SessionStore())
-    datenbank: DBSink = DBSink(Teilnahme.objects.create(), session=SessionStore())
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank):

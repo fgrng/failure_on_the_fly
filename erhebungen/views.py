@@ -936,7 +936,7 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, _bindung = _erhebungssitzung(token)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
@@ -947,7 +947,7 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_abbrechen(sink)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:

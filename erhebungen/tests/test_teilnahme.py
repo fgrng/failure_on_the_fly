@@ -31,6 +31,7 @@ from sitzungen.models import (
     Teilnahme,
     Vignettenposition,
 )
+from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
 
 
@@ -129,6 +130,26 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
         return Erhebungsbindung.objects.get()
+
+    def _verbrauchte_trainingssitzung_anlegen(
+        self, vignette: Vignette, *, sekunden: float
+    ) -> Sitzung:
+        # Legt die fremde, bereits weitgehend verbrauchte Trainingssitzung an.
+
+        konto: Konto = self.erhebung.eigentuemerinnen.get()
+        teilnahme: Teilnahme = Teilnahme.objects.create()
+        Trainingsbindung.objects.create(
+            teilnahme=teilnahme,
+            training=Training.objects.anlegen(konto, name="Brüche"),
+            konto=konto,
+        )
+        return Sitzung.objects.create(
+            teilnahme=teilnahme,
+            vignette=vignette,
+            simulationskern=vignette.gepinnter_kern,
+            modell_konfiguration=ModellKonfiguration.objects.aktive(),
+            verbrauchte_zeit=sekunden,
+        )
 
     def _entwurf_ersetzen(
         self, *, name: str, skript: list[dict]
@@ -836,24 +857,14 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_zeitbudget_ist_von_training_und_anderen_sitzungen_getrennt(self) -> None:
         """Fremder Zeitverbrauch beendet die Erhebungssitzung nicht."""
 
-        self._vignette_anlegen(
+        vignette: Vignette = self._vignette_anlegen(
             budget_typ=Vignette.BudgetTyp.ZEIT,
             budget_wert=5,
         )
         self._erhebung_fertigstellen()
-        self.client.get(self.url)
-        self.client.post(
-            reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
-        )
-        self.client.post(
-            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
-        )
-        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
-        session = self.client.session
-        session["training_verbrauchte_zeit"] = 999.0
-        session.save()
+        self._verbrauchte_trainingssitzung_anlegen(vignette, sekunden=999.0)
 
         with patch(
             "sitzungen.durchlauf.jetzt",
@@ -870,6 +881,72 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertNotContains(antwort, "Debrief")
         self.assertContains(antwort, "Ich addiere.")
+
+    def test_zeitbudget_ueberlebt_den_browserwechsel(self) -> None:
+        """Die andere Browser-Session führt den Zeitverbrauch derselben Sitzung fort."""
+
+        self._vignette_anlegen(
+            budget_typ=Vignette.BudgetTyp.ZEIT,
+            budget_wert=5,
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        # Ein Zug von 1 s im ersten Browser, einer von 6 s im zweiten: Der zweite
+        # erbt den Stand des ersten und bucht auf zusammen 7 s weiter.
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 20, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 26, tzinfo=UTC),
+            ],
+        ):
+            self.client.get(gespraech_url)
+            self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+            anderer_browser: Client = Client()
+            anderer_browser.get(gespraech_url)
+            debrief: HttpResponse = anderer_browser.post(
+                gespraech_url, {"eingabe": "Und warum?"}
+            )
+
+        self.assertContains(debrief, "Debrief")
+        self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 7)
+
+    def test_erschoepfte_zeit_fuehrt_den_schritt_zu_ende_und_zeigt_den_debrief(
+        self,
+    ) -> None:
+        """Der auslösende Schritt wird noch beantwortet, danach folgt der Debrief (ADR-0012)."""
+
+        self._vignette_anlegen(
+            budget_typ=Vignette.BudgetTyp.ZEIT,
+            budget_wert=5,
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 0, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 6, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 6, tzinfo=UTC),
+            ],
+        ):
+            self.client.get(gespraech_url)
+            debrief: HttpResponse = self.client.post(
+                gespraech_url, {"eingabe": "Wie rechnest du?"}
+            )
+
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
+        self.assertEqual(schritt.eingabe, "Wie rechnest du?")
+        self.assertEqual(schritt.aeusserung, "Ich addiere.")
+        self.assertContains(debrief, "Ich addiere.")
+        self.assertContains(debrief, "Debrief")
 
     def test_aktiver_abbruch_setzt_die_sitzung_auf_abgebrochen(self) -> None:
         """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""

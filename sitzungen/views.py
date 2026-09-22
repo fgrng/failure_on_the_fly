@@ -492,7 +492,7 @@ def persistiertes_gespraech(
             navigation=navigation,
             anhang=sitzungsblock(),
         )
-    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
     if request.method == "GET":
         sink.zug_beginnen(durchlauf.jetzt())
         return _persistiertes_gespraech_anzeigen(
