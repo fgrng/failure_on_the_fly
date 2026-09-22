@@ -6,6 +6,7 @@ from django.db.models.signals import m2m_changed, post_save
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
+from sitzungen.bindungen import Bindung
 
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
@@ -82,8 +83,10 @@ class Training(EigentuemerKreis):
             del self._wechselt_zustand
 
 
-class Trainingsbindung(models.Model):
+class Trainingsbindung(Bindung):
     """Verbindet eine Teilnahme mit Training und Nutzerkonto."""
+
+    KONTO_TRAGEND: bool = True
 
     teilnahme: models.OneToOneField = models.OneToOneField(
         "sitzungen.Teilnahme", on_delete=models.CASCADE
@@ -102,12 +105,14 @@ class Trainingsbindung(models.Model):
         ]
 
 
-class Abschrift(models.Model):
+class Abschrift(Bindung):
     """Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme.
 
     Sie hält den Namen der Erhebung als Text: Ein Fremdschlüssel dorthin wäre
     der Rückzeiger, den die Abschrift gerade nicht haben darf.
     """
+
+    KONTO_TRAGEND: bool = True
 
     teilnahme: models.OneToOneField = models.OneToOneField(
         "sitzungen.Teilnahme", on_delete=models.CASCADE
