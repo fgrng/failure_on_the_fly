@@ -87,8 +87,10 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 
     session: SessionStore = SessionStore()
     sink: ScratchSink = ScratchSink(session)
-    vignette: Vignette = Vignette(lernauftrag_text="Addiere zwei Brüche.")
     kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
+    vignette: Vignette = Vignette(
+        lernauftrag_text="Addiere zwei Brüche.", gepinnter_kern=kern
+    )
     konfiguration: ModellKonfiguration = ModellKonfiguration(
         sprachmodell="fake",
         parameter={

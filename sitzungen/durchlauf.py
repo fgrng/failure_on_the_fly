@@ -31,7 +31,7 @@ def sitzung_starten(
     *,
     simulationskern: Simulationskern | None = None,
 ) -> None:
-    """Beginnt die Sitzung bei ihrem übergebenen Ziel und Kern."""
+    """Beginnt die Sitzung mit dem übergebenen oder an der Vignette gepinnten Kern."""
 
     if simulationskern is None:
         simulationskern = vignette.gepinnter_kern
