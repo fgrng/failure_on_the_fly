@@ -14,6 +14,12 @@ status: accepted
 > leer gelassen" ununterscheidbar. Bindend bleiben der Schnitt entlang der
 > Domänenobjekte, die Azyklizität samt Kantenrichtung und die Zahl der Nähte;
 > eine dritte Naht kommt nicht hinzu.
+>
+> **Nachgeführt durch ADR-0042 (Gesprächsbudget-Uhr an der Sitzung):** Der Sink
+> führt den Budgetstand über zwei Mitglieder seines Protokolls statt über vier.
+> Der Budgetstand hat genau eine Implementierung und einen Speicher je Adapter:
+> Sitzungsfelder im `DBSink`, Browser-Session im `ScratchSink`. Das erweitert den
+> Umfang der bestehenden Sink-Naht, schafft aber keine dritte; es bleiben zwei.
 
 Die Module des Projekts werden entlang der **Domänenobjekte aus `CONTEXT.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 
@@ -51,7 +57,20 @@ Dass der **Verlauf hinter die Naht** reicht statt davor zu einem Prompt-String z
 
 Der **Sink** (`sitzungen/sink.py`): das Ziel eines Sitzungslaufs, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Der Lauf (`sitzungen/durchlauf.py`) kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.
 
-Der Sink ist **mehr als Persistenz**. Er trägt zusätzlich die unsichtbare Uhr und die Prüfung des Gesprächsbudgets aus ADR-0012, den lesenden Zugriff auf die bisherigen Gesprächsschritte und die beiden Stellen, an denen die Anlässe auseinandergehen: ob ein endgültig gescheiterter Schritt neben dem Transkript stehen bleibt (ADR-0011: die persistierte Sitzung behält ihn, der Probelauf verwirft ihn) und ob das erschöpfte Budget die Sitzung abschließt (der Probelauf tut es, die persistierte Sitzung wartet auf ihre Diagnose). Damit existiert der Ablauf eines Gesprächsschritts **einmal** — und ADR-0014, „der Probelauf unterscheidet sich allein in der Persistierung", ist strukturell wahr statt behauptet. Läge eines dieser Stücke vor der Naht, müsste es jeder Anlass ein zweites Mal richtig hinschreiben.
+Der Sink ist **mehr als Persistenz**. Er trägt zusätzlich den Budgetstand und die
+Prüfung des Gesprächsbudgets aus ADR-0012, den lesenden Zugriff auf die bisherigen
+Gesprächsschritte und die beiden Stellen, an denen die Anlässe auseinandergehen:
+ob ein endgültig gescheiterter Schritt neben dem Transkript stehen bleibt
+(ADR-0011: die persistierte Sitzung behält ihn, der Probelauf verwirft ihn) und ob
+das erschöpfte Budget die Sitzung abschließt (der Probelauf tut es, die persistierte
+Sitzung wartet auf ihre Diagnose). Der Budgetstand hat eine Implementierung; seine
+beiden Speicher sind Sitzungsfelder im `DBSink` und die Browser-Session im
+`ScratchSink`. Seine Uhr reist über zwei Mitglieder des Sink-Protokolls statt über
+vier. Das erweitert die bestehende Naht, schafft aber keine dritte. Damit existiert
+der Ablauf eines Gesprächsschritts **einmal** — und ADR-0014, „der Probelauf
+unterscheidet sich allein in der Persistierung", ist strukturell wahr statt
+behauptet. Läge eines dieser Stücke vor der Naht, müsste es jeder Anlass ein zweites
+Mal richtig hinschreiben.
 
 Was der Lauf an seine Aufruferin zurückgibt, ist der **Ausgang** des Gesprächsschritts — fortgesetzt, gescheitert oder Budget erschöpft. Er ist ein Rückgabewert und kein Gegenstand mit Eigenleben; deshalb steht er nicht im Glossar. Die Aufruferin verzweigt auf ihn, bevor sie rendert, statt die Regel „endgültig gescheitert" ein zweites Mal nachzurechnen.
 

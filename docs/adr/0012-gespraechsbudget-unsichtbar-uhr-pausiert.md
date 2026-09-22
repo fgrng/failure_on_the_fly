@@ -4,6 +4,15 @@ status: accepted
 
 # Das Gesprächsbudget gehört der Vignette, ist unsichtbar, und seine Uhr pausiert
 
+> **Nachgeführt durch ADR-0042 (Uhr an der Sitzung persistiert):** Eine Aussage
+> dieses Textes wurde missverstanden, nicht widerrufen. »Der Teilnehmer:in wird
+> der Budgetstand nicht angezeigt« meint die Darstellung, nicht die Lebensdauer:
+> Die verbrauchte Zeit und der Startpunkt der laufenden Spanne sind seither
+> Felder der Sitzung statt der Browser-Session, und die Zeitquelle ist die
+> Wanduhr statt `monotonic()`. Unverändert bleibt alles Weitere — das Budget
+> gehört der Vignette, die Uhr pausiert beim Absenden, es erscheint keine Uhr
+> auf dem Schirm.
+
 Das **Gesprächsbudget** ist ein Feld der Vignette. Es wird mit ihr finalisiert und eingefroren; weder Erhebung noch Training dürfen es überschreiben. Das Budget ist eine didaktische Aussage über die Vignette: Ein Fehlermuster, das erst nach mehreren gezielten Nachfragen sichtbar wird, braucht mehr Gesprächsschritte als eines, das beim ersten Nachhaken auffällt. Wer es von außen verstellt, verstellt die Schwierigkeit der Vignette, ohne sie zu versionieren — und zwei Sitzungen derselben finalen Fassung wären nicht mehr gleich dargeboten.
 
 ## Die Uhr läuft nur, wenn die Teilnehmer:in am Zug ist
