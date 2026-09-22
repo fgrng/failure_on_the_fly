@@ -13,6 +13,7 @@ from django.utils import timezone
 from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import FORSCHENDE_GRUPPE
+from sitzungen.bindungen import Bindung
 
 _LIKERT_STUFEN: list[int] = LikertSkalenpol.stufen()
 _NIEDRIGSTE_LIKERT_STUFE: int = _LIKERT_STUFEN[0]
@@ -513,8 +514,10 @@ class ErhebungsbindungManager(models.Manager["Erhebungsbindung"]):
                 continue
 
 
-class Erhebungsbindung(models.Model):
+class Erhebungsbindung(Bindung):
     """Verbindet eine pseudonyme Teilnahme mit ihrer Stichprobe."""
+
+    KONTO_TRAGEND: bool = False
 
     erstellt_am: models.DateTimeField = models.DateTimeField(
         auto_now_add=True,

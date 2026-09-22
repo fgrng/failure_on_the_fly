@@ -4,6 +4,20 @@ status: accepted
 
 # Die Teilnahme trägt keine Identität; Bindung und Pseudonymität liegen getrennt
 
+> **Nachgeführt durch ADR-0043 (Die Abschrift ist eine Kopie) und die Prüfung in
+> `sitzungen/bindungen.py`:** Die unten stehende Aussage, die verbotene
+> Verknüpfung sei mit zwei Bindungstabellen *nicht ausdrückbar*, gilt so nicht.
+> Sie stimmt je Tabelle — aber beide Bindungen zeigen mit einer 1:1-Beziehung
+> auf dieselbe Art Teilnahme, und nichts hinderte sie daran, auf *dieselbe Zeile*
+> zu zeigen. Konto ↔ Token wäre dann ein Join über zwei Kanten. Die Abschrift
+> vermeidet diesen Pfad, indem sie eine eigene Teilnahme anlegt und die
+> Erhebungsbindung nur liest; die gemeinsame Basis `Bindung` weist zusätzlich
+> jede Bindung ab, die eine Teilnahme mit einer Bindung der anderen Art belegt.
+> Bindend bleibt der Schnitt in zwei Bindungstabellen und die Kantenrichtung
+> nach `sitzungen`; der Schutz sitzt im Schema **und** in dieser einen Prüfung.
+> Sie steht bei der Teilnahme, weil `erhebungen` nach ADR-0006 nichts von Konten
+> und damit nichts von `training` wissen darf.
+
 Die **Teilnahme** ist genau ein Objekt, so wie `CONTEXT.md` sie definiert: die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind. Sie trägt ihre Identität und ihre Sitzungen — und sonst nichts. Weder Training noch Stichprobe, weder Nutzerkonto noch Teilnahme-Token.
 
 Woran eine Teilnahme hängt und wer hinter ihr steht, liegt in zwei **Bindungen**, die jeweils ihrer eigenen App gehören:
