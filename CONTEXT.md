@@ -148,8 +148,10 @@ Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwo
 _Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
 
 **Gesprächsbudget**:
-Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt.
-_Avoid_: Limit, Zeitlimit, Nachrichtenbudget
+Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0012); es ist eine Obergrenze, kein Soll.
+
+Wie weit eine Sitzung ihr Budget verbraucht hat, ist ihr **Budgetstand**: die Zahl der geglückten Gesprächsschritte oder die **verbrauchte Zeit**. Er gehört der Sitzung und überlebt einen Browserwechsel; die verbrauchte Zeit ist eine Größe der Datenspur. Bei Zeitbegrenzung misst die **Uhr** ausschließlich den **Zug** der Teilnehmer:in — die Zeit vom Anzeigen der Gesprächsseite bis zum Absenden ihrer Eingabe. Während die simulierte Schüler:in antwortet, steht die Uhr; Fehlversuche kosten keine Zeit. Der laufende, noch nicht abgesendete Zug ist die **offene Spanne**; wer die Gesprächsseite erneut aufruft, setzt sie neu an, ohne dass bereits verbrauchte Zeit verloren geht oder die Spanne dazugerechnet wird. Erschöpft sich das Budget während eines Gesprächsschritts, wird dieser zu Ende geführt.
+_Avoid_: Limit, Zeitlimit, Nachrichtenbudget, Timer, Countdown, Restzeit, Restbudget, Zeitstand — es gibt keinen Rest, den jemand sieht; Denkzeit, Bearbeitungszeit, Sitzungsdauer — die Uhr misst den Zug, nicht die Sitzung.
 
 ## Versionierung
 
