@@ -16,9 +16,11 @@
     </section>
 
     {% if gespraechsschritte %}
-        <div class="diagnosegespraech-verlauf" aria-label="Bisheriges Diagnosegespräch">
+        <section class="diagnosegespraech-verlauf" aria-labelledby="diagnosegespraech-verlauf-titel">
+            <h2 id="diagnosegespraech-verlauf-titel">Gespräch mit {{ vignette.schuelerin_name }}</h2>
             {% for schritt in gespraechsschritte %}
-                <article class="gespraechsschritt">
+                {# Ankermarke für das show:-Ziel der Eingabeformulare. #}
+                <article class="gespraechsschritt"{% if forloop.last %} id="gespraechsschritt-neu"{% endif %}>
                     <div class="gespraechsschritt__eingabe">
                         <span>Sie</span>
                         <p>{{ schritt.eingabe }}</p>
@@ -37,7 +39,7 @@
                     {% endif %}
                 </article>
             {% endfor %}
-        </div>
+        </section>
     {% endif %}
 
     {% if not gespraech_beendet %}

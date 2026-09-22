@@ -2,7 +2,7 @@
     <div class="gespraechseingabe gespraechseingabe--fehler" role="alert">
         <p>Die Antwort konnte nicht erzeugt werden.</p>
         {% if erneute_eingabe is not None %}
-            <form method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+            <form method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#gespraechsschritt-neu:top">
                 {% csrf_token %}
                 <input type="hidden" name="eingabe" value="{{ erneute_eingabe }}">
                 <input type="hidden" name="eingabemodus" value="{{ erneuter_eingabemodus }}">
@@ -12,29 +12,33 @@
     </div>
 {% else %}
     <div class="gespraechseingabe">
-        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#gespraechsschritt-neu:top" hx-disabled-elt="find .gespraechseingabe__senden, find .spracheingabe__steuerung" hx-on::before-request="this.elements.eingabe.readOnly = true">
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
             <input type="hidden" name="eingabemodus" value="getippt">
             <button class="button gespraechseingabe__senden" type="submit">Senden</button>
+            {% if spracheingabe_verfuegbar %}
+                {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=navigation.transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Optional: Starten Sie die Spracheingabe und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
+            {% endif %}
+            <p class="gespraechseingabe__verarbeitung" aria-live="polite">
+                <span class="gespraechseingabe__spinner" aria-hidden="true"></span>
+                Ihre Frage ist abgeschickt und wird gerade beantwortet …
+            </p>
         </form>
-        {% if spracheingabe_verfuegbar %}
-            {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=navigation.transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Starten Sie die Aufnahme und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
-        {% endif %}
     </div>
 {% endif %}
 
 {% if not ist_gescheitert %}
     <div class="sitzung-aktionen">
-        <form method="post" action="{{ navigation.beenden_url }}" hx-post="{{ navigation.beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML">
+        <form method="post" action="{{ navigation.beenden_url }}" hx-post="{{ navigation.beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#sitzung-debrief:top">
             {% csrf_token %}
             <button class="sitzung-aktion-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
         </form>
         {% if navigation.abbrechen_url %}
             <form method="post" action="{{ navigation.abbrechen_url }}">
                 {% csrf_token %}
-                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">{{ navigation.bezeichnung }} abbrechen</button>
+                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Sitzung abbrechen</button>
             </form>
         {% endif %}
     </div>

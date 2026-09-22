@@ -58,7 +58,8 @@
     border-top: 1px solid var(--color-border);
 }
 
-.aufgabenkontext h2 {
+.aufgabenkontext h2,
+.diagnosegespraech-verlauf h2 {
     margin: 0 0 var(--space-1);
     font-family: var(--font-body);
     font-size: .75rem;
@@ -155,11 +156,29 @@
     border-top: 1px solid var(--color-border);
 }
 
-.gespraechseingabe__formular { position: relative; }
+/* Eingabefeld links, Senden und Aufnahme rechts daneben, Hinweise darunter. */
+.gespraechseingabe__formular {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "beschriftung beschriftung"
+        "eingabe      senden"
+        "eingabe      aufnahme"
+        "hinweis      hinweis"
+        "verarbeitung verarbeitung";
+    gap: var(--space-2);
+    align-items: start;
+}
+
 .gespraechseingabe label,
 .diagnose label { display: block; margin-bottom: var(--space-1); font-weight: 650; }
-.gespraechseingabe textarea { min-height: 104px; padding: var(--space-2) calc(var(--space-8) + var(--space-6)) var(--space-2) var(--space-2); border-radius: 14px; }
-.gespraechseingabe__senden { position: absolute; right: var(--space-1); bottom: var(--space-1); }
+.gespraechseingabe label { grid-area: beschriftung; margin-bottom: 0; }
+.gespraechseingabe textarea { grid-area: eingabe; min-height: 104px; padding: var(--space-2); border-radius: 14px; }
+.gespraechseingabe textarea:read-only { background: var(--color-surface-muted); color: var(--color-text-muted); }
+.gespraechseingabe__senden { grid-area: senden; }
+.gespraechseingabe .spracheingabe__steuerung { grid-area: aufnahme; }
+.gespraechseingabe .spracheingabe__status { grid-area: hinweis; }
+.gespraechseingabe :disabled { opacity: .6; cursor: progress; }
 
 .spracheingabe {
     margin-top: var(--space-2);
@@ -168,9 +187,51 @@
     background: var(--color-surface-muted);
 }
 
+/* Im Gespräch trägt das Formular das Raster: die Teile reihen sich direkt ein. */
+.gespraechseingabe .spracheingabe { display: contents; }
+.gespraechseingabe .spracheingabe h2 { display: none; }
+
 .spracheingabe h2 { margin: 0 0 var(--space-1); font-size: 1rem; }
 .spracheingabe__status { margin: var(--space-1) 0 0; color: var(--color-text-muted); }
 .spracheingabe--aufnahme { background: var(--color-area-participant-tint); }
+.gespraechseingabe .spracheingabe--aufnahme { background: none; }
+
+/* Laufende Aufnahme: der Knopf selbst wechselt die Farbe. */
+.spracheingabe--aufnahme .spracheingabe__steuerung {
+    background: var(--color-danger);
+    color: var(--color-text-on-accent);
+}
+
+.spracheingabe--aufnahme .spracheingabe__steuerung:hover { background: var(--color-danger-emphasis); }
+
+/* Sichtbar nur, solange htmx die Antwort holt. */
+.gespraechseingabe__verarbeitung {
+    grid-area: verarbeitung;
+    display: none;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.gespraechseingabe__formular.htmx-request .gespraechseingabe__verarbeitung { display: flex; }
+
+.gespraechseingabe__spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: gespraechseingabe-dreht 900ms linear infinite;
+}
+
+@keyframes gespraechseingabe-dreht {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gespraechseingabe__spinner { animation-duration: 3s; }
+}
 
 .gespraechseingabe--fehler {
     padding: var(--space-3);
@@ -196,4 +257,27 @@
     .gespraechsschritt__eingabe,
     .gespraechsschritt__aeusserung { max-width: 94%; }
     .sitzung-illustration { width: min(100%, 360px); }
+}
+
+@media (max-width: 560px) {
+    .gespraechseingabe__formular {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "beschriftung"
+            "eingabe"
+            "senden"
+            "aufnahme"
+            "hinweis"
+            "verarbeitung";
+    }
+
+    .diagnose {
+        grid-template-areas:
+            "beschriftung"
+            "eingabe"
+            "senden"
+            "aufnahme"
+            "transkript"
+            "hinweis";
+    }
 }
