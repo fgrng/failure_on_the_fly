@@ -373,6 +373,13 @@ class Vignette(models.Model):
         return self.budget_typ != self.BudgetTyp.SCHRITTE
 
     @property
+    def anzeigename(self) -> str:
+        """Gibt den Namen der Historie zurück, sonst ein Label aus dem Kontext."""
+        return self.historie.name or (
+            f"{self.fach}: {self.thema} (Klasse {self.klassenstufe})"
+        )
+
+    @property
     def kern_pin_ueberholt(self) -> bool:
         """Gibt zurück, ob der gepinnte Kern von einer neueren Fassung überholt wurde."""
         return (

@@ -18,11 +18,6 @@ from .forms import VignetteForm
 from .models import Vignette, Vignettenhistorie, zufaellige_akteure
 
 
-def _fallback_label(vignette: Vignette) -> str:
-    """Leitet ein lesbares Label aus dem Unterrichtskontext ab."""
-    return f"{vignette.fach}: {vignette.thema} (Klasse {vignette.klassenstufe})"
-
-
 def _zustand_badge(vignette: Vignette) -> str:
     """Ordnet Modellzustände den gemeinsamen Badge-Klassen zu."""
     return {
@@ -91,7 +86,7 @@ def liste(request: HttpRequest) -> HttpResponse:
         neueste_fassung: Vignette = historie.vignette_set.latest("pk")
         historien.append(
             {
-                "label": historie.name or _fallback_label(neueste_fassung),
+                "label": neueste_fassung.anzeigename,
                 "fach": neueste_fassung.fach,
                 "thema": neueste_fassung.thema,
                 "klassenstufe": neueste_fassung.klassenstufe,

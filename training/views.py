@@ -233,7 +233,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     )
     return [
         {
-            "name": sitzung.vignette.historie.name or sitzung.vignette.fach,
+            "name": sitzung.vignette.anzeigename,
             "status": sitzung.get_status_display(),
             "status_badge": _sitzung_status_badge(sitzung.status),
             "gespraechsschritte": sitzung.gespraechsschritte,

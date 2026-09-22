@@ -927,7 +927,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             [
                 {
                     "pk": self.eigene_finale.pk,
-                    "label": "Mathematik",
+                    "label": self.eigene_finale.anzeigename,
                     "fach": "Mathematik",
                     "thema": self.eigene_finale.thema,
                     "aktion_url": reverse(

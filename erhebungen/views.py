@@ -169,7 +169,7 @@ def _vignettenzeilen(
     return [
         {
             "pk": vignette.pk,
-            "label": vignette.historie.name or vignette.fach,
+            "label": vignette.anzeigename,
             "fach": vignette.fach,
             "thema": vignette.thema,
             "aktion_url": reverse(aktion, args=[erhebung.pk, vignette.pk]),

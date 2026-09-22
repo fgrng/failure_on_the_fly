@@ -108,7 +108,7 @@
                                     <select id="id_vignette_{{ forloop.counter }}" name="vignetten">
                                         {% for option in vignettenzugehoerigkeiten %}
                                             <option value="{{ option.pk }}"{% if option.pk == zugehoerigkeit.pk %} selected{% endif %}>
-                                                {{ option.vignette.historie.name|default:option.vignette.fach }}
+                                                {{ option.vignette.anzeigename }}
                                             </option>
                                         {% endfor %}
                                     </select>
