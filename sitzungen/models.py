@@ -55,6 +55,8 @@ class Sitzung(models.Model):
         auto_now_add=True,
         null=True,
     )
+    verbrauchte_zeit: models.FloatField = models.FloatField(default=0.0)
+    offene_spanne_seit: models.DateTimeField = models.DateTimeField(null=True)
 
     @property
     def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:

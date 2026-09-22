@@ -522,7 +522,7 @@ def gespraech_beenden(request: HttpRequest) -> HttpResponse:
     navigation: Sitzungsnavigation = _sitzungsnavigation()
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, navigation)
 
@@ -541,7 +541,7 @@ def abbrechen(request: HttpRequest) -> HttpResponse:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
         return _zur_auswahl_zurueckkehren(request, sitzung)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung, session=request.session)
+    sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_abbrechen(sink)
     return _zur_auswahl_zurueckkehren(request, sitzung)
 

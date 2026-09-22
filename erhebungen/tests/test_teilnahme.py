@@ -871,6 +871,38 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotContains(antwort, "Debrief")
         self.assertContains(antwort, "Ich addiere.")
 
+    def test_zeitbudget_ueberlebt_den_browserwechsel(self) -> None:
+        """Die andere Browser-Session führt den Zeitverbrauch derselben Sitzung fort."""
+
+        self._vignette_anlegen(
+            budget_typ=Vignette.BudgetTyp.ZEIT,
+            budget_wert=5,
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            side_effect=[
+                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 20, tzinfo=UTC),
+                datetime(2026, 9, 22, 10, 1, 26, tzinfo=UTC),
+            ],
+        ):
+            self.client.get(gespraech_url)
+            self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+            anderer_browser: Client = Client()
+            anderer_browser.get(gespraech_url)
+            debrief: HttpResponse = anderer_browser.post(
+                gespraech_url, {"eingabe": "Und warum?"}
+            )
+
+        self.assertContains(debrief, "Debrief")
+        self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 7)
+
     def test_aktiver_abbruch_setzt_die_sitzung_auf_abgebrochen(self) -> None:
         """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""
 

@@ -133,26 +133,17 @@ class SitzungSink(Protocol):
 class DBSink:
     """Persistiert eine Sitzung inkrementell über die ORM-Modelle."""
 
-    def __init__(
-        self,
-        teilnahme: Teilnahme,
-        session: MutableMapping[str, Any] | None = None,
-    ) -> None:
-        """Bindet den Sink an die Teilnahme und optional an die Browser-Session."""
+    def __init__(self, teilnahme: Teilnahme) -> None:
+        """Bindet den Sink an die Teilnahme."""
 
         self.teilnahme: Teilnahme = teilnahme
         self.sitzung: Sitzung | None = None
-        self.session: MutableMapping[str, Any] = {} if session is None else session
 
     @classmethod
-    def fuer_sitzung(
-        cls,
-        sitzung: Sitzung,
-        session: MutableMapping[str, Any] | None = None,
-    ) -> "DBSink":
+    def fuer_sitzung(cls, sitzung: Sitzung) -> "DBSink":
         """Stellt den Sink für eine bereits persistierte Sitzung wieder her."""
 
-        sink: DBSink = cls(sitzung.teilnahme, session=session)
+        sink: DBSink = cls(sitzung.teilnahme)
         sink.sitzung = sitzung
         return sink
 
@@ -261,11 +252,6 @@ class DBSink:
 
         return self.gespraechsschritte.count() + 1
 
-    def _zeitbudget_schluessel(self, name: str) -> str:
-        # Isoliert die Uhr jeder persistierten Sitzung von allen anderen Sitzungen.
-
-        return f"sitzung_{self._sitzung.pk}_{name}"
-
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der Teilnehmerin neu an."""
 
@@ -281,42 +267,20 @@ class DBSink:
         self._budgetstand_speichern(budgetstand)
 
     def _budgetstand_laden(self) -> Budgetstand:
-        # Holt den pro Sitzung isolierten Zustand aus der Browser-Session.
+        # Rekonstruiert den Stand aus den Feldern der zugehörigen Sitzung.
 
-        startzeit: str | None = self.session.get(
-            self._zeitbudget_schluessel(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
-        )
         return Budgetstand(
-            verbrauchte_zeit=cast(
-                float,
-                self.session.get(
-                    self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL), 0.0
-                ),
-            ),
+            verbrauchte_zeit=self._sitzung.verbrauchte_zeit,
             geglueckte_schritte=self.gespraechsschritte.count(),
-            offene_spanne_seit=datetime.fromisoformat(startzeit)
-            if startzeit is not None
-            else None,
+            offene_spanne_seit=self._sitzung.offene_spanne_seit,
         )
 
     def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
-        # Legt den Speichervertrag des DB-Sinks fest, bis #245 ihn an die Sitzung zieht.
+        # Hält die Wanduhr bei der Sitzung statt in einer Browser-Session.
 
-        self.session[self._zeitbudget_schluessel(_VERBRAUCHTE_ZEIT_SCHLUESSEL)] = (
-            budgetstand.verbrauchte_zeit
-        )
-        schluessel: str = self._zeitbudget_schluessel(_ZEIT_LAEUFT_SEIT_SCHLUESSEL)
-        if budgetstand.offene_spanne_seit is None:
-            self.session.pop(schluessel, None)
-        else:
-            self.session[schluessel] = budgetstand.offene_spanne_seit.isoformat()
-        self._als_geaendert_markieren()
-
-    def _als_geaendert_markieren(self) -> None:
-        # Markiert Session-Änderungen für Django als speicherwürdig.
-
-        if hasattr(self.session, "modified"):
-            self.session.modified = True
+        self._sitzung.verbrauchte_zeit = budgetstand.verbrauchte_zeit
+        self._sitzung.offene_spanne_seit = budgetstand.offene_spanne_seit
+        self._sitzung.save(update_fields=["verbrauchte_zeit", "offene_spanne_seit"])
 
 
 def probelauf_laeuft(session: MutableMapping[str, Any]) -> bool:
