@@ -15,7 +15,7 @@
             </section>
         {% endif %}
 
-        {% if zeige_ausbildung_kuratieren or zeige_teilnahme %}
+        {% if zeige_ausbildung_kuratieren or zeige_teilnahme or zeige_abschriften %}
             <section class="sidebar-nav__group sidebar-nav__group--education">
                 <h2>Ausbildung</h2>
                 <div>
@@ -28,7 +28,9 @@
                         <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>
                         <a href="{% url 'training:historie' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "historie" %} aria-current="page"{% endif %}>Meine Trainings</a>
                     {% endif %}
+                    {% if zeige_abschriften %}
                     <a href="{% url 'training:abschriften' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "abschriften" %} aria-current="page"{% endif %}>Meine Abschriften</a>
+                    {% endif %}
                 </div>
             </section>
         {% endif %}

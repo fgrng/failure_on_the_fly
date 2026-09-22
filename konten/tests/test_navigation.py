@@ -29,6 +29,7 @@ from konten.models import Konto
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": False,
                 "zeige_teilnahme": True,
+                "zeige_abschriften": True,
                 "zeige_forschung": False,
                 "zeige_system": False,
             },
@@ -40,6 +41,7 @@ from konten.models import Konto
                 "zeige_entwicklung": True,
                 "zeige_ausbildung_kuratieren": False,
                 "zeige_teilnahme": False,
+                "zeige_abschriften": True,
                 "zeige_forschung": False,
                 "zeige_system": False,
             },
@@ -51,6 +53,7 @@ from konten.models import Konto
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": True,
                 "zeige_teilnahme": False,
+                "zeige_abschriften": True,
                 "zeige_forschung": False,
                 "zeige_system": False,
             },
@@ -62,6 +65,7 @@ from konten.models import Konto
                 "zeige_entwicklung": False,
                 "zeige_ausbildung_kuratieren": False,
                 "zeige_teilnahme": False,
+                "zeige_abschriften": True,
                 "zeige_forschung": True,
                 "zeige_system": False,
             },
@@ -73,6 +77,7 @@ from konten.models import Konto
                 "zeige_entwicklung": True,
                 "zeige_ausbildung_kuratieren": True,
                 "zeige_teilnahme": False,
+                "zeige_abschriften": True,
                 "zeige_forschung": True,
                 "zeige_system": True,
             },
@@ -176,6 +181,14 @@ class SidebarNavigationTests(TestCase):
         self.assertIn("Simulationskern ansehen", sidebar)
         self.assertNotIn("Simulationskern verwalten", sidebar)
         self.assertNotIn("Training starten", sidebar)
+
+    def test_jede_rolle_erreicht_die_abschriften(self) -> None:
+        """Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0043)."""
+        for rollen in ([], ["Autor:in"], ["Ausbilder:in"], ["Forschende:r"]):
+            with self.subTest(rollen=rollen):
+                Konto.objects.all().delete()
+
+                self.assertIn("Meine Abschriften", self._sidebar_fuer(*rollen))
 
     def test_forschende_sieht_forschungsbereich(self) -> None:
         """Die Forschung hängt nicht mehr an einer Template-Gruppenschleife."""
