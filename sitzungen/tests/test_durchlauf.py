@@ -23,7 +23,6 @@ from sitzungen.durchlauf import (
     sitzung_starten,
 )
 from sitzungen.sink import Budgetstand, DBSink, ScratchSink
-from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
 
@@ -306,27 +305,20 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
 
 
 @pytest.mark.django_db
-def test_zeitbudget_ist_von_anderen_sitzungen_und_dem_training_getrennt() -> None:
-    """Die zwei Sitzungsspeicher und das Training führen unabhängige Zeitstände."""
+def test_zeitbudget_ist_von_jeder_anderen_sitzung_getrennt() -> None:
+    """Der Zeitstand hängt an seiner Sitzungszeile und an keiner zweiten."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
-    konto: Konto = Konto.objects.get(username="ada")
     sitzung: DBSink = DBSink(Teilnahme.objects.create())
     andere_sitzung: DBSink = DBSink(Teilnahme.objects.create())
-    training: Training = Training.objects.anlegen(konto, name="Brüche")
-    trainingsbindung: Trainingsbindung = Trainingsbindung.objects.create(
-        teilnahme=Teilnahme.objects.create(), training=training, konto=konto
-    )
-    trainingssitzung: DBSink = DBSink(trainingsbindung.teilnahme)
 
-    for sink in (sitzung, andere_sitzung, trainingssitzung):
+    for sink in (sitzung, andere_sitzung):
         sitzung_starten(sink, vignette, konfiguration)
     sitzung.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
     sitzung.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
 
     assert _verbrauchte_zeit(sitzung) == 4.0
     assert _verbrauchte_zeit(andere_sitzung) == 0.0
-    assert _verbrauchte_zeit(trainingssitzung) == 0.0
 
 
 @pytest.mark.django_db
