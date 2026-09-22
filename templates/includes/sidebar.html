@@ -79,7 +79,13 @@
         {% endif %}
     </nav>
 
-    {% if user.is_authenticated %}
+    {% if teilnahme_token %}
+        <div class="sidebar-token">
+            <small>Ihr Teilnahme-Token</small>
+            <strong>{{ teilnahme_token }}</strong>
+            <small>Bitte notieren.</small>
+        </div>
+    {% elif user.is_authenticated %}
         <div class="sidebar-account">
             <span class="sidebar-account__avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</span>
             <span>

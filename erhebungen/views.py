@@ -49,6 +49,7 @@ from .ablauf import (
 )
 from .export import datenspur_zip
 from .forms import ItemblockFormular
+from .navigation import TEILNAHME_TOKENS_SESSION_KEY
 from .models import (
     Erhebung,
     Erhebungsbindung,
@@ -71,7 +72,6 @@ from sitzungen.views import (
 )
 from vignetten.models import Vignette
 
-_TEILNAHME_TOKENS_SESSION_KEY: str = "erhebung_teilnahme_tokens"
 _VIGNETTEN_SPALTEN: list[dict[str, str]] = [
     {"schluessel": "label", "beschriftung": "Name"},
 ]
@@ -769,9 +769,9 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None:
         bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
-        tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+        tokens: dict[str, str] = request.session.get(TEILNAHME_TOKENS_SESSION_KEY, {})
         tokens[str(teilnahme_link)] = bindung.token
-        request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
+        request.session[TEILNAHME_TOKENS_SESSION_KEY] = tokens
     if bindung.teilnahme.einwilligung_erteilt:
         return _weiter_im_ablauf(bindung)
     return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
@@ -897,7 +897,7 @@ def sitzung_fuer_transkription(request: HttpRequest) -> Sitzung:
     sitzung_pk: str | None = request.POST.get("sitzung_pk")
     if sitzung_pk is None:
         raise PermissionDenied
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+    tokens: dict[str, str] = request.session.get(TEILNAHME_TOKENS_SESSION_KEY, {})
     jetzt: datetime = timezone.now()
     sitzung: Sitzung | None = (
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme")
@@ -1095,7 +1095,7 @@ def _bindung_aus_session(
 ) -> Erhebungsbindung | None:
     """Lädt die zur Stichprobe passende Bindung des aktuellen Browsers."""
 
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+    tokens: dict[str, str] = request.session.get(TEILNAHME_TOKENS_SESSION_KEY, {})
     token: str | None = tokens.get(str(stichprobe.teilnahme_link))
     if token is None:
         return None
@@ -1114,11 +1114,11 @@ def _bindung_in_session_speichern(
 ) -> None:
     """Bindet einen tokenbasierten Wiedereinstieg an den aktuellen Browser."""
 
-    tokens: dict[str, str] = request.session.get(_TEILNAHME_TOKENS_SESSION_KEY, {})
+    tokens: dict[str, str] = request.session.get(TEILNAHME_TOKENS_SESSION_KEY, {})
     teilnahme_link = str(bindung.stichprobe.teilnahme_link)
     if tokens.get(teilnahme_link) != bindung.token:
         tokens[teilnahme_link] = bindung.token
-        request.session[_TEILNAHME_TOKENS_SESSION_KEY] = tokens
+        request.session[TEILNAHME_TOKENS_SESSION_KEY] = tokens
 
 
 def _laufende_bindung(token: str) -> Erhebungsbindung:

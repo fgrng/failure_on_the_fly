@@ -132,6 +132,26 @@
     cursor: pointer;
 }
 
+.sidebar-token {
+    margin-top: auto;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+}
+
+.sidebar-token small {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+}
+
+.sidebar-token strong {
+    /* Feste Laufweite, damit das eindeutige Token-Alphabet ablesbar bleibt. */
+    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    font-size: 1rem;
+    letter-spacing: .08em;
+    word-break: break-all;
+}
+
 .sidebar-login {
     margin-top: auto;
     padding: var(--space-1) var(--space-2);
@@ -163,5 +183,6 @@
     }
     .sidebar-layout > .site-main { padding: var(--space-4) var(--space-3); }
     .sidebar-account,
+    .sidebar-token,
     .sidebar-login { margin-top: var(--space-3); }
 }

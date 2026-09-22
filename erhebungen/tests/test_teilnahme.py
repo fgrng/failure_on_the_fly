@@ -212,6 +212,15 @@ class ErhebungsteilnahmeTests(TestCase):
             position=1,
         )
 
+    def _seitenleiste_zeigt_nur_das_token(
+        self, antwort: HttpResponse, token: str
+    ) -> None:
+        # Prüft den dritten Zweig des Kontoslots: Token statt Konto oder Anmeldung.
+
+        self.assertContains(antwort, token)
+        self.assertNotContains(antwort, "sidebar-account")
+        self.assertNotContains(antwort, "sidebar-login")
+
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
     ) -> None:
@@ -468,6 +477,57 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertIsNotNone(bindung.abgeschlossen_am)
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+
+    def test_seitenleiste_zeigt_das_token_auf_jeder_teilnahmeseite(self) -> None:
+        """Die Teilnehmer:in liest ihr Token ab, ohne in die Adresszeile zu sehen."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
+        # Ein nebenbei angemeldetes Konto bleibt während der Teilnahme unsichtbar.
+        self.client.force_login(Konto.objects.create_user(username="grace"))
+        self.client.get(self.url)
+        token: str = Erhebungsbindung.objects.get().token
+        einwilligung_url: str = reverse(
+            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
+        )
+
+        self._seitenleiste_zeigt_nur_das_token(self.client.get(einwilligung_url), token)
+        self.client.post(
+            einwilligung_url,
+            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+        )
+        self._seitenleiste_zeigt_nur_das_token(
+            self.client.get(
+                reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link])
+            ),
+            token,
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[token])
+        self._seitenleiste_zeigt_nur_das_token(self.client.get(gespraech_url), token)
+        # Der verbrauchte Schritt führt in den Debrief, der unter derselben URL steht.
+        self._seitenleiste_zeigt_nur_das_token(
+            self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"}), token
+        )
+        self.client.post(
+            reverse("erhebungen:debrief", args=[token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        itemblock_url: str = reverse("erhebungen:itemblock", args=[token])
+        self._seitenleiste_zeigt_nur_das_token(self.client.get(itemblock_url), token)
+        self.client.post(
+            itemblock_url,
+            {"antwort": ItemAntwort.objects.get(sitzung=None).pk, "weiter": "ja"},
+        )
+        self._seitenleiste_zeigt_nur_das_token(
+            self.client.get(
+                reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+            ),
+            token,
+        )
 
     def test_debrief_setzt_direkt_mit_der_naechsten_vignette_fort(self) -> None:
         """Der Ablauf startet nach einer Diagnose sofort die nächste Ziehung."""
