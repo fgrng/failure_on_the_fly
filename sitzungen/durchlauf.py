@@ -2,18 +2,26 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum, auto
 
 from django.conf import settings
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.utils import timezone
 
 from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from vignetten.models import Vignette, rahmen_platzhalter
+
+
+def _jetzt() -> datetime:
+    """Liefert die Wanduhr für Übergänge des Budgetstands."""
+
+    return timezone.now()
 
 
 def sitzung_starten(
@@ -76,7 +84,7 @@ def gespraechsschritt_ausfuehren(
     der Sink hinter der Naht — nicht dieser Ablauf.
     """
 
-    sink.zeitbudget_anhalten()
+    sink.zug_beenden(_jetzt())
     antwortversuch: Antwortversuch = antwort_versuchen(
         vignette,
         simulationskern,
@@ -94,33 +102,30 @@ def gespraechsschritt_ausfuehren(
             eingabemodus=eingabemodus,
             fehlversuche=fehlversuche,
         )
-        sink.zeitbudget_fortsetzen()
         return Ausgang.GESCHEITERT
-    sink.gespraechsschritt_anhaengen(
+    budget_erschoepft: bool = sink.gespraechsschritt_anhaengen(
         eingabe=eingabe,
         eingabemodus=eingabemodus,
         denkspur=antwortversuch.antwort.denkspur,
         aeusserung=antwortversuch.antwort.aeusserung,
         fehlversuche=fehlversuche,
     )
-    if sink.budget_erschoepft(vignette):
+    if budget_erschoepft:
         # Die Uhr bleibt stehen: Nach dem Budget verfasst niemand mehr eine Eingabe.
-        sink.gespraechsende_vermerken()
         return Ausgang.BUDGET_ERSCHOEPFT
-    sink.zeitbudget_fortsetzen()
     return Ausgang.FORTGESETZT
 
 
 def sitzung_beenden(sink: SitzungSink) -> None:
     """Hält die Uhr an und bereitet das Erreichen des Debriefs vor."""
 
-    sink.zeitbudget_anhalten()
+    sink.zug_beenden(_jetzt())
 
 
 def sitzung_abbrechen(sink: SitzungSink) -> None:
     """Hält die Uhr an und markiert die Sitzung als abgebrochen."""
 
-    sink.zeitbudget_anhalten()
+    sink.zug_beenden(_jetzt())
     sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
 
 
