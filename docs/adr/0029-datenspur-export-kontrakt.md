@@ -64,7 +64,7 @@ Pfade statt als Inhalt.
 | `stichproben.csv` | `id`, `beginn`, `ende`, `archiviert` |
 | `teilnahmen.csv` | `token`, `stichprobe_id`, `einwilligung_erteilt`, `audioverarbeitung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
 | `vignettenziehungen.csv` | `token`, `vignette_id`, `position` |
-| `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am` |
+| `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am`, `eingabemodus` |
@@ -100,6 +100,23 @@ die keine Konfiguration hat.
 Die Transkriptions-Konfiguration erscheint gar nicht im Export (ADR-0026): Die
 Transkription ist eine Deployment-Entscheidung der Betreiber:in, keine
 Eigenschaft der Datenspur.
+
+## Die verbrauchte Gesprächszeit im Export
+
+`sitzungen.csv` trägt in `verbrauchte_zeit` die tatsächlich verbrauchte
+Gesprächszeit der Sitzung in Sekunden — derselben Einheit, in der `budget_wert`
+einer Vignettenfassung mit `budget_typ` `zeit` bemessen ist. Die verbrauchte
+Zeit ist nach ADR-0012 selbst eine Größe der Datenspur: Sie sagt etwas über
+diagnostische Ökonomie aus, und genau dafür ist das Budget eine Obergrenze und
+kein Soll. Seit ADR-0042 steht sie an der Sitzung und kann deshalb exportiert
+werden.
+
+**Die Spalte ist nur zusammen mit dem Budget-Typ der Vignettenfassung zu
+lesen.** Für Sitzungen einer Vignette mit schrittbasiertem Budget bleibt sie
+bei null — dort läuft keine Uhr, die Null ist kein gemessener Wert.
+
+**Der Startpunkt der laufenden Spanne erscheint nicht.** Er ist interne
+Buchführung der Uhr und über das Ende einer Sitzung hinaus bedeutungslos.
 
 ## Der Fragebogen im Export
 

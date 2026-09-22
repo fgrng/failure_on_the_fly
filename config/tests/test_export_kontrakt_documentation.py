@@ -42,6 +42,36 @@ def test_adr_0029_listet_die_fragebogen_tabellen_mit_ihren_spalten() -> None:
         assert zeile in dateiformat
 
 
+def test_adr_0029_fuehrt_die_verbrauchte_zeit_in_der_sitzungszeile() -> None:
+    """Die Sitzungszeile trägt die verbrauchte Zeit, nicht den Spannenstart."""
+    dateiformat: str = adr_abschnitt("Dateiformat")
+    adr: str = adr_text()
+
+    assert (
+        "| `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, "
+        "`simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, "
+        "`verbrauchte_zeit` |" in dateiformat
+    )
+    assert "`offene_spanne_seit`" not in adr
+    for klausel in (
+        "in Sekunden",
+        "nur zusammen mit dem Budget-Typ",
+        "Der Startpunkt der laufenden Spanne erscheint nicht",
+    ):
+        assert klausel in adr
+
+
+def test_readme_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
+    """Der Download-Absatz erklärt, wie die verbrauchte Zeit zu lesen ist."""
+    abschnitt: str = readme_abschnitt("Erhebungen verwalten")
+
+    for klausel in (
+        "verbrauchte Gesprächszeit in Sekunden",
+        "schrittbasiertem Budget bleibt sie bei null",
+    ):
+        assert klausel in abschnitt
+
+
 def test_adr_0029_haelt_die_kodierungsrichtung_der_likert_skala_fest() -> None:
     """Die Richtung der Skala steht im Kontrakt, nicht nur im Quellcode."""
     adr: str = adr_text()

@@ -195,7 +195,10 @@ und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
+Fehlversuche und Diagnosen. Jede Sitzungszeile nennt die verbrauchte
+Gesprächszeit in Sekunden; bei einer Vignette mit schrittbasiertem Budget bleibt
+sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
+Vignettenfassung zu lesen. Jeder Gesprächsschritt und jede Diagnose vermerken
 dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
 zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
 ist damit eine Angabe für die Auswertung, kein Nachweis. Die verwendeten

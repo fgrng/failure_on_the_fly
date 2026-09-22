@@ -157,6 +157,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     "simulationskern_id",
                     "modell_konfiguration_id",
                     "erstellt_am",
+                    "verbrauchte_zeit",
                 ),
                 (
                     (
@@ -168,6 +169,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         position.sitzung.simulationskern_id,
                         position.sitzung.modell_konfiguration_id,
                         position.sitzung.erstellt_am,
+                        position.sitzung.verbrauchte_zeit,
                     )
                     for position in positionen.select_related(
                         "teilnahme__erhebungsbindung", "sitzung"

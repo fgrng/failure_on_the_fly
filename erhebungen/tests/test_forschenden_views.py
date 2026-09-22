@@ -89,7 +89,12 @@ def _infomaniak_konfiguration() -> ModellKonfiguration:
     )
 
 
-def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
+def _finale_vignette_anlegen(
+    konto: Konto,
+    fach: str,
+    budget_typ: str = Vignette.BudgetTyp.SCHRITTE,
+    budget_wert: int = 3,
+) -> Vignette:
     """Legt eine einbindbare finale Vignette an."""
 
     vignette: Vignette = Vignette.objects.anlegen(konto)
@@ -104,8 +109,8 @@ def _finale_vignette_anlegen(konto: Konto, fach: str) -> Vignette:
     vignette.fach = fach
     vignette.thema = "Bruchrechnung"
     vignette.klassenstufe = "6"
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 3
+    vignette.budget_typ = budget_typ
+    vignette.budget_wert = budget_wert
     vignette.save()
     vignette.finalisieren()
     return vignette
@@ -1917,6 +1922,64 @@ class ErhebungsExportTests(TestCase):
                     )
                 },
             },
+        )
+
+    def test_exportiert_die_verbrauchte_zeit_ohne_die_laufende_spanne(self) -> None:
+        """Die verbrauchte Zeit ist Datenspur (ADR-0012), der Spannenstart nicht."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+        erhebung.finalisieren()
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        zeitvignette: Vignette = _finale_vignette_anlegen(
+            ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
+        )
+        schrittvignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
+        for nummer, (vignette, verbraucht) in enumerate(
+            ((zeitvignette, 417.5), (schrittvignette, 0.0)), start=1
+        ):
+            bindung: Erhebungsbindung = _laufende_bindung(erhebung, f"2345-678{nummer}")
+            sitzung: Sitzung = Sitzung.objects.create(
+                teilnahme=bindung.teilnahme,
+                vignette=vignette,
+                simulationskern=kern,
+                modell_konfiguration=konfiguration,
+                verbrauchte_zeit=verbraucht,
+                offene_spanne_seit=timezone.now(),
+            )
+            Vignettenposition.objects.create(
+                teilnahme=bindung.teilnahme,
+                sitzung=sitzung,
+                vignette=vignette,
+                position=1,
+            )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            with TextIOWrapper(
+                zip_datei.open("sitzungen.csv"), encoding="utf-8"
+            ) as csv_datei:
+                leser: csv.DictReader = csv.DictReader(csv_datei)
+                zeilen: dict[str, dict[str, str]] = {
+                    zeile["vignette_id"]: zeile for zeile in leser
+                }
+                spalten: list[str] = list(leser.fieldnames or [])
+
+        self.assertNotIn("offene_spanne_seit", spalten)
+        self.assertEqual(
+            {
+                vignette_id: zeile["verbrauchte_zeit"]
+                for vignette_id, zeile in zeilen.items()
+            },
+            {str(zeitvignette.pk): "417.5", str(schrittvignette.pk): "0.0"},
         )
 
     def test_exportiert_gespraechsschritte_fehlversuche_und_diagnosen(self) -> None:
