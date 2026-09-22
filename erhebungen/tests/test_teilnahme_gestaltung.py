@@ -39,6 +39,7 @@ _KONTEXT: dict[str, object] = {
     "stichprobe": _STICHPROBE,
     "formular": _FORMULAR,
     "token": "ABCD-1234",
+    "teilnahme_token": "ABCD-1234",
 }
 _SEITEN: tuple[str, ...] = (
     "erhebungen/einwilligung.html",

@@ -53,6 +53,7 @@ class ErhebungsteilnahmeTests(TestCase):
             name="Brüche",
             einwilligungstext="Ich willige in die Teilnahme ein.",
             instruktionstext="Fragen Sie gezielt nach dem Rechenweg.",
+            abschlusstext="Vielen Dank für Ihre Zeit.",
         )
         self.kern: Simulationskern | None = None
 
@@ -220,6 +221,23 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(antwort, token)
         self.assertNotContains(antwort, "sidebar-account")
         self.assertNotContains(antwort, "sidebar-login")
+
+    def _abschlussseite_erklaert_die_abschrift(
+        self, antwort: HttpResponse, token: str
+    ) -> None:
+        # Prüft den systemseitigen Pflicht-Baustein unter dem Abschlusstext.
+
+        seite: str = antwort.content.decode()
+        self.assertIn(token, seite)
+        self.assertIn(self.erhebung.abschlusstext, seite)
+        self.assertLess(
+            seite.index(self.erhebung.abschlusstext),
+            seite.index("section-abschrift"),
+            "Der Hinweis steht über dem Abschlusstext der Forschenden.",
+        )
+        self.assertIn("Abschrift", seite)
+        self.assertIn("Ohne dieses Token", seite)
+        self.assertIn(f'href="{reverse("training:abschriften")}"', seite)
 
     def test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung(
         self,
@@ -470,8 +488,14 @@ class ErhebungsteilnahmeTests(TestCase):
             abschluss_antwort,
             reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
         )
-        self.client.get(
-            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link])
+        abschluss_url: str = reverse(
+            "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
+        )
+        abschluss: HttpResponse = self.client.get(abschluss_url)
+        self._abschlussseite_erklaert_die_abschrift(abschluss, bindung.token)
+        # Wer die Seite neu lädt, findet Token und Hinweis unverändert wieder.
+        self._abschlussseite_erklaert_die_abschrift(
+            self.client.get(abschluss_url), bindung.token
         )
         bindung.refresh_from_db()
         self.assertIsNotNone(bindung.abgeschlossen_am)

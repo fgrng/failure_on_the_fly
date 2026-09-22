@@ -19,5 +19,29 @@
             <p class="prose">{{ erhebung.abschlusstext }}</p>
         </div>
     </section>
+
+    {# Systemseitig und unabschaltbar, wie der Auftragsverarbeitungs-Absatz der
+       Einwilligung: Der Abschlusstext der Forschenden bleibt unberührt. #}
+    <section class="page-section" aria-labelledby="section-abschrift">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="section-abschrift">Ihre Abschrift</h2></span>
+        </header>
+        <div class="page-field">
+            <div class="card card--participant">
+                <div class="card__header">
+                    <h3>Ihr Teilnahme-Token</h3>
+                </div>
+                <div class="card__body">
+                    <p class="abschrift-token">{{ teilnahme_token }}</p>
+                    <p>
+                        Notieren Sie dieses Token. Angemeldet holen Sie sich damit später
+                        eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr
+                        Nutzerkonto. Ohne dieses Token gibt es keine Abschrift.
+                    </p>
+                    <p><a href="{% url 'training:abschriften' %}">Zur Token-Eingabe</a></p>
+                </div>
+            </div>
+        </div>
+    </section>
 </section>
 {% endblock %}

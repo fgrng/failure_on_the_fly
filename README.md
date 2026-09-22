@@ -168,6 +168,12 @@ notieren.
 Während einer Teilnahme erscheinen dort weder Kontoblock noch Anmeldelink, auch
 nicht bei nebenbei angemeldetem Konto; in Forschenden-Ansichten erscheint
 umgekehrt kein Teilnahme-Token.
+Unter dem Abschlusstext steht auf der Abschlussseite zusätzlich ein
+systemseitiger Hinweis, den die Forschende nicht abschalten kann: das Token
+groß und in fester Laufweite, dazu die Erklärung, dass sich damit angemeldet
+später eine Abschrift der eigenen Sitzungen ins Nutzerkonto holen lässt und
+dass es ohne das Token keine Abschrift gibt, samt Link auf die Token-Eingabe.
+Ein erneuter Aufruf der Abschlussseite zeigt beides wieder.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
 kann ohne Diagnose abgebrochen werden. Scheitert ein Antwortversuch endgültig,
 bleibt der Gesprächsschritt ohne Antwort erhalten.

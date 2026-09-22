@@ -127,6 +127,16 @@
     font-weight: 700;
 }
 
+/* ---- Teilnahme-Token zum Abtippen: groß und in fester Laufweite ---- */
+.abschrift-token {
+    margin-bottom: var(--space-2);
+    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    word-break: break-all;
+}
+
 /* ---- Auswahl: Radiobuttons behalten ihre Eigenbreite neben der Beschriftung ---- */
 .page-choices label {
     display: flex;
