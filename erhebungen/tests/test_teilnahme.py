@@ -137,13 +137,14 @@ class ErhebungsteilnahmeTests(TestCase):
         # Legt die fremde, bereits weitgehend verbrauchte Trainingssitzung an.
 
         konto: Konto = self.erhebung.eigentuemerinnen.get()
-        bindung: Trainingsbindung = Trainingsbindung.objects.create(
-            teilnahme=Teilnahme.objects.create(),
+        teilnahme: Teilnahme = Teilnahme.objects.create()
+        Trainingsbindung.objects.create(
+            teilnahme=teilnahme,
             training=Training.objects.anlegen(konto, name="Brüche"),
             konto=konto,
         )
         return Sitzung.objects.create(
-            teilnahme=bindung.teilnahme,
+            teilnahme=teilnahme,
             vignette=vignette,
             simulationskern=vignette.gepinnter_kern,
             modell_konfiguration=ModellKonfiguration.objects.aktive(),
@@ -892,6 +893,8 @@ class ErhebungsteilnahmeTests(TestCase):
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
 
+        # Ein Zug von 1 s im ersten Browser, einer von 6 s im zweiten: Der zweite
+        # erbt den Stand des ersten und bucht auf zusammen 7 s weiter.
         with patch(
             "sitzungen.durchlauf.jetzt",
             side_effect=[

@@ -48,6 +48,7 @@ def _verbrauchte_zeit(sink: ScratchSink | DBSink) -> float:
 
     if isinstance(sink, ScratchSink):
         return sink.session["probelauf"]["verbrauchte_zeit"]
+    sink.sitzung.refresh_from_db(fields=["verbrauchte_zeit"])
     return sink.sitzung.verbrauchte_zeit
 
 
@@ -309,16 +310,16 @@ def test_zeitbudget_ist_von_jeder_anderen_sitzung_getrennt() -> None:
     """Der Zeitstand hängt an seiner Sitzungszeile und an keiner zweiten."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
-    sitzung: DBSink = DBSink(Teilnahme.objects.create())
-    andere_sitzung: DBSink = DBSink(Teilnahme.objects.create())
+    sink: DBSink = DBSink(Teilnahme.objects.create())
+    anderer_sink: DBSink = DBSink(Teilnahme.objects.create())
+    sitzung_starten(sink, vignette, konfiguration)
+    sitzung_starten(anderer_sink, vignette, konfiguration)
 
-    for sink in (sitzung, andere_sitzung):
-        sitzung_starten(sink, vignette, konfiguration)
-    sitzung.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
-    sitzung.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
+    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+    sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
 
-    assert _verbrauchte_zeit(sitzung) == 4.0
-    assert _verbrauchte_zeit(andere_sitzung) == 0.0
+    assert _verbrauchte_zeit(sink) == 4.0
+    assert _verbrauchte_zeit(anderer_sink) == 0.0
 
 
 @pytest.mark.django_db

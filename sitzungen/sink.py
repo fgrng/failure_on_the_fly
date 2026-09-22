@@ -276,7 +276,7 @@ class DBSink:
         )
 
     def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
-        # Hält die Wanduhr bei der Sitzung statt in einer Browser-Session.
+        # Schreibt Zeitstand und offene Spanne an die Sitzungszeile zurück.
 
         self._sitzung.verbrauchte_zeit = budgetstand.verbrauchte_zeit
         self._sitzung.offene_spanne_seit = budgetstand.offene_spanne_seit
