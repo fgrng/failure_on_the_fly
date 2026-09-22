@@ -1,5 +1,6 @@
 """Persistenzmodelle einer Sitzung."""
 
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
 
@@ -187,3 +188,50 @@ class Diagnose(models.Model):
         choices=Eingabemodus,
         default=Eingabemodus.GETIPPT,
     )
+
+
+class Vignettenposition(models.Model):
+    """Eine gespielte Vignetten-Fassung an ihrer Position in einer Teilnahme."""
+
+    teilnahme: models.ForeignKey = models.ForeignKey(
+        Teilnahme,
+        on_delete=models.CASCADE,
+        related_name="vignettenpositionen",
+    )
+    sitzung: models.OneToOneField = models.OneToOneField(
+        Sitzung,
+        on_delete=models.CASCADE,
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+    vignette: models.ForeignKey = models.ForeignKey(
+        "vignetten.Vignette",
+        on_delete=models.PROTECT,
+    )
+
+    def clean(self) -> None:
+        """Bindet Sitzung und gespielte Fassung an dieselbe Teilnahme."""
+
+        fehler: dict[str, str] = {}
+        if self.sitzung.teilnahme_id != self.teilnahme_id:
+            fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
+        if self.sitzung.vignette_id != self.vignette_id:
+            fehler["vignette"] = "Die Vignette stimmt nicht mit der Sitzung überein."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Schreibt nur Positionen aus einer konsistenten Datenspur."""
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        """Hält die Reihenfolge je Teilnahme eindeutig und lesbar."""
+
+        ordering: list[str] = ["position"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["teilnahme", "position"],
+                name="sitzungen_position_ist_je_teilnahme_eindeutig",
+            ),
+        ]

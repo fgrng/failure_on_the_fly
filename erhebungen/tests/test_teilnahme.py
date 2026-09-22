@@ -17,7 +17,6 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
-    Vignettenposition,
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
@@ -30,6 +29,7 @@ from sitzungen.models import (
     Gespraechsschritt,
     Sitzung,
     Teilnahme,
+    Vignettenposition,
 )
 from vignetten.models import Vignette, Vignettenhistorie
 
@@ -1425,7 +1425,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(fehlversuch.rohantwort, "{unvollständig")
         self.assertEqual(sitzung.diagnose.text, "Bruchfehler")
         position: Vignettenposition = Vignettenposition.objects.get(
-            erhebungsbindung=bindung
+            teilnahme=bindung.teilnahme
         )
         self.assertEqual(position.sitzung, sitzung)
         self.assertEqual(position.vignette, vignette)

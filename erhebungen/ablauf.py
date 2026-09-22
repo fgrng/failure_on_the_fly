@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from simulation.models import ModellKonfiguration
 from sitzungen.durchlauf import sitzung_starten
-from sitzungen.models import Sitzung
+from sitzungen.models import Sitzung, Vignettenposition
 from sitzungen.sink import DBSink
 from vignetten.models import Vignette
 
@@ -18,7 +18,6 @@ from .models import (
     Erhebungsitem,
     ItemAntwort,
     Itemblock,
-    Vignettenposition,
     Vignettenziehung,
 )
 
@@ -224,7 +223,7 @@ def _sitzung_beginnen(bindung: Erhebungsbindung, vignette: Vignette) -> Sitzung:
     sitzung_starten(sink, vignette, modell_konfiguration)
     sitzung: Sitzung = sink.sitzung
     Vignettenposition.objects.create(
-        erhebungsbindung=bindung,
+        teilnahme=bindung.teilnahme,
         sitzung=sitzung,
         vignette=vignette,
         position=bindung.vignettenziehungen.get(vignette=vignette).position,

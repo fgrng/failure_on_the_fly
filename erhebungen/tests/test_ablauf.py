@@ -25,13 +25,12 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
-    Vignettenposition,
     Vignettenziehung,
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Sitzung, Teilnahme
+from sitzungen.models import Sitzung, Teilnahme, Vignettenposition
 from vignetten.models import Vignette
 
 

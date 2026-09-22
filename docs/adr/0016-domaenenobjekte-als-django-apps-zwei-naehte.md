@@ -31,9 +31,9 @@ apps/
   fragebogen_items/  Fragebogen-Item, Fragebogen-Item-Historie
   simulation/        Simulationskern, Modell-Konfiguration
   vignetten/         Vignette, Vignettenhistorie
-  sitzungen/         Teilnahme, Sitzung, Gesprächsschritt, Fehlversuch, Diagnose
+  sitzungen/         Teilnahme, Sitzung, Gesprächsschritt, Fehlversuch, Diagnose, Vignettenposition
   training/          Training, Trainingsbindung
-  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Ablauf, Item-Zuordnung, Item-Antwort
+  erhebungen/        Erhebung, Stichprobe, Erhebungsbindung, Ablauf, Vignettenziehung, Item-Zuordnung, Item-Antwort
   datenspuren/       Datenspur
 ```
 
@@ -44,6 +44,8 @@ apps/
 `training` und `erhebungen` zeigen auf `sitzungen`; `sitzungen` zeigt auf `vignetten` und `simulation` (die defensive Protokollierung der verwendeten Fassungen aus ADR-0003); `vignetten` zeigt auf `simulation` (der gepinnte Kern aus ADR-0004). `erhebungen` besitzt zusätzlich den Ablauf, der seine Erhebungsbindungen und die daraus entstehenden Sitzungen sequenziert. `fragebogen_items` ist ein **Blatt**: die Item-Bibliothek weiß nicht, wer ihre Items beantwortet. `datenspuren` ist das gegenüberliegende Blatt: Es kennt alles, und nichts kennt es.
 
 Daraus folgt, was `sitzungen` **nicht** darf: Es kennt weder Training noch Erhebung. Eine Sitzung ist laut Glossar die atomare Auswertungseinheit; ein `sitzungen`, das seine beiden Aufrufer kennt, wäre es nicht mehr.
+
+Die **Vignettenposition** — welche Sitzung die wievielte einer Teilnahme war — liegt deshalb bei `sitzungen` und hängt an der `Teilnahme`, nicht bei ihrem ersten Aufrufer und nicht an der `Erhebungsbindung`. Sie ist das Protokoll einer *gespielten* Folge und damit für jeden Aufrufer derselbe Begriff. Die *geplante* Folge samt Randomisierung bleibt als `Vignettenziehung` in `erhebungen`: Sie ist erhebungsspezifisch und kennt die Erhebungsbindung. Der Export liest die Positionen über die Teilnahme ihrer Erhebungsbindung; der Kontrakt aus ADR-0029 bleibt davon unberührt.
 
 ## Genau zwei Nähte
 

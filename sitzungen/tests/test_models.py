@@ -1,6 +1,7 @@
 """ORM-nahe Tests der persistierten Sitzung."""
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from konten.models import Konto
@@ -11,6 +12,7 @@ from sitzungen.models import (
     Gespraechsschritt,
     Sitzung,
     Teilnahme,
+    Vignettenposition,
 )
 from vignetten.models import Vignette
 
@@ -252,3 +254,138 @@ def test_bestandsdaten_duerfen_ohne_entstehungszeitpunkt_bestehen() -> None:
     sitzung.refresh_from_db()
 
     assert sitzung.erstellt_am is None
+
+
+def _vignette_und_kern() -> tuple[Vignette, Simulationskern, ModellKonfiguration]:
+    """Legt die gepinnten Bezugsobjekte einer Sitzung an."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    return (
+        Vignette.objects.anlegen(Konto.objects.create_user(username="ada")),
+        kern,
+        ModellKonfiguration.objects.create(sprachmodell="fake"),
+    )
+
+
+@pytest.mark.django_db
+def test_vignettenpositionen_einer_teilnahme_sind_nach_position_geordnet() -> None:
+    """Die Datenspur bewahrt die gespielte Vignetten-Reihenfolge je Teilnahme."""
+
+    erste_vignette, kern, konfiguration = _vignette_und_kern()
+    zweite_vignette: Vignette = Vignette.objects.anlegen(
+        Konto.objects.create_user(username="linus")
+    )
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    erste_sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=teilnahme,
+        vignette=erste_vignette,
+        simulationskern=kern,
+        modell_konfiguration=konfiguration,
+    )
+    zweite_sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=teilnahme,
+        vignette=zweite_vignette,
+        simulationskern=kern,
+        modell_konfiguration=konfiguration,
+    )
+
+    Vignettenposition.objects.create(
+        teilnahme=teilnahme,
+        sitzung=zweite_sitzung,
+        position=2,
+        vignette=zweite_vignette,
+    )
+    Vignettenposition.objects.create(
+        teilnahme=teilnahme,
+        sitzung=erste_sitzung,
+        position=1,
+        vignette=erste_vignette,
+    )
+
+    assert list(
+        teilnahme.vignettenpositionen.values_list("position", "sitzung", "vignette")
+    ) == [
+        (1, erste_sitzung.pk, erste_vignette.pk),
+        (2, zweite_sitzung.pk, zweite_vignette.pk),
+    ]
+
+
+@pytest.mark.django_db
+def test_vignettenposition_lehnt_sitzung_einer_anderen_teilnahme_ab() -> None:
+    """Eine Vignettenposition bleibt bei ihrer eigenen Teilnahme."""
+
+    vignette, kern, konfiguration = _vignette_und_kern()
+    fremde_sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=Teilnahme.objects.create(),
+        vignette=vignette,
+        simulationskern=kern,
+        modell_konfiguration=konfiguration,
+    )
+
+    with pytest.raises(ValidationError, match="anderen Teilnahme"):
+        Vignettenposition.objects.create(
+            teilnahme=Teilnahme.objects.create(),
+            sitzung=fremde_sitzung,
+            position=1,
+            vignette=vignette,
+        )
+
+
+@pytest.mark.django_db
+def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None:
+    """Die Datenspur bewahrt die tatsächlich in der Sitzung gespielte Fassung."""
+
+    sitzungs_vignette, kern, konfiguration = _vignette_und_kern()
+    andere_vignette: Vignette = Vignette.objects.anlegen(
+        Konto.objects.create_user(username="linus")
+    )
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=teilnahme,
+        vignette=sitzungs_vignette,
+        simulationskern=kern,
+        modell_konfiguration=konfiguration,
+    )
+
+    with pytest.raises(ValidationError, match="stimmt nicht mit der Sitzung"):
+        Vignettenposition.objects.create(
+            teilnahme=teilnahme,
+            sitzung=sitzung,
+            position=1,
+            vignette=andere_vignette,
+        )
+
+
+@pytest.mark.django_db
+def test_position_ist_je_teilnahme_eindeutig() -> None:
+    """Zwei Sitzungen derselben Teilnahme teilen sich keine Position."""
+
+    erste_vignette, kern, konfiguration = _vignette_und_kern()
+    zweite_vignette: Vignette = Vignette.objects.anlegen(
+        Konto.objects.create_user(username="linus")
+    )
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    sitzungen: list[Sitzung] = [
+        Sitzung.objects.create(
+            teilnahme=teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+        )
+        for vignette in (erste_vignette, zweite_vignette)
+    ]
+    Vignettenposition.objects.create(
+        teilnahme=teilnahme,
+        sitzung=sitzungen[0],
+        position=1,
+        vignette=erste_vignette,
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Vignettenposition.objects.create(
+            teilnahme=teilnahme,
+            sitzung=sitzungen[1],
+            position=1,
+            vignette=zweite_vignette,
+        )

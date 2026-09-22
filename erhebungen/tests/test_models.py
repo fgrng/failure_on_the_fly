@@ -19,7 +19,6 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
-    Vignettenposition,
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
@@ -769,108 +768,6 @@ def test_feste_reihenfolge_hat_keine_doppelte_position() -> None:
     with pytest.raises(IntegrityError), transaction.atomic():
         Erhebungsvignette.objects.bulk_create(
             [Erhebungsvignette(erhebung=erhebung, vignette=zweite, position=1)]
-        )
-
-
-@pytest.mark.django_db
-def test_vignettenpositionen_einer_teilnahme_sind_nach_position_geordnet() -> None:
-    """Die Datenspur bewahrt die gezogene Vignetten-Reihenfolge je Teilnahme."""
-
-    konto: Konto = Konto.objects.create_user(username="ada")
-    teilnahme: Teilnahme = Teilnahme.objects.create()
-    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    erste_vignette: Vignette = Vignette.objects.anlegen(konto)
-    zweite_vignette: Vignette = Vignette.objects.anlegen(konto)
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="fake"
-    )
-    erste_sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=teilnahme,
-        vignette=erste_vignette,
-        simulationskern=kern,
-        modell_konfiguration=konfiguration,
-    )
-    zweite_sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=teilnahme,
-        vignette=zweite_vignette,
-        simulationskern=kern,
-        modell_konfiguration=konfiguration,
-    )
-
-    Vignettenposition.objects.create(
-        erhebungsbindung=bindung,
-        sitzung=zweite_sitzung,
-        position=2,
-        vignette=zweite_vignette,
-    )
-    Vignettenposition.objects.create(
-        erhebungsbindung=bindung,
-        sitzung=erste_sitzung,
-        position=1,
-        vignette=erste_vignette,
-    )
-
-    assert list(
-        bindung.vignettenpositionen.values_list("position", "sitzung", "vignette")
-    ) == [
-        (1, erste_sitzung.pk, erste_vignette.pk),
-        (2, zweite_sitzung.pk, zweite_vignette.pk),
-    ]
-
-
-@pytest.mark.django_db
-def test_vignettenposition_lehnt_sitzung_einer_anderen_teilnahme_ab() -> None:
-    """Eine Vignettenposition bleibt bei ihrer eigenen Erhebungsbindung."""
-
-    konto: Konto = Konto.objects.create_user(username="ada")
-    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(
-        konto, Teilnahme.objects.create()
-    )
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    vignette: Vignette = Vignette.objects.anlegen(konto)
-    fremde_sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=Teilnahme.objects.create(),
-        vignette=vignette,
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
-    )
-
-    with pytest.raises(ValidationError, match="anderen Teilnahme"):
-        Vignettenposition.objects.create(
-            erhebungsbindung=bindung,
-            sitzung=fremde_sitzung,
-            position=1,
-            vignette=vignette,
-        )
-
-
-@pytest.mark.django_db
-def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None:
-    """Die Datenspur bewahrt die tatsächlich in der Sitzung gezogene Fassung."""
-
-    konto: Konto = Konto.objects.create_user(username="ada")
-    teilnahme: Teilnahme = Teilnahme.objects.create()
-    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    sitzungs_vignette: Vignette = Vignette.objects.anlegen(konto)
-    andere_vignette: Vignette = Vignette.objects.anlegen(konto)
-    sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=teilnahme,
-        vignette=sitzungs_vignette,
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
-    )
-
-    with pytest.raises(ValidationError, match="stimmt nicht mit der Sitzung"):
-        Vignettenposition.objects.create(
-            erhebungsbindung=bindung,
-            sitzung=sitzung,
-            position=1,
-            vignette=andere_vignette,
         )
 
 

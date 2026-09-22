@@ -26,7 +26,6 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
-    Vignettenposition,
     Vignettenziehung,
 )
 from fragebogen_items.models import FragebogenItem
@@ -38,6 +37,7 @@ from sitzungen.models import (
     Gespraechsschritt,
     Sitzung,
     Teilnahme,
+    Vignettenposition,
 )
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
@@ -1596,7 +1596,7 @@ class ErhebungsExportTests(TestCase):
             modell_konfiguration=zweite_konfiguration,
         )
         Vignettenposition.objects.create(
-            erhebungsbindung=bindung,
+            teilnahme=bindung.teilnahme,
             sitzung=sitzung,
             vignette=zweite_vignette,
             position=2,
@@ -1855,7 +1855,7 @@ class ErhebungsExportTests(TestCase):
                 status=status,
             )
             Vignettenposition.objects.create(
-                erhebungsbindung=bindung,
+                teilnahme=bindung.teilnahme,
                 sitzung=sitzung,
                 vignette=vignette,
                 position=1,
@@ -1948,7 +1948,10 @@ class ErhebungsExportTests(TestCase):
             modell_konfiguration=konfiguration,
         )
         Vignettenposition.objects.create(
-            erhebungsbindung=bindung, sitzung=sitzung, vignette=vignette, position=1
+            teilnahme=bindung.teilnahme,
+            sitzung=sitzung,
+            vignette=vignette,
+            position=1,
         )
         erfolgreicher_schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
             sitzung=sitzung,

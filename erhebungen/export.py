@@ -13,7 +13,12 @@ from django.utils import timezone
 
 from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 from simulation.models import ModellKonfiguration, Simulationskern
-from sitzungen.models import Diagnose, Fehlversuch, Gespraechsschritt
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Vignettenposition,
+)
 from vignetten.models import Vignette
 
 from .models import (
@@ -21,7 +26,6 @@ from .models import (
     Erhebungsbindung,
     ItemAntwort,
     Itemblock,
-    Vignettenposition,
     Vignettenziehung,
 )
 
@@ -139,8 +143,8 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             ),
         )
         positionen: QuerySet[Vignettenposition] = Vignettenposition.objects.filter(
-            erhebungsbindung__stichprobe__erhebung=erhebung
-        ).order_by("erhebungsbindung_id", "position")
+            teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung
+        ).order_by("teilnahme__erhebungsbindung__id", "position")
         zip_datei.writestr(
             "sitzungen.csv",
             _csv_inhalt(
@@ -157,7 +161,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 (
                     (
                         position.sitzung_id,
-                        position.erhebungsbindung.token,
+                        position.teilnahme.erhebungsbindung.token,
                         position.position,
                         position.sitzung.status,
                         position.sitzung.vignette_id,
@@ -166,7 +170,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                         position.sitzung.erstellt_am,
                     )
                     for position in positionen.select_related(
-                        "erhebungsbindung", "sitzung"
+                        "teilnahme__erhebungsbindung", "sitzung"
                     )
                 ),
             ),

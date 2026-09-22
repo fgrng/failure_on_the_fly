@@ -602,55 +602,6 @@ class Vignettenziehung(models.Model):
         ]
 
 
-class Vignettenposition(models.Model):
-    """Eine gezogene Vignetten-Fassung an ihrer Position in einer Teilnahme."""
-
-    erhebungsbindung: models.ForeignKey = models.ForeignKey(
-        Erhebungsbindung,
-        on_delete=models.CASCADE,
-        related_name="vignettenpositionen",
-    )
-    sitzung: models.OneToOneField = models.OneToOneField(
-        "sitzungen.Sitzung",
-        on_delete=models.CASCADE,
-    )
-    position: models.PositiveIntegerField = models.PositiveIntegerField()
-    vignette: models.ForeignKey = models.ForeignKey(
-        "vignetten.Vignette",
-        on_delete=models.PROTECT,
-    )
-
-    def clean(self) -> None:
-        """Bindet Sitzung und gezogene Fassung an dieselbe Teilnahme."""
-
-        sitzung = self.sitzung
-        erhebungsbindung = self.erhebungsbindung
-        fehler: dict[str, str] = {}
-        if sitzung.teilnahme_id != erhebungsbindung.teilnahme_id:
-            fehler["sitzung"] = "Die Sitzung gehört zu einer anderen Teilnahme."
-        if sitzung.vignette_id != self.vignette_id:
-            fehler["vignette"] = "Die Vignette stimmt nicht mit der Sitzung überein."
-        if fehler:
-            raise ValidationError(fehler)
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Schreibt nur Positionen aus einer konsistenten Datenspur."""
-
-        self.clean()
-        super().save(*args, **kwargs)
-
-    class Meta:
-        """Hält die Reihenfolge je Teilnahme eindeutig und lesbar."""
-
-        ordering: list[str] = ["position"]
-        constraints: list[models.BaseConstraint] = [
-            models.UniqueConstraint(
-                fields=["erhebungsbindung", "position"],
-                name="erhebungen_position_ist_je_teilnahme_eindeutig",
-            ),
-        ]
-
-
 class Itemblock(models.Model):
     """Die einem Andockpunkt entsprechenden Items, wie sie vorgelegt wurden."""
 
