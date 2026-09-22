@@ -331,7 +331,9 @@ Die Testsuite läuft mit `uv run python manage.py test`.
 ## Deployment auf Uberspace
 
 Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_django/);
-`isabell` steht für den eigenen Uberspace-Benutzernamen.
+`isabell` steht für den eigenen Uberspace-Benutzernamen. Der ausführliche
+Walkthrough für den Produktivbetrieb — mit Inbetriebnahme, Abnahme, Backup,
+Update und Fehlersuche — steht in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 1. **Projekt und Abhängigkeiten installieren.** Uberspace bringt Python 3.14
    mit; `uv` wird ins Home installiert:
