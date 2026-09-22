@@ -235,7 +235,6 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
         {
             "name": sitzung.vignette.anzeigename,
             "status": sitzung.get_status_display(),
-            "status_badge": _sitzung_status_badge(sitzung.status),
             "gespraechsschritte": sitzung.gespraechsschritte,
             # Eine Sitzung ohne Diagnose hat die Rückwärts-1:1 nicht; ihr
             # Zugriff wirft AttributeError.

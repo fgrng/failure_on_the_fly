@@ -23,9 +23,9 @@
         <section class="page-section" aria-labelledby="section-sitzung-{{ forloop.counter }}">
             <header class="page-section__head">
                 <b>{{ forloop.counter|stringformat:"02d" }}</b><span>
-                    <h2 id="section-sitzung-{{ forloop.counter }}">{{ sitzung.name }}</h2><small>Ausgang: {{ sitzung.status }}</small>
+                    <h2 id="section-sitzung-{{ forloop.counter }}">{{ sitzung.name }}</h2>
+                    <small>Ausgang: {{ sitzung.status }}</small>
                 </span>
-                <span class="badge badge--{{ sitzung.status_badge }}">{{ sitzung.status }}</span>
             </header>
 
             <div class="diagnosegespraech-verlauf" aria-label="Mein Diagnosegespräch">
