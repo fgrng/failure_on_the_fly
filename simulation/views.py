@@ -145,7 +145,7 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
 @administratorin_erforderlich
 @require_POST
 def kern_anlegen(request: HttpRequest, *, mit_vorlage: bool) -> HttpResponse:
-    """Legt die erste Kern-Fassung als Entwurf an — leer oder aus der Vorlage.
+    """Legt die erste Kern-Fassung als Entwurf an — leer oder aus dem Standardkern.
 
     Welcher Inhalt entsteht, entscheidet die Route und nicht die Anfrage. Die
     Naht selbst lehnt jede zweite erste Fassung ab; die Ablehnung erreicht die

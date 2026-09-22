@@ -1,4 +1,4 @@
-"""Die kanonischen Vorlagen für eine neue Simulationskern-Fassung."""
+"""Der Standardkern: die kanonische Erstfassung der Kern-Inhaltsfelder."""
 
 STANDARDKERN_VORLAGEN: dict[str, str] = {
     "system_prompt_vorlage": """Du spielst $schuelerin_name, ein Schüler oder eine Schülerin der Klassenstufe $klassenstufe im Fach $fach. Im aktuellen Unterricht geht es um: $thema.

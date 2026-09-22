@@ -29,7 +29,7 @@
         {% include "simulation/includes/kern_fassung_aktionen.html" with simulationskern=finale_fassung %}
     {% elif kern_fehlt %}
         <h2>Noch kein Simulationskern</h2>
-        <p class="system-page-empty">Legen Sie die erste Fassung als Entwurf an — leer oder aus den mitgelieferten Vorlagen.</p>
+        <p class="system-page-empty">Legen Sie die erste Fassung als Entwurf an — leer oder aus dem Standardkern.</p>
         <div class="page-actions">
             <form method="post" action="{% url 'simulation:kern_anlegen' %}">
                 {% csrf_token %}

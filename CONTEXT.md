@@ -135,6 +135,10 @@ _Avoid_: Autovervollständigung, Autocomplete, Typeahead, Modellpicker, Modellau
 Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Prompt-Vorlage, User-Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
 _Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
 
+**Standardkern**:
+Die im Code mitgeführte kanonische Erstfassung der fünf Inhaltsfelder des Simulationskerns. Er ist selbst keine Fassung und kein Zustand, sondern der Ausgangspunkt, aus dem eine frische Instanz ihre erste Kern-Fassung zieht — über die Verwaltungsseite als Entwurf, über `manage.py kern_initialisieren` als sofort spielbare finale Fassung. Danach spielt er keine Rolle mehr: Jede spätere Fassung entsteht aus ihrer Vorgängerin, nie erneut aus ihm.
+_Avoid_: mitgelieferte Vorlagen, Standardvorlagen, Default-Kern, Seed-Kern, Werkseinstellung
+
 **Denkspur**:
 Das interne Reasoning der simulierten Schüler:in, das zu jeder ihrer Antworten entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Der Simulationskern verlangt sie; sie gehört zur Rolle.
 _Avoid_: Chain-of-Thought, Reasoning, Gedankengang, native Reasoning-Spur — das vom Modell selbst erzeugte Reasoning wird nicht aufbewahrt (ADR-0005).

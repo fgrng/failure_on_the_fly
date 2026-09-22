@@ -255,7 +255,7 @@ class SimulationskernAnlegenTests(TestCase):
         self.assertContains(response, "Standardkern als Entwurf anlegen")
 
     def test_legt_einen_leeren_entwurf_an(self) -> None:
-        """Der leere Weg erzeugt genau einen Entwurf ohne Vorlagentexte."""
+        """Der leere Weg erzeugt genau einen Entwurf mit leeren Inhaltsfeldern."""
         response: HttpResponse = self.client.post(reverse("simulation:kern_anlegen"))
 
         self.assertRedirects(response, reverse("simulation:kern_verwalten"))
@@ -265,7 +265,7 @@ class SimulationskernAnlegenTests(TestCase):
         self.assertEqual(entwurf.rahmenhandlung_debrief, "")
 
     def test_legt_einen_entwurf_aus_den_standardvorlagen_an(self) -> None:
-        """Der Standardweg erzeugt einen Entwurf mit den kanonischen Vorlagen."""
+        """Der Standardweg erzeugt einen Entwurf aus dem Standardkern."""
         response: HttpResponse = self.client.post(
             reverse("simulation:kern_anlegen_standard")
         )

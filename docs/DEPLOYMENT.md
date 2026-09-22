@@ -292,7 +292,7 @@ Administration, der Simulationskern und die Modell-Konfiguration.
 2. **Simulationskern anlegen**, falls noch keine Fassung existiert. Unter
    `/system/kern/verwalten/` stehen dafür zwei Knöpfe: *Neuen Entwurf anlegen*
    legt eine leere erste Fassung an, *Standardkern als Entwurf anlegen* füllt
-   sie mit den mitgelieferten Vorlagen. Beide erzeugen einen **Entwurf** — er
+   sie mit dem Standardkern. Beide erzeugen einen **Entwurf** — er
    wird erst spielbar, wenn Sie ihn auf derselben Seite finalisieren; dazwischen
    können Sie die Vorlagen unter *Bearbeiten* an Ihre Instanz anpassen.
 
