@@ -207,7 +207,7 @@ Der stabile Zugangsweg zu genau einer Stichprobe. Er ist für alle Teilnehmenden
 _Avoid_: Einladungslink, Studienlink
 
 **Teilnahme-Token**:
-Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt.
+Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0043).
 _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 
 **Datenspur**:

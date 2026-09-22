@@ -47,8 +47,8 @@ def abschrift_holen(konto: Konto, token: str) -> Abschrift:
 
 
 def _holbare_bindung(token: str) -> Erhebungsbindung:
-    # Löst das Token auf, solange die Teilnahme abgeschlossen und nichts
-    # archiviert ist. Jeder andere Ausgang ist dieselbe Ablehnung.
+    # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen und
+    # nichts archiviert ist. Jeder andere Ausgang ist dieselbe Ablehnung.
 
     bindung: Erhebungsbindung | None = (
         Erhebungsbindung.objects.filter(
@@ -66,46 +66,54 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
 
 
 def _sitzungen_kopieren(quelle: Teilnahme, ziel: Teilnahme) -> None:
-    # Kopiert Sitzungen samt Transkript, Fehlversuchen, Diagnosen und Positionen.
-    # Die Zeitstempel der Kopien entstehen neu (`auto_now_add`): Die Abschrift
-    # führt die Importzeit, nicht die Spielzeit der Erhebung.
+    # Kopiert die Sitzungen in ihrer Anlagereihenfolge. Die gespielte Reihenfolge
+    # steht in der Vignettenposition und wird je Sitzung mitgegeben — eine
+    # Sitzung ohne Position bekommt auch in der Abschrift keine.
 
     positionen: dict[int, int] = {
         position.sitzung_id: position.position
         for position in quelle.vignettenpositionen.all()
     }
     for sitzung in quelle.sitzung_set.order_by("pk"):
-        kopie: Sitzung = Sitzung.objects.create(
-            teilnahme=ziel,
-            vignette_id=sitzung.vignette_id,
-            simulationskern_id=sitzung.simulationskern_id,
-            modell_konfiguration_id=sitzung.modell_konfiguration_id,
-            status=sitzung.status,
-            verbrauchte_zeit=sitzung.verbrauchte_zeit,
+        _sitzung_kopieren(sitzung, ziel, positionen.get(sitzung.pk))
+
+
+def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) -> None:
+    # Kopiert eine Sitzung samt Transkript, Fehlversuchen und Diagnose. Die
+    # Zeitstempel der Kopien entstehen neu (`auto_now_add`): Die Abschrift führt
+    # die Importzeit, nicht die Spielzeit der Erhebung.
+
+    kopie: Sitzung = Sitzung.objects.create(
+        teilnahme=ziel,
+        vignette_id=quelle.vignette_id,
+        simulationskern_id=quelle.simulationskern_id,
+        modell_konfiguration_id=quelle.modell_konfiguration_id,
+        status=quelle.status,
+        verbrauchte_zeit=quelle.verbrauchte_zeit,
+    )
+    for schritt in quelle.gespraechsschritte:
+        _schritt_kopieren(schritt, kopie)
+    diagnose: Diagnose | None = Diagnose.objects.filter(sitzung=quelle).first()
+    if diagnose is not None:
+        Diagnose.objects.create(
+            sitzung=kopie, text=diagnose.text, eingabemodus=diagnose.eingabemodus
         )
-        for schritt in sitzung.gespraechsschritte:
-            _schritt_kopieren(schritt, kopie)
-        diagnose: Diagnose | None = Diagnose.objects.filter(sitzung=sitzung).first()
-        if diagnose is not None:
-            Diagnose.objects.create(
-                sitzung=kopie, text=diagnose.text, eingabemodus=diagnose.eingabemodus
-            )
-        if sitzung.pk in positionen:
-            Vignettenposition.objects.create(
-                teilnahme=ziel,
-                sitzung=kopie,
-                vignette_id=kopie.vignette_id,
-                position=positionen[sitzung.pk],
-            )
+    if position is not None:
+        Vignettenposition.objects.create(
+            teilnahme=ziel,
+            sitzung=kopie,
+            vignette_id=kopie.vignette_id,
+            position=position,
+        )
 
 
-def _schritt_kopieren(schritt: Gespraechsschritt, sitzung: Sitzung) -> None:
+def _schritt_kopieren(schritt: Gespraechsschritt, ziel: Sitzung) -> None:
     # Kopiert einen Gesprächsschritt einschließlich Denkspur: Der CheckConstraint
     # lässt Äußerung ohne Denkspur nicht zu, die Sichtbarkeitszusage aus ADR-0005
     # sitzt im Rendering.
 
     kopie: Gespraechsschritt = Gespraechsschritt.objects.create(
-        sitzung=sitzung,
+        sitzung=ziel,
         eingabe=schritt.eingabe,
         denkspur=schritt.denkspur,
         aeusserung=schritt.aeusserung,

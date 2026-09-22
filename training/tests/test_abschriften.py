@@ -2,6 +2,7 @@
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -128,6 +129,18 @@ def _gespielte_teilnahme(
     return bindung
 
 
+def _gespielte_teilnahme_in_neuer_erhebung(name: str = "Brüche") -> Erhebungsbindung:
+    """Legt eine gespielte Teilnahme samt Erhebung und deren Forschender an.
+
+    Für Tests, die nur das Token brauchen und denen die Erhebungsseite selbst
+    gleichgültig ist.
+    """
+
+    return _gespielte_teilnahme(
+        _erhebung_anlegen(Konto.objects.create_user(username="ada"), name=name)
+    )
+
+
 @pytest.mark.django_db
 def test_holt_die_sitzungen_einer_abgeschlossenen_teilnahme_ins_konto() -> None:
     """Der Import kopiert die Datenspur vollständig unter eine eigene Teilnahme."""
@@ -171,13 +184,11 @@ def test_laesst_die_erhebungsseite_unberuehrt() -> None:
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = _erhebung_anlegen(forschende)
     bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
-    vorher: dict[str, object] = Erhebungsbindung.objects.filter(pk=bindung.pk).values()[
-        0
-    ]
+    vorher: dict[str, object] = Erhebungsbindung.objects.values().get(pk=bindung.pk)
 
     abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
 
-    assert Erhebungsbindung.objects.filter(pk=bindung.pk).values()[0] == vorher
+    assert Erhebungsbindung.objects.values().get(pk=bindung.pk) == vorher
     assert Erhebungsbindung.objects.count() == 1
     assert Sitzung.objects.filter(teilnahme=bindung.teilnahme).count() == 1
     assert (
@@ -232,9 +243,8 @@ def test_kopiert_keine_fragebogen_antworten() -> None:
 def test_kopierte_sitzungen_tragen_die_importzeit() -> None:
     """Die Zeitstempel der Abschrift gehören ihr selbst, nicht der Erhebung."""
 
-    forschende: Konto = Konto.objects.create_user(username="ada")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(_erhebung_anlegen(forschende))
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
     original: Sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
 
     abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
@@ -301,9 +311,8 @@ def test_import_nach_dem_erhebungsfenster_gelingt() -> None:
 def test_zweiter_import_erzeugt_eine_eigenstaendige_zweite_abschrift() -> None:
     """Es gibt keine Deduplizierung; sie verlangte die verbotene Verknüpfung."""
 
-    forschende: Konto = Konto.objects.create_user(username="ada")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(_erhebung_anlegen(forschende))
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
 
     erste: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
     zweite: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
@@ -313,13 +322,12 @@ def test_zweiter_import_erzeugt_eine_eigenstaendige_zweite_abschrift() -> None:
     assert Sitzung.objects.filter(teilnahme=zweite.teilnahme).count() == 1
 
 
-@pytest.mark.django_db
 def test_abschrift_haelt_weder_token_noch_verweis_auf_die_erhebung() -> None:
     """Nach dem Import sind beide Seiten wieder entkoppelt."""
 
     felder: set[str] = {feld.name for feld in Abschrift._meta.get_fields()}
 
-    assert felder & {"token", "erhebung", "stichprobe", "erhebungsbindung"} == set()
+    assert felder.isdisjoint({"token", "erhebung", "stichprobe", "erhebungsbindung"})
 
 
 @pytest.mark.django_db
@@ -341,15 +349,16 @@ def test_eingegebenes_token_erzeugt_die_abschrift_und_listet_sie(
 ) -> None:
     """Nach dem Import erscheint die Abschrift mit Erhebungsname und Importzeit."""
 
-    forschende: Konto = Konto.objects.create_user(username="ada")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(
-        _erhebung_anlegen(forschende, name="Brüche im Herbst")
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung(
+        name="Brüche im Herbst"
     )
     client.force_login(teilnehmerin)
     url: str = reverse("training:abschriften")
 
-    antwort = client.post(url, {"token": bindung.token.lower()}, follow=True)
+    antwort: HttpResponse = client.post(
+        url, {"token": bindung.token.lower()}, follow=True
+    )
 
     abschrift: Abschrift = Abschrift.objects.get(konto=teilnehmerin)
     assert abschrift.erhebungsname == "Brüche im Herbst"
@@ -364,7 +373,7 @@ def test_abgelehntes_token_meldet_den_grundlosen_hinweis(client: Client) -> None
 
     client.force_login(Konto.objects.create_user(username="grace"))
 
-    antwort = client.post(
+    antwort: HttpResponse = client.post(
         reverse("training:abschriften"), {"token": "9999-9999"}, follow=True
     )
 
@@ -376,16 +385,15 @@ def test_abgelehntes_token_meldet_den_grundlosen_hinweis(client: Client) -> None
 def test_abschriften_fremder_konten_bleiben_aus_der_liste(client: Client) -> None:
     """Die Liste zeigt ausschließlich die eigenen Abschriften."""
 
-    forschende: Konto = Konto.objects.create_user(username="ada")
     fremde: Konto = Konto.objects.create_user(username="linus")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(
-        _erhebung_anlegen(forschende, name="Fremde Erhebung")
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung(
+        name="Fremde Erhebung"
     )
     abschrift_holen(fremde, bindung.token)
     client.force_login(teilnehmerin)
 
-    antwort = client.get(reverse("training:abschriften"))
+    antwort: HttpResponse = client.get(reverse("training:abschriften"))
 
     assert "Fremde Erhebung" not in antwort.content.decode()
 
@@ -394,14 +402,13 @@ def test_abschriften_fremder_konten_bleiben_aus_der_liste(client: Client) -> Non
 def test_abschrift_zaehlt_nicht_zur_trainingshistorie(client: Client) -> None:
     """Die Historie zählt weiterhin nur über die Trainingsbindung."""
 
-    forschende: Konto = Konto.objects.create_user(username="ada")
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(
-        _erhebung_anlegen(forschende, name="Brüche im Herbst")
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung(
+        name="Brüche im Herbst"
     )
     abschrift_holen(teilnehmerin, bindung.token)
     client.force_login(teilnehmerin)
 
-    antwort = client.get(reverse("training:historie"))
+    antwort: HttpResponse = client.get(reverse("training:historie"))
 
     assert "Brüche im Herbst" not in antwort.content.decode()

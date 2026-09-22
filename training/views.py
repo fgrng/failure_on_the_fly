@@ -205,15 +205,10 @@ def abschriften(request: HttpRequest) -> HttpResponse:
         except ValidationError as ablehnung:
             messages.error(request, ablehnung.message)
         return redirect("training:abschriften")
-    return render(
-        request,
-        "training/abschriften.html",
-        {
-            "abschriften": Abschrift.objects.filter(konto=request.user).order_by(
-                "-importiert_am"
-            )
-        },
+    eigene: QuerySet[Abschrift] = Abschrift.objects.filter(konto=request.user).order_by(
+        "-importiert_am"
     )
+    return render(request, "training/abschriften.html", {"abschriften": eigene})
 
 
 @login_required
