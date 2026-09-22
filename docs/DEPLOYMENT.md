@@ -141,6 +141,7 @@ CSRF_TRUSTED_ORIGINS=https://isabell.uber.space
 DATABASE_PFAD=/home/isabell/failure_on_the_fly/db.sqlite3
 STATIC_ROOT=/home/isabell/html/static
 MEDIA_ROOT=/home/isabell/html/media
+TIME_ZONE=Europe/Berlin
 TRANSKRIPTION_ZERO_RETENTION=False
 EOF
 chmod 600 ~/failure_on_the_fly/.env
@@ -157,6 +158,7 @@ Was die Werte bedeuten:
 | `DATABASE_PFAD` | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst. |
 | `STATIC_ROOT` | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot. |
 | `MEDIA_ROOT` | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot. |
+| `TIME_ZONE` | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
 | `TRANSKRIPTION_ZERO_RETENTION` | Schaltet die Audio-Transkription frei. Erst auf `True` setzen, wenn die Zero-Retention des Anbieters vertraglich zugesichert ist. |
 | `SECURE_SSL_REDIRECT` | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13). |
 
@@ -504,8 +506,9 @@ Häufige Stolpersteine:
   `TRANSKRIPTION_ZERO_RETENTION=True` ist die Zusage der Betreiber:in, nicht eine
   technische Prüfung (ADR-0026). Ohne Vertrag bleibt der Schalter auf `False`; das
   Training ist über die Tastatur uneingeschränkt spielbar.
-- **Zeitstempel sind UTC.** `TIME_ZONE` steht auf `UTC`; alle Zeiten im
-  Datenspur-Export sind entsprechend zu lesen.
+- **Der Datenspur-Export ist immer UTC**, unabhängig von `TIME_ZONE`. Eingabe und
+  Anzeige in der Oberfläche — etwa der Erhebungszeitraum einer Stichprobe — laufen
+  dagegen in `TIME_ZONE` (voreingestellt `Europe/Berlin`).
 - **Teilnahme-Token sind ablesbar** und trennen die Forschungsdaten vom Konto
   (ADR-0006, ADR-0018). Ein geteilter Teilnahme-Link ist folglich der Zugang zu
   genau dieser Teilnahme — Links gehören nicht in öffentliche Kanäle.

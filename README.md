@@ -354,6 +354,7 @@ Update und Fehlersuche — steht in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
    CSRF_TRUSTED_ORIGINS=https://isabell.uber.space
    STATIC_ROOT=/home/isabell/html/static
    MEDIA_ROOT=/home/isabell/html/media
+   TIME_ZONE=Europe/Berlin
    TRANSKRIPTION_ZERO_RETENTION=True
    ```
 

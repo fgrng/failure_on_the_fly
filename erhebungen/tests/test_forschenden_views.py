@@ -3,7 +3,7 @@
 import csv
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
 
@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import connection
 from django.http import HttpResponse
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -1263,6 +1263,24 @@ class StichprobenAnlegenTests(TestCase):
                 reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
             ),
         )
+
+    @override_settings(TIME_ZONE="Europe/Berlin")
+    def test_liest_den_eingegebenen_zeitraum_als_ortszeit(self) -> None:
+        """Das Formularfeld sendet nackte Wanduhrzeit; sie meint die Ortszeit.
+
+        Liest der View sie stattdessen als UTC, verschiebt sich das
+        Teilnahmefenster um den Ortsversatz und die Stichprobe verweigert
+        die Teilnahme, obwohl sie laut Eingabe längst läuft.
+        """
+
+        self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
+            {"beginn": "2026-08-01T09:00", "ende": "2026-08-31T17:00"},
+        )
+
+        stichprobe: Stichprobe = Stichprobe.objects.get(erhebung=self.erhebung)
+        self.assertEqual(stichprobe.beginn, datetime(2026, 8, 1, 7, tzinfo=UTC))
+        self.assertEqual(stichprobe.ende, datetime(2026, 8, 31, 15, tzinfo=UTC))
 
     def test_zeigt_phase_und_anzahl_teilnahmen_je_stichprobe(self) -> None:
         """Die Detailseite ordnet jede Stichprobe zeitlich und nach Datenvolumen ein."""
