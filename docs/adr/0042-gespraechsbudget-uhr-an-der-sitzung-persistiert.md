@@ -45,6 +45,13 @@ Geführt werden die Felder vom **Sink** — der Naht, die die Uhr schon heute tr
 (ADR-0016). Die Änderung gehört dorthin und nicht in eine View; eine dritte Naht
 entsteht nicht.
 
+Der **Budgetstand** ist ein speicherloses Wertobjekt mit genau einer
+Implementierung (#256). Seine beiden Speicher sind die beiden Sink-Adapter:
+`DBSink` führt ihn in den Feldern der Sitzung, `ScratchSink` in der
+Browser-Session. Der Stand wird nicht ausgetauscht, also ist er keine dritte
+Naht. Das Sink-Protokoll trägt die Uhr über zwei Mitglieder statt über vier;
+die Zahl der Nähte bleibt zwei.
+
 ## 3. Die Zeitquelle ist die Wanduhr
 
 `monotonic()` liefert einen **prozessrelativen** Wert. Die Differenz zweier
