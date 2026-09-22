@@ -7,7 +7,7 @@ dependencies = [
     "django>=6.0.7",
     "django-htmx>=1.27.0",
     "httpx>=0.28.1",
-    "litellm==1.80.10",
+    "litellm>=1.84.0",
     "pillow>=12.1.1",
     "python-dotenv>=1.1.1",
 ]
@@ -30,7 +30,12 @@ python_files = ["test_*.py"]
 line-length = 88
 target-version = "py314"
 
+[tool.ruff.lint]
+# Ruff 0.16 hat seinen Standard-Regelsatz erweitert; wir bleiben beim bisherigen.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.ruff.format]
 # Django generiert Migrationen; ihr Umbruch ist nicht unsere Entscheidung.
 # Der Linter prüft sie weiterhin, nur der Formatter lässt sie in Ruhe.
-exclude = ["**/migrations/**"]
+# Ruff 0.16 formatiert auch Codeblöcke in Markdown; die ADRs bleiben unberührt.
+exclude = ["**/migrations/**", "**/*.md"]
