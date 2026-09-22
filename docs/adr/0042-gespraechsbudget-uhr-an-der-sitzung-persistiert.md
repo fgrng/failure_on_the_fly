@@ -85,7 +85,7 @@ gedacht hätte. Bei einem unsichtbaren Budget, das Obergrenze und nicht Soll ist
 ist der geschenkte Rest der harmlosere Fehler als das verbrannte Budget: Er
 verlängert die Denkzeit, er beendet kein Gespräch.
 
-## Consequences
+## Konsequenzen
 
 - Die verbrauchte Gesprächszeit steht in der Datenbank und nimmt damit den Weg
   in den Export (ADR-0029). Sie ist ohnehin eine Größe der Datenspur; bisher
