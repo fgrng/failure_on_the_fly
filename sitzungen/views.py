@@ -308,18 +308,23 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def probelauf_debrief(request: HttpRequest) -> HttpResponse:
-    """Verwirft den Probelauf samt eingegebener Diagnose."""
+    """Verwirft den Probelauf samt eingegebener Diagnose.
+
+    Danach steht die Autor:in wieder bei ihrer Vignette: Von dort hat sie den
+    Probelauf gestartet, und dort ändert sie, was ihr aufgefallen ist. Nur der
+    freie Auswähler der Administration führt zu sich selbst zurück — er ist
+    kein Editor, sondern die Werkbank für beliebige Tripel.
+    """
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sink: ScratchSink = ScratchSink(request.session)
-    ziel: str = (
-        "sitzungen:administratorin_probelauf_auswahl"
-        if sink.freie_auswahl
-        else "sitzungen:probelauf_auswahl"
-    )
+    freie_auswahl: bool = sink.freie_auswahl
+    vignette_pk: int = sink.vignette_pk
     sink.verwerfen()
-    return redirect(ziel)
+    if freie_auswahl:
+        return redirect("sitzungen:administratorin_probelauf_auswahl")
+    return redirect("vignetten:detail", pk=vignette_pk)
 
 
 def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None:

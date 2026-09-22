@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -37,6 +38,9 @@ class ProbelaufStartTests(TestCase):
         """Legt die sichtbaren und fremden Entwürfe für die HTTP-Tests an."""
 
         self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        # Den Probelauf startet nur, wer den Vignetteneditor erreicht — und
+        # dorthin führt er nach dem Debrief auch zurück.
+        self.ada.groups.add(Group.objects.get(name="Autor:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
         self.kern: Simulationskern = Simulationskern.objects.anlegen(
             user_prompt_vorlage=(
@@ -779,7 +783,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             {"diagnose": "Brüche werden addiert."},
         )
 
-        self.assertRedirects(ende, reverse("sitzungen:probelauf_auswahl"))
+        self.assertRedirects(ende, reverse("vignetten:detail", args=[self.entwurf.pk]))
         self.assertNotIn("probelauf", self.client.session)
         self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
         self.assertEqual(Gespraechsschritt.objects.count(), anzahl_schritte)
