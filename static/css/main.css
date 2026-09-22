@@ -133,7 +133,7 @@ a:hover {
     background: var(--area-solid, var(--color-surface-muted));
     color: var(--area-on-solid, var(--color-text));
 }
-.card__header :is(h1, h2, h3, h4) {
+.card .card__header :is(h1, h2, h3, h4) {
     margin: 0;
     color: inherit;
 }
@@ -329,4 +329,10 @@ select:focus {
 .prose {
     margin: 0;
     white-space: pre-wrap;
+}
+
+/* ---- Aktionsspalte: nur so breit wie ihre Knöpfe, der Rest bleibt dem Text ---- */
+.table__action {
+    width: 1%;
+    white-space: nowrap;
 }

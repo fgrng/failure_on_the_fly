@@ -49,6 +49,11 @@
     border-bottom: 1px solid var(--color-border);
 }
 
+/* ---- Variante: Kopf über dem Inhalt, Inhalt über die ganze Breite ---- */
+.page-section--gestapelt {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .page-section__head {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr);
@@ -127,6 +132,17 @@
     font-weight: 700;
 }
 
+/* ---- Aktionszeile eines Abschnitts: dieselbe Geste wie .vignette-form-actions,
+   nur ohne das Formular-Stylesheet, das die Systemseiten nicht laden ---- */
+.page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
 /* ---- Teilnahme-Token zum Abtippen: groß und in fester Laufweite ---- */
 .abschrift-token {
     margin-bottom: var(--space-2);
@@ -160,4 +176,80 @@
     .field-grid,
     .field-grid--three { grid-template-columns: 1fr; }
     .page-field--wide { grid-column: auto; }
+}
+
+/* ---- Eigentümer:innen: der Kreis als Zeile ruhiger Namens-Chips ---- */
+.eigentuemerinnen-liste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    list-style: none;
+}
+
+.eigentuemerin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    font-size: .875rem;
+}
+
+.eigentuemerin-chip form {
+    display: inline-flex;
+}
+
+.eigentuemerin-chip button {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    line-height: 1;
+}
+
+.eigentuemerin-chip button:hover,
+.eigentuemerin-chip button:focus {
+    color: var(--color-danger);
+}
+
+/* ---- Eigentümer:innen: Auswahl und Knopf sitzen nebeneinander ---- */
+.eigentuemerin-hinzufuegen {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--space-2);
+}
+
+.eigentuemerin-hinzufuegen label {
+    display: grid;
+    flex: 1 1 14rem;
+    gap: var(--space-1);
+}
+
+.eigentuemerin-hinzufuegen button {
+    width: auto;
+}
+
+/* ---- Stichprobe anlegen: eine rechtsbündige Zeile über ihrer Tabelle ---- */
+.stichprobe-anlegen {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.stichprobe-anlegen input {
+    width: auto;
+}
+
+.stichprobe-anlegen button {
+    width: auto;
 }

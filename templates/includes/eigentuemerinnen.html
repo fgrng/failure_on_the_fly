@@ -9,26 +9,30 @@ Vignette und Fragebogen-Item fallen die beiden auseinander: Die URL geht
         <b>{{ eigentuemerinnen_abschnitt_nummer }}</b>
         <div><h2 id="detail-eigentuemerinnen">Eigentümer:innen</h2></div>
     </div>
-    <ul>
-        {% for konto in kreis.eigentuemerinnen.all %}
-            <li>{{ konto.username }}
-                {% if kreis.hat_mehrere_eigentuemerinnen %}
-                    <form method="post"
-                          action="{% url eigentuemerin_entfernen_url objekt_pk konto.pk %}">
-                        {% csrf_token %}
-                        <button type="submit">Entfernen</button>
-                    </form>
-                {% endif %}
-            </li>
-        {% endfor %}
-    </ul>
-    <form method="post" action="{% url eigentuemerin_hinzufuegen_url objekt_pk %}">
-        {% csrf_token %}
-        <label>Eigentümer:in <select name="konto">
-            {% for konto in kreis.moegliche_ergaenzungen %}
-                <option value="{{ konto.pk }}">{{ konto.username }}</option>
+    <div>
+        <ul class="eigentuemerinnen-liste">
+            {% for konto in kreis.eigentuemerinnen.all %}
+                <li class="eigentuemerin-chip">{{ konto.username }}
+                    {% if kreis.hat_mehrere_eigentuemerinnen %}
+                        <form method="post"
+                              action="{% url eigentuemerin_entfernen_url objekt_pk konto.pk %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    aria-label="{{ konto.username }} als Eigentümer:in entfernen"
+                                    title="Entfernen">&times;</button>
+                        </form>
+                    {% endif %}
+                </li>
             {% endfor %}
-        </select></label>
-        <button class="button" type="submit">Eigentümer:in hinzufügen</button>
-    </form>
+        </ul>
+        <form class="eigentuemerin-hinzufuegen" method="post" action="{% url eigentuemerin_hinzufuegen_url objekt_pk %}">
+            {% csrf_token %}
+            <label>Eigentümer:in <select name="konto">
+                {% for konto in kreis.moegliche_ergaenzungen %}
+                    <option value="{{ konto.pk }}">{{ konto.username }}</option>
+                {% endfor %}
+            </select></label>
+            <button class="button" type="submit">Eigentümer:in hinzufügen</button>
+        </form>
+    </div>
 </section>
