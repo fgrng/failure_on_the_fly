@@ -100,16 +100,12 @@ _ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
 }
 
 
-def _ist_forschende(konto: Konto) -> bool:
-    """Prüft die Forschungsrolle ohne Administrations-Override."""
-
-    return konto.groups.filter(name=FORSCHENDE_GRUPPE).exists()
-
-
 _forschende_oder_administratorin = rolle_oder_administration(FORSCHENDE_GRUPPE)
 
 
-_forschende_erforderlich = rolle_erforderlich(_ist_forschende)
+# Eine einzige Tür für den gesamten Forschungsbereich, wie in fragebogen_items
+# und vignetten: Die Administration sieht eine Erhebung nicht nur, sie kann sie
+# auch anlegen und bearbeiten (ADR-0033).
 _forschende_oder_administratorin_erforderlich = rolle_erforderlich(
     _forschende_oder_administratorin
 )
@@ -272,7 +268,7 @@ def liste(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine neue Erhebung als Entwurf an."""
 
@@ -427,7 +423,7 @@ def eigentuemerin_entfernen(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def export(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
 
@@ -446,7 +442,7 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Legt unter einer finalen eigenen Erhebung eine Stichprobe an."""
 
@@ -470,7 +466,7 @@ def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def stichprobe_archivieren(
     request: HttpRequest, pk: int, stichprobe_pk: int
 ) -> HttpResponse:
@@ -487,7 +483,7 @@ def stichprobe_archivieren(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def vignette_hinzufuegen(
     request: HttpRequest, pk: int, vignette_pk: int
 ) -> HttpResponse:
@@ -511,7 +507,7 @@ def vignette_hinzufuegen(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Entfernt eine finale Fassung aus einem eigenen Entwurf."""
 
@@ -526,7 +522,7 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def item_hinzufuegen(
     request: HttpRequest, pk: int, item_pk: int, andockpunkt: str
 ) -> HttpResponse:
@@ -558,7 +554,7 @@ def item_hinzufuegen(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def item_entfernen(
     request: HttpRequest, pk: int, zugehoerigkeit_pk: int
 ) -> HttpResponse:
@@ -629,7 +625,7 @@ def _itemreihenfolge_aendern(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 @transaction.atomic
 def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach oben."""
@@ -638,7 +634,7 @@ def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResp
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 @transaction.atomic
 def item_runter(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
     """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach unten."""
@@ -672,7 +668,7 @@ def _feste_reihenfolge_setzen(
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 @transaction.atomic
 def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die konfigurierbaren Texte, Regel und feste Reihenfolge eines Entwurfs."""
@@ -707,7 +703,7 @@ def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
     """Löscht einen eigenen Entwurf physisch."""
 
@@ -720,7 +716,7 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen eigenen Entwurf über dessen Domänenmethode."""
 
@@ -732,7 +728,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def zurueckziehen(request: HttpRequest, pk: int) -> HttpResponse:
     """Zieht eine eigene finale Erhebung zurück, wenn ihr Guard es erlaubt."""
 
@@ -744,7 +740,7 @@ def zurueckziehen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine eigene finale Erhebung über deren Domänenmethode."""
 
@@ -756,7 +752,7 @@ def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-@_forschende_erforderlich
+@_forschende_oder_administratorin_erforderlich
 def entarchivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Macht eine eigene archivierte Erhebung wieder final."""
 

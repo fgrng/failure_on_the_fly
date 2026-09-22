@@ -203,9 +203,9 @@ die Daten der Erhebung unberührt bleiben.
 
 ## Erhebungen verwalten
 
-Konten mit der Rolle `Forschende:r` erreichen unter `/erhebungen/eigene/` die
+Forschende und Administrator:innen erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
-Erhebungen. In einem Entwurf wählen sie finale Vignetten,
+Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
 Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; das Design
 finaler Erhebungen bleibt unveränderlich, ihr Eigentümer-Kreis änderbar. Das

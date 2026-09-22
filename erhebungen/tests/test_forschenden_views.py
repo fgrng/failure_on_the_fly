@@ -230,6 +230,20 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertNotContains(liste, "ABCD-2345")
         self.assertContains(liste, "sidebar-account")
 
+    def test_administration_legt_eine_erhebung_an(self) -> None:
+        """Die Administration steht im Forschungsbereich nicht vor der Tür (ADR-0033)."""
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
+        self.client.force_login(administratorin)
+
+        angelegt: HttpResponse = self.client.post(
+            reverse("erhebungen:anlegen"), {"name": "Brüche erforschen"}
+        )
+
+        erhebung: Erhebung = Erhebung.objects.get(eigentuemerinnen=administratorin)
+        self.assertRedirects(angelegt, reverse("erhebungen:detail", args=[erhebung.pk]))
+
     def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
         """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""
         grace: Konto = get_user_model().objects.create_user(username="grace")
