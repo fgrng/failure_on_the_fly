@@ -1,10 +1,13 @@
 """Tests der beiden Markdown-Profile über ihre HTML-Ausgabe."""
 
+from collections.abc import Callable
+
 from django.test import SimpleTestCase
+from django.utils.safestring import SafeString
 
 from texte.markdown import informationstext, szenentext
 
-_PROFILE = (informationstext, szenentext)
+_PROFILE: tuple[Callable[[str], SafeString], ...] = (informationstext, szenentext)
 
 
 class GemeinsamerUmfangTests(SimpleTestCase):
