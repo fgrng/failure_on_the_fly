@@ -1840,6 +1840,96 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(position.vignette, vignette)
         self.assertEqual(position.position, 1)
 
+    def test_fluechtige_teilnahme_spielt_alle_vignetten_ohne_inhaltszeilen(
+        self,
+    ) -> None:
+        """Ohne Speicherung stehen Verlauf und Debrief nur im Browser, das Gerüst in der DB."""
+
+        self._entwurf_ersetzen(
+            name="Flüchtig",
+            skript=[
+                {"fehler": "formatbruch", "rohantwort": "{unvollständig"},
+                {"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."},
+                {"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."},
+            ],
+        )
+        self._vignette_anlegen(budget_wert=2)
+        self._vignette_anlegen(budget_wert=2, position=2)
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {"sprachmodell_eingewilligt": "ja", "speicherung_eingewilligt": "nein"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        for _ in range(2):
+            gespraech: HttpResponse = self.client.post(
+                gespraech_url, {"eingabe": "Wie rechnest du?"}
+            )
+            self.assertContains(gespraech, "Wie rechnest du?")
+            self.assertContains(gespraech, "Ich addiere.")
+            # Der Reload im selben Browser zeigt den Verlauf aus der Session.
+            neu_geladen: HttpResponse = self.client.get(gespraech_url)
+            self.assertContains(neu_geladen, "Ich addiere.")
+            self.assertNotContains(neu_geladen, "Debrief")
+            debrief: HttpResponse = self.client.post(
+                gespraech_url, {"eingabe": "Und dann?"}
+            )
+            self.assertContains(debrief, "Debrief")
+            self.assertContains(debrief, "Und dann?")
+            self.assertContains(self.client.get(gespraech_url), "Und dann?")
+            sitzung: Sitzung = Sitzung.objects.get(status=Sitzung.Status.LAUFEND)
+            weiter: HttpResponse = self.client.post(
+                reverse("erhebungen:debrief", args=[bindung.token]),
+                {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
+            )
+            sitzung.refresh_from_db()
+            self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+
+        self.assertRedirects(
+            weiter,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+        )
+        bindung.refresh_from_db()
+        self.assertIsNotNone(bindung.abgeschlossen_am)
+        self.assertEqual(Sitzung.objects.count(), 2)
+        self.assertEqual(Vignettenposition.objects.count(), 2)
+        self.assertEqual(Vignettenziehung.objects.count(), 2)
+        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertFalse(Fehlversuch.objects.exists())
+        self.assertFalse(Diagnose.objects.exists())
+
+    def test_fluechtige_sitzung_zeigt_den_abgebrochenen_verlauf(self) -> None:
+        """Ein endgültiger Fehlschlag steht im Verlauf der Session, nicht in der DB."""
+
+        self._scheiternde_erhebung_einrichten()
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {"sprachmodell_eingewilligt": "ja", "speicherung_eingewilligt": "nein"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech", args=[bindung.token]),
+            {"eingabe": "Wie rechnest du?"},
+        )
+
+        self.assertContains(antwort, "Wie rechnest du?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
+        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertFalse(Fehlversuch.objects.exists())
+
     def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
         """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""
 

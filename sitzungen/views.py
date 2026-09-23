@@ -29,12 +29,13 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
+from sitzungen.models import Eingabemodus, Sitzung
 from sitzungen.sink import (
     DBSink,
     GespraechsschrittDaten,
     ScratchSink,
     probelauf_laeuft,
+    sink_fuer_sitzung,
 )
 from vignetten.models import Vignette
 
@@ -399,23 +400,21 @@ def persistierten_debrief_anzeigen(
 ) -> HttpResponse:
     # Rendert den Debrief einer persistierten Sitzung.
 
+    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     # Liegt die Diagnose bereits vor, zeigt das Formular sie nur noch an:
     # Sie ist je Sitzung einmalig und darf sich nicht nachträglich ändern.
-    abgegebene_diagnose: str | None = (
-        Diagnose.objects.filter(sitzung=sitzung).values_list("text", flat=True).first()
-    )
     return sitzung_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=sitzung.gespraechsschritte,
+        gespraechsschritte=sink.gespraechsschritte,
         ist_probelauf=False,
         zeigt_debrief=True,
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sitzung.pk,
         anhang=anhang,
-        abgegebene_diagnose=abgegebene_diagnose,
+        abgegebene_diagnose=sink.abgegebene_diagnose,
     )
 
 
@@ -430,7 +429,6 @@ def persistierten_fehler_anzeigen(
     return _persistiertes_gespraech_anzeigen(
         request,
         sitzung,
-        sitzung.gespraechsschritte,
         ist_gescheitert=True,
         navigation=navigation,
         anhang=anhang,
@@ -440,7 +438,6 @@ def persistierten_fehler_anzeigen(
 def _persistiertes_gespraech_anzeigen(
     request: HttpRequest,
     sitzung: Sitzung,
-    schritte: QuerySet[Gespraechsschritt],
     *,
     navigation: Sitzungsnavigation,
     ist_gescheitert: bool = False,
@@ -453,7 +450,9 @@ def _persistiertes_gespraech_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=schritte,
+        gespraechsschritte=sink_fuer_sitzung(
+            sitzung, request.session
+        ).gespraechsschritte,
         ist_probelauf=False,
         ist_gescheitert=ist_gescheitert,
         ist_lesend=ist_lesend,
@@ -481,6 +480,7 @@ def persistiertes_gespraech(
     `sitzungsblock` rendert den Anhang, den die Aufruferin unter eine beendete
     Sitzung hängt. Er wird erst gerufen, wenn die gewählte Darstellung ihn
     wirklich trägt, weil sein Anlegen zur Datenspur gehört (ADR-0029).
+    Welche Senke die Inhalte hält, entscheidet die Teilnahme der Sitzung.
     """
 
     if request.method not in {"GET", "POST"}:
@@ -489,7 +489,6 @@ def persistiertes_gespraech(
         return persistierten_debrief_anzeigen(
             request, sitzung, navigation, sitzungsblock()
         )
-    schritte: QuerySet[Gespraechsschritt] = sitzung.gespraechsschritte
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(
             request, sitzung, navigation, sitzungsblock()
@@ -498,16 +497,15 @@ def persistiertes_gespraech(
         return _persistiertes_gespraech_anzeigen(
             request,
             sitzung,
-            schritte,
             ist_lesend=True,
             navigation=navigation,
             anhang=sitzungsblock(),
         )
-    sink: DBSink = DBSink.fuer_sitzung(sitzung)
+    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     if request.method == "GET":
         sink.zug_beginnen(durchlauf.jetzt())
         return _persistiertes_gespraech_anzeigen(
-            request, sitzung, schritte, navigation=navigation
+            request, sitzung, navigation=navigation
         )
     ausgang: Ausgang = gespraechsschritt_ausfuehren(
         sink,
@@ -524,9 +522,4 @@ def persistiertes_gespraech(
     if ausgang is Ausgang.BUDGET_ERSCHOEPFT:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     sink.zug_beginnen(durchlauf.jetzt())
-    return _persistiertes_gespraech_anzeigen(
-        request,
-        sitzung,
-        sitzung.gespraechsschritte,
-        navigation=navigation,
-    )
+    return _persistiertes_gespraech_anzeigen(request, sitzung, navigation=navigation)

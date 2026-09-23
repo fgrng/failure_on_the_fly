@@ -70,7 +70,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
 )
 from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
-from sitzungen.sink import DBSink
+from sitzungen.sink import DBSink, sink_fuer_sitzung
 from sitzungen.views import (
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
@@ -1001,7 +1001,7 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, _bindung = _erhebungssitzung(token)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung)
+    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
@@ -1012,7 +1012,7 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
-    sink: DBSink = DBSink.fuer_sitzung(sitzung)
+    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_abbrechen(sink)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
@@ -1037,7 +1037,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status != Sitzung.Status.LAUFEND:
             return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
-        DBSink.fuer_sitzung(sitzung).diagnose_setzen(
+        sink_fuer_sitzung(sitzung, request.session).diagnose_setzen(
             request.POST["diagnose"],
             eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
         )

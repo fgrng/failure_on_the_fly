@@ -218,6 +218,10 @@ _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 Die drei Entscheidungen, die eine Teilnehmer:in am Einwilligungstor einer Erhebung getrennt trifft: **a) Verarbeitung durch Sprachmodelle**, **b) Spracherkennung** und **c) Speicherung und Verwendung für Forschungszwecke**. Jede ist eine Pflichtwahl ohne Vorauswahl unter einem festen, nicht abschaltbaren Systemtext; b wird nur angeboten, wenn die Instanz transkribiert. Sie stehen dreiwertig an der Teilnahme — ja, nein oder leer für „nicht entschieden oder nicht angeboten“ — und gehen in den Export (ADR-0029). Allein a entscheidet über den Zutritt: Ohne sie führt jeder Teilnahmeweg auf die **Abbruchseite**, und es entstehen weder Ziehung noch Sitzung. Bis a erteilt ist, lassen sich die Entscheidungen neu treffen, danach stehen alle drei fest. Im Code heißt b weiterhin Audioverarbeitung.
 _Avoid_: Einwilligung erteilt, Teilnahmeeinwilligung, Zustimmung, Consent
 
+**Flüchtige Teilnahme**:
+Die Teilnahme an einer Erhebung, deren Teilnehmer:in der Speicherung (Einwilligung c) widersprochen hat. Sie läuft vollständig ab, mit Diagnosegespräch, Debrief und Diagnose. Gespeichert wird aber nur ihr **Ablaufgerüst**: Ziehung, Sitzungen mit Vignette, Kern, Modell-Konfiguration, Status, Zeitstempeln und Budget-Uhr sowie die Vignettenposition. Gesprächsschritte, Fehlversuche und Diagnose leben allein in der Browser-Session und erreichen die Datenbank nie (ADR-0045). Das Gerüst wird normal exportiert.
+_Avoid_: anonyme Teilnahme, Teilnahme ohne Daten, Gastteilnahme
+
 **Datenspur**:
 Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur und werden nicht exportiert.
 _Avoid_: Logs, Rohdaten, Protokoll

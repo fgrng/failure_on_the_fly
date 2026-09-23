@@ -40,6 +40,8 @@ from sitzungen.models import (
     Teilnahme,
     Vignettenposition,
 )
+from sitzungen.durchlauf import gespraechsschritt_ausfuehren, sitzung_starten
+from sitzungen.sink import FluechtigerSink
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
@@ -2060,6 +2062,88 @@ class ErhebungsExportTests(TestCase):
             verbrauchte_zeiten,
             {str(zeitvignette.pk): "417.5", str(schrittvignette.pk): "0.0"},
         )
+
+    def test_exportiert_fluechtige_teilnahme_mit_geruest_ohne_inhaltszeilen(
+        self,
+    ) -> None:
+        """Die flüchtige Teilnahme erscheint mit Sitzung, Uhr und Status, ohne Inhalte."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {"fehler": "formatbruch", "rohantwort": "Kein JSON."},
+                    {"denkspur": "Meine Regel.", "aeusserung": "2/5."},
+                ]
+            },
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+        erhebung.finalisieren()
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(
+            ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
+        )
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
+        bindung.teilnahme.speicherung_eingewilligt = False
+        bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
+        sink: FluechtigerSink = FluechtigerSink(bindung.teilnahme, {})
+        sitzung_starten(sink, vignette, konfiguration, simulationskern=kern)
+        Vignettenposition.objects.create(
+            teilnahme=bindung.teilnahme,
+            sitzung=sink.sitzung,
+            vignette=vignette,
+            position=1,
+        )
+        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Warum?"
+        )
+        sink.diagnose_setzen("Bruchfehler")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        def _zeilen(name: str) -> list[dict[str, str]]:
+            # Liest eine CSV-Datei des Exports als Zeilen.
+
+            return list(
+                csv.DictReader(TextIOWrapper(zip_datei.open(name), encoding="utf-8"))
+            )
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            teilnahmen: list[dict[str, str]] = _zeilen("teilnahmen.csv")
+            sitzungen: list[dict[str, str]] = _zeilen("sitzungen.csv")
+            inhalte: dict[str, list[dict[str, str]]] = {
+                name: _zeilen(name)
+                for name in (
+                    "gespraechsschritte.csv",
+                    "fehlversuche.csv",
+                    "diagnosen.csv",
+                )
+            }
+
+        self.assertEqual(
+            [
+                (zeile["token"], zeile["speicherung_eingewilligt"])
+                for zeile in teilnahmen
+            ],
+            [("2345-6789", "False")],
+        )
+        self.assertEqual(
+            [
+                (zeile["token"], zeile["status"], zeile["verbrauchte_zeit"])
+                for zeile in sitzungen
+            ],
+            [("2345-6789", Sitzung.Status.ABGESCHLOSSEN, "4.0")],
+        )
+        self.assertEqual(inhalte, {name: [] for name in inhalte})
 
     def test_exportiert_gespraechsschritte_fehlversuche_und_diagnosen(self) -> None:
         """Der Export bewahrt die vollständige Datenspur einschließlich Abbrüchen."""

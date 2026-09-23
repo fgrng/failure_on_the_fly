@@ -22,7 +22,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.sink import Budgetstand, DBSink, ScratchSink
+from sitzungen.sink import Budgetstand, DBSink, FluechtigerSink, ScratchSink
 from vignetten.models import Vignette
 
 
@@ -642,4 +642,114 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
 
     assert ausgaenge == [Ausgang.BUDGET_ERSCHOEPFT, Ausgang.BUDGET_ERSCHOEPFT]
     assert scratch.ist_beendet
+    assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND
+
+
+@pytest.mark.django_db
+def test_fluechtiger_sink_haelt_den_verlauf_nur_in_der_session() -> None:
+    """Die Sitzung steht mit Status in der DB, ihr Gespräch nur in der Session."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [
+            {"fehler": "formatbruch", "rohantwort": "Kein JSON."},
+            {"denkspur": "Meine Regel.", "aeusserung": "2/5."},
+        ]
+    )
+    session: SessionStore = SessionStore()
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), session)
+
+    sitzung_starten(sink, vignette, konfiguration)
+    gespraechsschritt_ausfuehren(
+        sink,
+        vignette,
+        kern,
+        konfiguration,
+        eingabe="Warum?",
+        eingabemodus="transkribiert",
+    )
+    sink.diagnose_setzen("Zähler und Nenner werden addiert.")
+
+    assert not Gespraechsschritt.objects.exists()
+    assert not Fehlversuch.objects.exists()
+    assert not Diagnose.objects.exists()
+    sitzung: Sitzung = Sitzung.objects.get()
+    assert sitzung.status == Sitzung.Status.ABGESCHLOSSEN
+    wiederhergestellt: FluechtigerSink = FluechtigerSink.fuer_sitzung(sitzung, session)
+    assert wiederhergestellt.gespraechsschritte == [
+        {
+            "reihenfolge": 1,
+            "eingabe": "Warum?",
+            "eingabemodus": "transkribiert",
+            "denkspur": "Meine Regel.",
+            "aeusserung": "2/5.",
+            "fehlversuche": [{"grund": "Formatbruch", "rohantwort": "Kein JSON."}],
+        }
+    ]
+    assert wiederhergestellt.abgegebene_diagnose == "Zähler und Nenner werden addiert."
+
+
+@pytest.mark.django_db
+def test_fluechtiger_sink_haelt_den_gescheiterten_schritt_nur_in_der_session() -> None:
+    """Der Abbruchschritt steht im Verlauf der Session, der Status in der DB."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"fehler": "anbieterfehler"}] * 3
+    )
+    session: SessionStore = SessionStore()
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), session)
+
+    sitzung_starten(sink, vignette, konfiguration)
+    ausgang: Ausgang = gespraechsschritt_ausfuehren(
+        sink, vignette, kern, konfiguration, eingabe="Warum?"
+    )
+
+    assert ausgang is Ausgang.GESCHEITERT
+    assert not Gespraechsschritt.objects.exists()
+    assert not Fehlversuch.objects.exists()
+    assert Sitzung.objects.get().status == Sitzung.Status.GESCHEITERT
+    [schritt] = FluechtigerSink.fuer_sitzung(
+        Sitzung.objects.get(), session
+    ).gespraechsschritte
+    assert (schritt["eingabe"], schritt["aeusserung"]) == ("Warum?", None)
+    assert len(schritt["fehlversuche"]) == 3
+
+
+@pytest.mark.django_db
+def test_fluechtiger_sink_fuehrt_budget_uhr_an_der_sitzung() -> None:
+    """Uhr und Schrittbudget laufen wie im DB-Sink über die Sitzungszeile."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
+    )
+    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
+    vignette.budget_wert = 600
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), SessionStore())
+    sitzung_starten(sink, vignette, konfiguration)
+
+    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+    sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
+
+    assert _verbrauchte_zeit(sink) == 4.0
+    assert not modellverlauf(sink)
+
+
+@pytest.mark.django_db
+def test_fluechtiger_sink_meldet_das_erschoepfte_schrittbudget() -> None:
+    """Das Schrittbudget zählt die Schritte der Session; die Diagnose schließt ab."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
+    )
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 1
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), SessionStore())
+    sitzung_starten(sink, vignette, konfiguration)
+
+    ausgang: Ausgang = gespraechsschritt_ausfuehren(
+        sink, vignette, kern, konfiguration, eingabe="Warum?"
+    )
+
+    assert ausgang is Ausgang.BUDGET_ERSCHOEPFT
     assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND

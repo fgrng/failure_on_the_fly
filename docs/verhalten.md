@@ -166,8 +166,14 @@ Teilnahme-Link, Token-Wiedereinstieg und alle übrigen Teilnahmeseiten führen
 dann dorthin, und es entstehen weder Ziehung noch Sitzung. Ihr Knopf »Zur
 Startseite der Erhebung« führt zurück zum Einwilligungsformular ohne
 Vorauswahl; eine neue Entscheidung ersetzt die alte. Ist die Verarbeitung durch
-Sprachmodelle einmal erteilt, stehen alle drei Entscheidungen fest. Die
-Entscheidung zur Speicherung wird bislang nur festgehalten.
+Sprachmodelle einmal erteilt, stehen alle drei Entscheidungen fest.
+Wer der Speicherung nicht zustimmt, macht eine flüchtige Teilnahme: Die
+Vignetten werden genauso gespielt, Verlauf, Debrief und Diagnose erscheinen wie
+gewohnt, und ein Neuladen im selben Browser setzt an derselben Stelle fort.
+Gesprächsschritte, Fehlversuche und Diagnose liegen dabei aber nur in der
+Browser-Session und werden nie gespeichert; gespeichert und exportiert wird nur
+das Ablaufgerüst (Ziehung, Sitzungen mit Status, Zeitstempeln und verbrauchter
+Zeit, Vignettenposition).
 Wer der Spracherkennung zustimmt, kann Eingaben im Diagnosegespräch und die
 Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
 vollständig nutzbar.
