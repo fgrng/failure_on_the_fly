@@ -6,8 +6,10 @@ from config.tests.dokumentation import (
     CONTEXT_PATH,
     README_PATH,
     REPO_ROOT,
+    VERHALTEN_PATH,
     glossareintrag,
     readme_abschnitt,
+    verhalten_abschnitt,
 )
 
 
@@ -28,9 +30,9 @@ def test_readme_nennt_den_betriebsschritt_nach_der_migration() -> None:
         assert klausel in deployment
 
 
-def test_readme_beschreibt_die_anbieterwahl_in_heutiger_form() -> None:
+def test_verhaltensdoku_beschreibt_die_anbieterwahl_in_heutiger_form() -> None:
     """Der Anbieter ist eine feste Auswahl und trägt seine Zugangsdaten selbst."""
-    konfiguration: str = readme_abschnitt("Modell-Konfiguration")
+    konfiguration: str = verhalten_abschnitt("Modell-Konfiguration")
 
     for klausel in (
         "feste Auswahl",
@@ -42,12 +44,12 @@ def test_readme_beschreibt_die_anbieterwahl_in_heutiger_form() -> None:
         assert klausel in konfiguration
 
 
-def test_readme_nennt_das_abgeloeste_vorgabemodell_nicht_mehr() -> None:
+def test_dokumentation_nennt_das_abgeloeste_vorgabemodell_nicht_mehr() -> None:
     """Weder Seed noch Anleitung kennen noch ein OpenAI-Vorgabemodell."""
-    readme: str = README_PATH.read_text()
-
-    for abgeloest in ("OpenAI", "gpt-"):
-        assert abgeloest not in readme
+    for pfad in (README_PATH, VERHALTEN_PATH):
+        text: str = pfad.read_text()
+        for abgeloest in ("OpenAI", "gpt-"):
+            assert abgeloest not in text
 
 
 def test_env_beispiel_fuehrt_nur_noch_die_zero_retention_einstellung() -> None:
@@ -61,7 +63,7 @@ def test_env_beispiel_fuehrt_nur_noch_die_zero_retention_einstellung() -> None:
 
 def test_keine_dokumentationsstelle_nennt_zugangsdaten_in_der_umgebung() -> None:
     """Zugangsdaten für das Sprachmodell stehen nirgends als Umgebungsvariable."""
-    for pfad in (README_PATH, CONTEXT_PATH, ENV_BEISPIEL_PATH):
+    for pfad in (README_PATH, VERHALTEN_PATH, CONTEXT_PATH, ENV_BEISPIEL_PATH):
         assert "API_KEY" not in pfad.read_text()
 
 

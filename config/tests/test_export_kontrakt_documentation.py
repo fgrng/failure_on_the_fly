@@ -4,7 +4,7 @@ from config.tests.dokumentation import (
     ADR_0029_PATH,
     abschnitt,
     in_einer_zeile,
-    readme_abschnitt,
+    verhalten_abschnitt,
 )
 
 
@@ -127,9 +127,9 @@ def test_adr_0029_verwirft_die_anderen_orte_der_likert_kodierung() -> None:
         assert klausel in optionen
 
 
-def test_readme_beschreibt_die_fragebogen_tabellen_des_downloads() -> None:
+def test_verhaltensdoku_beschreibt_die_fragebogen_tabellen_des_downloads() -> None:
     """Der Download-Absatz nennt, was der Fragebogen-Teil beilegt."""
-    abschnitt: str = readme_abschnitt("Erhebungen verwalten")
+    abschnitt: str = verhalten_abschnitt("Erhebungen verwalten")
 
     for klausel in (
         "vollen Wortlaut",
@@ -140,9 +140,9 @@ def test_readme_beschreibt_die_fragebogen_tabellen_des_downloads() -> None:
         assert klausel in abschnitt
 
 
-def test_readme_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
+def test_verhaltensdoku_nennt_die_verbrauchte_zeit_der_sitzungszeile() -> None:
     """Der Download-Absatz erklärt, wie die verbrauchte Zeit zu lesen ist."""
-    abschnitt: str = readme_abschnitt("Erhebungen verwalten")
+    abschnitt: str = verhalten_abschnitt("Erhebungen verwalten")
 
     for klausel in (
         "verbrauchte Zeit in Sekunden",

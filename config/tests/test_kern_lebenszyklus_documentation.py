@@ -5,7 +5,7 @@ from pathlib import Path
 from config.tests.dokumentation import (
     REPO_ROOT,
     glossareintrag,
-    readme_abschnitt,
+    verhalten_abschnitt,
 )
 
 ADR_0003_PATH: Path = (
@@ -108,7 +108,7 @@ def test_glossar_nimmt_den_kern_von_der_umkehrbarkeit_aus() -> None:
 def test_keine_projektdokumentation_kennt_die_kern_archivgesten() -> None:
     """Archivieren und Entarchivieren des Kerns stehen nirgends als Geste."""
     for text in (
-        readme_abschnitt("Simulationskern"),
+        verhalten_abschnitt("Simulationskern"),
         glossareintrag("Historie"),
         glossareintrag("Archiviert"),
         AUTOR_GEM_PATH.read_text(),
@@ -117,9 +117,9 @@ def test_keine_projektdokumentation_kennt_die_kern_archivgesten() -> None:
         assert "zurückholen" not in text
 
 
-def test_readme_beschreibt_den_kern_nach_dem_ueberholen() -> None:
-    """Der README-Abschnitt zum Kern nennt die eine Fassung und den Hinweis."""
-    kern_abschnitt: str = readme_abschnitt("Simulationskern")
+def test_verhaltensdoku_beschreibt_den_kern_nach_dem_ueberholen() -> None:
+    """Der Verhaltensdoku-Abschnitt zum Kern nennt die eine Fassung und den Hinweis."""
+    kern_abschnitt: str = verhalten_abschnitt("Simulationskern")
 
     for klausel in (
         "genau eine finale Fassung",

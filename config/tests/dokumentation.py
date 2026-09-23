@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT: Path = Path(__file__).parents[2]
 CONTEXT_PATH: Path = REPO_ROOT / "CONTEXT.md"
 README_PATH: Path = REPO_ROOT / "README.md"
+VERHALTEN_PATH: Path = REPO_ROOT / "docs/verhalten.md"
 ADR_0029_PATH: Path = REPO_ROOT / "docs/adr/0029-datenspur-export-kontrakt.md"
 
 
@@ -22,6 +23,11 @@ def abschnitt(pfad: Path, ueberschrift: str) -> str:
 def readme_abschnitt(ueberschrift: str) -> str:
     """Liefert den README-Abschnitt unter der Überschrift in einer Zeile."""
     return in_einer_zeile(abschnitt(README_PATH, ueberschrift))
+
+
+def verhalten_abschnitt(ueberschrift: str) -> str:
+    """Liefert den Abschnitt der Verhaltensdoku unter der Überschrift in einer Zeile."""
+    return in_einer_zeile(abschnitt(VERHALTEN_PATH, ueberschrift))
 
 
 def glossareintrag(begriff: str) -> str:

@@ -1,6 +1,6 @@
 Check ./CONTEXT.md for terminology questions.
 
-When changing public-facing behavior, check README.md to see if the documentation needs updating.
+When changing public-facing behavior, update docs/verhalten.md (behaviour per area); check README.md only for setup and deployment changes.
 
 # Agent Skills
 

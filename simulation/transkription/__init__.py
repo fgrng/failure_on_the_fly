@@ -14,7 +14,7 @@ PLATZHALTER_TRANSKRIPT: str = "Dies ist ein Platzhalter-Transkript."
 # Wie lange eine Aufnahme höchstens unterwegs sein darf — bei beiden Anbietern
 # gleich: als Timeout des synchronen Aufrufs, als Gesamtbudget des Pollings
 # einschließlich jeder einzelnen Anfrage darin. Die 120 s lassen 60 s Luft zum
-# Worker-Timeout des Deployments (180 s, README), sodass ein hängender Anbieter
+# Worker-Timeout des Deployments (180 s, docs/DEPLOYMENT.md), sodass ein hängender Anbieter
 # einen sauberen Fehlerstatus erzeugt statt eines getöteten Workers.
 TRANSKRIPTION_BUDGET_SEKUNDEN: float = 120.0
 

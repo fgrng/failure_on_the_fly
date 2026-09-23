@@ -5,9 +5,9 @@ Uberspace bis zu einer Instanz, auf der eine Erhebung laufen kann, und beschreib
 danach den Betrieb: Update, Backup, Logs, Stolpersteine.
 
 `isabell` steht überall für den eigenen Uberspace-Benutzernamen, `isabell.uber.space`
-für dessen Standarddomain. Die Kurzfassung steht im README (Abschnitt „Deployment
-auf Uberspace“); dieses Dokument ist die ausführliche Fassung mit Inbetriebnahme
-und Betriebsteil.
+für dessen Standarddomain. Das README nennt nur die drei Dinge, die man vor dem
+Deployment wissen muss; dieses Dokument ist die vollständige Anleitung mit
+Inbetriebnahme und Betriebsteil.
 
 Die Uberspace-Handbuchseiten, auf die sich die einzelnen Schritte stützen, sind
 jeweils verlinkt; der Einstieg ist <https://manual.uberspace.de/>.

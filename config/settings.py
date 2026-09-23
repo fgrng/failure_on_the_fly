@@ -167,7 +167,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Im Deployment liefert der Webserver STATIC_ROOT und MEDIA_ROOT selbst aus;
-# beide Pfade zeigen dort in sein Docroot (siehe README).
+# beide Pfade zeigen dort in sein Docroot (siehe docs/DEPLOYMENT.md).
 STATIC_ROOT: Path = Path(os.environ.get("STATIC_ROOT", BASE_DIR / "staticfiles"))
 
 MEDIA_ROOT: Path = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
