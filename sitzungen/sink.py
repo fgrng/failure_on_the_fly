@@ -172,9 +172,33 @@ class DBSink:
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> bool:
-        """Schreibt einen geglückten Schritt und seine Fehlversuche atomar."""
+        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung."""
 
         budgetstand: Budgetstand = self._budgetstand_laden()
+        self._geglueckten_schritt_ablegen(
+            eingabe=eingabe,
+            eingabemodus=eingabemodus,
+            denkspur=denkspur,
+            aeusserung=aeusserung,
+            fehlversuche=fehlversuche,
+        )
+        budgetstand.gespraechsschritt_anhaengen()
+        self._budgetstand_speichern(budgetstand)
+        return budgetstand.ist_erschoepft(
+            self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
+        )
+
+    def _geglueckten_schritt_ablegen(
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        denkspur: str,
+        aeusserung: str,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        # Schreibt einen geglückten Schritt und seine Fehlversuche atomar.
+
         with transaction.atomic():
             schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
                 sitzung=self._sitzung,
@@ -190,11 +214,6 @@ class DBSink:
                     for fehlversuch in fehlversuche
                 ]
             )
-        budgetstand.gespraechsschritt_anhaengen()
-        self._budgetstand_speichern(budgetstand)
-        return budgetstand.ist_erschoepft(
-            self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
-        )
 
     def gescheiterten_schritt_behandeln(
         self,
@@ -345,7 +364,7 @@ class FluechtigerSink(DBSink):
 
         return cast(str | None, self._zustand.get("diagnose"))
 
-    def gespraechsschritt_anhaengen(
+    def _geglueckten_schritt_ablegen(
         self,
         *,
         eingabe: str,
@@ -353,17 +372,11 @@ class FluechtigerSink(DBSink):
         denkspur: str,
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
-    ) -> bool:
-        """Hängt den geglückten Schritt an den Verlauf der Session."""
+    ) -> None:
+        # Hängt den geglückten Schritt an den Verlauf der Session.
 
-        budgetstand: Budgetstand = self._budgetstand_laden()
         self._schritt_anhaengen(
             eingabe, eingabemodus, denkspur, aeusserung, fehlversuche
-        )
-        budgetstand.gespraechsschritt_anhaengen()
-        self._budgetstand_speichern(budgetstand)
-        return budgetstand.ist_erschoepft(
-            self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
         )
 
     def gescheiterten_schritt_behandeln(
