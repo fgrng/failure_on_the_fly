@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, F, Max, QuerySet
+from django.db.models import Count, F, Max, Q, QuerySet
 from django.http import (
     Http404,
     HttpRequest,
@@ -289,7 +289,15 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     stichproben: QuerySet[Stichprobe] = erhebung.stichprobe_set.annotate(
-        teilnahmezahl=Count("erhebungsbindung")
+        teilnahmezahl=Count("erhebungsbindung"),
+        sprachmodell_abgelehnt=Count(
+            "erhebungsbindung",
+            filter=Q(erhebungsbindung__teilnahme__sprachmodell_eingewilligt=False),
+        ),
+        ohne_speicherung=Count(
+            "erhebungsbindung",
+            filter=Q(erhebungsbindung__teilnahme__speicherung_eingewilligt=False),
+        ),
     )
 
     for stichprobe in stichproben:
