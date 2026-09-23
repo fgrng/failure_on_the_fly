@@ -82,8 +82,9 @@ Positionsmarker `[bild]` **allein auf eine eigene Zeile**; mitten in einer Zeile
 bleibt `[bild]` gewöhnlicher Text. Ohne Marker steht das Bild unter dem Text.
 
 **Arbeitsheft Bild** `[sichtbar]` — dieselbe Bearbeitung als Abbildung. Es
-steht am Positionsmarker des Arbeitsheft-Texts, sonst darunter. Das Bild selbst erreicht
-den Prompt nie; für die Simulation zählt allein die Arbeitsheft-Beschreibung.
+steht am Positionsmarker des Arbeitsheft-Texts, sonst darunter. Das Bild selbst
+erreicht den Prompt nie; für die Simulation zählt allein die
+Arbeitsheft-Beschreibung.
 Der Co-Autor kann kein Bild erzeugen — er liefert Arbeitsheft-Text und
 Arbeitsheft-Beschreibung, den Upload macht die Autor:in.
 

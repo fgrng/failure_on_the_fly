@@ -14,6 +14,7 @@ from django.utils import timezone
 from konten.models import Konto
 from simulation.models import Simulationskern
 from vignetten.models import (
+    Aufgabenkontextteil,
     Vignette,
     Vignettenhistorie,
     prompt_platzhalter,
@@ -212,7 +213,7 @@ def test_positionsmarker_zaehlt_nur_allein_auf_einer_zeile(text: str) -> None:
 def test_positionsmarker_auf_eigener_zeile_zerlegt_den_text() -> None:
     """Allein auf einer Zeile zerlegt der erste Marker den Text; alle verschwinden."""
 
-    teil = Vignette(
+    teil: Aufgabenkontextteil = Vignette(
         arbeitsheft_text="Oben\n   [Bild]\t\nMitte\n[bild]\nunten",
         arbeitsheft_bild="vignettenbilder/heft.gif",
     ).arbeitsheft
