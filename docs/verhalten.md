@@ -262,8 +262,11 @@ Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhe
 Kreis änderbar. Unter einer finalen Erhebung lassen sich
 Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
 Teilnahme-Link, ihre aus dem Zeitraum abgeleitete Phase — geplant, läuft oder
-abgeschlossen — und die Zahl ihrer Teilnahmen. Datenfreie Stichproben lassen
-sich archivieren; die Phasenspalte weist sie danach als archiviert aus.
+abgeschlossen — und die Zahl ihrer Teilnahmen. Daneben stehen, nach dem
+aktuellen Stand der Einwilligungen, die Zahl der Teilnahmen, die die Verarbeitung
+durch Sprachmodelle abgelehnt haben, und die Zahl der Teilnahmen ohne
+Speicherung. Datenfreie Stichproben lassen sich archivieren; die Phasenspalte
+weist sie danach als archiviert aus.
 Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
 zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
 Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.

@@ -1321,6 +1321,43 @@ class StichprobenAnlegenTests(TestCase):
         self.assertContains(detail, '<th scope="col">Teilnahmen</th>')
         self.assertContains(detail, "<td>1</td>")
 
+    def test_zaehlt_abgelehnte_sprachmodelle_und_speicherung_je_stichprobe(
+        self,
+    ) -> None:
+        """Die Detailseite zeigt, wie viele a bzw. c nach aktuellem Stand ablehnen."""
+
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        einwilligungen: list[tuple[bool | None, bool | None]] = [
+            (False, None),
+            (True, False),
+            (True, False),
+            (True, True),
+            (None, None),
+        ]
+        for nummer, (sprachmodell, speicherung) in enumerate(einwilligungen):
+            Erhebungsbindung.objects.create(
+                stichprobe=stichprobe,
+                teilnahme=Teilnahme.objects.create(
+                    sprachmodell_eingewilligt=sprachmodell,
+                    speicherung_eingewilligt=speicherung,
+                ),
+                token=f"2345-678{nummer}",
+            )
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(
+            detail, '<th scope="col">Sprachmodelle abgelehnt</th>', html=True
+        )
+        self.assertContains(detail, '<th scope="col">Ohne Speicherung</th>', html=True)
+        self.assertContains(detail, "<td>5</td><td>1</td><td>2</td>", html=True)
+
     def test_zeichnet_archivierte_stichproben_in_der_phasenspalte_aus(self) -> None:
         """Eine archivierte Stichprobe trägt ihren Zustand neben der Phase."""
 
