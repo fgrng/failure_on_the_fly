@@ -10,8 +10,8 @@ from django.views.decorators.http import require_POST
 
 from konten.models import Konto
 from konten.navigation import (
-    AUTORIN_GRUPPE,
     FORSCHENDE_GRUPPE,
+    ist_autorin,
     rolle_erforderlich,
     rolle_oder_administration,
 )
@@ -22,14 +22,13 @@ _PROFILE: dict[str, Callable[[str], SafeString]] = {
     "informationstext": markdown.informationstext,
     "szenentext": markdown.szenentext,
 }
+_ist_forschende: Callable[[Konto], bool] = rolle_oder_administration(FORSCHENDE_GRUPPE)
 
 
 def _schreibt_texte(konto: Konto) -> bool:
     # Wer Erhebungstexte oder Vignetten und Kern schreibt, darf vorschauen.
 
-    return rolle_oder_administration(AUTORIN_GRUPPE)(
-        konto
-    ) or rolle_oder_administration(FORSCHENDE_GRUPPE)(konto)
+    return ist_autorin(konto) or _ist_forschende(konto)
 
 
 @login_required
