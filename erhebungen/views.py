@@ -822,18 +822,16 @@ def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
             return HttpResponseBadRequest(
                 "Bitte entscheiden Sie über jede Einwilligung."
             )
+        zustimmungen: dict[str, bool] = {
+            feld: wert == "ja" for feld, wert in entscheidungen.items()
+        }
         teilnahme: Teilnahme = bindung.teilnahme
-        teilnahme.sprachmodell_eingewilligt = (
-            entscheidungen["sprachmodell_eingewilligt"] == "ja"
+        teilnahme.sprachmodell_eingewilligt = zustimmungen["sprachmodell_eingewilligt"]
+        # Eine nicht angebotene Spracherkennung bleibt unentschieden.
+        teilnahme.audioverarbeitung_eingewilligt = zustimmungen.get(
+            "audioverarbeitung_eingewilligt"
         )
-        teilnahme.audioverarbeitung_eingewilligt = (
-            entscheidungen["audioverarbeitung_eingewilligt"] == "ja"
-            if "audioverarbeitung_eingewilligt" in entscheidungen
-            else None
-        )
-        teilnahme.speicherung_eingewilligt = (
-            entscheidungen["speicherung_eingewilligt"] == "ja"
-        )
+        teilnahme.speicherung_eingewilligt = zustimmungen["speicherung_eingewilligt"]
         teilnahme.save(
             update_fields=[
                 "sprachmodell_eingewilligt",
