@@ -114,6 +114,8 @@ class ErhebungsteilnahmeTests(TestCase):
         budget_typ: str = Vignette.BudgetTyp.SCHRITTE,
         budget_wert: int = 1,
         position: int = 1,
+        lernauftrag_text: str = "Addiere Brüche.",
+        arbeitsheft_text: str = "1/2 + 1/3 = 2/5",
     ) -> Vignette:
         """Bindet eine spielbare finale Vignette an die Erhebung."""
 
@@ -131,9 +133,9 @@ class ErhebungsteilnahmeTests(TestCase):
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere Brüche.",
+            lernauftrag_text=lernauftrag_text,
             arbeitsheft_bildbeschreibung="Eine falsche Bruchrechnung.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            arbeitsheft_text=arbeitsheft_text,
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             lehrperson_name="Weber",
@@ -654,6 +656,26 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(
             sitzung.simulationskern.zustand, Simulationskern.Zustand.ARCHIVIERT
         )
+
+    def test_sitzung_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
+        self,
+    ) -> None:
+        """Beide Texte erscheinen als Szenentext, Link-Syntax bleibt wörtlich."""
+
+        self._vignette_anlegen(
+            lernauftrag_text="Addiere *zwei* Brüche.\n[Tipp](https://example.org)",
+            arbeitsheft_text="1/2 + 1/3\n\\= 2/5",
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        antwort: HttpResponse = self.client.get(
+            reverse("erhebungen:gespraech", args=[bindung.token])
+        )
+
+        self.assertContains(antwort, "Addiere <em>zwei</em> Brüche.<br>")
+        self.assertContains(antwort, "[Tipp](https://example.org)")
+        self.assertContains(antwort, "<p>1/2 + 1/3<br>\n= 2/5</p>")
 
     def test_token_spielt_eine_vignette_bis_zum_abschluss(self) -> None:
         """Die pseudonyme Teilnahme bewahrt die Datenspur ohne Denkspuransicht."""

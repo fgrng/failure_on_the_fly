@@ -234,6 +234,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     return [
         {
             "name": sitzung.vignette.anzeigename,
+            "vignette": sitzung.vignette,
             "status": sitzung.get_status_display(),
             "gespraechsschritte": sitzung.gespraechsschritte,
             # Eine Sitzung ohne Diagnose hat die Rückwärts-1:1 nicht; ihr

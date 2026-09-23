@@ -4,7 +4,7 @@
 {% block title %}Abschrift: {{ abschrift.erhebungsname }}{% endblock %}
 
 {% block extra_head %}
-    {# Die Gesprächsblasen des Transkripts stehen in sitzung.css. #}
+    {# Aufgabenkontext und Gesprächsblasen des Transkripts stehen in sitzung.css. #}
     <link rel="stylesheet" href="{% static 'css/sitzung.css' %}">
 {% endblock %}
 
@@ -27,6 +27,17 @@
                     <small>Ausgang: {{ sitzung.status }}</small>
                 </span>
             </header>
+
+            <div class="aufgabenkontext">
+                <section>
+                    <h3>Lernauftrag</h3>
+                    {% include "vignetten/includes/aufgabenkontext_inhalt.html" with teil=sitzung.vignette.lernauftrag %}
+                </section>
+                <section>
+                    <h3>Arbeitsheft von {{ sitzung.vignette.schuelerin_name }}</h3>
+                    {% include "vignetten/includes/aufgabenkontext_inhalt.html" with teil=sitzung.vignette.arbeitsheft %}
+                </section>
+            </div>
 
             <div class="diagnosegespraech-verlauf" aria-label="Mein Diagnosegespräch">
                 {% for schritt in sitzung.gespraechsschritte %}

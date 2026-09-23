@@ -197,6 +197,32 @@ class ProbelaufStartTests(TestCase):
         self.assertContains(response, 'alt="Arbeitsblatt mit Zahlenreihe"')
         self.assertNotContains(response, "[BILD]")
 
+    def test_lernauftrag_rendert_die_teile_um_das_bild_je_als_szenentext(
+        self,
+    ) -> None:
+        """Vor und nach dem Bild steht je ein eigener Szenentext, Alt-Text bleibt roh."""
+
+        self.entwurf.lernauftrag_text = "**Oben**\n[bild]\n- unten"
+        self.entwurf.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+        self.entwurf.lernauftrag_bildbeschreibung = "Reihe *1, 2, 3*"
+        self.entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(
+            response,
+            '<div class="markdown-text aufgabenkontext-inhalt">'
+            "<p><strong>Oben</strong></p>\n</div>",
+        )
+        self.assertContains(
+            response,
+            '<div class="markdown-text aufgabenkontext-inhalt">'
+            "<ul>\n<li>unten</li>\n</ul>\n</div>",
+        )
+        self.assertContains(response, 'alt="Reihe *1, 2, 3*"')
+
     def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
         self,
     ) -> None:
@@ -346,6 +372,40 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
             "<arbeitsheft_bildbeschreibung>Heftseite</arbeitsheft_bildbeschreibung>",
             prompt_inhalt,
         )
+
+    def test_prompt_erhaelt_die_markdown_quelle(self) -> None:
+        """Das Sprachmodell liest Lernauftrag und Arbeitsheft ungerendert."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        kern: Simulationskern = self.kern.bearbeiten()
+        kern.user_prompt_vorlage = "$lernauftrag $arbeitsheft"
+        kern.save()
+        kern.finalisieren()
+        self.entwurf.gepinnter_kern = kern
+        self.entwurf.lernauftrag_text = (
+            "Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
+        )
+        self.entwurf.arbeitsheft_text = "1/2 + 1/3\n\\= 2/5 \\*"
+        self.entwurf.save()
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"),
+            {"eingabe": "Wie hast du gerechnet?"},
+        )
+
+        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        self.assertIn(
+            "<lernauftrag_text>Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
+            "</lernauftrag_text>",
+            prompt_inhalt,
+        )
+        self.assertIn(
+            "<arbeitsheft_text>1/2 + 1/3\n\\= 2/5 \\*</arbeitsheft_text>",
+            prompt_inhalt,
+        )
+        self.assertNotIn("<strong>", prompt_inhalt)
 
     def test_simulationshinweise_erscheinen_nicht_auf_sitzungsseite_aber_im_prompt(
         self,
