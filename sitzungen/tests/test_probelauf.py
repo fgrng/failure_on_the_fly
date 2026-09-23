@@ -161,7 +161,9 @@ class ProbelaufStartTests(TestCase):
     def test_arbeitsheft_ordnet_text_und_bild_am_marker(self) -> None:
         """Das Gespräch zeigt den Arbeitshefttext um das Bild herum."""
 
-        self.entwurf.arbeitsheft_text = "Rechnung oben [BILD] Rechnung unten [bild]"
+        self.entwurf.arbeitsheft_text = (
+            "Rechnung oben\n [BILD] \nRechnung unten\n[bild]"
+        )
         self.entwurf.arbeitsheft_bild = "vignettenbilder/heft.gif"
         self.entwurf.arbeitsheft_bildbeschreibung = "Durchgestrichene Rechnung"
         self.entwurf.save()
@@ -172,15 +174,15 @@ class ProbelaufStartTests(TestCase):
         )
 
         inhalt: str = response.content.decode()
-        self.assertLess(inhalt.index("Rechnung oben "), inhalt.index("heft.gif"))
-        self.assertLess(inhalt.index("heft.gif"), inhalt.index(" Rechnung unten "))
+        self.assertLess(inhalt.index("Rechnung oben"), inhalt.index("heft.gif"))
+        self.assertLess(inhalt.index("heft.gif"), inhalt.index("Rechnung unten"))
         self.assertContains(response, 'alt="Durchgestrichene Rechnung"')
         self.assertNotContains(response, "[BILD]")
 
     def test_lernauftrag_ordnet_text_und_bild_am_marker(self) -> None:
         """Die Sitzungsseite zeigt den Lernauftrag um sein Bild herum."""
 
-        self.entwurf.lernauftrag_text = "Oben [BILD] unten [bild]"
+        self.entwurf.lernauftrag_text = "Oben\n[BILD]\nunten\n[bild]"
         self.entwurf.lernauftrag_bild = "vignettenbilder/auftrag.gif"
         self.entwurf.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
         self.entwurf.save()
@@ -190,8 +192,8 @@ class ProbelaufStartTests(TestCase):
         )
 
         inhalt: str = response.content.decode()
-        self.assertLess(inhalt.index("Oben "), inhalt.index("auftrag.gif"))
-        self.assertLess(inhalt.index("auftrag.gif"), inhalt.index(" unten "))
+        self.assertLess(inhalt.index("Oben"), inhalt.index("auftrag.gif"))
+        self.assertLess(inhalt.index("auftrag.gif"), inhalt.index("unten"))
         self.assertContains(response, 'alt="Arbeitsblatt mit Zahlenreihe"')
         self.assertNotContains(response, "[BILD]")
 
@@ -305,6 +307,44 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         return self.client.post(
             reverse("sitzungen:probelauf_gespraech"),
             {"eingabe": "Und warum?", "eingabemodus": eingabemodus},
+        )
+
+    def test_bildbeschreibung_im_prompt_folgt_dem_positionsmarker(self) -> None:
+        """Nur ein Marker allein auf seiner Zeile setzt die Bildbeschreibung dazwischen."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        kern: Simulationskern = self.kern.bearbeiten()
+        kern.user_prompt_vorlage = "$lernauftrag $arbeitsheft"
+        kern.save()
+        kern.finalisieren()
+        self.entwurf.gepinnter_kern = kern
+        self.entwurf.lernauftrag_text = "Rechne zuerst.\n[Bild]\nBegründe danach."
+        self.entwurf.lernauftrag_bild = "vignettenbilder/auftrag.gif"
+        self.entwurf.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
+        self.entwurf.arbeitsheft_text = "8 + 4 = [bild] 12"
+        self.entwurf.arbeitsheft_bild = "vignettenbilder/heft.gif"
+        self.entwurf.arbeitsheft_bildbeschreibung = "Heftseite"
+        self.entwurf.save()
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        self.client.post(
+            reverse("sitzungen:probelauf_gespraech"),
+            {"eingabe": "Wie hast du gerechnet?"},
+        )
+
+        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        self.assertIn(
+            "<lernauftrag_text>Rechne zuerst.\n</lernauftrag_text>\n"
+            "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Zahlenreihe"
+            "</lernauftrag_bildbeschreibung>\n"
+            "<lernauftrag_text>Begründe danach.</lernauftrag_text>",
+            prompt_inhalt,
+        )
+        self.assertIn(
+            "<arbeitsheft_text>8 + 4 = [bild] 12</arbeitsheft_text>\n"
+            "<arbeitsheft_bildbeschreibung>Heftseite</arbeitsheft_bildbeschreibung>",
+            prompt_inhalt,
         )
 
     def test_simulationshinweise_erscheinen_nicht_auf_sitzungsseite_aber_im_prompt(

@@ -35,11 +35,11 @@ def test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe() -> None
 
     vollstaendig: Vignette = Vignette(
         fehlermuster_beschreibung="Das Gleichheitszeichen gilt als Aufforderung.",
-        lernauftrag_text="Setze die passende Zahl ein: [bild]",
+        lernauftrag_text="Setze die passende Zahl ein:\n[bild]",
         lernauftrag_bild="vignettenbilder/auftrag.gif",
         lernauftrag_bildbeschreibung="Arbeitsblatt mit einer Platzhalteraufgabe.",
         lernauftrag_simulationshinweise="Lukas ignoriert den Term rechts der Lücke.",
-        arbeitsheft_text="8 + 4 = 12 [bild]",
+        arbeitsheft_text="8 + 4 = 12\n[bild]",
         arbeitsheft_bild="vignettenbilder/heft.gif",
         arbeitsheft_bildbeschreibung="Heftseite mit der Rechnung 8 + 4 = 12.",
         arbeitsheft_simulationshinweise="Auf Nachfragen beharrt Lukas auf der 12.",

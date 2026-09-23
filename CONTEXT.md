@@ -36,7 +36,7 @@ Einer der beiden gleich gebauten Teile des Aufgabenkontexts — der Lernauftrag 
 _Avoid_: Kontextteil, Abschnitt, Block
 
 **Lernauftrag-Text**:
-Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat. Mit dem Positionsmarker `[bild]` wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
+Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat. Mit dem Positionsmarker `[bild]` allein auf einer Zeile wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
 _Avoid_: Aufgabe, Auftrag, Übung
 
 **Lernauftrag-Bild**:
@@ -48,7 +48,7 @@ Die textuelle Beschreibung dessen, was auf dem Lernauftrag-Bild zu sehen ist. Si
 _Avoid_: Bildtext, Bearbeitungsbeschreibung
 
 **Arbeitsheft-Text**:
-Der Textinhalt des Arbeitshefts der simulierten Schüler:in (die abgetippte Bearbeitung). Mit dem Positionsmarker `[bild]` wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
+Der Textinhalt des Arbeitshefts der simulierten Schüler:in (die abgetippte Bearbeitung). Mit dem Positionsmarker `[bild]` allein auf einer Zeile wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
 _Avoid_: Schülerlösung, Lösung, Heft, Arbeitsheft-Inhalt
 
 **Arbeitsheft-Bild**:
@@ -64,7 +64,7 @@ Zusätzliche fachdidaktische oder verhaltensbezogene Hinweise zum Lernauftrag od
 _Avoid_: Systemhinweise, Prompthinweise, Regieanweisungen
 
 **Positionsmarker**:
-Die Kennzeichnung `[bild]` im Lernauftrag- oder Arbeitsheft-Text, die festlegt, an welcher Stelle das jeweilige Bild bzw. im Prompt die Bildbeschreibung erscheint. Der erste Marker gewinnt; ohne Bild oder ohne Marker greift das Standardverhalten.
+Die Kennzeichnung `[bild]` allein auf einer Zeile im Lernauftrag- oder Arbeitsheft-Text, die festlegt, an welcher Stelle das jeweilige Bild bzw. im Prompt die Bildbeschreibung erscheint. Leerraum um den Marker und Groß- und Kleinschreibung spielen keine Rolle; mitten in einer Zeile oder als Linktext (`[bild](…)`) ist `[bild]` gewöhnlicher Text. Der erste Marker gewinnt; ohne Bild oder ohne Marker greift das Standardverhalten.
 _Avoid_: Platzhalter, Bildplatzhalter, Marker
 
 ## Sitzung einer Vignette

@@ -18,7 +18,10 @@ from konten.navigation import AUTORIN_GRUPPE
 from simulation.models import Simulationskern
 
 
-_POSITIONSMARKER: re.Pattern[str] = re.compile(r"\[bild\]", re.IGNORECASE)
+# Der Marker zählt nur allein auf seiner Zeile; die ganze Zeile samt Umbruch fällt weg.
+_POSITIONSMARKER: re.Pattern[str] = re.compile(
+    r"^[^\S\r\n]*\[bild\][^\S\r\n]*(?:\r?\n|\Z)", re.IGNORECASE | re.MULTILINE
+)
 
 _SCHUELERINNEN: tuple[tuple[str, str], ...] = (
     ("Mia", "weiblich"),
@@ -239,7 +242,7 @@ class Vignette(models.Model):
     )
     lernauftrag_text: models.TextField = models.TextField(
         blank=True,
-        help_text="Text des Lernauftrags. Mit [bild] steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
+        help_text="Text des Lernauftrags. Mit [bild] allein auf einer Zeile steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
     )
     lernauftrag_bild: models.ImageField = models.ImageField(
         upload_to=vignetten_bild_pfad,
@@ -256,7 +259,7 @@ class Vignette(models.Model):
     )
     arbeitsheft_text: models.TextField = models.TextField(
         blank=True,
-        help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Mit [bild] steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
+        help_text="Inhalt des Arbeitshefts von der zu simulierenden Schüler:in. Mit [bild] allein auf einer Zeile steht das Bild an dieser Stelle; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.",
     )
     arbeitsheft_bild: models.ImageField = models.ImageField(
         upload_to=vignetten_bild_pfad,

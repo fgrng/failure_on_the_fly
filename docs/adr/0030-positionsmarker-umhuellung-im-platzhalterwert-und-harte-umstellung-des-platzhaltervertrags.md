@@ -66,6 +66,18 @@ an seine Stelle treten die komponierten Platzhalter `$lernauftrag` und
   die Umschreibung des Standardkerns und die Anpassung der Tests wird
   Kompatibilitätsballast im Code vermieden.
 
+## Nachtrag (2026-09): Marker nur allein auf einer Zeile
+
+Mit Markdown in Lernauftrag und Arbeitsheft (#270) zählt `[bild]` nur noch als
+Positionsmarker, wenn er allein auf einer Zeile steht; umgebender Leerraum ist
+erlaubt, Groß- und Kleinschreibung bleibt egal. Die Markerzeile fällt samt
+Zeilenumbruch weg. Mitten in einer Zeile oder als Linktext (`[bild](…)`) ist
+`[bild]` gewöhnlicher Text und bleibt unverändert stehen. So entsteht keine
+versehentliche Zerlegung mitten in einem Satz oder einer Markdown-Struktur, und
+das Bild steht immer zwischen zwei Textblöcken. „Der erste Marker gewinnt" und
+das Standardverhalten ohne Marker bzw. ohne Bild bleiben; die Regel gilt wie
+bisher gleichermaßen für Anzeige und Prompt.
+
 ## Consequences
 
 - Das Vignettenmodell ist die alleinige Quelle der Wahrheit für die

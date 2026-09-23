@@ -28,6 +28,13 @@ Administratorin als Eigentümer:in hinzufügen oder eine vorhandene entfernen. D
 Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
 die verbleibenden Eigentümer:innen.
 
+Im Lernauftrag- und Arbeitsheft-Text legt der Positionsmarker `[bild]` fest, wo
+das hochgeladene Bild steht und wo das Sprachmodell die Bildbeschreibung
+erhält. Er zählt nur allein auf einer Zeile (Leerraum und Groß- und
+Kleinschreibung egal); mitten in einer Zeile oder als `[bild](…)` bleibt er
+gewöhnlicher Text. Der erste Marker gewinnt, weitere verschwinden. Ohne Marker
+steht das Bild unter dem Text, ohne Bild verschwinden die Marker ersatzlos.
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;

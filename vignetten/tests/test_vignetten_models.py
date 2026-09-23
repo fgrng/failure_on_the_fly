@@ -28,7 +28,7 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
         zustand=Vignette.Zustand.FINAL,
         fehlermuster_beschreibung="Brüche <werden> addiert.",
         lernauftrag_text="Addiere zwei Brüche.",
-        arbeitsheft_text="8 + 4 = 12 [BILD] Also ist die Lösung 7. [bild]",
+        arbeitsheft_text="8 + 4 = 12\n  [BILD] \nAlso ist die Lösung 7.\n[bild]",
         arbeitsheft_bild="vignettenbilder/heft.gif",
         arbeitsheft_bildbeschreibung="Heftseite mit durchgestrichener 12.",
         schuelerin_name="Mia",
@@ -51,10 +51,10 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
         ),
         "arbeitsheft": (
             "<arbeitsheft>\n"
-            "<arbeitsheft_text>8 + 4 = 12 </arbeitsheft_text>\n"
+            "<arbeitsheft_text>8 + 4 = 12\n</arbeitsheft_text>\n"
             "<arbeitsheft_bildbeschreibung>Heftseite mit durchgestrichener 12."
             "</arbeitsheft_bildbeschreibung>\n"
-            "<arbeitsheft_text> Also ist die Lösung 7. </arbeitsheft_text>\n"
+            "<arbeitsheft_text>Also ist die Lösung 7.\n</arbeitsheft_text>\n"
             "</arbeitsheft>"
         ),
         "lernauftrag_simulationshinweise": "",
@@ -72,7 +72,7 @@ def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> No
 
     platzhalter: dict[str, str] = prompt_platzhalter(
         Vignette(
-            lernauftrag_text="Rechne zuerst. [BILD] Begründe danach. [bild]",
+            lernauftrag_text="Rechne zuerst.\r\n\t[Bild]\r\nBegründe danach.",
             lernauftrag_bild="vignettenbilder/auftrag.gif",
             lernauftrag_bildbeschreibung="Arbeitsblatt mit einer Zahlenreihe.",
         )
@@ -80,10 +80,10 @@ def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> No
 
     assert platzhalter["lernauftrag"] == (
         "<lernauftrag>\n"
-        "<lernauftrag_text>Rechne zuerst. </lernauftrag_text>\n"
+        "<lernauftrag_text>Rechne zuerst.\r\n</lernauftrag_text>\n"
         "<lernauftrag_bildbeschreibung>Arbeitsblatt mit einer Zahlenreihe."
         "</lernauftrag_bildbeschreibung>\n"
-        "<lernauftrag_text> Begründe danach. </lernauftrag_text>\n"
+        "<lernauftrag_text>Begründe danach.</lernauftrag_text>\n"
         "</lernauftrag>"
     )
 
@@ -156,12 +156,12 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
     """Ein unvollständiger Entwurf gibt den Marker nie an das Modell weiter."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(arbeitsheft_text="Oben [BILD] unten [bild]")
+        Vignette(arbeitsheft_text="Oben\n[BILD]\nunten\n[bild]")
     )
 
     assert platzhalter["arbeitsheft"] == (
         "<arbeitsheft>\n"
-        "<arbeitsheft_text>Oben  unten </arbeitsheft_text>\n"
+        "<arbeitsheft_text>Oben\nunten\n</arbeitsheft_text>\n"
         "</arbeitsheft>"
     )
 
@@ -170,14 +170,54 @@ def test_prompt_platzhalter_entfernt_lernauftrag_marker_ohne_bild() -> None:
     """Ein Lernauftrag ohne Bild gibt den Marker nie an das Modell weiter."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(lernauftrag_text="Oben [BILD] unten [bild]")
+        Vignette(lernauftrag_text="Oben\n[BILD]\nunten\n[bild]")
     )
 
     assert platzhalter["lernauftrag"] == (
         "<lernauftrag>\n"
-        "<lernauftrag_text>Oben  unten </lernauftrag_text>\n"
+        "<lernauftrag_text>Oben\nunten\n</lernauftrag_text>\n"
         "</lernauftrag>"
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Setze [bild] ein.",
+        "Setze ein:\n[bild](https://example.org/bild.png)\nFertig.",
+        "Setze ein: [BILD]\nFertig.",
+    ],
+)
+def test_positionsmarker_zaehlt_nur_allein_auf_einer_zeile(text: str) -> None:
+    """Mitten in einer Zeile oder als Linktext bleibt [bild] gewöhnlicher Text."""
+
+    vignette: Vignette = Vignette(
+        lernauftrag_text=text,
+        lernauftrag_bild="vignettenbilder/auftrag.gif",
+        lernauftrag_bildbeschreibung="Arbeitsblatt",
+    )
+
+    assert (
+        vignette.lernauftrag.text_vor_bild,
+        vignette.lernauftrag.text_nach_bild,
+    ) == (text, "")
+    assert prompt_platzhalter(vignette)["lernauftrag"] == (
+        "<lernauftrag>\n"
+        f"<lernauftrag_text>{text}</lernauftrag_text>\n"
+        "<lernauftrag_bildbeschreibung>Arbeitsblatt</lernauftrag_bildbeschreibung>\n"
+        "</lernauftrag>"
+    )
+
+
+def test_positionsmarker_auf_eigener_zeile_zerlegt_den_text() -> None:
+    """Allein auf einer Zeile zerlegt der erste Marker den Text; alle verschwinden."""
+
+    teil = Vignette(
+        arbeitsheft_text="Oben\n   [Bild]\t\nMitte\n[bild]\nunten",
+        arbeitsheft_bild="vignettenbilder/heft.gif",
+    ).arbeitsheft
+
+    assert (teil.text_vor_bild, teil.text_nach_bild) == ("Oben\n", "Mitte\nunten")
 
 
 def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text() -> None:

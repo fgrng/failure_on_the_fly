@@ -77,10 +77,12 @@ nur als Alt-Text des Arbeitsheft-Bildes. Sie muss die fehlerhafte Bearbeitung so
 genau beschreiben, dass die simulierte Schüler:in sie erklären kann.
 
 **Arbeitsheft Text** `[sichtbar]` — die sichtbare, fehlerhafte Bearbeitung als
-Text. Erscheint im Aufgabenkontext, wenn kein Bild hochgeladen ist.
+Text. Soll ein Bild zwischen zwei Textteilen stehen, setzt man den
+Positionsmarker `[bild]` **allein auf eine eigene Zeile**; mitten in einer Zeile
+bleibt `[bild]` gewöhnlicher Text. Ohne Marker steht das Bild unter dem Text.
 
-**Arbeitsheft Bild** `[sichtbar]` — dieselbe Bearbeitung als Abbildung. Ist ein
-Bild vorhanden, verdrängt es den Text in der Anzeige. Das Bild selbst erreicht
+**Arbeitsheft Bild** `[sichtbar]` — dieselbe Bearbeitung als Abbildung. Es
+steht am Positionsmarker des Arbeitsheft-Texts, sonst darunter. Das Bild selbst erreicht
 den Prompt nie; für die Simulation zählt allein die Arbeitsheft-Beschreibung.
 Der Co-Autor kann kein Bild erzeugen — er liefert Arbeitsheft-Text und
 Arbeitsheft-Beschreibung, den Upload macht die Autor:in.
