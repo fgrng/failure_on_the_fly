@@ -260,7 +260,15 @@ Forschende und Administrator:innen erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
 Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
-Einwilligungs- und Abschlusstext. Reine Entwürfe lassen sich löschen; das Design
+Einwilligungs- und Abschlusstext. Unter jedem dieser drei Felder steht ein
+kurzer Markdown-Hinweis samt Link-Syntax; der Umschalter »Bearbeiten |
+Vorschau« zeigt den ungespeicherten Text so, wie die Teilnahmeseite ihn
+rendert. Die Vorschau holt das Fragment vom Endpunkt `/texte/vorschau/`, der
+Quelle und Profil (Informations- oder Szenentext) annimmt, mit derselben
+Funktion wie die Anzeigeseite rendert und nichts speichert; er steht nur
+angemeldeten Autor:innen, Forschenden und Administrator:innen offen. Finale und
+archivierte Erhebungen zeigen die drei Texte gerendert als Leseansicht, ein
+leerer Text erscheint als »—«. Reine Entwürfe lassen sich löschen; das Design
 finaler Erhebungen bleibt unveränderlich, ihr Eigentümer-Kreis änderbar. Das
 Finalisieren pinnt die aktive
 Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder

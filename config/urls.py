@@ -28,6 +28,7 @@ urlpatterns = [
     path("erhebungen/", include("erhebungen.urls")),
     path("fragebogen-items/", include("fragebogen_items.urls")),
     path("sitzungen/", include("sitzungen.urls")),
+    path("texte/", include("texte.urls")),
     path("system/", include("simulation.urls")),
     path("trainings/", include("training.urls")),
     path("vignetten/", include("vignetten.urls")),

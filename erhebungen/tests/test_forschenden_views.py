@@ -2968,3 +2968,86 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         self.assertContains(detail, "Am Ende")
         self.assertContains(detail, "Keine Fragebogen-Items aufgenommen.", count=2)
         self.assertNotContains(detail, "Finale Items aufnehmen")
+
+
+class ErhebungstexteVorschauUndLeseansichtTests(TestCase):
+    """Forschende sehen ihre Erhebungstexte so, wie Teilnehmer:innen sie sehen."""
+
+    def setUp(self) -> None:
+        # Richtet eine Forschende mit einem Entwurf voller Markdown-Texte ein.
+
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
+        self.erhebung.instruktionstext = "# Ablauf\n- erst\n- dann"
+        self.erhebung.einwilligungstext = "**Zweck** [Datenschutz](https://example.org)"
+        self.erhebung.abschlusstext = ""
+        self.erhebung.save()
+        ModellKonfiguration.objects.aktivieren(_forschungskonfiguration())
+        self.client.force_login(self.ada)
+
+    def _detail(self) -> HttpResponse:
+        return self.client.get(reverse("erhebungen:detail", args=[self.erhebung.pk]))
+
+    def test_entwurf_bietet_je_textfeld_hinweis_und_umschalter(self) -> None:
+        """Alle drei Felder holen ihre Vorschau im Profil Informationstext."""
+
+        detail: HttpResponse = self._detail()
+
+        self.assertContains(detail, ">Bearbeiten</button>", count=3)
+        self.assertContains(detail, ">Vorschau</button>", count=3)
+        self.assertContains(detail, f'hx-post="{reverse("texte:vorschau")}"', count=3)
+        self.assertContains(detail, '"profil": "informationstext"', count=3)
+        self.assertContains(detail, "[Linktext](https://…)", count=3)
+        for feld in ("instruktionstext", "einwilligungstext", "abschlusstext"):
+            self.assertContains(detail, f'name="{feld}"')
+        self.assertNotContains(detail, "<h3>Ablauf</h3>")
+
+    def test_vorschau_entspricht_der_teilnahmeseite(self) -> None:
+        """Endpunkt und Teilnahmeseite liefern dasselbe Rendering."""
+
+        vorschau: HttpResponse = self.client.post(
+            reverse("texte:vorschau"),
+            {
+                "profil": "informationstext",
+                "quelle": self.erhebung.einwilligungstext,
+            },
+        )
+        self.erhebung.finalisieren()
+        stichprobe: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        teilnahmeseite: HttpResponse = self.client.get(
+            reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link]),
+            follow=True,
+        )
+
+        self.assertContains(teilnahmeseite, vorschau.content.decode().strip())
+
+    def test_finale_erhebung_zeigt_die_texte_gerendert_und_nur_lesend(self) -> None:
+        """Die Leseansicht rendert Markdown und nutzt für Leeres den Platzhalter."""
+
+        self.erhebung.finalisieren()
+
+        detail: HttpResponse = self._detail()
+
+        self.assertContains(detail, "<h3>Ablauf</h3>")
+        self.assertContains(detail, "<li>erst</li>")
+        self.assertContains(detail, "<strong>Zweck</strong>")
+        self.assertContains(detail, 'href="https://example.org"')
+        self.assertContains(detail, '<div class="markdown-text">—</div>')
+        self.assertNotContains(detail, "<textarea")
+        self.assertNotContains(detail, ">Vorschau</button>")
+
+    def test_archivierte_erhebung_zeigt_die_texte_gerendert(self) -> None:
+        """Auch nach dem Archivieren bleibt nachlesbar, was eingefroren wurde."""
+
+        self.erhebung.finalisieren()
+        self.erhebung.archivieren()
+
+        detail: HttpResponse = self._detail()
+
+        self.assertContains(detail, "<h3>Ablauf</h3>")
+        self.assertContains(detail, "<strong>Zweck</strong>")

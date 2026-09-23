@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static texte %}
 
 {% block title %}{{ erhebung.name }}{% endblock %}
 
@@ -70,18 +70,9 @@
                     <b>01</b><span><h2 id="section-config">Konfiguration</h2><small>Instruktion, Einwilligung und Abschluss definieren.</small></span>
                 </header>
                 <div class="field-grid">
-                    <div class="vignette-field page-field--wide">
-                        <label for="id_instruktionstext">Instruktion</label>
-                        <textarea id="id_instruktionstext" name="instruktionstext">{{ erhebung.instruktionstext }}</textarea>
-                    </div>
-                    <div class="vignette-field page-field--wide">
-                        <label for="id_einwilligungstext">Einwilligung</label>
-                        <textarea id="id_einwilligungstext" name="einwilligungstext">{{ erhebung.einwilligungstext }}</textarea>
-                    </div>
-                    <div class="vignette-field page-field--wide">
-                        <label for="id_abschlusstext">Abschluss</label>
-                        <textarea id="id_abschlusstext" name="abschlusstext">{{ erhebung.abschlusstext }}</textarea>
-                    </div>
+                    {% include "texte/includes/markdown_feld.html" with feld_id="id_instruktionstext" feld_name="instruktionstext" label="Instruktion" wert=erhebung.instruktionstext profil="informationstext" %}
+                    {% include "texte/includes/markdown_feld.html" with feld_id="id_einwilligungstext" feld_name="einwilligungstext" label="Einwilligung" wert=erhebung.einwilligungstext profil="informationstext" %}
+                    {% include "texte/includes/markdown_feld.html" with feld_id="id_abschlusstext" feld_name="abschlusstext" label="Abschluss" wert=erhebung.abschlusstext profil="informationstext" %}
                 </div>
             </section>
 
@@ -179,9 +170,20 @@
             </dl>
         </section>
 
+        <section class="page-section" aria-labelledby="section-texte">
+            <header class="page-section__head">
+                <b>02</b><span><h2 id="section-texte">Texte</h2><small>So lesen Teilnehmer:innen Instruktion, Einwilligung und Abschluss.</small></span>
+            </header>
+            <dl class="field-grid">
+                <div class="page-field--wide"><dt>Instruktion</dt><dd><div class="markdown-text">{{ erhebung.instruktionstext|informationstext|default:"—" }}</div></dd></div>
+                <div class="page-field--wide"><dt>Einwilligung</dt><dd><div class="markdown-text">{{ erhebung.einwilligungstext|informationstext|default:"—" }}</div></dd></div>
+                <div class="page-field--wide"><dt>Abschluss</dt><dd><div class="markdown-text">{{ erhebung.abschlusstext|informationstext|default:"—" }}</div></dd></div>
+            </dl>
+        </section>
+
         <section class="page-section page-section--gestapelt" aria-labelledby="section-fragebogen">
             <header class="page-section__head">
-                <b>02</b><span><h2 id="section-fragebogen">Fragebogen</h2></span>
+                <b>03</b><span><h2 id="section-fragebogen">Fragebogen</h2></span>
             </header>
             <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
             <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
@@ -204,7 +206,7 @@
         {% if erhebung.status == erhebung.Status.FINAL %}
             <section class="page-section" aria-labelledby="section-stichproben">
                 <header class="page-section__head">
-                    <b>03</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
+                    <b>04</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
                 </header>
                 <div>
                     <form class="stichprobe-anlegen" method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}">
