@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "seeds",
     "simulation",
     "sitzungen",
+    "texte",
     "training",
     "vignetten",
 ]
