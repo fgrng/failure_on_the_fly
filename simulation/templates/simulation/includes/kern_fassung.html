@@ -1,3 +1,4 @@
+{% load texte %}
 <section class="page-section" aria-label="Rahmenhandlung">
     <header class="page-section__head">
         <b>01</b><span><h2>Rahmenhandlung</h2><small>Hospitationseinleitung, Gesprächseinleitung und Debrief jeder Sitzung</small></span>
@@ -5,9 +6,9 @@
     <div class="system-page-fields">
         <div class="system-page-field-list">
             {% if simulationskern %}
-                <section class="page-field"><h3>Hospitationseinleitung</h3><pre>{{ simulationskern.rahmenhandlung_einleitung }}</pre></section>
-                <section class="page-field"><h3>Gesprächseinleitung</h3><pre>{{ simulationskern.rahmenhandlung_gespraechseinleitung }}</pre></section>
-                <section class="page-field"><h3>Debrief</h3><pre>{{ simulationskern.rahmenhandlung_debrief }}</pre></section>
+                <section class="page-field"><h3>Hospitationseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_einleitung|szenentext }}</div></section>
+                <section class="page-field"><h3>Gesprächseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_gespraechseinleitung|szenentext }}</div></section>
+                <section class="page-field"><h3>Debrief</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_debrief|szenentext }}</div></section>
             {% else %}
                 <p class="system-page-empty">Noch keine Rahmenhandlung vorhanden.</p>
             {% endif %}

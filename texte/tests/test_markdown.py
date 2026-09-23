@@ -3,9 +3,10 @@
 from collections.abc import Callable
 
 from django.test import SimpleTestCase
+from django.utils.html import escape
 from django.utils.safestring import SafeString
 
-from texte.markdown import informationstext, szenentext
+from texte.markdown import informationstext, szenentext, woertlich
 
 _PROFILE: tuple[Callable[[str], SafeString], ...] = (informationstext, szenentext)
 
@@ -163,3 +164,14 @@ class SzenentextLinkTests(SimpleTestCase):
 
         self.assertNotIn("<a", html)
         self.assertIn("[Hinweis](https://example.org)", html)
+
+
+class WoertlichTests(SimpleTestCase):
+    """Ein escapter Wert erscheint im gerenderten Text unverändert."""
+
+    def test_markdown_zeichen_eines_werts_wirken_nicht(self) -> None:
+        for wert in ("# 1. *a* _b_ [c](https://d.org) <i>", "- x", "1. y", "> z"):
+            with self.subTest(wert=wert):
+                html: str = szenentext(woertlich(wert))
+
+                self.assertEqual(html, f"<p>{escape(wert)}</p>\n")

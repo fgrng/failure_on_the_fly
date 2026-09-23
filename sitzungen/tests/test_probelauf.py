@@ -126,6 +126,32 @@ class ProbelaufStartTests(TestCase):
         self.assertContains(response, "begleitet Sie bei Mathematik in Klasse 5.")
         self.assertContains(response, "zeigt Ihnen die Bearbeitung.")
 
+    def test_rahmenhandlung_erscheint_als_szenentext_mit_woertlichen_werten(
+        self,
+    ) -> None:
+        """Einleitung, Gesprächseinleitung und Debrief werden gerendert."""
+
+        kern: Simulationskern = self.kern.bearbeiten()
+        kern.rahmenhandlung_einleitung = "# Hospitation\n\nThema: **$thema**"
+        kern.rahmenhandlung_gespraechseinleitung = "*$schuelerin_name* zeigt."
+        kern.rahmenhandlung_debrief = "- [Diagnose](https://example.org)"
+        kern.save()
+        kern.finalisieren()
+        self.entwurf.gepinnter_kern = kern
+        self.entwurf.thema = "_Brüche_"
+        self.entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+
+        self.assertContains(response, 'class="markdown-text rahmenhandlung__text"')
+        self.assertContains(response, "<h3>Hospitation</h3>")
+        self.assertContains(response, "<strong>_Brüche_</strong>")
+        self.assertContains(response, "<em>Mia</em> zeigt.")
+        self.assertContains(debrief, "<li>[Diagnose](https://example.org)</li>")
+
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
 

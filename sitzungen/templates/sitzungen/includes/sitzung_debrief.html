@@ -5,7 +5,7 @@
         <h1 id="sitzung-debrief-titel">Ihre Diagnose</h1>
     </header>
     <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell einer Lehrperson am Tisch im Gespräch, Gesicht bewusst unausgeformt; auf dem Tisch zwei Kaffeebecher und Notizblätter." width="800" height="800" loading="lazy" decoding="async">
-    <p class="sitzung-debrief__aufforderung">{{ debrief }}</p>
+    <div class="markdown-text sitzung-debrief__aufforderung">{{ debrief }}</div>
     {# Dieselbe Hülle wie die Gesprächseingabe: Die Diagnose erbt deren Raster. #}
     <div class="gespraechseingabe">
         <form id="diagnose-formular" class="gespraechseingabe__formular diagnose" method="post" action="{{ navigation.debrief_url }}">

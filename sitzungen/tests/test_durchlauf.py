@@ -18,6 +18,7 @@ from sitzungen.durchlauf import (
     Ausgang,
     gespraechsschritt_ausfuehren,
     modellverlauf,
+    rahmenhandlung_rendern,
     sitzung_abbrechen,
     sitzung_beenden,
     sitzung_starten,
@@ -643,3 +644,35 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     assert ausgaenge == [Ausgang.BUDGET_ERSCHOEPFT, Ausgang.BUDGET_ERSCHOEPFT]
     assert scratch.ist_beendet
     assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND
+
+
+@pytest.mark.django_db
+def test_rahmenhandlung_escaped_vignettenwerte_und_rendert_das_markdown_des_kerns() -> (
+    None
+):
+    """Nur das Markdown des Kerns wirkt, Vignettenwerte erscheinen wörtlich."""
+
+    vignette, _, _ = _persistierbares_tripel([])
+    vignette.thema = "*Brüche* _kürzen_"
+    vignette.fach = "[Mathe](https://example.org)"
+
+    html: str = rahmenhandlung_rendern(
+        "# Hospitation\n\nThema: **$thema**\nFach: $fach", vignette
+    )
+
+    assert "<h3>Hospitation</h3>" in html
+    assert "<strong>*Brüche* _kürzen_</strong>" in html
+    assert "Fach: [Mathe](https://example.org)</p>" in html
+    assert "<a " not in html
+
+
+@pytest.mark.django_db
+def test_rahmenhandlung_link_syntax_des_kerns_bleibt_woertlich() -> None:
+    """Die Rahmenhandlung ist Szenentext: Links des Kerns entstehen nicht."""
+
+    vignette, _, _ = _persistierbares_tripel([])
+    vignette.thema = "Brüche"
+
+    html: str = rahmenhandlung_rendern("[$thema](https://example.org)", vignette)
+
+    assert html == "<p>[Brüche](https://example.org)</p>\n"
