@@ -1,9 +1,10 @@
+{% load texte %}
 {% if teil.text_vor_bild %}
-    <p class="aufgabenkontext-inhalt">{{ teil.text_vor_bild }}</p>
+    <div class="markdown-text aufgabenkontext-inhalt">{{ teil.text_vor_bild|szenentext }}</div>
 {% endif %}
 {% if teil.bild %}
     <img class="aufgabenkontext-bild" src="{{ teil.bild.url }}" alt="{{ teil.bildbeschreibung|default:'Abbildung ohne Bildbeschreibung' }}">
 {% endif %}
 {% if teil.text_nach_bild %}
-    <p class="aufgabenkontext-inhalt">{{ teil.text_nach_bild }}</p>
+    <div class="markdown-text aufgabenkontext-inhalt">{{ teil.text_nach_bild|szenentext }}</div>
 {% endif %}

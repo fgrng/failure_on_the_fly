@@ -224,6 +224,32 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "27 + 15 = 312")
         self.assertContains(response, "Die Zahlen stehen untereinander.")
 
+    def test_rendert_lernauftrag_und_arbeitsheft_als_szenentext(self) -> None:
+        """Markdown wirkt, Link-Syntax bleibt wörtlich, Nebenfelder bleiben roh."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            lernauftrag_text="Addiere **27** und 15.\n[Tafel](https://example.org)",
+            lernauftrag_simulationshinweise="Hinweis **roh**",
+            arbeitsheft_text="27 + 15\n= 312",
+            arbeitsheft_bildbeschreibung="Die *Zahlen* stehen untereinander.",
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[vignette.pk])
+        )
+
+        self.assertContains(response, "Addiere <strong>27</strong> und 15.<br>")
+        self.assertContains(response, "[Tafel](https://example.org)")
+        self.assertNotContains(response, 'href="https://example.org"')
+        self.assertContains(response, "<p>27 + 15<br>\n= 312</p>", html=False)
+        self.assertContains(response, "Hinweis **roh**")
+        self.assertContains(response, "Die *Zahlen* stehen untereinander.")
+        self.assertContains(response, '<div class="markdown-text')
+
     def test_rendert_simulationshinweise(self) -> None:
         """Die Ansicht zeigt beide Simulationshinweise in ihren Abschnitten."""
         ada: Konto = _autorin("ada")

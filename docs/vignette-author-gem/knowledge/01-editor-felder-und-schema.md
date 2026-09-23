@@ -81,6 +81,12 @@ Text. Soll ein Bild zwischen zwei Textteilen stehen, setzt man den
 Positionsmarker `[bild]` **allein auf eine eigene Zeile**; mitten in einer Zeile
 bleibt `[bild]` gewöhnlicher Text. Ohne Marker steht das Bild unter dem Text.
 
+Lernauftrag und Arbeitsheft Text sind **Markdown ohne Links**: Jeder
+Zeilenumbruch bleibt erhalten, dazu `**fett**`, `*kursiv*`, Listen, Zitatblock
+und Überschriften `#`–`###`; Link-Syntax erscheint wörtlich. Schülernotation mit
+`*`, `_`, führendem `-` oder `1.` wird darum per Backslash escaped — etwa
+`2\*3\*4`, `\_\_\_` oder `\- 5`. Der Prompt erhält die Quelle unverändert.
+
 **Arbeitsheft Bild** `[sichtbar]` — dieselbe Bearbeitung als Abbildung. Es
 steht am Positionsmarker des Arbeitsheft-Texts, sonst darunter. Das Bild selbst
 erreicht den Prompt nie; für die Simulation zählt allein die

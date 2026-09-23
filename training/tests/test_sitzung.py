@@ -24,6 +24,8 @@ class TrainingssitzungTests(TestCase):
         budget_wert: int = 3,
         audioverarbeitung_eingewilligt: bool = True,
         kern_ueberholen: bool = False,
+        lernauftrag_text: str = "Addiere zwei Brüche.",
+        arbeitsheft_text: str = "1/2 + 1/3 = 2/5",
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
@@ -46,9 +48,9 @@ class TrainingssitzungTests(TestCase):
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere zwei Brüche.",
+            lernauftrag_text=lernauftrag_text,
             arbeitsheft_bildbeschreibung="Mia rechnet 1/2 + 1/3 = 2/5.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
+            arbeitsheft_text=arbeitsheft_text,
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             lehrperson_name="Weber",
@@ -90,6 +92,23 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertContains(self.start_response, "Spracheingabe starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
+
+    def test_training_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
+        self,
+    ) -> None:
+        """Beide Texte erscheinen als Szenentext, Link-Syntax bleibt wörtlich."""
+
+        self._sitzung_starten(
+            [],
+            lernauftrag_text="Addiere **zwei** Brüche.\n[Tipp](https://example.org)",
+            arbeitsheft_text="1/2 + 1/3\n\\= 2/5",
+        )
+
+        self.assertContains(
+            self.start_response, "Addiere <strong>zwei</strong> Brüche.<br>"
+        )
+        self.assertContains(self.start_response, "[Tipp](https://example.org)")
+        self.assertContains(self.start_response, "<p>1/2 + 1/3<br>\n= 2/5</p>")
 
     def test_training_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
         """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""

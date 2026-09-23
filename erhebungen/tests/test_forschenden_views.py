@@ -1693,7 +1693,9 @@ class ErhebungsExportTests(TestCase):
         zweiter_kern.finalisieren()
         erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
         erste_vignette = erste_vignette.bearbeiten()
-        erste_vignette.lernauftrag_text = "Addiere [bild] die Brüche."
+        erste_vignette.lernauftrag_text = (
+            "Addiere **die** Brüche.\n[bild]\n- [Tipp](https://x.org)"
+        )
         erste_vignette.lernauftrag_bild = "vignettenbilder/lernauftrag.png"
         erste_vignette.lernauftrag_bildbeschreibung = "Ein Bruch-Arbeitsblatt"
         erste_vignette.lernauftrag_simulationshinweise = "Hinweis zum Lernauftrag"
@@ -1701,7 +1703,7 @@ class ErhebungsExportTests(TestCase):
         erste_vignette.save()
         erste_vignette.finalisieren()
         zweite_vignette: Vignette = erste_vignette.bearbeiten()
-        zweite_vignette.arbeitsheft_text = "1/2 + [bild] 1/3 = 2/5"
+        zweite_vignette.arbeitsheft_text = "1/2 + [bild] 1/3\n\\= 2/5 \\_"
         zweite_vignette.arbeitsheft_bild = "vignettenbilder/bruchbild.png"
         zweite_vignette.arbeitsheft_bildbeschreibung = (
             "Bildbeschreibung des Arbeitshefts"
@@ -1794,7 +1796,7 @@ class ErhebungsExportTests(TestCase):
         )
         self.assertEqual(
             vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_text"],
-            "Addiere [bild] die Brüche.",
+            "Addiere **die** Brüche.\n[bild]\n- [Tipp](https://x.org)",
         )
         self.assertEqual(
             vignetten_nach_id[str(erste_vignette.pk)]["lernauftrag_bild"],
@@ -1818,7 +1820,7 @@ class ErhebungsExportTests(TestCase):
         )
         self.assertEqual(
             vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_text"],
-            "1/2 + [bild] 1/3 = 2/5",
+            "1/2 + [bild] 1/3\n\\= 2/5 \\_",
         )
         self.assertEqual(
             vignetten_nach_id[str(zweite_vignette.pk)]["referenzdiagnose"],

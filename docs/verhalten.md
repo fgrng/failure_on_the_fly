@@ -35,6 +35,16 @@ Kleinschreibung egal); mitten in einer Zeile oder als `[bild](…)` bleibt er
 gewöhnlicher Text. Der erste Marker gewinnt, weitere verschwinden. Ohne Marker
 steht das Bild unter dem Text, ohne Bild verschwinden die Marker ersatzlos.
 
+Lernauftrag- und Arbeitsheft-Text erscheinen als gerendertes Markdown im Profil
+Szenentext: in der Sitzung von Training, Erhebung und Probelauf, in der
+Abschrift und in der Vignetten-Detailansicht. Der Umfang gleicht dem der
+Erhebungstexte (siehe „Erhebungsteilnahme"), nur ohne Links: Link-Syntax
+erscheint wörtlich. Die Teile vor und nach dem Bild werden je für sich
+gerendert. Schülernotation mit `*`, `_`, führendem `-` oder `1.` escapen
+Autor:innen mit einem Backslash. Bildbeschreibung und Simulationshinweise
+bleiben reiner Text. Prompt und Datenspur-Export erhalten die unveränderte
+Markdown-Quelle.
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
@@ -246,9 +256,9 @@ Tokens werden ohne Angabe eines Grundes abgelehnt. Die Liste zeigt je Abschrift
 den Namen der Erhebung und den Importzeitpunkt — nicht die Spielzeit der
 Erhebung.
 Von der Liste führt jede Abschrift in eine eigene, nur lesende Ansicht: die
-gespielten Vignetten in der Reihenfolge ihrer Vignettenposition, je Vignette das
-Transkript des Diagnosegesprächs, den Ausgang der Sitzung und die eigene
-Diagnose. Die Denkspur der simulierten Schüler:in erscheint auch hier nicht; es
+gespielten Vignetten in der Reihenfolge ihrer Vignettenposition, je Vignette
+Lernauftrag und Arbeitsheft, das Transkript des Diagnosegesprächs, den Ausgang
+der Sitzung und die eigene Diagnose. Die Denkspur der simulierten Schüler:in erscheint auch hier nicht; es
 gibt weder Eingabefeld noch Sitzungsnavigation. Abschriften sind kontoprivat —
 eine fremde ist nicht erreichbar. Aus der Ansicht heraus lässt sich die Abschrift
 löschen; dabei verschwinden ihre Teilnahme und die kopierten Sitzungen, während

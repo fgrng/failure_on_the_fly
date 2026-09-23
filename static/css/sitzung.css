@@ -39,7 +39,7 @@
 
 .rahmenhandlung__text,
 .gespraechseinleitung__text,
-.aufgabenkontext p,
+.aufgabenkontext-inhalt,
 .sitzung-debrief__aufforderung {
     font-family: var(--font-heading);
     font-size: 1.45rem;
@@ -59,6 +59,7 @@
 }
 
 .aufgabenkontext h2,
+.aufgabenkontext > section > h3,
 .diagnosegespraech-verlauf h2 {
     margin: 0 0 var(--space-1);
     font-family: var(--font-body);
@@ -68,8 +69,7 @@
     text-transform: uppercase;
 }
 
-.aufgabenkontext p { margin: 0; }
-.aufgabenkontext-inhalt { margin: 0; white-space: pre-wrap; }
+.aufgabenkontext-inhalt { margin: 0; }
 .aufgabenkontext img { display: block; max-width: 100%; height: auto; }
 .aufgabenkontext .aufgabenkontext-bild { width: 100%; }
 .aufgabenkontext--arbeitsheft { margin-top: var(--space-3); }

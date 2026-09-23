@@ -58,9 +58,9 @@ def _finale_vignette_anlegen(konto: Konto, name: str = "") -> Vignette:
         vignette.historie.name = name
         vignette.historie.save(update_fields=["name"])
     vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag_text = "Addiere die Brüche."
+    vignette.lernauftrag_text = "Addiere **die** Brüche.\n[Tipp](https://example.org)"
     vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
-    vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
+    vignette.arbeitsheft_text = "1/2 + 1/3\n\\= 2/5"
     vignette.schuelerin_name = "Lea"
     vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
     vignette.lehrperson_name = "Ada"
@@ -520,6 +520,19 @@ def test_ansicht_zeigt_transkript_ausgang_und_eigene_diagnose(client: Client) ->
     assert "Zähler und Nenner addiert." in inhalt
     assert "Abgeschlossen" in inhalt
     assert "Abgebrochen" in inhalt
+
+
+@pytest.mark.django_db
+def test_ansicht_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
+    client: Client,
+) -> None:
+    """Die Abschrift zeigt den Aufgabenkontext wie die gespielte Sitzung."""
+
+    inhalt: str = _gelesene_ansicht(client)
+
+    assert "Addiere <strong>die</strong> Brüche.<br>" in inhalt
+    assert "[Tipp](https://example.org)" in inhalt
+    assert "<p>1/2 + 1/3<br>\n= 2/5</p>" in inhalt
 
 
 @pytest.mark.django_db
