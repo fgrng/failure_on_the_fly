@@ -24,3 +24,4 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - Leere Quelle ergibt leeres HTML; Platzhalter wie „—" bleiben Sache des Templates.
 - Gerenderte Texte stehen in `<div class="markdown-text">` mit eigenem Stylesheet (`static/css/markdown-text.css`), das sich per doppeltem Klassenselektor gegen Seitenregeln wie `.page-field h3` abschirmt.
 - `&`-Entitäten werden nicht aufgelöst, sondern erscheinen wörtlich.
+- Die Editor-Vorschau holt das Fragment von `texte:vorschau` (POST mit `quelle` und `profil`), statt in JavaScript zu rendern. Für die Rollenprüfung (Autor:in, Forschende:r, Administration) kennt `texte` dafür `konten`, die Infrastruktur aller Apps; Domänen-Apps kennt es weiterhin nicht.
