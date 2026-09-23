@@ -7,7 +7,7 @@
     <img class="sitzung-illustration" src="{% static 'images/sitzung/gespraechsanlass-'|add:vignette.schuelerin_bildkuerzel|add:'.webp' %}" alt="Aquarell über die Schulter einer lernenden Person, die auf ein aufgeschlagenes Heft mit angedeuteter, unleserlicher Handschrift blickt." width="800" height="800" loading="lazy" decoding="async">
 
     {% if gespraechseinleitung %}
-        <p class="gespraechseinleitung__text">{{ gespraechseinleitung }}</p>
+        <div class="markdown-text gespraechseinleitung__text">{{ gespraechseinleitung }}</div>
     {% endif %}
 
     <section class="aufgabenkontext aufgabenkontext--arbeitsheft">

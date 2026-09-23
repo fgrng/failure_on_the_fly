@@ -61,6 +61,15 @@ auf der bisherigen Fassung bleiben finalisierbar und spielbar. Ihre Detailansich
 weist neben dem Vorspulen-Knopf auf den überholten Pin hin; Vorspulen bleibt eine
 Wahl der Autor:in.
 
+Die drei Abschnitte der Rahmenhandlung (Hospitationseinleitung,
+Gesprächseinleitung, Debrief) sind Markdown im Profil Szenentext: derselbe Umfang
+wie bei den Erhebungstexten, aber ohne Links, Link-Syntax bleibt wörtlich. In
+jeder Sitzung (Training, Erhebung, Probelauf) erscheinen sie gerendert. Die
+Werte der Vignette werden vor dem Einsetzen escaped, sodass nur das Markdown des
+Kerns wirkt: `**$thema**` hebt das Thema hervor, ein Thema mit `*` oder `_`
+erscheint dagegen wörtlich. Die Leseansichten der Kern-Fassungen zeigen die
+Rahmenhandlung gerendert, die Platzhalter wörtlich als `$name`.
+
 ## Modell-Konfiguration
 
 Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/`.

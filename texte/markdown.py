@@ -9,6 +9,7 @@ der Parser rohes HTML nie durchreicht; einen nachgelagerten Sanitizer gibt es
 nicht (siehe ADR „Markdown mit zwei Profilen, Quelle bleibt roh").
 """
 
+import string
 from collections.abc import Sequence
 
 from django.utils.safestring import SafeString, mark_safe
@@ -35,6 +36,7 @@ _ABGESCHALTET: tuple[str, ...] = (
 _OBERSTE_EBENE: int = 3
 _TIEFSTE_QUELLEBENE: int = 3
 _LINK_SCHEMATA: tuple[str, ...] = ("https:", "http:", "mailto:")
+_ESCAPES: dict[int, str] = {ord(z): f"\\{z}" for z in string.punctuation}
 
 
 def _ueberschriften_einordnen(state: StateCore) -> None:
@@ -136,3 +138,11 @@ def szenentext(quelle: str) -> SafeString:
     """Rendert Lernauftrag, Arbeitsheft und Rahmenhandlung, ohne Links."""
 
     return mark_safe(_SZENENTEXT.render(quelle) if quelle else "")
+
+
+def woertlich(wert: str) -> str:
+    """Escaped einen eingesetzten Wert, damit er im Markdown wörtlich erscheint."""
+
+    # CommonMark erlaubt den Backslash vor jedem ASCII-Satzzeichen und zeigt
+    # es dann wörtlich; so muss keine Syntaxregel einzeln bedacht werden.
+    return wert.translate(_ESCAPES)

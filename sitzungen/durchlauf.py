@@ -10,11 +10,13 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
+from django.utils.safestring import SafeString
 
 from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
+from texte.markdown import szenentext, woertlich
 from vignetten.models import Vignette, rahmen_platzhalter
 
 
@@ -147,10 +149,17 @@ class Sitzungsnavigation:
     transkription_url: str
 
 
-def _rahmen_rendern(vorlage: str, vignette: Vignette) -> str:
-    # Füllt einen Abschnitt der Rahmenhandlung mit den Werten seiner Vignette.
+def rahmenhandlung_rendern(vorlage: str, vignette: Vignette) -> SafeString:
+    """Füllt einen Abschnitt der Rahmenhandlung und rendert ihn als Szenentext.
 
-    return vorlage_rendern(vorlage, rahmen_platzhalter(vignette))
+    Die Werte der Vignette werden vor dem Einsetzen escaped, damit nur das
+    Markdown des Kerns wirkt.
+    """
+
+    platzhalter: dict[str, str] = {
+        name: woertlich(wert) for name, wert in rahmen_platzhalter(vignette).items()
+    }
+    return szenentext(vorlage_rendern(vorlage, platzhalter))
 
 
 def _ist_htmx(request: HttpRequest) -> bool:
@@ -181,8 +190,8 @@ def sitzung_anzeigen(
 
     context: dict[str, object] = {
         "vignette": vignette,
-        "einleitung": _rahmen_rendern(kern.rahmenhandlung_einleitung, vignette),
-        "gespraechseinleitung": _rahmen_rendern(
+        "einleitung": rahmenhandlung_rendern(kern.rahmenhandlung_einleitung, vignette),
+        "gespraechseinleitung": rahmenhandlung_rendern(
             kern.rahmenhandlung_gespraechseinleitung, vignette
         ),
         "gespraechsschritte": gespraechsschritte,
@@ -190,7 +199,7 @@ def sitzung_anzeigen(
         "erneute_eingabe": erneute_eingabe,
         "erneuter_eingabemodus": erneuter_eingabemodus,
         "ist_gescheitert": ist_gescheitert,
-        "debrief": _rahmen_rendern(kern.rahmenhandlung_debrief, vignette),
+        "debrief": rahmenhandlung_rendern(kern.rahmenhandlung_debrief, vignette),
         "zeigt_debrief": zeigt_debrief,
         "ist_lesend": ist_lesend,
         "spracheingabe_verfuegbar": spracheingabe_verfuegbar,

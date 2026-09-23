@@ -21,6 +21,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 ## Consequences
 
 - Wer Schülernotation mit `*`, `_`, führendem `-` oder `1.` wörtlich zeigen will, escaped sie mit Backslash.
+- In der Rahmenhandlung werden die Platzhalterwerte der Vignette vor dem Einsetzen (ADR-0020) mit Backslash vor jedem ASCII-Satzzeichen escaped (`texte.markdown.woertlich`); erst der gefüllte Text wird gerendert. So wirkt nur das Markdown des Kerns.
 - Leere Quelle ergibt leeres HTML; Platzhalter wie „—" bleiben Sache des Templates.
 - Gerenderte Texte stehen in `<div class="markdown-text">` mit eigenem Stylesheet (`static/css/markdown-text.css`), das sich per doppeltem Klassenselektor gegen Seitenregeln wie `.page-field h3` abschirmt.
 - `&`-Entitäten werden nicht aufgelöst, sondern erscheinen wörtlich.

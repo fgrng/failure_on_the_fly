@@ -30,7 +30,7 @@ class TrainingssitzungTests(TestCase):
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(
             rahmenhandlung_gespraechseinleitung=(
-                "$schuelerin_name zeigt Ihnen die Bearbeitung."
+                "**$schuelerin_name** zeigt Ihnen die Bearbeitung."
             )
         )
         kern.finalisieren()
@@ -82,7 +82,9 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Die Ausgangslage")
         self.assertContains(self.start_response, "rahmenhandlung-einstieg-w.webp")
         self.assertContains(self.start_response, "gespraechsanlass-w.webp")
-        self.assertContains(self.start_response, "Mia zeigt Ihnen die Bearbeitung.")
+        self.assertContains(
+            self.start_response, "<strong>Mia</strong> zeigt Ihnen die Bearbeitung."
+        )
         self.assertContains(self.start_response, "Addiere zwei Brüche.")
         self.assertContains(self.start_response, "1/2 + 1/3 = 2/5")
         self.assertContains(self.start_response, "Ihre nächste Frage")
@@ -94,7 +96,9 @@ class TrainingssitzungTests(TestCase):
 
         self._sitzung_starten([], kern_ueberholen=True)
 
-        self.assertContains(self.start_response, "Mia zeigt Ihnen die Bearbeitung.")
+        self.assertContains(
+            self.start_response, "<strong>Mia</strong> zeigt Ihnen die Bearbeitung."
+        )
         self.assertEqual(
             Sitzung.objects.get().simulationskern.zustand,
             Simulationskern.Zustand.ARCHIVIERT,

@@ -45,9 +45,11 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         kern: Simulationskern = aelterer_kern.bearbeiten()
         kern.system_prompt_vorlage = "Aktueller System-Prompt"
         kern.user_prompt_vorlage = "Aktueller User-Prompt"
-        kern.rahmenhandlung_einleitung = "Aktuelle Einleitung"
-        kern.rahmenhandlung_gespraechseinleitung = "Aktuelle Gesprächseinleitung"
-        kern.rahmenhandlung_debrief = "Aktueller Debrief"
+        kern.rahmenhandlung_einleitung = "# Aktuelle Einleitung\n\nZu **$thema**"
+        kern.rahmenhandlung_gespraechseinleitung = (
+            "Aktuelle Gesprächseinleitung\n\n- *erster Schritt*"
+        )
+        kern.rahmenhandlung_debrief = "Aktueller Debrief\n[$fach](https://x.org)"
         kern.save()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
@@ -88,6 +90,16 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
         self.assertContains(response, "Aktuelle Gesprächseinleitung")
+
+    def test_rendert_die_rahmenhandlung_mit_woertlichen_platzhaltern(self) -> None:
+        """Die drei Abschnitte erscheinen als Szenentext, `$name` bleibt stehen."""
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, "<h3>Aktuelle Einleitung</h3>")
+        self.assertContains(response, "Zu <strong>$thema</strong>")
+        self.assertContains(response, "<li><em>erster Schritt</em></li>")
+        self.assertContains(response, "Aktueller Debrief<br>\n[$fach](https://x.org)")
+        self.assertContains(response, 'class="markdown-text"', count=3)
 
     def test_zeigt_keinen_aelteren_system_prompt(self) -> None:
         """Angemeldete sehen nicht den System-Prompt der älteren Fassung."""
