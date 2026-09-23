@@ -71,6 +71,8 @@ _ZUSTIMMUNG: dict[str, str] = {
 }
 
 
+# Die lokale .env darf nicht bestimmen, welche Einwilligungen angeboten werden.
+@override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
 class ErhebungsteilnahmeTests(TestCase):
     """Teilnahmen entstehen ausschließlich über den Teilnahme-Link."""
 
