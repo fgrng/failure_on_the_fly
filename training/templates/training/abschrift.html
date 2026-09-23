@@ -23,7 +23,7 @@
         <section class="page-section" aria-labelledby="section-sitzung-{{ forloop.counter }}">
             <header class="page-section__head">
                 <b>{{ forloop.counter|stringformat:"02d" }}</b><span>
-                    <h2 id="section-sitzung-{{ forloop.counter }}">{{ sitzung.name }}</h2>
+                    <h2 id="section-sitzung-{{ forloop.counter }}">{{ sitzung.vignette.anzeigename }}</h2>
                     <small>Ausgang: {{ sitzung.status }}</small>
                 </span>
             </header>
