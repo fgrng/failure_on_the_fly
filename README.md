@@ -331,6 +331,37 @@ Die Testsuite läuft mit `uv run python manage.py test`.
 > bearbeitet. Die Zugangsdaten liegen an diesen Konfigurationen, nicht mehr
 > in der Umgebung.
 
+## Entwicklungsarbeit mit Coding Agents
+
+Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattpocock/sandcastle), das offene Issues mit
+dem Label `AFK` in Docker-Sandboxen abarbeitet: planen, implementieren,
+reviewen, mergen. Voraussetzung sind Node, Docker und die Zugangsdaten aus
+`.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
+
+```
+npm install
+npx sandcastle docker build-image
+npm run sandcastle
+```
+
+Das Sandbox-Image wird nicht automatisch gebaut; ohne den mittleren Schritt
+bricht der Lauf mit `Image 'sandcastle:failure_on_the_fly' not found locally`
+ab. Zu wiederholen ist er nach jeder Änderung an `.sandcastle/Dockerfile` und
+nach jeder an `uv.lock` — das Image hält den vorgewärmten uv-Cache, aus dem
+die Sandbox ihre Abhängigkeiten zieht, statt sie neu zu laden.
+
+Welche Modelle die vier Phasen fahren, wählt `--agent`:
+
+```
+npm run sandcastle                    # Claude Code, der Default
+npm run sandcastle:codex              # Codex
+npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
+```
+
+Prompts, Coding-Standards und das Dockerfile der Sandbox liegen ebenfalls in
+`.sandcastle/`; Logs und Worktrees des Laufs bleiben dort unversioniert.
+
+
 ## Deployment auf Uberspace
 
 Die Anleitung folgt dem [Uberspace-Django-Guide](https://lab.uberspace.de/guide_django/);

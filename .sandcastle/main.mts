@@ -22,13 +22,14 @@
 // backlog is exhausted (a plan with no issues).
 //
 // Usage:
-//   npx tsx .sandcastle/main.mts
-// Or add to package.json:
-//   "scripts": { "sandcastle": "npx tsx .sandcastle/main.mts" }
+//   npm run sandcastle                  — Claude Code line-up (default)
+//   npm run sandcastle -- --agent codex — Codex line-up
+//   npm run sandcastle:codex            — same, without the `--` dance
 
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import { parseArgs } from "node:util";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { z } from "zod";
@@ -54,23 +55,65 @@ const MAX_ITERATIONS = 10;
 // Maximum number of issues to implement+review concurrently within one iteration.
 const MAX_PARALLEL = 4;
 
+// Maximum agent invocations the implementer gets per issue. The implement
+// prompt is written as a Ralph loop ("REPEAT until done", "notes for next
+// iteration"), which only works if the agent is re-invoked after a run that
+// ends without the completion signal. Sandcastle's default is 1, which would
+// silently cut the loop after a single invocation.
+const MAX_IMPLEMENT_ITERATIONS = 20;
+
 // ---------------------------------------------------------------------------
 // Agents — one place to swap models per phase
 // ---------------------------------------------------------------------------
 //
-// Claude Code is the active default. To switch a phase, comment out its line
-// and uncomment the alternative. Both CLIs are installed in the image and both
-// are authenticated by the hooks below, so either set works as-is.
+// One line-up per CLI, picked at startup with `--agent`. Both CLIs are
+// installed in the image and both are authenticated by the hooks below, so
+// either line-up works as-is.
 
-const plannerAgent = sandcastle.claudeCode("claude-sonnet-5", { effort: "medium" });
-const implementerAgent = sandcastle.claudeCode("claude-opus-5", { effort: "medium" });
-const reviewerAgent = sandcastle.claudeCode("claude-opus-5", { effort: "high" });
-const mergerAgent = sandcastle.claudeCode("claude-opus-5", { effort: "high" });
+type Lineup = {
+  planner: sandcastle.AgentProvider;
+  implementer: sandcastle.AgentProvider;
+  reviewer: sandcastle.AgentProvider;
+  merger: sandcastle.AgentProvider;
+};
 
-// const plannerAgent = sandcastle.codex("gpt-5.6-terra");
-// const implementerAgent = sandcastle.codex("gpt-5.6-terra", { effort: "medium" });
-// const reviewerAgent = sandcastle.codex("gpt-5.6-terra", { effort: "medium" });
-// const mergerAgent = sandcastle.codex("gpt-5.6-sol", { effort: "high" });
+const LINEUPS: Record<string, Lineup> = {
+  claude: {
+    planner: sandcastle.claudeCode("claude-sonnet-5", { effort: "medium" }),
+    implementer: sandcastle.claudeCode("claude-opus-5", { effort: "medium" }),
+    reviewer: sandcastle.claudeCode("claude-opus-5", { effort: "high" }),
+    merger: sandcastle.claudeCode("claude-opus-5", { effort: "high" }),
+  },
+  codex: {
+    planner: sandcastle.codex("gpt-5.6-terra"),
+    implementer: sandcastle.codex("gpt-5.6-sol", { effort: "medium" }),
+    reviewer: sandcastle.codex("gpt-5.6-sol", { effort: "high" }),
+    merger: sandcastle.codex("gpt-5.6-sol", { effort: "high" }),
+  },
+};
+
+const DEFAULT_LINEUP = "claude";
+
+const { values: cliArgs } = parseArgs({
+  options: { agent: { type: "string", short: "a", default: DEFAULT_LINEUP } },
+});
+
+const lineupName = cliArgs.agent ?? DEFAULT_LINEUP;
+const lineup = LINEUPS[lineupName];
+
+if (!lineup) {
+  console.error(
+    `Unknown --agent "${lineupName}". Available: ${Object.keys(LINEUPS).join(", ")}`,
+  );
+  process.exit(1);
+}
+
+console.log(`Agent line-up: ${lineupName}`);
+
+const plannerAgent = lineup.planner;
+const implementerAgent = lineup.implementer;
+const reviewerAgent = lineup.reviewer;
+const mergerAgent = lineup.merger;
 
 // Shape the planner must emit inside its <plan> tag. Validated by Sandcastle,
 // so a malformed or missing plan fails with a schema error instead of a raw
@@ -102,6 +145,16 @@ const agentSandbox = () =>
 // Codex and Claude Code auth material from the read-only mounts into the
 // respective config directories so both CLIs are authenticated.
 const hooks = {
+  host: {
+    // config/settings.py reads SECRET_KEY from the environment via .env, but
+    // .env is gitignored and therefore absent from a fresh worktree — every
+    // `uv run pytest` the prompts ask for would die with KeyError: 'SECRET_KEY'.
+    // .env.example carries a placeholder secret, which is all the test suite
+    // needs. Guarded by `test -f` so the phases that run against the host
+    // checkout directly (planner, merger — branch strategy "head") never
+    // overwrite the developer's real .env.
+    onWorktreeReady: [{ command: "test -f .env || cp .env.example .env" }],
+  },
   sandbox: {
     onSandboxReady: [
       // The image (see .sandcastle/Dockerfile) pre-warms uv's cache, so this
@@ -182,6 +235,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     hooks,
     copyToWorktree,
     name: "Planner",
+    // Reading and reasoning only, no code to write. Structured output requires
+    // exactly one iteration, so this is not merely a default worth spelling out.
+    maxIterations: 1,
     agent: plannerAgent,
     promptFile: "./.sandcastle/plan-prompt.md",
     output: sandcastle.Output.object({ tag: "plan", schema: planSchema }),
@@ -225,6 +281,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
         const implement = await sandbox.run({
           name: "Implementer #" + issue.id,
+          maxIterations: MAX_IMPLEMENT_ITERATIONS,
           agent: implementerAgent,
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
@@ -246,6 +303,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           }
           await sandbox.run({
             name: "Reviewer #" + issue.id,
+            // A single pass over the finished diff, matching the prompt.
+            maxIterations: 1,
             agent: reviewerAgent,
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
