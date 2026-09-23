@@ -149,11 +149,26 @@ Ein Teilnahme-Link einer Stichprobe legt im Browser eine pseudonyme Teilnahme an
 oder setzt sie fort. Dafür ist kein Nutzerkonto erforderlich; die
 Forschungsdaten sind über ein ablesbares Teilnahme-Token von Trainingsaktivitäten
 getrennt. Während das Teilnahmefenster läuft, führt der Link zuerst über die
-Teilnahme- und die getrennte Audio-Einwilligung sowie die Instruktion; diese
-weist darauf hin, dass das Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
+Einwilligung und die Instruktion; diese weist darauf hin, dass das
+Diagnosegespräch begrenzt ist. Anschließend werden die gezogenen Vignetten als
 persistierte Sitzungen gespielt; Gespräch, Diagnose und interne Denkspur bleiben
 Teil der Datenspur, wobei die Denkspur nie in der Teilnehmer:innenansicht erscheint.
-Wer der Audioverarbeitung zustimmt, kann Eingaben im Diagnosegespräch und die
+Die Einwilligungsseite zeigt unter dem Einwilligungstext der Forschenden drei
+getrennte Einwilligungen mit je einem festen, nicht abschaltbaren Systemtext zur
+Folge einer Ablehnung: Verarbeitung durch Sprachmodelle, Spracherkennung und
+Speicherung und Verwendung für Forschungszwecke; der Text zur Speicherung nennt
+den Widerruf per Teilnahme-Token bei der Studienleitung. Jede ist eine
+Pflichtwahl Ja/Nein ohne Vorauswahl, danach folgt »Weiter«. Die Spracherkennung
+wird nur gefragt, wenn die Instanz transkribiert (Zero-Retention-Zusage
+gesetzt). Wer der Verarbeitung durch Sprachmodelle nicht zustimmt, landet auf
+einer systemseitigen Abbruchseite ohne Abschlusstext, Fragebogen oder Token;
+Teilnahme-Link, Token-Wiedereinstieg und alle übrigen Teilnahmeseiten führen
+dann dorthin, und es entstehen weder Ziehung noch Sitzung. Ihr Knopf »Zur
+Startseite der Erhebung« führt zurück zum Einwilligungsformular ohne
+Vorauswahl; eine neue Entscheidung ersetzt die alte. Ist die Verarbeitung durch
+Sprachmodelle einmal erteilt, stehen alle drei Entscheidungen fest. Die
+Entscheidung zur Speicherung wird bislang nur festgehalten.
+Wer der Spracherkennung zustimmt, kann Eingaben im Diagnosegespräch und die
 Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
 vollständig nutzbar.
 Nach jeder beendeten Sitzung erscheinen ihre freiwilligen Fragebogen-Items direkt

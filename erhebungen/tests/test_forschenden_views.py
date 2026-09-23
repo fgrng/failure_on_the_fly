@@ -1546,7 +1546,9 @@ class ErhebungsExportTests(TestCase):
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
             stichprobe=stichprobe,
-            teilnahme=Teilnahme.objects.create(),
+            teilnahme=Teilnahme.objects.create(
+                sprachmodell_eingewilligt=True, speicherung_eingewilligt=False
+            ),
             token="2345-6789",
         )
         self.client.force_login(ada)
@@ -1602,7 +1604,10 @@ class ErhebungsExportTests(TestCase):
         self.assertEqual(stichprobenzeile["id"], str(stichprobe.pk))
         self.assertEqual(stichprobenzeile["beginn"], "2026-07-01T08:00:00+00:00")
         self.assertEqual(teilnahmezeile["token"], bindung.token)
+        self.assertEqual(teilnahmezeile["sprachmodell_eingewilligt"], "True")
         self.assertEqual(teilnahmezeile["audioverarbeitung_eingewilligt"], "NA")
+        self.assertEqual(teilnahmezeile["speicherung_eingewilligt"], "False")
+        self.assertNotIn("einwilligung_erteilt", teilnahmezeile)
         self.assertRegex(
             teilnahmezeile["erstellt_am"],
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",

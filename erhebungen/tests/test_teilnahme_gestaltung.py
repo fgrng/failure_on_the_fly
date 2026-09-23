@@ -49,6 +49,7 @@ _SEITEN: tuple[str, ...] = (
     "erhebungen/instruktion.html",
     "erhebungen/itemblock.html",
     "erhebungen/abschluss.html",
+    "erhebungen/abbruchseite.html",
 )
 _FORMULARSEITEN: tuple[str, ...] = (
     "erhebungen/einwilligung.html",

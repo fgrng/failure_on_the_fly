@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Keine Teilnahme möglich{% endblock %}
+
+{% block content %}
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Erhebung</p>
+            <h1>Keine Teilnahme möglich</h1>
+        </div>
+    </header>
+
+    {% comment %}
+    Systemseitig und wörtlich verbindlich (#278): ohne Abschlusstext der
+    Forschenden, Fragebogen und Token-Baustein.
+    {% endcomment %}
+    <section class="page-section" aria-labelledby="section-abbruch">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="section-abbruch">Einwilligung abgelehnt</h2></span>
+        </header>
+        <div class="page-field">
+            <p>
+                Ohne Einwilligung in die Verarbeitung durch Sprachmodelle ist eine Teilnahme an dieser Erhebung nicht möglich. Es wurden keine Daten aus Diagnosegesprächen oder Fragebögen erhoben. Wenn Sie Ihre Entscheidung ändern möchten, können Sie zur Startseite der Erhebung zurückkehren.
+            </p>
+            <p>
+                <a class="button" href="{% url 'erhebungen:einwilligung' teilnahme_link=stichprobe.teilnahme_link %}">Zur Startseite der Erhebung</a>
+            </p>
+        </div>
+    </section>
+</section>
+{% endblock %}

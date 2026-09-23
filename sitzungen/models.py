@@ -8,8 +8,18 @@ from django.db.models import Q
 class Teilnahme(models.Model):
     """Die anonyme Klammer für Sitzungen eines Aufrufers."""
 
-    einwilligung_erteilt: models.BooleanField = models.BooleanField(default=False)
+    # Die drei Einwilligungen einer Erhebungsteilnahme; `None` heißt nicht
+    # entschieden oder nicht angeboten. Die Audioverarbeitung heißt in der
+    # Oberfläche Spracherkennung und wird auch im Training eingeholt.
+    sprachmodell_eingewilligt: models.BooleanField = models.BooleanField(
+        null=True,
+        default=None,
+    )
     audioverarbeitung_eingewilligt: models.BooleanField = models.BooleanField(
+        null=True,
+        default=None,
+    )
+    speicherung_eingewilligt: models.BooleanField = models.BooleanField(
         null=True,
         default=None,
     )

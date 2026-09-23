@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Callable, Iterable
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -68,7 +69,7 @@ from sitzungen.durchlauf import (
     sitzung_abbrechen,
     sitzung_beenden,
 )
-from sitzungen.models import Eingabemodus, Sitzung
+from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
 from sitzungen.sink import DBSink
 from sitzungen.views import (
     persistiertes_gespraech,
@@ -770,41 +771,99 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if bindung is None:
         bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
         _bindung_in_session_speichern(request, bindung)
-    if bindung.teilnahme.einwilligung_erteilt:
-        return _weiter_im_ablauf(bindung)
-    return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(bindung)
+
+
+def _ohne_zutritt(
+    bindung: Erhebungsbindung | None, teilnahme_link: UUID
+) -> HttpResponseRedirect | None:
+    # Das eine Tor der Teilnahmeseiten: die Einwilligung in Sprachmodelle.
+
+    if bindung is None or bindung.teilnahme.sprachmodell_eingewilligt is None:
+        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    if not bindung.teilnahme.sprachmodell_eingewilligt:
+        return redirect("erhebungen:abbruchseite", teilnahme_link=teilnahme_link)
+    return None
+
+
+def _angebotene_einwilligungen() -> list[str]:
+    # Die Spracherkennung wird nur gefragt, wenn die Instanz transkribiert.
+
+    if settings.TRANSKRIPTION_ZERO_RETENTION:
+        return [
+            "sprachmodell_eingewilligt",
+            "audioverarbeitung_eingewilligt",
+            "speicherung_eingewilligt",
+        ]
+    return ["sprachmodell_eingewilligt", "speicherung_eingewilligt"]
 
 
 def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
-    """Zeigt das Einwilligungstor der Erhebung."""
+    """Holt die drei Einwilligungen ein, bis die in Sprachmodelle erteilt ist.
+
+    Eine Ablehnung der Sprachmodelle lässt sich überschreiben; mit ihrer
+    Zustimmung stehen alle drei Entscheidungen fest.
+    """
 
     stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
     if bindung is None:
         return redirect("erhebungen:teilnehmen", teilnahme_link=teilnahme_link)
+    angeboten: list[str] = _angebotene_einwilligungen()
     if request.method == "POST":
-        if request.POST.get("einwilligung") != "ja":
-            return HttpResponseBadRequest("Bitte willigen Sie in die Teilnahme ein.")
-        audioentscheidung: str | None = request.POST.get(
+        if bindung.teilnahme.sprachmodell_eingewilligt:
+            return HttpResponseBadRequest(
+                "Die Einwilligungen wurden bereits festgehalten."
+            )
+        entscheidungen: dict[str, str | None] = {
+            feld: request.POST.get(feld) for feld in angeboten
+        }
+        if any(wert not in {"ja", "nein"} for wert in entscheidungen.values()):
+            return HttpResponseBadRequest(
+                "Bitte entscheiden Sie über jede Einwilligung."
+            )
+        zustimmungen: dict[str, bool] = {
+            feld: wert == "ja" for feld, wert in entscheidungen.items()
+        }
+        teilnahme: Teilnahme = bindung.teilnahme
+        teilnahme.sprachmodell_eingewilligt = zustimmungen["sprachmodell_eingewilligt"]
+        # Eine nicht angebotene Spracherkennung bleibt unentschieden.
+        teilnahme.audioverarbeitung_eingewilligt = zustimmungen.get(
             "audioverarbeitung_eingewilligt"
         )
-        if audioentscheidung not in {"ja", "nein"}:
-            return HttpResponseBadRequest(
-                "Bitte stimmen Sie der Audioverarbeitung zu oder lehnen Sie sie ab."
-            )
-        if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
-            return HttpResponseBadRequest(
-                "Die Einwilligung zur Audioverarbeitung wurde bereits festgehalten."
-            )
-        bindung.teilnahme.einwilligung_erteilt = True
-        bindung.teilnahme.audioverarbeitung_eingewilligt = audioentscheidung == "ja"
-        bindung.teilnahme.save(
-            update_fields=["einwilligung_erteilt", "audioverarbeitung_eingewilligt"]
+        teilnahme.speicherung_eingewilligt = zustimmungen["speicherung_eingewilligt"]
+        teilnahme.save(
+            update_fields=[
+                "sprachmodell_eingewilligt",
+                "audioverarbeitung_eingewilligt",
+                "speicherung_eingewilligt",
+            ]
         )
-        return redirect("erhebungen:instruktion", teilnahme_link=teilnahme_link)
+        return _ohne_zutritt(bindung, teilnahme_link) or redirect(
+            "erhebungen:instruktion", teilnahme_link=teilnahme_link
+        )
     return render(
-        request, "erhebungen/einwilligung.html", {"erhebung": stichprobe.erhebung}
+        request,
+        "erhebungen/einwilligung.html",
+        {
+            "erhebung": stichprobe.erhebung,
+            "spracherkennung_angeboten": (
+                "audioverarbeitung_eingewilligt" in angeboten
+            ),
+        },
     )
+
+
+def abbruchseite(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
+    """Erklärt, dass ohne Sprachmodelle keine Teilnahme möglich ist."""
+
+    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
+    bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
+    if bindung is None:
+        return redirect("erhebungen:teilnehmen", teilnahme_link=teilnahme_link)
+    if bindung.teilnahme.sprachmodell_eingewilligt is not False:
+        return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(bindung)
+    return render(request, "erhebungen/abbruchseite.html", {"stichprobe": stichprobe})
 
 
 def instruktion(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
@@ -812,8 +871,9 @@ def instruktion(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 
     stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
-    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
-        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
+    if tor is not None:
+        return tor
     return render(
         request,
         "erhebungen/instruktion.html",
@@ -828,8 +888,9 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
-    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
-        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
+    if tor is not None:
+        return tor
     vignette_beginnen(bindung)
     return _weiter_im_ablauf(bindung)
 
@@ -916,6 +977,13 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     """Führt einen persistierten Gesprächsschritt anonym über das Token aus."""
 
     bindung: Erhebungsbindung = _laufende_bindung(token)
+    if bindung.teilnahme.sprachmodell_eingewilligt is False:
+        # Der Token-Wiedereinstieg bindet den Browser, damit ihn die
+        # Abbruchseite wiedererkennt.
+        _bindung_in_session_speichern(request, bindung)
+        return redirect(
+            "erhebungen:abbruchseite", teilnahme_link=bindung.stichprobe.teilnahme_link
+        )
     sitzung: Sitzung | None = sitzung_am_zug(bindung)
     if sitzung is None:
         raise Http404("Zu diesem Token steht keine Sitzung offen.")
@@ -1034,8 +1102,9 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
     bindung = _laufende_bindung(token)
     teilnahme_link = bindung.stichprobe.teilnahme_link
     _bindung_in_session_speichern(request, bindung)
-    if not bindung.teilnahme.einwilligung_erteilt:
-        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
+    if tor is not None:
+        return tor
     if request.method == "GET":
         umleitung: HttpResponseRedirect | None = _umleitung_falls_woanders(
             request, bindung
@@ -1076,8 +1145,9 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 
     stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
     bindung: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
-    if bindung is None or not bindung.teilnahme.einwilligung_erteilt:
-        return redirect("erhebungen:einwilligung", teilnahme_link=teilnahme_link)
+    tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
+    if tor is not None:
+        return tor
     umleitung: HttpResponseRedirect | None = _umleitung_falls_woanders(request, bindung)
     if umleitung is not None:
         return umleitung
