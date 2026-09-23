@@ -11,6 +11,7 @@ dependencies = [
     # Wheels für glibc ≥ 2.28; auf dem Produktivserver (glibc 2.17) müsste
     # sonst aus dem Quellpaket gebaut werden, was am alten GCC scheitert.
     "litellm>=1.84.0,<1.92",
+    "markdown-it-py>=4.0.0",
     "pillow>=12.1.1",
     "python-dotenv>=1.1.1",
 ]

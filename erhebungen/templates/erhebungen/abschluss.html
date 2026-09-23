@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load texte %}
 
 {% block title %}Erhebung abgeschlossen{% endblock %}
 
@@ -16,7 +17,7 @@
             <b>01</b><span><h2 id="section-abschluss">Abschluss</h2></span>
         </header>
         <div class="page-field">
-            <p class="prose">{{ erhebung.abschlusstext }}</p>
+            <div class="markdown-text">{{ erhebung.abschlusstext|informationstext }}</div>
         </div>
     </section>
 

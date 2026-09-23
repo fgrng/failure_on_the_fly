@@ -55,6 +55,25 @@ _FORMULARSEITEN: tuple[str, ...] = (
     "erhebungen/instruktion.html",
     "erhebungen/itemblock.html",
 )
+_TEXTSEITEN: tuple[str, ...] = (
+    "erhebungen/einwilligung.html",
+    "erhebungen/instruktion.html",
+    "erhebungen/abschluss.html",
+)
+_MARKDOWN: str = (
+    "# Zweck\n\n"
+    "Die Teilnahme ist **freiwillig**\n"
+    "und jederzeit widerrufbar.\n\n"
+    "[Datenschutz](https://example.org/datenschutz) <script>x</script>"
+)
+_MARKDOWN_KONTEXT: dict[str, object] = {
+    **_KONTEXT,
+    "erhebung": SimpleNamespace(
+        einwilligungstext=_MARKDOWN,
+        instruktionstext=_MARKDOWN,
+        abschlusstext=_MARKDOWN,
+    ),
+}
 _TEILVORLAGE: str = "erhebungen/includes/itemblock_form.html"
 _BESCHRIFTUNGSVERWEIS: re.Pattern[str] = re.compile(r'aria-labelledby="([^"]+)"')
 _KNOPF: re.Pattern[str] = re.compile(r"<button[^>]*>")
@@ -125,6 +144,22 @@ class TeilnahmeseitenGestaltungTests(SimpleTestCase):
                 self.assertNotIn("--phsg-", seite)
                 self.assertNotIn("color:", seite)
                 self.assertNotIn("background:", seite)
+
+    def test_erhebungstexte_erscheinen_gerendert_im_eigenen_container(self) -> None:
+        """Einwilligung, Instruktion und Abschluss rendern Markdown als Informationstext."""
+
+        for vorlage in _TEXTSEITEN:
+            with self.subTest(vorlage=vorlage):
+                seite: str = render_to_string(vorlage, _MARKDOWN_KONTEXT)
+
+                self.assertIn('<div class="markdown-text">', seite)
+                self.assertIn("<h3>Zweck</h3>", seite)
+                self.assertIn("<strong>freiwillig</strong><br>", seite)
+                self.assertIn('href="https://example.org/datenschutz"', seite)
+                self.assertIn('target="_blank"', seite)
+                self.assertIn("&lt;script&gt;", seite)
+                self.assertNotIn("<script>", seite)
+                self.assertNotIn('class="prose"', seite)
 
     def test_itemblock_teilvorlage_traegt_ihre_klassen_selbst(self) -> None:
         """Der htmx-Tausch mit `outerHTML` darf keine Gestaltung verlieren."""

@@ -134,3 +134,39 @@ def test_feature_styles_use_spacing_tokens() -> None:
             violations.append(f"{path.name}: {match.group().strip(' ;{')}")
 
     assert violations == []
+
+
+def test_markdown_text_steps_its_headings_below_the_section_head() -> None:
+    """h3–h5 der Markdown-Texte sind gestuft und kleiner als der Abschnittskopf."""
+
+    page_css: str = (STATIC / "css" / "page.css").read_text()
+    markdown_css: str = (STATIC / "css" / "markdown-text.css").read_text()
+    abschnittskopf: float = float(
+        re.search(r"\.page-section__head h2 \{[^}]*font-size: ([\d.]+)rem", page_css)[1]
+    )
+
+    groessen: list[float] = [
+        float(
+            re.search(
+                rf"\.markdown-text\.markdown-text {ebene} \{{[^}}]*font-size: ([\d.]+)rem",
+                markdown_css,
+            )[1]
+        )
+        for ebene in ("h3", "h4", "h5")
+    ]
+
+    assert groessen == sorted(groessen, reverse=True)
+    assert len(set(groessen)) == 3
+    assert max(groessen) < abschnittskopf
+
+
+def test_markdown_text_is_shielded_against_page_heading_rules() -> None:
+    """Der doppelte Klassenselektor schlägt `.page-field h3` und Verwandte."""
+
+    base_html: str = (STATIC.parent / "templates" / "base.html").read_text()
+    markdown_css: str = (STATIC / "css" / "markdown-text.css").read_text()
+
+    assert "css/markdown-text.css" in base_html
+    for ebene in ("h3", "h4", "h5"):
+        assert f".markdown-text.markdown-text {ebene} {{" in markdown_css
+    assert ".markdown-text.markdown-text p {" in markdown_css

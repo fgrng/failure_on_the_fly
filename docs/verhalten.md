@@ -191,6 +191,17 @@ Fragebogenblock, erscheint er darunter als eigener Abschnitt. Scheitert ein Antw
 bleibt der Gesprächsschritt ohne Antwort erhalten.
 Nach dem Teilnahmefenster sind unfertige Teilnahmen verfallen und nicht fortsetzbar.
 
+Einwilligungs-, Instruktions- und Abschlusstext erscheinen als gerendertes
+Markdown: Absätze durch Leerzeilen, jeder einfache Zeilenumbruch bleibt
+erhalten, dazu **fett**, *kursiv*, Aufzählungen, nummerierte Listen und
+Zitatblock. Überschriften `#`, `##` und `###` ordnen sich als dritte bis fünfte
+Ebene unter den Abschnittskopf der Seite ein. Links sind nur mit `https:`,
+`http:` und `mailto:` möglich; sie öffnen in einem neuen Tab, tragen einen
+sichtbaren Pfeil und kündigen Screenreadern das Öffnen in neuem Tab an. Rohes
+HTML, Bilder, Tabellen, Codeblöcke, tiefere Überschriften, andere Link-Ziele
+wie `javascript:` oder relative Pfade sowie nackte URLs erscheinen wörtlich;
+ein vorangestellter Backslash zeigt Markdown-Zeichen wörtlich.
+
 ## Abschriften holen
 
 Unter `/trainings/abschriften/` gibt jedes eingeloggte Konto ein Teilnahme-Token

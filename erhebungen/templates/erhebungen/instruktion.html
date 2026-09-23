@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static texte %}
 
 {% block title %}Instruktion{% endblock %}
 
@@ -21,7 +21,7 @@
             <b>01</b><span><h2 id="section-instruktion">Vor dem Beginn</h2></span>
         </header>
         <div class="page-field">
-            <p class="prose">{{ erhebung.instruktionstext }}</p>
+            <div class="markdown-text">{{ erhebung.instruktionstext|informationstext }}</div>
         </div>
     </section>
 

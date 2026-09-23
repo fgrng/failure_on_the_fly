@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static texte %}
 
 {% block title %}Einwilligung{% endblock %}
 
@@ -21,7 +21,7 @@
             <b>01</b><span><h2 id="section-teilnahme">Teilnahme</h2></span>
         </header>
         <div class="page-field">
-            <p class="prose">{{ erhebung.einwilligungstext }}</p>
+            <div class="markdown-text">{{ erhebung.einwilligungstext|informationstext }}</div>
         </div>
     </section>
 
