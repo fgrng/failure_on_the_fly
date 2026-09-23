@@ -107,7 +107,7 @@ def _gespielte_teilnahme(
 
     bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
         stichprobe=stichprobe or _stichprobe_anlegen(erhebung),
-        teilnahme=Teilnahme.objects.create(einwilligung_erteilt=True),
+        teilnahme=Teilnahme.objects.create(sprachmodell_eingewilligt=True),
         token=token,
         abgeschlossen_am=timezone.now() if abgeschlossen else None,
     )

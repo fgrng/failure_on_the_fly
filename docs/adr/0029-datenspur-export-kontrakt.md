@@ -62,7 +62,7 @@ Pfade statt als Inhalt.
 | --- | --- |
 | `erhebung.csv` | `id`, `name`, `randomisierung`, `instruktionstext`, `einwilligungstext`, `abschlusstext`, `modell_konfiguration_id` |
 | `stichproben.csv` | `id`, `beginn`, `ende`, `archiviert` |
-| `teilnahmen.csv` | `token`, `stichprobe_id`, `einwilligung_erteilt`, `audioverarbeitung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
+| `teilnahmen.csv` | `token`, `stichprobe_id`, `sprachmodell_eingewilligt`, `audioverarbeitung_eingewilligt`, `speicherung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
 | `vignettenziehungen.csv` | `token`, `vignette_id`, `position` |
 | `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
@@ -180,3 +180,17 @@ mehr rückwirkend sind, ist damit gewahrt.
   Bedarf über die Stichprobenspalte gruppieren.
 - Die vollständige Datenspur bleibt ohne Zugriff auf die Anwendungsdatenbank
   nachvollziehbar; Identitäten von Forschenden bleiben außerhalb des Exports.
+
+## Nachtrag: Drei Einwilligungsspalten statt `einwilligung_erteilt`
+
+Seit #278 holt das Einwilligungstor einer Erhebung drei Einwilligungen getrennt
+ein: Verarbeitung durch Sprachmodelle, Spracherkennung und Speicherung für
+Forschungszwecke. `teilnahmen.csv` trägt dafür `sprachmodell_eingewilligt`,
+`audioverarbeitung_eingewilligt` (in der Oberfläche »Spracherkennung«) und
+`speicherung_eingewilligt`; `einwilligung_erteilt` entfällt. Jede Spalte ist
+`True`, `False` oder `NA` — `NA` heißt nicht entschieden oder, bei der
+Spracherkennung auf einer Instanz ohne Transkription, nicht angeboten. So
+lassen sich »abgelehnt« und »nicht gefragt« unterscheiden. Teilnahmen, die die
+Sprachmodelle abgelehnt haben, erscheinen mit `False` und ohne Ziehung oder
+Sitzung. Der Export zeigt stets den letzten Stand. Da noch keine Erhebung
+ausgeliefert war, ist die Formatänderung zulässig.

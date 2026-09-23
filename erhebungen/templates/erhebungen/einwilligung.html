@@ -25,31 +25,76 @@
         </div>
     </section>
 
+    {% comment %}
+    Die Texte zu den drei Einwilligungen sind systemseitig, wörtlich verbindlich
+    (#278) und nicht abschaltbar. Keine Option ist vorausgewählt.
+    {% endcomment %}
     <form class="form" method="post">
         {% csrf_token %}
-        <section class="page-section" aria-labelledby="section-audioverarbeitung">
+        <section class="page-section" aria-labelledby="section-sprachmodell">
             <header class="page-section__head">
-                <b>02</b><span><h2 id="section-audioverarbeitung">Audioverarbeitung</h2></span>
+                <b>02</b><span><h2 id="section-sprachmodell">Verarbeitung durch Sprachmodelle</h2></span>
             </header>
             <div class="page-field">
                 <p>
-                    Audio zur Transkription wird an einen externen Auftragsverarbeiter
-                    übermittelt und danach nicht gespeichert.
+                    Ihre Eingaben im Diagnosegespräch werden an ein Sprachmodell bei einem externen Auftragsverarbeiter übermittelt, das die Antworten der simulierten Schüler:in erzeugt. Ohne diese Einwilligung ist eine Teilnahme nicht möglich.
+                </p>
+                <div class="page-choices">
+                    <label>
+                        <input type="radio" name="sprachmodell_eingewilligt" value="ja" required>
+                        Ja, ich willige ein
+                    </label>
+                    <label>
+                        <input type="radio" name="sprachmodell_eingewilligt" value="nein">
+                        Nein, ich willige nicht ein
+                    </label>
+                </div>
+            </div>
+        </section>
+        {% if spracherkennung_angeboten %}
+        <section class="page-section" aria-labelledby="section-spracherkennung">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-spracherkennung">Spracherkennung</h2></span>
+            </header>
+            <div class="page-field">
+                <p>
+                    Wenn Sie die Spracheingabe nutzen, wird Ihre Aufnahme zur Umwandlung in Text an einen externen Auftragsverarbeiter übermittelt. Das Audio wird dort nicht gespeichert und auch von uns nicht aufbewahrt. Ohne diese Einwilligung können Sie vollständig per Tastatur teilnehmen.
                 </p>
                 <div class="page-choices">
                     <label>
                         <input type="radio" name="audioverarbeitung_eingewilligt" value="ja" required>
-                        Mit Audio fortfahren
+                        Ja, ich willige ein
                     </label>
                     <label>
                         <input type="radio" name="audioverarbeitung_eingewilligt" value="nein">
-                        Ohne Audio fortfahren
+                        Nein, ich willige nicht ein
+                    </label>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+        <section class="page-section" aria-labelledby="section-speicherung">
+            <header class="page-section__head">
+                <b>{% if spracherkennung_angeboten %}04{% else %}03{% endif %}</b><span><h2 id="section-speicherung">Speicherung und Verwendung für Forschungszwecke</h2></span>
+            </header>
+            <div class="page-field">
+                <p>
+                    Ihre Gespräche, Diagnosen und Fragebogen-Antworten werden pseudonym gespeichert und für Forschungszwecke ausgewertet. Ohne diese Einwilligung können Sie trotzdem vollständig teilnehmen; gespeichert werden dann nur technische Ablaufdaten (etwa welche Vignetten in welcher Reihenfolge gespielt wurden und wie lange), nicht aber Ihre Eingaben. Sie können Ihre Einwilligung jederzeit widerrufen, indem Sie sich unter Angabe Ihres Teilnahme-Tokens an die Studienleitung wenden.
+                </p>
+                <div class="page-choices">
+                    <label>
+                        <input type="radio" name="speicherung_eingewilligt" value="ja" required>
+                        Ja, ich willige ein
+                    </label>
+                    <label>
+                        <input type="radio" name="speicherung_eingewilligt" value="nein">
+                        Nein, ich willige nicht ein
                     </label>
                 </div>
             </div>
         </section>
         <div class="vignette-form-actions">
-            <button class="button" type="submit" name="einwilligung" value="ja">Einwilligen</button>
+            <button class="button" type="submit">Weiter</button>
         </div>
     </form>
 </section>

@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from django.http import HttpResponse
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -17,6 +17,7 @@ from erhebungen.models import (
     ItemAntwort,
     Itemblock,
     Stichprobe,
+    Vignettenziehung,
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
@@ -33,6 +34,41 @@ from sitzungen.models import (
 )
 from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette, Vignettenhistorie
+
+# Der verbindliche Wortlaut der Systemtexte aus #278.
+_SYSTEMTEXT_SPRACHMODELL: str = (
+    "Ihre Eingaben im Diagnosegespräch werden an ein Sprachmodell bei einem "
+    "externen Auftragsverarbeiter übermittelt, das die Antworten der simulierten "
+    "Schüler:in erzeugt. Ohne diese Einwilligung ist eine Teilnahme nicht möglich."
+)
+_SYSTEMTEXT_SPRACHERKENNUNG: str = (
+    "Wenn Sie die Spracheingabe nutzen, wird Ihre Aufnahme zur Umwandlung in Text "
+    "an einen externen Auftragsverarbeiter übermittelt. Das Audio wird dort nicht "
+    "gespeichert und auch von uns nicht aufbewahrt. Ohne diese Einwilligung können "
+    "Sie vollständig per Tastatur teilnehmen."
+)
+_SYSTEMTEXT_SPEICHERUNG: str = (
+    "Ihre Gespräche, Diagnosen und Fragebogen-Antworten werden pseudonym "
+    "gespeichert und für Forschungszwecke ausgewertet. Ohne diese Einwilligung "
+    "können Sie trotzdem vollständig teilnehmen; gespeichert werden dann nur "
+    "technische Ablaufdaten (etwa welche Vignetten in welcher Reihenfolge gespielt "
+    "wurden und wie lange), nicht aber Ihre Eingaben. Sie können Ihre Einwilligung "
+    "jederzeit widerrufen, indem Sie sich unter Angabe Ihres Teilnahme-Tokens an "
+    "die Studienleitung wenden."
+)
+_ABBRUCHTEXT: str = (
+    "Ohne Einwilligung in die Verarbeitung durch Sprachmodelle ist eine Teilnahme "
+    "an dieser Erhebung nicht möglich. Es wurden keine Daten aus "
+    "Diagnosegesprächen oder Fragebögen erhoben. Wenn Sie Ihre Entscheidung ändern "
+    "möchten, können Sie zur Startseite der Erhebung zurückkehren."
+)
+
+# Die Einwilligung in Sprachmodelle und Speicherung, mit der ein Test in den
+# Ablauf kommt. Die Spracherkennung wird nur bei aktiver Transkription gefragt.
+_ZUSTIMMUNG: dict[str, str] = {
+    "sprachmodell_eingewilligt": "ja",
+    "speicherung_eingewilligt": "ja",
+}
 
 
 class ErhebungsteilnahmeTests(TestCase):
@@ -123,7 +159,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
             {
-                "einwilligung": "ja",
+                **_ZUSTIMMUNG,
                 "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
             },
         )
@@ -131,6 +167,11 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
         )
         return Erhebungsbindung.objects.get()
+
+    def _einwilligung_url(self) -> str:
+        # Das Einwilligungsformular der Stichprobe, zugleich ihre Startseite.
+
+        return reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link])
 
     def _verbrauchte_trainingssitzung_anlegen(
         self, vignette: Vignette, *, sekunden: float
@@ -272,7 +313,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
 
         self.assertRedirects(
@@ -280,7 +321,8 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
-        self.assertTrue(bindung.teilnahme.einwilligung_erteilt)
+        self.assertTrue(bindung.teilnahme.sprachmodell_eingewilligt)
+        self.assertTrue(bindung.teilnahme.speicherung_eingewilligt)
         fortsetzung: HttpResponse = self.client.get(self.url)
         self.assertRedirects(
             fortsetzung,
@@ -291,33 +333,90 @@ class ErhebungsteilnahmeTests(TestCase):
             Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id
         )
 
-    def test_einwilligung_holt_die_getrennte_audioentscheidung_ein(self) -> None:
-        """Teilnahme und Audioverarbeitung bleiben zwei unabhängige Zustimmungen."""
+    def test_formular_zeigt_die_systemtexte_ohne_vorauswahl(self) -> None:
+        """Unter dem Text der Forschenden stehen die festen Texte zu a und c."""
 
         self._erhebung_fertigstellen()
         self.client.get(self.url)
-        einwilligung_url: str = reverse(
-            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
-        )
-        formular: HttpResponse = self.client.get(einwilligung_url)
 
-        self.assertContains(
-            formular,
-            "Audio zur Transkription wird an einen externen Auftragsverarbeiter",
+        formular: HttpResponse = self.client.get(self._einwilligung_url())
+
+        self.assertContains(formular, "Ich willige in die Teilnahme ein.")
+        self.assertContains(formular, _SYSTEMTEXT_SPRACHMODELL)
+        self.assertContains(formular, _SYSTEMTEXT_SPEICHERUNG)
+        self.assertNotContains(formular, _SYSTEMTEXT_SPRACHERKENNUNG)
+        self.assertNotContains(formular, 'name="audioverarbeitung_eingewilligt"')
+        self.assertNotContains(formular, "checked")
+        self.assertContains(formular, "Weiter")
+
+    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
+    def test_spracherkennung_wird_nur_bei_aktiver_transkription_gefragt(
+        self,
+    ) -> None:
+        """Mit Zero-Retention-Zusage ist b eine weitere Pflichtwahl."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+
+        formular: HttpResponse = self.client.get(self._einwilligung_url())
+        ohne_b: HttpResponse = self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+
+        self.assertContains(formular, _SYSTEMTEXT_SPRACHERKENNUNG)
+        self.assertEqual(ohne_b.status_code, 400)
+        self.assertIsNone(
+            Erhebungsbindung.objects.get().teilnahme.sprachmodell_eingewilligt
         )
         antwort: HttpResponse = self.client.post(
-            einwilligung_url,
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "audioverarbeitung_eingewilligt": "nein"},
         )
-
         self.assertRedirects(
             antwort,
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
-        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
-        self.assertTrue(teilnahme.einwilligung_erteilt)
-        self.assertFalse(teilnahme.audioverarbeitung_eingewilligt)
+        self.assertFalse(
+            Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt
+        )
 
+    def test_ohne_transkription_bleibt_die_spracherkennung_unentschieden(
+        self,
+    ) -> None:
+        """Eine nicht angebotene Option wird nicht festgehalten, auch wenn sie kommt."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+
+        self.client.post(
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "audioverarbeitung_eingewilligt": "ja"},
+        )
+
+        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
+        self.assertTrue(teilnahme.sprachmodell_eingewilligt)
+        self.assertIsNone(teilnahme.audioverarbeitung_eingewilligt)
+
+    def test_jede_angebotene_option_ist_eine_pflichtwahl(self) -> None:
+        """Fehlt eine Entscheidung oder ist sie unzulässig, wird nichts festgehalten."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+
+        for daten in (
+            {"sprachmodell_eingewilligt": "ja"},
+            {"speicherung_eingewilligt": "ja"},
+            {**_ZUSTIMMUNG, "speicherung_eingewilligt": "vielleicht"},
+        ):
+            with self.subTest(daten=daten):
+                antwort: HttpResponse = self.client.post(
+                    self._einwilligung_url(), daten
+                )
+
+                self.assertEqual(antwort.status_code, 400)
+                teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
+                self.assertIsNone(teilnahme.sprachmodell_eingewilligt)
+                self.assertIsNone(teilnahme.speicherung_eingewilligt)
+
+    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_audioeinwilligung_aktiviert_spracheingabe_in_gespraech_und_debrief(
         self,
     ) -> None:
@@ -338,27 +437,150 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(gespraech, "Spracheingabe starten")
         self.assertContains(debrief, "Spracheingabe starten")
 
-    def test_audioentscheidung_laesst_sich_nicht_ueberschreiben(self) -> None:
-        """Eine einmal erfasste Audioentscheidung bleibt Teil der Datenspur."""
+    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
+    def test_nach_zustimmung_zu_sprachmodellen_ist_die_entscheidung_endgueltig(
+        self,
+    ) -> None:
+        """Mit a = ja bleiben alle drei Entscheidungen Teil der Datenspur."""
 
         self._erhebung_fertigstellen()
         self.client.get(self.url)
-        einwilligung_url: str = reverse(
-            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
-        )
         self.client.post(
-            einwilligung_url,
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "audioverarbeitung_eingewilligt": "nein"},
         )
 
         antwort: HttpResponse = self.client.post(
-            einwilligung_url,
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "ja"},
+            self._einwilligung_url(),
+            {
+                "sprachmodell_eingewilligt": "ja",
+                "audioverarbeitung_eingewilligt": "ja",
+                "speicherung_eingewilligt": "nein",
+            },
         )
 
         self.assertEqual(antwort.status_code, 400)
+        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
+        self.assertFalse(teilnahme.audioverarbeitung_eingewilligt)
+        self.assertTrue(teilnahme.speicherung_eingewilligt)
+
+    def test_ablehnung_der_sprachmodelle_fuehrt_auf_die_abbruchseite(self) -> None:
+        """Ohne a entsteht nichts, und die Seite erklärt den Rückweg."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        abbruch_url: str = reverse(
+            "erhebungen:abbruchseite", args=[self.stichprobe.teilnahme_link]
+        )
+
+        antwort: HttpResponse = self.client.post(
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "sprachmodell_eingewilligt": "nein"},
+        )
+
+        self.assertRedirects(antwort, abbruch_url)
+        seite: HttpResponse = self.client.get(abbruch_url)
+        self.assertContains(seite, _ABBRUCHTEXT)
+        self.assertContains(seite, "Zur Startseite der Erhebung")
+        self.assertContains(seite, f'href="{self._einwilligung_url()}"')
+        self.assertNotContains(seite, "Vielen Dank für Ihre Zeit.")
+        self.assertNotContains(seite, "Ihr Teilnahme-Token")
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        self.assertFalse(bindung.teilnahme.sprachmodell_eingewilligt)
+        self.assertIsNone(bindung.abgeschlossen_am)
+        self.assertFalse(Vignettenziehung.objects.exists())
+        self.assertFalse(Sitzung.objects.exists())
+
+    def test_nach_ablehnung_fuehren_alle_teilnahmewege_auf_die_abbruchseite(
+        self,
+    ) -> None:
+        """Link, Token-Wiedereinstieg und Teilnahmeseiten landen beim Abbruch."""
+
+        self._vignette_anlegen()
+        self._abschluss_item_anlegen()
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "sprachmodell_eingewilligt": "nein"},
+        )
+        token: str = Erhebungsbindung.objects.get().token
+        link = self.stichprobe.teilnahme_link
+        abbruch_url: str = reverse("erhebungen:abbruchseite", args=[link])
+
+        # Die Token-Wege gehen auch von einem frischen Browser aus.
+        frischer_browser: Client = Client()
+        for browser, methode, url in (
+            (self.client, "get", self.url),
+            (self.client, "get", reverse("erhebungen:instruktion", args=[link])),
+            (self.client, "post", reverse("erhebungen:spielen", args=[link])),
+            (self.client, "get", reverse("erhebungen:abschluss", args=[link])),
+            (frischer_browser, "get", reverse("erhebungen:itemblock", args=[token])),
+            (frischer_browser, "get", reverse("erhebungen:gespraech", args=[token])),
+        ):
+            with self.subTest(url=url):
+                self.assertRedirects(
+                    getattr(browser, methode)(url),
+                    abbruch_url,
+                    fetch_redirect_response=False,
+                )
+
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        self.assertIsNone(bindung.abgeschlossen_am)
+        self.assertFalse(Vignettenziehung.objects.exists())
+        self.assertFalse(Sitzung.objects.exists())
+        self.assertFalse(Itemblock.objects.exists())
+
+    def test_rueckweg_zeigt_leeres_formular_und_ueberschreibt_die_ablehnung(
+        self,
+    ) -> None:
+        """Wer a abgelehnt hat, kann neu entscheiden, bis a = ja gegeben ist."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {"sprachmodell_eingewilligt": "nein", "speicherung_eingewilligt": "ja"},
+        )
+
+        formular: HttpResponse = self.client.get(self._einwilligung_url())
+        zweite_ablehnung: HttpResponse = self.client.post(
+            self._einwilligung_url(),
+            {"sprachmodell_eingewilligt": "nein", "speicherung_eingewilligt": "nein"},
+        )
+
+        self.assertEqual(formular.status_code, 200)
+        self.assertNotContains(formular, "checked")
+        self.assertEqual(zweite_ablehnung.status_code, 302)
         self.assertFalse(
-            Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt
+            Erhebungsbindung.objects.get().teilnahme.speicherung_eingewilligt
+        )
+        antwort: HttpResponse = self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+        )
+        teilnahme: Teilnahme = Erhebungsbindung.objects.get().teilnahme
+        self.assertTrue(teilnahme.sprachmodell_eingewilligt)
+        self.assertTrue(teilnahme.speicherung_eingewilligt)
+
+    def test_abbruchseite_setzt_vor_und_nach_der_zustimmung_im_ablauf_fort(
+        self,
+    ) -> None:
+        """Die Abbruchseite gibt es nur für eine Teilnahme, die a abgelehnt hat."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        abbruch_url: str = reverse(
+            "erhebungen:abbruchseite", args=[self.stichprobe.teilnahme_link]
+        )
+
+        self.assertRedirects(self.client.get(abbruch_url), self._einwilligung_url())
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        self.assertRedirects(
+            self.client.get(abbruch_url),
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
         )
 
     def test_ausserhalb_des_laufenden_zeitraums_ist_einstieg_und_fortsetzung_gesperrt(
@@ -413,7 +635,7 @@ class ErhebungsteilnahmeTests(TestCase):
             pk=erster_browser.pk
         ).get()
         self.assertNotEqual(zweite_bindung.teilnahme_id, erster_browser.teilnahme_id)
-        self.assertFalse(zweite_bindung.teilnahme.einwilligung_erteilt)
+        self.assertIsNone(zweite_bindung.teilnahme.sprachmodell_eingewilligt)
 
     def test_token_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
         """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
@@ -439,7 +661,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
         start_antwort: HttpResponse = self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -499,7 +721,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self._seitenleiste_zeigt_nur_das_token(self.client.get(einwilligung_url), token)
         self.client.post(
             einwilligung_url,
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
         self._seitenleiste_zeigt_nur_das_token(
             self.client.get(
@@ -542,7 +764,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -892,7 +1114,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(self.url)
         self.client.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
         self.client.post(
             reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
@@ -1236,7 +1458,7 @@ class ErhebungsteilnahmeTests(TestCase):
         einstieg.get(self.url)
         einstieg.post(
             reverse("erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]),
-            {"einwilligung": "ja", "audioverarbeitung_eingewilligt": "nein"},
+            _ZUSTIMMUNG,
         )
         bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
         einstieg.post(

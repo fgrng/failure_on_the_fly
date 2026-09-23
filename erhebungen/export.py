@@ -106,8 +106,9 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 (
                     "token",
                     "stichprobe_id",
-                    "einwilligung_erteilt",
+                    "sprachmodell_eingewilligt",
                     "audioverarbeitung_eingewilligt",
+                    "speicherung_eingewilligt",
                     "randomisierungs_seed",
                     "erstellt_am",
                 ),
@@ -115,8 +116,9 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                     (
                         bindung.token,
                         bindung.stichprobe_id,
-                        bindung.teilnahme.einwilligung_erteilt,
+                        bindung.teilnahme.sprachmodell_eingewilligt,
                         bindung.teilnahme.audioverarbeitung_eingewilligt,
+                        bindung.teilnahme.speicherung_eingewilligt,
                         bindung.randomisierungs_seed,
                         bindung.erstellt_am,
                     )
