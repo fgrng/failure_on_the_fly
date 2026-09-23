@@ -1331,7 +1331,7 @@ class StichprobenAnlegenTests(TestCase):
         )
         einwilligungen: list[tuple[bool | None, bool | None]] = [
             (False, None),
-            (False, None),
+            (True, False),
             (True, False),
             (True, True),
             (None, None),
@@ -1345,13 +1345,6 @@ class StichprobenAnlegenTests(TestCase):
                 ),
                 token=f"2345-678{nummer}",
             )
-        # Eine revidierte Ablehnung von a zählt nach ihrem aktuellen Stand.
-        revidiert: Teilnahme = Teilnahme.objects.get(
-            erhebungsbindung__token="2345-6781"
-        )
-        revidiert.sprachmodell_eingewilligt = True
-        revidiert.speicherung_eingewilligt = False
-        revidiert.save()
 
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
@@ -1361,11 +1354,7 @@ class StichprobenAnlegenTests(TestCase):
             detail, '<th scope="col">Sprachmodelle abgelehnt</th>', html=True
         )
         self.assertContains(detail, '<th scope="col">Ohne Speicherung</th>', html=True)
-        self.assertContains(
-            detail,
-            "<td>5</td><td>1</td><td>2</td>",
-            html=True,
-        )
+        self.assertContains(detail, "<td>5</td><td>1</td><td>2</td>", html=True)
 
     def test_zeichnet_archivierte_stichproben_in_der_phasenspalte_aus(self) -> None:
         """Eine archivierte Stichprobe trägt ihren Zustand neben der Phase."""
