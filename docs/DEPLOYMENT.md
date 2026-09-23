@@ -47,6 +47,11 @@ Konsequenzen, die den Rest der Anleitung erklären:
   (<https://manual.uberspace.de/lang-python/>). Fehlt die Version auf dem
   Host, beschafft `uv python install 3.14` einen eigenen Interpreter ins Home;
   `uv sync` findet ihn dann ohne `--python`-Angabe.
+- Uberspace 7 läuft auf CentOS 7 mit glibc 2.17. Deshalb ist `litellm` in
+  `pyproject.toml` auf `< 1.92` festgehalten: Ab 1.92 enthält litellm einen
+  Rust-Teil und liefert für Linux nur Wheels für glibc ≥ 2.28; auf dem Host
+  müsste `uv sync` sonst aus dem Quellpaket bauen, was am dortigen GCC 9.3
+  scheitert. Der Pin fällt erst, wenn der Produktivhost eine neuere glibc hat.
 - Zugriff auf das Git-Repository vom Uberspace aus (öffentliches HTTPS-Clone oder
   ein Deploy-Key, siehe Schritt 3).
 - Optional eine eigene Domain samt Zugriff auf deren DNS (Schritt 8).
