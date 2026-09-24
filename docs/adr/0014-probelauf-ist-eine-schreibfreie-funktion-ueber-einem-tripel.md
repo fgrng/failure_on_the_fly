@@ -19,3 +19,7 @@ Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegesprä
 - Ein Probelauf einer Administrator:in gegen einen Kern-Entwurf läuft mit einer Vignette, die für einen anderen Kern geschrieben wurde. Ihre Felder passen, weil der Vertrag fest ist (ADR-0010) — ihr Fehlermuster wurde gegen diesen Kern nie geprüft. Das ist richtig so: Die Administrator:in prüft den Kern, nicht die Vignette.
 - Probeläufe verursachen Modellkosten, ohne eine Spur zu hinterlassen. Ob das Betreibende interessiert, ist eine Frage der Admin-Seite.
 - Administrator:innen können eine neue Modell-Konfiguration erproben, bevor sie sie aktiv schalten (ADR-0013).
+
+## Nachführung (Grilling, Issue #285): Evalläufe
+
+Der Satz „Das System weiß nicht, ob eine Vignette je getestet wurde“ gilt nicht mehr ganz. Neben dem Probelauf gibt es den **Evallauf** (ADR-0046): automatisch, im Hintergrund (ADR-0047) und aufbewahrt. Das System weiß damit, ob für eine Vignettenfassung ein Evallauf existiert und wie er ausging; es erzwingt weiterhin nichts. Der Probelauf selbst bleibt unverändert schreibfrei und nutzt die Modell-Konfiguration der Verwendung *Schüler:in* (ADR-0013).

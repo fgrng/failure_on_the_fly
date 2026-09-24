@@ -27,3 +27,9 @@ Der Kern kann diesen Pin nicht tragen: Die Modell-Konfiguration hängt ausdrück
 - Wird ein Modell abgekündigt, während eine Erhebung läuft, muss jemand eingreifen und die Erhebung umstellen oder abschließen. Ein sichtbarer, entscheidbarer Vorgang statt eines stillen Bruchs.
 - Die Frage „welche Konfigurationen gab es je?" bleibt beantwortbar, und zwei Sitzungen sind über Fremdschlüssel vergleichbar statt über einen Textvergleich eingebetteter Werte.
 - Der Begriff „Fassung" aus dem Glossar meint bei der Modell-Konfiguration einen append-only Datensatz, bei den drei versionierten Artefakten eine Fassung mit Lebenszyklus.
+
+## Nachführung (Grilling, Issue #285): ein Zeiger je Verwendung, eine Bezeichnung
+
+Aus „genau eine ist aktiv“ wird **„genau eine je Verwendung“**. Die Zeigertabelle trägt statt der einen Singleton-Zeile eine Zeile je **Verwendung** — *Schüler:in*, *Lehrperson*, *Bewerter* —, und die Unique-Spalte wechselt vom konstanten Singleton-Feld zur Verwendung. Die Evals (ADR-0046) sollen simulierte Lehrperson und Bewerter mit anderen Modellen und Anbietern betreiben können als die Simulation; ein Bewerter auf demselben Modell wie die Geprüfte urteilt befangen. Was sich unterscheidet, ist die Verwendung, nicht das Ding — deshalb ein Zeiger mehr statt eines neuen Artefakts. Dieselbe Konfiguration darf mehreren Verwendungen dienen. Die bestehende aktive Konfiguration wird zur *Schüler:in*; alles, was hier über den Pin der Erhebung steht, meint diese Verwendung.
+
+Die Konfiguration selbst bleibt append-only. Sie bekommt eine **Bezeichnung**, beim Anlegen vergeben und danach unveränderlich wie alles an ihr, damit sie sich in drei Auswahlen wiederfinden lässt. Die Datenspur pinnt weiter per Fremdschlüssel.

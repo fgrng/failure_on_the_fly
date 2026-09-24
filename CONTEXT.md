@@ -15,7 +15,7 @@ Die stabile, systematisch angewandte Regel, kongruent zu der die simulierte Sch�
 _Avoid_: Fehlvorstellung, systematischer Fehler, Misconception — fachdidaktische Unterkategorien, die dasselbe Modellierungsobjekt meinen.
 
 **Referenzdiagnose**:
-Die fachdidaktische Notiz der Autor:in zum Fehlermuster ihrer Vignette. Optional und ohne jede Wirkung auf Simulation und Ablauf.
+Die fachdidaktische Notiz der Autor:in zum Fehlermuster ihrer Vignette. Optional und ohne jede Wirkung auf Simulation, Ablauf und Evals.
 _Avoid_: Musterlösung, Goldstandard, Erwartungshorizont
 
 **Unterrichtskontext**:
@@ -124,8 +124,12 @@ Der Dienst, der eine Naht nach außen bedient — eine feste Auswahl aus `fake`,
 _Avoid_: Provider, Vendor, Backend, Hoster
 
 **Modell-Konfiguration**:
-Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036). Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; genau eine ist aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
+Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036) — sowie eine Bezeichnung, unter der sie sich in den Auswahlen wiederfinden lässt. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; je Verwendung ist genau eine aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
+
+**Verwendung**:
+Wofür eine Modell-Konfiguration aktiv ist: **Schüler:in** (Sitzungen, Probeläufe und die simulierte Schüler:in im Evallauf), **Lehrperson** (die simulierte Lehrperson) oder **Bewerter**. Je Verwendung ist genau eine Konfiguration aktiv; dieselbe darf mehreren Verwendungen dienen.
+_Avoid_: Rolle — meint die Rechte eines Kontos; Zweck, Einsatz
 
 **Transkriptions-Konfiguration**:
 Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0036).
@@ -233,6 +237,48 @@ _Avoid_: anonyme Teilnahme, Teilnahme ohne Daten, Gastteilnahme
 **Datenspur**:
 Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur und werden nicht exportiert.
 _Avoid_: Logs, Rohdaten, Protokoll
+
+## Evals
+
+**Eval**:
+Ein systemweit festgelegter Prüffall dafür, ob die simulierte Schüler:in einer Vignette ein bestimmtes Verhalten zeigt. Er besteht aus einem oder mehreren Evalinputs und einem oder mehreren Evalkriterien; jedes Evalkriterium wird an jedem Evalgespräch jedes seiner Evalinputs gemessen. Evals beurteilen das Verhalten der Simulation, nie die Diagnose der Teilnehmer:in (ADR-0009).
+_Avoid_: Evaluation — in der Bildungsforschung die Auswertung, die ADR-0009 für die Diagnose ausschließt; Test, Testfall, Prüffall, Task
+
+**Evalkatalog**:
+Das systemweite versionierte Artefakt aus allen Evals und den übergreifenden Kriterien. Er hat eine eigene Linie neben dem Simulationskern, genau eine finale Fassung und wird allein von der Administration gepflegt. Nichts pinnt ihn: Jeder Evallauf prüft gegen die aktuell finale Fassung. Er legt auch fest, wie oft jeder Evalinput läuft.
+_Avoid_: Prüfkatalog, Prüfvorgabe, Eval-Suite, Benchmark
+
+**Evalinput**:
+Wie die simulierte Lehrperson in einem Evalgespräch spricht: eine Folge von **Inputschritten**, von denen jeder einen Wechsel aus Äußerung und Antwort auslöst. Ein Inputschritt ist entweder **fest** — eine **Inputäußerung**, die wörtlich vorgebracht wird — oder **gelenkt** — eine **Inputstrategie**, nach der die simulierte Lehrperson die Äußerung dieses Schritts selbst formuliert, gegebenenfalls in Reaktion auf das bisher Gesagte. Beide Arten dürfen sich in einem Evalinput mischen; die Zahl seiner Inputschritte ist die Länge jedes seiner Evalgespräche.
+_Avoid_: Gesprächsführung, Skript, Prompt
+
+**Evalkriterium**:
+Eine Rubrik an einem Eval, nach der der Bewerter jedes Evalgespräch dieses Evals beurteilt.
+_Avoid_: Fallkriterium, Metrik
+
+**Übergreifendes Kriterium**:
+Eine Rubrik am Evalkatalog, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt — für Verhalten, das in jedem Gespräch gelten muss, etwa Rollentreue.
+_Avoid_: globales Kriterium, Invariante
+
+**Evalgespräch**:
+Ein einzelnes Gespräch zwischen simulierter Lehrperson und simulierter Schüler:in nach einem Evalinput, eine seiner Wiederholungen. Es ist keine Sitzung: Es hat weder Teilnehmer:in noch Rahmenhandlung, Debrief oder Diagnose.
+_Avoid_: Sitzung, Diagnosegespräch, Trial, Durchlauf
+
+**Evallauf**:
+Die Ausführung aller Evals des Evalkatalogs über einer Vignettenfassung — mit deren gepinntem Kern und den für Schüler:in, Lehrperson und Bewerter aktiven Modell-Konfigurationen. Je Vignettenfassung gibt es höchstens einen; ein neuer ersetzt den alten. Er ist **veraltet**, sobald sich seit seinem Start die Vignettenfassung, ihr Kern, eine der drei aktiven Modell-Konfigurationen oder der finale Evalkatalog geändert hat. Anders als der Probelauf wird er aufbewahrt. Fehlt ihm ein Urteil, ist er **unvollständig**; bricht er mittendrin ab, ist er **abgebrochen** — was fertig war, bleibt sichtbar, fortgesetzt wird nicht.
+_Avoid_: Prüflauf, Vignetteneval, Testlauf, Probelauf
+
+**Urteil**:
+Das Ergebnis eines Kriteriums an einem Evalgespräch: _erfüllt_ oder _nicht erfüllt_, stets mit Begründung. Über die Wiederholungen eines Evalinputs ergibt sich die **Quote** der erfüllten Urteile; **bestanden** ist das Kriterium dort nur, wenn alle Urteile erfüllt sind. Quote und Bestehen werden immer gemeinsam gezeigt. Scheitert der Antwortversuch der simulierten Schüler:in endgültig, ist jedes Kriterium ihres Evalgesprächs _nicht erfüllt_; versagen simulierte Lehrperson oder Bewerter, bleibt es **ohne Urteil** — das zählt weder als erfüllt noch als nicht erfüllt, schließt aber das Bestehen aus.
+_Avoid_: Score, Note, Punktzahl
+
+**Simulierte Lehrperson**:
+Die von einem Sprachmodell gespielte Gesprächspartnerin der simulierten Schüler:in im Evalgespräch. Sie kennt die simulationsseitigen Felder der Vignette samt Fehlermuster und das bisherige Gespräch, nie die Denkspur und nie die Referenzdiagnose. Sie ist weder die erfahrene Lehrperson noch eine Nachbildung der Teilnehmer:in, sondern prüft.
+_Avoid_: Prüfer:in, Tester, Lehrer-Bot
+
+**Bewerter**:
+Das Sprachmodell, das Evalgespräche nach Evalkriterien und übergreifenden Kriterien beurteilt. Es sieht den Gesprächsverlauf samt Denkspur und die simulationsseitigen Felder der Vignette, nie die Referenzdiagnose.
+_Avoid_: Judge, Grader, Bewertungsmodell
 
 ## Fragebögen
 

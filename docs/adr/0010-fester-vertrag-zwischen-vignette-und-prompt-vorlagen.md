@@ -61,3 +61,9 @@ Drei Präzisierungen, die die abgeleiteten Formen und die Akteure konkretisieren
   `VERTRAG_RAHMEN` ist damit: die rohen Nutzeransicht-Werte (`$schuelerin_name`, `$schuelerin_geschlecht`, `$lehrperson_name`, `$lehrperson_geschlecht`, `$fach`, `$thema`, `$klassenstufe`) **plus** `$schuelerin_pronomen`, `$schuelerin_possessiv`, `$lehrperson_pronomen`, `$lehrperson_possessiv`, `$lehrperson_anrede`. `$lernauftrag` und `$arbeitsheft` sind **nicht** enthalten (Ansichtsbausteine).
 
 - **Beide Akteure sind Pflicht zum Finalisieren.** Weil eine Rahmenhandlung `$lehrperson_*` verwenden darf, hielte eine leere Lehrperson stille Leerstellen im Fließtext offen; deshalb werden Name und Geschlecht beider Akteure beim Finalisieren verlangt (die Pflichtprüfung selbst lebt in `finalisieren()`, ADR-0021-Nachführung).
+
+## Nachführung (Grilling, Issue #285): `VERTRAG_EVAL` als dritte Menge
+
+Der Evalkatalog (ADR-0046) trägt zwei Vorlagen: die **Lehrperson-Vorlage** und die **Bewerter-Vorlage**. Sie schöpfen aus einer dritten, ebenso im Code festgelegten Menge, `VERTRAG_EVAL`: alle Felder aus `VERTRAG_PROMPT` mit derselben Umhüllung, dazu drei Werte, die der Evallauf berechnet — `$inputstrategie` (nur Lehrperson-Vorlage, die Anweisung des aktuellen Inputschritts), `$kriterium` (nur Bewerter-Vorlage) und `$verlauf` (beide). Den Verlauf rendert der Code je Empfänger: für den Bewerter mit Denkspuren, für die simulierte Lehrperson ohne — sie darf die Denkspur nicht durch eine falsch geschriebene Vorlage sehen. Die Referenzdiagnose bleibt draußen wie hier.
+
+Inputäußerungen, Inputstrategien und Kriterien sind reiner Text ohne Platzhalter: Sie sind fach-agnostisch, und was vignettenspezifisch sein muss, holt sich die Lehrperson über ihre Vorlage. Das Finalisieren des Katalogs prüft die beiden Vorlagen mit demselben Teilmengen-Test wie hier, ohne Modellaufruf.

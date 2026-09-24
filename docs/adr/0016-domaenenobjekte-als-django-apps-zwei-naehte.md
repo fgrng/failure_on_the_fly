@@ -21,6 +21,16 @@ status: accepted
 > Sitzungsfelder im `DBSink`, Browser-Session im `ScratchSink`. Das erweitert den
 > Umfang der bestehenden Sink-Naht, schafft aber keine dritte; es bleiben zwei.
 
+> **Nachgeführt durch ADR-0046 (Evals, Grilling #285):** Eine App kommt hinzu:
+> `evals` besitzt Evallauf, Evalgespräch und Urteil und zeigt auf `vignetten` und
+> `simulation`; nichts zeigt auf sie. `vignetten` liest den Stand eines
+> Evallaufs allein über den Reverse-Accessor, ohne Import. Der Evalkatalog kennt
+> keine Vignette und liegt deshalb in `simulation`. Die Sprachmodell-Naht bekommt
+> keine Schwester, sondern zwei weitere Aufrufer (simulierte Lehrperson,
+> Bewerter) mit eigenem Ausgabeschema; ihr Rückgabewert ist das geparste Objekt
+> *des übergebenen* Schemas. Der Evallauf hat nur einen Speicherort und braucht
+> keinen Sink. Es bleiben zwei Nähte.
+
 Die Module des Projekts werden entlang der **Domänenobjekte aus `CONTEXT.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 
 Die App- und Modulnamen sind **deutsch**, weil das Glossar deutsch ist. Ein englischer Verzeichnisname zwänge zu einer Übersetzungstabelle zwischen Glossar und Code, in der genau die Unterscheidungen verschwimmen, die `CONTEXT.md` mühsam aufgestellt hat — `studies` etwa trüge den Begriff, den der Eintrag **Erhebung** ausdrücklich vermeidet.
