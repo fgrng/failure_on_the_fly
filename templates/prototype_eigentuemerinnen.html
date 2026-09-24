@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+{# PROTOTYPE #289 – Siehe templates/PROTOTYPE_EIGENTUEMERINNEN.md. Kein Knopf schreibt etwas. #}
+
+{% block title %}Prototyp · Eigentümer:innen{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+    <style>
+        /* PROTOTYPE #289 */
+        .ei-zustand { margin-top: var(--space-5); }
+        .ei-ich { color: var(--color-text-muted); font-size: .8rem; }
+        .ei-hinweis { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: .8rem; }
+        .ei-entfernen {
+            width: auto; padding: 0; border: 0; background: none;
+            color: var(--color-danger); font: inherit; font-size: .875rem; cursor: pointer;
+        }
+        .ei-entfernen:hover { text-decoration: underline; }
+        .ei-gesperrt { color: var(--color-text-muted); font-size: .8rem; }
+        .ei-zeile { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
+        .ei-zeile label { display: grid; flex: 1 1 14rem; gap: var(--space-1); }
+        .ei-zeile button { width: auto; }
+
+        /* B: Tabelle, darunter abgetrennter Bereich */
+        .ei-b-tabelle { width: 100%; border-collapse: collapse; }
+        .ei-b-tabelle th, .ei-b-tabelle td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+        .ei-b-tabelle th { color: var(--color-text-muted); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+        .ei-b-tabelle td:last-child, .ei-b-tabelle th:last-child { text-align: right; }
+        .ei-b-hinzu { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
+        .ei-b-hinzu h3 { margin: 0 0 var(--space-2); font-size: .95rem; }
+
+        /* C: Zeilenliste, letzte Zeile klappt auf */
+        .ei-c-liste { margin: 0; padding: 0; list-style: none; border: 1px solid var(--color-border); border-radius: var(--radius); }
+        .ei-c-liste > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+        .ei-c-liste > li:last-child { border-bottom: 0; }
+        .ei-c-name { flex: 1 1 auto; }
+        .ei-c-name small { display: block; color: var(--color-text-muted); }
+        .ei-c-hinzu { background: var(--color-surface-muted); }
+        .ei-c-hinzu details { width: 100%; }
+        .ei-c-hinzu summary { cursor: pointer; color: var(--color-accent); font-weight: 600; }
+        .ei-c-hinzu .ei-zeile { margin-top: var(--space-2); }
+        .ei-c-bestaetigen { width: 100%; }
+        .ei-c-bestaetigen summary { list-style: none; text-align: right; }
+        .ei-c-bestaetigen summary::-webkit-details-marker { display: none; }
+        .ei-c-bestaetigen[open] summary { display: none; }
+        .ei-c-bestaetigen p { margin: 0 0 var(--space-2); font-size: .875rem; }
+
+        /* D: zwei Spalten, Verlassen als eigener Fuß */
+        .ei-d { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-4); }
+        @container hauptbereich (max-width: 760px) { .ei-d { grid-template-columns: minmax(0, 1fr); } }
+        .ei-d h3 { margin: 0 0 var(--space-2); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+        .ei-d-liste { margin: 0; padding: 0; list-style: none; }
+        .ei-d-liste li { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-1) 0; border-bottom: 1px solid var(--color-border); }
+        .ei-d-karte { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-muted); }
+        .ei-d-karte .ei-zeile { flex-direction: column; align-items: stretch; }
+        .ei-d-verlassen { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
+        .ei-d-verlassen p { margin: 0; flex: 1 1 20rem; font-size: .875rem; color: var(--color-text-muted); }
+        .button[disabled] { opacity: .45; cursor: not-allowed; }
+    </style>
+{% endblock %}
+
+{% block content %}
+<section class="page">
+    <div class="prototype-hinweis" style="margin-bottom: var(--space-4);">
+        <p><strong>{{ variantenbezeichnung }}.</strong>
+        {% if variante == "a" %}So ist es heute (Vergleich): Chips mit ×, die Auswahl folgt ohne Abstand darunter. Beim Entfernen der eigenen Person gibt es keinen Hinweis.
+        {% elif variante == "b" %}Tabelle mit Name, Rolle und Aktion. »Entfernen« ist ein roter Textlink; in der eigenen Zeile heißt er »Mich entfernen« und sagt darunter, was passiert. Hinzufügen steht unter einer eigenen Unterüberschrift, durch eine Linie getrennt.
+        {% elif variante == "c" %}Eine gerahmte Liste; die letzte Zeile »+ Eigentümer:in hinzufügen« klappt Auswahl und Knopf auf. Die eigene Entfernung fragt erst nach (aufklappend, ohne JavaScript).
+        {% else %}Links der Kreis, rechts eine Karte zum Hinzufügen. Aus der Liste entfernt man nur andere; die eigene Person verlässt den Kreis über einen eigenen Fuß mit Erklärung.{% endif %}
+        Jeder Zustand steht unten als eigener Abschnitt 07. Die Knöpfe tun nichts.</p>
+    </div>
+
+    <header class="page-head">
+        <div>
+            <p>Vignette ansehen</p>
+            <h1>Mathematik: Brüche addieren</h1>
+            <span>Klassenstufe 6 · angemeldet als fabian.gruenig</span>
+        </div>
+        <span class="badge badge--draft">Entwurf</span>
+    </header>
+
+    <section class="page-section" aria-labelledby="attrappe-budget">
+        <header class="page-section__head">
+            <b>06</b><span><h2 id="attrappe-budget">Gesprächsbudget</h2><small>Attrappe als Nachbar</small></span>
+        </header>
+        <div>
+            <dl class="field-grid">
+                <div><dt>Budget Typ</dt><dd>Anzahl Züge</dd></div>
+                <div><dt>Budget Wert</dt><dd>12</dd></div>
+            </dl>
+        </div>
+    </section>
+
+    {% for zustand in zustaende %}
+    <p class="prototype-hinweis ei-zustand"><strong>Zustand {{ forloop.counter }}:</strong> {{ zustand.titel }}</p>
+    <section class="page-section" aria-labelledby="ei-{{ forloop.counter }}">
+        <div class="page-section__head">
+            <b>07</b>
+            <div><h2 id="ei-{{ forloop.counter }}">Eigentümer:innen</h2>{% if variante != "a" %}<small>Wer diese Vignette sehen und bearbeiten darf</small>{% endif %}</div>
+        </div>
+        <div>
+        {% if variante == "a" %}
+            <ul class="eigentuemerinnen-liste">
+                {% for p in zustand.kreis %}
+                    <li class="eigentuemerin-chip">{{ p.name }}
+                        {% if zustand.kreis|length > 1 %}<form><button type="button" aria-label="{{ p.name }} als Eigentümer:in entfernen" title="Entfernen">&times;</button></form>{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+            <form class="eigentuemerin-hinzufuegen">
+                <label>Eigentümer:in <select>
+                    {% for name in zustand.moegliche %}<option>{{ name }}</option>{% endfor %}
+                </select></label>
+                <button class="button" type="button">Eigentümer:in hinzufügen</button>
+            </form>
+
+        {% elif variante == "b" %}
+            <table class="ei-b-tabelle">
+                <thead><tr><th>Name</th><th>Rolle</th><th><span style="position:absolute;left:-9999px">Aktion</span></th></tr></thead>
+                <tbody>
+                {% for p in zustand.kreis %}
+                    <tr>
+                        <td>{{ p.name }}{% if p.ich %} <span class="ei-ich">(Sie)</span>{% endif %}</td>
+                        <td>{{ p.rolle }}</td>
+                        <td>
+                            {% if zustand.kreis|length > 1 %}
+                                <button type="button" class="ei-entfernen">{% if p.ich %}Mich entfernen{% else %}Entfernen{% endif %}</button>
+                                {% if p.ich %}<p class="ei-hinweis">Sie verlieren den Zugriff; die Vignette bleibt bei den übrigen Eigentümer:innen.</p>{% endif %}
+                            {% else %}
+                                <span class="ei-gesperrt" title="Der Kreis bleibt immer besetzt.">Letzte Eigentümer:in</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% if zustand.kreis|length == 1 %}<p class="ei-hinweis">Fügen Sie zuerst eine weitere Person hinzu, um sich selbst entfernen zu können.</p>{% endif %}
+            <div class="ei-b-hinzu">
+                <h3>Eigentümer:in hinzufügen</h3>
+                {% if zustand.moegliche %}
+                    <form class="ei-zeile">
+                        <label>Person <select>
+                            {% for name in zustand.moegliche %}<option>{{ name }}</option>{% endfor %}
+                        </select></label>
+                        <button class="button button--secondary" type="button">Hinzufügen</button>
+                    </form>
+                {% else %}
+                    <p class="ei-hinweis">Alle Autor:innen und Administrator:innen gehören schon zum Kreis.</p>
+                {% endif %}
+            </div>
+
+        {% elif variante == "c" %}
+            <ul class="ei-c-liste">
+                {% for p in zustand.kreis %}
+                    <li>
+                        <span class="ei-c-name">{{ p.name }}{% if p.ich %} <span class="ei-ich">(Sie)</span>{% endif %}<small>{{ p.rolle }}</small></span>
+                        {% if zustand.kreis|length == 1 %}
+                            <span class="ei-gesperrt">Letzte Eigentümer:in, nicht entfernbar</span>
+                        {% elif p.ich %}
+                            <details class="ei-c-bestaetigen">
+                                <summary><span class="ei-entfernen">Mich entfernen …</span></summary>
+                                <p>Sie verlieren den Zugriff auf diese Vignette. Sie bleibt bei den übrigen Eigentümer:innen.</p>
+                                <button type="button" class="button button--danger">Ja, mich entfernen</button>
+                            </details>
+                        {% else %}
+                            <button type="button" class="ei-entfernen" aria-label="{{ p.name }} entfernen">Entfernen</button>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                <li class="ei-c-hinzu">
+                    {% if zustand.moegliche %}
+                        <details>
+                            <summary>+ Eigentümer:in hinzufügen</summary>
+                            <form class="ei-zeile">
+                                <label>Person <select>
+                                    {% for name in zustand.moegliche %}<option>{{ name }}</option>{% endfor %}
+                                </select></label>
+                                <button class="button" type="button">Hinzufügen</button>
+                            </form>
+                        </details>
+                    {% else %}
+                        <span class="ei-gesperrt">Alle Autor:innen und Administrator:innen gehören schon zum Kreis.</span>
+                    {% endif %}
+                </li>
+            </ul>
+
+        {% else %}
+            <div class="ei-d">
+                <div>
+                    <h3>Im Kreis ({{ zustand.kreis|length }})</h3>
+                    <ul class="ei-d-liste">
+                        {% for p in zustand.kreis %}
+                            <li>
+                                <span>{{ p.name }}{% if p.ich %} <span class="ei-ich">(Sie)</span>{% endif %} · <span class="ei-ich">{{ p.rolle }}</span></span>
+                                {% if not p.ich %}<button type="button" class="ei-entfernen">Entfernen</button>{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="ei-d-karte">
+                    <h3>Person hinzufügen</h3>
+                    {% if zustand.moegliche %}
+                        <form class="ei-zeile">
+                            <label><span style="position:absolute;left:-9999px">Person</span><select>
+                                {% for name in zustand.moegliche %}<option>{{ name }}</option>{% endfor %}
+                            </select></label>
+                            <button class="button" type="button">Hinzufügen</button>
+                        </form>
+                    {% else %}
+                        <p class="ei-hinweis">Niemand mehr verfügbar: Alle Autor:innen und Administrator:innen gehören schon zum Kreis.</p>
+                    {% endif %}
+                </div>
+                <div class="ei-d-verlassen">
+                    {% if zustand.kreis|length > 1 %}
+                        <p>Wenn Sie den Kreis verlassen, verlieren Sie den Zugriff. Die Vignette bleibt bei den übrigen {{ zustand.kreis|length|add:"-1" }} Eigentümer:innen.</p>
+                        <button type="button" class="button button--danger">Kreis verlassen</button>
+                    {% else %}
+                        <p>Sie sind die letzte Eigentümer:in. Fügen Sie zuerst jemanden hinzu, bevor Sie den Kreis verlassen.</p>
+                        <button type="button" class="button button--danger" disabled>Kreis verlassen</button>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+        </div>
+    </section>
+    {% endfor %}
+</section>
+{% include "includes/prototype_switcher.html" %}
+{% endblock %}

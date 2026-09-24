@@ -32,6 +32,12 @@ urlpatterns = [
         prototype.bereichsmarkierung,
         name="bereichsmarkierung_prototype",
     ),
+    # PROTOTYPE #289 – nur mit DEBUG, siehe templates/PROTOTYPE_EIGENTUEMERINNEN.md.
+    path(
+        "prototype/eigentuemerinnen/",
+        prototype.eigentuemerinnen,
+        name="eigentuemerinnen_prototype",
+    ),
     path("accounts/", include("django.contrib.auth.urls")),
     path("erhebungen/", include("erhebungen.urls")),
     path("fragebogen-items/", include("fragebogen_items.urls")),

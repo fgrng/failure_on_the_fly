@@ -44,3 +44,42 @@ def bereichsmarkierung(request: HttpRequest) -> HttpResponse:
     # Sitzungscookie: verschwindet mit dem Schließen des Browsers.
     antwort.set_cookie("prototype_nav", str(kontext["variante"]), samesite="Lax")
     return antwort
+
+
+# PROTOTYPE #289 – Eigentümer:innen-Abschnitt. Mit dem Prototyp löschen.
+_EIGENTUEMERINNEN_VARIANTEN: dict[str, str] = {
+    "a": "A · Heute: Chips, Auswahl direkt darunter",
+    "b": "B · Tabelle, Hinzufügen mit Unterüberschrift",
+    "c": "C · Liste mit aufklappbarer Hinzufügen-Zeile",
+    "d": "D · Zwei Spalten, »Kreis verlassen« getrennt",
+}
+
+_ICH = {"name": "fabian.gruenig", "rolle": "Autorin", "ich": True}
+_ANNA = {"name": "anna.meier", "rolle": "Administratorin", "ich": False}
+_JONAS = {"name": "jonas.keller", "rolle": "Autor", "ich": False}
+
+# Drei Zustände, die jede Variante untereinander zeigt.
+_EIGENTUEMERINNEN_ZUSTAENDE: list[dict[str, object]] = [
+    {
+        "titel": "Mehrere Eigentümer:innen, Auswahl vorhanden",
+        "kreis": [_ICH, _ANNA, _JONAS],
+        "moegliche": ["lea.brunner", "tim.huber"],
+    },
+    {
+        "titel": "Nur noch die eigene Person im Kreis (Entfernen gesperrt)",
+        "kreis": [_ICH],
+        "moegliche": ["anna.meier", "jonas.keller", "lea.brunner"],
+    },
+    {
+        "titel": "Niemand mehr hinzuzufügen (leere Auswahl)",
+        "kreis": [_ICH, _ANNA],
+        "moegliche": [],
+    },
+]
+
+
+def eigentuemerinnen(request: HttpRequest) -> HttpResponse:
+    """PROTOTYPE #289: Varianten des Eigentümer:innen-Abschnitts, ohne Datenbank."""
+    kontext = variantenkontext(request, _EIGENTUEMERINNEN_VARIANTEN)
+    kontext["zustaende"] = _EIGENTUEMERINNEN_ZUSTAENDE
+    return render(request, "prototype_eigentuemerinnen.html", kontext)
