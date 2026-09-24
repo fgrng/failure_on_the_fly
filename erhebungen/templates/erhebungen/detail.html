@@ -242,7 +242,7 @@
                                         <td>{{ stichprobe.phase.label }}{% if stichprobe.archiviert %} <span class="badge badge--archived">Archiviert</span>{% endif %}</td>
                                         <td>{{ stichprobe.teilnahmezahl }}</td>
                                         <td>{{ stichprobe.sprachmodell_abgelehnt }}</td>
-                                        <td>{{ stichprobe.ohne_speicherung }}</td>
+                                        <td>{{ stichprobe.fluechtig }}</td>
                                         <td><input type="text" value="{{ stichprobe.teilnahme_url }}" readonly style="width: 100%;"></td>
                                         <td class="table__action">
                                             {% if not stichprobe.archiviert and not stichprobe.traegt_daten %}

@@ -12,7 +12,7 @@ from django.utils import timezone
 from simulation.models import ModellKonfiguration
 from sitzungen.durchlauf import sitzung_starten
 from sitzungen.models import Sitzung, Vignettenposition
-from sitzungen.sink import DBSink, sink_fuer_teilnahme
+from sitzungen.sink import GeruestSink, sink_fuer_teilnahme
 from vignetten.models import Vignette
 
 from .models import (
@@ -227,7 +227,7 @@ def _sitzung_beginnen(
     )
     if modell_konfiguration is None:
         raise RuntimeError("Erhebungsvignetten brauchen eine Modell-Konfiguration.")
-    sink: DBSink = sink_fuer_teilnahme(bindung.teilnahme, session)
+    sink: GeruestSink = sink_fuer_teilnahme(bindung.teilnahme, session)
     sitzung_starten(sink, vignette, modell_konfiguration)
     sitzung: Sitzung = sink.sitzung
     Vignettenposition.objects.create(

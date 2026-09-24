@@ -37,6 +37,11 @@ class Teilnahme(models.Model):
         """
         return self.speicherung_eingewilligt is False
 
+    @staticmethod
+    def fluechtig_q(pfad: str = "") -> Q:
+        """Dieselbe Regel wie `ist_fluechtig` für Abfragen über eine Beziehung."""
+        return Q(**{f"{pfad}speicherung_eingewilligt": False})
+
 
 class Sitzung(models.Model):
     """Eine persistierte Sitzung einer Vignette."""

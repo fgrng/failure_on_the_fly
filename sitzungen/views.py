@@ -31,7 +31,7 @@ from sitzungen.durchlauf import (
 )
 from sitzungen.models import Eingabemodus, Sitzung
 from sitzungen.sink import (
-    DBSink,
+    GeruestSink,
     GespraechsschrittDaten,
     ScratchSink,
     probelauf_laeuft,
@@ -400,7 +400,7 @@ def persistierten_debrief_anzeigen(
 ) -> HttpResponse:
     # Rendert den Debrief einer persistierten Sitzung.
 
-    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     # Liegt die Diagnose bereits vor, zeigt das Formular sie nur noch an:
     # Sie ist je Sitzung einmalig und darf sich nicht nachträglich ändern.
     return sitzung_anzeigen(
@@ -501,7 +501,7 @@ def persistiertes_gespraech(
             navigation=navigation,
             anhang=sitzungsblock(),
         )
-    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     if request.method == "GET":
         sink.zug_beginnen(durchlauf.jetzt())
         return _persistiertes_gespraech_anzeigen(

@@ -199,7 +199,8 @@ Teilnahme-Link, Token-Wiedereinstieg und alle übrigen Teilnahmeseiten führen
 dann dorthin, und es entstehen weder Ziehung noch Sitzung. Ihr Knopf »Zur
 Startseite der Erhebung« führt zurück zum Einwilligungsformular ohne
 Vorauswahl; eine neue Entscheidung ersetzt die alte. Ist die Verarbeitung durch
-Sprachmodelle einmal erteilt, stehen alle drei Entscheidungen fest.
+Sprachmodelle einmal erteilt, stehen alle drei Entscheidungen fest; ein
+erneuter Aufruf des Einwilligungsformulars führt dann in den Ablauf.
 Wer der Speicherung nicht zustimmt, macht eine flüchtige Teilnahme: Die
 Vignetten werden genauso gespielt, Verlauf, Debrief und Diagnose erscheinen wie
 gewohnt, und ein Neuladen im selben Browser setzt an derselben Stelle fort.

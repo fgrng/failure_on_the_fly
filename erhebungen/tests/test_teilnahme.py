@@ -347,6 +347,25 @@ class ErhebungsteilnahmeTests(TestCase):
             Erhebungsbindung.objects.get().teilnahme_id, bindung.teilnahme_id
         )
 
+    def test_einwilligungsformular_fuehrt_nach_erteilter_einwilligung_in_den_ablauf(
+        self,
+    ) -> None:
+        """Mit Zustimmung zu Sprachmodellen ist das Formular nicht mehr erreichbar."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        einwilligung_url: str = reverse(
+            "erhebungen:einwilligung", args=[self.stichprobe.teilnahme_link]
+        )
+        self.client.post(einwilligung_url, _ZUSTIMMUNG)
+
+        antwort: HttpResponse = self.client.get(einwilligung_url)
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+        )
+
     def test_formular_zeigt_die_systemtexte_ohne_vorauswahl(self) -> None:
         """Unter dem Text der Forschenden stehen die festen Texte zu a und c."""
 

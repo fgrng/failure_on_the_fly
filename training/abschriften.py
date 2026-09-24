@@ -82,7 +82,7 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
             abgeschlossen_am__isnull=False,
             stichprobe__archiviert=False,
         )
-        .exclude(teilnahme__speicherung_eingewilligt=False)
+        .exclude(Teilnahme.fluechtig_q("teilnahme__"))
         .exclude(stichprobe__erhebung__status=Erhebung.Status.ARCHIVIERT)
         .select_related("stichprobe__erhebung", "teilnahme")
         .first()
