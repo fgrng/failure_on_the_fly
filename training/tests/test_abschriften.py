@@ -102,12 +102,16 @@ def _gespielte_teilnahme(
     stichprobe: Stichprobe | None = None,
     token: str = "2345-6789",
     abgeschlossen: bool = True,
+    speicherung_eingewilligt: bool | None = None,
 ) -> Erhebungsbindung:
     """Legt eine Erhebungsteilnahme mit einer vollständig gespielten Sitzung an."""
 
     bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
         stichprobe=stichprobe or _stichprobe_anlegen(erhebung),
-        teilnahme=Teilnahme.objects.create(sprachmodell_eingewilligt=True),
+        teilnahme=Teilnahme.objects.create(
+            sprachmodell_eingewilligt=True,
+            speicherung_eingewilligt=speicherung_eingewilligt,
+        ),
         token=token,
         abgeschlossen_am=timezone.now() if abgeschlossen else None,
     )
@@ -294,9 +298,7 @@ def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
             erhebung.finalisieren()
             erhebung.archivieren()
         case "fluechtig":
-            bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
-            bindung.teilnahme.speicherung_eingewilligt = False
-            bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
+            _gespielte_teilnahme(erhebung, speicherung_eingewilligt=False)
 
     with pytest.raises(ValidationError) as abgelehnt:
         abschrift_holen(teilnehmerin, token)
@@ -399,9 +401,10 @@ def test_token_einer_fluechtigen_teilnahme_meldet_den_grundlosen_hinweis(
 ) -> None:
     """Auch eine flüchtige Teilnahme verrät die Token-Eingabe nicht."""
 
-    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
-    bindung.teilnahme.speicherung_eingewilligt = False
-    bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
+    forschende: Konto = Konto.objects.create_user(username="ada")
+    bindung: Erhebungsbindung = _gespielte_teilnahme(
+        _erhebung_anlegen(forschende), speicherung_eingewilligt=False
+    )
     client.force_login(Konto.objects.create_user(username="grace"))
 
     antwort: HttpResponse = client.post(
