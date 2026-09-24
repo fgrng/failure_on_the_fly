@@ -416,6 +416,43 @@ class SimulationskernVerwaltungTests(TestCase):
         ):
             self.assertContains(response, f">{bezeichnung}</label>")
 
+    def test_rahmenhandlung_bietet_hinweis_und_umschalter_im_szenentext(
+        self,
+    ) -> None:
+        """Nur die drei Rahmenhandlungsfelder erhalten die Markdown-Vorschau."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        self.assertContains(response, ">Bearbeiten</button>", count=3)
+        self.assertContains(response, ">Vorschau</button>", count=3)
+        self.assertContains(response, '"profil": "szenentext"', count=3)
+        for feld in (
+            "rahmenhandlung_einleitung",
+            "rahmenhandlung_gespraechseinleitung",
+            "rahmenhandlung_debrief",
+        ):
+            self.assertContains(response, f'id="id_{feld}_vorschau"')
+            self.assertContains(response, f'aria-describedby="id_{feld}_helptext"')
+        self.assertNotContains(response, 'id="id_system_prompt_vorlage_vorschau"')
+        self.assertNotContains(response, "[Linktext](https://…)")
+        self.assertContains(response, "Erlaubte Platzhalter:", count=5)
+
+    def test_kern_vorschau_laesst_platzhalter_woertlich_stehen(self) -> None:
+        """Die Vorschau ersetzt keine Platzhalter, Markdown um sie wirkt."""
+        response: HttpResponse = self.client.post(
+            reverse("texte:vorschau"),
+            {"profil": "szenentext", "quelle": "Zu **$thema** bei $lehrperson_anrede"},
+        )
+
+        self.assertContains(
+            response, "Zu <strong>$thema</strong> bei $lehrperson_anrede"
+        )
+
     def test_platzhalteranzeige_folgt_dem_prompt_vertrag(self) -> None:
         """Die Seite nennt jeden Platzhalter des Prompt-Vertrags."""
         entwurf: Simulationskern = Simulationskern.objects.get(

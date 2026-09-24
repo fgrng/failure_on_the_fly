@@ -43,7 +43,11 @@ erscheint wörtlich. Die Teile vor und nach dem Bild werden je für sich
 gerendert. Schülernotation mit `*`, `_`, führendem `-` oder `1.` escapen
 Autor:innen mit einem Backslash. Bildbeschreibung und Simulationshinweise
 bleiben reiner Text. Prompt und Datenspur-Export erhalten die unveränderte
-Markdown-Quelle.
+Markdown-Quelle. Im Vignettenformular stehen unter beiden Feldern der
+Markdown-Hinweis ohne Link-Syntax, samt Backslash-Regel, und derselbe
+Umschalter »Bearbeiten | Vorschau« wie bei den Erhebungstexten; die Vorschau
+rendert den ungespeicherten Text im Profil Szenentext so wie die Sitzung. Bei
+einem Text mit Positionsmarker zeigt sie `[bild]` wörtlich.
 
 ## Trainings verwalten
 
@@ -78,7 +82,10 @@ jeder Sitzung (Training, Erhebung, Probelauf) erscheinen sie gerendert. Die
 Werte der Vignette werden vor dem Einsetzen escaped, sodass nur das Markdown des
 Kerns wirkt: `**$thema**` hebt das Thema hervor, ein Thema mit `*` oder `_`
 erscheint dagegen wörtlich. Die Leseansichten der Kern-Fassungen zeigen die
-Rahmenhandlung gerendert, die Platzhalter wörtlich als `$name`.
+Rahmenhandlung gerendert, die Platzhalter wörtlich als `$name`. Auf der
+Bearbeitungsseite des Entwurfs tragen die drei Felder denselben Markdown-Hinweis
+und Umschalter »Bearbeiten | Vorschau« wie das Vignettenformular; auch dort
+bleiben die Platzhalter in der Vorschau wörtlich stehen.
 
 ## Modell-Konfiguration
 
