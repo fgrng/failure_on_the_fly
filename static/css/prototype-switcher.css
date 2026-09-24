@@ -1,0 +1,47 @@
+/* PROTOTYPE – Variantenleiste (#287, #290). Mit den Prototypen löschen. */
+
+.prototype-switcher {
+    position: fixed;
+    z-index: 20;
+    bottom: var(--space-3);
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: 999px;
+    background: var(--color-text);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text) 30%, transparent);
+    color: var(--color-surface);
+    font-size: .9rem;
+    transform: translateX(-50%);
+}
+
+.prototype-switcher__pfeil {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.prototype-switcher__pfeil:hover {
+    background: var(--phsg-gray-100);
+    color: var(--color-text);
+}
+
+/* Kennzeichnet Flächen, die nur der Prototyp zeigt (Erklärungen, Zustand). */
+.prototype-hinweis {
+    padding: var(--space-2);
+    border: 2px dashed var(--phsg-gray-400);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    font-size: .86rem;
+}
+
+.prototype-hinweis > :first-child { margin-top: 0; }
+.prototype-hinweis > :last-child { margin-bottom: 0; }

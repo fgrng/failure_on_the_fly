@@ -1,0 +1,15 @@
+{# PROTOTYPE #290 – Nachbau von texte/includes/markdown_feld.html (main), clientseitig. Erwartet `t` im Alpine-Scope und feld_id. #}
+<div class="vignette-field markdown-feld" x-data="{ vorschau: false }">
+    <div class="markdown-feld__kopf">
+        {% if not ohne_label %}<label for="{{ feld_id }}"><span x-text="t.label"></span> <span class="lt-status" :class="$store.texte.statusklasse(t)" x-text="$store.texte.status(t)"></span></label>{% endif %}
+        <div class="markdown-feld__umschalter" role="group" :aria-label="'Ansicht ' + t.label">
+            <button type="button" :aria-pressed="vorschau ? 'false' : 'true'" @click="vorschau = false">Bearbeiten</button>
+            <button type="button" :aria-pressed="vorschau ? 'true' : 'false'" @click="vorschau = true">Vorschau</button>
+        </div>
+    </div>
+    <div class="markdown-feld__eingabe" x-show="!vorschau">
+        <textarea id="{{ feld_id }}" :name="t.name" x-model="t.wert" aria-describedby="{{ feld_id }}_helptext" placeholder="Noch kein Text"></textarea>
+    </div>
+    <div class="markdown-feld__vorschau markdown-text" x-show="vorschau" x-cloak x-html="$store.texte.html(t) || '<em>leer</em>'"></div>
+    <small id="{{ feld_id }}_helptext" class="markdown-feld__hinweis">Markdown: Absätze, **fett**, *kursiv*, # Überschrift, - Liste, [Link](https://…).</small>
+</div>

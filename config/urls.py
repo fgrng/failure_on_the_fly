@@ -21,9 +21,17 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from django.urls import include, path
 
+from . import prototype
+
 urlpatterns = [
     path("", TemplateView.as_view(template_name="start.html"), name="start"),
     path("admin/", admin.site.urls),
+    # PROTOTYPE #287 – nur mit DEBUG, siehe templates/PROTOTYPE_BEREICHSMARKIERUNG.md.
+    path(
+        "prototype/bereichsmarkierung/",
+        prototype.bereichsmarkierung,
+        name="bereichsmarkierung_prototype",
+    ),
     path("accounts/", include("django.contrib.auth.urls")),
     path("erhebungen/", include("erhebungen.urls")),
     path("fragebogen-items/", include("fragebogen_items.urls")),

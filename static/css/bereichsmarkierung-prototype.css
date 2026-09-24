@@ -1,0 +1,128 @@
+/* PROTOTYPE #287 – Aktiv- und Hover-Markierung der Sidebar. Wegwerfen, sobald entschieden ist.
+   Greift nur unter [data-nav-variante], das base.html aus dem Cookie `prototype_nav` setzt
+   und die Musterkarten auf der Prototypseite selbst tragen. `.ist-hover` erzwingt in den
+   Musterkarten den Hover-Zustand. Variante a ist der heutige Stand aus navigation.css. */
+
+[data-nav-variante] .sidebar-nav__group--development {
+    --bereich-solid: var(--color-area-authoring-solid);
+    --bereich-tint: var(--color-area-authoring-tint);
+}
+[data-nav-variante] .sidebar-nav__group--education {
+    --bereich-solid: var(--color-area-participant-solid);
+    --bereich-tint: var(--color-area-participant-tint);
+}
+[data-nav-variante] .sidebar-nav__group--research {
+    --bereich-solid: var(--color-area-research-solid);
+    --bereich-tint: var(--color-area-research-tint);
+}
+[data-nav-variante] .sidebar-nav__group--system {
+    --bereich-solid: var(--color-area-system-solid);
+    --bereich-tint: var(--color-area-system-tint);
+}
+
+/* a · heute: grüne Schrift, grüner Balken */
+[data-nav-variante="a"] .sidebar-nav__group a.ist-hover {
+    background: var(--color-surface);
+    color: var(--color-accent-hover);
+}
+
+/* b · nur der Balken trägt die Bereichsfarbe, die Schrift bleibt grün */
+[data-nav-variante="b"] .sidebar-nav__group a.ist-hover {
+    background: var(--color-surface);
+    color: var(--color-accent-hover);
+}
+[data-nav-variante="b"] .sidebar-nav__group a[aria-current="page"] {
+    box-shadow: inset 3px 0 var(--bereich-solid);
+}
+
+/* c · Balken und Fläche im Bereichston, Schrift neutral dunkel */
+[data-nav-variante="c"] .sidebar-nav__group a:is(:hover, .ist-hover) {
+    background: color-mix(in srgb, var(--bereich-tint) 55%, var(--color-surface));
+    box-shadow: inset 3px 0 color-mix(in srgb, var(--bereich-solid) 40%, var(--color-surface));
+    color: var(--color-text);
+    text-decoration: none;
+}
+[data-nav-variante="c"] .sidebar-nav__group a[aria-current="page"] {
+    background: var(--bereich-tint);
+    box-shadow: inset 3px 0 var(--bereich-solid);
+    color: var(--color-text);
+}
+
+/* d · die Gruppe des aktiven Eintrags wird zur getönten Fläche, der Eintrag selbst
+   bleibt neutral (weiss, dunkle Schrift, Punkt in Bereichsfarbe) */
+[data-nav-variante="d"] .sidebar-nav__group:has(a[aria-current="page"]) {
+    padding-bottom: var(--space-1);
+    border-radius: var(--radius);
+    background: var(--bereich-tint);
+}
+[data-nav-variante="d"] .sidebar-nav__group:has(a[aria-current="page"]) h2 {
+    background: transparent;
+}
+[data-nav-variante="d"] .sidebar-nav__group a:is(:hover, .ist-hover) {
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+[data-nav-variante="d"] .sidebar-nav__group a[aria-current="page"] {
+    justify-content: flex-start;
+    gap: var(--space-1);
+    background: var(--color-surface);
+    box-shadow: none;
+    color: var(--color-text);
+}
+[data-nav-variante="d"] .sidebar-nav__group a[aria-current="page"]::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--bereich-solid);
+}
+
+/* ---- Prototypseite ---- */
+.bm-muster {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.bm-muster .sidebar-nav__group {
+    align-content: start;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+}
+
+.bm-muster small.bm-zustand {
+    color: var(--color-text-muted);
+    font-size: .7rem;
+    font-weight: 500;
+}
+
+.bm-tabelle td,
+.bm-tabelle th {
+    padding: var(--space-1) var(--space-2);
+    font-size: .84rem;
+    vertical-align: top;
+}
+
+.bm-tabelle del {
+    color: var(--color-text-muted);
+}
+
+.bm-tabelle ins {
+    display: block;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.bm-bereich {
+    display: inline-block;
+    padding: 0 var(--space-1);
+    border-left: 4px solid var(--area-solid);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+@container hauptbereich (max-width: 900px) {
+    .bm-muster { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

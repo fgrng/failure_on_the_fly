@@ -16,6 +16,18 @@ urlpatterns: list[URLPattern] = [
         views.itemseite_prototype,
         name="itemseite_prototype",
     ),
+    # PROTOTYPE #290 – nur mit DEBUG, siehe erhebungen/PROTOTYPE_LANGE_TEXTE.md.
+    path(
+        "prototype/lange-texte/",
+        views.lange_texte_prototype,
+        name="lange_texte_prototype",
+    ),
+    # PROTOTYPE #287 (Namensfeld) – nur mit DEBUG, siehe erhebungen/PROTOTYPE_NAMENSFELD.md.
+    path(
+        "prototype/namensfeld/",
+        views.namensfeld_prototype,
+        name="namensfeld_prototype",
+    ),
     path("eigene/", views.liste, name="liste"),
     path("eigene/anlegen/", views.anlegen, name="anlegen"),
     path("eigene/<int:pk>/", views.detail, name="detail"),

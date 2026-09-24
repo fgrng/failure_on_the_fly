@@ -1,0 +1,68 @@
+/* PROTOTYPE #290 – lange Erhebungstexte. Wegwerfen, sobald entschieden ist. */
+
+[x-cloak] { display: none !important; }
+
+/* ---- Nachbau aus main: markdown-text.css (Markdown-Feld und gerenderter Text) ---- */
+.markdown-feld__kopf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1); margin-bottom: var(--space-1); }
+.markdown-feld__kopf label { margin: 0; }
+.markdown-feld__umschalter { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+.markdown-feld__umschalter button { padding: 0 var(--space-1); line-height: 1.8; border: 0; background: var(--color-surface); color: var(--color-text-muted); font: inherit; font-size: .78rem; cursor: pointer; }
+.markdown-feld__umschalter button[aria-pressed="true"] { background: var(--color-text); color: var(--color-surface); }
+.markdown-feld__vorschau { min-height: 116px; padding: var(--space-1); border: 1px dashed var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.markdown-feld__hinweis { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: .75rem; }
+.markdown-text > :first-child { margin-top: 0; }
+.markdown-text > :last-child { margin-bottom: 0; }
+.markdown-text p, .markdown-text ul { margin: 0 0 var(--space-2); }
+.markdown-text :is(h3, h4, h5) { margin: var(--space-3) 0 var(--space-1); font-size: 1em; }
+
+/* ---- Rahmen der Prototypseite ---- */
+#erhebung-konfiguration .page-section > * { min-width: 0; }
+.lt-zustand { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-bottom: var(--space-3); }
+.lt-attrappe { display: grid; gap: var(--space-1); }
+.lt-attrappe div { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-muted); color: var(--color-text-muted); font-size: .86rem; }
+
+.lt-status { display: inline-block; padding: 0 var(--space-1); border-radius: 999px; background: var(--phsg-gray-100); color: var(--color-text-muted); font-size: .72rem; font-weight: 600; white-space: nowrap; }
+.lt-status--fehlt { background: var(--color-danger-tint); color: var(--color-danger-emphasis); }
+.lt-status--geaendert { background: var(--color-area-authoring-tint); color: var(--phsg-yellow-deep); }
+.lt-feld--fehlt textarea, .lt-feld--fehlt dd { border-left: 3px solid var(--color-danger); }
+.lt-link { padding: 0; border: 0; background: none; color: var(--color-accent); font: inherit; font-size: .84rem; text-decoration: underline; cursor: pointer; }
+.lt-klein { padding: 2px var(--space-1); font-size: .78rem; }
+
+/* ---- A · Akkordeon ---- */
+.lt-akkordeon { display: grid; gap: var(--space-1); }
+.lt-box { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.lt-box--fehlt { border-color: var(--color-danger); }
+.lt-box summary { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: var(--space-1) var(--space-2); padding: var(--space-1) var(--space-2); cursor: pointer; }
+.lt-box__titel { font-size: .86rem; font-weight: 700; }
+.lt-box__vorschau { overflow: hidden; color: var(--color-text-muted); font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.lt-box[open] .lt-box__vorschau { visibility: hidden; }
+.lt-box > .markdown-feld { padding: 0 var(--space-2) var(--space-2); }
+
+/* ---- B · wachsende Felder ---- */
+.lt-wachsend { display: grid; gap: var(--space-2); }
+.lt-wachsend textarea { min-height: 0; height: 3.2rem; resize: none; field-sizing: content; max-height: 3.2rem; overflow: hidden; transition: max-height .15s; }
+.lt-wachsend .markdown-feld:focus-within textarea { max-height: 60vh; min-height: 8rem; overflow: auto; }
+.lt-wachsend .markdown-feld__umschalter, .lt-wachsend .markdown-feld__hinweis { visibility: hidden; }
+.lt-wachsend .markdown-feld:focus-within :is(.markdown-feld__umschalter, .markdown-feld__hinweis),
+.lt-wachsend .markdown-feld:has([aria-pressed="true"]:last-child) .markdown-feld__umschalter { visibility: visible; }
+.lt-wachsend .markdown-feld__hinweis { margin-top: 2px; }
+
+/* ---- C · Lesen mit Bearbeiten ---- */
+.lt-lesen { display: grid; gap: var(--space-2); margin: 0; }
+.lt-lesen dt { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); font-size: .86rem; font-weight: 700; }
+.lt-lesen dt .button { margin-left: auto; }
+.lt-lesen dd { margin: 0; padding-left: var(--space-2); border-left: 3px solid var(--color-border); }
+.lt-lesen > .lt-feld--fehlt dd { border-left-color: var(--color-danger); }
+.lt-gekuerzt { max-height: 4.8em; overflow: hidden; mask-image: linear-gradient(#000 60%, transparent); }
+.lt-gekuerzt--ganz { max-height: none; mask-image: none; }
+.lt-leer { margin: 0; color: var(--color-text-muted); font-style: italic; }
+.lt-aktionen { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+
+/* ---- D · Reiter ---- */
+.lt-reiter__leiste { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-2); }
+.lt-reiter__leiste button { display: flex; align-items: center; gap: 6px; padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: none; color: var(--color-text-muted); font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; }
+.lt-reiter__leiste button[aria-selected="true"] { margin-bottom: -1px; border-color: var(--color-border); background: var(--color-surface); color: var(--color-text); }
+.lt-marke { display: inline-grid; width: 1.1rem; height: 1.1rem; place-items: center; border-radius: 50%; font-size: .7rem; }
+.lt-marke--fehlt { background: var(--color-danger); color: var(--phsg-white); }
+.lt-marke--geaendert { color: var(--phsg-yellow-dark); }
+.lt-reiter textarea { min-height: 14rem; }

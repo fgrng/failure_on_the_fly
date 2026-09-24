@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static %}
+{# PROTOTYPE #287 – Bereichsmarkierung in Navigation und Formularseiten. Siehe templates/PROTOTYPE_BEREICHSMARKIERUNG.md. #}
+
+{% block title %}Prototyp · Bereichsmarkierung{% endblock %}
+
+{% block extra_head %}
+    {# Beim ersten Aufruf ist das Cookie noch nicht gesetzt, darum hier fest laden. #}
+    <link rel="stylesheet" href="{% static 'css/bereichsmarkierung-prototype.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page" data-nav-variante="{{ variante }}">
+    <header class="page-head">
+        <div>
+            <p>Prototyp #287 · keine Speicherung</p>
+            <h1>Bereichsmarkierung</h1>
+            <span>{{ variantenbezeichnung }}. Die echte Sidebar links trägt dieselbe Variante auf allen Seiten, solange der Browser offen ist. <a href="?aus=1">Prototyp-Cookie löschen</a></span>
+        </div>
+    </header>
+
+    <section class="page-section page-section--gestapelt" aria-labelledby="bm-muster">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="bm-muster">Sidebar in allen vier Bereichen</h2><small>Je Gruppe: normal, Hover (erzwungen), aktiv. Mit der Maus über die Einträge fahren zeigt den echten Hover.</small></span>
+        </header>
+        <div class="bm-muster">
+            <section class="sidebar-nav__group sidebar-nav__group--development">
+                <h2>Entwicklung</h2>
+                <div>
+                    <a href="#">Vignetten ansehen <small class="bm-zustand">normal</small></a>
+                    <a href="#" class="ist-hover">Simulationskern ansehen <small class="bm-zustand">hover</small></a>
+                    <a href="#" aria-current="page">Neue Vignette erstellen <small class="bm-zustand">aktiv</small></a>
+                </div>
+            </section>
+            <section class="sidebar-nav__group sidebar-nav__group--education">
+                <h2>Ausbildung</h2>
+                <div>
+                    <a href="#">Trainingskataloge ansehen <small class="bm-zustand">normal</small></a>
+                    <a href="#" class="ist-hover">Meine Abschriften <small class="bm-zustand">hover</small></a>
+                    <a href="#" aria-current="page">Trainingskatalog erstellen <small class="bm-zustand">aktiv</small></a>
+                </div>
+            </section>
+            <section class="sidebar-nav__group sidebar-nav__group--research">
+                <h2>Forschung</h2>
+                <div>
+                    <a href="#">Meine Erhebungen <small class="bm-zustand">normal</small></a>
+                    <a href="#" class="ist-hover">Fragebogen-Items <small class="bm-zustand">hover</small></a>
+                    <a href="#" aria-current="page">Neue Erhebung anlegen <small class="bm-zustand">aktiv</small></a>
+                </div>
+            </section>
+            <section class="sidebar-nav__group sidebar-nav__group--system">
+                <h2>System</h2>
+                <div>
+                    <a href="#">Modell-Konfiguration <small class="bm-zustand">normal</small></a>
+                    <a href="#" class="ist-hover">Administration <small class="bm-zustand">hover</small></a>
+                    <a href="#" aria-current="page">Transkriptions-Konfiguration <small class="bm-zustand">aktiv</small></a>
+                </div>
+            </section>
+        </div>
+        <div class="prototype-hinweis">
+            {% if variante == "a" %}
+                <p><strong>A · heute.</strong> Aktiv: weisse Fläche, grüne Schrift (#2c512c), grüner Balken (#009b56). Hover: weisse Fläche, grüne Schrift. Entspricht ADR-0024 wörtlich. Dissonanz: gelbe Gruppe mit grünem Balken.</p>
+            {% elif variante == "b" %}
+                <p><strong>B · Balken in Bereichsfarbe.</strong> Aktiv: nur der 3-px-Balken wechselt auf <code>--color-area-*-solid</code>, die Schrift bleibt grün. Hover unverändert grün. Kleinster Eingriff: Grün bleibt die Interaktionsfarbe, der Balken ist ein grafisches Element (WCAG 1.4.11, 3:1). Gelb-Dark auf Weiss: <strong>4,42:1</strong>, Mint 4,71, Violett 8,79, Blau 7,44.</p>
+            {% elif variante == "c" %}
+                <p><strong>C · Balken und Fläche im Bereichston.</strong> Aktiv: Fläche <code>--color-area-*-tint</code>, Balken <code>-solid</code>, Schrift neutral dunkel (#383836; auf Tint ≥ 8,3:1). Hover: halbe Tint-Fläche, aufgehellter Balken in Bereichsfarbe, dunkle Schrift, keine Unterstreichung. Grün verschwindet ganz aus der Navigation, darum müsste ADR-0024 »aktive Navigation« aus den grünen Akzenten streichen.</p>
+            {% else %}
+                <p><strong>D · Gruppe als getönte Fläche.</strong> Die ganze Gruppe des aktiven Eintrags wird zur Tint-Fläche. Der Eintrag selbst ist weiss mit dunkler Schrift und einem Punkt in Bereichsfarbe, ohne Balken. Hover: weiss, dunkle Schrift. Der Bereich ist schon von Weitem sichtbar, der einzelne Eintrag ist aber schwächer markiert.</p>
+            {% endif %}
+            <p>Zum Vergleich auf echten Seiten: <a href="{% url 'vignetten:anlegen' %}">Neue Vignette</a> · <a href="{% url 'training:anlegen' %}">Training erstellen</a> · <a href="{% url 'erhebungen:liste' %}">Meine Erhebungen</a> · <a href="{% url 'simulation:modell_konfiguration' %}">Modell-Konfiguration</a></p>
+        </div>
+    </section>
+
+    <section class="page-section page-section--gestapelt" aria-labelledby="bm-seiten">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="bm-seiten">Vorschlag: Seite → Bereich → Überzeile → Titel → Knopf</h2><small>Durchgestrichen der heutige Stand, darunter fett der Vorschlag. Ohne Streichung bleibt es. Regel: Überzeile = Sidebar-Gruppe / Sidebar-Eintrag; Titel = Aktion bzw. Objektname; Verb überall »anlegen«; Bearbeiten-Seiten speichern »Änderungen«.</small></span>
+        </header>
+        <div class="table-wrap">
+            <table class="table bm-tabelle">
+                <thead>
+                    <tr><th>Seite</th><th>Bereich</th><th>Überzeile</th><th>Titel</th><th>Absendeknopf</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>vignetten/anlegen</code></td><td><span class="bm-bereich area--authoring">Entwicklung</span></td><td><del>Neue Vignette</del><ins>Entwicklung / Vignetten</ins></td><td><del>Schritt für Schritt zur Trainingssituation</del><ins>Vignette anlegen</ins><small>alter Titel wird Untertitel</small></td><td><del>Vignette speichern</del><ins>Vignette anlegen</ins></td></tr>
+                    <tr><td><code>vignetten/bearbeiten</code></td><td><span class="bm-bereich area--authoring">Entwicklung</span></td><td><del>Vignette bearbeiten</del><ins>Entwicklung / Vignetten</ins></td><td><del>Schritt für Schritt zur Trainingssituation</del><ins>Vignette bearbeiten</ins></td><td><del>Vignette speichern</del><ins>Änderungen speichern</ins></td></tr>
+                    <tr><td><code>vignetten/liste</code></td><td><del>ohne</del><ins><span class="bm-bereich area--authoring">Entwicklung</span></ins></td><td><del>Entwicklung</del><ins>Entwicklung / Vignetten</ins></td><td>Meine Vignetten</td><td>–</td></tr>
+                    <tr><td><code>vignetten/detail</code></td><td><del>ohne</del><ins><span class="bm-bereich area--authoring">Entwicklung</span></ins></td><td><del>Vignette ansehen</del><ins>Entwicklung / Vignetten</ins></td><td>Fach: Thema</td><td>–</td></tr>
+                    <tr><td><code>simulation/kern</code></td><td><span class="bm-bereich area--authoring">Entwicklung</span></td><td><del>Entwicklung</del><ins>Entwicklung / Simulationskern</ins></td><td>Simulationskern</td><td>–</td></tr>
+                    <tr><td><code>simulation/kern_verwalten</code></td><td><del>System</del><ins><span class="bm-bereich area--authoring">Entwicklung</span></ins></td><td><del>System</del><ins>Entwicklung / Simulationskern</ins></td><td>Simulationskern verwalten</td><td>Neuen Entwurf anlegen</td></tr>
+                    <tr><td><code>simulation/kern_bearbeiten</code></td><td><del>System</del><ins><span class="bm-bereich area--authoring">Entwicklung</span></ins></td><td><del>System</del><ins>Entwicklung / Simulationskern</ins></td><td>Kern-Entwurf bearbeiten</td><td><del>Kern-Entwurf speichern</del><ins>Änderungen speichern</ins></td></tr>
+                    <tr><td><code>training/anlegen</code></td><td><del>Entwicklung</del><ins><span class="bm-bereich area--participant">Ausbildung</span></ins></td><td><del>Neues Training</del><ins>Ausbildung / Trainings</ins></td><td><del>Training erstellen</del><ins>Training anlegen</ins></td><td>Training anlegen</td></tr>
+                    <tr><td><code>training/kuratieren</code></td><td><del>ohne</del><ins><span class="bm-bereich area--participant">Ausbildung</span></ins></td><td><del>Training kuratieren</del><ins>Ausbildung / Trainings</ins></td><td>Name des Trainings</td><td>–</td></tr>
+                    <tr><td><code>training/katalog</code>, <code>liste</code></td><td><del>ohne</del><ins><span class="bm-bereich area--participant">Ausbildung</span></ins></td><td>Ausbildung</td><td>Trainingskataloge / Meine Trainings</td><td>–</td></tr>
+                    <tr><td><code>training/detail</code>, <code>wahl</code>, <code>einwilligung</code></td><td><del>ohne (detail)</del><ins><span class="bm-bereich area--participant">Ausbildung</span></ins></td><td><del>Training ansehen / Training starten</del><ins>Ausbildung / Training starten</ins></td><td>–</td><td>–</td></tr>
+                    <tr><td><code>erhebungen/anlegen</code></td><td><span class="bm-bereich area--research">Forschung</span></td><td><del>Forschung</del><ins>Forschung / Meine Erhebungen</ins></td><td><del>Neue Erhebung anlegen</del><ins>Erhebung anlegen</ins></td><td><del>Anlegen</del><ins>Erhebung anlegen</ins><small>Namensfeld über das Formular rendern (Fehler, Hilfetext)</small></td></tr>
+                    <tr><td><code>erhebungen/detail</code></td><td><span class="bm-bereich area--research">Forschung</span></td><td>Forschung / Meine Erhebungen</td><td>Name der Erhebung</td><td>Konfiguration speichern</td></tr>
+                    <tr><td><code>fragebogen_items/anlegen</code></td><td><span class="bm-bereich area--research">Forschung</span></td><td><del>Forschung</del><ins>Forschung / Fragebogen-Items</ins></td><td><del>Neues Fragebogen-Item anlegen</del><ins>Fragebogen-Item anlegen</ins></td><td><del>Item anlegen</del><ins>Fragebogen-Item anlegen</ins></td></tr>
+                    <tr><td><code>fragebogen_items/bearbeiten</code></td><td><span class="bm-bereich area--research">Forschung</span></td><td>Forschung / Fragebogen-Items</td><td>Fragebogen-Item bearbeiten</td><td>Änderungen speichern</td></tr>
+                    <tr><td><code>simulation/modell_konfiguration</code></td><td><span class="bm-bereich area--system">System</span></td><td><del>System</del><ins>System / Modell-Konfiguration</ins></td><td>Modell-Konfiguration</td><td>Konfiguration anlegen</td></tr>
+                    <tr><td><code>simulation/transkriptions_konfiguration</code></td><td><span class="bm-bereich area--system">System</span></td><td><del>System</del><ins>System / Transkriptions-Konfiguration</ins></td><td>Transkriptions-Konfiguration</td><td><del>Konfiguration speichern</del><ins>Änderungen speichern</ins></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="prototype-hinweis">
+            <p><strong>Sidebar dazu:</strong> »Simulationskern verwalten« wandert von System nach Entwicklung (neben »Simulationskern ansehen«). Einträge: »Neue Vignette erstellen« → »Neue Vignette anlegen«, »Trainingskatalog erstellen« → »Neues Training anlegen«, »Trainingskataloge ansehen« → »Trainings ansehen« (CONTEXT.md kennt nur »Training«).</p>
+        </div>
+    </section>
+
+    <section class="page-section page-section--gestapelt" aria-labelledby="bm-felder">
+        <header class="page-section__head">
+            <b>03</b><span><h2 id="bm-felder">Vorschlag: Feldbeschriftungen im Vignettenformular</h2><small><code>vignetten/forms.py</code> und <code>vignetten/detail.html</code>, gekoppelt wie in CONTEXT.md.</small></span>
+        </header>
+        <div class="table-wrap">
+            <table class="table bm-tabelle">
+                <thead><tr><th>Feld</th><th>Heute</th><th>Vorschlag</th></tr></thead>
+                <tbody>
+                    <tr><td><code>fehlermuster_beschreibung</code></td><td>Fehlermuster Beschreibung</td><td><ins>Fehlermuster-Beschreibung</ins></td></tr>
+                    <tr><td><code>lernauftrag_text</code> / <code>arbeitsheft_text</code></td><td>Lernauftrag Text</td><td><ins>Lernauftrag-Text</ins></td></tr>
+                    <tr><td><code>*_bild</code></td><td>Lernauftrag Bild</td><td><ins>Lernauftrag-Bild</ins></td></tr>
+                    <tr><td><code>*_bildbeschreibung</code></td><td>Lernauftrag Bildbeschreibung</td><td><ins>Lernauftrag-Bildbeschreibung</ins></td></tr>
+                    <tr><td><code>*_simulationshinweise</code></td><td>Lernauftrag Simulationshinweise (optional)</td><td><ins>Lernauftrag-Simulationshinweise (optional)</ins></td></tr>
+                    <tr><td><code>schuelerin_name</code></td><td>Schüler:in Vorname</td><td><ins>Vorname der Schüler:in</ins></td></tr>
+                    <tr><td><code>budget_typ</code> / <code>budget_wert</code></td><td>Budget Typ / Budget Wert</td><td><ins>Budget-Typ / Budget-Wert</ins></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+
+{% include "includes/prototype_switcher.html" %}
+{% endblock %}

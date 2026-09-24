@@ -1,0 +1,8 @@
+{# PROTOTYPE #290 · B – alle drei Felder sichtbar, aber zwei Zeilen hoch; beim Fokus wachsen sie mit dem Inhalt. Umschalter und Hinweis nur am fokussierten Feld. Ein Speichern für alle. #}
+<div class="lt-wachsend">
+    {% for text in texte %}
+    <div x-data="{ t: $store.texte.get('{{ text.schluessel }}') }" :class="{ 'lt-feld--fehlt': $store.texte.fehlt(t) }">
+        {% include "erhebungen/prototype_lange_texte/markdown_feld.html" with feld_id="b-"|add:text.schluessel %}
+    </div>
+    {% endfor %}
+</div>

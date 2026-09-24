@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+{# PROTOTYPE #290 – lange Erhebungstexte platzsparend bearbeiten. Siehe erhebungen/PROTOTYPE_LANGE_TEXTE.md. #}
+
+{% block title %}Prototyp · Lange Erhebungstexte{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+    <link rel="stylesheet" href="{% static 'css/lange-texte-prototype.css' %}">
+    {{ texte|json_script:"lange-texte-daten" }}
+    <script src="{% static 'js/lange-texte-prototype.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen · Prototyp #290</p>
+            <h1>Bruchrechnung Herbst 2026</h1>
+            <span>{{ variantenbezeichnung }}. Nichts wird gespeichert; »Speichern« meldet nur, was gesendet würde.</span>
+        </div>
+        <span class="badge badge--draft">Entwurf</span>
+    </header>
+
+    <div class="prototype-hinweis lt-zustand" x-data>
+        <strong>Zustand</strong>
+        <template x-for="t in $store.texte.liste" :key="t.schluessel">
+            <span><span x-text="t.label"></span>: <span class="lt-status" :class="$store.texte.statusklasse(t)" x-text="$store.texte.status(t)"></span></span>
+        </template>
+        <span>Abschnitt 02 beginnt <strong x-text="$store.texte.abschnitt02"></strong> px unter dem Beginn von 01.</span>
+        <span role="status" x-text="$store.texte.meldung"></span>
+    </div>
+
+    <form id="erhebung-konfiguration" method="post" x-data @submit.prevent="$store.texte.speichern()">
+        <section id="lt-konfiguration" class="page-section" aria-labelledby="section-config">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-config">Konfiguration</h2><small>Instruktion, Einwilligung und Abschluss definieren.</small></span>
+            </header>
+            {% include variantenvorlage %}
+        </section>
+        {% if variante != "c" %}
+        <div class="vignette-form-actions">
+            <button class="button" type="submit">Konfiguration speichern</button>
+        </div>
+        {% endif %}
+    </form>
+
+    <section id="lt-vignetten" class="page-section" aria-labelledby="section-vignettes">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="section-vignettes">Vignetten verwalten</h2><small>Attrappe: steht hier nur, damit man sieht, wann die Liste beginnt.</small></span>
+        </header>
+        <div class="lt-attrappe">
+            <div>Mathematik: Brüche addieren · Entwurf 3</div>
+            <div>Mathematik: Brüche kürzen · Final</div>
+            <div>Mathematik: Dezimalbrüche · Final</div>
+        </div>
+    </section>
+
+    <section class="page-section" aria-labelledby="section-fragebogen">
+        <header class="page-section__head">
+            <b>03</b><span><h2 id="section-fragebogen">Fragebogen</h2><small>Attrappe.</small></span>
+        </header>
+        <div class="lt-attrappe">
+            <div>Nach jeder Vignettensitzung · 2 Items</div>
+            <div>Am Ende · 4 Items</div>
+        </div>
+    </section>
+</section>
+
+{% include "includes/prototype_switcher.html" %}
+{% endblock %}

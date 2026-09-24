@@ -1,0 +1,18 @@
+{# PROTOTYPE #290 · D – ein einziges Markdown-Feld, die drei Texte als Reiter darüber. Status als Marke am Reiter. Ein Speichern für alle. #}
+<div class="lt-reiter" x-data="{ aktiv: 'instruktion' }">
+    <div class="lt-reiter__leiste" role="tablist" aria-label="Erhebungstexte">
+        {% for text in texte %}
+        <button type="button" role="tab" x-data="{ t: $store.texte.get('{{ text.schluessel }}') }"
+                :aria-selected="aktiv === t.schluessel ? 'true' : 'false'" @click="aktiv = t.schluessel">
+            <span x-text="t.label"></span>
+            <span class="lt-marke lt-marke--fehlt" x-show="$store.texte.fehlt(t)" title="Leer, wird benötigt">!</span>
+            <span class="lt-marke lt-marke--geaendert" x-show="$store.texte.geaendert(t)" title="Ungespeichert">●</span>
+        </button>
+        {% endfor %}
+    </div>
+    {% for text in texte %}
+    <div role="tabpanel" x-show="aktiv === '{{ text.schluessel }}'" x-data="{ t: $store.texte.get('{{ text.schluessel }}') }" {% if not forloop.first %}x-cloak{% endif %}>
+        {% include "erhebungen/prototype_lange_texte/markdown_feld.html" with feld_id="d-"|add:text.schluessel ohne_label=True %}
+    </div>
+    {% endfor %}
+</div>

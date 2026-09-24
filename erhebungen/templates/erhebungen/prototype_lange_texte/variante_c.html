@@ -1,0 +1,32 @@
+{# PROTOTYPE #290 · C – gerenderter Text wie in der finalisierten Ansicht, gekürzt auf wenige Zeilen. »Bearbeiten« öffnet das Markdown-Feld mit eigenem Speichern/Abbrechen je Text. #}
+<dl class="lt-lesen">
+    {% for text in texte %}
+    <div x-data="{ t: $store.texte.get('{{ text.schluessel }}'), bearbeiten: false, ganz: false }"
+         :class="{ 'lt-feld--fehlt': $store.texte.fehlt(t) && !bearbeiten }">
+        <dt>
+            <span x-text="t.label"></span>
+            <span class="lt-status" :class="$store.texte.statusklasse(t)" x-text="$store.texte.status(t)"></span>
+            <button type="button" class="button button--secondary lt-klein" x-show="!bearbeiten" @click="bearbeiten = true; $nextTick(() => document.getElementById('c-{{ text.schluessel }}').focus())"
+                    x-text="$store.texte.leer(t) ? 'Text schreiben' : 'Bearbeiten'"></button>
+        </dt>
+        <dd x-show="!bearbeiten">
+            <template x-if="$store.texte.leer(t)">
+                <p class="lt-leer" x-text="t.benoetigt ? 'Noch kein Text. Teilnehmende sehen hier eine leere Seite.' : 'Kein Text (optional).'"></p>
+            </template>
+            <template x-if="!$store.texte.leer(t)">
+                <div>
+                    <div class="markdown-text lt-gekuerzt" :class="{ 'lt-gekuerzt--ganz': ganz }" x-html="$store.texte.html(t)"></div>
+                    <button type="button" class="lt-link" x-show="t.wert.length > 200" @click="ganz = !ganz" x-text="ganz ? 'Weniger anzeigen' : 'Ganz anzeigen'"></button>
+                </div>
+            </template>
+        </dd>
+        <dd x-show="bearbeiten" x-cloak>
+            {% include "erhebungen/prototype_lange_texte/markdown_feld.html" with feld_id="c-"|add:text.schluessel ohne_label=True %}
+            <div class="lt-aktionen">
+                <button type="button" class="lt-link" @click="$store.texte.verwerfen(t.schluessel); bearbeiten = false">Abbrechen</button>
+                <button type="button" class="button" @click="$store.texte.speichern(t.schluessel); bearbeiten = false" x-text="t.label + ' speichern'"></button>
+            </div>
+        </dd>
+    </div>
+    {% endfor %}
+</dl>

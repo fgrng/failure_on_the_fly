@@ -1,0 +1,8 @@
+{# PROTOTYPE #290 · Heute – drei vollständige Markdown-Felder untereinander, wie auf main. Nur als Messlatte. #}
+<div class="field-grid">
+    {% for text in texte %}
+    <div class="page-field--wide" x-data="{ t: $store.texte.get('{{ text.schluessel }}') }">
+        {% include "erhebungen/prototype_lange_texte/markdown_feld.html" with feld_id="h-"|add:text.schluessel %}
+    </div>
+    {% endfor %}
+</div>

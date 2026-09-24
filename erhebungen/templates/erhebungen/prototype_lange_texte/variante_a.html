@@ -1,0 +1,14 @@
+{# PROTOTYPE #290 · A – <details> je Text. Geschlossen: Status und erste Zeilen. Leere benötigte Texte starten offen. Ein Speichern für alle. #}
+<div class="lt-akkordeon">
+    {% for text in texte %}
+    <details class="lt-box" x-data="{ t: $store.texte.get('{{ text.schluessel }}') }" {% if text.benoetigt and not text.wert %}open{% endif %}
+             :class="{ 'lt-box--fehlt': $store.texte.fehlt(t), 'lt-box--geaendert': $store.texte.geaendert(t) }">
+        <summary>
+            <span class="lt-box__titel" x-text="t.label"></span>
+            <span class="lt-status" :class="$store.texte.statusklasse(t)" x-text="$store.texte.status(t)"></span>
+            <span class="lt-box__vorschau" x-show="!$store.texte.leer(t)" x-text="$store.texte.ersteZeile(t)"></span>
+        </summary>
+        {% include "erhebungen/prototype_lange_texte/markdown_feld.html" with feld_id="a-"|add:text.schluessel ohne_label=True %}
+    </details>
+    {% endfor %}
+</div>

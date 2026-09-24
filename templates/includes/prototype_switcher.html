@@ -1,0 +1,9 @@
+{% load static %}
+{# PROTOTYPE – Variantenleiste für #287, #290. Erwartet den Kontext aus config/prototype.py. #}
+<link rel="stylesheet" href="{% static 'css/prototype-switcher.css' %}">
+<script src="{% static 'js/prototype-switcher.js' %}" defer></script>
+<nav class="prototype-switcher" aria-label="Prototyp-Variante wechseln" data-vorherige="{{ vorherige_variante }}" data-naechste="{{ naechste_variante }}">
+    <a class="prototype-switcher__pfeil" href="?variant={{ vorherige_variante }}" aria-label="Vorherige Variante">←</a>
+    <span>{{ variantenbezeichnung }}</span>
+    <a class="prototype-switcher__pfeil" href="?variant={{ naechste_variante }}" aria-label="Nächste Variante">→</a>
+</nav>

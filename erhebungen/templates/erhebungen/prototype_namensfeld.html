@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+{# PROTOTYPE #287 (Namensfeld) – Siehe erhebungen/PROTOTYPE_NAMENSFELD.md. #}
+
+{% block title %}Prototyp · Namensfeld der Erhebung{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <style>
+        /* PROTOTYPE */
+        [x-cloak] { display: none !important; }
+        .nf-titel { display: flex; align-items: center; gap: var(--space-2); }
+        .nf-titel input { font-family: var(--font-heading); font-size: clamp(1.6rem, 3vw, 2.6rem); padding: 0 var(--space-1); }
+        .nf-fehler { margin: var(--space-1) 0 0; color: var(--color-danger); font-size: .78rem; }
+    </style>
+{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <div class="prototype-hinweis" style="margin-bottom: var(--space-4);">
+        <p><strong>{{ variantenbezeichnung }}.</strong>
+        {% if variante == "a" %}So ist es heute: Das Feld steht von Hand im Template, die View nimmt den Wert ungeprüft. Probieren: nur Leerzeichen eingeben (der Browser lässt sie durch) oder einen sehr langen Namen.
+        {% elif variante == "b" %}Gleiches Aussehen, aber ein Django-Formular dahinter: Leerzeichen werden abgeschnitten, »leer« und »zu lang« kommen als Meldung unter dem Feld zurück, die Eingabe bleibt stehen, und ein Hilfetext sagt, wo der Name auftaucht. Zum Ausprobieren ist die Browserprüfung abgeschaltet (<code>novalidate</code>), damit man die Servermeldung sieht.
+        {% else %}Keine eigene Anlegen-Seite: »Neue Erhebung anlegen« legt sofort einen Entwurf »Neue Erhebung« an und öffnet ihn. Der Name ist der Seitentitel und lässt sich dort jederzeit umbenennen (heute geht das nach dem Anlegen gar nicht mehr).{% endif %}</p>
+        {% if ergebnis %}<p role="status"><strong>Ergebnis:</strong> {{ ergebnis }}</p>{% endif %}
+    </div>
+
+    {% if variante == "c" %}
+    <header class="page-head" x-data="{ bearbeiten: false, name: 'Neue Erhebung', entwurf: 'Neue Erhebung', get fehler() { return !this.entwurf.trim() ? 'Bitte geben Sie einen Namen ein.' : this.entwurf.length > 255 ? 'Höchstens 255 Zeichen.' : '' } }">
+        <div>
+            <p>Forschung / Meine Erhebungen</p>
+            <div class="nf-titel" x-show="!bearbeiten">
+                <h1 x-text="name"></h1>
+                <button type="button" class="button button--secondary" @click="entwurf = name; bearbeiten = true; $nextTick(() => $refs.eingabe.select())">Umbenennen</button>
+            </div>
+            <form class="nf-titel" x-show="bearbeiten" x-cloak @submit.prevent="if (!fehler) { name = entwurf.trim(); bearbeiten = false }" @keydown.escape="bearbeiten = false">
+                <label for="nf-name" class="visually-hidden" style="position:absolute;left:-9999px">Name</label>
+                <input id="nf-name" x-ref="eingabe" x-model="entwurf" maxlength="300">
+                <button class="button" type="submit">Speichern</button>
+                <button class="button button--secondary" type="button" @click="bearbeiten = false">Abbrechen</button>
+            </form>
+            <p class="nf-fehler" x-show="bearbeiten && fehler" x-text="fehler"></p>
+            <span>Erscheint in Ihrer Erhebungsliste, im Dateinamen der Datenspur und in den Abschriften der Teilnehmenden.</span>
+        </div>
+        <span class="badge badge--draft">Entwurf</span>
+    </header>
+    <section class="page-section" aria-labelledby="nf-attrappe">
+        <header class="page-section__head"><b>01</b><span><h2 id="nf-attrappe">Konfiguration</h2><small>Attrappe: Hier geht die Erhebungsseite weiter.</small></span></header>
+        <div class="prototype-hinweis">Instruktion, Einwilligung, Abschluss …</div>
+    </section>
+    {% else %}
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen</p>
+            <h1>Erhebung anlegen</h1>
+            <span>Legen Sie den Namen für die Datenerhebung fest.</span>
+        </div>
+    </header>
+    <form method="post" {% if variante == "b" %}novalidate{% endif %}>
+        {% csrf_token %}
+        <section class="page-section" aria-labelledby="section-name">
+            <header class="page-section__head">
+                <b>01</b><span><h2 id="section-name">Name</h2><small>Wie soll die Erhebung heißen?</small></span>
+            </header>
+            <div class="field-grid">
+                {% if variante == "a" %}
+                <div class="vignette-field">
+                    <label for="id_name">Name</label>
+                    <input id="id_name" name="name" required>
+                </div>
+                {% else %}
+                {% with feld=formular.name %}
+                <div class="vignette-field">
+                    <label for="{{ feld.id_for_label }}">{{ feld.label }}</label>
+                    {{ feld }}
+                    <small id="{{ feld.id_for_label }}_helptext">{{ feld.help_text }}</small>
+                    {{ feld.errors }}
+                </div>
+                {% endwith %}
+                {% endif %}
+            </div>
+        </section>
+        <div class="vignette-form-actions">
+            <a href="?variant={{ variante }}">Abbrechen</a>
+            <button class="button" type="submit">Erhebung anlegen</button>
+        </div>
+    </form>
+    {% endif %}
+</section>
+
+{% include "includes/prototype_switcher.html" %}
+{% endblock %}

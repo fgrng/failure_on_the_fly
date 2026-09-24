@@ -125,6 +125,111 @@ def itemseite_prototype(request: HttpRequest) -> HttpResponse:
     )
 
 
+# PROTOTYPE #290 – wegwerfen, sobald über die langen Erhebungstexte entschieden ist.
+_LANGE_TEXTE_VARIANTEN: dict[str, str] = {
+    "a": "A · Aufklappbare Boxen mit Vorschau",
+    "b": "B · Kleine Felder, die beim Fokus wachsen",
+    "c": "C · Lesen, je Text »Bearbeiten«",
+    "d": "D · Ein Feld mit Reitern",
+    "heute": "Heute · drei volle Felder (Vergleich)",
+}
+_LANGE_TEXTE_BEISPIEL: list[dict[str, object]] = [
+    {
+        "schluessel": "instruktion",
+        "name": "instruktionstext",
+        "label": "Instruktion",
+        "benoetigt": True,
+        "wert": (
+            "# Willkommen\n\n"
+            "In dieser Studie führen Sie **drei kurze Diagnosegespräche** mit simulierten "
+            "Schüler:innen. Jede Schüler:in hat eine Aufgabe zur Bruchrechnung bearbeitet "
+            "und dabei einen Fehler gemacht.\n\n"
+            "## So gehen Sie vor\n\n"
+            "- Lesen Sie zuerst den Lernauftrag und das Arbeitsheft.\n"
+            "- Fragen Sie im Gespräch nach, bis Sie verstehen, wie die Schüler:in denkt.\n"
+            "- Halten Sie am Ende Ihre Diagnose in eigenen Worten fest.\n\n"
+            "Die Gespräche haben ein Zeitbudget. Wenn es aufgebraucht ist, endet das "
+            "Gespräch, und Sie gelangen direkt zur Diagnose.\n\n"
+            "## Technische Hinweise\n\n"
+            "Sie können tippen oder, falls angeboten, die Spracheingabe nutzen. Bitte "
+            "verwenden Sie einen aktuellen Browser und laden Sie die Seite während eines "
+            "Gesprächs nicht neu.\n\n"
+            "Bei Fragen erreichen Sie die Studienleitung unter "
+            "[studie@example.org](mailto:studie@example.org)."
+        ),
+    },
+    {
+        "schluessel": "einwilligung",
+        "name": "einwilligungstext",
+        "label": "Einwilligung",
+        "benoetigt": True,
+        "wert": "",
+    },
+    {
+        "schluessel": "abschluss",
+        "name": "abschlusstext",
+        "label": "Abschluss",
+        "benoetigt": False,
+        "wert": "Vielen Dank für Ihre Teilnahme! Sie können das Fenster jetzt schließen.",
+    },
+]
+
+
+def lange_texte_prototype(request: HttpRequest) -> HttpResponse:
+    """PROTOTYPE #290: Varianten für Instruktion, Einwilligung und Abschluss, ohne Datenbank."""
+    from config.prototype import variantenkontext
+
+    kontext = variantenkontext(request, _LANGE_TEXTE_VARIANTEN)
+    kontext["texte"] = _LANGE_TEXTE_BEISPIEL
+    kontext["variantenvorlage"] = (
+        f"erhebungen/prototype_lange_texte/variante_{kontext['variante']}.html"
+    )
+    return render(request, "erhebungen/prototype_lange_texte.html", kontext)
+
+
+# PROTOTYPE #287 (Namensfeld) – wegwerfen, sobald entschieden ist.
+_NAMENSFELD_VARIANTEN: dict[str, str] = {
+    "a": "A · Heute: Feld von Hand, keine Prüfung",
+    "b": "B · Über ein Django-Formular",
+    "c": "C · Ohne Anlegen-Seite, Name in der Erhebung ändern",
+}
+
+
+def namensfeld_prototype(request: HttpRequest) -> HttpResponse:
+    """PROTOTYPE: Namensfeld der Erhebung; »Anlegen« zeigt nur, was passieren würde."""
+    from django import forms
+
+    from config.prototype import variantenkontext
+
+    class NamensFormular(forms.Form):
+        name = forms.CharField(
+            label="Name",
+            max_length=255,
+            help_text=(
+                "Erscheint in Ihrer Erhebungsliste, im Dateinamen der Datenspur und "
+                "in den Abschriften der Teilnehmenden."
+            ),
+        )
+
+    kontext = variantenkontext(request, _NAMENSFELD_VARIANTEN)
+    formular = NamensFormular(request.POST or None)
+    if request.method == "POST":
+        roh = request.POST.get("name", "")
+        if kontext["variante"] == "a":
+            kontext["ergebnis"] = (
+                f"Würde anlegen: »{roh}« ({len(roh)} Zeichen, ungeprüft). "
+                "Leerzeichen allein oder über 255 Zeichen gehen durch, bis die Datenbank "
+                "sich beschwert; dann gibt es einen Serverfehler statt einer Meldung."
+            )
+        elif formular.is_valid():
+            kontext["ergebnis"] = (
+                f"Würde anlegen: »{formular.cleaned_data['name']}« und zur Erhebung weiterleiten."
+            )
+    kontext["formular"] = formular
+    kontext["eingabe"] = request.POST.get("name", "")
+    return render(request, "erhebungen/prototype_namensfeld.html", kontext)
+
+
 def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
     """Lädt eine für die eingeloggte Forschende sichtbare Erhebung."""
 
