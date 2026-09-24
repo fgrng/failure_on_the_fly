@@ -30,6 +30,11 @@ def ist_autorin(konto: "Konto") -> bool:
     return ist_administratorin(konto) or AUTORIN_GRUPPE in _rollen(konto)
 
 
+def ist_forschende(konto: "Konto") -> bool:
+    """Prüft die Forschungsrolle einschließlich Administrations-Override."""
+    return ist_administratorin(konto) or FORSCHENDE_GRUPPE in _rollen(konto)
+
+
 def ist_administratorin(konto: "Konto") -> bool:
     """Prüft die Administrationsrolle."""
     return konto.is_superuser

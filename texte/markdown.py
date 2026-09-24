@@ -3,14 +3,15 @@
 Zwei Profile: Der **Informationstext** (Instruktions-, Einwilligungs- und
 Abschlusstext einer Erhebung) erlaubt Links nach außen, der **Szenentext**
 (Lernauftrag, Arbeitsheft, Rahmenhandlung) nicht. Beide kennen Absätze mit
-erhaltenen Zeilenumbrüchen, Fett, Kursiv, `#`–`###` als `h3`–`h5`, Listen und
-Zitatblock. Alles andere erscheint wörtlich. Sicher wird das HTML dadurch, dass
+erhaltenen Zeilenumbrüchen, Fett, Kursiv, `#`–`###` als `h3`–`h5`, Listen,
+Zitatblock und eingerückte Codeblöcke. Alles andere erscheint wörtlich. Sicher wird das HTML dadurch, dass
 der Parser rohes HTML nie durchreicht; einen nachgelagerten Sanitizer gibt es
 nicht (siehe ADR „Markdown mit zwei Profilen, Quelle bleibt roh").
 """
 
 import string
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from django.utils.safestring import SafeString, mark_safe
 from markdown_it import MarkdownIt
@@ -22,7 +23,6 @@ from markdown_it.token import Token
 from markdown_it.utils import EnvType, OptionsDict
 
 _ABGESCHALTET: tuple[str, ...] = (
-    "code",
     "fence",
     "hr",
     "lheading",
@@ -83,10 +83,12 @@ def _externer_link_auf(
     env: EnvType,
 ) -> str:
     # Öffnet im neuen Tab, damit etwa getroffene Einwilligungen nicht verloren
-    # gehen, und ohne der Zielseite Zugriff auf die Plattform zu geben.
+    # gehen, und ohne der Zielseite Zugriff auf die Plattform zu geben. Eine
+    # E-Mail-Adresse öffnet das Mailprogramm; ein neuer Tab bliebe leer.
 
-    tokens[index].attrSet("target", "_blank")
-    tokens[index].attrSet("rel", "noopener noreferrer")
+    if not _ist_email(tokens[index]):
+        tokens[index].attrSet("target", "_blank")
+        tokens[index].attrSet("rel", "noopener noreferrer")
     return renderer.renderToken(tokens, index, options, env)
 
 
@@ -97,12 +99,20 @@ def _externer_link_zu(
     options: OptionsDict,
     env: EnvType,
 ) -> str:
-    # Den sichtbaren Pfeil setzt das Stylesheet; Screenreader lesen diesen Text.
+    # Das sichtbare Zeichen setzt das Stylesheet; Screenreader lesen diesen Text.
 
+    oeffnend: Token = next(
+        token for token in reversed(tokens[:index]) if token.type == "link_open"
+    )
+    hinweis: str = "E-Mail" if _ist_email(oeffnend) else "öffnet in neuem Tab"
     return (
-        '<span class="markdown-text__extern"> (öffnet in neuem Tab)</span>'
+        f'<span class="markdown-text__extern"> ({hinweis})</span>'
         + renderer.renderToken(tokens, index, options, env)
     )
+
+
+def _ist_email(link_open: Token) -> bool:
+    return str(link_open.attrGet("href") or "").lower().startswith("mailto:")
 
 
 def _parser(mit_links: bool) -> MarkdownIt:
@@ -131,13 +141,58 @@ _SZENENTEXT: MarkdownIt = _parser(mit_links=False)
 def informationstext(quelle: str) -> SafeString:
     """Rendert Instruktions-, Einwilligungs- und Abschlusstext, mit Links."""
 
-    return mark_safe(_INFORMATIONSTEXT.render(quelle) if quelle else "")
+    return _rendern(_INFORMATIONSTEXT, quelle)
 
 
 def szenentext(quelle: str) -> SafeString:
     """Rendert Lernauftrag, Arbeitsheft und Rahmenhandlung, ohne Links."""
 
-    return mark_safe(_SZENENTEXT.render(quelle) if quelle else "")
+    return _rendern(_SZENENTEXT, quelle)
+
+
+def _rendern(parser: MarkdownIt, quelle: str) -> SafeString:
+    return mark_safe(parser.render(quelle) if quelle else "")
+
+
+@dataclass(frozen=True)
+class Profil:
+    """Ein Markdown-Profil: wie es rendert und was der Editor darüber sagt."""
+
+    rendern: Callable[[str], SafeString]
+    hinweis: SafeString
+
+
+_HINWEIS_GRUNDUMFANG: str = (
+    "Markdown: <code>**fett**</code>, <code>*kursiv*</code>, "
+    "<code># Überschrift</code> (bis <code>###</code>), <code>- Aufzählung</code>, "
+    "<code>1. Liste</code>, <code>&gt; Zitat</code>"
+)
+_HINWEIS_UMBRUECHE: str = (
+    ". Jeder Zeilenumbruch bleibt erhalten, eine Leerzeile beginnt einen neuen "
+    "Absatz. Nach einer Leerzeile bleibt ein um vier Leerzeichen eingerückter "
+    "Block samt Einrückung stehen."
+)
+
+PROFILE: dict[str, Profil] = {
+    "informationstext": Profil(
+        rendern=informationstext,
+        hinweis=mark_safe(
+            _HINWEIS_GRUNDUMFANG
+            + ", <code>[Linktext](https://…)</code>"
+            + _HINWEIS_UMBRUECHE
+        ),
+    ),
+    "szenentext": Profil(
+        rendern=szenentext,
+        hinweis=mark_safe(
+            _HINWEIS_GRUNDUMFANG
+            + _HINWEIS_UMBRUECHE
+            + " Schülernotation mit <code>*</code>, <code>_</code>, führendem "
+            "<code>-</code> oder <code>1.</code> per Backslash escapen, etwa "
+            "<code>\\*</code>."
+        ),
+    ),
+}
 
 
 def woertlich(wert: str) -> str:

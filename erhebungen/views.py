@@ -27,9 +27,8 @@ from django.utils.text import slugify
 
 from konten.models import Konto
 from konten.navigation import (
-    FORSCHENDE_GRUPPE,
+    ist_forschende,
     rolle_erforderlich,
-    rolle_oder_administration,
 )
 
 from .ablauf import (
@@ -101,15 +100,12 @@ _ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
 }
 
 
-_forschende_oder_administratorin = rolle_oder_administration(FORSCHENDE_GRUPPE)
 
 
 # Eine einzige Tür für den gesamten Forschungsbereich, wie in fragebogen_items
 # und vignetten: Die Administration sieht eine Erhebung nicht nur, sie kann sie
 # auch anlegen und bearbeiten (ADR-0033).
-_forschende_oder_administratorin_erforderlich = rolle_erforderlich(
-    _forschende_oder_administratorin
-)
+_forschende_oder_administratorin_erforderlich = rolle_erforderlich(ist_forschende)
 
 
 def itemseite_prototype(request: HttpRequest) -> HttpResponse:

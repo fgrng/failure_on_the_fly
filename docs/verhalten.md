@@ -45,11 +45,12 @@ Szenentext: in der Sitzung von Training, Erhebung und Probelauf, in der
 Abschrift und in der Vignetten-Detailansicht. Der Umfang gleicht dem der
 Erhebungstexte (siehe „Erhebungsteilnahme"), nur ohne Links: Link-Syntax
 erscheint wörtlich. Die Teile vor und nach dem Bild werden je für sich
-gerendert. Schülernotation mit `*`, `_`, führendem `-` oder `1.` escapen
+gerendert. In der Sitzung stehen Überschriften über dem großen Fließtext der
+Szene. Rechenschritte mit Einrückung lassen sich als eingerückter Block setzen. Schülernotation mit `*`, `_`, führendem `-` oder `1.` escapen
 Autor:innen mit einem Backslash. Bildbeschreibung und Simulationshinweise
 bleiben reiner Text. Prompt und Datenspur-Export erhalten die unveränderte
 Markdown-Quelle. Im Vignettenformular stehen unter beiden Feldern der
-Markdown-Hinweis ohne Link-Syntax, samt Backslash-Regel, und derselbe
+Markdown-Hinweis ohne Link-Syntax, samt Backslash- und Einrückungsregel, und derselbe
 Umschalter »Bearbeiten | Vorschau« wie bei den Erhebungstexten; die Vorschau
 rendert den ungespeicherten Text im Profil Szenentext so wie die Sitzung. Bei
 einem Text mit Positionsmarker zeigt sie `[bild]` wörtlich.
@@ -87,7 +88,8 @@ jeder Sitzung (Training, Erhebung, Probelauf) erscheinen sie gerendert. Die
 Werte der Vignette werden vor dem Einsetzen escaped, sodass nur das Markdown des
 Kerns wirkt: `**$thema**` hebt das Thema hervor, ein Thema mit `*` oder `_`
 erscheint dagegen wörtlich. Die Leseansichten der Kern-Fassungen zeigen die
-Rahmenhandlung gerendert, die Platzhalter wörtlich als `$name`. Auf der
+Rahmenhandlung gerendert, die Platzhalter wörtlich als `$name`; ein leerer
+Abschnitt zeigt »—«. Auf der
 Bearbeitungsseite des Entwurfs tragen die drei Felder denselben Markdown-Hinweis
 und Umschalter »Bearbeiten | Vorschau« wie das Vignettenformular; auch dort
 bleiben die Platzhalter in der Vorschau wörtlich stehen.
@@ -261,10 +263,13 @@ Einwilligungs-, Instruktions- und Abschlusstext erscheinen als gerendertes
 Markdown: Absätze durch Leerzeilen, jeder einfache Zeilenumbruch bleibt
 erhalten, dazu **fett**, *kursiv*, Aufzählungen, nummerierte Listen und
 Zitatblock. Überschriften `#`, `##` und `###` ordnen sich als dritte bis fünfte
-Ebene unter den Abschnittskopf der Seite ein. Links sind nur mit `https:`,
-`http:` und `mailto:` möglich; sie öffnen in einem neuen Tab, tragen einen
-sichtbaren Pfeil und kündigen Screenreadern das Öffnen in neuem Tab an. Rohes
-HTML, Bilder, Tabellen, Codeblöcke, tiefere Überschriften, andere Link-Ziele
+Ebene unter den Abschnittskopf der Seite ein. Ein nach einer Leerzeile um vier
+Leerzeichen eingerückter Block erscheint in Festbreitenschrift und behält seine
+Einrückung. Links sind nur mit `https:`, `http:` und `mailto:` möglich. Web-Links
+öffnen in einem neuen Tab, tragen einen sichtbaren Pfeil und kündigen Screenreadern
+das Öffnen in neuem Tab an; E-Mail-Links öffnen das Mailprogramm im selben Tab,
+tragen einen Briefumschlag und kündigen sich als E-Mail an. Rohes
+HTML, Bilder, Tabellen, umzäunte Codeblöcke, tiefere Überschriften, andere Link-Ziele
 wie `javascript:` oder relative Pfade sowie nackte URLs erscheinen wörtlich;
 ein vorangestellter Backslash zeigt Markdown-Zeichen wörtlich.
 
