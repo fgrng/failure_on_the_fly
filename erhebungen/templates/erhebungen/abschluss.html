@@ -23,8 +23,22 @@
 
     {% comment %}
     Systemseitig und unabschaltbar, wie der Auftragsverarbeitungs-Absatz der
-    Einwilligung: Der Abschlusstext der Forschenden bleibt unberührt.
+    Einwilligung: Der Abschlusstext der Forschenden bleibt unberührt. Eine
+    flüchtige Teilnahme hat nichts, woraus sich eine Abschrift holen ließe,
+    und erfährt das statt des Tokens.
     {% endcomment %}
+    {% if fluechtig %}
+    <section class="page-section" aria-labelledby="section-speicherung">
+        <header class="page-section__head">
+            <b>02</b><span><h2 id="section-speicherung">Keine Speicherung</h2></span>
+        </header>
+        <div class="page-field">
+            <p>
+                Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert.
+            </p>
+        </div>
+    </section>
+    {% else %}
     <section class="page-section" aria-labelledby="section-abschrift">
         <header class="page-section__head">
             <b>02</b><span><h2 id="section-abschrift">Ihre Abschrift</h2></span>
@@ -46,5 +60,6 @@
             </div>
         </div>
     </section>
+    {% endif %}
 </section>
 {% endblock %}

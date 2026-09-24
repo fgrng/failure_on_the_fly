@@ -162,6 +162,20 @@ class TeilnahmeseitenGestaltungTests(SimpleTestCase):
                 self.assertNotIn("<script>", seite)
                 self.assertNotIn('class="prose"', seite)
 
+    def test_fluechtige_abschlussseite_behaelt_das_seitengeruest(self) -> None:
+        """Der Hinweis ohne Speicherung ersetzt den Baustein im selben Gerüst."""
+
+        seite: str = render_to_string(
+            "erhebungen/abschluss.html", {**_KONTEXT, "fluechtig": True}
+        )
+
+        self.assertIn('class="page area--participant"', seite)
+        self.assertEqual(seite.count('class="page-section"'), 2)
+        for verweis in _BESCHRIFTUNGSVERWEIS.findall(seite):
+            self.assertIn(f'id="{verweis}"', seite)
+        self.assertNotIn("abschrift-token", seite)
+        self.assertNotIn("card--research", seite)
+
     def test_itemblock_teilvorlage_traegt_ihre_klassen_selbst(self) -> None:
         """Der htmx-Tausch mit `outerHTML` darf keine Gestaltung verlieren."""
 

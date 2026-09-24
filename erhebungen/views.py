@@ -1161,7 +1161,12 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         return umleitung
     bindung_abschliessen(bindung)
     return render(
-        request, "erhebungen/abschluss.html", {"erhebung": stichprobe.erhebung}
+        request,
+        "erhebungen/abschluss.html",
+        {
+            "erhebung": stichprobe.erhebung,
+            "fluechtig": bindung.teilnahme.speicherung_eingewilligt is False,
+        },
     )
 
 

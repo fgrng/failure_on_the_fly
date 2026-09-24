@@ -72,8 +72,9 @@ def teilnahme_einer_abschrift_raeumen(teilnahme: Teilnahme) -> None:
 
 
 def _holbare_bindung(token: str) -> Erhebungsbindung:
-    # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen und
-    # nichts archiviert ist. Jeder andere Ausgang ist dieselbe Ablehnung.
+    # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen,
+    # nicht flüchtig und nichts archiviert ist. Jeder andere Ausgang ist
+    # dieselbe Ablehnung.
 
     bindung: Erhebungsbindung | None = (
         Erhebungsbindung.objects.filter(
@@ -81,6 +82,7 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
             abgeschlossen_am__isnull=False,
             stichprobe__archiviert=False,
         )
+        .exclude(teilnahme__speicherung_eingewilligt=False)
         .exclude(stichprobe__erhebung__status=Erhebung.Status.ARCHIVIERT)
         .select_related("stichprobe__erhebung", "teilnahme")
         .first()

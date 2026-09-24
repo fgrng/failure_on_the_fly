@@ -63,6 +63,12 @@ _ABBRUCHTEXT: str = (
     "möchten, können Sie zur Startseite der Erhebung zurückkehren."
 )
 
+# Der verbindliche Wortlaut des Abschlusshinweises einer flüchtigen Teilnahme.
+_NICHT_GESPEICHERT: str = (
+    "Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, "
+    "Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert."
+)
+
 # Die Einwilligung in Sprachmodelle und Speicherung, mit der ein Test in den
 # Ablauf kommt. Die Spracherkennung wird nur bei aktiver Transkription gefragt.
 _ZUSTIMMUNG: dict[str, str] = {
@@ -1925,6 +1931,43 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
         self.assertFalse(Diagnose.objects.exists())
+
+    def test_fluechtige_abschlussseite_ersetzt_den_abschrift_baustein(self) -> None:
+        """Ohne Speicherung sagt die Abschlussseite, dass nichts gespeichert wurde."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {"sprachmodell_eingewilligt": "ja", "speicherung_eingewilligt": "nein"},
+        )
+        self.client.post(
+            reverse("erhebungen:spielen", args=[self.stichprobe.teilnahme_link])
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
+        abschluss_url: str = reverse(
+            "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
+        )
+
+        # Auch der erneute Aufruf zeigt den Hinweis statt des Tokens.
+        for _ in range(2):
+            antwort: HttpResponse = self.client.get(abschluss_url)
+            seite: str = antwort.content.decode()
+            self.assertIn(self.erhebung.abschlusstext, seite)
+            self.assertIn(_NICHT_GESPEICHERT, seite)
+            self.assertLess(
+                seite.index(self.erhebung.abschlusstext),
+                seite.index(_NICHT_GESPEICHERT),
+            )
+            self.assertNotIn("section-abschrift", seite)
+            self.assertNotIn("Ohne dieses Token", seite)
+            self.assertNotIn(f'href="{reverse("training:abschriften")}"', seite)
+            # Das Token der Seitenleiste bleibt für den Wiedereinstieg.
+            self._seitenleiste_zeigt_nur_das_token(antwort, bindung.token)
+        bindung.refresh_from_db()
+        self.assertIsNotNone(bindung.abgeschlossen_am)
 
     def test_fluechtige_sitzung_zeigt_den_abgebrochenen_verlauf(self) -> None:
         """Ein endgültiger Fehlschlag steht im Verlauf der Session, nicht in der DB."""

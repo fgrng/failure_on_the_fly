@@ -269,6 +269,7 @@ def test_kopierte_sitzungen_tragen_die_importzeit() -> None:
         "nicht_abgeschlossen",
         "stichprobe_archiviert",
         "erhebung_archiviert",
+        "fluechtig",
     ],
 )
 def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
@@ -292,6 +293,10 @@ def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
             _gespielte_teilnahme(erhebung)
             erhebung.finalisieren()
             erhebung.archivieren()
+        case "fluechtig":
+            bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
+            bindung.teilnahme.speicherung_eingewilligt = False
+            bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
 
     with pytest.raises(ValidationError) as abgelehnt:
         abschrift_holen(teilnehmerin, token)
@@ -382,6 +387,25 @@ def test_abgelehntes_token_meldet_den_grundlosen_hinweis(client: Client) -> None
 
     antwort: HttpResponse = client.post(
         reverse("training:abschriften"), {"token": "9999-9999"}, follow=True
+    )
+
+    assert ABLEHNUNG in antwort.content.decode()
+    assert not Abschrift.objects.exists()
+
+
+@pytest.mark.django_db
+def test_token_einer_fluechtigen_teilnahme_meldet_den_grundlosen_hinweis(
+    client: Client,
+) -> None:
+    """Auch eine flüchtige Teilnahme verrät die Token-Eingabe nicht."""
+
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
+    bindung.teilnahme.speicherung_eingewilligt = False
+    bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
+    client.force_login(Konto.objects.create_user(username="grace"))
+
+    antwort: HttpResponse = client.post(
+        reverse("training:abschriften"), {"token": bindung.token}, follow=True
     )
 
     assert ABLEHNUNG in antwort.content.decode()

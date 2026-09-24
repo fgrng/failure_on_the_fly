@@ -224,6 +224,11 @@ groß und in fester Laufweite, dazu die Erklärung, dass sich damit angemeldet
 später eine Abschrift der eigenen Sitzungen ins Nutzerkonto holen lässt und
 dass es ohne das Token keine Abschrift gibt, samt Link auf die Token-Eingabe.
 Ein erneuter Aufruf der Abschlussseite zeigt beides wieder.
+Bei einer flüchtigen Teilnahme ersetzt diesen Baustein der ebenso
+unabschaltbare Hinweis »Sie haben der Speicherung Ihrer Daten nicht zugestimmt.
+Ihre Gespräche, Diagnosen und Fragebogen-Antworten wurden deshalb nicht
+gespeichert.« — ohne Token, Abschrift-Erklärung und Link; auch er erscheint bei
+jedem Aufruf wieder. Abschlusstext und Token in der Seitenleiste bleiben.
 Ein Diagnosegespräch kann vorzeitig in den Debrief geführt werden; eine Sitzung
 kann ohne Diagnose abgebrochen werden. Ist die Diagnose abgegeben, bleibt sie im
 Debrief sichtbar, lässt sich aber nicht mehr ändern; hängt an der Sitzung ein
@@ -252,7 +257,8 @@ unberührt, es wird kein Token gespeichert und keine Verknüpfung zwischen Konto
 und Teilnahme festgehalten. Der Import gelingt unabhängig vom Teilnahmefenster,
 solange weder Stichprobe noch Erhebung archiviert sind, und ist beliebig oft
 wiederholbar; jede Wiederholung erzeugt eine weitere Abschrift. Unbrauchbare
-Tokens werden ohne Angabe eines Grundes abgelehnt. Die Liste zeigt je Abschrift
+Tokens — auch das einer flüchtigen Teilnahme — werden ohne Angabe eines Grundes
+abgelehnt. Die Liste zeigt je Abschrift
 den Namen der Erhebung und den Importzeitpunkt — nicht die Spielzeit der
 Erhebung.
 Von der Liste führt jede Abschrift in eine eigene, nur lesende Ansicht: die
