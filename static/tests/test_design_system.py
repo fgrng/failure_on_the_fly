@@ -115,6 +115,28 @@ def test_main_layout_exposes_eight_column_grid() -> None:
     assert "--content-max-width: 1440px;" in tokens_css
 
 
+def test_page_sections_follow_the_main_area_not_the_viewport() -> None:
+    """Abschnitte stehen im Achterraster und brechen an der Breite des Hauptbereichs um."""
+
+    page_css: str = (STATIC / "css" / "page.css").read_text()
+    media_blocks: list[str] = re.findall(r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", page_css)
+
+    assert "container: hauptbereich / inline-size;" in page_css
+    assert ".page-section > .field-grid { grid-template-columns: subgrid; }" in page_css
+    assert "@container hauptbereich (max-width: 900px)" in page_css
+    assert not any(".page-section" in block or ".field-grid" in block for block in media_blocks)
+
+
+def test_form_actions_stay_visible_at_the_top() -> None:
+    """Die Aktionszeile eines Formulars rückt nach oben und klebt beim Scrollen."""
+
+    vignette_form_css: str = (STATIC / "css" / "vignette-form.css").read_text()
+
+    assert "order: -1;" in vignette_form_css
+    assert "position: sticky;" in vignette_form_css
+    assert ".page:not(.area--participant) form > .vignette-form-actions" in vignette_form_css
+
+
 def test_feature_styles_use_spacing_tokens() -> None:
     """Layout-Abstände verwenden das öffentliche 8-px-Abstandsraster."""
 

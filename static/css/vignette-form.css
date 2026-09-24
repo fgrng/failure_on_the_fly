@@ -52,3 +52,44 @@
     gap: var(--space-3);
     margin-top: var(--space-4);
 }
+
+/* Im Formular rückt die Aktionszeile an den Anfang und bleibt beim Scrollen oben
+   sichtbar. Im Markup steht sie weiter am Ende, damit die Tab-Reihenfolge erst durch
+   die Felder führt. z-index 2 liegt über den Vorschlagslisten (z-index 1).
+   Teilnahmeseiten sind ausgenommen: Dort steht »Einwilligen« nach der Wahl, über
+   die eingewilligt wird. */
+.page:not(.area--participant) form:has(> .vignette-form-actions) {
+    display: flex;
+    flex-direction: column;
+}
+
+.page:not(.area--participant) form > .vignette-form-actions {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 calc(-1 * var(--space-4));
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+    backdrop-filter: blur(6px);
+}
+
+/* Die Unterkante der Leiste trennt schon vom ersten Abschnitt. */
+.page:not(.area--participant) form:has(> .vignette-form-actions) > .page-section:first-of-type {
+    border-top: 0;
+}
+
+/* Schmal ist der Hauptbereich nur --space-3 eingerückt (navigation.css). */
+@media (max-width: 760px) {
+    .page:not(.area--participant) form > .vignette-form-actions {
+        margin-inline: calc(-1 * var(--space-3));
+        padding-inline: var(--space-3);
+    }
+}
+
+/* Steckt das Formular in einem Abschnitt, bleibt die Leiste in dessen Inhaltsspalte. */
+.page:not(.area--participant) .page-section form > .vignette-form-actions {
+    margin: 0 0 var(--space-2);
+    padding-inline: 0;
+}

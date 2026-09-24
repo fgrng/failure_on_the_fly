@@ -20,6 +20,15 @@ vergibt die drei fachlichen Rollen als Groups und kann weitere Superuser ernenne
 Konten lassen sich dort bewusst nicht löschen, solange #156 den Umgang mit
 Löschbegehren noch nicht festlegt.
 
+## Formulare
+
+In den Formularen zum Anlegen und Bearbeiten (Vignetten, Trainings, Erhebungen,
+Fragebogen-Items, Simulationskern, Modell- und Transkriptions-Konfiguration)
+stehen die Aktionen wie »Abbrechen« und »Speichern« oben im Formular und bleiben
+beim Scrollen sichtbar, solange das Formular im Bild ist. Auf den Seiten der
+Teilnahme stehen sie weiterhin am Ende, etwa »Einwilligen« nach der Wahl zur
+Audioverarbeitung.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen
