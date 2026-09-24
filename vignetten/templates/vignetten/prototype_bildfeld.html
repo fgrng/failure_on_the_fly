@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+{# PROTOTYPE #288 – Bildfeld im Vignettenformular. Siehe vignetten/PROTOTYPE_BILDFELD.md. #}
+
+{% block title %}Prototyp · Bildfeld{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bildfeld-prototype.css' %}">
+    <script src="{% static 'js/bildfeld-prototype.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="page area--authoring bf-prototype">
+    <header class="page-head">
+        <div>
+            <p>Prototyp #288 · keine Speicherung</p>
+            <h1>Bildfeld im Vignettenformular</h1>
+            <span>{{ variantenbezeichnung }}. Oben zum Ausprobieren (Datei wählen, ablegen, ersetzen, entfernen, »Speichern« täuscht einen Formularfehler vor), unten alle Zustände nebeneinander.</span>
+        </div>
+    </header>
+
+    {% if variante != "vergleich" %}
+    {% with vorlage=varianten.0.1 %}
+    <form method="post" enctype="multipart/form-data" autocomplete="off">
+        {% csrf_token %}
+        <section class="page-section" aria-labelledby="section-live">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-live">Lernauftrag</h2><small>Was hat die Lehrperson der Schüler:in aufgegeben?</small></span>
+            </header>
+            <div class="field-grid">
+                <div class="vignette-field{% if variante == 'c' %} page-field--wide{% endif %}">
+                    <label for="live-text">Lernauftrag Text</label>
+                    <textarea id="live-text" name="live-text">Berechne:
+[bild]
+Schreibe deinen Rechenweg auf.</textarea>
+                    {% if abgeschickt %}<ul class="errorlist"><li>Prototyp: Der Server meldet hier einen erfundenen Fehler, damit das Formular erneut erscheint.</li></ul>{% endif %}
+                </div>
+                {% include vorlage with feld="live-bild" zustand=live_zustand gespeichert=True verloren=verlorene_datei text_id="live-text" beschreibung="Bruchaufgabe 3/4 + 1/8 in einem Kasten." %}
+                {% if variante != "c" %}
+                <div class="vignette-field page-field--wide">
+                    <label for="live-beschreibung">Lernauftrag Bildbeschreibung</label>
+                    <textarea id="live-beschreibung">Bruchaufgabe 3/4 + 1/8 in einem Kasten.</textarea>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        <div class="vignette-form-actions">
+            <a href="?variant={{ variante }}">Zurücksetzen</a>
+            <button class="button" type="submit">Vignette speichern</button>
+        </div>
+    </form>
+    {% endwith %}
+    {% endif %}
+
+    {% for schluessel, vorlage, name in varianten %}
+    <section class="page-section page-section--gestapelt" aria-labelledby="zustaende-{{ schluessel }}">
+        <header class="page-section__head">
+            <b>{{ schluessel|upper }}</b><span><h2 id="zustaende-{{ schluessel }}">Zustände · {{ name }}</h2><small>Jede Kachel ist ein eigenes, bedienbares Feld.</small></span>
+        </header>
+        <div class="bf-zustaende{% if schluessel == 'c' %} bf-zustaende--breit{% endif %}">
+            {% for zustand, zustandsname in zustaende %}
+            {% with feld="z-"|add:schluessel|add:"-"|add:zustand %}
+            <div class="bf-zustand">
+                <p class="bf-zustand__name">{{ forloop.counter }} · {{ zustandsname }}</p>
+                {% if zustand == "gespeichert" or zustand == "entfernen" or zustand == "fehler" %}
+                {% include vorlage with feld=feld zustand=zustand gespeichert=True beschreibung="Bruchaufgabe 3/4 + 1/8 in einem Kasten." %}
+                {% else %}
+                {% include vorlage with feld=feld zustand=zustand gespeichert=False beschreibung="" %}
+                {% endif %}
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</section>
+
+<nav class="prototype-switcher" aria-label="Prototyp-Variante wechseln" data-vorherige="{{ vorherige_variante }}" data-naechste="{{ naechste_variante }}">
+    <a class="prototype-switcher__pfeil" href="?variant={{ vorherige_variante }}" aria-label="Vorherige Variante">←</a>
+    <span>{{ variantenbezeichnung }}</span>
+    <a class="prototype-switcher__pfeil" href="?variant={{ naechste_variante }}" aria-label="Nächste Variante">→</a>
+</nav>
+{% endblock %}

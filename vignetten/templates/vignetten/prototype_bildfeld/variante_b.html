@@ -1,0 +1,35 @@
+{% load static %}{# PROTOTYPE #288 · Variante B: kompakte Anhangzeile mit Vorschaubild, Ablegen nur als Zusatz. #}
+<div class="bf bf-b vignette-field" x-data="bildfeld({zustand: '{{ zustand }}', gespeichert: {{ gespeichert|yesno:'true,false' }}, bild: '{% static 'images/prototype-bildfeld/lernauftrag.png' %}', verloren: '{{ verloren|escapejs }}'})" :data-zustand="zustand">
+    <label for="{{ feld }}">Lernauftrag Bild</label>
+    <input class="bf__eingabe" type="file" accept="image/*" id="{{ feld }}" name="{{ feld }}" x-ref="eingabe" @change="gewaehlt($el)" aria-describedby="{{ feld }}-status">
+    <input type="checkbox" hidden name="{{ feld }}-clear" :checked="wirdEntfernt">
+
+    <div class="bf-b__zeile" :class="{ 'ist-ziehen': ziehen, 'ist-fehler': istFehler }"
+         @dragover.prevent="ziehen = true" @dragleave="ziehen = false" @drop.prevent="abgelegt($event)">
+        <span class="bf-b__daumen">
+            <img x-show="bildUrl" :src="bildUrl" alt="">
+            <svg x-show="!bildUrl" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg>
+        </span>
+        <span class="bf-b__text">
+            <strong x-text="bildUrl ? anzeigename : 'Kein Bild'"></strong>
+            <small x-text="ziehen ? 'Loslassen, um das Bild zu übernehmen' : (istNeu ? groesse + ' · wird beim Speichern hochgeladen' : (bildUrl ? '' : 'Datei auswählen oder hierher ziehen'))"></small>
+        </span>
+        <span class="bf__status" x-show="statusText" x-text="statusText"></span>
+        <span class="bf__aktionen">
+            <template x-if="!bildUrl">
+                <button type="button" class="button button--secondary" @click="auswaehlen()">Bild auswählen</button>
+            </template>
+            <template x-if="istNeu">
+                <button type="button" class="bf__link" @click="verwerfen()">Verwerfen</button>
+            </template>
+            <template x-if="bildUrl && !istNeu && !wirdEntfernt">
+                <span><button type="button" class="button button--secondary" @click="auswaehlen()">Ersetzen</button>
+                <button type="button" class="bf__link bf__link--gefahr" @click="entfernen()">Entfernen</button></span>
+            </template>
+            <template x-if="wirdEntfernt">
+                <button type="button" class="button button--secondary" @click="behalten()">Rückgängig</button>
+            </template>
+        </span>
+    </div>
+    <p class="bf__meldung" :class="{ 'ist-fehler': istFehler }" id="{{ feld }}-status" role="status" x-text="meldung"></p>
+</div>

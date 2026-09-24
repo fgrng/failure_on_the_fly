@@ -1,0 +1,202 @@
+/* PROTOTYPE #288 – Bildfeld-Varianten. Wegwerfen, sobald entschieden ist. */
+
+/* ---- Gemeinsam: echtes Eingabefeld unsichtbar, aber fokussierbar ---- */
+.bf { position: relative; min-width: 0; }
+.bf__eingabe {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+.bf:has(.bf__eingabe:focus-visible) :is(.bf-a__zone, .bf-b__zeile, .bf-c__bild) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+}
+.bf__status {
+    padding: 2px var(--space-1);
+    border-radius: 999px;
+    background: var(--color-area-authoring-tint);
+    color: var(--phsg-yellow-deep);
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+[data-zustand="gewaehlt"] .bf__status { background: var(--color-area-authoring-solid); color: var(--color-area-authoring-on-solid); }
+[data-zustand="entfernen"] .bf__status { background: var(--color-danger-tint); color: var(--color-danger-emphasis); }
+.bf__aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.bf__aktionen > span { display: contents; }
+.bf__aktionen .button { padding: 4px var(--space-2); font-size: .82rem; }
+.bf__link {
+    padding: 4px var(--space-1);
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-size: .82rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.bf__link--gefahr { color: var(--color-danger); }
+.bf__name { flex: 1; min-width: 0; overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.bf__meldung { min-height: 1.2em; margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: .78rem; }
+.bf__meldung.ist-fehler { color: var(--color-danger); font-weight: 700; }
+.bf__meldung:empty { display: none; }
+
+/* ---- A · Ablagezone ---- */
+.bf-a__zone {
+    position: relative;
+    display: grid;
+    min-height: 160px;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    transition: border-color .15s, background .15s;
+}
+.bf-a__zone:hover, .bf-a__zone.ist-ziehen { border-color: var(--area-solid); background: var(--color-area-authoring-tint); }
+.bf-a__zone.hat-bild { border-style: solid; background: var(--color-surface); }
+[data-zustand="fehler"] .bf-a__zone, [data-zustand="verloren"] .bf-a__zone { border-color: var(--color-danger); }
+.bf .bf-a__leer {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    margin: 0 !important;
+    color: var(--color-text-muted);
+    font-weight: 400 !important;
+    text-align: center;
+    cursor: pointer;
+}
+.bf-a__leer svg { color: var(--area-solid); }
+.bf-a__leer strong { color: var(--color-text); }
+.bf-a__leer u { color: var(--color-accent); }
+.bf-a__bild { position: relative; display: grid; place-items: center; margin: 0; padding: var(--space-2); }
+.bf-a__bild img { max-width: 100%; max-height: 220px; }
+.bf-a__bild .bf__status { position: absolute; top: var(--space-1); left: var(--space-1); }
+[data-zustand="entfernen"] .bf-a__bild img { opacity: .3; filter: grayscale(1); }
+.bf-a__ablegen {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--color-area-authoring-tint) 90%, transparent);
+    font-weight: 700;
+}
+.bf__leiste { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-1); }
+
+/* ---- B · Anhangzeile ---- */
+.bf-b__zeile {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas: "daumen text status" "daumen aktionen aktionen";
+    align-items: center;
+    gap: 4px var(--space-2);
+    padding: var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+.bf-b__zeile.ist-ziehen { border: 1px dashed var(--area-solid); background: var(--color-area-authoring-tint); }
+.bf-b__zeile.ist-fehler { border-color: var(--color-danger); }
+.bf-b__daumen {
+    grid-area: daumen;
+    display: grid;
+    width: 64px;
+    height: 64px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+}
+.bf-b__daumen img { width: 100%; height: 100%; object-fit: contain; }
+[data-zustand="entfernen"] .bf-b__daumen img { opacity: .3; }
+[data-zustand="entfernen"] .bf-b__text strong { text-decoration: line-through; }
+.bf-b__text { grid-area: text; display: grid; min-width: 0; }
+.bf-b__text strong { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; white-space: nowrap; }
+.bf-b__text small { color: var(--color-text-muted); font-size: .75rem; }
+.bf-b__zeile > .bf__status { grid-area: status; justify-self: end; }
+.bf-b__zeile > .bf__aktionen { grid-area: aktionen; }
+
+/* ---- C · Bildkarte mit Beschreibung ---- */
+.bf-c { margin: 0; padding: 0; border: 1px solid var(--area-solid); border-radius: var(--radius); overflow: hidden; }
+.bf-c legend {
+    float: left;
+    width: 100%;
+    padding: var(--space-1) var(--space-2) 0;
+    font-size: .86rem;
+    font-weight: 700;
+}
+.bf-c__kopf {
+    clear: both;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: 4px var(--space-2) var(--space-1);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: .78rem;
+}
+.bf-c__koerper { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.bf-c__bild {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    padding: var(--space-2);
+    background: var(--color-surface-muted);
+    border-right: 1px solid var(--color-border);
+}
+.bf-c__bild:not(.hat-bild) { margin: var(--space-2); border: 2px dashed var(--color-border); border-radius: var(--radius); }
+.bf-c__bild.ist-ziehen { border-color: var(--area-solid); background: var(--color-area-authoring-tint); }
+[data-zustand="fehler"] .bf-c__bild, [data-zustand="verloren"] .bf-c__bild { border-color: var(--color-danger); }
+.bf-c__bild img { max-width: 100%; max-height: 200px; }
+[data-zustand="entfernen"] .bf-c__bild img { opacity: .3; filter: grayscale(1); }
+.bf .bf-c__bild label { display: grid; justify-items: center; gap: 4px; margin: 0 !important; color: var(--color-accent); cursor: pointer; }
+.bf-c__bild label small { color: var(--color-text-muted); font-weight: 400; }
+.bf-c__beschreibung { display: grid; align-content: start; gap: 4px; padding: var(--space-2); }
+.bf-c__beschreibung small { margin: 0 !important; }
+.bf-c__hinweis { color: var(--phsg-yellow-deep) !important; font-weight: 700; }
+.bf-c .bf__aktionen { margin-top: var(--space-1); }
+.bf-c > .bf__meldung { margin: 0; padding: 0 var(--space-2) var(--space-2); }
+
+/* ---- Zustandsgalerie ---- */
+.bf-zustaende { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: var(--space-4) var(--space-3); }
+.bf-zustaende--breit { grid-template-columns: repeat(auto-fill, minmax(34rem, 1fr)); }
+.bf-zustand__name {
+    margin: 0 0 var(--space-1);
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+/* ---- Variantenleiste (wie itemseite-prototype.css) ---- */
+.prototype-switcher {
+    position: fixed;
+    z-index: 3;
+    bottom: var(--space-3);
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: 999px;
+    background: var(--color-text);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text) 30%, transparent);
+    color: var(--color-surface);
+    transform: translateX(-50%);
+}
+.prototype-switcher__pfeil {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 700;
+}

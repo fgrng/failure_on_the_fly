@@ -8,6 +8,11 @@ from . import views
 app_name: str = "vignetten"
 
 urlpatterns: list[URLPattern] = [
+    path(
+        "prototype/bildfeld/",
+        views.bildfeld_prototype,
+        name="bildfeld_prototype",
+    ),
     path("", views.liste, name="liste"),
     path("anlegen/", views.anlegen, name="anlegen"),
     path("<int:pk>/bearbeiten/", views.bearbeiten, name="bearbeiten"),

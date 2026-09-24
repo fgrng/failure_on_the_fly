@@ -2,10 +2,11 @@
 
 from typing import Callable
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -16,6 +17,61 @@ from konten.navigation import (
 
 from .forms import VignetteForm
 from .models import Vignette, Vignettenhistorie, zufaellige_akteure
+
+# PROTOTYPE #288 – wegwerfen, sobald die Bildfeld-Entscheidung gefallen ist.
+_BILDFELD_VARIANTEN: dict[str, str] = {
+    "a": "A · Ablagezone",
+    "b": "B · Anhangzeile",
+    "c": "C · Bildkarte mit Beschreibung",
+    "vergleich": "Vergleich · alle Varianten",
+}
+_BILDFELD_ZUSTAENDE: list[tuple[str, str]] = [
+    ("leer", "Leer"),
+    ("gewaehlt", "Datei gewählt, noch nicht gespeichert"),
+    ("gespeichert", "Gespeichert"),
+    ("entfernen", "Wird beim Speichern entfernt"),
+    ("fehler", "Fehler: kein Bild"),
+    ("verloren", "Nach Formularfehler: Auswahl verloren"),
+]
+
+
+def bildfeld_prototype(request: HttpRequest) -> HttpResponse:
+    """PROTOTYPE #288: Varianten des Bild-Uploads, ohne Datenbank."""
+    if not settings.DEBUG:
+        raise Http404
+    schluessel = list(_BILDFELD_VARIANTEN)
+    variante = request.GET.get("variant", "a")
+    if variante not in _BILDFELD_VARIANTEN:
+        variante = "a"
+    i = schluessel.index(variante)
+    # Ein POST tut so, als hätte ein anderes Feld einen Fehler: Die gewählte Datei
+    # ist dann weg, genau wie im echten Formular.
+    live_zustand, verlorene_datei = "gespeichert", ""
+    if request.method == "POST":
+        datei = request.FILES.get("live-bild")
+        if "live-bild-clear" in request.POST:
+            live_zustand = "entfernen"
+        if datei:
+            live_zustand, verlorene_datei = "verloren", datei.name
+    return render(
+        request,
+        "vignetten/prototype_bildfeld.html",
+        {
+            "variante": variante,
+            "variantenbezeichnung": _BILDFELD_VARIANTEN[variante],
+            "vorherige_variante": schluessel[i - 1],
+            "naechste_variante": schluessel[(i + 1) % len(schluessel)],
+            "varianten": [
+                (k, f"vignetten/prototype_bildfeld/variante_{k}.html", name)
+                for k, name in _BILDFELD_VARIANTEN.items()
+                if k != "vergleich" and variante in (k, "vergleich")
+            ],
+            "zustaende": _BILDFELD_ZUSTAENDE,
+            "live_zustand": live_zustand,
+            "verlorene_datei": verlorene_datei,
+            "abgeschickt": request.method == "POST",
+        },
+    )
 
 
 def _zustand_badge(vignette: Vignette) -> str:

@@ -1,0 +1,48 @@
+{% load static %}{# PROTOTYPE #288 · Variante C: Bild und Bildbeschreibung als eine Karte, Position über den Marker sichtbar. #}
+<fieldset class="bf bf-c page-field--wide" x-data="bildfeld({zustand: '{{ zustand }}', gespeichert: {{ gespeichert|yesno:'true,false' }}, bild: '{% static 'images/prototype-bildfeld/lernauftrag.png' %}', verloren: '{{ verloren|escapejs }}', textId: '{{ text_id }}', beschreibung: '{{ beschreibung|escapejs }}'})"
+          :data-zustand="zustand" @input.window="if ($event.target.id === textId) text = $event.target.value">
+    <legend>Lernauftrag Bild</legend>
+    <input class="bf__eingabe" type="file" accept="image/*" id="{{ feld }}" name="{{ feld }}" x-ref="eingabe" @change="gewaehlt($el)" aria-describedby="{{ feld }}-status">
+    <input type="checkbox" hidden name="{{ feld }}-clear" :checked="wirdEntfernt">
+
+    <header class="bf-c__kopf">
+        <span x-show="!textId">Position im Text: an der Stelle <code>[bild]</code></span>
+        <template x-if="textId">
+            <span x-text="markerGesetzt ? 'Position im Text: an der Stelle [bild]' : 'Position: unter dem Text (kein Marker [bild] gesetzt)'"></span>
+        </template>
+        <span class="bf__status" x-show="statusText" x-text="statusText"></span>
+    </header>
+
+    <div class="bf-c__koerper">
+        <div class="bf-c__bild" :class="{ 'ist-ziehen': ziehen, 'hat-bild': bildUrl }"
+             @dragover.prevent="ziehen = true" @dragleave="ziehen = false" @drop.prevent="abgelegt($event)">
+            <img x-show="bildUrl" :src="bildUrl" :alt="beschreibung">
+            <label x-show="!bildUrl" for="{{ feld }}">
+                <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Bild hinzufügen</span>
+                <small>oder hierher ziehen</small>
+            </label>
+        </div>
+        <div class="bf-c__beschreibung vignette-field">
+            <label for="{{ feld }}-beschreibung">Bildbeschreibung</label>
+            <textarea id="{{ feld }}-beschreibung" name="{{ feld }}-beschreibung" x-model="beschreibung" rows="4"></textarea>
+            <small>Alt-Text für Teilnehmende und die Bildfassung, die die Simulation liest.</small>
+            <small class="bf-c__hinweis" x-show="bildUrl && !wirdEntfernt && !beschreibung.trim()">Ohne Beschreibung »sieht« die simulierte Schüler:in das Bild nicht.</small>
+            <small class="bf-c__hinweis" x-show="wirdEntfernt">Die Beschreibung bleibt stehen und wird ohne Bild weiter an die Simulation gegeben.</small>
+            <span class="bf__aktionen">
+                <template x-if="istNeu">
+                    <span><button type="button" class="button button--secondary" @click="auswaehlen()">Andere Datei</button>
+                    <button type="button" class="bf__link" @click="verwerfen()">Auswahl verwerfen</button></span>
+                </template>
+                <template x-if="bildUrl && !istNeu && !wirdEntfernt">
+                    <span><button type="button" class="button button--secondary" @click="auswaehlen()">Bild ersetzen</button>
+                    <button type="button" class="bf__link bf__link--gefahr" @click="entfernen()">Bild entfernen</button></span>
+                </template>
+                <template x-if="wirdEntfernt">
+                    <button type="button" class="button button--secondary" @click="behalten()">Rückgängig</button>
+                </template>
+            </span>
+        </div>
+    </div>
+    <p class="bf__meldung" :class="{ 'ist-fehler': istFehler }" id="{{ feld }}-status" role="status" x-text="meldung"></p>
+</fieldset>
