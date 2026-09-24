@@ -1,5 +1,6 @@
 """Naht für die Ziele eines Sitzungslaufs."""
 
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -131,22 +132,19 @@ class SitzungSink(Protocol):
         """Bucht die offene Spanne vor Modellaufruf oder Sitzungsende."""
 
 
-class DBSink:
-    """Persistiert eine Sitzung inkrementell über die ORM-Modelle."""
+class GeruestSink(ABC):
+    """Führt das Ablaufgerüst einer Sitzung inkrementell in der DB.
+
+    Sitzung, Status und Budget-Uhr stehen an der Sitzungszeile. Wo
+    Gesprächsschritte, Fehlversuche und Diagnose liegen, legen die beiden
+    Senken selbst fest (ADR-0045).
+    """
 
     def __init__(self, teilnahme: Teilnahme) -> None:
         """Bindet den Sink an die Teilnahme."""
 
         self.teilnahme: Teilnahme = teilnahme
         self.sitzung: Sitzung | None = None
-
-    @classmethod
-    def fuer_sitzung(cls, sitzung: Sitzung) -> "DBSink":
-        """Stellt den Sink für eine bereits persistierte Sitzung wieder her."""
-
-        sink: DBSink = cls(sitzung.teilnahme)
-        sink.sitzung = sitzung
-        return sink
 
     def sitzung_starten(
         self,
@@ -188,33 +186,6 @@ class DBSink:
             self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
         )
 
-    def _geglueckten_schritt_ablegen(
-        self,
-        *,
-        eingabe: str,
-        eingabemodus: str,
-        denkspur: str,
-        aeusserung: str,
-        fehlversuche: list[FehlversuchDaten],
-    ) -> None:
-        # Schreibt einen geglückten Schritt und seine Fehlversuche atomar.
-
-        with transaction.atomic():
-            schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
-                sitzung=self._sitzung,
-                eingabe=eingabe,
-                eingabemodus=eingabemodus,
-                denkspur=denkspur,
-                aeusserung=aeusserung,
-                reihenfolge=self._naechste_reihenfolge(),
-            )
-            Fehlversuch.objects.bulk_create(
-                [
-                    Fehlversuch(gespraechsschritt=schritt, **fehlversuch)
-                    for fehlversuch in fehlversuche
-                ]
-            )
-
     def gescheiterten_schritt_behandeln(
         self,
         *,
@@ -225,26 +196,18 @@ class DBSink:
         """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0011)."""
 
         with transaction.atomic():
-            Gespraechsschritt.objects.answerless_anlegen(
-                sitzung=self._sitzung,
-                eingabe=eingabe,
-                eingabemodus=eingabemodus,
-                reihenfolge=self._naechste_reihenfolge(),
-                fehlversuche=[
-                    Fehlversuch(**fehlversuch) for fehlversuch in fehlversuche
-                ],
+            self._abbruchschritt_ablegen(
+                eingabe=eingabe, eingabemodus=eingabemodus, fehlversuche=fehlversuche
             )
             self.status_setzen(Sitzung.Status.GESCHEITERT)
 
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
     ) -> None:
-        """Speichert die Diagnose und schließt die Sitzung gemeinsam ab."""
+        """Bewahrt die Diagnose und schließt die Sitzung gemeinsam ab."""
 
         with transaction.atomic():
-            Diagnose.objects.create(
-                sitzung=self._sitzung, text=text, eingabemodus=eingabemodus
-            )
+            self._diagnose_ablegen(text, eingabemodus=eingabemodus)
             self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
 
     def status_setzen(self, status: Sitzung.Status) -> None:
@@ -254,49 +217,69 @@ class DBSink:
         self._sitzung.save(update_fields=["status"])
 
     @property
+    @abstractmethod
     def gespraechsschritte(
         self,
-    ) -> QuerySet[Gespraechsschritt] | list[GespraechsschrittDaten]:
-        """Liefert die gespeicherten Schritte in ihrer Reihenfolge."""
-
-        return self._sitzung.gespraechsschritte
+    ) -> Iterable[GespraechsschrittDaten | Gespraechsschritt]:
+        """Liefert die bisherigen Schritte in ihrer Reihenfolge."""
 
     @property
+    @abstractmethod
     def verlauf_fehlt(self) -> bool:
-        """Meldet, ob der Verlauf der Sitzung hier nicht greifbar ist.
-
-        Die DB trägt ihn in jeden Browser.
-        """
-
-        return False
+        """Meldet, ob der Verlauf der Sitzung hier nicht greifbar ist."""
 
     @property
+    @abstractmethod
     def abgegebene_diagnose(self) -> str | None:
         """Liefert den Text der bereits abgegebenen Diagnose, sonst nichts."""
 
-        return (
-            Diagnose.objects.filter(sitzung=self._sitzung)
-            .values_list("text", flat=True)
-            .first()
-        )
+    @abstractmethod
+    def _geglueckten_schritt_ablegen(
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        denkspur: str,
+        aeusserung: str,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        # Legt einen geglückten Schritt samt Fehlversuchen dort ab, wo dieser
+        # Sink Inhalte hält.
+        ...
+
+    @abstractmethod
+    def _abbruchschritt_ablegen(
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        # Legt den antwortlosen Schritt eines endgültigen Fehlschlags ab.
+        ...
+
+    @abstractmethod
+    def _diagnose_ablegen(self, text: str, *, eingabemodus: str) -> None:
+        # Legt die Diagnose dort ab, wo dieser Sink Inhalte hält.
+        ...
+
+    @abstractmethod
+    def _schrittzahl(self) -> int:
+        # Zählt die bisherigen Schritte dort, wo dieser Sink sie hält.
+        ...
 
     @property
     def _sitzung(self) -> Sitzung:
         # Liefert die gestartete Sitzung oder weist auf einen falschen Ablauf hin.
 
         if self.sitzung is None:
-            raise RuntimeError("Der DB-Sink braucht zuerst eine gestartete Sitzung.")
+            raise RuntimeError("Der Sink braucht zuerst eine gestartete Sitzung.")
         return self.sitzung
 
     def _naechste_reihenfolge(self) -> int:
         # Bestimmt die fortlaufende Position des nächsten Gesprächsschritts.
 
         return self._schrittzahl() + 1
-
-    def _schrittzahl(self) -> int:
-        # Zählt die bisherigen Schritte dort, wo dieser Sink sie hält.
-
-        return self._sitzung.gespraechsschritte.count()
 
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der Teilnehmerin neu an."""
@@ -333,13 +316,102 @@ class DBSink:
         self._sitzung.save(update_fields=["verbrauchte_zeit", "offene_spanne_seit"])
 
 
-class FluechtigerSink(DBSink):
+class DBSink(GeruestSink):
+    """Persistiert eine Sitzung samt Inhalten inkrementell über die ORM-Modelle."""
+
+    @classmethod
+    def fuer_sitzung(cls, sitzung: Sitzung) -> "DBSink":
+        """Stellt den Sink für eine bereits persistierte Sitzung wieder her."""
+
+        sink: DBSink = cls(sitzung.teilnahme)
+        sink.sitzung = sitzung
+        return sink
+
+    @property
+    def gespraechsschritte(self) -> QuerySet[Gespraechsschritt]:
+        """Liefert die gespeicherten Schritte in ihrer Reihenfolge."""
+
+        return self._sitzung.gespraechsschritte
+
+    @property
+    def verlauf_fehlt(self) -> bool:
+        """Die DB trägt den Verlauf in jeden Browser; er fehlt nie."""
+
+        return False
+
+    @property
+    def abgegebene_diagnose(self) -> str | None:
+        """Liefert den Text der bereits abgegebenen Diagnose, sonst nichts."""
+
+        return (
+            Diagnose.objects.filter(sitzung=self._sitzung)
+            .values_list("text", flat=True)
+            .first()
+        )
+
+    def _geglueckten_schritt_ablegen(
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        denkspur: str,
+        aeusserung: str,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        # Schreibt einen geglückten Schritt und seine Fehlversuche atomar.
+
+        with transaction.atomic():
+            schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+                sitzung=self._sitzung,
+                eingabe=eingabe,
+                eingabemodus=eingabemodus,
+                denkspur=denkspur,
+                aeusserung=aeusserung,
+                reihenfolge=self._naechste_reihenfolge(),
+            )
+            Fehlversuch.objects.bulk_create(
+                [
+                    Fehlversuch(gespraechsschritt=schritt, **fehlversuch)
+                    for fehlversuch in fehlversuche
+                ]
+            )
+
+    def _abbruchschritt_ablegen(
+        self,
+        *,
+        eingabe: str,
+        eingabemodus: str,
+        fehlversuche: list[FehlversuchDaten],
+    ) -> None:
+        # Behält den antwortlosen Schritt samt Fehlversuchen in der DB.
+
+        Gespraechsschritt.objects.answerless_anlegen(
+            sitzung=self._sitzung,
+            eingabe=eingabe,
+            eingabemodus=eingabemodus,
+            reihenfolge=self._naechste_reihenfolge(),
+            fehlversuche=[Fehlversuch(**fehlversuch) for fehlversuch in fehlversuche],
+        )
+
+    def _diagnose_ablegen(self, text: str, *, eingabemodus: str) -> None:
+        # Speichert die Diagnose als eigene Zeile.
+
+        Diagnose.objects.create(
+            sitzung=self._sitzung, text=text, eingabemodus=eingabemodus
+        )
+
+    def _schrittzahl(self) -> int:
+        # Zählt die Zeilen der DB.
+
+        return self._sitzung.gespraechsschritte.count()
+
+
+class FluechtigerSink(GeruestSink):
     """Führt das Ablaufgerüst in der DB und die Inhalte nur in der Session.
 
-    Die Senke der flüchtigen Teilnahme: Sitzung, Status und Budget-Uhr stehen
-    wie beim DB-Sink an der Sitzungszeile. Gesprächsschritte samt
-    Fehlversuchen und die Diagnose liegen allein in der Browser-Session,
-    je Sitzung unter ihrem Primärschlüssel, und erreichen die DB nie.
+    Die Senke der flüchtigen Teilnahme: Gesprächsschritte samt Fehlversuchen
+    und die Diagnose liegen allein in der Browser-Session, je Sitzung unter
+    ihrem Primärschlüssel, und erreichen die DB nie.
     """
 
     def __init__(self, teilnahme: Teilnahme, session: MutableMapping[str, Any]) -> None:
@@ -349,7 +421,7 @@ class FluechtigerSink(DBSink):
         self.session: MutableMapping[str, Any] = session
 
     @classmethod
-    def fuer_sitzung(  # type: ignore[override]
+    def fuer_sitzung(
         cls, sitzung: Sitzung, session: MutableMapping[str, Any]
     ) -> "FluechtigerSink":
         """Stellt den Sink für eine laufende oder beendete Sitzung wieder her."""
@@ -367,9 +439,7 @@ class FluechtigerSink(DBSink):
         """Legt die Sitzung in der DB und ihren Verlauf in dieser Session an."""
 
         super().sitzung_starten(vignette, simulationskern, modell_konfiguration)
-        # Der leere Eintrag weist diese Session als Trägerin des Verlaufs aus.
-        self._zustand
-        self._als_geaendert_markieren()
+        self._verlauf_anlegen()
 
     @property
     def verlauf_fehlt(self) -> bool:
@@ -378,9 +448,7 @@ class FluechtigerSink(DBSink):
         Das ist in einem anderen Browser oder nach Ablauf der Session der Fall.
         """
 
-        return str(self._sitzung.pk) not in self.session.get(
-            _FLUECHTIGE_SITZUNGEN_SCHLUESSEL, {}
-        )
+        return str(self._sitzung.pk) not in self._sitzungsverlaeufe
 
     @property
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
@@ -412,29 +480,23 @@ class FluechtigerSink(DBSink):
             eingabe, eingabemodus, denkspur, aeusserung, fehlversuche
         )
 
-    def gescheiterten_schritt_behandeln(
+    def _abbruchschritt_ablegen(
         self,
         *,
         eingabe: str,
         eingabemodus: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        """Hält den Abbruchschritt in der Session und den Status in der DB."""
+        # Hält den antwortlosen Schritt nur im Verlauf der Session.
 
         self._schritt_anhaengen(eingabe, eingabemodus, None, None, fehlversuche)
-        self.status_setzen(Sitzung.Status.GESCHEITERT)
 
-    def diagnose_setzen(
-        self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
-    ) -> None:
-        """Hält die Diagnose in der Session und schließt die Sitzung in der DB ab.
-
-        Der Eingabemodus gehört zum Inhalt und wird deshalb nicht festgehalten.
-        """
+    def _diagnose_ablegen(self, text: str, *, eingabemodus: str) -> None:
+        # Hält die Diagnose in der Session. Der Eingabemodus gehört zum Inhalt
+        # und wird deshalb nicht festgehalten.
 
         self._zustand["diagnose"] = text
-        self._als_geaendert_markieren()
-        self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        _session_als_geaendert_markieren(self.session)
 
     def _schritt_anhaengen(
         self,
@@ -447,51 +509,87 @@ class FluechtigerSink(DBSink):
         # Legt einen Schritt in der gemeinsamen Speicherform in die Session.
 
         self.gespraechsschritte.append(
-            {
-                "reihenfolge": self._naechste_reihenfolge(),
-                "eingabe": eingabe,
-                "eingabemodus": eingabemodus,
-                "denkspur": denkspur,
-                "aeusserung": aeusserung,
-                "fehlversuche": fehlversuche,
-            }
+            _schrittdaten(
+                self._naechste_reihenfolge(),
+                eingabe,
+                eingabemodus,
+                denkspur,
+                aeusserung,
+                fehlversuche,
+            )
         )
-        self._als_geaendert_markieren()
+        _session_als_geaendert_markieren(self.session)
 
     def _schrittzahl(self) -> int:
         # Zählt die Schritte der Session statt der Zeilen der DB.
 
         return len(self.gespraechsschritte)
 
+    def _verlauf_anlegen(self) -> None:
+        # Der leere Eintrag weist diese Session als Trägerin des Verlaufs aus.
+
+        self._sitzungsverlaeufe[str(self._sitzung.pk)] = {"gespraechsschritte": []}
+        _session_als_geaendert_markieren(self.session)
+
+    @property
+    def _sitzungsverlaeufe(self) -> MutableMapping[str, Any]:
+        # Die Verläufe aller flüchtigen Sitzungen dieser Session.
+
+        return cast(
+            MutableMapping[str, Any],
+            self.session.setdefault(_FLUECHTIGE_SITZUNGEN_SCHLUESSEL, {}),
+        )
+
     @property
     def _zustand(self) -> MutableMapping[str, Any]:
         # Kapselt den Session-Eintrag dieser einen Sitzung.
 
-        sitzungen: MutableMapping[str, Any] = self.session.setdefault(
-            _FLUECHTIGE_SITZUNGEN_SCHLUESSEL, {}
-        )
         return cast(
-            MutableMapping[str, Any], sitzungen.setdefault(str(self._sitzung.pk), {})
+            MutableMapping[str, Any],
+            self._sitzungsverlaeufe.setdefault(str(self._sitzung.pk), {}),
         )
 
-    def _als_geaendert_markieren(self) -> None:
-        # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
 
-        if hasattr(self.session, "modified"):
-            self.session.modified = True
+def _schrittdaten(
+    reihenfolge: int,
+    eingabe: str,
+    eingabemodus: str,
+    denkspur: str | None,
+    aeusserung: str | None,
+    fehlversuche: list[FehlversuchDaten],
+) -> GespraechsschrittDaten:
+    # Baut die gemeinsame Speicherform der beiden Session-Senken.
+
+    return {
+        "reihenfolge": reihenfolge,
+        "eingabe": eingabe,
+        "eingabemodus": eingabemodus,
+        "denkspur": denkspur,
+        "aeusserung": aeusserung,
+        "fehlversuche": fehlversuche,
+    }
+
+
+def _session_als_geaendert_markieren(session: MutableMapping[str, Any]) -> None:
+    # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
+
+    if hasattr(session, "modified"):
+        session.modified = True
 
 
 def sink_fuer_teilnahme(
     teilnahme: Teilnahme, session: MutableMapping[str, Any]
-) -> DBSink:
+) -> GeruestSink:
     """Wählt die Senke einer neuen Sitzung allein nach der Speicherung."""
 
-    if teilnahme.speicherung_eingewilligt is False:
+    if teilnahme.ist_fluechtig:
         return FluechtigerSink(teilnahme, session)
     return DBSink(teilnahme)
 
 
-def sink_fuer_sitzung(sitzung: Sitzung, session: MutableMapping[str, Any]) -> DBSink:
+def sink_fuer_sitzung(
+    sitzung: Sitzung, session: MutableMapping[str, Any]
+) -> GeruestSink:
     """Wählt die Senke einer bestehenden Sitzung allein nach der Speicherung."""
 
     if sitzung.teilnahme.ist_fluechtig:
@@ -588,14 +686,14 @@ class ScratchSink:
 
         budgetstand: Budgetstand = self._budgetstand_laden()
         self.gespraechsschritte.append(
-            {
-                "reihenfolge": len(self.gespraechsschritte) + 1,
-                "eingabe": eingabe,
-                "eingabemodus": eingabemodus,
-                "denkspur": denkspur,
-                "aeusserung": aeusserung,
-                "fehlversuche": fehlversuche,
-            }
+            _schrittdaten(
+                len(self.gespraechsschritte) + 1,
+                eingabe,
+                eingabemodus,
+                denkspur,
+                aeusserung,
+                fehlversuche,
+            )
         )
         budgetstand.gespraechsschritt_anhaengen()
         self._budgetstand_speichern(budgetstand)
@@ -635,13 +733,13 @@ class ScratchSink:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
         self._zustand["status"] = status
-        self._als_geaendert_markieren()
+        _session_als_geaendert_markieren(self.session)
 
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""
 
         self._zustand["freie_auswahl"] = True
-        self._als_geaendert_markieren()
+        _session_als_geaendert_markieren(self.session)
 
     @property
     def _vignette(self) -> Vignette:
@@ -693,15 +791,9 @@ class ScratchSink:
             self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = (
                 budgetstand.offene_spanne_seit.isoformat()
             )
-        self._als_geaendert_markieren()
+        _session_als_geaendert_markieren(self.session)
 
     def verwerfen(self) -> None:
         """Entfernt den vollständigen Probelaufzustand aus der Session."""
 
         self.session.pop(_PROBELAUF_SESSION_SCHLUESSEL, None)
-
-    def _als_geaendert_markieren(self) -> None:
-        # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
-
-        if hasattr(self.session, "modified"):
-            self.session.modified = True

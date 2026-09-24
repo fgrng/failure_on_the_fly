@@ -44,13 +44,19 @@ exportiert (ADR-0029) und weder nachträglich reduziert noch gesperrt.
   lautet „nie gespeichert“, nicht „nicht ausgewertet“.
 - **Die Wahl in die Views legen** — verworfen: Sie gehört an die Naht, die die
   Persistierung schon trägt (ADR-0016); die Views fragen nur nach der Senke
-  einer Sitzung.
+  einer Sitzung. Das gilt für die Inhalte einer Sitzung. Fragebogen-Antworten,
+  der Abschlusshinweis und die Abschrift sind keine Sitzungsinhalte; der
+  Fragebogen (`block_vorlegen`, `ItemblockFormular`), die Abschlussseite und
+  die Abschrift fragen deshalb direkt `Teilnahme.ist_fluechtig` bzw. in
+  Abfragen `Teilnahme.fluechtig_q`. Eine andere Formulierung der Regel gibt es
+  nicht.
 
 ## Consequences
 
 - Das Sitzungssenken-Protokoll hat nun drei Adapter; die Zahl der Nähte bleibt
-  gleich. Der `FluechtigerSink` erbt Gerüst und Uhr vom `DBSink` und ersetzt
-  nur, wo Schritte und Diagnose liegen.
+  gleich. `DBSink` und `FluechtigerSink` teilen Gerüst und Uhr über die
+  gemeinsame Basis `GeruestSink` und unterscheiden sich nur darin, wo Schritte
+  und Diagnose liegen.
 - Ein endgültig gescheiterter Antwortversuch setzt den Status `gescheitert` in
   der DB; der antwortlose Schritt steht nur im Verlauf der Session.
 - Der Verlauf einer flüchtigen Sitzung lässt sich nach dem Verlust der

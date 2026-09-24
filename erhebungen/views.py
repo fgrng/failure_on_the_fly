@@ -69,7 +69,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
 )
 from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
-from sitzungen.sink import DBSink, sink_fuer_sitzung
+from sitzungen.sink import GeruestSink, sink_fuer_sitzung
 from sitzungen.views import (
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
@@ -290,9 +290,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "erhebungsbindung",
             filter=Q(erhebungsbindung__teilnahme__sprachmodell_eingewilligt=False),
         ),
-        ohne_speicherung=Count(
+        fluechtig=Count(
             "erhebungsbindung",
-            filter=Q(erhebungsbindung__teilnahme__speicherung_eingewilligt=False),
+            filter=Teilnahme.fluechtig_q("erhebungsbindung__teilnahme__"),
         ),
     )
 
@@ -846,6 +846,8 @@ def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         return _ohne_zutritt(bindung, teilnahme_link) or redirect(
             "erhebungen:instruktion", teilnahme_link=teilnahme_link
         )
+    if bindung.teilnahme.sprachmodell_eingewilligt:
+        return _weiter_im_ablauf(request, bindung)
     return render(
         request,
         "erhebungen/einwilligung.html",
@@ -1018,7 +1020,7 @@ def _sitzung_ohne_verlauf_abbrechen(
     sitzung: Sitzung | None = laufende_sitzung(bindung)
     if sitzung is None:
         return None
-    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     if not sink.verlauf_fehlt:
         return None
     sitzung_abbrechen(sink)
@@ -1037,7 +1039,7 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     )
     if ohne_verlauf is not None:
         return ohne_verlauf
-    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
@@ -1048,7 +1050,7 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
-    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_abbrechen(sink)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
@@ -1199,7 +1201,7 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         "erhebungen/abschluss.html",
         {
             "erhebung": stichprobe.erhebung,
-            "fluechtig": bindung.teilnahme.speicherung_eingewilligt is False,
+            "fluechtig": bindung.teilnahme.ist_fluechtig,
         },
     )
 
