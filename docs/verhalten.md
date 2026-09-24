@@ -259,8 +259,9 @@ gilt sofort, beim Entfernen schließt sich die Reihenfolge. Ist eine Fassung
 bereits am anderen Andockpunkt gebunden, kennzeichnet die Auswahl dies, ohne ihre
 Aufnahme zu verhindern. Der Schalter »Zufällige Reihenfolge« über der
 Vignettenliste mischt die Vignetten je Teilnahme; dann entfallen Nummern,
-Positionswahl und Verschieben. Beim Wechsel zurück zu fest wird die angezeigte
-Liste zur Reihenfolge.
+Positionswahl und Verschieben. Die Reihenfolge der Liste bleibt dabei
+gespeichert: Beim Wechsel zurück zu fest gilt wieder die zuvor festgelegte
+Reihenfolge, neu aufgenommene Vignetten stehen am Ende.
 Finale und archivierte Erhebungen zeigen Vignetten und Items weiterhin als
 nummerierte Listen ohne Auswahl und Änderungsaktionen; nach einem Rückzug sind sie
 wieder bearbeitbar.

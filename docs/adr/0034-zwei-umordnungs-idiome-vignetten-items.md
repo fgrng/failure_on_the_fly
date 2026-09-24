@@ -1,6 +1,8 @@
 ---
-status: accepted
+status: superseded by ADR-0044
 ---
+
+> Abgelöst durch ADR-0044: Vignetten und Items nutzen dieselbe Zuordnungsliste; die Position ist von der Reihenfolgeregel getrennt.
 
 # Zwei Umordnungs-Idiome nebeneinander: Positions-Select für Vignetten, Hoch/Runter für Items
 

@@ -294,7 +294,11 @@ class Zuordnung(models.Model):
 
 
 class Erhebungsvignette(Zuordnung):
-    """Die finale Vignetten-Fassung einer Erhebung samt fester Position."""
+    """Die finale Vignetten-Fassung einer Erhebung samt ihrer Listenposition.
+
+    Die Position bleibt auch bei zufälliger Reihenfolge gespeichert; ob sie für
+    die Teilnahme gilt, entscheidet allein `Erhebung.randomisierung`.
+    """
 
     erhebung: models.ForeignKey = models.ForeignKey(
         Erhebung,
@@ -304,12 +308,10 @@ class Erhebungsvignette(Zuordnung):
     vignette: models.ForeignKey = models.ForeignKey(
         "vignetten.Vignette", on_delete=models.PROTECT
     )
-    position: models.PositiveIntegerField = models.PositiveIntegerField(
-        null=True, blank=True
-    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
 
     def clean(self) -> None:
-        """Erlaubt nur in Entwürfen eigene finale Fassungen an passender Position."""
+        """Erlaubt nur in Entwürfen eigene finale Fassungen."""
 
         from vignetten.models import Vignette
 
@@ -320,16 +322,11 @@ class Erhebungsvignette(Zuordnung):
             pk__in=self.erhebung.eigentuemerinnen.all()
         ).exists():
             fehler["vignette"] = "Erhebungen können nur eigene Vignetten einbinden."
-        if self.erhebung.randomisierung == Erhebung.Randomisierung.FEST:
-            if self.position is None:
-                fehler["position"] = "Feste Reihenfolgen brauchen eine Position."
-        elif self.position is not None:
-            fehler["position"] = "Zufällige Reihenfolgen haben keine Position."
         if fehler:
             raise ValidationError(fehler)
 
     class Meta:
-        """Macht Mitgliedschaft und feste Position je Erhebung eindeutig."""
+        """Macht Mitgliedschaft und Position je Erhebung eindeutig."""
 
         ordering: list[str] = ["position", "pk"]
         constraints: list[models.BaseConstraint] = [
@@ -339,8 +336,7 @@ class Erhebungsvignette(Zuordnung):
             ),
             models.UniqueConstraint(
                 fields=["erhebung", "position"],
-                condition=models.Q(position__isnull=False),
-                name="erhebungen_feste_position_ist_eindeutig",
+                name="erhebungen_vignettenposition_ist_eindeutig",
             ),
         ]
 

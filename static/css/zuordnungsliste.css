@@ -23,13 +23,13 @@
 }
 .zuordnungsliste__kopf h3 { margin: 0; font-size: 1rem; }
 
-.zuordnungsliste__schalter { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
+.zuordnungsliste__schalter { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.9rem; cursor: pointer; }
 .zuordnungsliste__schalter input { width: 1.1rem; height: 1.1rem; accent-color: var(--color-area-research-solid); }
 
 .zuordnungsliste__hinweis {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1);
     margin: 0 0 var(--space-1);
     color: var(--color-text-muted);
     font-size: 0.85rem;
@@ -40,10 +40,10 @@
 
 .zuordnungsliste__liste {
     display: grid;
-    gap: 4px;
+    gap: var(--space-1);
     min-height: 3rem;
     margin: 0;
-    padding: 4px;
+    padding: var(--space-1);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     list-style: none;
@@ -55,7 +55,7 @@
     align-items: center;
     gap: var(--space-1);
     min-height: 2.75rem;
-    padding: 4px var(--space-1);
+    padding: var(--space-1);
     border: 1px solid var(--color-border);
     border-radius: 6px;
     background: var(--color-surface);
@@ -71,7 +71,7 @@
     font-weight: 600;
 }
 .zuordnungsliste__leer { padding: var(--space-1); color: var(--color-text-muted); font-size: 0.9rem; }
-.zuordnungsliste__leiste { display: inline-flex; align-items: center; gap: 2px; }
+.zuordnungsliste__leiste { display: inline-flex; align-items: center; gap: 0; }
 
 .zuordnung-iconknopf {
     display: grid;

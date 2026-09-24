@@ -189,8 +189,10 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(3)]
-    for vignette in vignetten:
-        Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
+    for position, vignette in enumerate(vignetten, start=1):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=vignette, position=position
+        )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
     )
@@ -313,7 +315,7 @@ def test_abfrage_nach_dem_naechsten_schritt_schreibt_keine_zeile() -> None:
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignette: Vignette = _finale_vignette_anlegen(konto)
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
     item: FragebogenItem = _finales_item_anlegen(konto)
     Erhebungsitem.objects.create(
         erhebung=erhebung,
@@ -391,9 +393,11 @@ def test_ziehung_bleibt_nach_dem_ersten_festschreiben_unveraendert() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    for _ in range(4):
+    for position in range(1, 5):
         Erhebungsvignette.objects.create(
-            erhebung=erhebung, vignette=_finale_vignette_anlegen(konto)
+            erhebung=erhebung,
+            vignette=_finale_vignette_anlegen(konto),
+            position=position,
         )
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 

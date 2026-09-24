@@ -775,6 +775,54 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             ),
         )
 
+    def test_entfernen_nach_umsortieren_schliesst_die_luecke(self) -> None:
+        """Auch umsortierte Listen rücken beim Entfernen ohne Konflikt nach."""
+
+        items: list[FragebogenItem] = [
+            _finales_item_anlegen(self.ada, f"Item {nummer}") for nummer in range(3)
+        ]
+        for item in items:
+            self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+                )
+            )
+        zuordnungen: list[Erhebungsitem] = [
+            Erhebungsitem.objects.get(erhebung=self.erhebung, item=item)
+            for item in items
+        ]
+        # Umgekehrte Reihenfolge: Die zuerst angelegte Zeile steht jetzt hinten.
+        self.client.post(
+            reverse(
+                "erhebungen:item_verschieben",
+                args=[self.erhebung.pk, zuordnungen[2].pk],
+            ),
+            {"position": 1},
+        )
+        self.client.post(
+            reverse(
+                "erhebungen:item_verschieben",
+                args=[self.erhebung.pk, zuordnungen[0].pk],
+            ),
+            {"position": 3},
+        )
+
+        entfernen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_entfernen",
+                args=[self.erhebung.pk, zuordnungen[2].pk],
+            )
+        )
+
+        self.assertEqual(
+            [
+                (zeile["pk"], zeile["position"])
+                for zeile in entfernen.context["am_ende_aufgenommene_daten"]
+            ],
+            [(items[1].pk, 1), (items[0].pk, 2)],
+        )
+
     def test_entfernen_schliesst_die_itemreihenfolge_lueckenlos(self) -> None:
         """Das nächste Item ergänzt die nach dem Entfernen geschlossene Reihenfolge."""
 
@@ -1054,12 +1102,31 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             (zweite_zugehoerigkeit.position, erste_zugehoerigkeit.position), (1, 2)
         )
 
-    def test_umschalten_auf_zufaellig_loescht_die_positionen(self) -> None:
-        """Eine zufällige Reihenfolge trägt keine Positionen."""
+    def test_umschalten_bewahrt_die_reihenfolge_hin_und_zurueck(self) -> None:
+        """Die Regel wechselt, die Listenpositionen bleiben unberührt."""
 
-        zugehoerigkeit: Erhebungsvignette = Erhebungsvignette.objects.create(
-            erhebung=self.erhebung, vignette=self.eigene_finale, position=1
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_verschieben", args=[self.erhebung.pk, zweite.pk]
+            ),
+            {"position": 1},
         )
+        erwartet: list[tuple[int, int]] = [(zweite.pk, 1), (self.eigene_finale.pk, 2)]
+
+        def positionen() -> list[tuple[int, int]]:
+            return list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", "position"
+                )
+            )
 
         zufaellig: HttpResponse = self.client.post(
             reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
@@ -1070,14 +1137,22 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             zufaellig, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
         self.erhebung.refresh_from_db()
-        zugehoerigkeit.refresh_from_db()
         self.assertEqual(
             self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG
         )
-        self.assertIsNone(zugehoerigkeit.position)
+        self.assertEqual(positionen(), erwartet)
 
-    def test_umschalten_auf_fest_macht_die_liste_zur_reihenfolge(self) -> None:
-        """Beim Wechsel zu fest bekommt jede Vignette ihre angezeigte Position."""
+        self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.FEST},
+        )
+
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
+        self.assertEqual(positionen(), erwartet)
+
+    def test_zufaellige_reihenfolge_nimmt_mit_position_auf(self) -> None:
+        """Auch bei zufälliger Reihenfolge bekommt jede Vignette ihre Listenposition."""
 
         self.erhebung.randomisierung = Erhebung.Randomisierung.ZUFAELLIG
         self.erhebung.save(update_fields=["randomisierung"])
@@ -1089,16 +1164,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     args=[self.erhebung.pk, vignette.pk],
                 )
             )
-        self.assertFalse(
-            Erhebungsvignette.objects.filter(
-                erhebung=self.erhebung, position__isnull=False
-            ).exists()
-        )
-
-        self.client.post(
-            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.FEST},
-        )
 
         self.assertEqual(
             list(
