@@ -343,8 +343,9 @@ Budget-Typ der Vignettenfassung zu lesen. Die verwendeten
 Vignettenfassungen, Simulationskern-Fassungen und Modell-Konfigurationen liegen
 mit ihrem vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
 Datenbankzugriff interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe:
-Die der Erhebung zugeordneten Fragebogen-Items liegen mit ihrem vollen Wortlaut
-bei, eine eigene Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von
+Die tatsächlich vorgelegten Fassungen der Fragebogen-Items liegen mit ihrem
+vollen Wortlaut bei; eine zugeordnete, aber nie vorgelegte Fassung erscheint
+nicht. Eine eigene Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von
 1 »Stimme gar nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und
 die vorgelegten Itemblöcke stehen mit ihrem Andockpunkt sowie den Zeitstempeln
 der Vorlage und der Erledigung darin — ein übersprungener Block bleibt so als

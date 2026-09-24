@@ -38,10 +38,11 @@ def glossareintrag(begriff: str) -> str:
     return in_einer_zeile(eintrag)
 
 
-def exportdateien_aus_adr_0029() -> list[str]:
-    """Liefert die Dateinamen aus der Kontrakttabelle des Export-ADR."""
-    return [
-        zeile.split("`")[1]
-        for zeile in abschnitt(ADR_0029_PATH, "Dateiformat").splitlines()
-        if zeile.startswith("| `")
-    ]
+def exportkontrakt_aus_adr_0029() -> dict[str, list[str]]:
+    """Liefert je Datei der Kontrakttabelle des Export-ADR ihre Spalten."""
+    kontrakt: dict[str, list[str]] = {}
+    for zeile in abschnitt(ADR_0029_PATH, "Dateiformat").splitlines():
+        if zeile.startswith("| `"):
+            datei, *spalten = zeile.split("`")[1::2]
+            kontrakt[datei] = spalten
+    return kontrakt

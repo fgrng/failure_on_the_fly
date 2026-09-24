@@ -126,7 +126,10 @@ Buchführung der Uhr und über das Ende einer Sitzung hinaus bedeutungslos.
 Vier Tabellen tragen den Fragebogen-Teil einer Erhebung: `itembloecke.csv` je
 vorgelegtem Block, `item_antworten.csv` je vorgelegtem Item,
 `fragebogen_items.csv` mit dem vollen Wortlaut der tatsächlich vorgelegten
-Item-Fassungen und `likert_skala.csv` mit der globalen Kodierung.
+Item-Fassungen und `likert_skala.csv` mit der globalen Kodierung. Vorgelegt ist
+eine Fassung, sobald eine Zeile in `item_antworten.csv` auf sie verweist; eine
+bloß zugeordnete Fassung fehlt, und flüchtige Teilnahmen, die keine
+Antwortzeilen hinterlassen, tragen keine Fassung bei.
 
 **`likert_stufe` steigt mit der Zustimmung**, ebenso `stufe` in
 `likert_skala.csv` — es ist dieselbe Zahl. 1 ist »Stimme gar nicht zu«, 6 ist

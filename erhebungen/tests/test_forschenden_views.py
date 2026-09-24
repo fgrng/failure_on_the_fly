@@ -16,7 +16,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.dokumentation import exportdateien_aus_adr_0029
+from config.tests.dokumentation import exportkontrakt_aus_adr_0029
 from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
@@ -1599,26 +1599,6 @@ class ErhebungsExportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/zip")
         with ZipFile(BytesIO(response.content)) as zip_datei:
-            self.assertEqual(
-                sorted(zip_datei.namelist()),
-                [
-                    "diagnosen.csv",
-                    "erhebung.csv",
-                    "fehlversuche.csv",
-                    "fragebogen_items.csv",
-                    "gespraechsschritte.csv",
-                    "item_antworten.csv",
-                    "itembloecke.csv",
-                    "likert_skala.csv",
-                    "modellkonfigurationen.csv",
-                    "simulationskerne.csv",
-                    "sitzungen.csv",
-                    "stichproben.csv",
-                    "teilnahmen.csv",
-                    "vignettenfassungen.csv",
-                    "vignettenziehungen.csv",
-                ],
-            )
             erhebungszeile = next(
                 csv.DictReader(
                     TextIOWrapper(zip_datei.open("erhebung.csv"), encoding="utf-8")
@@ -2575,10 +2555,9 @@ class ErhebungsExportTests(TestCase):
         )
         self.client.force_login(ada)
 
-        with CaptureQueriesContext(connection) as abfragen:
-            response: HttpResponse = self.client.get(
-                reverse("erhebungen:export", args=[erhebung.pk])
-            )
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
 
         with ZipFile(BytesIO(response.content)) as zip_datei:
             antwort_leser: csv.DictReader[str] = csv.DictReader(
@@ -2650,15 +2629,6 @@ class ErhebungsExportTests(TestCase):
                 },
             ],
         )
-        # Vier Antwortzeilen, eine Abfrage: der Export zerfällt nicht in N+1.
-        self.assertEqual(
-            sum(
-                1
-                for abfrage in abfragen.captured_queries
-                if "erhebungen_itemantwort" in abfrage["sql"]
-            ),
-            1,
-        )
 
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
@@ -2698,23 +2668,7 @@ class ErhebungsExportTests(TestCase):
             "likert_skala.csv": 7,
         }
         with ZipFile(BytesIO(export.content)) as zip_datei:
-            for dateiname in (
-                "erhebung.csv",
-                "stichproben.csv",
-                "teilnahmen.csv",
-                "vignettenziehungen.csv",
-                "sitzungen.csv",
-                "gespraechsschritte.csv",
-                "fehlversuche.csv",
-                "diagnosen.csv",
-                "itembloecke.csv",
-                "item_antworten.csv",
-                "vignettenfassungen.csv",
-                "simulationskerne.csv",
-                "modellkonfigurationen.csv",
-                "fragebogen_items.csv",
-                "likert_skala.csv",
-            ):
+            for dateiname in zip_datei.namelist():
                 with TextIOWrapper(
                     zip_datei.open(dateiname), encoding="utf-8"
                 ) as csv_datei:
@@ -2737,24 +2691,32 @@ class ErhebungsExportTests(TestCase):
         )
         likert_item.finalisieren()
         _finales_item_anlegen(ada, "Nicht zugeordnet")
-        Erhebungsitem.objects.create(
-            erhebung=erhebung,
-            item=beidseitiges_item,
-            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-            position=1,
+        nie_vorgelegtes_item: FragebogenItem = _finales_item_anlegen(
+            ada, "Zugeordnet, aber nie vorgelegt"
         )
-        Erhebungsitem.objects.create(
-            erhebung=erhebung,
-            item=beidseitiges_item,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-            position=1,
+        _item_zuordnen(
+            erhebung, beidseitiges_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 1
         )
-        Erhebungsitem.objects.create(
-            erhebung=erhebung,
-            item=likert_item,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-            position=2,
+        beidseitig_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, beidseitiges_item, Erhebungsitem.Andockpunkt.AM_ENDE, 1
         )
+        likert_am_ende: Erhebungsitem = _item_zuordnen(
+            erhebung, likert_item, Erhebungsitem.Andockpunkt.AM_ENDE, 2
+        )
+        _item_zuordnen(
+            erhebung, nie_vorgelegtes_item, Erhebungsitem.Andockpunkt.NACH_SITZUNG, 2
+        )
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
+        block_am_ende: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung, andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
+        )
+        # Eine unbeantwortete Antwortzeile genügt: vorgelegt ist, was eine Zeile hat.
+        for zuordnung in (beidseitig_am_ende, likert_am_ende):
+            ItemAntwort.objects.create(
+                itemblock=block_am_ende,
+                erhebungsbindung=bindung,
+                erhebungsitem=zuordnung,
+            )
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -2825,17 +2787,25 @@ class ErhebungsExportTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
+        block: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung, andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
+        )
         for position in range(1, 4):
-            Erhebungsitem.objects.create(
-                erhebung=erhebung,
-                item=_finales_item_anlegen(ada, f"Item {position}"),
-                andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
-                position=position,
+            ItemAntwort.objects.create(
+                itemblock=block,
+                erhebungsbindung=bindung,
+                erhebungsitem=_item_zuordnen(
+                    erhebung,
+                    _finales_item_anlegen(ada, f"Item {position}"),
+                    Erhebungsitem.Andockpunkt.AM_ENDE,
+                    position,
+                ),
             )
         self.client.force_login(ada)
         with CaptureQueriesContext(connection) as mit_drei_items:
             self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
-        erhebung.itemzugehoerigkeiten.exclude(position=1).delete()
+        block.antworten.exclude(erhebungsitem__position=1).delete()
         with CaptureQueriesContext(connection) as mit_einem_item:
             self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
 
@@ -2868,8 +2838,8 @@ class ErhebungsExportTests(TestCase):
         self.assertContains(detail, reverse("erhebungen:export", args=[erhebung.pk]))
         self.assertEqual(export.status_code, 200)
 
-    def test_die_dateiliste_folgt_dem_kontrakt_aus_adr_0029(self) -> None:
-        """Der veröffentlichte Kontrakt nennt genau die gelieferten Dateien."""
+    def test_dateien_und_spalten_folgen_dem_kontrakt_aus_adr_0029(self) -> None:
+        """Der veröffentlichte Kontrakt nennt genau die gelieferten Dateien und Spalten."""
 
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
@@ -2881,9 +2851,16 @@ class ErhebungsExportTests(TestCase):
         )
 
         with ZipFile(BytesIO(export.content)) as zip_datei:
-            self.assertEqual(
-                sorted(zip_datei.namelist()), sorted(exportdateien_aus_adr_0029())
-            )
+            kopfzeilen: dict[str, list[str]] = {
+                dateiname: next(
+                    csv.reader(
+                        TextIOWrapper(zip_datei.open(dateiname), encoding="utf-8")
+                    )
+                )
+                for dateiname in zip_datei.namelist()
+            }
+
+        self.assertEqual(kopfzeilen, exportkontrakt_aus_adr_0029())
 
 
 class ErhebungenGesperrteItemzuordnungTests(TestCase):
