@@ -54,7 +54,9 @@ exportiert (ADR-0029) und weder nachträglich reduziert noch gesperrt.
 - Ein endgültig gescheiterter Antwortversuch setzt den Status `gescheitert` in
   der DB; der antwortlose Schritt steht nur im Verlauf der Session.
 - Der Verlauf einer flüchtigen Sitzung lässt sich nach dem Verlust der
-  Browser-Session nicht wiederherstellen. Wie der Wiedereinstieg in einem
-  anderen Browser damit umgeht, regelt #281.
+  Browser-Session nicht wiederherstellen. Der `FluechtigerSink` legt den
+  Session-Eintrag deshalb schon beim Sitzungsstart an; fehlt er beim
+  Wiedereinstieg, wird die laufende Sitzung als `abgebrochen` beendet und der
+  Ablauf geht weiter (#281).
 - Die gespeicherte Diagnose-Zeile fehlt; die Diagnose im Debrief liest die
   Senke aus der Session.

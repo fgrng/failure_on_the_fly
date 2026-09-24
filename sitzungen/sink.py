@@ -262,6 +262,15 @@ class DBSink:
         return self._sitzung.gespraechsschritte
 
     @property
+    def verlauf_fehlt(self) -> bool:
+        """Meldet, ob der Verlauf der Sitzung hier nicht greifbar ist.
+
+        Die DB trägt ihn in jeden Browser.
+        """
+
+        return False
+
+    @property
     def abgegebene_diagnose(self) -> str | None:
         """Liefert den Text der bereits abgegebenen Diagnose, sonst nichts."""
 
@@ -348,6 +357,30 @@ class FluechtigerSink(DBSink):
         sink: FluechtigerSink = cls(sitzung.teilnahme, session)
         sink.sitzung = sitzung
         return sink
+
+    def sitzung_starten(
+        self,
+        vignette: Vignette,
+        simulationskern: Simulationskern,
+        modell_konfiguration: ModellKonfiguration,
+    ) -> None:
+        """Legt die Sitzung in der DB und ihren Verlauf in dieser Session an."""
+
+        super().sitzung_starten(vignette, simulationskern, modell_konfiguration)
+        # Der leere Eintrag weist diese Session als Trägerin des Verlaufs aus.
+        self._zustand
+        self._als_geaendert_markieren()
+
+    @property
+    def verlauf_fehlt(self) -> bool:
+        """Meldet eine Sitzung, deren Verlauf nicht in dieser Session liegt.
+
+        Das ist in einem anderen Browser oder nach Ablauf der Session der Fall.
+        """
+
+        return str(self._sitzung.pk) not in self.session.get(
+            _FLUECHTIGE_SITZUNGEN_SCHLUESSEL, {}
+        )
 
     @property
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
@@ -446,6 +479,16 @@ class FluechtigerSink(DBSink):
 
         if hasattr(self.session, "modified"):
             self.session.modified = True
+
+
+def sink_fuer_teilnahme(
+    teilnahme: Teilnahme, session: MutableMapping[str, Any]
+) -> DBSink:
+    """Wählt die Senke einer neuen Sitzung allein nach der Speicherung."""
+
+    if teilnahme.speicherung_eingewilligt is False:
+        return FluechtigerSink(teilnahme, session)
+    return DBSink(teilnahme)
 
 
 def sink_fuer_sitzung(sitzung: Sitzung, session: MutableMapping[str, Any]) -> DBSink:

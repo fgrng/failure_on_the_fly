@@ -161,7 +161,10 @@ class ErhebungsteilnahmeTests(TestCase):
         return vignette
 
     def _laufende_sitzung_starten(
-        self, *, audioverarbeitung_eingewilligt: str = "nein"
+        self,
+        *,
+        audioverarbeitung_eingewilligt: str = "nein",
+        speicherung_eingewilligt: str = "ja",
     ) -> Erhebungsbindung:
         """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
 
@@ -171,6 +174,7 @@ class ErhebungsteilnahmeTests(TestCase):
             {
                 **_ZUSTIMMUNG,
                 "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
+                "speicherung_eingewilligt": speicherung_eingewilligt,
             },
         )
         self.client.post(
@@ -1994,6 +1998,131 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
+
+    def test_token_wiedereinstieg_bricht_fluechtige_sitzung_ohne_verlauf_ab(
+        self,
+    ) -> None:
+        """Ein frischer Browser spricht nicht mit einer Schüler:in ohne Gedächtnis."""
+
+        self._vignette_anlegen(budget_wert=2)
+        self._vignette_anlegen(budget_wert=2, position=2)
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+        erste_sitzung: Sitzung = Sitzung.objects.get()
+
+        anderer_browser: Client = Client()
+        wiedereinstieg: HttpResponse = anderer_browser.get(gespraech_url)
+
+        self.assertRedirects(
+            wiedereinstieg, gespraech_url, fetch_redirect_response=False
+        )
+        erste_sitzung.refresh_from_db()
+        self.assertEqual(erste_sitzung.status, Sitzung.Status.ABGEBROCHEN)
+        zweite_sitzung: Sitzung = Sitzung.objects.get(status=Sitzung.Status.LAUFEND)
+        self.assertNotEqual(zweite_sitzung.vignette, erste_sitzung.vignette)
+        weiter: HttpResponse = anderer_browser.post(
+            gespraech_url, {"eingabe": "Und dann?"}
+        )
+        self.assertContains(weiter, "Und dann?")
+        self.assertNotContains(weiter, "Wie rechnest du?")
+        zweite_sitzung.refresh_from_db()
+        self.assertEqual(zweite_sitzung.status, Sitzung.Status.LAUFEND)
+
+    def test_abgebrochene_fluechtige_sitzung_fuehrt_zu_ihrem_fragebogen(
+        self,
+    ) -> None:
+        """Nach dem Abbruch geht es mit dem Fragebogen der Sitzung weiter."""
+
+        self._vignette_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        anderer_browser: Client = Client()
+        anderer_browser.get(gespraech_url)
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+        self.assertContains(anderer_browser.get(gespraech_url), "Wie war die Sitzung?")
+
+    def test_letzte_abgebrochene_fluechtige_sitzung_fuehrt_zum_abschluss(
+        self,
+    ) -> None:
+        """Steht danach nichts mehr an, erreicht der frische Browser den Abschluss."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+
+        anderer_browser: Client = Client()
+        wiedereinstieg: HttpResponse = anderer_browser.get(
+            reverse("erhebungen:gespraech", args=[bindung.token]), follow=True
+        )
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+        self.assertRedirects(
+            wiedereinstieg,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+        )
+
+    def test_debrief_ohne_verlauf_schliesst_die_fluechtige_sitzung_nicht_ab(
+        self,
+    ) -> None:
+        """Auch ein Debrief aus einer verlorenen Session bricht die Sitzung ab."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        sitzung: Sitzung = Sitzung.objects.get()
+
+        Client().post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
+        Client().post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
+        )
+
+        sitzung.refresh_from_db()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_fluechtige_sitzung_laeuft_im_selben_browser_weiter(self) -> None:
+        """Mit dem Verlauf in der Session bleibt die Sitzung beim Wiedereinstieg."""
+
+        self._vignette_anlegen(budget_wert=2)
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        wiedereinstieg: HttpResponse = self.client.get(self.url, follow=True)
+
+        self.assertContains(wiedereinstieg, "Wie rechnest du?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
+    def test_gespeicherte_sitzung_laeuft_im_frischen_browser_weiter(self) -> None:
+        """Mit Speicherung trägt die DB den Verlauf in jeden Browser."""
+
+        self._vignette_anlegen(budget_wert=2)
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        wiedereinstieg: HttpResponse = Client().get(gespraech_url)
+
+        self.assertContains(wiedereinstieg, "Wie rechnest du?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
 
     def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
         """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""

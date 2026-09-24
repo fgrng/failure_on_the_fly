@@ -347,7 +347,7 @@ def test_vignette_beginnen_schreibt_ziehung_sitzung_und_position() -> None:
     erhebung.finalisieren()
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
-    sitzung: Sitzung | None = vignette_beginnen(bindung)
+    sitzung: Sitzung | None = vignette_beginnen(bindung, {})
 
     assert sitzung is not None
     assert sitzung.vignette == erste
@@ -375,8 +375,8 @@ def test_zwei_aufrufe_beginnen_keine_zweite_sitzung() -> None:
     erhebung.finalisieren()
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 
-    erste_sitzung: Sitzung | None = vignette_beginnen(bindung)
-    zweite_sitzung: Sitzung | None = vignette_beginnen(bindung)
+    erste_sitzung: Sitzung | None = vignette_beginnen(bindung, {})
+    zweite_sitzung: Sitzung | None = vignette_beginnen(bindung, {})
 
     assert erste_sitzung == zweite_sitzung
     assert Sitzung.objects.count() == 1

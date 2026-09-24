@@ -779,7 +779,7 @@ def teilnehmen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if bindung is None:
         bindung = _bindung_anlegen_fuer_laufende_stichprobe(stichprobe)
         _bindung_in_session_speichern(request, bindung)
-    return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(bindung)
+    return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(request, bindung)
 
 
 def _ohne_zutritt(
@@ -870,7 +870,9 @@ def abbruchseite(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if bindung is None:
         return redirect("erhebungen:teilnehmen", teilnahme_link=teilnahme_link)
     if bindung.teilnahme.sprachmodell_eingewilligt is not False:
-        return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(bindung)
+        return _ohne_zutritt(bindung, teilnahme_link) or _weiter_im_ablauf(
+            request, bindung
+        )
     return render(request, "erhebungen/abbruchseite.html", {"stichprobe": stichprobe})
 
 
@@ -899,11 +901,13 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
     if tor is not None:
         return tor
-    vignette_beginnen(bindung)
-    return _weiter_im_ablauf(bindung)
+    vignette_beginnen(bindung, request.session)
+    return _weiter_im_ablauf(request, bindung)
 
 
-def _weiter_im_ablauf(bindung: Erhebungsbindung) -> HttpResponseRedirect:
+def _weiter_im_ablauf(
+    request: HttpRequest, bindung: Erhebungsbindung
+) -> HttpResponseRedirect:
     """Führt die Teilnahme dorthin, wo ihr Ablauf gerade steht.
 
     Die einzige Verzweigung der Erhebungs-Views über die sechs Ablaufschritte.
@@ -918,7 +922,7 @@ def _weiter_im_ablauf(bindung: Erhebungsbindung) -> HttpResponseRedirect:
         case LaufendeSitzung() | OffenerSitzungsblock():
             return redirect("erhebungen:gespraech", token=bindung.token)
         case NaechsteVignette():
-            vignette_beginnen(bindung)
+            vignette_beginnen(bindung, request.session)
             return redirect("erhebungen:gespraech", token=bindung.token)
         case OffenerAbschlussblock():
             return redirect("erhebungen:itemblock", token=bindung.token)
@@ -931,7 +935,7 @@ def _umleitung_falls_woanders(
 ) -> HttpResponseRedirect | None:
     # Folgt dem Ablauf, solange er nicht auf die aufgerufene Seite selbst zeigt.
 
-    weiter: HttpResponseRedirect = _weiter_im_ablauf(bindung)
+    weiter: HttpResponseRedirect = _weiter_im_ablauf(request, bindung)
     return None if weiter.url == request.path else weiter
 
 
@@ -992,6 +996,11 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
         return redirect(
             "erhebungen:abbruchseite", teilnahme_link=bindung.stichprobe.teilnahme_link
         )
+    ohne_verlauf: HttpResponseRedirect | None = _sitzung_ohne_verlauf_abbrechen(
+        request, bindung
+    )
+    if ohne_verlauf is not None:
+        return ohne_verlauf
     sitzung: Sitzung | None = sitzung_am_zug(bindung)
     if sitzung is None:
         raise Http404("Zu diesem Token steht keine Sitzung offen.")
@@ -1003,12 +1012,35 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
     )
 
 
+def _sitzung_ohne_verlauf_abbrechen(
+    request: HttpRequest, bindung: Erhebungsbindung
+) -> HttpResponseRedirect | None:
+    # Eine flüchtige Sitzung, deren Verlauf nicht in dieser Session liegt, endet
+    # als abgebrochen, statt ohne Gedächtnis weiterzulaufen; der Browser folgt
+    # danach dem Ablauf.
+
+    sitzung: Sitzung | None = laufende_sitzung(bindung)
+    if sitzung is None:
+        return None
+    sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
+    if not sink.verlauf_fehlt:
+        return None
+    sitzung_abbrechen(sink)
+    _bindung_in_session_speichern(request, bindung)
+    return _weiter_im_ablauf(request, bindung)
+
+
 def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     """Zeigt für die tokenaufgelöste Sitzung den Debrief."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung, _bindung = _erhebungssitzung(token)
+    sitzung, bindung = _erhebungssitzung(token)
+    ohne_verlauf: HttpResponseRedirect | None = _sitzung_ohne_verlauf_abbrechen(
+        request, bindung
+    )
+    if ohne_verlauf is not None:
+        return ohne_verlauf
     sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
@@ -1038,6 +1070,11 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
+    ohne_verlauf: HttpResponseRedirect | None = _sitzung_ohne_verlauf_abbrechen(
+        request, bindung
+    )
+    if ohne_verlauf is not None:
+        return ohne_verlauf
     uebermittelte_sitzung_pk: str | None = request.POST.get("sitzung_pk")
     if uebermittelte_sitzung_pk != str(sitzung.pk):
         return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
@@ -1054,7 +1091,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         return persistierten_debrief_anzeigen(
             request, sitzung, _sitzungsnavigation(token), anhang
         )
-    return _weiter_im_ablauf(bindung)
+    return _weiter_im_ablauf(request, bindung)
 
 
 def _sitzungsblock_rendern(
@@ -1137,7 +1174,7 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         formular.speichern()
         if "weiter" in request.POST:
             block_erledigen(block)
-            return _weiter_im_ablauf(bindung)
+            return _weiter_im_ablauf(request, bindung)
         # Ein frisches Formular legt den eben geschriebenen Stand wieder vor.
         formular = ItemblockFormular(block)
     template = (
