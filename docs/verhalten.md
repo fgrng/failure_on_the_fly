@@ -193,6 +193,12 @@ Gesprächsschritte, Fehlversuche und Diagnose liegen dabei aber nur in der
 Browser-Session und werden nie gespeichert; gespeichert und exportiert wird nur
 das Ablaufgerüst (Ziehung, Sitzungen mit Status, Zeitstempeln und verbrauchter
 Zeit, Vignettenposition).
+Das Token führt auch eine flüchtige Teilnahme in einem anderen Browser fort.
+Liegt der Verlauf einer laufenden Sitzung dort nicht vor, etwa in einem anderen
+Browser oder nach Ablauf der Session, endet diese Sitzung als `abgebrochen`,
+statt mit einer Schüler:in ohne Gedächtnis weiterzulaufen. Danach geht der
+Ablauf regulär weiter: mit dem Fragebogen der Sitzung, der nächsten Vignette
+oder dem Abschluss.
 Wer der Spracherkennung zustimmt, kann Eingaben im Diagnosegespräch und die
 Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die Tastatureingabe
 vollständig nutzbar.
