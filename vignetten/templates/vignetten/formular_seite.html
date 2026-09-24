@@ -3,6 +3,7 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <script src="{% static 'js/bildkarte.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -53,9 +54,8 @@
                 <b>03</b><span><h2 id="section-lernauftrag">Lernauftrag</h2><small>Was hat die Lehrperson der Schüler:in aufgegeben?</small></span>
             </header>
             <div class="field-grid">
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_text %}
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bild %}
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bildbeschreibung wide=True %}
+                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_text wide=True %}
+                {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.lernauftrag %}
                 {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_simulationshinweise wide=True %}
             </div>
         </section>
@@ -65,9 +65,8 @@
                 <b>04</b><span><h2 id="section-arbeitsheft">Arbeitsheft</h2><small>Was hat die Schüler:in bereits bearbeitet?</small></span>
             </header>
             <div class="field-grid">
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_text %}
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bild %}
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bildbeschreibung wide=True %}
+                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_text wide=True %}
+                {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.arbeitsheft %}
                 {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_simulationshinweise wide=True %}
             </div>
         </section>

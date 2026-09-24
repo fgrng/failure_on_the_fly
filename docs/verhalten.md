@@ -37,6 +37,18 @@ Administratorin als Eigentümer:in hinzufügen oder eine vorhandene entfernen. D
 Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
 die verbleibenden Eigentümer:innen.
 
+Im Formular zum Anlegen und Bearbeiten stehen Lernauftrag- und Arbeitsheft-Bild
+jeweils mit ihrer Bildbeschreibung in einer Bildkarte. Ein Bild lässt sich
+auswählen oder auf die Bildfläche ziehen; Dateien, die kein Bild sind, weist die
+Karte gleich ab. Ein gewähltes oder gespeichertes Bild erscheint als Vorschau,
+ein neu gewähltes ist bis zum Speichern als »Neu · noch nicht gespeichert«
+markiert. Der Kopf der Karte zeigt, ob das Bild am Positionsmarker `[bild]` im
+Text oder mangels Marker unter dem Text erscheint, und die Karte weist auf eine
+fehlende Bildbeschreibung hin. »Bild entfernen« entfernt beim Speichern auch die
+Bildbeschreibung, »Rückgängig« holt beides zurück. Hat das Formular beim
+Speichern einen Fehler, geht eine gerade gewählte Datei verloren; die Karte
+nennt sie dann und bittet, sie erneut zu wählen.
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;

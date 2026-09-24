@@ -720,6 +720,76 @@ class VignetteBearbeitenViewTests(TestCase):
                 Path(media_root, self.vignette.lernauftrag_bild.name).is_file()
             )
 
+    def test_bild_entfernen_leert_auch_die_bildbeschreibung(self) -> None:
+        """Ohne Bild bleibt keine Bildbeschreibung für die Simulation zurück."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(
+                bearbeiten_url,
+                {
+                    **self._geschlechter(),
+                    "arbeitsheft_bild": _gif_upload(),
+                    "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
+                },
+            )
+            self.vignette.refresh_from_db()
+            self.assertEqual(
+                self.vignette.arbeitsheft_bildbeschreibung, "27 + 15 = 312"
+            )
+
+            self.client.post(
+                bearbeiten_url,
+                {
+                    **self._geschlechter(),
+                    "arbeitsheft_bild-clear": "on",
+                    "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
+                },
+            )
+            self.vignette.refresh_from_db()
+
+            self.assertFalse(self.vignette.arbeitsheft_bild)
+            self.assertEqual(self.vignette.arbeitsheft_bildbeschreibung, "")
+
+    def test_zeigt_gespeichertes_bild_als_vorschau_statt_als_pfad(self) -> None:
+        """Das Bildfeld zeigt das vorhandene Bild, nicht Djangos »Derzeit:«-Zeile."""
+        with (
+            TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+        ):
+            bearbeiten_url: str = reverse(
+                "vignetten:bearbeiten", args=[self.vignette.pk]
+            )
+            self.client.post(
+                bearbeiten_url,
+                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
+            )
+            self.vignette.refresh_from_db()
+
+            response: HttpResponse = self.client.get(bearbeiten_url)
+
+            self.assertContains(
+                response, f'data-gespeichert="{self.vignette.lernauftrag_bild.url}"'
+            )
+            self.assertContains(response, 'name="lernauftrag_bild-clear"')
+            self.assertNotContains(
+                response, f'href="{self.vignette.lernauftrag_bild.url}"'
+            )
+
+    def test_nennt_nach_formularfehler_die_verlorene_datei(self) -> None:
+        """Ein Upload geht beim erneuten Anzeigen verloren und wird deshalb genannt."""
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+            {"schuelerin_geschlecht": "", "arbeitsheft_bild": _gif_upload()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "arbeitsblatt.gif")
+
     def test_versteckt_fremden_entwurf(self) -> None:
         """Entwürfe anderer Eigentümerinnen bleiben über den Editor unsichtbar."""
         grace: Konto = get_user_model().objects.create_user(username="grace")

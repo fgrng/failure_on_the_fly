@@ -1,0 +1,58 @@
+{% comment %}
+    Bild und Bildbeschreibung eines Aufgabenkontextteils als eine Karte (#288).
+    Erwartet karte=form.bildkarten.<teil>. Das echte Dateifeld bleibt die Grundlage;
+    Alpine (static/js/bildkarte.js) zeichnet nur Vorschau und Zustand.
+{% endcomment %}
+{% with bild=karte.bild beschreibung=karte.beschreibung %}
+<fieldset class="bildkarte page-field--wide" x-data="bildkarte"
+          data-zustand="{% if karte.verlorene_datei %}verloren{% elif bild.errors %}fehler{% elif karte.entfernen %}entfernen{% elif karte.gespeichert_url %}gespeichert{% else %}leer{% endif %}"
+          data-gespeichert="{{ karte.gespeichert_url }}"
+          data-verloren="{{ karte.verlorene_datei }}"
+          data-text-id="{{ karte.text_id }}"
+          :data-zustand="zustand"
+          @input.window="if ($event.target.id === textId) text = $event.target.value">
+    <legend>{{ bild.label }}</legend>
+    {{ bild }}
+    <input type="checkbox" hidden name="{{ bild.html_name }}-clear"{% if karte.entfernen %} checked{% endif %} :checked="wirdEntfernt">
+
+    <header class="bildkarte__kopf">
+        <span x-text="markerGesetzt ? 'Position im Text: an der Stelle [bild]' : 'Position: unter dem Text (kein Marker [bild] gesetzt)'"></span>
+        <span class="bildkarte__status" x-show="statusText" x-text="statusText"></span>
+    </header>
+
+    <div class="bildkarte__koerper">
+        <div class="bildkarte__bild" :class="{ 'ist-ziehen': ziehen, 'hat-bild': bildUrl }"
+             @dragover.prevent="ziehen = true" @dragleave="ziehen = false" @drop.prevent="abgelegt($event)">
+            <img x-show="bildUrl" :src="bildUrl" :alt="beschreibung" x-cloak>
+            <label for="{{ bild.id_for_label }}" x-show="!bildUrl">
+                <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Bild hinzufügen</span>
+                <small>oder hierher ziehen</small>
+            </label>
+        </div>
+        <div class="bildkarte__beschreibung">
+            <label for="{{ beschreibung.id_for_label }}">{{ beschreibung.label }}</label>
+            {{ beschreibung }}
+            {% if beschreibung.help_text %}<small>{{ beschreibung.help_text }}</small>{% endif %}
+            {{ beschreibung.errors }}
+            <small class="bildkarte__hinweis" x-show="bildUrl && !wirdEntfernt && !beschreibung.trim()" x-cloak>Ohne Bildbeschreibung »sieht« die simulierte Schüler:in das Bild nicht.</small>
+            <small class="bildkarte__hinweis" x-show="wirdEntfernt" x-cloak>Mit dem Bild wird auch die Bildbeschreibung entfernt.</small>
+            <div class="bildkarte__aktionen" x-show="bildUrl" x-cloak>
+                <template x-if="istNeu">
+                    <span><button type="button" class="button button--secondary" @click="auswaehlen()">Andere Datei</button>
+                    <button type="button" class="bildkarte__link" @click="verwerfen()">Auswahl verwerfen</button></span>
+                </template>
+                <template x-if="!istNeu && !wirdEntfernt">
+                    <span><button type="button" class="button button--secondary" @click="auswaehlen()">Bild ersetzen</button>
+                    <button type="button" class="bildkarte__link bildkarte__link--gefahr" @click="entfernen()">Bild entfernen</button></span>
+                </template>
+                <template x-if="wirdEntfernt">
+                    <button type="button" class="button button--secondary" @click="behalten()">Rückgängig</button>
+                </template>
+            </div>
+        </div>
+    </div>
+    {{ bild.errors }}
+    <p class="bildkarte__meldung" :class="{ 'ist-fehler': istFehler }" id="{{ bild.id_for_label }}_status" role="status" x-text="meldung">{% if karte.verlorene_datei %}Ihre Auswahl »{{ karte.verlorene_datei }}« wurde nicht übernommen, weil das Formular noch Fehler enthält. Bitte wählen Sie das Bild erneut aus.{% endif %}</p>
+</fieldset>
+{% endwith %}
