@@ -53,13 +53,15 @@ def _feld(antwort: ItemAntwort) -> forms.Field:
 def _leere_antwortzeilen(block: Itemblock) -> list[ItemAntwort]:
     # Stellt die Items des Blocks als ungespeicherte, leere Antwortzeilen dar.
 
-    return [
-        ItemAntwort(itemblock=block, erhebungsitem=erhebungsitem)
-        for erhebungsitem in block.erhebungsbindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
-            andockpunkt=block.andockpunkt
-        )
+    erhebung = block.erhebungsbindung.stichprobe.erhebung
+    erhebungsitems = (
+        erhebung.itemzugehoerigkeiten.filter(andockpunkt=block.andockpunkt)
         .select_related("item")
         .order_by("position")
+    )
+    return [
+        ItemAntwort(itemblock=block, erhebungsitem=erhebungsitem)
+        for erhebungsitem in erhebungsitems
     ]
 
 
