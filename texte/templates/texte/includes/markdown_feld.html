@@ -19,7 +19,11 @@
         </div>
     </div>
     <div class="markdown-feld__eingabe" x-show="!vorschau">
-        {% if field %}{{ field }}{% else %}<textarea id="{{ feld_id }}" name="{{ feld_name }}" aria-describedby="{{ feld_id }}_helptext">{{ wert }}</textarea>{% endif %}
+        {% if field %}
+            {{ field }}
+        {% else %}
+            <textarea id="{{ feld_id }}" name="{{ feld_name }}" aria-describedby="{{ feld_id }}_helptext">{{ wert }}</textarea>
+        {% endif %}
     </div>
     <div id="{{ feld_id }}_vorschau" class="markdown-feld__vorschau" aria-live="polite" x-show="vorschau" x-cloak></div>
     <small id="{{ feld_id }}_helptext" class="markdown-feld__hinweis">
