@@ -1138,8 +1138,9 @@ def itemblock(request: HttpRequest, token: str) -> HttpResponse:
         if "weiter" in request.POST:
             block_erledigen(block)
             return _weiter_im_ablauf(bindung)
-        # Ein frisches Formular legt den eben geschriebenen Stand wieder vor.
-        formular = ItemblockFormular(block)
+        if formular.speichert:
+            # Ein frisches Formular legt den eben geschriebenen Stand wieder vor.
+            formular = ItemblockFormular(block)
     template = (
         "erhebungen/includes/itemblock_form.html"
         if ist_htmx

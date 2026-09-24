@@ -155,7 +155,10 @@ class ErhebungsteilnahmeTests(TestCase):
         return vignette
 
     def _laufende_sitzung_starten(
-        self, *, audioverarbeitung_eingewilligt: str = "nein"
+        self,
+        *,
+        audioverarbeitung_eingewilligt: str = "nein",
+        speicherung_eingewilligt: str = "ja",
     ) -> Erhebungsbindung:
         """Startet die Teilnahme bis zur laufenden Sitzung und gibt ihre Bindung zurück."""
 
@@ -165,6 +168,7 @@ class ErhebungsteilnahmeTests(TestCase):
             {
                 **_ZUSTIMMUNG,
                 "audioverarbeitung_eingewilligt": audioverarbeitung_eingewilligt,
+                "speicherung_eingewilligt": speicherung_eingewilligt,
             },
         )
         self.client.post(
@@ -832,7 +836,7 @@ class ErhebungsteilnahmeTests(TestCase):
             block_url,
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Hilfreich",
+                f"item_{itemantwort.erhebungsitem_id}": "Hilfreich",
             },
         )
         self.assertContains(gespeicherte_antwort, "Hilfreich")
@@ -929,7 +933,7 @@ class ErhebungsteilnahmeTests(TestCase):
             block_url,
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Hilfreich",
+                f"item_{itemantwort.erhebungsitem_id}": "Hilfreich",
             },
         )
 
@@ -962,7 +966,10 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotContains(block, "hx-params")
         fragment = self.client.post(
             block_url,
-            {f"item_{erste_antwort.pk}": "Fertig", f"item_{zweite_antwort.pk}": ""},
+            {
+                f"item_{erste_antwort.erhebungsitem_id}": "Fertig",
+                f"item_{zweite_antwort.erhebungsitem_id}": "",
+            },
             headers={"HX-Request": "true"},
         )
 
@@ -997,7 +1004,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(block, "Stimme voll zu")
         self.assertNotContains(block, ">6<")
 
-        self.client.post(block_url, {f"item_{itemantwort.pk}": "6"})
+        self.client.post(block_url, {f"item_{itemantwort.erhebungsitem_id}": "6"})
 
         itemantwort.refresh_from_db()
         self.assertEqual(itemantwort.likert_stufe, 6)
@@ -1016,7 +1023,9 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.get(block_url)
         itemantwort = ItemAntwort.objects.get(erhebungsitem=zugehoerigkeit)
 
-        antwort = self.client.post(block_url, {f"item_{itemantwort.pk}": "7"})
+        antwort = self.client.post(
+            block_url, {f"item_{itemantwort.erhebungsitem_id}": "7"}
+        )
 
         self.assertEqual(antwort.status_code, 400)
         itemantwort.refresh_from_db()
@@ -1051,7 +1060,7 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:itemblock", args=[bindung.token]),
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Hilfreich",
+                f"item_{itemantwort.erhebungsitem_id}": "Hilfreich",
             },
         )
 
@@ -1077,7 +1086,7 @@ class ErhebungsteilnahmeTests(TestCase):
             block_url,
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Zu spät",
+                f"item_{itemantwort.erhebungsitem_id}": "Zu spät",
             },
         )
 
@@ -1443,7 +1452,10 @@ class ErhebungsteilnahmeTests(TestCase):
         itemantwort: ItemAntwort = ItemAntwort.objects.get()
         self.client.post(
             reverse("erhebungen:itemblock", args=[bindung.token]),
-            {"antwort": itemantwort.pk, f"item_{itemantwort.pk}": "Hilfreich"},
+            {
+                "antwort": itemantwort.pk,
+                f"item_{itemantwort.erhebungsitem_id}": "Hilfreich",
+            },
         )
 
         wiedereinstieg: HttpResponse = self.client.get(self.url)
@@ -1451,7 +1463,7 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:itemblock", args=[bindung.token]),
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Doch nicht",
+                f"item_{itemantwort.erhebungsitem_id}": "Doch nicht",
             },
         )
 
@@ -1503,7 +1515,7 @@ class ErhebungsteilnahmeTests(TestCase):
             block_url,
             {
                 "antwort": erste_blockantwort.pk,
-                f"item_{erste_blockantwort.pk}": "Hilfreich",
+                f"item_{erste_blockantwort.erhebungsitem_id}": "Hilfreich",
                 "weiter": "ja",
             },
         )
@@ -1534,7 +1546,7 @@ class ErhebungsteilnahmeTests(TestCase):
             block_url,
             {
                 "antwort": abschlussantwort.pk,
-                f"item_{abschlussantwort.pk}": "Aufschlussreich",
+                f"item_{abschlussantwort.erhebungsitem_id}": "Aufschlussreich",
                 "weiter": "ja",
             },
         )
@@ -1581,7 +1593,7 @@ class ErhebungsteilnahmeTests(TestCase):
             reverse("erhebungen:itemblock", args=[bindung.token]),
             {
                 "antwort": itemantwort.pk,
-                f"item_{itemantwort.pk}": "Hilfreich",
+                f"item_{itemantwort.erhebungsitem_id}": "Hilfreich",
                 "weiter": "ja",
             },
         )
@@ -1951,6 +1963,56 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
+
+    def test_fluechtige_teilnahme_verwirft_die_fragebogen_antworten(self) -> None:
+        """Ohne Speicherung werden die Blöcke vorgelegt und erledigt, nie beantwortet."""
+
+        self._vignette_anlegen()
+        self._fragebogen_item_nach_sitzung_anlegen()
+        abschlussitem: Erhebungsitem = self._abschluss_item_anlegen(
+            wortlaut="Wie war die Erhebung?"
+        )
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        block_url: str = reverse("erhebungen:itemblock", args=[bindung.token])
+        sitzungsitem: Erhebungsitem = Erhebungsitem.objects.get(
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG
+        )
+
+        debrief: HttpResponse = self.client.post(
+            reverse("erhebungen:debrief", args=[bindung.token]),
+            {"diagnose": "Bruchfehler", "sitzung_pk": Sitzung.objects.get().pk},
+        )
+        self.assertContains(debrief, "Wie war die Sitzung?")
+        zum_abschlussblock: HttpResponse = self.client.post(
+            block_url, {f"item_{sitzungsitem.pk}": "Hilfreich", "weiter": "ja"}
+        )
+        self.assertRedirects(
+            zum_abschlussblock, block_url, fetch_redirect_response=False
+        )
+
+        self.assertContains(self.client.get(block_url), "Wie war die Erhebung?")
+        fragment: HttpResponse = self.client.post(
+            block_url,
+            {f"item_{abschlussitem.pk}": "Aufschlussreich"},
+            headers={"HX-Request": "true"},
+        )
+        # Das Fragment behält die Eingabe, obwohl nichts gespeichert wird.
+        self.assertContains(fragment, "Aufschlussreich")
+        ende: HttpResponse = self.client.post(
+            block_url, {f"item_{abschlussitem.pk}": "Aufschlussreich", "weiter": "ja"}
+        )
+
+        self.assertRedirects(
+            ende,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(ItemAntwort.objects.exists())
+        self.assertEqual(Itemblock.objects.count(), 2)
+        self.assertFalse(Itemblock.objects.filter(erledigt_am__isnull=True).exists())
 
     def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
         """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""

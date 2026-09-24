@@ -449,13 +449,9 @@ class FluechtigerSink(DBSink):
 
 
 def sink_fuer_sitzung(sitzung: Sitzung, session: MutableMapping[str, Any]) -> DBSink:
-    """Wählt die Senke einer bestehenden Sitzung allein nach der Speicherung.
+    """Wählt die Senke einer bestehenden Sitzung allein nach der Speicherung."""
 
-    Wer der Speicherung widersprochen hat, macht eine flüchtige Teilnahme.
-    Unentschieden bleibt sie etwa im Training und wird dort gespeichert.
-    """
-
-    if sitzung.teilnahme.speicherung_eingewilligt is False:
+    if sitzung.teilnahme.ist_fluechtig:
         return FluechtigerSink.fuer_sitzung(sitzung, session)
     return DBSink.fuer_sitzung(sitzung)
 

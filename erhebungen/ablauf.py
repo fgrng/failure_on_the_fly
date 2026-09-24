@@ -239,7 +239,8 @@ def block_vorlegen(
     """Legt Block und Antwortzeilen eines Andockpunkts einmalig an.
 
     Ohne Items an diesem Andockpunkt entsteht kein Block; die Rückgabe ist dann
-    ``None``.
+    ``None``. Eine flüchtige Teilnahme bekommt den Block, aber keine
+    Antwortzeilen, auch nicht als Markierung „vorgelegt, übersprungen".
     """
 
     erhebungsitems: list[Erhebungsitem] = list(
@@ -254,6 +255,8 @@ def block_vorlegen(
             andockpunkt=andockpunkt,
             sitzung=sitzung,
         )
+        if bindung.teilnahme.ist_fluechtig:
+            return block
         for erhebungsitem in erhebungsitems:
             ItemAntwort.objects.get_or_create(
                 itemblock=block,
