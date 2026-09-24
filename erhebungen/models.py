@@ -145,11 +145,13 @@ class Erhebung(EigentuemerKreis):
 
     @transaction.atomic
     def finalisieren(self) -> None:
-        """Finalisiert einen Entwurf und pinnt die aktive Modell-Konfiguration."""
+        """Finalisiert einen Entwurf und pinnt die Modell-Konfiguration der Schüler:in."""
 
-        from simulation.models import ModellKonfiguration
+        from simulation.models import ModellKonfiguration, Verwendung
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.belegte(
+            Verwendung.SCHUELERIN
+        )
         self._status_wechseln(
             erwarteter_status=self.Status.ENTWURF,
             zielstatus=self.Status.FINAL,

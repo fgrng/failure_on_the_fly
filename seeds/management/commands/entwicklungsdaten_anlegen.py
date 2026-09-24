@@ -23,7 +23,7 @@ from django.db import transaction
 
 from konten.apps import KONTOROLLEN
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 from training.models import Training
 from vignetten.models import Vignette
@@ -218,15 +218,19 @@ class Command(BaseCommand):
         return kern
 
     def _modell_konfiguration_sicherstellen(self) -> None:
-        """Legt die Fake-Konfiguration an und aktiviert sie für Offline-Klicktests."""
+        """Legt die Fake-Konfiguration an und aktiviert sie für alle Verwendungen."""
         fake_parameter: dict[str, object] = {"skript": FAKE_SKRIPT}
         fake: ModellKonfiguration = ModellKonfiguration.objects.filter(
             sprachmodell="fake", parameter=fake_parameter
         ).first() or ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter=fake_parameter
+            bezeichnung="Offline (fake)", sprachmodell="fake", parameter=fake_parameter
         )
-        ModellKonfiguration.objects.aktivieren(fake)
-        self.stdout.write("  Modell-Konfiguration 'fake' für Offline-Tests aktiv.")
+        # Offline-Klicktests brauchen jede Verwendung belegt, auch die der Evals.
+        for verwendung in Verwendung:
+            ModellKonfiguration.objects.aktivieren(fake, verwendung)
+        self.stdout.write(
+            "  Modell-Konfiguration 'fake' für alle Verwendungen aktiv (Offline-Tests)."
+        )
 
     def _vignetten_anlegen(
         self, autorin: object, kern: Simulationskern

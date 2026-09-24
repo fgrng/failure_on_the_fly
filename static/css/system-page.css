@@ -71,3 +71,49 @@
     color: var(--color-danger);
     font-size: .78rem;
 }
+
+/* Modell-Konfigurationen: schmale Liste links, Detail der gewählten rechts. */
+.modell-konfigurationen {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--space-3);
+    align-items: start;
+}
+
+.modell-konfigurationen__zeile--gewaehlt td { background: var(--color-area-system-tint); }
+.modell-konfigurationen__zeile a { color: inherit; text-decoration: none; }
+.modell-konfigurationen__zeile small { display: block; color: var(--color-text-muted); overflow-wrap: anywhere; }
+
+/* Ein Kürzel je Verwendung; hervorgehoben, wo die Konfiguration aktiv ist. */
+.verwendungskuerzel {
+    display: inline-block;
+    min-width: 1.4rem;
+    margin-right: .15rem;
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.verwendungskuerzel--aktiv { background: var(--area-solid); color: var(--area-on-solid); }
+
+.modell-konfiguration-detail {
+    position: sticky;
+    top: var(--space-2);
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.modell-konfiguration-detail h3 { margin: 0; }
+.modell-konfiguration-detail__schalter { display: grid; gap: var(--space-1); }
+.modell-konfiguration-detail__schalter .button { width: 100%; }
+
+@media (max-width: 1100px) {
+    .modell-konfigurationen { grid-template-columns: 1fr; }
+    .modell-konfiguration-detail { position: static; }
+}

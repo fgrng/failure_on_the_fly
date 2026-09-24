@@ -1,9 +1,10 @@
 <section class="page-section" aria-label="Modell-Konfiguration">
     <header class="page-section__head">
-        <b>03</b><span><h2>Modell-Konfiguration</h2><small>Aktiver Anbieter, Sprachmodell und Parameter</small></span>
+        <b>03</b><span><h2>Modell-Konfiguration</h2><small>Die für die Schüler:in aktive: Anbieter, Sprachmodell und Parameter</small></span>
     </header>
     {% if modell_konfiguration %}
         <dl class="field-grid">
+            <div><dt>Bezeichnung</dt><dd>{{ modell_konfiguration.bezeichnung }}</dd></div>
             <div><dt>Anbieter</dt><dd>{{ modell_konfiguration.anbieter }}</dd></div>
             <div><dt>Basis-URL</dt><dd>{{ modell_konfiguration.anbieter_basis_url|default:"—" }}</dd></div>
             <div><dt>Token</dt><dd>{{ modell_konfiguration.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
@@ -11,6 +12,6 @@
             <div><dt>Parameter</dt><dd><pre>{{ modell_konfiguration.parameter }}</pre></dd></div>
         </dl>
     {% else %}
-        <p class="system-page-empty">Keine aktive Modell-Konfiguration.</p>
+        <p class="system-page-empty">Für die Schüler:in ist keine Modell-Konfiguration aktiv.</p>
     {% endif %}
 </section>

@@ -15,7 +15,7 @@ from konten.navigation import (
     AUTORIN_GRUPPE,
     FORSCHENDE_GRUPPE,
 )
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from training.models import Training
 from vignetten.models import Vignettenhistorie
 
@@ -78,7 +78,8 @@ def test_erhebung_ist_archiviert_nicht_mehr_aktiv() -> None:
     """Die Erhebung leitet ihren Haken aus ihrem Status ab."""
     konto: Konto = Konto.objects.create_user(username="ada")
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
+        Verwendung.SCHUELERIN,
     )
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Studie")
 

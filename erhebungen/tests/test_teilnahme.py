@@ -21,7 +21,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
     Diagnose,
@@ -86,12 +86,13 @@ class ErhebungsteilnahmeTests(TestCase):
         """Legt den Entwurf an, den jeder Test um sein Design ergänzt."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [{"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."}]
             },
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         self.erhebung: Erhebung = Erhebung.objects.anlegen(
             Konto.objects.create_user(username="ada"),
             name="Brüche",
@@ -203,7 +204,9 @@ class ErhebungsteilnahmeTests(TestCase):
             teilnahme=teilnahme,
             vignette=vignette,
             simulationskern=vignette.gepinnter_kern,
-            modell_konfiguration=ModellKonfiguration.objects.aktive(),
+            modell_konfiguration=ModellKonfiguration.objects.aktive(
+                Verwendung.SCHUELERIN
+            ),
             verbrauchte_zeit=sekunden,
         )
 
@@ -213,10 +216,11 @@ class ErhebungsteilnahmeTests(TestCase):
         # Tauscht aktive Modellkonfiguration und Entwurf gegen einen eigenen Aufbau.
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         self.erhebung = Erhebung.objects.anlegen(
             self.erhebung.eigentuemerinnen.get(), name=name
         )

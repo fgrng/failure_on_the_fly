@@ -27,6 +27,7 @@ def test_antwort_versuchen_liefert_denkspur_und_aeusserung_des_fakes() -> None:
             user_prompt_vorlage="$lernauftrag",
         ),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -50,6 +51,7 @@ def test_antwort_versuchen_haelt_formatbruch_neben_der_antwort_fest() -> None:
         Vignette(lernauftrag_text="Addiere zwei Brüche."),
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -74,6 +76,7 @@ def test_antwort_versuchen_haelt_anbieterfehler_neben_der_antwort_fest() -> None
         Vignette(lernauftrag_text="Addiere zwei Brüche."),
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -97,6 +100,7 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
         Vignette(lernauftrag_text="Addiere zwei Brüche."),
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": [{"fehler": "anbieterfehler"}] * MAX_VERSUCHE},
         ),
@@ -118,6 +122,7 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
         Vignette(lernauftrag_text="Addiere zwei Brüche."),
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -135,6 +140,7 @@ def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
         Vignette(lernauftrag_text="Addiere zwei Brüche."),
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": [{"denkspur": "x", "aeusserung": "2/5."}]},
         ),
@@ -160,6 +166,7 @@ def test_antwort_versuchen_persistiert_nichts() -> None:
     """Der Funktionsaufruf verändert keine Modell-Konfiguration."""
 
     konfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         sprachmodell="fake",
         parameter={"skript": [{"denkspur": "Ich addiere.", "aeusserung": "2/5."}]},
     )

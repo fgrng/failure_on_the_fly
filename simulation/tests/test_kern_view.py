@@ -16,6 +16,7 @@ from simulation.models import (
     Anbieter,
     ModellKonfiguration,
     Simulationskern,
+    Verwendung,
 )
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
@@ -69,12 +70,13 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         kern.save()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             anbieter=Anbieter.OPENROUTER,
             sprachmodell="openrouter/gpt-test",
             anbieter_token="sk-or-geheim",
             parameter={"temperature": 0.2},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         self.client.force_login(konto)
 
     def test_zeigt_den_system_prompt_der_neuesten_finalen_fassung(self) -> None:
@@ -201,12 +203,14 @@ class SimulationskernLeereAnsichtTests(TestCase):
         self.assertNotContains(response, reverse("simulation:kern_anlegen"))
 
     def test_zeigt_fehlende_aktive_modellkonfiguration(self) -> None:
-        """Ohne aktiven Zeiger erklärt die Ansicht die fehlende Konfiguration."""
+        """Ohne Zeiger der Schüler:in erklärt die Ansicht die fehlende Konfiguration."""
         self.client.force_login(self.konto)
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertContains(response, "Keine aktive Modell-Konfiguration")
+        self.assertContains(
+            response, "Für die Schüler:in ist keine Modell-Konfiguration aktiv."
+        )
 
     def test_erfordert_anmeldung(self) -> None:
         """Anonyme Anfragen werden zur Anmeldung weitergeleitet."""
@@ -225,13 +229,16 @@ class ModellKonfigurationAnzeigeTests(TestCase):
     def setUp(self) -> None:
         """Aktiviert eine Infomaniak-Konfiguration mit Basis-URL und Token."""
         self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             anbieter=Anbieter.INFOMANIAK,
             sprachmodell="openai/mistral24b",
             anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
             anbieter_token="sk-infomaniak-geheim1234",
             parameter={"temperature": 0.2},
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         self.client.force_login(_administratorin("linus"))
 
     def test_zeigt_anbieter_basis_url_und_parameter(self) -> None:

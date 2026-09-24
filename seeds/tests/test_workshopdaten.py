@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from konten.models import Konto
 from konten.navigation import AUTORIN_GRUPPE
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 
 from ..management.commands.workshopdaten_anlegen import SIMULATIONSMODELL
 
@@ -57,7 +57,9 @@ class WorkshopdatenTests(TestCase):
                 zustand=Simulationskern.Zustand.FINAL
             ).exists()
         )
-        aktive: ModellKonfiguration = ModellKonfiguration.objects.aktive()
+        aktive: ModellKonfiguration = ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
+        )
         self.assertEqual(aktive.sprachmodell, SIMULATIONSMODELL)
         self.assertEqual(aktive.parameter, {})
 

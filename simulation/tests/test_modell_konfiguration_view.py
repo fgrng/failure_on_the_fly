@@ -14,6 +14,7 @@ from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
     ModellKonfiguration,
+    Verwendung,
 )
 from simulation.modellverzeichnis import (
     INFOMANIAK_MODELLE_URL,
@@ -41,9 +42,25 @@ def _administratorin(username: str = "linus") -> Konto:
 def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
     """Legt eine gültige Konfiguration an, wie sie die Seite auflistet."""
     return ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=sprachmodell,
         anbieter_token=token,
+    )
+
+
+def _aktivieren_url(konfiguration: ModellKonfiguration, verwendung: str) -> str:
+    """Die Aktivieren-Geste einer Konfiguration für eine Verwendung."""
+    return reverse(
+        "simulation:modell_konfiguration_aktivieren",
+        args=[konfiguration.pk, verwendung],
+    )
+
+
+def _liste_mit(konfiguration: ModellKonfiguration) -> str:
+    """Die Liste mit der Konfiguration im Detail."""
+    return (
+        f"{reverse('simulation:modell_konfiguration')}?konfiguration={konfiguration.pk}"
     )
 
 
@@ -55,6 +72,7 @@ def _formularfelder() -> list[str]:
 def _anlegedaten(**werte: object) -> dict[str, object]:
     """Liefert einen gültigen Formularbeutel, geändert um die Testwerte."""
     return {
+        "bezeichnung": "Opus für Urteile",
         "anbieter": Anbieter.OPENROUTER,
         "sprachmodell": "openrouter/anthropic/claude-opus-4-8",
         "anbieter_basis_url": "",
@@ -92,7 +110,8 @@ class ModellKonfigurationRollenTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse(
-                "simulation:modell_konfiguration_aktivieren", args=[konfiguration.pk]
+                "simulation:modell_konfiguration_aktivieren",
+                args=[konfiguration.pk, Verwendung.SCHUELERIN],
             )
         )
 
@@ -106,7 +125,7 @@ class ZweiFassungenTestCase(TestCase):
         """Legt zwei Konfigurationen an und aktiviert die ältere."""
         self.aeltere: ModellKonfiguration = _openrouter("openrouter/altes-modell")
         self.neuere: ModellKonfiguration = _openrouter("openrouter/neues-modell")
-        ModellKonfiguration.objects.aktivieren(self.aeltere)
+        ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.SCHUELERIN)
         self.client.force_login(_administratorin())
 
 
@@ -130,18 +149,72 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
         self.assertContains(response, "openrouter/altes-modell")
         self.assertContains(response, "openrouter/neues-modell")
 
-    def test_markiert_die_aktive_konfiguration(self) -> None:
-        """Die Liste sagt, welche Fassung neue Sitzungen bedient."""
+    def test_markiert_die_aktiven_verwendungen_je_zeile(self) -> None:
+        """Die Kürzel sagen je Zeile, für welche Verwendungen sie aktiv ist."""
+        ModellKonfiguration.objects.aktivieren(self.neuere, Verwendung.BEWERTER)
+
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )
-        zeilen: list[dict[str, object]] = response.context["konfigurationen"]
+        zeilen: dict[object, dict[str, object]] = {
+            zeile["pk"]: zeile for zeile in response.context["konfigurationen"]
+        }
 
-        self.assertContains(response, '<span class="badge badge--system">Aktiv</span>')
         self.assertEqual(
-            {zeile["pk"] for zeile in zeilen if zeile["ist_aktiv"]},
-            {self.aeltere.pk},
+            [v["ist_aktiv"] for v in zeilen[self.aeltere.pk]["verwendungen"]],
+            [True, False, False],
         )
+        self.assertEqual(
+            [v["ist_aktiv"] for v in zeilen[self.neuere.pk]["verwendungen"]],
+            [False, False, True],
+        )
+        self.assertContains(response, 'title="Schüler:in: aktiv"')
+
+    def test_zeigt_ohne_auswahl_die_konfiguration_der_schuelerin(self) -> None:
+        """Das Detail beginnt bei der Konfiguration, auf der Sitzungen laufen."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertEqual(response.context["gewaehlt"]["pk"], self.aeltere.pk)
+
+    def test_zeigt_die_gewaehlte_konfiguration_im_detail(self) -> None:
+        """Die gewählte Zeile trägt das Detail samt Aktivieren je Verwendung."""
+        response: HttpResponse = self.client.get(_liste_mit(self.neuere))
+
+        self.assertEqual(response.context["gewaehlt"]["pk"], self.neuere.pk)
+        self.assertContains(response, "Für Schüler:in aktivieren (statt Test)")
+        self.assertContains(response, "Für Lehrperson aktivieren</button>")
+        self.assertContains(response, _aktivieren_url(self.neuere, Verwendung.BEWERTER))
+
+    def test_zeigt_die_aktive_verwendung_ohne_knopf(self) -> None:
+        """Was schon aktiv ist, lässt sich nicht noch einmal aktivieren."""
+        response: HttpResponse = self.client.get(_liste_mit(self.aeltere))
+
+        self.assertContains(response, "✓ Aktiv für Schüler:in")
+        self.assertNotContains(
+            response, _aktivieren_url(self.aeltere, Verwendung.SCHUELERIN)
+        )
+
+    def test_verlinkt_die_gewaehlte_als_vorlage(self) -> None:
+        """Aus dem Detail führt ein Weg zu einer neuen Konfiguration."""
+        response: HttpResponse = self.client.get(_liste_mit(self.neuere))
+
+        self.assertContains(
+            response,
+            f"{reverse('simulation:modell_konfiguration_neu')}?vorlage={self.neuere.pk}",
+        )
+
+    def test_nennt_den_leeren_bestand(self) -> None:
+        """Ohne Konfiguration gibt es kein Detail, nur den Hinweis."""
+        AktiveModellKonfiguration.objects.all().delete()
+        ModellKonfiguration.objects.all().delete()
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(response, "Noch keine Modell-Konfiguration angelegt.")
 
     def test_bietet_weder_bearbeiten_noch_loeschen_an(self) -> None:
         """Die Oberfläche verspricht nicht, was das append-only-Modell verbietet."""
@@ -171,11 +244,11 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
 
     def test_zeigt_einen_leerhinweis_ohne_token(self) -> None:
         """Eine Konfiguration ohne Zugangsdaten fällt vor dem ersten Aufruf auf."""
-        ModellKonfiguration.objects.create(sprachmodell="fake")
-
-        response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration")
+        fake: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Offline", sprachmodell="fake"
         )
+
+        response: HttpResponse = self.client.get(_liste_mit(fake))
 
         self.assertContains(response, "Kein Token hinterlegt")
 
@@ -200,11 +273,12 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_legt_eine_neue_konfiguration_an(self) -> None:
         """Das Formular schreibt eine Zeile und kehrt zur Liste zurück."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"), _anlegedaten()
+            reverse("simulation:modell_konfiguration_neu"), _anlegedaten()
         )
 
-        self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertRedirects(response, _liste_mit(konfiguration))
+        self.assertEqual(konfiguration.bezeichnung, "Opus für Urteile")
         self.assertEqual(konfiguration.anbieter, Anbieter.OPENROUTER)
         self.assertEqual(konfiguration.anbieter_token, TOKEN)
         self.assertEqual(konfiguration.parameter, {"temperature": 0.2})
@@ -212,7 +286,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_gibt_das_token_nach_dem_speichern_nicht_zurueck(self) -> None:
         """Der Klartext erscheint weder im Formular noch in der Liste."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"), _anlegedaten(), follow=True
+            reverse("simulation:modell_konfiguration_neu"), _anlegedaten(), follow=True
         )
 
         self.assertNotContains(response, TOKEN)
@@ -220,7 +294,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_meldet_ungueltiges_json_am_feld(self) -> None:
         """Ein Syntaxfehler steht dort, wo er entstanden ist."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"),
+            reverse("simulation:modell_konfiguration_neu"),
             _anlegedaten(parameter="{kaputt"),
         )
 
@@ -232,7 +306,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_meldet_unbekannten_parameter_schluessel_mit_erlaubten_werten(self) -> None:
         """Die Meldung am Feld sagt auch, was erlaubt gewesen wäre."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"),
+            reverse("simulation:modell_konfiguration_neu"),
             _anlegedaten(parameter='{"mock_response": "Ich addiere."}'),
         )
 
@@ -244,7 +318,8 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_meldet_fehlendes_token_am_feld(self) -> None:
         """Ein Verstoß gegen die Anbieterbindung steht am jeweiligen Feld."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"), _anlegedaten(anbieter_token="")
+            reverse("simulation:modell_konfiguration_neu"),
+            _anlegedaten(anbieter_token=""),
         )
 
         self.assertFormError(
@@ -256,7 +331,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_meldet_fehlendes_praefix_am_modellnamen(self) -> None:
         """Der Modellname trägt die Anbieterbindung, die er verletzt."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"),
+            reverse("simulation:modell_konfiguration_neu"),
             _anlegedaten(sprachmodell="claude-opus-4-8"),
         )
 
@@ -269,11 +344,80 @@ class ModellKonfigurationAnlegenTests(TestCase):
     def test_gibt_den_klartext_bei_einem_fehler_nicht_zurueck(self) -> None:
         """Auch das erneut gezeigte Formular trägt das Token nicht."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"),
+            reverse("simulation:modell_konfiguration_neu"),
             _anlegedaten(sprachmodell="claude-opus-4-8"),
         )
 
         self.assertNotContains(response, TOKEN)
+
+
+class ModellKonfigurationEditorTests(ZweiFassungenTestCase):
+    """Der getrennte Editor legt an, auf Wunsch aus einer Vorlage."""
+
+    def test_verlangt_eine_bezeichnung(self) -> None:
+        """Keine namenlose Konfiguration entsteht neu."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:modell_konfiguration_neu"), _anlegedaten(bezeichnung="")
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "bezeichnung",
+            "Dieses Feld ist zwingend erforderlich.",
+        )
+        self.assertEqual(ModellKonfiguration.objects.count(), 2)
+
+    def test_aktiviert_die_neue_konfiguration_nicht(self) -> None:
+        """Aktiviert wird allein in der Liste."""
+        self.client.post(reverse("simulation:modell_konfiguration_neu"), _anlegedaten())
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive_je_verwendung(),
+            {Verwendung.SCHUELERIN: self.aeltere.pk},
+        )
+
+    def test_fuellt_aus_der_vorlage_alles_ausser_dem_token_vor(self) -> None:
+        """Das Token bleibt write-only und wird für jede Konfiguration neu getippt."""
+        response: HttpResponse = self.client.get(
+            f"{reverse('simulation:modell_konfiguration_neu')}?vorlage={self.neuere.pk}"
+        )
+        form: ModellKonfigurationForm = response.context["form"]
+
+        self.assertEqual(form["bezeichnung"].value(), "Test (Kopie)")
+        self.assertEqual(form["anbieter"].value(), Anbieter.OPENROUTER)
+        self.assertEqual(form["sprachmodell"].value(), "openrouter/neues-modell")
+        self.assertFalse(form["anbieter_token"].value())
+        self.assertNotContains(response, TOKEN)
+        self.assertContains(response, "das Token wird neu eingegeben")
+
+    def test_laesst_die_vorlage_unveraendert(self) -> None:
+        """Aus der Vorlage entsteht eine neue Zeile."""
+        self.client.post(
+            f"{reverse('simulation:modell_konfiguration_neu')}?vorlage={self.neuere.pk}",
+            _anlegedaten(sprachmodell="openrouter/neues-modell"),
+        )
+
+        self.assertEqual(ModellKonfiguration.objects.count(), 3)
+        self.neuere.refresh_from_db()
+        self.assertEqual(self.neuere.bezeichnung, "Test")
+
+    def test_weist_eine_unbekannte_vorlage_ab(self) -> None:
+        """Eine Vorlage, die es nicht gibt, ist kein leerer Editor."""
+        response: HttpResponse = self.client.get(
+            f"{reverse('simulation:modell_konfiguration_neu')}?vorlage=999"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
+        """Auch der Editor gehört zur Administration."""
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration_neu")
+        )
+
+        self.assertEqual(response.status_code, 403)
 
 
 class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
@@ -282,11 +426,13 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
     def test_aktiviert_eine_bestehende_konfiguration(self) -> None:
         """Nach dem Umschalten zeigt die Liste die neue als aktiv."""
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
+            _aktivieren_url(self.neuere, Verwendung.SCHUELERIN)
         )
 
-        self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
-        self.assertEqual(ModellKonfiguration.objects.aktive(), self.neuere)
+        self.assertRedirects(response, _liste_mit(self.neuere))
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), self.neuere
+        )
 
     def test_verschiebt_nur_den_zeiger_ohne_zeile_zu_mutieren(self) -> None:
         """Das Umschalten geht über aktivieren() und lässt beide Zeilen unberührt."""
@@ -294,9 +440,7 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
             ModellKonfiguration.objects.order_by("pk").values_list()
         )
 
-        self.client.post(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
-        )
+        self.client.post(_aktivieren_url(self.neuere, Verwendung.SCHUELERIN))
 
         self.assertEqual(
             list(ModellKonfiguration.objects.order_by("pk").values_list()), vorher
@@ -306,10 +450,31 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
     def test_aktivieren_ist_der_post_route_vorbehalten(self) -> None:
         """Eine Zustandsänderung entsteht nicht durch einen Aufruf per GET."""
         response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
+            _aktivieren_url(self.neuere, Verwendung.SCHUELERIN)
         )
 
         self.assertEqual(response.status_code, 405)
+
+    def test_schaltet_eine_verwendung_ohne_die_anderen_zu_beruehren(self) -> None:
+        """Dieselbe Konfiguration darf zusätzlich einer weiteren Verwendung dienen."""
+        self.client.post(_aktivieren_url(self.aeltere, Verwendung.BEWERTER))
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), self.aeltere
+        )
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.BEWERTER), self.aeltere
+        )
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON))
+
+    def test_weist_eine_unbekannte_verwendung_ab(self) -> None:
+        """Nur die drei festen Verwendungen tragen einen Zeiger."""
+        response: HttpResponse = self.client.post(
+            _aktivieren_url(self.neuere, "zuschauer")
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(AktiveModellKonfiguration.objects.count(), 1)
 
 
 class ModellKonfigurationNavigationTests(TestCase):
@@ -339,8 +504,9 @@ class ModellKonfigurationFakeTests(TestCase):
         self.client.force_login(_administratorin())
 
         response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration"),
+            reverse("simulation:modell_konfiguration_neu"),
             {
+                "bezeichnung": "Offline",
                 "anbieter": Anbieter.FAKE,
                 "sprachmodell": "fake",
                 "anbieter_basis_url": "",
@@ -349,8 +515,9 @@ class ModellKonfigurationFakeTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
-        self.assertEqual(ModellKonfiguration.objects.get().parameter, {})
+        fake: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertRedirects(response, _liste_mit(fake))
+        self.assertEqual(fake.parameter, {})
 
 
 class ModellKonfigurationFormularTests(TestCase):
@@ -363,7 +530,7 @@ class ModellKonfigurationFormularTests(TestCase):
     def test_nennt_jedes_feld_des_formulars(self) -> None:
         """Kein im Formular geführtes Feld fehlt auf der Seite."""
         response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration")
+            reverse("simulation:modell_konfiguration_neu")
         )
 
         for feld in _formularfelder():
@@ -372,7 +539,7 @@ class ModellKonfigurationFormularTests(TestCase):
     def test_haelt_die_reihenfolge_des_formulars(self) -> None:
         """Die namentliche Aufzählung ordnet die Felder wie das Formular."""
         response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration")
+            reverse("simulation:modell_konfiguration_neu")
         )
         koerper: str = response.content.decode()
 
@@ -624,7 +791,7 @@ class ModellvorschlaegeSeitenTests(TestCase):
     def _seite(self) -> HttpResponse:
         # Ruft die Seite ab, auf der der Knopf neben dem Sprachmodell steht.
 
-        return self.client.get(reverse("simulation:modell_konfiguration"))
+        return self.client.get(reverse("simulation:modell_konfiguration_neu"))
 
     def test_traegt_den_knopf_neben_dem_sprachmodell(self) -> None:
         """Der Knopf ist der einzige Auslöser des Abrufs."""

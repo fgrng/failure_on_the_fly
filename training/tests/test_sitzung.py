@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
 from training.models import Training
 from vignetten.models import Vignette, Vignettenhistorie
@@ -39,10 +39,11 @@ class TrainingssitzungTests(TestCase):
         if kern_ueberholen:
             kern.bearbeiten().finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),

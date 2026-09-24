@@ -6,6 +6,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 
 from konten.models import Konto
+from simulation.models import ModellKonfiguration, Verwendung
 from texte.markdown import szenentext
 from training.models import Training
 from vignetten.models import Vignette
@@ -66,6 +67,19 @@ class EntwicklungsdatenTests(TestCase):
                     html: str = szenentext(text)
                     for auszeichnung in ("<strong>", "<em>", "<ul>", "<ol>", "<h"):
                         self.assertNotIn(auszeichnung, html, text)
+
+    def test_belegt_jede_verwendung_mit_der_fake_konfiguration(self) -> None:
+        """Eine frische Entwicklungsinstanz ist sofort spielbar, auch für Evals."""
+
+        call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+        call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+
+        fake: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertEqual(fake.bezeichnung, "Offline (fake)")
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive_je_verwendung(),
+            {verwendung.value: fake.pk for verwendung in Verwendung},
+        )
 
     def test_zweiter_lauf_ist_idempotent(self) -> None:
         """Ein wiederholter Aufruf wirft keine Fehler und dupliziert nichts."""

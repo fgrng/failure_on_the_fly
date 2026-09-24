@@ -18,7 +18,7 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import (
     Diagnose,
     Fehlversuch,
@@ -80,7 +80,8 @@ def _erhebung_anlegen(konto: Konto, name: str = "Brüche") -> Erhebung:
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name=name)
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
+        Verwendung.SCHUELERIN,
     )
     Erhebungsvignette.objects.create(
         erhebung=erhebung, vignette=_finale_vignette_anlegen(konto), position=1
@@ -120,7 +121,7 @@ def _gespielte_teilnahme(
         teilnahme=bindung.teilnahme,
         vignette=vignette,
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(),
+        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGESCHLOSSEN,
     )
     schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
@@ -466,7 +467,7 @@ def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
         teilnahme=bindung.teilnahme,
         vignette=_finale_vignette_anlegen(forschende, name="Zuerst gespielt"),
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(),
+        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
     Gespraechsschritt.objects.create(
@@ -523,7 +524,7 @@ def test_ansicht_zeigt_auch_eine_sitzung_ohne_vignettenposition(
         teilnahme=bindung.teilnahme,
         vignette=_finale_vignette_anlegen(forschende, name="Ohne Position"),
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(),
+        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
     abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)

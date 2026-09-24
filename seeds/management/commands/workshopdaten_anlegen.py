@@ -19,7 +19,7 @@ from django.utils.crypto import get_random_string
 
 from konten.models import Konto
 from konten.navigation import AUTORIN_GRUPPE
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
@@ -98,10 +98,14 @@ class Command(BaseCommand):
         ).first()
         if konfiguration is None:
             konfiguration = ModellKonfiguration.objects.create(
-                sprachmodell=SIMULATIONSMODELL, parameter={}
+                bezeichnung=f"Workshop ({SIMULATIONSMODELL})",
+                sprachmodell=SIMULATIONSMODELL,
+                parameter={},
             )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
-        self.stdout.write(f"  Modell-Konfiguration '{SIMULATIONSMODELL}' aktiv.")
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        self.stdout.write(
+            f"  Modell-Konfiguration '{SIMULATIONSMODELL}' für die Schüler:in aktiv."
+        )
 
     def _konten_anlegen(
         self,

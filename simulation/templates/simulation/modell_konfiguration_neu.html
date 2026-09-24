@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Neue Modell-Konfiguration{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p><a href="{% url 'simulation:modell_konfiguration' %}">← Modell-Konfigurationen</a></p>
+            <h1>Neue Modell-Konfiguration</h1>
+            <span>
+                {% if vorlage %}Vorlage: <strong>{{ vorlage.bezeichnung }}</strong> (Nr. {{ vorlage.pk }}). Die Vorlage bleibt unverändert; das Token wird neu eingegeben.
+                {% else %}Eine neue Konfiguration entsteht; bestehende bleiben unverändert.{% endif %}
+            </span>
+        </div>
+    </header>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <section class="page-section" aria-label="Bezeichnung">
+            <header class="page-section__head">
+                <b>01</b><span><h2>Bezeichnung</h2><small>Unter ihr findet man die Konfiguration in den Auswahlen wieder</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {% include "vignetten/includes/form_field.html" with field=form.bezeichnung %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-label="Anbieter und Sprachmodell">
+            <header class="page-section__head">
+                <b>02</b><span><h2>Anbieter und Sprachmodell</h2><small>Aktiviert wird anschließend in der Liste</small></span>
+            </header>
+            {% comment %}
+                Der Anbieter steht im Alpine-Zustand, weil zwei Dinge an ihm
+                hängen: Beim Anbieter »fake« gibt es nichts zu laden, und ein
+                Wechsel darf keine Liste des vorigen Anbieters stehen lassen.
+            {% endcomment %}
+            <div class="system-page-field-list"
+                 x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
+                 @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
+                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
+                {% include "vignetten/includes/form_field.html" with field=form.parameter %}
+            </div>
+        </section>
+
+        <div class="vignette-form-actions">
+            <a class="button button--secondary" href="{% url 'simulation:modell_konfiguration' %}">Abbrechen</a>
+            <button class="button" type="submit">Konfiguration anlegen</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

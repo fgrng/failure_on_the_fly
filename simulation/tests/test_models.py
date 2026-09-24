@@ -15,6 +15,7 @@ from simulation.models import (
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    Verwendung,
 )
 
 
@@ -354,6 +355,7 @@ def _openrouter_konfiguration(name: str) -> ModellKonfiguration:
     # Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt.
 
     return ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=f"openrouter/{name}",
         anbieter_token="sk-or-geheim",
@@ -367,10 +369,10 @@ def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None
     erste: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
     zweite: ModellKonfiguration = _openrouter_konfiguration("zweites-modell")
 
-    ModellKonfiguration.objects.aktivieren(erste)
-    ModellKonfiguration.objects.aktivieren(zweite)
+    ModellKonfiguration.objects.aktivieren(erste, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(zweite, Verwendung.SCHUELERIN)
 
-    assert ModellKonfiguration.objects.aktive() == zweite
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == zweite
 
 
 @pytest.mark.django_db
@@ -401,7 +403,7 @@ def test_aktive_modell_konfiguration_kann_nicht_geloescht_werden() -> None:
     """Der aktive Zeiger schützt seine Konfiguration vor dem Löschen."""
 
     konfiguration: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
 
     with pytest.raises(ProtectedError):
         konfiguration.delete()

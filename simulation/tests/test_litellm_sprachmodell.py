@@ -154,6 +154,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.OPENROUTER,
                 sprachmodell="openrouter/openai/gpt-test",
                 anbieter_token="sk-or-geheim",
@@ -286,6 +287,7 @@ def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> N
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.INFOMANIAK,
                 sprachmodell="openai/mistral24b",
                 anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
@@ -311,6 +313,7 @@ def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.OPENROUTER,
                 sprachmodell="openrouter/anthropic/claude-opus-4-8",
                 anbieter_token="sk-or-geheim",
@@ -338,6 +341,7 @@ def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> N
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.FAKE,
                 sprachmodell="fake",
                 parameter={
@@ -391,6 +395,7 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.OPENROUTER,
                 sprachmodell="openrouter/openai/gpt-test",
                 anbieter_token="sk-or-geheim",
@@ -438,6 +443,7 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
             Vignette(lernauftrag_text="Addiere zwei Brüche."),
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
+                bezeichnung="Test",
                 anbieter=Anbieter.OPENROUTER,
                 sprachmodell="openrouter/openai/gpt-test",
                 anbieter_token="sk-or-geheim",

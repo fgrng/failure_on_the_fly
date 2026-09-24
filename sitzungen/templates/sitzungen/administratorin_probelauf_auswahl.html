@@ -15,7 +15,7 @@
         <label for="modell_konfiguration_pk">Modell-Konfiguration</label>
         <select id="modell_konfiguration_pk" name="modell_konfiguration_pk">
             {% for konfiguration in modell_konfigurationen %}
-                <option value="{{ konfiguration.pk }}">{{ konfiguration.pk }}: {{ konfiguration.sprachmodell }}</option>
+                <option value="{{ konfiguration.pk }}">{{ konfiguration.bezeichnung }} ({{ konfiguration.sprachmodell }})</option>
             {% endfor %}
         </select>
         <label for="vignette_pk">Vignette</label>

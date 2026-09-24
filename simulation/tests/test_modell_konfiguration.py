@@ -2,8 +2,15 @@
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 
-from simulation.models import Anbieter, ModellKonfiguration
+from simulation.models import (
+    AktiveModellKonfiguration,
+    Anbieter,
+    ModellKonfiguration,
+    Verwendung,
+)
 
 
 def _openrouter(**werte: object) -> ModellKonfiguration:
@@ -11,11 +18,12 @@ def _openrouter(**werte: object) -> ModellKonfiguration:
 
     return ModellKonfiguration.objects.create(
         **{
+            "bezeichnung": "Test",
             "anbieter": Anbieter.OPENROUTER,
             "sprachmodell": "openrouter/anthropic/claude-opus-4-8",
             "anbieter_token": "sk-or-geheim",
             **werte,
-        }
+        },
     )
 
 
@@ -24,6 +32,7 @@ def test_fake_laeuft_ohne_endpunkt_und_ohne_token() -> None:
     """Die Vorgabe telefoniert nicht nach außen und braucht keine Zugangsdaten."""
 
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         sprachmodell="fake",
         parameter={"skript": []},
     )
@@ -47,6 +56,7 @@ def test_infomaniak_verlangt_praefix_url_und_token() -> None:
     """Infomaniak spricht das OpenAI-Protokoll an einer kontoeigenen Wurzel."""
 
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         anbieter=Anbieter.INFOMANIAK,
         sprachmodell="openai/mistral24b",
         anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
@@ -89,6 +99,7 @@ def test_lehnt_infomaniak_ohne_basis_url_ab() -> None:
 
     with pytest.raises(ValidationError, match="anbieter_basis_url"):
         ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             anbieter=Anbieter.INFOMANIAK,
             sprachmodell="openai/mistral24b",
             anbieter_token="infomaniak-geheim",
@@ -101,6 +112,7 @@ def test_lehnt_fake_mit_zugangsdaten_ab() -> None:
 
     with pytest.raises(ValidationError, match="anbieter_token"):
         ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             anbieter_token="sk-or-geheim",
         )
@@ -111,7 +123,9 @@ def test_lehnt_fake_mit_fremdem_modellnamen_ab() -> None:
     """Der Anbieter `fake` bedient genau ein Modell."""
 
     with pytest.raises(ValidationError, match="sprachmodell"):
-        ModellKonfiguration.objects.create(sprachmodell="openrouter/gpt-4o")
+        ModellKonfiguration.objects.create(
+            bezeichnung="Test", sprachmodell="openrouter/gpt-4o"
+        )
 
 
 @pytest.mark.django_db
@@ -162,6 +176,7 @@ def test_erlaubt_skript_nur_beim_anbieter_fake() -> None:
     """Das Fake-Skript ist der Konfigurationskanal des zweiten Adapters."""
 
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         sprachmodell="fake",
         parameter={"skript": [{"denkspur": "Ich addiere.", "aeusserung": "2/5."}]},
     )
@@ -218,7 +233,100 @@ def test_maskiert_das_fehlende_token_als_leeren_wert() -> None:
     """Ohne Token gibt es nichts zu maskieren; den Hinweis trägt die Ansicht."""
 
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="fake"
+        bezeichnung="Test", sprachmodell="fake"
     )
 
     assert konfiguration.anbieter_token_maskiert == ""
+
+
+@pytest.mark.django_db
+def test_verlangt_eine_bezeichnung() -> None:
+    """Eine namenlose Konfiguration entsteht nicht neu."""
+
+    with pytest.raises(ValidationError) as fehler:
+        ModellKonfiguration.objects.create(sprachmodell="fake")
+
+    assert "bezeichnung" in fehler.value.message_dict
+
+
+@pytest.mark.django_db
+def test_die_bezeichnung_ist_nach_dem_anlegen_unveraenderlich() -> None:
+    """Eine gepinnte Konfiguration heißt nie anders als bei der Erhebung."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration.bezeichnung = "Umbenannt"
+
+    with pytest.raises(RuntimeError):
+        konfiguration.save()
+
+
+@pytest.mark.django_db
+def test_unbelegte_verwendung_liefert_keine() -> None:
+    """Solange die Administration nichts gesetzt hat, gibt es keine Konfiguration."""
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) is None
+    with pytest.raises(AktiveModellKonfiguration.DoesNotExist):
+        ModellKonfiguration.objects.belegte(Verwendung.BEWERTER)
+
+
+@pytest.mark.django_db
+def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
+    """Eine kleine Instanz braucht nicht drei gleiche Datensätze."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    for verwendung in Verwendung:
+        ModellKonfiguration.objects.aktivieren(konfiguration, verwendung)
+
+    assert ModellKonfiguration.objects.aktive_je_verwendung() == {
+        Verwendung.SCHUELERIN: konfiguration.pk,
+        Verwendung.LEHRPERSON: konfiguration.pk,
+        Verwendung.BEWERTER: konfiguration.pk,
+    }
+
+
+@pytest.mark.django_db
+def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
+    """Je Verwendung ein Zeiger; ein Wechsel bewegt nur den eigenen."""
+
+    schuelerin: ModellKonfiguration = _openrouter()
+    bewerter: ModellKonfiguration = _openrouter(bezeichnung="Bewerter")
+    ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.BEWERTER)
+
+    ModellKonfiguration.objects.aktivieren(bewerter, Verwendung.BEWERTER)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == schuelerin
+    assert ModellKonfiguration.objects.belegte(Verwendung.BEWERTER) == bewerter
+    assert AktiveModellKonfiguration.objects.count() == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_macht_die_aktive_zur_schuelerin_und_benennt_den_bestand() -> None:
+    """Der Umstieg auf Verwendungen verliert keine aktive Konfiguration."""
+
+    vorher = [("simulation", "0006_transkriptionskonfiguration")]
+    nachher = [("simulation", "0007_modellkonfiguration_je_verwendung")]
+    executor: MigrationExecutor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        alte_apps = executor.loader.project_state(vorher).apps
+        alte_konfiguration = alte_apps.get_model(
+            "simulation", "ModellKonfiguration"
+        ).objects.create(sprachmodell="fake")
+        alte_apps.get_model("simulation", "AktiveModellKonfiguration").objects.create(
+            konfiguration=alte_konfiguration, singleton=1
+        )
+        MigrationExecutor(connection).migrate(nachher)
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
+            pk=alte_konfiguration.pk
+        )
+        aktive: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
+        )
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
+
+    assert konfiguration.bezeichnung == f"fake (Nr. {konfiguration.pk})"
+    assert konfiguration.angelegt_am is None
+    assert aktive == konfiguration
+    assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) is None

@@ -38,6 +38,7 @@ def _persistierbares_tripel(
         Vignette.objects.anlegen(Konto.objects.create_user(username="ada")),
         kern,
         ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         ),
@@ -94,6 +95,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         lernauftrag_text="Addiere zwei Brüche.", gepinnter_kern=kern
     )
     konfiguration: ModellKonfiguration = ModellKonfiguration(
+        bezeichnung="Test",
         sprachmodell="fake",
         parameter={
             "skript": [

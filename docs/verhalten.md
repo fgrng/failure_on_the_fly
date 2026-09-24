@@ -66,8 +66,8 @@ Eigentümer:innen.
 
 ## Simulationskern
 
-Autor:innen und Administrator:innen können die finale Kern-Fassung und die
-aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
+Autor:innen und Administrator:innen können die finale Kern-Fassung und die für
+die Schüler:in aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, stellt die Ansicht das nur fest. Administrator:innen
 erhalten unter `/system/kern/verwalten/` außerdem den Überblick über den Entwurf, die
 finale Fassung und die eingeklappten archivierten Kern-Fassungen. Solange es überhaupt
@@ -96,7 +96,15 @@ bleiben die Platzhalter in der Vorschau wörtlich stehen.
 
 ## Modell-Konfiguration
 
-Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/`.
+Administrator:innen setzen die Sprachmodelle unter `/system/modell-konfiguration/`.
+Jede Konfiguration trägt eine Bezeichnung, die beim Anlegen Pflicht ist und danach
+so unveränderlich bleibt wie alles an ihr. Je **Verwendung** ist genau eine
+Konfiguration aktiv: *Schüler:in* für Sitzungen, Probeläufe und die simulierte
+Schüler:in im Evallauf, *Lehrperson* für die simulierte Lehrperson, *Bewerter* für
+die Urteile. Dieselbe Konfiguration darf mehreren Verwendungen dienen. Alles, was
+vor den Verwendungen „die aktive“ Konfiguration las — Training, Probelauf der
+Autor:in und der Pin der Erhebung —, liest die der Schüler:in. Eine noch unbelegte
+Verwendung hat keine Konfiguration.
 Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —,
 der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
@@ -118,14 +126,25 @@ ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
 dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
 prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
 bevor es eine Erhebung erreicht.
-Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
-Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
-genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
-eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt. Ein
-Umschalten trifft laufende Trainings sofort und laufende Erhebungen gar nicht; eine
-Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren. Das
-Token wird eingegeben, aber nie zurückgegeben: Die Liste zeigt es nur maskiert mit
-seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte.
+Die Seite listet links alle je angelegten Konfigurationen mit Bezeichnung,
+Modellnamen und Anlagedatum; Kürzel S, L und B zeigen je Zeile, für welche
+Verwendungen sie aktiv ist. Rechts steht das Detail der gewählten Zeile — ohne
+Auswahl das der Schüler:in — mit Anbieter, Basis-URL, maskiertem Token und
+Parametern. Dort wird sie je Verwendung aktiviert; der Knopf nennt, welche
+Konfiguration er ablöst, und das Umschalten fragt nicht nach. Angelegt wird auf
+einer eigenen Seite unter `/system/modell-konfiguration/neu/`; die neue
+Konfiguration ist danach für keine Verwendung aktiv, aktiviert wird allein in der
+Liste. „Als Vorlage für eine neue Konfiguration“ füllt dort Bezeichnung (mit dem
+Zusatz „(Kopie)“), Anbieter, Basis-URL, Sprachmodell und Parameter vor, nie das
+Token: Es wird für jede Konfiguration neu eingegeben. Bearbeiten und Löschen gibt
+es nicht — eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung
+pinnt. Ein Umschalten der Schüler:in trifft laufende Trainings sofort und laufende
+Erhebungen gar nicht; Lehrperson und Bewerter sprechen nur in Evalläufen. Eine
+Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren.
+Das Token wird eingegeben, aber nie zurückgegeben: Die Seite zeigt es nur
+maskiert mit seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte.
+Die Auswahl des freien Probelauf-Tripels nennt die Konfigurationen mit ihrer
+Bezeichnung.
 
 ## Transkriptions-Konfiguration
 
@@ -313,8 +332,8 @@ angemeldeten Autor:innen, Forschenden und Administrator:innen offen. Finale und
 archivierte Erhebungen zeigen die drei Texte gerendert als Leseansicht, ein
 leerer Text erscheint als »—«. Reine Entwürfe lassen sich löschen; das Design
 finaler Erhebungen bleibt unveränderlich, ihr Eigentümer-Kreis änderbar. Das
-Finalisieren pinnt die aktive
-Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
+Finalisieren pinnt die Modell-Konfiguration der Schüler:in sichtbar, samt
+Bezeichnung; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
 Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung

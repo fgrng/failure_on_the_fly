@@ -11,7 +11,7 @@ from django.urls import reverse
 from unittest.mock import patch
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
     Diagnose,
@@ -59,9 +59,11 @@ class ProbelaufStartTests(TestCase):
         )
         self.kern.finalisieren()
         self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": []}
+            bezeichnung="Test", sprachmodell="fake", parameter={"skript": []}
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         self.entwurf: Vignette = Vignette.objects.anlegen(self.ada)
         self.entwurf.historie.name = "Eigener Entwurf"
         self.entwurf.historie.save()
@@ -109,6 +111,26 @@ class ProbelaufStartTests(TestCase):
             session["probelauf"]["modell_konfiguration_pk"], self.konfiguration.pk
         )
         self.assertEqual(session["probelauf"]["gespraechsschritte"], [])
+
+    def test_probelauf_laeuft_auf_der_schuelerin_nicht_auf_lehrperson_oder_bewerter(
+        self,
+    ) -> None:
+        """Die Autor:in sieht, was Teilnehmende sehen — nicht das Modell der Evals."""
+
+        eval_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Evals", sprachmodell="fake", parameter={"skript": []}
+        )
+        ModellKonfiguration.objects.aktivieren(
+            eval_konfiguration, Verwendung.LEHRPERSON
+        )
+        ModellKonfiguration.objects.aktivieren(eval_konfiguration, Verwendung.BEWERTER)
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+
+        self.assertEqual(
+            self.client.session["probelauf"]["modell_konfiguration_pk"],
+            self.konfiguration.pk,
+        )
 
     def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
         """Der Probelauf rendert mit den beim Anlegen gesetzten Akteuren."""
@@ -314,6 +336,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Richtet den Fake für einen erfolgreichen Schritt ein."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -324,7 +347,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 ]
             },
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
 
     def _budget_konfigurieren(
         self, budget_typ: Vignette.BudgetTyp, budget_wert: int
@@ -341,9 +366,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
 
         self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+            bezeichnung="Test",
+            sprachmodell="fake",
+            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
         session = self.client.session
         session["probelauf"]["gespraechsschritte"] = [
@@ -532,6 +561,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Nur Äußerungen erreichen den nächsten Modellaufruf."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -542,7 +572,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 ]
             },
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         anzahl_vignetten: int = Vignette.objects.count()
         anzahl_kerne: int = Simulationskern.objects.count()
         anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
@@ -697,9 +729,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+            bezeichnung="Test",
+            sprachmodell="fake",
+            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
@@ -776,10 +812,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": [{"denkspur": "still", "aeusserung": ""}]},
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         self.client.post(
@@ -874,6 +913,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -884,7 +924,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 ]
             },
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         anzahl_sitzungen: int = Sitzung.objects.count()
         anzahl_schritte: int = Gespraechsschritt.objects.count()
         anzahl_diagnosen: int = Diagnose.objects.count()
@@ -940,11 +982,14 @@ class AdministratorinProbelaufTests(TestCase):
         )
         self.kern_entwurf.save()
         aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
-        ModellKonfiguration.objects.aktivieren(aktive_konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            aktive_konfiguration, Verwendung.SCHUELERIN
+        )
         self.test_konfiguration: ModellKonfiguration = (
             ModellKonfiguration.objects.create(
+                bezeichnung="Test",
                 sprachmodell="fake",
                 parameter={
                     "skript": [
@@ -1020,7 +1065,8 @@ class AdministratorinProbelaufTests(TestCase):
         self.vignette.refresh_from_db()
         self.assertEqual(self.vignette.gepinnter_kern_id, self.gepinnter_kern_pk)
         self.assertNotEqual(
-            ModellKonfiguration.objects.aktive(), self.test_konfiguration
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+            self.test_konfiguration,
         )
 
     def test_nicht_administratorin_erreicht_freien_auswaehler_nicht(self) -> None:
@@ -1043,13 +1089,15 @@ class GeteiltesKontoTests(ProbelaufStartTests):
 
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(
+                bezeichnung="Test",
                 sprachmodell="fake",
                 parameter={
                     "skript": [
                         {"denkspur": "Mia rechnet ihre Regel.", "aeusserung": "So."}
                     ]
                 },
-            )
+            ),
+            Verwendung.SCHUELERIN,
         )
         zweiter_entwurf: Vignette = Vignette.objects.anlegen(self.ada)
         zweiter_entwurf.historie.name = "Zweiter Entwurf"

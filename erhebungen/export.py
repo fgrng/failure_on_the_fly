@@ -275,7 +275,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         ),
         "modellkonfigurationen.csv": _csv_aus_objekten(
             konfigurationen,
-            ("id", "anbieter", "sprachmodell", "parameter"),
+            ("id", "bezeichnung", "anbieter", "sprachmodell", "parameter"),
             parameter=lambda konfiguration: json.dumps(
                 konfiguration.parameter, ensure_ascii=False
             ),

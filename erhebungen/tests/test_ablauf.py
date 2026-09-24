@@ -29,7 +29,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import Sitzung, Teilnahme, Vignettenposition
 from vignetten.models import Vignette
 
@@ -83,7 +83,8 @@ def _spielbarer_entwurf_anlegen(konto: Konto) -> Erhebung:
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
+        Verwendung.SCHUELERIN,
     )
     return erhebung
 
@@ -112,7 +113,9 @@ def _sitzung_anlegen(
         teilnahme=bindung.teilnahme,
         vignette=vignette,
         simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(sprachmodell="fake"),
+        modell_konfiguration=ModellKonfiguration.objects.create(
+            bezeichnung="Test", sprachmodell="fake"
+        ),
         status=status,
     )
 

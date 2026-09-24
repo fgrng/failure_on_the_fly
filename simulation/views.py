@@ -6,8 +6,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
@@ -29,10 +30,10 @@ from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
-    AktiveModellKonfiguration,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    Verwendung,
 )
 from .standardkern import STANDARDKERN_VORLAGEN
 
@@ -51,19 +52,12 @@ def _archivierte_fassungen() -> QuerySet[Simulationskern]:
     ).order_by("-finalisiert_am", "-pk")
 
 
-def _aktive_konfiguration() -> ModellKonfiguration | None:
-    # Liefert die aktive Konfiguration, solange der Zeiger schon gesetzt ist.
-
-    try:
-        return ModellKonfiguration.objects.aktive()
-    except AktiveModellKonfiguration.DoesNotExist:
-        return None
-
-
 def _kern_kontext() -> dict[str, object]:
     """Liefert die gemeinsame Anzeige-Referenz für Kern-Ansichten."""
     return {
-        "modell_konfiguration": _aktive_konfiguration(),
+        "modell_konfiguration": ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
+        ),
         "prompt_platzhalter": sorted(VERTRAG_PROMPT),
         "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
         "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
@@ -218,40 +212,125 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _konfigurationszeilen() -> list[dict[str, object]]:
+def _konfigurationszeilen(aktive: dict[str, int]) -> list[dict[str, object]]:
     # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
 
-    aktive: ModellKonfiguration | None = _aktive_konfiguration()
-    aktive_pk: int | None = aktive.pk if aktive else None
     return [
         {
             "pk": konfiguration.pk,
+            "bezeichnung": konfiguration.bezeichnung,
+            "angelegt_am": konfiguration.angelegt_am,
             "anbieter": konfiguration.anbieter,
             "sprachmodell": konfiguration.sprachmodell,
             "anbieter_basis_url": konfiguration.anbieter_basis_url,
             "anbieter_token_maskiert": konfiguration.anbieter_token_maskiert,
             "parameter": konfiguration.parameter,
-            "ist_aktiv": konfiguration.pk == aktive_pk,
+            "verwendungen": [
+                {
+                    "label": verwendung.label,
+                    "ist_aktiv": aktive.get(verwendung) == konfiguration.pk,
+                }
+                for verwendung in Verwendung
+            ],
         }
         for konfiguration in ModellKonfiguration.objects.order_by("-pk")
     ]
 
 
+def _gewaehlte_zeile(
+    request: HttpRequest, zeilen: list[dict[str, object]], aktive: dict[str, int]
+) -> dict[str, object] | None:
+    # Die genannte Zeile, sonst die der Schüler:in, sonst die neueste.
+
+    je_pk: dict[object, dict[str, object]] = {zeile["pk"]: zeile for zeile in zeilen}
+    genannt: str = request.GET.get("konfiguration", "")
+    if genannt.isdigit() and int(genannt) in je_pk:
+        return je_pk[int(genannt)]
+    if aktive.get(Verwendung.SCHUELERIN) in je_pk:
+        return je_pk[aktive[Verwendung.SCHUELERIN]]
+    return zeilen[0] if zeilen else None
+
+
+def _schalter(
+    gewaehlt: dict[str, object], zeilen: list[dict[str, object]], aktive: dict[str, int]
+) -> list[dict[str, object]]:
+    # Je Verwendung: aktiv für die gewählte Zeile, oder wen ein Umschalten ablöst.
+
+    bezeichnung_je_pk: dict[object, object] = {
+        zeile["pk"]: zeile["bezeichnung"] for zeile in zeilen
+    }
+    return [
+        {
+            "wert": verwendung.value,
+            "label": verwendung.label,
+            "ist_aktiv": aktive.get(verwendung) == gewaehlt["pk"],
+            "abgeloest": bezeichnung_je_pk.get(aktive.get(verwendung), ""),
+        }
+        for verwendung in Verwendung
+    ]
+
+
 @administratorin_erforderlich
 def modell_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Listet alle Modell-Konfigurationen und legt eine neue Fassung an."""
+    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
+    aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
+    zeilen: list[dict[str, object]] = _konfigurationszeilen(aktive)
+    gewaehlt: dict[str, object] | None = _gewaehlte_zeile(request, zeilen, aktive)
+    return render(
+        request,
+        "simulation/modell_konfiguration.html",
+        {
+            "konfigurationen": zeilen,
+            "gewaehlt": gewaehlt,
+            "schalter": _schalter(gewaehlt, zeilen, aktive) if gewaehlt else [],
+        },
+    )
+
+
+def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
+    # Zurück zur Liste, die eben berührte Konfiguration im Detail.
+
+    return redirect(
+        f"{reverse('simulation:modell_konfiguration')}?konfiguration={konfiguration.pk}"
+    )
+
+
+@administratorin_erforderlich
+def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
+    """Legt eine neue Konfiguration an, auf Wunsch aus einer Vorlage.
+
+    Die Vorlage füllt alles vor außer dem Token: Das bleibt write-only und wird
+    für jede neue Konfiguration neu eingegeben.
+    """
+    vorlage: ModellKonfiguration | None = None
+    if request.GET.get("vorlage"):
+        vorlage = get_object_or_404(ModellKonfiguration, pk=request.GET["vorlage"])
     form: ModellKonfigurationForm
     if request.method == "POST":
         form = ModellKonfigurationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect("simulation:modell_konfiguration")
+            konfiguration: ModellKonfiguration = form.save()
+            messages.success(
+                request,
+                f"Die Konfiguration »{konfiguration.bezeichnung}« ist angelegt.",
+            )
+            return _zur_konfiguration(konfiguration)
+    elif vorlage:
+        form = ModellKonfigurationForm(
+            initial={
+                "bezeichnung": f"{vorlage.bezeichnung} (Kopie)",
+                "anbieter": vorlage.anbieter,
+                "anbieter_basis_url": vorlage.anbieter_basis_url,
+                "sprachmodell": vorlage.sprachmodell,
+                "parameter": vorlage.parameter,
+            }
+        )
     else:
         form = ModellKonfigurationForm()
     return render(
         request,
-        "simulation/modell_konfiguration.html",
-        {"form": form, "konfigurationen": _konfigurationszeilen()},
+        "simulation/modell_konfiguration_neu.html",
+        {"form": form, "vorlage": vorlage},
     )
 
 
@@ -325,12 +404,20 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
 
 @administratorin_erforderlich
 @require_POST
-def modell_konfiguration_aktivieren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Richtet den einzigen aktiven Zeiger auf eine bestehende Fassung."""
-    ModellKonfiguration.objects.aktivieren(
-        get_object_or_404(ModellKonfiguration, pk=pk)
+def modell_konfiguration_aktivieren(
+    request: HttpRequest, pk: int, verwendung: str
+) -> HttpResponse:
+    """Richtet den Zeiger einer Verwendung auf eine bestehende Konfiguration."""
+    if verwendung not in Verwendung.values:
+        raise Http404("Unbekannte Verwendung.")
+    konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
+    messages.success(
+        request,
+        f"»{konfiguration.bezeichnung}« ist jetzt für "
+        f"{Verwendung(verwendung).label} aktiv.",
     )
-    return redirect("simulation:modell_konfiguration")
+    return _zur_konfiguration(konfiguration)
 
 
 @administratorin_erforderlich
