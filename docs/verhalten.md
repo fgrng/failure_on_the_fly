@@ -192,7 +192,10 @@ gewohnt, und ein Neuladen im selben Browser setzt an derselben Stelle fort.
 Gesprächsschritte, Fehlversuche und Diagnose liegen dabei aber nur in der
 Browser-Session und werden nie gespeichert; gespeichert und exportiert wird nur
 das Ablaufgerüst (Ziehung, Sitzungen mit Status, Zeitstempeln und verbrauchter
-Zeit, Vignettenposition).
+Zeit, Vignettenposition). Auch die Fragebögen werden ihr wie allen anderen
+vorgelegt, doch ihre Antworten werden beim Abschicken verworfen: Es entsteht
+keine Item-Antwort, auch keine Markierung »vorgelegt, übersprungen«; nur der
+Itemblock hält mit Vorlage und Erledigung fest, dass der Ablauf weiterging.
 Das Token führt auch eine flüchtige Teilnahme in einem anderen Browser fort.
 Liegt der Verlauf einer laufenden Sitzung dort nicht vor, etwa in einem anderen
 Browser oder nach Ablauf der Session, endet diese Sitzung als `abgebrochen`,
@@ -337,7 +340,8 @@ vorgelegt erkennbar. Die Antworten selbst liegen als eigene Tabelle bei, eine
 Zeile je vorgelegtem Fragebogen-Item, mit getrennten Spalten für Freitext und
 Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
 Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen«
-von »nie gesehen«.
+von »nie gesehen«. Flüchtige Teilnahmen haben Itemblöcke, aber keine
+Antwortzeilen.
 
 ## Fragebogen-Items verwalten
 

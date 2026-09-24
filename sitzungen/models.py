@@ -29,6 +29,14 @@ class Teilnahme(models.Model):
         """Macht die serverseitige Voraussetzung für Transkription abfragbar."""
         return self.audioverarbeitung_eingewilligt is True
 
+    @property
+    def ist_fluechtig(self) -> bool:
+        """Wer der Speicherung widersprochen hat, macht eine flüchtige Teilnahme.
+
+        Unentschieden bleibt sie etwa im Training und wird dort gespeichert.
+        """
+        return self.speicherung_eingewilligt is False
+
 
 class Sitzung(models.Model):
     """Eine persistierte Sitzung einer Vignette."""

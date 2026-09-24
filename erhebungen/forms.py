@@ -11,9 +11,9 @@ from .models import ItemAntwort, Itemblock
 
 
 def _feldname(antwort: ItemAntwort) -> str:
-    # Bindet ein Feld an genau eine Antwortzeile des Blocks.
+    # Bindet ein Feld an das Item der Antwortzeile, das im Block nur einmal steht.
 
-    return f"item_{antwort.pk}"
+    return f"item_{antwort.erhebungsitem_id}"
 
 
 def _ist_likert(antwort: ItemAntwort) -> bool:
@@ -50,6 +50,21 @@ def _feld(antwort: ItemAntwort) -> forms.Field:
     )
 
 
+def _leere_antwortzeilen(block: Itemblock) -> list[ItemAntwort]:
+    # Stellt die Items des Blocks als ungespeicherte, leere Antwortzeilen dar.
+
+    erhebung = block.erhebungsbindung.stichprobe.erhebung
+    erhebungsitems = (
+        erhebung.itemzugehoerigkeiten.filter(andockpunkt=block.andockpunkt)
+        .select_related("item")
+        .order_by("position")
+    )
+    return [
+        ItemAntwort(itemblock=block, erhebungsitem=erhebungsitem)
+        for erhebungsitem in erhebungsitems
+    ]
+
+
 class ItemblockFormular(forms.Form):
     """Nimmt die freiwilligen Antworten eines vorgelegten Blocks entgegen.
 
@@ -62,13 +77,22 @@ class ItemblockFormular(forms.Form):
         """Baut die Felder aus den Antwortzeilen des vorgelegten Blocks."""
 
         super().__init__(*args, **kwargs)
-        self.antworten: list[ItemAntwort] = block.antwortzeilen()
+        self.speichert: bool = not block.erhebungsbindung.teilnahme.ist_fluechtig
+        self.antworten: list[ItemAntwort] = (
+            block.antwortzeilen() if self.speichert else _leere_antwortzeilen(block)
+        )
         for antwort in self.antworten:
             self.fields[_feldname(antwort)] = _feld(antwort)
 
     def speichern(self) -> None:
-        """Schreibt die Antwortzeilen des Blocks in einem Rutsch."""
+        """Schreibt die Antwortzeilen des Blocks in einem Rutsch.
 
+        Eine flüchtige Teilnahme hat keine Antwortzeilen; ihre Antworten werden
+        verworfen.
+        """
+
+        if not self.speichert:
+            return
         with transaction.atomic():
             for antwort in self.antworten:
                 wert: int | str | None = self.cleaned_data[_feldname(antwort)]
