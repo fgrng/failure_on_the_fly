@@ -32,6 +32,22 @@ def _administratorin(username: str) -> Konto:
     return get_user_model().objects.create_user(username=username, is_superuser=True)
 
 
+class SimulationskernAnsichtLeereRahmenhandlungTests(TestCase):
+    """Leere Abschnitte der Rahmenhandlung zeigen den gewohnten Platzhalter."""
+
+    def test_leere_abschnitte_zeigen_einen_strich(self) -> None:
+        """Ohne Text steht „—“ im Container, wie in der Leseansicht der Erhebung."""
+        kern: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="System-Prompt",
+        )
+        kern.finalisieren()
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern"))
+
+        self.assertContains(response, '<div class="markdown-text">—</div>', count=3)
+
+
 class SimulationskernAnsichtMitKernTests(TestCase):
     """Die Kernansicht zeigt die aktuelle finale Fassung ohne Schreibroute."""
 

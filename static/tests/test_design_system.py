@@ -137,7 +137,8 @@ def test_feature_styles_use_spacing_tokens() -> None:
 
 
 def test_markdown_text_steps_its_headings_below_the_section_head() -> None:
-    """h3–h5 der Markdown-Texte sind gestuft und kleiner als der Abschnittskopf."""
+    """h3–h5 der Markdown-Texte sind gestuft und auf Seitenfeldern (Text 1rem)
+    kleiner als der Abschnittskopf."""
 
     page_css: str = (STATIC / "css" / "page.css").read_text()
     markdown_css: str = (STATIC / "css" / "markdown-text.css").read_text()
@@ -148,7 +149,7 @@ def test_markdown_text_steps_its_headings_below_the_section_head() -> None:
     groessen: list[float] = [
         float(
             re.search(
-                rf"\.markdown-text\.markdown-text {ebene} \{{[^}}]*font-size: ([\d.]+)rem",
+                rf"\.markdown-text\.markdown-text {ebene} \{{[^}}]*font-size: ([\d.]+)em",
                 markdown_css,
             )[1]
         )
@@ -158,6 +159,25 @@ def test_markdown_text_steps_its_headings_below_the_section_head() -> None:
     assert groessen == sorted(groessen, reverse=True)
     assert len(set(groessen)) == 3
     assert max(groessen) < abschnittskopf
+
+
+def test_szenentext_headings_stand_above_the_scene_text() -> None:
+    """In der Sitzung sind h3–h5 gestuft und nie kleiner als der Fließtext."""
+
+    sitzung_css: str = (STATIC / "css" / "sitzung.css").read_text()
+    groessen: list[float] = [
+        float(
+            re.search(
+                rf"\.markdown-text\.markdown-text {ebene} \{{ font-size: ([\d.]+)em",
+                sitzung_css,
+            )[1]
+        )
+        for ebene in ("h3", "h4", "h5")
+    ]
+
+    assert groessen == sorted(groessen, reverse=True)
+    assert len(set(groessen)) == 3
+    assert min(groessen) >= 1
 
 
 def test_markdown_text_is_shielded_against_page_heading_rules() -> None:

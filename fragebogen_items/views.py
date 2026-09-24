@@ -7,9 +7,8 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllow
 from django.shortcuts import get_object_or_404, redirect, render
 
 from konten.navigation import (
-    FORSCHENDE_GRUPPE,
+    ist_forschende,
     rolle_erforderlich,
-    rolle_oder_administration,
 )
 from konten.models import Konto
 
@@ -25,10 +24,7 @@ class ItemZeile(TypedDict):
     zustand_badge: str
 
 
-_forschende_oder_administratorin = rolle_oder_administration(FORSCHENDE_GRUPPE)
-_forschende_oder_administratorin_erforderlich = rolle_erforderlich(
-    _forschende_oder_administratorin
-)
+_forschende_oder_administratorin_erforderlich = rolle_erforderlich(ist_forschende)
 
 
 def _sichtbares_item(

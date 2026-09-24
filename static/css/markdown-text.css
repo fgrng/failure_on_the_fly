@@ -1,8 +1,10 @@
 /* Gerenderte Markdown-Texte (texte/markdown.py) in ihrem eigenen Container.
    Der doppelte Klassenselektor hebt jede Regel über die Seitenregeln gleicher
    Form (etwa `.page-field h3`, `.page-field p`), gleich in welcher Reihenfolge
-   die Stylesheets geladen werden. Die Überschriften bleiben kleiner als der
-   Abschnittskopf (`.page-section__head h2`, 1.05rem), unter dem sie stehen. */
+   die Stylesheets geladen werden. Die Überschriften messen sich am Text, den
+   sie gliedern; auf Seitenfeldern (1rem) bleiben sie so kleiner als der
+   Abschnittskopf (`.page-section__head h2`, 1.05rem). Die Szenentexte der
+   Sitzung stufen sie in sitzung.css über ihren größeren Fließtext. */
 
 .markdown-text {
     overflow-wrap: anywhere;
@@ -28,19 +30,19 @@
 
 .markdown-text.markdown-text h3 {
     font-family: var(--font-heading);
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 600;
 }
 
 .markdown-text.markdown-text h4 {
     font-family: var(--font-body);
-    font-size: .94rem;
+    font-size: .94em;
     font-weight: 700;
 }
 
 .markdown-text.markdown-text h5 {
     font-family: var(--font-body);
-    font-size: .86rem;
+    font-size: .86em;
     font-weight: 700;
     color: var(--color-text-muted);
 }
@@ -61,14 +63,26 @@
     color: var(--color-text-muted);
 }
 
+.markdown-text.markdown-text pre {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-mono);
+    font-size: .9em;
+    white-space: pre-wrap;
+}
+
 .markdown-text.markdown-text a {
     text-decoration: underline;
 }
 
-/* Sichtbarer Extern-Hinweis; Screenreader lesen stattdessen den Text daneben. */
-.markdown-text.markdown-text a::after {
-    content: "\2197" / "";
-    margin-left: .15em;
+/* Sichtbarer Hinweis, ob ein Link in neuem Tab oder im Mailprogramm öffnet;
+   Screenreader lesen stattdessen den Text daneben. Das schmale Leerzeichen
+   rückt das Zeichen ab, ohne das Abstandsraster zu verlassen. */
+.markdown-text.markdown-text a[target="_blank"]::after {
+    content: "\2009\2197" / "";
+}
+
+.markdown-text.markdown-text a[href^="mailto:"]::after {
+    content: "\2009\2709" / "";
 }
 
 .markdown-text__extern {

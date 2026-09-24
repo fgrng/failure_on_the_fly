@@ -105,6 +105,10 @@ _Avoid_: bearbeitet, redigiert, Eingabeart, Modalität, Input-Modus
 Der Abschnitt der Rahmenhandlung, in dem die erfahrene Lehrperson nach dem Diagnosegespräch um die Diagnose bittet. Er beendet jede regulär abgeschlossene Sitzung und erreicht keinen Prompt.
 _Avoid_: Nachbesprechung, Reflexion, Auswertung
 
+**Szenentext**:
+Jeder Text, den die Teilnehmer:in als Teil der Szene einer Sitzung liest: die drei Abschnitte der Rahmenhandlung sowie Lernauftrag- und Arbeitsheft-Text des Aufgabenkontexts. Er ist Markdown ohne Links, damit niemand die Szene verlässt; eingesetzte Platzhalterwerte erscheinen wörtlich, und Prompt wie Export erhalten die unveränderte Quelle (ADR-0044).
+_Avoid_: Aufgabentext, Szenenbeschreibung, Fließtext
+
 **Diagnose**:
 Die freie Beschreibung des beobachteten Fehlermusters durch die Teilnehmer:in, genau einmal am Ende jeder regulär abgeschlossenen Sitzung. Sie wird erfasst, nicht bewertet; abgebrochene und gescheiterte Sitzungen haben keine.
 _Avoid_: Diagnoseurteil, Befund, Einschätzung, Bewertung
@@ -201,6 +205,10 @@ _Avoid_: Übung, Kurs, Übungsmodus
 **Erhebung**:
 Ein von einem Eigentümer-Kreis der Forschenden zusammengestelltes Untersuchungsdesign aus finalen Vignetten, ihrer Reihenfolge und Fragebogen-Items. Zugang über einen Teilnahme-Link.
 _Avoid_: Studie, Umfrage, Survey, Experiment
+
+**Informationstext**:
+Einer der drei Texte einer Erhebung, die die Teilnehmer:in außerhalb jeder Sitzung liest: Instruktions-, Einwilligungs- und Abschlusstext. Er ist Markdown und darf als einziger Text nach außen verlinken; gespeichert, exportiert und eingefroren wird die unveränderte Quelle (ADR-0044).
+_Avoid_: Infotext, Hinweistext
 
 **Stichprobe**:
 Eine organisatorische Untergruppe einer Erhebung, die einen eigenen Teilnahme-Link trägt und die über ihn entstandenen Teilnahmen bündelt. Sie dient der Gruppenstruktur im Export, nicht einer eigenen experimentellen Bedingung. Ihr Archivieren hat eine zweite Bedeutung: Aus einer archivierten Stichprobe — wie aus einer archivierten Erhebung — lässt sich keine Abschrift mehr holen. Ihre **Phase** ist nichts Gespeichertes, sondern die Lage ihres Zeitraums zur Systemzeit: _geplant_ (noch nicht offen), _läuft_ (Teilnahme möglich) oder _abgeschlossen_ (geschlossen; erst jetzt ist eine Abschrift zu holen).

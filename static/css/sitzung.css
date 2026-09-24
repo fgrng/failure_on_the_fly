@@ -46,6 +46,12 @@
     line-height: 1.5;
 }
 
+/* Überschriften der Szenentexte stehen über dem großen Fließtext der Szene;
+   der dreifache Selektor schlägt die Grundregeln in markdown-text.css. */
+:is(.rahmenhandlung__text, .gespraechseinleitung__text, .aufgabenkontext-inhalt, .sitzung-debrief__aufforderung).markdown-text.markdown-text h3 { font-size: 1.25em; }
+:is(.rahmenhandlung__text, .gespraechseinleitung__text, .aufgabenkontext-inhalt, .sitzung-debrief__aufforderung).markdown-text.markdown-text h4 { font-size: 1.1em; }
+:is(.rahmenhandlung__text, .gespraechseinleitung__text, .aufgabenkontext-inhalt, .sitzung-debrief__aufforderung).markdown-text.markdown-text h5 { font-size: 1em; }
+
 .rahmenhandlung__text { margin: var(--space-3) 0 0; }
 .gespraechseinleitung__text { margin: var(--space-3) 0 0; }
 .sitzung-debrief__aufforderung { margin: var(--space-4) 0 0; }

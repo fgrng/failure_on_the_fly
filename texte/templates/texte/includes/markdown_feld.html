@@ -1,3 +1,4 @@
+{% load texte %}
 {% comment %}
     Textfeld mit Markdown-Hinweis und Umschalter „Bearbeiten | Vorschau“.
     Die Vorschau rendert der Server im gewählten Profil (`informationstext`
@@ -28,7 +29,7 @@
     <div id="{{ feld_id }}_vorschau" class="markdown-feld__vorschau" aria-live="polite" x-show="vorschau" x-cloak></div>
     <small id="{{ feld_id }}_helptext" class="markdown-feld__hinweis">
         {% if field.help_text %}{{ field.help_text }}<br>{% endif %}
-        Markdown: <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code> (bis <code>###</code>), <code>- Aufzählung</code>, <code>1. Liste</code>, <code>&gt; Zitat</code>{% if profil == "informationstext" %}, <code>[Linktext](https://…)</code>{% endif %}. Jeder Zeilenumbruch bleibt erhalten, eine Leerzeile beginnt einen neuen Absatz.{% if profil == "szenentext" %} Schülernotation mit <code>*</code>, <code>_</code>, führendem <code>-</code> oder <code>1.</code> per Backslash escapen, etwa <code>\*</code>.{% endif %}
+        {% markdown_hinweis profil %}
     </small>
     {{ field.errors }}
 </div>

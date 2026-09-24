@@ -1,34 +1,20 @@
 """Vorschau der Markdown-Texte für die Editoren."""
 
-from typing import Callable
-
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
-from django.utils.safestring import SafeString
 from django.views.decorators.http import require_POST
 
 from konten.models import Konto
-from konten.navigation import (
-    FORSCHENDE_GRUPPE,
-    ist_autorin,
-    rolle_erforderlich,
-    rolle_oder_administration,
-)
+from konten.navigation import ist_autorin, ist_forschende, rolle_erforderlich
 
 from . import markdown
-
-_PROFILE: dict[str, Callable[[str], SafeString]] = {
-    "informationstext": markdown.informationstext,
-    "szenentext": markdown.szenentext,
-}
-_ist_forschende: Callable[[Konto], bool] = rolle_oder_administration(FORSCHENDE_GRUPPE)
 
 
 def _schreibt_texte(konto: Konto) -> bool:
     # Wer Erhebungstexte oder Vignetten und Kern schreibt, darf vorschauen.
 
-    return ist_autorin(konto) or _ist_forschende(konto)
+    return ist_autorin(konto) or ist_forschende(konto)
 
 
 @login_required
@@ -41,13 +27,13 @@ def vorschau(request: HttpRequest) -> HttpResponse:
     damit Vorschau und Teilnahmeseite dieselbe Funktion nutzen.
     """
 
-    rendern: Callable[[str], SafeString] | None = _PROFILE.get(
+    profil: markdown.Profil | None = markdown.PROFILE.get(
         request.POST.get("profil", "")
     )
-    if rendern is None:
+    if profil is None:
         return HttpResponseBadRequest("Unbekanntes Profil.")
     return render(
         request,
         "texte/vorschau.html",
-        {"html": rendern(request.POST.get("quelle", ""))},
+        {"html": profil.rendern(request.POST.get("quelle", ""))},
     )

@@ -26,3 +26,9 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - Gerenderte Texte stehen in `<div class="markdown-text">` mit eigenem Stylesheet (`static/css/markdown-text.css`), das sich per doppeltem Klassenselektor gegen Seitenregeln wie `.page-field h3` abschirmt.
 - `&`-Entitäten werden nicht aufgelöst, sondern erscheinen wörtlich.
 - Die Editor-Vorschau holt das Fragment von `texte:vorschau` (POST mit `quelle` und `profil`), statt in JavaScript zu rendern. Für die Rollenprüfung (Autor:in, Forschende:r, Administration) kennt `texte` dafür `konten`, die Infrastruktur aller Apps; Domänen-Apps kennt es weiterhin nicht.
+
+## Nachtrag (2026-09): Eingerückte Codeblöcke, E-Mail-Links, Profil-Register
+
+- **Eingerückte Codeblöcke gehören zum Umfang beider Profile.** Nach einer Leerzeile wird ein um vier Leerzeichen eingerückter Block zu `<pre><code>` und behält seine Einrückung; so lassen sich Rechenschritte im Arbeitsheft untereinander ausrichten. Umzäunte Codeblöcke und Inline-Backticks erscheinen weiterhin wörtlich.
+- **`mailto:`-Links öffnen nicht in neuem Tab.** Ein neuer Tab bliebe leer, weil das Mailprogramm übernimmt. Sie tragen statt des Pfeils einen Briefumschlag und kündigen sich Screenreadern als „E-Mail“ an; `https:`/`http:` bleiben wie beschrieben.
+- **Profil-Register.** `texte.markdown.PROFILE` bündelt je Profilname die Renderfunktion und den Markdown-Hinweis des Editors. Vorschau-Endpunkt und Template-Tag `{% markdown_hinweis profil %}` lesen daraus, statt den Profilnamen je für sich auszuwerten. `informationstext()` und `szenentext()` bleiben die Einstiegspunkte der Anzeige.

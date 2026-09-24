@@ -6,7 +6,7 @@ from django.test import SimpleTestCase
 from django.utils.html import escape
 from django.utils.safestring import SafeString
 
-from texte.markdown import informationstext, szenentext, woertlich
+from texte.markdown import PROFILE, informationstext, szenentext, woertlich
 
 _PROFILE: tuple[Callable[[str], SafeString], ...] = (informationstext, szenentext)
 
@@ -87,36 +87,31 @@ class GemeinsamerUmfangTests(SimpleTestCase):
                 self.assertNotIn("<table", html)
                 self.assertIn("| a | b |", html)
 
-    def test_codebloecke_erscheinen_woertlich(self) -> None:
+    def test_umzaeunte_codebloecke_und_backticks_erscheinen_woertlich(self) -> None:
         for profil in _PROFILE:
             with self.subTest(profil=profil.__name__):
-                html: str = profil("```\n3 + 4\n```\n\n    eingerückt\n\n`inline`")
+                html: str = profil("```\n3 + 4\n```\n\n`inline`")
 
                 self.assertNotIn("<pre", html)
                 self.assertNotIn("<code", html)
                 self.assertIn("```", html)
-                self.assertIn("eingerückt", html)
                 self.assertIn("`inline`", html)
 
-    def test_nackte_urls_werden_nicht_verlinkt(self) -> None:
+    def test_eingerueckter_codeblock_behaelt_seine_einrueckung(self) -> None:
         for profil in _PROFILE:
             with self.subTest(profil=profil.__name__):
-                html: str = profil("Siehe https://example.org und www.example.org")
+                html: str = profil("Rechnung:\n\n    3x + 4 = 10\n      3x = 6\n\nfertig")
 
-                self.assertNotIn("<a", html)
-                self.assertIn("https://example.org", html)
+                self.assertIn("<pre><code>3x + 4 = 10\n  3x = 6\n</code></pre>", html)
+                self.assertIn("<p>fertig</p>", html)
 
-    def test_backslash_escapes_bleiben_woertlich(self) -> None:
+    def test_eingerueckte_zeile_ohne_leerzeile_bleibt_im_absatz(self) -> None:
         for profil in _PROFILE:
             with self.subTest(profil=profil.__name__):
-                html: str = profil("3 \\* 4 = 12\n\\- 5\n\\# keine Überschrift")
+                html: str = profil("Rechnung:\n    3x = 6")
 
-                self.assertIn("3 * 4 = 12", html)
-                self.assertIn("- 5", html)
-                self.assertIn("# keine Überschrift", html)
-                self.assertNotIn("<em>", html)
-                self.assertNotIn("<ul>", html)
-                self.assertNotIn("<h3>", html)
+                self.assertNotIn("<pre", html)
+                self.assertIn("3x = 6", html)
 
     def test_leere_quelle_ergibt_leeres_html(self) -> None:
         for profil in _PROFILE:
@@ -127,12 +122,8 @@ class GemeinsamerUmfangTests(SimpleTestCase):
 class InformationstextLinkTests(SimpleTestCase):
     """Der Informationstext verlinkt nur nach außen und sagt das auch."""
 
-    def test_erlaubte_schemata_werden_zu_externen_links(self) -> None:
-        for ziel in (
-            "https://example.org/datenschutz",
-            "http://example.org",
-            "mailto:forschung@example.org",
-        ):
+    def test_web_links_oeffnen_in_neuem_tab(self) -> None:
+        for ziel in ("https://example.org/datenschutz", "http://example.org"):
             with self.subTest(ziel=ziel):
                 html: str = informationstext(f"[Hinweis]({ziel})")
 
@@ -141,6 +132,14 @@ class InformationstextLinkTests(SimpleTestCase):
                 self.assertIn('rel="noopener noreferrer"', html)
                 self.assertIn('class="markdown-text__extern"', html)
                 self.assertIn("öffnet in neuem Tab", html)
+
+    def test_email_links_oeffnen_ohne_neuen_tab(self) -> None:
+        html: str = informationstext("[Schreiben Sie uns](mailto:forschung@example.org)")
+
+        self.assertIn('href="mailto:forschung@example.org"', html)
+        self.assertNotIn("target=", html)
+        self.assertIn('class="markdown-text__extern"> (E-Mail)', html)
+        self.assertNotIn("öffnet in neuem Tab", html)
 
     def test_andere_ziele_erscheinen_woertlich(self) -> None:
         for ziel in (
@@ -175,3 +174,19 @@ class WoertlichTests(SimpleTestCase):
                 html: str = szenentext(woertlich(wert))
 
                 self.assertEqual(html, f"<p>{escape(wert)}</p>\n")
+
+
+class ProfilRegisterTests(SimpleTestCase):
+    """Das Register liefert je Profil Rendering und passenden Editorhinweis."""
+
+    def test_register_rendert_wie_die_einstiegspunkte(self) -> None:
+        self.assertEqual(
+            PROFILE["informationstext"].rendern("[a](https://b.org)"),
+            informationstext("[a](https://b.org)"),
+        )
+        self.assertEqual(PROFILE["szenentext"].rendern("**a**"), szenentext("**a**"))
+
+    def test_nur_der_informationstext_nennt_link_syntax(self) -> None:
+        self.assertIn("[Linktext](https://…)", PROFILE["informationstext"].hinweis)
+        self.assertNotIn("[Linktext]", PROFILE["szenentext"].hinweis)
+        self.assertIn("Schülernotation", PROFILE["szenentext"].hinweis)

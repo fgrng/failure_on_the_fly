@@ -6,9 +6,9 @@
     <div class="system-page-fields">
         <div class="system-page-field-list">
             {% if simulationskern %}
-                <section class="page-field"><h3>Hospitationseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_einleitung|szenentext }}</div></section>
-                <section class="page-field"><h3>Gesprächseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_gespraechseinleitung|szenentext }}</div></section>
-                <section class="page-field"><h3>Debrief</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_debrief|szenentext }}</div></section>
+                <section class="page-field"><h3>Hospitationseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_einleitung|szenentext|default:"—" }}</div></section>
+                <section class="page-field"><h3>Gesprächseinleitung</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_gespraechseinleitung|szenentext|default:"—" }}</div></section>
+                <section class="page-field"><h3>Debrief</h3><div class="markdown-text">{{ simulationskern.rahmenhandlung_debrief|szenentext|default:"—" }}</div></section>
             {% else %}
                 <p class="system-page-empty">Noch keine Rahmenhandlung vorhanden.</p>
             {% endif %}
