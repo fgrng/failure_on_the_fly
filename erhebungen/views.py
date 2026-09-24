@@ -1035,12 +1035,12 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+    sitzung, bindung = _erhebungssitzung(token)
     ohne_verlauf: HttpResponseRedirect | None = _sitzung_ohne_verlauf_abbrechen(
-        request, _laufende_bindung(token)
+        request, bindung
     )
     if ohne_verlauf is not None:
         return ohne_verlauf
-    sitzung, _bindung = _erhebungssitzung(token)
     sink: DBSink = sink_fuer_sitzung(sitzung, request.session)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
@@ -1069,12 +1069,12 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+    sitzung, bindung = _erhebungssitzung(token)
     ohne_verlauf: HttpResponseRedirect | None = _sitzung_ohne_verlauf_abbrechen(
-        request, _laufende_bindung(token)
+        request, bindung
     )
     if ohne_verlauf is not None:
         return ohne_verlauf
-    sitzung, bindung = _erhebungssitzung(token)
     uebermittelte_sitzung_pk: str | None = request.POST.get("sitzung_pk")
     if uebermittelte_sitzung_pk != str(sitzung.pk):
         return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
