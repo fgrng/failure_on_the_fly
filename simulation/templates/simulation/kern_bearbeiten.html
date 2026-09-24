@@ -29,9 +29,9 @@
             </header>
             <div class="system-page-fields">
                 <div class="system-page-field-list">
-                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_einleitung %}
-                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_gespraechseinleitung %}
-                    {% include "vignetten/includes/form_field.html" with field=form.rahmenhandlung_debrief %}
+                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_einleitung profil="szenentext" %}
+                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_gespraechseinleitung profil="szenentext" %}
+                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_debrief profil="szenentext" %}
                 </div>
                 {% include "simulation/includes/rahmen_platzhalter.html" %}
             </div>

@@ -867,6 +867,69 @@ class VignetteFormularSeiteTests(TestCase):
                 self.assertContains(response, f'name="{feldname}"')
 
 
+class VignetteMarkdownVorschauViewTests(TestCase):
+    """Lernauftrag und Arbeitsheft bieten Markdown-Hinweis und Vorschau."""
+
+    def setUp(self) -> None:
+        """Legt einen angemeldeten Eigentümer mit Markdown im Entwurf an."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        self.vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            lernauftrag_text="Addiere **27** und 15.",
+            arbeitsheft_text="27 \\* 15\n= 405",
+        )
+        self.client.force_login(ada)
+
+    def test_beide_editoren_bieten_hinweis_und_umschalter_im_szenentext(self) -> None:
+        """Beide Szenentextfelder holen ihre Vorschau im Profil Szenentext."""
+        for url in (
+            reverse("vignetten:anlegen"),
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+        ):
+            response: HttpResponse = self.client.get(url)
+
+            self.assertContains(response, ">Bearbeiten</button>", count=2)
+            self.assertContains(response, ">Vorschau</button>", count=2)
+            self.assertContains(
+                response, f'hx-post="{reverse("texte:vorschau")}"', count=2
+            )
+            self.assertContains(response, '"profil": "szenentext"', count=2)
+            self.assertContains(response, 'id="id_lernauftrag_text_vorschau"')
+            self.assertContains(response, 'id="id_arbeitsheft_text_vorschau"')
+            self.assertContains(response, "per Backslash escapen", count=2)
+            self.assertNotContains(response, "[Linktext](https://…)")
+
+    def test_felder_behalten_hilfetext_und_beschreibung(self) -> None:
+        """Hilfetext und Markdown-Hinweis beschreiben das Feld gemeinsam."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, 'aria-describedby="id_lernauftrag_text_helptext"')
+        self.assertContains(response, 'id="id_lernauftrag_text_helptext"')
+        self.assertContains(response, "allein auf einer Zeile")
+        self.assertContains(response, "27 \\* 15\n= 405</textarea>")
+
+    def test_vorschau_entspricht_der_anzeige_der_vignette(self) -> None:
+        """Endpunkt und Anzeige liefern für den Arbeitsheft-Text dasselbe Rendering."""
+        vorschau: HttpResponse = self.client.post(
+            reverse("texte:vorschau"),
+            {"profil": "szenentext", "quelle": self.vignette.arbeitsheft_text},
+        )
+        detail: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+
+        fragment: str = vorschau.content.decode().strip()
+        inhalt: str = fragment.removeprefix('<div class="markdown-text">')
+        self.assertIn("<p>27 * 15<br>", inhalt)
+        self.assertContains(
+            detail, f'<div class="markdown-text aufgabenkontext-inhalt">{inhalt}'
+        )
+
+
 class VignetteFinalisierenViewTests(TestCase):
     """Entwürfe lassen sich mit lesbaren Fehlermeldungen finalisieren."""
 

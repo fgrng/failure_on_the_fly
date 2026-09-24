@@ -2,7 +2,9 @@
     Textfeld mit Markdown-Hinweis und Umschalter „Bearbeiten | Vorschau“.
     Die Vorschau rendert der Server im gewählten Profil (`informationstext`
     oder `szenentext`), damit sie der Anzeigeseite exakt entspricht. Erwartet
-    feld_id, feld_name, label, wert und profil.
+    feld_id, label, profil und entweder ein Formularfeld (field, samt
+    Hilfetext und Fehlern) oder feld_name und wert. Für Formularfelder nimmt
+    markdown_formularfeld.html feld_id und label aus dem Feld.
 {% endcomment %}
 <div class="vignette-field page-field--wide markdown-feld" x-data="{ vorschau: false }">
     <div class="markdown-feld__kopf">
@@ -16,9 +18,13 @@
                     hx-target="#{{ feld_id }}_vorschau">Vorschau</button>
         </div>
     </div>
-    <textarea id="{{ feld_id }}" name="{{ feld_name }}" aria-describedby="{{ feld_id }}_hinweis" x-show="!vorschau">{{ wert }}</textarea>
+    <div class="markdown-feld__eingabe" x-show="!vorschau">
+        {% if field %}{{ field }}{% else %}<textarea id="{{ feld_id }}" name="{{ feld_name }}" aria-describedby="{{ feld_id }}_helptext">{{ wert }}</textarea>{% endif %}
+    </div>
     <div id="{{ feld_id }}_vorschau" class="markdown-feld__vorschau" aria-live="polite" x-show="vorschau" x-cloak></div>
-    <small id="{{ feld_id }}_hinweis" class="markdown-feld__hinweis">
-        Markdown: <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code> (bis <code>###</code>), <code>- Aufzählung</code>, <code>1. Liste</code>, <code>&gt; Zitat</code>{% if profil == "informationstext" %}, <code>[Linktext](https://…)</code>{% endif %}. Jeder Zeilenumbruch bleibt erhalten, eine Leerzeile beginnt einen neuen Absatz.
+    <small id="{{ feld_id }}_helptext" class="markdown-feld__hinweis">
+        {% if field.help_text %}{{ field.help_text }}<br>{% endif %}
+        Markdown: <code>**fett**</code>, <code>*kursiv*</code>, <code># Überschrift</code> (bis <code>###</code>), <code>- Aufzählung</code>, <code>1. Liste</code>, <code>&gt; Zitat</code>{% if profil == "informationstext" %}, <code>[Linktext](https://…)</code>{% endif %}. Jeder Zeilenumbruch bleibt erhalten, eine Leerzeile beginnt einen neuen Absatz.{% if profil == "szenentext" %} Schülernotation mit <code>*</code>, <code>_</code>, führendem <code>-</code> oder <code>1.</code> per Backslash escapen, etwa <code>\*</code>.{% endif %}
     </small>
+    {{ field.errors }}
 </div>
