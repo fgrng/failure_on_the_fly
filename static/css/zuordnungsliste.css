@@ -1,0 +1,122 @@
+/* ---- Zuordnungsliste: Vignetten und Items einer Erhebung (#291) ---- */
+
+.zuordnung-unsichtbar {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.zuordnung-icon { display: block; width: 1rem; height: 1rem; }
+
+.zuordnungsliste + .zuordnungsliste { margin-top: var(--space-4); }
+
+.zuordnungsliste__kopf {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1);
+}
+.zuordnungsliste__kopf h3 { margin: 0; font-size: 1rem; }
+
+.zuordnungsliste__schalter { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
+.zuordnungsliste__schalter input { width: 1.1rem; height: 1.1rem; accent-color: var(--color-area-research-solid); }
+
+.zuordnungsliste__hinweis {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 var(--space-1);
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
+.zuordnungsliste__einfuegen { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-bottom: var(--space-1); }
+.zuordnungsliste__einfuegen select { flex: 1 1 12rem; min-width: 0; }
+
+.zuordnungsliste__liste {
+    display: grid;
+    gap: 4px;
+    min-height: 3rem;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    list-style: none;
+}
+.zuordnungsliste__liste--ungeordnet { border-style: dashed; }
+
+.zuordnungsliste__zeile {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 2.75rem;
+    padding: 4px var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface);
+}
+.zuordnungsliste__zeile--gezogen { opacity: 0.35; }
+.zuordnungsliste__text { flex: 1; min-width: 0; }
+.zuordnungsliste__nummer {
+    display: inline-grid;
+    min-width: 1.75rem;
+    justify-items: end;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+.zuordnungsliste__leer { padding: var(--space-1); color: var(--color-text-muted); font-size: 0.9rem; }
+.zuordnungsliste__leiste { display: inline-flex; align-items: center; gap: 2px; }
+
+.zuordnung-iconknopf {
+    display: grid;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    place-items: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-accent);
+    cursor: pointer;
+}
+.zuordnung-iconknopf:hover { border-color: currentColor; }
+.zuordnung-iconknopf:disabled { border-color: transparent; opacity: 0.3; cursor: default; }
+.zuordnung-iconknopf:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; }
+.zuordnung-iconknopf--gefahr { color: var(--color-danger); }
+
+.zuordnung-griff {
+    display: grid;
+    width: 1.5rem;
+    height: 2.25rem;
+    place-items: center;
+    color: var(--color-text-muted);
+    cursor: grab;
+    touch-action: none; /* sonst scrollt der Finger statt zu ziehen */
+}
+.zuordnung-griff:hover { color: var(--color-text); }
+
+.zuordnung-geist {
+    position: fixed;
+    z-index: 10;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-text) 25%, transparent);
+}
+.zuordnung-einfuegemarke {
+    position: fixed;
+    z-index: 9;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-area-research-solid);
+    pointer-events: none;
+}
+body.zuordnung-zieht,
+body.zuordnung-zieht * { cursor: grabbing !important; user-select: none; }

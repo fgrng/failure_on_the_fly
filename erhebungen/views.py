@@ -76,14 +76,6 @@ from sitzungen.views import (
 )
 from vignetten.models import Vignette
 
-_VIGNETTEN_SPALTEN: list[dict[str, str]] = [
-    {"schluessel": "label", "beschriftung": "Name"},
-]
-_VIGNETTEN_SUCHSCHLUESSEL: tuple[str, ...] = ("label", "fach", "thema")
-_ITEM_SPALTEN: list[dict[str, str]] = [
-    {"schluessel": "label", "beschriftung": "Wortlaut"}
-]
-_ITEM_SUCHSCHLUESSEL: tuple[str, ...] = ("label",)
 _ANDERE_ANDOCKPUNKTE: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: Erhebungsitem.Andockpunkt.AM_ENDE,
     Erhebungsitem.Andockpunkt.AM_ENDE: Erhebungsitem.Andockpunkt.NACH_SITZUNG,
@@ -162,9 +154,9 @@ def _status_badge(erhebung: Erhebung) -> str:
 
 
 def _vignettenzeilen(
-    vignetten: Iterable[Vignette], erhebung: Erhebung, aktion: str
+    vignetten: Iterable[Vignette], erhebung: Erhebung, aktionen: dict[str, str]
 ) -> list[dict[str, object]]:
-    """Baut die Tabellenzeilen einer Zuordnungsspalte samt ihrer Aktions-URL."""
+    """Baut die Zeilen einer Vignettenliste samt ihrer Aktions-URLs."""
 
     return [
         {
@@ -172,77 +164,124 @@ def _vignettenzeilen(
             "label": vignette.anzeigename,
             "fach": vignette.fach,
             "thema": vignette.thema,
-            "aktion_url": reverse(aktion, args=[erhebung.pk, vignette.pk]),
+            **{
+                schluessel: reverse(aktion, args=[erhebung.pk, vignette.pk])
+                for schluessel, aktion in aktionen.items()
+            },
         }
         for vignette in vignetten
     ]
 
 
-def _itemzeilen(
+def _verfuegbare_itemzeilen(
     items: Iterable[FragebogenItem],
     erhebung: Erhebung,
     andockpunkt: str,
-    aktion: str,
-    zugehoerigkeiten: dict[int, Erhebungsitem] | None = None,
-    badge_beschriftungen: dict[int, str] | None = None,
-    bearbeitbar: bool = True,
+    badge_beschriftungen: dict[int, str],
 ) -> list[dict[str, object]]:
-    """Baut die Tabellenzeilen einer Item-Spalte samt ihrer Aktions-URL."""
+    """Baut die Auswahl einer Itemliste samt Einfüge-URL und Hinweis."""
 
-    if zugehoerigkeiten is None:
-        badge_beschriftungen = badge_beschriftungen or {}
-        return [
-            {
-                "pk": item.pk,
-                "label": item.wortlaut,
-                "aktion_url": reverse(aktion, args=[erhebung.pk, item.pk, andockpunkt]),
-                "badge": badge_beschriftungen.get(item.pk),
-            }
-            for item in items
-        ]
-
-    zeilen: list[dict[str, object]] = []
-    item_liste: list[FragebogenItem] = list(items)
-    for index, item in enumerate(item_liste):
-        zugehoerigkeit: Erhebungsitem = zugehoerigkeiten[item.pk]
-        zeile: dict[str, object] = {
+    return [
+        {
             "pk": item.pk,
             "label": item.wortlaut,
+            "einfuegen_url": reverse(
+                "erhebungen:item_hinzufuegen", args=[erhebung.pk, item.pk, andockpunkt]
+            ),
+            "badge": badge_beschriftungen.get(item.pk),
+        }
+        for item in items
+    ]
+
+
+def _aufgenommene_itemzeilen(
+    zugehoerigkeiten: Iterable[Erhebungsitem],
+    erhebung: Erhebung,
+    am_anderen_andockpunkt: set[int],
+    bearbeitbar: bool,
+) -> list[dict[str, object]]:
+    """Baut die Zeilen einer Itemliste samt ihrer Aktions-URLs."""
+
+    zeilen: list[dict[str, object]] = []
+    for zugehoerigkeit in zugehoerigkeiten:
+        zeile: dict[str, object] = {
+            "pk": zugehoerigkeit.item_id,
+            "label": zugehoerigkeit.item.wortlaut,
             "position": zugehoerigkeit.position,
         }
         if bearbeitbar:
-            aktionen: list[dict[str, str]] = []
-            if index:
-                aktionen.append(
-                    {
-                        "beschriftung": "Hoch",
-                        "aktion_url": reverse(
-                            "erhebungen:item_hoch",
-                            args=[erhebung.pk, zugehoerigkeit.pk],
-                        ),
-                    }
-                )
-            if index < len(item_liste) - 1:
-                aktionen.append(
-                    {
-                        "beschriftung": "Runter",
-                        "aktion_url": reverse(
-                            "erhebungen:item_runter",
-                            args=[erhebung.pk, zugehoerigkeit.pk],
-                        ),
-                    }
-                )
-            aktionen.append(
-                {
-                    "beschriftung": "Entfernen",
-                    "aktion_url": reverse(
-                        aktion, args=[erhebung.pk, zugehoerigkeit.pk]
-                    ),
-                }
+            argumente: list[int] = [erhebung.pk, zugehoerigkeit.pk]
+            zeile["verschieben_url"] = reverse(
+                "erhebungen:item_verschieben", args=argumente
             )
-            zeile["aktionen"] = aktionen
+            zeile["entfernen_url"] = reverse(
+                "erhebungen:item_entfernen", args=argumente
+            )
+            # Hängt die Fassung schon am anderen Andockpunkt, gibt es nichts umzuhängen.
+            if zugehoerigkeit.item_id not in am_anderen_andockpunkt:
+                zeile["umhaengen_url"] = reverse(
+                    "erhebungen:item_umhaengen", args=argumente
+                )
         zeilen.append(zeile)
     return zeilen
+
+
+def _position(request: HttpRequest) -> int | None:
+    """Liest die gewünschte, 1-basierte Listenposition aus dem Formular."""
+
+    try:
+        return int(request.POST["position"])
+    except KeyError, ValueError:
+        return None
+
+
+def _reihenfolge_schreiben(
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] | QuerySet[Erhebungsitem],
+    ids: list[int],
+) -> None:
+    """Schreibt die Positionen 1..n, ohne die eindeutigen Positionen zu kreuzen."""
+
+    versatz: int = max(
+        zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0,
+        len(ids),
+    )
+    zugehoerigkeiten.update(position=F("position") + versatz)
+    for position, zugehoerigkeit_id in enumerate(ids, start=1):
+        zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
+
+
+def _einreihen(
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] | QuerySet[Erhebungsitem],
+    zugehoerigkeit_pk: int,
+    position: int | None,
+) -> None:
+    """Setzt eine Zuordnung an eine Listenposition; ohne Position ans Ende."""
+
+    ids: list[int] = [
+        pk
+        for pk in zugehoerigkeiten.order_by("position", "pk").values_list(
+            "pk", flat=True
+        )
+        if pk != zugehoerigkeit_pk
+    ]
+    index: int = len(ids) if position is None else min(max(position - 1, 0), len(ids))
+    ids.insert(index, zugehoerigkeit_pk)
+    _reihenfolge_schreiben(zugehoerigkeiten, ids)
+
+
+def _feste_vignetten_nummerieren(erhebung: Erhebung) -> None:
+    """Schließt die feste Vignettenreihenfolge lückenlos."""
+
+    if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
+        zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
+            erhebung.vignettenzugehoerigkeiten.select_for_update()
+        )
+        _reihenfolge_schreiben(
+            zugehoerigkeiten,
+            list(
+                zugehoerigkeiten.order_by("position", "pk").values_list("pk", flat=True)
+            ),
+        )
 
 
 def _validierte_aktion_ausfuehren(
@@ -296,6 +335,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
         )
 
+    bearbeitbar: bool = erhebung.status == Erhebung.Status.ENTWURF
     vignettenzugehoerigkeiten: QuerySet[Erhebungsvignette] = (
         erhebung.vignettenzugehoerigkeiten.select_related(
             "vignette", "vignette__historie"
@@ -304,44 +344,38 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     verfuegbare_vignetten: QuerySet[Vignette] = _eigene_finalen_vignetten(
         request
     ).exclude(pk__in=erhebung.vignetten.values("pk"))
-    itemzugehoerigkeiten: QuerySet[Erhebungsitem] = (
+    itemzugehoerigkeiten: list[Erhebungsitem] = list(
         erhebung.itemzugehoerigkeiten.select_related("item")
     )
-    itemdaten: dict[str, dict[str, object]] = {}
-    for andockpunkt in Erhebungsitem.Andockpunkt.values:
-        zugehoerigkeiten_am_andockpunkt: list[Erhebungsitem] = [
-            zugehoerigkeit
+    item_ids: dict[str, set[int]] = {
+        andockpunkt: {
+            zugehoerigkeit.item_id
             for zugehoerigkeit in itemzugehoerigkeiten
             if zugehoerigkeit.andockpunkt == andockpunkt
-        ]
-        aufgenommene_items: list[FragebogenItem] = [
-            zugehoerigkeit.item for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
-        ]
+        }
+        for andockpunkt in Erhebungsitem.Andockpunkt.values
+    }
+    itemdaten: dict[str, dict[str, object]] = {}
+    for andockpunkt in Erhebungsitem.Andockpunkt.values:
         anderer_andockpunkt: str = _ANDERE_ANDOCKPUNKTE[andockpunkt]
-        badge_beschriftung: str = _BADGE_BESCHRIFTUNGEN[anderer_andockpunkt]
         itemdaten[andockpunkt] = {
-            "aufgenommene": _itemzeilen(
-                aufgenommene_items,
-                erhebung,
-                andockpunkt,
-                "erhebungen:item_entfernen",
-                {
-                    zugehoerigkeit.item_id: zugehoerigkeit
-                    for zugehoerigkeit in zugehoerigkeiten_am_andockpunkt
-                },
-                bearbeitbar=erhebung.status == Erhebung.Status.ENTWURF,
-            ),
-            "verfuegbare": _itemzeilen(
-                _eigene_finalen_items(request).exclude(
-                    pk__in=[item.pk for item in aufgenommene_items]
-                ),
-                erhebung,
-                andockpunkt,
-                "erhebungen:item_hinzufuegen",
-                badge_beschriftungen={
-                    zugehoerigkeit.item_id: badge_beschriftung
+            "aufgenommene": _aufgenommene_itemzeilen(
+                [
+                    zugehoerigkeit
                     for zugehoerigkeit in itemzugehoerigkeiten
-                    if zugehoerigkeit.andockpunkt == anderer_andockpunkt
+                    if zugehoerigkeit.andockpunkt == andockpunkt
+                ],
+                erhebung,
+                item_ids[anderer_andockpunkt],
+                bearbeitbar,
+            ),
+            "verfuegbare": _verfuegbare_itemzeilen(
+                _eigene_finalen_items(request).exclude(pk__in=item_ids[andockpunkt]),
+                erhebung,
+                andockpunkt,
+                {
+                    item_id: _BADGE_BESCHRIFTUNGEN[anderer_andockpunkt]
+                    for item_id in item_ids[anderer_andockpunkt]
                 },
             ),
         }
@@ -352,22 +386,24 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "erhebung": erhebung,
             "status_badge": _status_badge(erhebung),
-            "vignettenzugehoerigkeiten": vignettenzugehoerigkeiten,
             "aufgenommene_daten": _vignettenzeilen(
                 [
                     zugehoerigkeit.vignette
                     for zugehoerigkeit in vignettenzugehoerigkeiten
                 ],
                 erhebung,
-                "erhebungen:vignette_entfernen",
+                {
+                    "verschieben_url": "erhebungen:vignette_verschieben",
+                    "entfernen_url": "erhebungen:vignette_entfernen",
+                }
+                if bearbeitbar
+                else {},
             ),
             "verfuegbare_daten": _vignettenzeilen(
-                verfuegbare_vignetten, erhebung, "erhebungen:vignette_hinzufuegen"
+                verfuegbare_vignetten,
+                erhebung,
+                {"einfuegen_url": "erhebungen:vignette_hinzufuegen"},
             ),
-            "vignetten_spalten": _VIGNETTEN_SPALTEN,
-            "vignetten_suchschluessel": _VIGNETTEN_SUCHSCHLUESSEL,
-            "item_spalten": _ITEM_SPALTEN,
-            "item_suchschluessel": _ITEM_SUCHSCHLUESSEL,
             "nach_sitzung_aufgenommene_daten": itemdaten[
                 Erhebungsitem.Andockpunkt.NACH_SITZUNG
             ]["aufgenommene"],
@@ -484,10 +520,14 @@ def stichprobe_archivieren(
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
+@transaction.atomic
 def vignette_hinzufuegen(
     request: HttpRequest, pk: int, vignette_pk: int
 ) -> HttpResponse:
-    """Nimmt eine eigene finale Fassung in einen eigenen Entwurf auf."""
+    """Nimmt eine eigene finale Fassung in einen eigenen Entwurf auf.
+
+    Bei fester Reihenfolge an die gewünschte Position, sonst ans Ende.
+    """
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -497,17 +537,26 @@ def vignette_hinzufuegen(
     vignette: Vignette = get_object_or_404(
         _eigene_finalen_vignetten(request), pk=vignette_pk
     )
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
+        erhebung.vignettenzugehoerigkeiten.select_for_update()
+    )
+    fest: bool = erhebung.randomisierung == Erhebung.Randomisierung.FEST
     position: int | None = None
-    if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
-        position = erhebung.vignettenzugehoerigkeiten.count() + 1
-    Erhebungsvignette.objects.get_or_create(
+    if fest:
+        position = (
+            zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
+        ) + 1
+    zugehoerigkeit, angelegt = Erhebungsvignette.objects.get_or_create(
         erhebung=erhebung, vignette=vignette, defaults={"position": position}
     )
+    if fest and angelegt:
+        _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
+@transaction.atomic
 def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
     """Entfernt eine finale Fassung aus einem eigenen Entwurf."""
 
@@ -518,15 +567,76 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
         get_object_or_404(
             erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk
         ).delete()
+        _feste_vignetten_nummerieren(erhebung)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
+@transaction.atomic
+def vignette_verschieben(
+    request: HttpRequest, pk: int, vignette_pk: int
+) -> HttpResponse:
+    """Setzt eine Vignette in der festen Reihenfolge an eine neue Position."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
+        erhebung.vignettenzugehoerigkeiten.select_for_update()
+    )
+    zugehoerigkeit: Erhebungsvignette = get_object_or_404(
+        zugehoerigkeiten, vignette_id=vignette_pk
+    )
+    position: int | None = _position(request)
+    if position is None:
+        return HttpResponseBadRequest("Position fehlt.")
+    # Eine zufällige Reihenfolge hat keine Positionen, die sich verschieben ließen.
+    if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
+        _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, position)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+@transaction.atomic
+def reihenfolge_umschalten(request: HttpRequest, pk: int) -> HttpResponse:
+    """Wechselt zwischen fester und zufälliger Vignettenreihenfolge.
+
+    Beim Wechsel zu fest wird die angezeigte Liste zur Reihenfolge; beim Wechsel
+    zu zufällig verlieren die Vignetten ihre Positionen.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+    randomisierung: str = request.POST.get("randomisierung", "")
+    if randomisierung not in Erhebung.Randomisierung.values:
+        return HttpResponseBadRequest("Unbekannte Randomisierungsregel.")
+    if randomisierung != erhebung.randomisierung:
+        erhebung.randomisierung = randomisierung
+        erhebung.save(update_fields=["randomisierung"])
+        if randomisierung == Erhebung.Randomisierung.FEST:
+            _feste_vignetten_nummerieren(erhebung)
+        else:
+            erhebung.vignettenzugehoerigkeiten.update(position=None)
+    return redirect("erhebungen:detail", pk=erhebung.pk)
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+@transaction.atomic
 def item_hinzufuegen(
     request: HttpRequest, pk: int, item_pk: int, andockpunkt: str
 ) -> HttpResponse:
-    """Nimmt eine eigene finale Item-Fassung an einem Andockpunkt auf."""
+    """Nimmt eine eigene finale Item-Fassung an einem Andockpunkt auf.
+
+    An die gewünschte Position, ohne Position ans Ende.
+    """
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -536,20 +646,21 @@ def item_hinzufuegen(
     if andockpunkt not in Erhebungsitem.Andockpunkt.values:
         raise PermissionDenied
     item: FragebogenItem = get_object_or_404(_eigene_finalen_items(request), pk=item_pk)
-    zugehoerigkeiten: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.filter(
-        andockpunkt=andockpunkt
+    zugehoerigkeiten: QuerySet[Erhebungsitem] = (
+        erhebung.itemzugehoerigkeiten.select_for_update().filter(
+            andockpunkt=andockpunkt
+        )
     )
     if zugehoerigkeiten.filter(item=item).exists():
         return HttpResponse(status=409)
-    position: int = (
-        zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
-    ) + 1
-    Erhebungsitem.objects.create(
+    zugehoerigkeit: Erhebungsitem = Erhebungsitem.objects.create(
         erhebung=erhebung,
         item=item,
         andockpunkt=andockpunkt,
-        position=position,
+        position=(zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0)
+        + 1,
     )
+    _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
     return detail(request, pk)
 
 
@@ -577,110 +688,79 @@ def item_entfernen(
     return detail(request, pk)
 
 
-def _item_verschieben(
-    erhebung: Erhebung, zugehoerigkeit_pk: int, richtung: int
-) -> None:
-    """Vertauscht eine Item-Zuordnung mit ihrer Nachbarin am selben Andockpunkt."""
-
-    zugehoerigkeit: Erhebungsitem = get_object_or_404(
-        erhebung.itemzugehoerigkeiten.select_for_update(), pk=zugehoerigkeit_pk
-    )
-    nachbarin: Erhebungsitem | None = (
-        erhebung.itemzugehoerigkeiten.select_for_update()
-        .filter(
-            andockpunkt=zugehoerigkeit.andockpunkt,
-            position=zugehoerigkeit.position + richtung,
-        )
-        .first()
-    )
-    if nachbarin is None:
-        return
-    hoechste_position: int = (
-        erhebung.itemzugehoerigkeiten.filter(
-            andockpunkt=zugehoerigkeit.andockpunkt
-        ).aggregate(Max("position"))["position__max"]
-        or 0
-    )
-    bisherige_position: int = zugehoerigkeit.position
-    zugehoerigkeit.position = hoechste_position + 1
-    zugehoerigkeit.save(update_fields=["position"])
-    nachbarin.position = bisherige_position
-    nachbarin.save(update_fields=["position"])
-    zugehoerigkeit.position = bisherige_position + richtung
-    zugehoerigkeit.save(update_fields=["position"])
-
-
-def _itemreihenfolge_aendern(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int, richtung: int
+@login_required
+@_forschende_oder_administratorin_erforderlich
+@transaction.atomic
+def item_verschieben(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
 ) -> HttpResponse:
-    """Verschiebt eine Item-Zuordnung und aktualisiert die Detailansicht."""
+    """Setzt eine Item-Zuordnung innerhalb ihres Andockpunkts an eine neue Position."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.ENTWURF:
         raise PermissionDenied
-    _item_verschieben(erhebung, zugehoerigkeit_pk, richtung)
+    zugehoerigkeit: Erhebungsitem = get_object_or_404(
+        erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk
+    )
+    position: int | None = _position(request)
+    if position is None:
+        return HttpResponseBadRequest("Position fehlt.")
+    _einreihen(
+        erhebung.itemzugehoerigkeiten.select_for_update().filter(
+            andockpunkt=zugehoerigkeit.andockpunkt
+        ),
+        zugehoerigkeit.pk,
+        position,
+    )
     return detail(request, pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
 @transaction.atomic
-def item_hoch(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
-    """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach oben."""
+def item_umhaengen(
+    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
+) -> HttpResponse:
+    """Hängt eine Item-Zuordnung ans Ende des anderen Andockpunkts um."""
 
-    return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, -1)
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        raise PermissionDenied
+    zugehoerigkeit: Erhebungsitem = get_object_or_404(
+        erhebung.itemzugehoerigkeiten.select_for_update(), pk=zugehoerigkeit_pk
+    )
+    bisheriger_andockpunkt: str = zugehoerigkeit.andockpunkt
+    bisherige_position: int = zugehoerigkeit.position
+    ziel: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=_ANDERE_ANDOCKPUNKTE[bisheriger_andockpunkt]
+    )
+    if ziel.filter(item_id=zugehoerigkeit.item_id).exists():
+        return HttpResponse(status=409)
+    zugehoerigkeit.andockpunkt = _ANDERE_ANDOCKPUNKTE[bisheriger_andockpunkt]
+    zugehoerigkeit.position = (
+        ziel.aggregate(Max("position"))["position__max"] or 0
+    ) + 1
+    zugehoerigkeit.save(update_fields=["andockpunkt", "position"])
+    erhebung.itemzugehoerigkeiten.filter(
+        andockpunkt=bisheriger_andockpunkt, position__gt=bisherige_position
+    ).update(position=F("position") - 1)
+    return detail(request, pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
-def item_runter(request: HttpRequest, pk: int, zugehoerigkeit_pk: int) -> HttpResponse:
-    """Verschiebt eine Item-Zuordnung im Andockpunkt um eine Position nach unten."""
-
-    return _itemreihenfolge_aendern(request, pk, zugehoerigkeit_pk, 1)
-
-
-def _feste_reihenfolge_setzen(
-    erhebung: Erhebung, zugehoerigkeit_ids: list[str]
-) -> None:
-    """Schreibt eine vollständige Reihenfolge ohne die eindeutigen Positionen zu kreuzen."""
-
-    zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
-        erhebung.vignettenzugehoerigkeiten.select_for_update()
-    )
-    vorhandene_ids: list[int] = list(zugehoerigkeiten.values_list("pk", flat=True))
-    try:
-        neue_ids: list[int] = [int(pk) for pk in zugehoerigkeit_ids]
-    except ValueError:
-        return
-    if len(neue_ids) != len(set(neue_ids)) or set(neue_ids) != set(vorhandene_ids):
-        return
-    bisherige_positionen: list[int] = list(
-        zugehoerigkeiten.values_list("position", flat=True)
-    )
-    zugehoerigkeiten.update(
-        position=F("position") + max(bisherige_positionen, default=0)
-    )
-    for position, zugehoerigkeit_id in enumerate(neue_ids, start=1):
-        zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
-
-
-@login_required
-@_forschende_oder_administratorin_erforderlich
-@transaction.atomic
 def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
-    """Speichert die konfigurierbaren Texte, Regel und feste Reihenfolge eines Entwurfs."""
+    """Speichert Instruktions-, Einwilligungs- und Abschlusstext eines Entwurfs."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.ENTWURF:
         return redirect("erhebungen:detail", pk=erhebung.pk)
-    randomisierung: str = request.POST.get("randomisierung", erhebung.randomisierung)
-    if randomisierung not in Erhebung.Randomisierung.values:
-        return HttpResponseBadRequest("Unbekannte Randomisierungsregel.")
     erhebung.instruktionstext = request.POST.get(
         "instruktionstext", erhebung.instruktionstext
     )
@@ -688,17 +768,9 @@ def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
         "einwilligungstext", erhebung.einwilligungstext
     )
     erhebung.abschlusstext = request.POST.get("abschlusstext", erhebung.abschlusstext)
-    erhebung.randomisierung = randomisierung
     erhebung.save(
-        update_fields=[
-            "instruktionstext",
-            "einwilligungstext",
-            "abschlusstext",
-            "randomisierung",
-        ]
+        update_fields=["instruktionstext", "einwilligungstext", "abschlusstext"]
     )
-    if randomisierung == Erhebung.Randomisierung.FEST and "vignetten" in request.POST:
-        _feste_reihenfolge_setzen(erhebung, request.POST.getlist("vignetten"))
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
 

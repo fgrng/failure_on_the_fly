@@ -249,12 +249,21 @@ sich archivieren; die Phasenspalte weist sie danach als archiviert aus.
 Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
 zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
 Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
-Ist eine Fassung bereits am anderen Andockpunkt gebunden, kennzeichnet die
-jeweilige Bibliothek dies, ohne ihre Aufnahme zu verhindern.
-Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items per
-Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
-Finale und archivierte Erhebungen zeigen diese Zuordnung weiterhin ohne Bibliothek
-und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
+Vignetten und beide Andockpunkte sind je eine Liste; ihre Reihenfolge ist die
+Reihenfolge der Erhebung, ein eigenes Positionsfeld gibt es nicht. Über jeder
+Liste wählt man eine Fassung und die Stelle, an der sie eingefügt wird. Jede
+Zeile trägt Symbolknöpfe zum Verschieben nach oben oder unten und zum Entfernen,
+ein Item zusätzlich einen zum Umhängen an den anderen Andockpunkt; umsortieren
+lässt sich auch durch Ziehen am Griff, mit Maus wie mit Touch. Jede Änderung
+gilt sofort, beim Entfernen schließt sich die Reihenfolge. Ist eine Fassung
+bereits am anderen Andockpunkt gebunden, kennzeichnet die Auswahl dies, ohne ihre
+Aufnahme zu verhindern. Der Schalter »Zufällige Reihenfolge« über der
+Vignettenliste mischt die Vignetten je Teilnahme; dann entfallen Nummern,
+Positionswahl und Verschieben. Beim Wechsel zurück zu fest wird die angezeigte
+Liste zur Reihenfolge.
+Finale und archivierte Erhebungen zeigen Vignetten und Items weiterhin als
+nummerierte Listen ohne Auswahl und Änderungsaktionen; nach einem Rückzug sind sie
+wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,

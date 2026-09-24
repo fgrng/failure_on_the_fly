@@ -6,7 +6,8 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
-    <script src="{% static 'js/zuordnungstabelle.js' %}" defer></script>
+    <link rel="stylesheet" href="{% static 'css/zuordnungsliste.css' %}">
+    <script src="{% static 'js/zuordnungsliste.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -55,7 +56,8 @@
     {% include "includes/eigentuemerinnen.html" with eigentuemerinnen_abschnitt_nummer="01" eigentuemerin_hinzufuegen_url="erhebungen:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="erhebungen:eigentuemerin_entfernen" kreis=erhebung objekt_pk=erhebung.pk %}
 
     {% if erhebung.status == erhebung.Status.ENTWURF %}
-        <div id="erhebung-entwurf-editor" x-data="{ randomisierung: '{{ erhebung.randomisierung }}' }">
+        <div id="erhebung-entwurf-editor">
+        <div data-zuordnung-daten>{{ erhebung.randomisierung|json_script:"randomisierung-daten" }}</div>
         <div data-zuordnung-daten>{{ aufgenommene_daten|json_script:"aufgenommene-daten" }}</div>
         <div data-zuordnung-daten>{{ verfuegbare_daten|json_script:"verfuegbare-daten" }}</div>
         <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
@@ -84,88 +86,31 @@
                     </div>
                 </div>
             </section>
-
-            <section class="page-section" aria-labelledby="section-vignettes">
-                <header class="page-section__head">
-                    <b>02</b><span><h2 id="section-vignettes">Vignetten verwalten</h2><small>Fügen Sie der Erhebung finale Vignetten hinzu oder entfernen Sie diese.</small></span>
-                </header>
-                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
-
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="verfuegbare-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Finale Vignetten aufnehmen" suchfeld_label="Verfügbare Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Vignetten verfügbar." %}
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="aufgenommene-daten" positions_id="vignetten-positionen-inhalt" spalten=vignetten_spalten suchschluessel=vignetten_suchschluessel ueberschrift="Aufgenommene Vignetten" suchfeld_label="Aufgenommene Vignetten durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--danger" aktionsbeschriftung="Entfernen" leertext="Keine Vignetten gefunden." %}
-
-                </div>
-            </section>
-
-            <section class="page-section" aria-labelledby="section-order">
-                <header class="page-section__head">
-                    <b>03</b><span><h2 id="section-order">Reihenfolge</h2><small>Präsentationsreihenfolge der Vignetten konfigurieren.</small></span>
-                </header>
-                <div class="field-grid">
-                    <div class="vignette-field page-field--wide">
-                        <label for="id_randomisierung">Modus der Reihenfolge</label>
-                        <select id="id_randomisierung" name="randomisierung" x-model="randomisierung">
-                            {% for wert, bezeichnung in erhebung.Randomisierung.choices %}
-                                <option value="{{ wert }}"{% if wert == erhebung.randomisierung %} selected{% endif %}>{{ bezeichnung }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div id="vignetten-positionen" class="vignette-field page-field--wide" x-show="randomisierung === '{{ erhebung.Randomisierung.FEST }}'" x-cloak>
-                        <p style="margin-bottom: 1rem;"><strong>Positionen (feste Reihenfolge)</strong></p>
-                        <div id="vignetten-positionen-inhalt" class="field-grid">
-                            {% for zugehoerigkeit in vignettenzugehoerigkeiten %}
-                                <div class="vignette-field page-field--wide">
-                                    <label for="id_vignette_{{ forloop.counter }}">Position {{ forloop.counter }}</label>
-                                    <select id="id_vignette_{{ forloop.counter }}" name="vignetten">
-                                        {% for option in vignettenzugehoerigkeiten %}
-                                            <option value="{{ option.pk }}"{% if option.pk == zugehoerigkeit.pk %} selected{% endif %}>
-                                                {{ option.vignette.anzeigename }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            {% endfor %}
-                            {% if not vignettenzugehoerigkeiten %}
-                                <p>Noch keine Vignetten aufgenommen.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </section>
         </form>
-
-        <section class="page-section page-section--gestapelt" aria-labelledby="section-fragebogen">
-            <header class="page-section__head">
-                <b>04</b><span><h2 id="section-fragebogen">Fragebogen verwalten</h2><small>Fügen Sie finale Items an den jeweiligen Andockpunkt hinzu oder entfernen Sie diese.</small></span>
-            </header>
-            <div>
-            <section class="page-section page-section--gestapelt" aria-labelledby="section-nach-sitzung">
-                <header class="page-section__head">
-                    <b>01</b><span><h3 id="section-nach-sitzung">Nach jeder Vignettensitzung</h3></span>
-                </header>
-                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." zeige_badges=True %}
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
-                </div>
-            </section>
-            <section class="page-section page-section--gestapelt" aria-labelledby="section-am-ende">
-                <header class="page-section__head">
-                    <b>02</b><span><h3 id="section-am-ende">Am Ende</h3></span>
-                </header>
-                <div class="field-grid page-field--wide" style="grid-template-columns: 1fr 1fr; align-items: start;">
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-verfuegbare-daten" positions_id="" spalten=item_spalten suchschluessel=item_suchschluessel ueberschrift="Finale Items aufnehmen" suchfeld_label="Verfügbare Items durchsuchen" aktion_spalte="Aktion" aktionsklasse="button--secondary" aktionsbeschriftung="Aufnehmen" leertext="Keine weiteren finalen Items verfügbar." zeige_badges=True %}
-                    {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Items" suchfeld_label="Aufgenommene Items durchsuchen" aktion_spalte="Aktion" mehrere_aktionen=True nicht_sortierbar=True leertext="Keine Items aufgenommen." %}
-                </div>
-            </section>
-            </div>
-        </section>
 
         <div class="vignette-form-actions">
             <button class="button" type="submit" form="erhebung-konfiguration">Konfiguration speichern</button>
         </div>
-        </div>
 
+        <section class="page-section" aria-labelledby="section-vignettes">
+            <header class="page-section__head">
+                <b>02</b><span><h2 id="section-vignettes">Vignetten</h2><small>Die Liste ist die Reihenfolge der Sitzungen. Änderungen gelten sofort.</small></span>
+            </header>
+            <div>
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="aufgenommene-daten" verfuegbar_id="verfuegbare-daten" titel="Vignettensitzungen" reihenfolge=True leertext="Noch keine Vignetten aufgenommen." %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-fragebogen">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-fragebogen">Fragebogen</h2><small>Finale Items je Andockpunkt. ⇄ hängt ein Item an den anderen Andockpunkt um.</small></span>
+            </header>
+            <div>
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="nach-sitzung-aufgenommene-daten" verfuegbar_id="nach-sitzung-verfuegbare-daten" titel="Nach jeder Vignettensitzung" andere="Am Ende" leertext="Noch keine Items aufgenommen." %}
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="am-ende-aufgenommene-daten" verfuegbar_id="am-ende-verfuegbare-daten" titel="Am Ende" andere="Nach jeder Vignettensitzung" leertext="Noch keine Items aufgenommen." %}
+            </div>
+        </section>
+        </div>
 
     {% else %}
         <section class="page-section" aria-labelledby="section-config">
@@ -179,32 +124,34 @@
             </dl>
         </section>
 
-        <section class="page-section page-section--gestapelt" aria-labelledby="section-fragebogen">
+        <div data-zuordnung-daten>{{ erhebung.randomisierung|json_script:"randomisierung-daten" }}</div>
+        <div data-zuordnung-daten>{{ aufgenommene_daten|json_script:"aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
+        <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
+
+        <section class="page-section" aria-labelledby="section-vignettes">
             <header class="page-section__head">
-                <b>02</b><span><h2 id="section-fragebogen">Fragebogen</h2></span>
+                <b>02</b><span><h2 id="section-vignettes">Vignetten</h2></span>
             </header>
-            <div data-zuordnung-daten>{{ nach_sitzung_aufgenommene_daten|json_script:"nach-sitzung-aufgenommene-daten" }}</div>
-            <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
             <div>
-            <section class="page-section page-section--gestapelt" aria-labelledby="section-nach-sitzung">
-                <header class="page-section__head">
-                    <b>01</b><span><h3 id="section-nach-sitzung">Nach jeder Vignettensitzung</h3></span>
-                </header>
-                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="nach-sitzung-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Fragebogen-Items" suchfeld_label="Aufgenommene Fragebogen-Items durchsuchen" nicht_sortierbar=True nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
-            </section>
-            <section class="page-section page-section--gestapelt" aria-labelledby="section-am-ende">
-                <header class="page-section__head">
-                    <b>02</b><span><h3 id="section-am-ende">Am Ende</h3></span>
-                </header>
-                {% include "erhebungen/includes/zuordnungsspalte.html" with daten_id="am-ende-aufgenommene-daten" positions_id="" spalten=item_spalten standard_schluessel="position" suchschluessel=item_suchschluessel ueberschrift="Aufgenommene Fragebogen-Items" suchfeld_label="Aufgenommene Fragebogen-Items durchsuchen" nicht_sortierbar=True nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
-            </section>
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="aufgenommene-daten" titel="Vignettensitzungen" reihenfolge=True nur_lesen=True leertext="Keine Vignetten aufgenommen." %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-labelledby="section-fragebogen">
+            <header class="page-section__head">
+                <b>03</b><span><h2 id="section-fragebogen">Fragebogen</h2></span>
+            </header>
+            <div>
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="nach-sitzung-aufgenommene-daten" titel="Nach jeder Vignettensitzung" nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
+                {% include "erhebungen/includes/zuordnungsliste.html" with daten_id="am-ende-aufgenommene-daten" titel="Am Ende" nur_lesen=True leertext="Keine Fragebogen-Items aufgenommen." %}
             </div>
         </section>
 
         {% if erhebung.status == erhebung.Status.FINAL %}
             <section class="page-section" aria-labelledby="section-stichproben">
                 <header class="page-section__head">
-                    <b>03</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
+                    <b>04</b><span><h2 id="section-stichproben">Stichproben</h2><small>Zeiträume für Teilnahmen verwalten.</small></span>
                 </header>
                 <div>
                     <form class="stichprobe-anlegen" method="post" action="{% url 'erhebungen:stichprobe_anlegen' erhebung.pk %}">

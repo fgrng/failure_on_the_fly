@@ -529,7 +529,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         aufgenommen: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        self.assertContains(aufgenommen, "Position 1")
+        self.assertEqual(
+            [zeile["pk"] for zeile in aufgenommen.context["aufgenommene_daten"]],
+            [self.eigene_finale.pk],
+        )
+        self.assertEqual(
+            Erhebungsvignette.objects.get(erhebung=self.erhebung).position, 1
+        )
 
         entfernt: HttpResponse = self.client.post(
             reverse(
@@ -610,7 +616,10 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         self.assertContains(detail, "schon am Ende")
-        self.assertContains(detail, "badge--research")
+        self.assertEqual(
+            detail.context["nach_sitzung_verfuegbare_daten"][0]["badge"],
+            "schon am Ende",
+        )
         self.assertContains(
             detail,
             reverse(
@@ -713,7 +722,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def test_verschiebt_item_innerhalb_seines_andockpunkts_ohne_seitenwechsel(
         self,
     ) -> None:
-        """Hoch verschiebt die Zuordnung und lässt den anderen Andockpunkt unverändert."""
+        """Verschieben ändert nur die Reihenfolge am eigenen Andockpunkt."""
 
         erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
         zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
@@ -735,9 +744,10 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         verschieben: HttpResponse = self.client.post(
             reverse(
-                "erhebungen:item_hoch",
+                "erhebungen:item_verschieben",
                 args=[self.erhebung.pk, zweite_zuordnung.pk],
-            )
+            ),
+            {"position": 1},
         )
 
         self.assertEqual(verschieben.status_code, 200)
@@ -756,22 +766,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             [drittes_item.pk],
         )
         self.assertEqual(
-            [
-                aktion["beschriftung"]
-                for aktion in verschieben.context["nach_sitzung_aufgenommene_daten"][0][
-                    "aktionen"
-                ]
+            verschieben.context["nach_sitzung_aufgenommene_daten"][0][
+                "verschieben_url"
             ],
-            ["Runter", "Entfernen"],
-        )
-        self.assertEqual(
-            [
-                aktion["beschriftung"]
-                for aktion in verschieben.context["nach_sitzung_aufgenommene_daten"][1][
-                    "aktionen"
-                ]
-            ],
-            ["Hoch", "Entfernen"],
+            reverse(
+                "erhebungen:item_verschieben",
+                args=[self.erhebung.pk, zweite_zuordnung.pk],
+            ),
         )
 
     def test_entfernen_schliesst_die_itemreihenfolge_lueckenlos(self) -> None:
@@ -857,7 +858,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertEqual(gesperrt.status_code, 403)
 
     def test_itemreihenfolge_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
-        """Auch Hoch und Runter ändern eine finale Erhebung nicht."""
+        """Auch Verschieben ändert eine finale Erhebung nicht."""
 
         erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
         zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
@@ -882,9 +883,10 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         gesperrt: HttpResponse = self.client.post(
             reverse(
-                "erhebungen:item_hoch",
+                "erhebungen:item_verschieben",
                 args=[self.erhebung.pk, zweite_zuordnung.pk],
-            )
+            ),
+            {"position": 1},
         )
 
         self.assertEqual(gesperrt.status_code, 403)
@@ -909,14 +911,14 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             )
         )
         self.assertEqual(wieder_offen.status_code, 200)
-        self.assertContains(wieder_offen, "Finale Items aufnehmen")
+        self.assertContains(wieder_offen, "zuordnungsliste__einfuegen")
         self.assertEqual(
             wieder_offen.context["am_ende_aufgenommene_daten"][0]["label"],
             item.wortlaut,
         )
 
     def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:
-        """Beide Spalten tragen dieselbe Zeilenform mit passender Aktions-URL."""
+        """Auswahl und Liste tragen ihre passenden Aktions-URLs."""
 
         verfuegbar: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
@@ -930,7 +932,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     "label": self.eigene_finale.anzeigename,
                     "fach": "Mathematik",
                     "thema": self.eigene_finale.thema,
-                    "aktion_url": reverse(
+                    "einfuegen_url": reverse(
                         "erhebungen:vignette_hinzufuegen",
                         args=[self.erhebung.pk, self.eigene_finale.pk],
                     ),
@@ -949,27 +951,30 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
         self.assertEqual(aufgenommen.context["verfuegbare_daten"], [])
+        zeile: dict[str, object] = aufgenommen.context["aufgenommene_daten"][0]
         self.assertEqual(
-            [
-                zeile["aktion_url"]
-                for zeile in aufgenommen.context["aufgenommene_daten"]
-            ],
-            [
-                reverse(
-                    "erhebungen:vignette_entfernen",
-                    args=[self.erhebung.pk, self.eigene_finale.pk],
-                )
-            ],
+            zeile["entfernen_url"],
+            reverse(
+                "erhebungen:vignette_entfernen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            ),
+        )
+        self.assertEqual(
+            zeile["verschieben_url"],
+            reverse(
+                "erhebungen:vignette_verschieben",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            ),
         )
 
-    def test_detailseite_rendert_zuordnungsspalten_ueber_include(self) -> None:
-        """Bibliothek und Aufnahme verwenden denselben Zuordnungsspalten-Baustein."""
+    def test_detailseite_rendert_zuordnungslisten_ueber_include(self) -> None:
+        """Vignetten und beide Andockpunkte verwenden denselben Listen-Baustein."""
 
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
 
-        self.assertTemplateUsed(detail, "erhebungen/includes/zuordnungsspalte.html")
+        self.assertTemplateUsed(detail, "erhebungen/includes/zuordnungsliste.html")
 
     def test_haelt_fremde_und_unfertige_fassungen_aus_den_zeilen_heraus(self) -> None:
         """Die anbietende Spalte zeigt weder fremde noch nicht-finale Fassungen."""
@@ -1014,15 +1019,17 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         speichern: HttpResponse = self.client.post(
             reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
             {
-                "randomisierung": Erhebung.Randomisierung.FEST,
                 "instruktionstext": "Bitte diagnostizieren Sie.",
                 "einwilligungstext": "Ich willige ein.",
                 "abschlusstext": "Vielen Dank.",
-                "vignetten": [
-                    str(zweite_zugehoerigkeit.pk),
-                    str(erste_zugehoerigkeit.pk),
-                ],
             },
+        )
+        verschieben: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:vignette_verschieben",
+                args=[self.erhebung.pk, zweite.pk],
+            ),
+            {"position": 1},
         )
 
         self.assertRedirects(
@@ -1034,35 +1041,228 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertContains(detail, "Bitte diagnostizieren Sie.")
         self.assertContains(detail, "Ich willige ein.")
         self.assertContains(detail, "Vielen Dank.")
-        self.assertContains(
-            detail,
-            f'<option value="{zweite_zugehoerigkeit.pk}" selected>',
+        self.assertRedirects(
+            verschieben, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        self.assertContains(
-            detail,
-            f'<option value="{erste_zugehoerigkeit.pk}" selected>',
+        self.assertEqual(
+            [zeile["pk"] for zeile in detail.context["aufgenommene_daten"]],
+            [zweite.pk, self.eigene_finale.pk],
+        )
+        erste_zugehoerigkeit.refresh_from_db()
+        zweite_zugehoerigkeit.refresh_from_db()
+        self.assertEqual(
+            (zweite_zugehoerigkeit.position, erste_zugehoerigkeit.position), (1, 2)
         )
 
-    def test_zufaellige_reihenfolge_blendet_positionswahl_aus(self) -> None:
-        """Eine zufällige Reihenfolge hat keine bearbeitbare Positionswahl."""
+    def test_umschalten_auf_zufaellig_loescht_die_positionen(self) -> None:
+        """Eine zufällige Reihenfolge trägt keine Positionen."""
 
-        Erhebungsvignette.objects.create(
+        zugehoerigkeit: Erhebungsvignette = Erhebungsvignette.objects.create(
             erhebung=self.erhebung, vignette=self.eigene_finale, position=1
         )
 
         zufaellig: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
             {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
         )
 
         self.assertRedirects(
             zufaellig, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        self.erhebung.refresh_from_db()
+        zugehoerigkeit.refresh_from_db()
+        self.assertEqual(
+            self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG
         )
-        self.assertContains(detail, 'value="zufällig" selected')
-        self.assertNotContains(detail, "Reihenfolge der aufgenommenen Vignetten:")
+        self.assertIsNone(zugehoerigkeit.position)
+
+    def test_umschalten_auf_fest_macht_die_liste_zur_reihenfolge(self) -> None:
+        """Beim Wechsel zu fest bekommt jede Vignette ihre angezeigte Position."""
+
+        self.erhebung.randomisierung = Erhebung.Randomisierung.ZUFAELLIG
+        self.erhebung.save(update_fields=["randomisierung"])
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+        self.assertFalse(
+            Erhebungsvignette.objects.filter(
+                erhebung=self.erhebung, position__isnull=False
+            ).exists()
+        )
+
+        self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.FEST},
+        )
+
+        self.assertEqual(
+            list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", "position"
+                )
+            ),
+            [(self.eigene_finale.pk, 1), (zweite.pk, 2)],
+        )
+
+    def test_umschalten_lehnt_unbekannte_regel_ab(self) -> None:
+        """Nur die zwei bekannten Reihenfolgeregeln sind wählbar."""
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
+            {"randomisierung": "rückwärts"},
+        )
+
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_fuegt_vignette_an_gewuenschter_position_ein(self) -> None:
+        """Bei fester Reihenfolge landet eine neue Vignette an der gewählten Stelle."""
+
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        dritte: Vignette = _finale_vignette_anlegen(self.ada, "Physik")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_hinzufuegen", args=[self.erhebung.pk, dritte.pk]
+            ),
+            {"position": 2},
+        )
+
+        self.assertEqual(
+            list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", "position"
+                )
+            ),
+            [(self.eigene_finale.pk, 1), (dritte.pk, 2), (zweite.pk, 3)],
+        )
+
+    def test_entfernen_schliesst_die_vignettenreihenfolge_lueckenlos(self) -> None:
+        """Nach dem Entfernen rücken die folgenden Vignetten nach."""
+
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_entfernen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            )
+        )
+
+        self.assertEqual(
+            Erhebungsvignette.objects.get(erhebung=self.erhebung).position, 1
+        )
+
+    def test_fuegt_item_an_gewuenschter_position_ein(self) -> None:
+        """Ein neues Item landet an der gewählten Stelle seines Andockpunkts."""
+
+        erstes: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
+        zweites: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
+        for item in (erstes, zweites):
+            self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+                )
+            )
+        neues: FragebogenItem = _finales_item_anlegen(self.ada, "Neues Item")
+
+        einfuegen: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:item_hinzufuegen",
+                args=[self.erhebung.pk, neues.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
+            ),
+            {"position": 1},
+        )
+
+        self.assertEqual(
+            [zeile["pk"] for zeile in einfuegen.context["am_ende_aufgenommene_daten"]],
+            [neues.pk, erstes.pk, zweites.pk],
+        )
+
+    def test_haengt_item_an_den_anderen_andockpunkt_um(self) -> None:
+        """Umhängen setzt das Item ans Ende des anderen Andockpunkts."""
+
+        erstes: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
+        zweites: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
+        schon_am_ende: FragebogenItem = _finales_item_anlegen(self.ada, "Am Ende")
+        for item, andockpunkt in (
+            (erstes, Erhebungsitem.Andockpunkt.NACH_SITZUNG),
+            (zweites, Erhebungsitem.Andockpunkt.NACH_SITZUNG),
+            (schon_am_ende, Erhebungsitem.Andockpunkt.AM_ENDE),
+        ):
+            self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[self.erhebung.pk, item.pk, andockpunkt],
+                )
+            )
+        zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung, item=erstes
+        )
+
+        umhaengen: HttpResponse = self.client.post(
+            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk])
+        )
+
+        self.assertEqual(umhaengen.status_code, 200)
+        self.assertEqual(
+            [
+                (zeile["pk"], zeile["position"])
+                for zeile in umhaengen.context["nach_sitzung_aufgenommene_daten"]
+            ],
+            [(zweites.pk, 1)],
+        )
+        self.assertEqual(
+            [
+                (zeile["pk"], zeile["position"])
+                for zeile in umhaengen.context["am_ende_aufgenommene_daten"]
+            ],
+            [(schon_am_ende.pk, 1), (erstes.pk, 2)],
+        )
+
+    def test_umhaengen_lehnt_doppelte_bindung_ab(self) -> None:
+        """Hängt ein Item schon am anderen Andockpunkt, gibt es kein Umhängen."""
+
+        item: FragebogenItem = _finales_item_anlegen(self.ada, "Überall")
+        for andockpunkt in Erhebungsitem.Andockpunkt.values:
+            antwort: HttpResponse = self.client.post(
+                reverse(
+                    "erhebungen:item_hinzufuegen",
+                    args=[self.erhebung.pk, item.pk, andockpunkt],
+                )
+            )
+        zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
+            erhebung=self.erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        )
+
+        self.assertNotIn(
+            "umhaengen_url", antwort.context["nach_sitzung_aufgenommene_daten"][0]
+        )
+        umhaengen: HttpResponse = self.client.post(
+            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk])
+        )
+        self.assertEqual(umhaengen.status_code, 409)
 
     def test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen(self) -> None:
         """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
@@ -1095,7 +1295,25 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse("erhebungen:konfiguration_speichern", args=[fremde_erhebung.pk]),
             {"instruktionstext": "Nicht speichern"},
         )
+        final_umschalten: HttpResponse = self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
+        )
+        final_verschieben: HttpResponse = self.client.post(
+            reverse(
+                "erhebungen:vignette_verschieben",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            ),
+            {"position": 1},
+        )
+        fremd_umschalten: HttpResponse = self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[fremde_erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
+        )
 
+        self.assertEqual(final_umschalten.status_code, 302)
+        self.assertEqual(final_verschieben.status_code, 403)
+        self.assertEqual(fremd_umschalten.status_code, 404)
         self.assertEqual(final_entfernen.status_code, 302)
         self.assertEqual(final_aufnehmen.status_code, 302)
         self.assertEqual(final_speichern.status_code, 302)
@@ -1105,6 +1323,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
         self.erhebung.refresh_from_db()
         self.assertEqual(self.erhebung.instruktionstext, "")
+        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
         self.erhebung.archivieren()
 
         archiv_speichern: HttpResponse = self.client.post(
@@ -2810,14 +3029,51 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         self.assertLess(
             inhalt.index("Nach Sitzung eins"), inhalt.index("Nach Sitzung zwei")
         )
-        self.assertNotContains(detail, "Finale Items aufnehmen")
+        self.assertNotContains(detail, "zuordnungsliste__einfuegen")
         for url in (
             reverse("erhebungen:item_entfernen", args=[erhebung.pk, erste_bindung.pk]),
-            reverse("erhebungen:item_hoch", args=[erhebung.pk, zweite_bindung.pk]),
-            reverse("erhebungen:item_runter", args=[erhebung.pk, erste_bindung.pk]),
+            reverse(
+                "erhebungen:item_verschieben", args=[erhebung.pk, zweite_bindung.pk]
+            ),
+            reverse("erhebungen:item_umhaengen", args=[erhebung.pk, erste_bindung.pk]),
             reverse("erhebungen:item_entfernen", args=[erhebung.pk, ende_bindung.pk]),
         ):
             self.assertNotContains(detail, url)
+
+    def test_finale_erhebung_zeigt_vignetten_ohne_aktionen(self) -> None:
+        """Auch die Vignettenliste bleibt nach dem Finalisieren lesbar, aber fest."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+        Simulationskern.objects.anlegen().finalisieren()
+        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=vignette, position=1
+        )
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(sprachmodell="fake")
+        )
+        erhebung.finalisieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+
+        self.assertContains(detail, "Vignettensitzungen")
+        self.assertContains(detail, "Feste Reihenfolge")
+        self.assertEqual(
+            detail.context["aufgenommene_daten"],
+            [
+                {
+                    "pk": vignette.pk,
+                    "label": vignette.anzeigename,
+                    "fach": vignette.fach,
+                    "thema": vignette.thema,
+                }
+            ],
+        )
 
     def test_archivierte_erhebung_zeigt_leere_andockpunktbereiche_gesperrt(
         self,

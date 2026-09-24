@@ -1,0 +1,66 @@
+<div class="zuordnungsliste" data-zuordnungsliste x-id="['wahl', 'position']"
+     x-data="zuordnungsliste({ datenId: '{{ daten_id|escapejs }}', verfuegbarId: '{{ verfuegbar_id|default:''|escapejs }}', randomisierungId: '{% if reihenfolge %}randomisierung-daten{% endif %}', fest: '{{ erhebung.Randomisierung.FEST|escapejs }}' })">
+    <div class="zuordnungsliste__kopf">
+        <h3>{{ titel }} <span class="table-toolbar__count" x-text="'(' + rows.length + ')'"></span></h3>
+        {% if reihenfolge %}
+            {% if nur_lesen %}
+                <span class="badge badge--research">{{ erhebung.get_randomisierung_display }}</span>
+            {% else %}
+                <label class="zuordnungsliste__schalter">
+                    <input type="checkbox" role="switch" :checked="!geordnet"
+                           @change="senden('{% url 'erhebungen:reihenfolge_umschalten' erhebung.pk %}', { randomisierung: $event.target.checked ? '{{ erhebung.Randomisierung.ZUFAELLIG|escapejs }}' : fest }, $event.target.checked ? 'Zufällige Reihenfolge: wird je Teilnahme gemischt.' : 'Feste Reihenfolge: die Liste ist die Reihenfolge.')">
+                    <span>Zufällige Reihenfolge</span>
+                </label>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% if reihenfolge and not nur_lesen %}
+        <p class="zuordnungsliste__hinweis" x-show="!geordnet" x-cloak>{% include "erhebungen/includes/icon.html" with name="mischen" %} Wird je Teilnahme gemischt. Die Anordnung hier spielt keine Rolle.</p>
+    {% endif %}
+
+    {% if not nur_lesen %}
+        <div class="zuordnungsliste__einfuegen">
+            <label class="zuordnung-unsichtbar" :for="$id('wahl')">{{ titel }}: hinzufügen</label>
+            <select :id="$id('wahl')" x-model="wahl">
+                <option value="">Hinzufügen …</option>
+                <template x-for="eintrag in verfuegbar" :key="eintrag.pk">
+                    <option :value="eintrag.pk" x-text="eintrag.label + (eintrag.badge ? ' (' + eintrag.badge + ')' : '')"></option>
+                </template>
+            </select>
+            <label class="zuordnung-unsichtbar" :for="$id('position')">Einfügen an</label>
+            <select :id="$id('position')" x-model="position" x-show="geordnet">
+                <option value="">am Ende</option>
+                <option value="1" x-show="rows.length">am Anfang</option>
+                <template x-for="(zeile, i) in rows.slice(0, -1)" :key="zeile.pk">
+                    <option :value="i + 2" x-text="'nach ' + (i + 1) + '. ' + kurz(zeile.label)"></option>
+                </template>
+            </select>
+            <button type="button" class="button button--small" :disabled="!wahl" @click="einfuegen()">Einfügen</button>
+        </div>
+    {% endif %}
+
+    <ol class="zuordnungsliste__liste" :class="!geordnet && 'zuordnungsliste__liste--ungeordnet'" aria-label="{{ titel }}">
+        <template x-for="(zeile, i) in rows" :key="zeile.pk">
+            <li class="zuordnungsliste__zeile" :data-pk="zeile.pk">
+                <span class="zuordnungsliste__nummer" x-show="geordnet" x-text="i + 1"></span>
+                {% if reihenfolge %}<span class="zuordnungsliste__nummer" x-show="!geordnet" title="Gemischt">{% include "erhebungen/includes/icon.html" with name="mischen" %}</span>{% endif %}
+                <span class="zuordnungsliste__text" x-text="zeile.label"></span>
+                {% if not nur_lesen %}
+                    <span class="zuordnungsliste__leiste" role="group" :aria-label="'Aktionen für ' + zeile.label">
+                        <span class="zuordnungsliste__leiste" x-show="geordnet">
+                            <button type="button" class="zuordnung-iconknopf" :disabled="i === 0" @click="verschieben(zeile, i, 'Nach oben')" :aria-label="zeile.label + ' nach oben'" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                            <button type="button" class="zuordnung-iconknopf" :disabled="i === rows.length - 1" @click="verschieben(zeile, i + 2, 'Nach unten')" :aria-label="zeile.label + ' nach unten'" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                            <span class="zuordnung-griff" data-griff aria-hidden="true" title="Ziehen zum Umsortieren">{% include "erhebungen/includes/icon.html" with name="griff" %}</span>
+                        </span>
+                        {% if andere %}
+                            <button type="button" class="zuordnung-iconknopf" x-show="zeile.umhaengen_url" @click="senden(zeile.umhaengen_url, {}, zeile.label + ' hängt jetzt an »{{ andere }}«.')" :aria-label="zeile.label + ' nach »{{ andere }}« umhängen'" title="Nach »{{ andere }}« umhängen">{% include "erhebungen/includes/icon.html" with name="tausch" %}</button>
+                        {% endif %}
+                        <button type="button" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" @click="senden(zeile.entfernen_url, {}, zeile.label + ' entfernt.')" :aria-label="zeile.label + ' entfernen'" title="Entfernen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                    </span>
+                {% endif %}
+            </li>
+        </template>
+        <li class="zuordnungsliste__leer" x-show="rows.length === 0">{{ leertext }}</li>
+    </ol>
+    <p class="zuordnung-unsichtbar" role="status" aria-live="polite" x-text="meldung"></p>
+</div>
