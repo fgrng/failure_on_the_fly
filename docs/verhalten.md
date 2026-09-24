@@ -20,6 +20,11 @@ vergibt die drei fachlichen Rollen als Groups und kann weitere Superuser ernenne
 Konten lassen sich dort bewusst nicht löschen, solange #156 den Umgang mit
 Löschbegehren noch nicht festlegt.
 
+Die gesamte Oberfläche ist deutschsprachig, auch Djangos eigene Texte:
+Formularfehler (»Dieses Feld ist zwingend erforderlich.«), die Bedienelemente
+bereits hochgeladener Bilder und die Datumsanzeige. Auswahlfelder ohne
+Vorbelegung zeigen »Bitte wählen …«.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen

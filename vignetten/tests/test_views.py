@@ -548,7 +548,7 @@ class VignetteBearbeitenViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "This field is required.")
+        self.assertContains(response, "Dieses Feld ist zwingend erforderlich.")
         self.vignette.refresh_from_db()
         self.assertEqual(
             self.vignette.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH
