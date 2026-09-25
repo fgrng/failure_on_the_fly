@@ -1,14 +1,15 @@
 {% load texte %}
 {% comment %}
-    Hülle um markdown_feld.html: Der Text steht gerendert und gekürzt zum Lesen,
-    »Bearbeiten« (bei leerem Text »Text schreiben«) öffnet das Markdown-Feld.
-    Die Hülle steht in einem Formular; ihr »Speichern« sendet es ganz, mit allen
-    übrigen Feldern. »Abbrechen« setzt nur diesen Text auf den geladenen Stand
-    zurück. Erwartet feld_id, label, wert und dazu feld_name oder ein
-    Formularfeld (field) wie markdown_feld.html; für Formularfelder nimmt
-    lesefeld_formularfeld.html die Werte aus dem Feld. Mit profil ist der Text
-    Markdown und das Feld bekommt die Vorschau; ohne profil steht er als
-    Klartext und braucht field. Mit offen startet das Feld im Bearbeiten.
+    Lese-Hülle um einen großen Text: Er steht gerendert und gekürzt zum Lesen,
+    »Bearbeiten« (bei leerem Text »Text schreiben«) öffnet das Eingabefeld.
+    Mit profil ist der Text Markdown und das Eingabefeld markdown_feld.html
+    samt Vorschau; ohne profil steht er als Klartext und das Eingabefeld ist
+    das Formularfeld field. Die Hülle steht in einem Formular; ihr »Speichern«
+    sendet es ganz, mit allen übrigen Feldern. »Abbrechen« setzt nur diesen
+    Text auf den geladenen Stand zurück. Mit offen startet sie im Bearbeiten.
+    Erwartet feld_id, label, wert und dazu feld_name oder field wie
+    markdown_feld.html; für Formularfelder nimmt lesefeld_formularfeld.html
+    die Werte aus dem Feld.
 {% endcomment %}
 <div class="vignette-field page-field--wide markdown-lesefeld"
      x-data="{ bearbeiten: {% if offen %}true{% else %}false{% endif %}, ganz: false, lang: false }">

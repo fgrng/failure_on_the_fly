@@ -742,6 +742,7 @@ class SimulationskernLangeTexteTests(TestCase):
         self.client.force_login(_administratorin("linus"))
 
     def _daten(self, **werte: str) -> dict[str, str]:
+        # POST-Daten mit den gespeicherten Texten, überschrieben durch werte.
         daten: dict[str, str] = {
             feld: getattr(self.entwurf, feld)
             for feld in (
