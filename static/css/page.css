@@ -178,61 +178,85 @@
     .page-field--wide { grid-column: auto; }
 }
 
-/* ---- Eigentümer:innen: der Kreis als Zeile ruhiger Namens-Chips ---- */
-.eigentuemerinnen-liste {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: 0 0 var(--space-3);
-    padding: 0;
-    list-style: none;
+/* ---- Eigentümer:innen: der Kreis als Tabelle, Hinzufügen abgetrennt ---- */
+.eigentuemerinnen {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.eigentuemerin-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
+.eigentuemerinnen th,
+.eigentuemerinnen td {
     padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: var(--color-surface-muted);
-    font-size: .875rem;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
 }
 
-.eigentuemerin-chip form {
-    display: inline-flex;
+.eigentuemerinnen th {
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
 }
 
-.eigentuemerin-chip button {
+.eigentuemerinnen th:last-child,
+.eigentuemerinnen td:last-child {
+    text-align: right;
+}
+
+.eigentuemerinnen__sie,
+.eigentuemerinnen__hinweis {
+    color: var(--color-text-muted);
+    font-size: .8rem;
+}
+
+p.eigentuemerinnen__hinweis {
+    margin: var(--space-1) 0 0;
+}
+
+/* Rot nur, weil Entfernen destruktiv ist (ADR-0024); als Textlink, nicht als Knopf. */
+.eigentuemerinnen__entfernen {
     width: auto;
     padding: 0;
     border: 0;
-    background: transparent;
-    color: var(--color-text-muted);
-    font: inherit;
-    line-height: 1;
-}
-
-.eigentuemerin-chip button:hover,
-.eigentuemerin-chip button:focus {
+    background: none;
     color: var(--color-danger);
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
 }
 
-/* ---- Eigentümer:innen: Auswahl und Knopf sitzen nebeneinander ---- */
-.eigentuemerin-hinzufuegen {
+.eigentuemerinnen__entfernen:hover,
+.eigentuemerinnen__entfernen:focus {
+    text-decoration: underline;
+}
+
+.eigentuemerinnen-hinzufuegen {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px dashed var(--color-border);
+}
+
+.eigentuemerinnen-hinzufuegen h3 {
+    margin: 0 0 var(--space-2);
+    font-size: .95rem;
+}
+
+/* Auswahl und Knopf sitzen nebeneinander. */
+.eigentuemerinnen-hinzufuegen__zeile {
     display: flex;
     flex-wrap: wrap;
     align-items: end;
     gap: var(--space-2);
 }
 
-.eigentuemerin-hinzufuegen label {
+.eigentuemerinnen-hinzufuegen__zeile label {
     display: grid;
     flex: 1 1 14rem;
     gap: var(--space-1);
 }
 
-.eigentuemerin-hinzufuegen button {
+.eigentuemerinnen-hinzufuegen__zeile button {
     width: auto;
 }
 

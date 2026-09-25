@@ -104,6 +104,26 @@ def test_konto_kann_mehrere_rollen_tragen() -> None:
     }
 
 
+@pytest.mark.django_db
+def test_rollen_nennen_alle_fachrollen_und_die_administration() -> None:
+    """Die Rollenanzeige führt jede Fachrolle und zuletzt die Administration."""
+    konto: Konto = Konto.objects.create_user(username="lehrerin", is_superuser=True)
+    konto.groups.add(
+        Group.objects.get(name="Forschende:r"),
+        Group.objects.get(name="Autor:in"),
+    )
+
+    assert konto.rollen() == ["Autor:in", "Forschende:r", "Administrator:in"]
+
+
+@pytest.mark.django_db
+def test_rollen_sind_ohne_rolle_leer() -> None:
+    """Ein Konto ohne Fachrolle und Administration trägt keine Rolle."""
+    konto: Konto = Konto.objects.create_user(username="teilnehmerin")
+
+    assert konto.rollen() == []
+
+
 def test_konto_ist_das_aktive_nutzermodell() -> None:
     """Konto ist das von Django verwendete Nutzer-Modell."""
     assert get_user_model() is Konto

@@ -3,36 +3,71 @@ Der Eigentümer-Kreis eines Bestands. `kreis` ist das Objekt, das den Kreis
 trägt; `objekt_pk` das, worüber die beiden Routen geführt werden. Bei
 Vignette und Fragebogen-Item fallen die beiden auseinander: Die URL geht
 über die Fassung, der Kreis hängt an der Historie.
+
+`dieses_artefakt` und `das_artefakt` nennen das Artefakt mit seinem Artikel
+(»diese Vignette« / »die Vignette«, »dieses Training« / »das Training«).
 {% endcomment %}
 <section class="page-section" aria-labelledby="detail-eigentuemerinnen">
     <div class="page-section__head">
         <b>{{ eigentuemerinnen_abschnitt_nummer }}</b>
-        <div><h2 id="detail-eigentuemerinnen">Eigentümer:innen</h2></div>
+        <div><h2 id="detail-eigentuemerinnen">Eigentümer:innen</h2><small>Wer {{ dieses_artefakt }} sehen und bearbeiten darf</small></div>
     </div>
     <div>
-        <ul class="eigentuemerinnen-liste">
-            {% for konto in kreis.eigentuemerinnen.all %}
-                <li class="eigentuemerin-chip">{{ konto.username }}
-                    {% if kreis.hat_mehrere_eigentuemerinnen %}
-                        <form method="post"
-                              action="{% url eigentuemerin_entfernen_url objekt_pk konto.pk %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    aria-label="{{ konto.username }} als Eigentümer:in entfernen"
-                                    title="Entfernen">&times;</button>
-                        </form>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-        <form class="eigentuemerin-hinzufuegen" method="post" action="{% url eigentuemerin_hinzufuegen_url objekt_pk %}">
-            {% csrf_token %}
-            <label>Eigentümer:in <select name="konto">
-                {% for konto in kreis.moegliche_ergaenzungen %}
-                    <option value="{{ konto.pk }}">{{ konto.username }}</option>
+        <table class="eigentuemerinnen">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Rolle</th>
+                    <th scope="col">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for konto in kreis.eigentuemerinnen.all %}
+                    <tr>
+                        <td>{{ konto.username }}{% if konto.pk == user.pk %} <span class="eigentuemerinnen__sie">(Sie)</span>{% endif %}</td>
+                        <td>{{ konto.rollen|join:", "|default:"—" }}</td>
+                        <td>
+                            {% if kreis.hat_mehrere_eigentuemerinnen %}
+                                <form method="post" action="{% url eigentuemerin_entfernen_url objekt_pk konto.pk %}">
+                                    {% csrf_token %}
+                                    {% if konto.pk == user.pk %}
+                                        <button class="eigentuemerinnen__entfernen" type="submit">Mich entfernen</button>
+                                    {% else %}
+                                        <button class="eigentuemerinnen__entfernen" type="submit"
+                                                aria-label="{{ konto.username }} als Eigentümer:in entfernen">Entfernen</button>
+                                    {% endif %}
+                                </form>
+                                {% if konto.pk == user.pk %}
+                                    <p class="eigentuemerinnen__hinweis">Sie verlieren den Zugriff; {{ das_artefakt }} bleibt bei den übrigen Eigentümer:innen.</p>
+                                {% endif %}
+                            {% else %}
+                                <span class="eigentuemerinnen__hinweis">Letzte Eigentümer:in</span>
+                            {% endif %}
+                        </td>
+                    </tr>
                 {% endfor %}
-            </select></label>
-            <button class="button" type="submit">Eigentümer:in hinzufügen</button>
-        </form>
+            </tbody>
+        </table>
+        {% if not kreis.hat_mehrere_eigentuemerinnen %}
+            <p class="eigentuemerinnen__hinweis">Der Kreis bleibt immer besetzt. Fügen Sie zuerst eine weitere Person hinzu, bevor Sie die letzte entfernen.</p>
+        {% endif %}
+        <div class="eigentuemerinnen-hinzufuegen">
+            <h3>Eigentümer:in hinzufügen</h3>
+            {% with ergaenzungen=kreis.moegliche_ergaenzungen %}
+                {% if ergaenzungen %}
+                    <form class="eigentuemerinnen-hinzufuegen__zeile" method="post" action="{% url eigentuemerin_hinzufuegen_url objekt_pk %}">
+                        {% csrf_token %}
+                        <label>Person <select name="konto">
+                            {% for konto in ergaenzungen %}
+                                <option value="{{ konto.pk }}">{{ konto.username }}</option>
+                            {% endfor %}
+                        </select></label>
+                        <button class="button" type="submit">Hinzufügen</button>
+                    </form>
+                {% else %}
+                    <p class="eigentuemerinnen__hinweis">Alle Konten mit der Rolle {{ kreis.ROLLENGRUPPE }} und alle Administrator:innen gehören schon zum Kreis.</p>
+                {% endif %}
+            {% endwith %}
+        </div>
     </div>
 </section>

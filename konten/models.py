@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import ProtectedError, Q
 
 from konten.eigentuemerschaft import bestandsmodelle
+from konten.navigation import KONTOROLLEN
 
 
 class KontoQuerySet(models.QuerySet["Konto"]):
@@ -30,6 +31,14 @@ class Konto(AbstractUser):
         if update_fields := kwargs.get("update_fields"):
             kwargs["update_fields"] = set(update_fields) | {"is_staff"}
         super().save(*args, **kwargs)
+
+    def rollen(self) -> list[str]:
+        """Nennt die Fachrollen in fester Reihenfolge, zuletzt die Administration."""
+        gruppen: set[str] = set(self.groups.values_list("name", flat=True))
+        rollen: list[str] = [rolle for rolle in KONTOROLLEN if rolle in gruppen]
+        if self.is_superuser:
+            rollen.append("Administrator:in")
+        return rollen
 
     def delete(
         self,
