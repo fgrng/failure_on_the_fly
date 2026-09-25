@@ -384,18 +384,15 @@ Zeichen, Leerzeichen am Rand werden abgeschnitten, ein leerer Name wird
 abgelehnt. Ein Hilfetext am Feld nennt, wo der Name erscheint (Erhebungsliste,
 Dateiname der Datenspur, Abschriften der Teilnehmenden). Meldungen stehen am
 Feld, die Eingabe bleibt nach einem Fehler stehen. Umbenennen lässt sich eine
-Erhebung nicht. In einem Entwurf wählen sie finale Vignetten,
-bestimmen eine feste oder zufällige Reihenfolge. Neu aufgenommene Vignetten
-stehen am Ende der Liste. Bei zufälliger Reihenfolge wird je Teilnahme gemischt,
-die Reihenfolge der Liste bleibt aber gespeichert: Beim Wechsel zurück zu fest
-gilt wieder die zuvor festgelegte Reihenfolge. Außerdem pflegen sie Instruktions-,
-Einwilligungs- und Abschlusstext. Die drei Texte stehen im Entwurf zunächst
+Erhebung nicht. In einem Entwurf stellen sie finale Vignetten zu einer Liste
+zusammen (siehe unten) und pflegen Instruktions-, Einwilligungs- und
+Abschlusstext. Die drei Texte stehen im Entwurf zunächst
 gerendert zum Lesen, auf wenige Zeilen gekürzt; »Ganz anzeigen« klappt einen
 langen Text auf. Ein leerer Text zeigt »Noch kein Text« und statt
 »Bearbeiten« den Knopf »Text schreiben«. »Bearbeiten« öffnet nur diesen Text
 im Markdown-Feld, mit eigenen Knöpfen »Speichern« und »Abbrechen«. Jeder
-Speichern-Knopf der Seite, am Text wie unten »Konfiguration speichern«,
-speichert die ganze Erhebung: alle Felder und alle geöffneten Texte.
+Speichern-Knopf der Seite, am Text wie unter den Texten »Konfiguration
+speichern«, speichert alle drei Texte, auch die geöffneten.
 »Abbrechen« verwirft nur die Änderungen an diesem Text. Auch »Finalisieren«
 speichert vorher alles, offene Texte eingeschlossen. Wer die Seite mit
 ungespeicherten Änderungen verlässt, wird vom Browser gewarnt. Die drei Texte
@@ -426,12 +423,26 @@ weist sie danach als archiviert aus.
 Der optionale Fragebogen eines Entwurfs besteht aus eigenen finalen Items an
 zwei getrennten Andockpunkten: nach jeder Vignettensitzung oder am Ende. Eine
 Fassung kann an beiden Stellen, je Stelle aber nur einmal vorkommen.
-Ist eine Fassung bereits am anderen Andockpunkt gebunden, kennzeichnet die
-jeweilige Bibliothek dies, ohne ihre Aufnahme zu verhindern.
-Innerhalb jedes Andockpunkts lässt sich die Reihenfolge der Fragebogen-Items per
-Hoch und Runter festlegen; beim Entfernen eines Fragebogen-Items schließt sie sich.
-Finale und archivierte Erhebungen zeigen diese Zuordnung weiterhin ohne Bibliothek
-und Änderungsaktionen; nach einem Rückzug ist sie wieder bearbeitbar.
+Vignetten und beide Andockpunkte sind je eine Liste; ihre Reihenfolge ist die
+Reihenfolge der Erhebung, ein eigenes Positionsfeld gibt es nicht. Über jeder
+Liste wählt man unter »Hinzufügen …« eine Fassung und die Stelle, an der sie
+eingefügt wird (»am Ende«, »am Anfang« oder »nach …«). Jede Zeile trägt
+Symbolknöpfe mit Beschriftung für Hilfstechnik: ↑ und ↓ verschieben um eine
+Stelle, 🗑 entfernt; ein Item hat zusätzlich ⇄ zum Umhängen ans Ende des anderen
+Andockpunkts, solange es dort nicht schon hängt. Umsortieren lässt sich auch
+durch Ziehen am Griff, mit Maus wie mit Touch, aber nur innerhalb einer Liste;
+ohne Maus reichen die Knöpfe und Auswahlfelder. Jede Änderung gilt sofort, beim
+Entfernen und Umhängen schließt sich die Reihenfolge. Ist eine Fassung bereits
+am anderen Andockpunkt gebunden, kennzeichnet die Auswahl dies, ohne ihre
+Aufnahme zu verhindern. Der Schalter »Zufällige Reihenfolge« über der
+Vignettenliste mischt die Vignetten je Teilnahme; dann zeigt die Liste keine
+Nummern, keine Positionswahl und kein Verschieben. Das Umschalten ändert nur
+die Regel: Die Reihenfolge der Liste bleibt gespeichert, beim Wechsel zurück zu
+fest gilt wieder die zuvor festgelegte Reihenfolge, neu aufgenommene Vignetten
+stehen am Ende.
+Finale und archivierte Erhebungen zeigen Vignetten und Items weiterhin als
+Listen, samt Reihenfolgeregel, ohne Auswahl und Änderungsaktionen; nach einem
+Rückzug sind sie wieder bearbeitbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
