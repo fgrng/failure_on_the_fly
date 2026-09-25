@@ -474,6 +474,34 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(gespraech, "Spracheingabe starten")
         self.assertContains(debrief, "Spracheingabe starten")
 
+    def test_gespraech_zeigt_die_abgesetzte_aktionszeile(self) -> None:
+        """Beenden, Erklärsatz und roter Abbrechen-Link; im Debrief keine Zeile."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        gespraech: HttpResponse = self.client.get(
+            reverse("erhebungen:gespraech", args=[bindung.token])
+        )
+        debrief: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+        )
+
+        self.assertContains(
+            gespraech, 'class="button button--neutral sitzung-aktionen__beenden"'
+        )
+        self.assertContains(
+            gespraech, "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose."
+        )
+        self.assertContains(
+            gespraech, 'class="sitzung-aktion-link sitzung-aktion-link--gefahr"'
+        )
+        self.assertContains(
+            gespraech, reverse("erhebungen:abbrechen", args=[bindung.token])
+        )
+        self.assertNotContains(debrief, 'class="sitzung-aktionen"')
+
     @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_ohne_audioeinwilligung_steht_ein_stiller_hinweis_statt_des_knopfs(
         self,
@@ -1249,7 +1277,7 @@ class ErhebungsteilnahmeTests(TestCase):
                 gespraech_url, {"eingabe": "Wie rechnest du?"}
             )
 
-        self.assertNotContains(antwort, "Debrief")
+        self.assertNotContains(antwort, 'id="sitzung-debrief"')
         self.assertContains(antwort, "Ich addiere.")
 
     def test_zeitbudget_ueberlebt_den_browserwechsel(self) -> None:
@@ -1961,7 +1989,7 @@ class ErhebungsteilnahmeTests(TestCase):
             # Der Reload im selben Browser zeigt den Verlauf aus der Session.
             neu_geladen: HttpResponse = self.client.get(gespraech_url)
             self.assertContains(neu_geladen, "Ich addiere.")
-            self.assertNotContains(neu_geladen, "Debrief")
+            self.assertNotContains(neu_geladen, 'id="sitzung-debrief"')
             debrief: HttpResponse = self.client.post(
                 gespraech_url, {"eingabe": "Und dann?"}
             )

@@ -307,10 +307,26 @@
 }
 
 .gespraechseingabe--fehler p { margin-top: 0; }
-.sitzung-aktionen { display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* Abgesetzte Aktionszeile unter der Eingabe: Abbrechen links, Erklärsatz und Beenden rechts. */
+.sitzung-aktionen {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+}
+
 .sitzung-aktionen form { margin: 0; }
-.sitzung-aktion-link { border: 0; background: transparent; color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer; }
-.sitzung-aktion-link--ruhig { color: var(--color-text-muted); font-weight: 500; }
+.sitzung-aktionen__abbrechen { margin-right: auto; }
+.sitzung-aktionen__hinweis { margin: 0; color: var(--color-text-muted); }
+.sitzung-aktion-link { padding: 0; border: 0; background: transparent; font: inherit; cursor: pointer; }
+.sitzung-aktion-link:hover { text-decoration: underline; }
+.sitzung-aktion-link--gefahr { color: var(--color-danger); }
+.sitzung-aktion-link--gefahr:hover { color: var(--color-danger-emphasis); }
 
 /* Dasselbe Raster wie im Gespräch, erweitert um das Transkriptfeld darüber. */
 .diagnose {
@@ -359,4 +375,7 @@
             "aufnahme     senden"
             "hinweis      hinweis";
     }
+
+    /* Der Erklärsatz steht oben allein, Abbrechen und Beenden teilen sich die Zeile darunter. */
+    .sitzung-aktionen__hinweis { flex-basis: 100%; order: -1; }
 }

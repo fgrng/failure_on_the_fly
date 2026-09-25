@@ -327,6 +327,16 @@ Status. Ohne Einwilligung gibt es keinen Knopf; an seiner Stelle steht still
 „Spracheingabe nicht freigegeben. Sie nutzen die Tastatur.“ Auf schmalen
 Bildschirmen stehen Spracheingabe und Senden in einer Zeile, der Status darunter.
 
+Im Gespräch folgt unter der Eingabezeile eine eigene Aktionszeile, durch eine
+Trennlinie abgesetzt. Rechts steht „Gespräch beenden →“ als grau umrandeter
+Knopf, davor in gedämpfter Schrift „Genug gefragt? Danach folgt der Debrief mit
+Ihrer Diagnose.“ Links steht in Training und Erhebung „Sitzung abbrechen“ als
+roter Textlink; die Sitzung wird damit verworfen. Im Probelauf gibt es kein
+Abbrechen. Beide Aktionen wirken ohne Rückfrage. Nach einer fehlgeschlagenen
+Antwort heißt der Knopf „Gespräch beenden und Debrief anzeigen“. Im Debrief gibt
+es keine Aktionszeile. Auf schmalen Bildschirmen steht der Erklärsatz allein
+oben, Abbrechen und Beenden teilen sich die Zeile darunter.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der

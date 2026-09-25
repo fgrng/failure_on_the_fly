@@ -83,6 +83,16 @@ a:hover {
 .button--danger:hover {
     background: var(--color-danger-emphasis);
 }
+/* Umrandet ohne Bereichsfarbe: für nicht destruktive Nebenwege. */
+.button--neutral {
+    background: transparent;
+    border-color: var(--color-border);
+    color: var(--color-text);
+}
+.button--neutral:hover {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+}
 
 /* ---- Bereichs-Chrome ---- */
 .area--participant,
