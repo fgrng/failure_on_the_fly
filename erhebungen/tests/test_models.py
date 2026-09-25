@@ -179,6 +179,62 @@ def test_eigentuemerinnen_migration_uebernimmt_bestand_und_stellt_trigger_zuruec
     assert "AFTER UPDATE OF randomisierung" in trigger_sql
 
 
+@pytest.mark.django_db(transaction=True)
+def test_positionsmigration_traegt_positionen_zufaelliger_erhebungen_nach() -> None:
+    """Zufällige Erhebungen bekommen Positionen; rückwärts verlieren sie sie wieder."""
+
+    # Andere Migrationstests hinterlassen einen älteren Stand.
+    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    MigrationExecutor(connection).migrate(nachher)
+    ada: Konto = Konto.objects.create_user(username="ada")
+    Simulationskern.objects.anlegen().finalisieren()
+    zufaellig: Erhebung = Erhebung.objects.anlegen(
+        ada, name="Zufall", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
+    )
+    fest: Erhebung = Erhebung.objects.anlegen(ada, name="Fest")
+    erste: Vignette = _finale_vignette_anlegen(ada)
+    zweite: Vignette = _finale_vignette_anlegen(ada)
+    # Umgekehrt zur Aufnahme-Reihenfolge, damit die Nachtragung sichtbar wird.
+    Erhebungsvignette.objects.create(erhebung=zufaellig, vignette=erste, position=2)
+    Erhebungsvignette.objects.create(erhebung=zufaellig, vignette=zweite, position=1)
+    Erhebungsvignette.objects.create(erhebung=fest, vignette=zweite, position=1)
+    Erhebungsvignette.objects.create(erhebung=fest, vignette=erste, position=2)
+
+    def positionen(erhebung: Erhebung) -> list[tuple[int, int | None]]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT vignette_id, position FROM erhebungen_erhebungsvignette "
+                "WHERE erhebung_id = %s ORDER BY id",
+                [erhebung.pk],
+            )
+            return cursor.fetchall()
+
+    vorher = [("erhebungen", "0016_vignettenposition_zieht_um")]
+    MigrationExecutor(connection).migrate(vorher)
+    try:
+        rueckwaerts = (positionen(zufaellig), positionen(fest))
+        MigrationExecutor(connection).migrate(nachher)
+        vorwaerts = (positionen(zufaellig), positionen(fest))
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'trigger' "
+                "AND name = 'erhebungen_reihenfolgeregel_bewahren'"
+            )
+            reihenfolgeregel_trigger = cursor.fetchall()
+    finally:
+        MigrationExecutor(connection).migrate(nachher)
+
+    assert rueckwaerts == (
+        [(erste.pk, None), (zweite.pk, None)],
+        [(zweite.pk, 1), (erste.pk, 2)],
+    )
+    assert vorwaerts == (
+        [(erste.pk, 1), (zweite.pk, 2)],
+        [(zweite.pk, 1), (erste.pk, 2)],
+    )
+    assert reihenfolgeregel_trigger == []
+
+
 @pytest.mark.django_db
 def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
     """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
@@ -303,36 +359,62 @@ def test_erhebung_bindet_material_ueber_eine_kreis_schnittmenge_ein() -> None:
 
 
 @pytest.mark.django_db
-def test_zufaellige_erhebung_hat_keine_vignettenpositionen() -> None:
-    """Eine zufällige Reihenfolge speichert an der Mitgliedschaft keine Position."""
+def test_erhebungsvignette_braucht_eine_position() -> None:
+    """Ohne Position lässt sich keine Vignettenbindung speichern."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.anlegen(
         ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
+    Simulationskern.objects.anlegen().finalisieren()
     finale: Vignette = _finale_vignette_anlegen(ada)
 
-    with pytest.raises(ValidationError, match="keine Position"):
-        Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale, position=1)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale)
+    with pytest.raises(ValidationError, match="position"):
+        Erhebungsvignette(erhebung=erhebung, vignette=finale).full_clean()
 
 
 @pytest.mark.django_db
-def test_zufaellige_erhebung_nimmt_finale_vignetten_ohne_position_auf() -> None:
-    """Eine zufällige Reihenfolge bindet finale Vignetten ohne Position ein."""
+def test_zufaellige_erhebung_bewahrt_vignettenpositionen() -> None:
+    """Auch eine zufällige Reihenfolge speichert die Position der Liste."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.anlegen(
         ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    finale: Vignette = _finale_vignette_anlegen(ada)
+    Simulationskern.objects.anlegen().finalisieren()
+    erste: Vignette = _finale_vignette_anlegen(ada)
+    zweite: Vignette = _finale_vignette_anlegen(ada)
 
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=2)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=1)
+    for regel in (Erhebung.Randomisierung.FEST, Erhebung.Randomisierung.ZUFAELLIG):
+        erhebung.randomisierung = regel
+        erhebung.save(update_fields=["randomisierung"])
 
-    assert list(erhebung.vignetten.all()) == [finale]
+    assert list(
+        erhebung.vignettenzugehoerigkeiten.values_list("vignette_id", "position")
+    ) == [(zweite.pk, 1), (erste.pk, 2)]
+
+
+@pytest.mark.django_db
+def test_vignettenposition_ist_je_erhebung_eindeutig() -> None:
+    """Zwei Vignetten einer Erhebung teilen sich keine Position."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
+    )
+    Simulationskern.objects.anlegen().finalisieren()
+    Erhebungsvignette.objects.create(
+        erhebung=erhebung, vignette=_finale_vignette_anlegen(ada), position=1
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=_finale_vignette_anlegen(ada), position=1
+        )
 
 
 @pytest.mark.django_db

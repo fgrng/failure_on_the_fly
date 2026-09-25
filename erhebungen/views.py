@@ -491,7 +491,11 @@ def stichprobe_archivieren(
 def vignette_hinzufuegen(
     request: HttpRequest, pk: int, vignette_pk: int
 ) -> HttpResponse:
-    """Nimmt eine eigene finale Fassung in einen eigenen Entwurf auf."""
+    """Nimmt eine eigene finale Fassung am Ende der Liste eines eigenen Entwurfs auf.
+
+    Die Position gilt unabhängig von der Reihenfolgeregel; bei zufälliger
+    Reihenfolge bleibt sie für einen späteren Wechsel zu fest gespeichert.
+    """
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -501,9 +505,10 @@ def vignette_hinzufuegen(
     vignette: Vignette = get_object_or_404(
         _eigene_finalen_vignetten(request), pk=vignette_pk
     )
-    position: int | None = None
-    if erhebung.randomisierung == Erhebung.Randomisierung.FEST:
-        position = erhebung.vignettenzugehoerigkeiten.count() + 1
+    position: int = (
+        erhebung.vignettenzugehoerigkeiten.aggregate(Max("position"))["position__max"]
+        or 0
+    ) + 1
     Erhebungsvignette.objects.get_or_create(
         erhebung=erhebung, vignette=vignette, defaults={"position": position}
     )

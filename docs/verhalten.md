@@ -374,7 +374,10 @@ abgelehnt. Ein Hilfetext am Feld nennt, wo der Name erscheint (Erhebungsliste,
 Dateiname der Datenspur, Abschriften der Teilnehmenden). Meldungen stehen am
 Feld, die Eingabe bleibt nach einem Fehler stehen. Umbenennen lässt sich eine
 Erhebung nicht. In einem Entwurf wählen sie finale Vignetten,
-bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
+bestimmen eine feste oder zufällige Reihenfolge. Neu aufgenommene Vignetten
+stehen am Ende der Liste. Bei zufälliger Reihenfolge wird je Teilnahme gemischt,
+die Reihenfolge der Liste bleibt aber gespeichert: Beim Wechsel zurück zu fest
+gilt wieder die zuvor festgelegte Reihenfolge. Außerdem pflegen sie Instruktions-,
 Einwilligungs- und Abschlusstext. Die drei Texte stehen im Entwurf zunächst
 gerendert zum Lesen, auf wenige Zeilen gekürzt; »Ganz anzeigen« klappt einen
 langen Text auf. Ein leerer Text zeigt »Noch kein Text« und statt
