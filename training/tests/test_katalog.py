@@ -38,6 +38,26 @@ class TrainingskatalogTests(TestCase):
         self.assertContains(response, reverse("training:detail", args=[training.pk]))
         self.assertContains(response, reverse("training:katalog"))
 
+    def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
+        """Der Name ist der einzige Link; der Zeilenhinweis nennt action_label."""
+        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        Training.objects.anlegen(ausbilderin, name="Bruchrechnung").veroeffentlichen()
+        self.client.force_login(ausbilderin)
+
+        response: HttpResponse = self.client.get(reverse("training:katalog"))
+
+        self.assertContains(
+            response, '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>'
+        )
+        self.assertContains(
+            response,
+            '<td class="table__zeilenhinweis" aria-hidden="true"'
+            " x-text=\"r.action_label + ' ›'\"></td>",
+        )
+        self.assertContains(response, "table--zeilenlink")
+        self.assertNotContains(response, "button--secondary")
+        self.assertNotContains(response, ">Aktion<")
+
     def test_versteckt_unveroeffentlichte_trainings(self) -> None:
         """Entwürfe erscheinen weder im Katalog noch über ihre Detail-URL."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")

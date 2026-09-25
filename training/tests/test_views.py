@@ -35,6 +35,27 @@ class TrainingAnlegenTests(TestCase):
         self.assertContains(liste, "Gleichungen")
         self.assertNotContains(liste, "Fremdes Training")
 
+    def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
+        """Der Name führt zum Kuratieren; der Zeilenhinweis nennt »Kuratieren ›«."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        training: Training = Training.objects.anlegen(ada, name="Gleichungen")
+        self.client.force_login(ada)
+
+        liste: HttpResponse = self.client.get(reverse("training:liste"))
+
+        self.assertContains(
+            liste, '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>'
+        )
+        self.assertContains(liste, reverse("training:kuratieren", args=[training.pk]))
+        self.assertContains(
+            liste,
+            '<td class="table__zeilenhinweis" aria-hidden="true">Kuratieren ›</td>',
+        )
+        self.assertContains(liste, "table--zeilenlink")
+        self.assertNotContains(liste, "button--secondary")
+        self.assertNotContains(liste, ">Aktion<")
+
     def test_konto_ohne_ausbilderrolle_kann_kein_training_anlegen(self) -> None:
         """Die Ausbilder-UI weist eingeloggte Teilnehmer:innen zurück."""
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")

@@ -58,19 +58,19 @@
         </div>
 
         <div class="table-wrap vignette-index-table">
-            <table class="table table--sortable">
+            <table class="table table--sortable table--zeilenlink">
                 <thead>
                     <tr>
                         <th scope="col"><button type="button" class="table__sort" @click="sortiere('name')">Training<span class="table__sort-arrow" :class="pfeilKlasse('name')"></span></button></th>
                         <th scope="col"><button type="button" class="table__sort" @click="sortiere('sort_progress')">Vignetten bearbeitet<span class="table__sort-arrow" :class="pfeilKlasse('sort_progress')"></span></button></th>
                         <th scope="col">Sitzungen gesamt</th>
-                        <th scope="col">Aktion</th>
+                        <th scope="col"><span class="visually-hidden">Ansehen</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="(r, i) in sichtbar" :key="i">
                         <tr>
-                            <td x-text="r.name"></td>
+                            <td><a class="zeilenlink" :href="r.url" x-text="r.name"></a></td>
                             <td x-text="r.fortschritt"></td>
                             <td>
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -88,11 +88,11 @@
                                     </template>
                                 </div>
                             </td>
-                            <td><a class="button button--secondary" :href="r.url">Ansehen</a></td>
+                            <td class="table__zeilenhinweis" aria-hidden="true">Ansehen ›</td>
                         </tr>
                     </template>
                     <tr x-show="sichtbar.length === 0">
-                        <td colspan="3" class="table__empty">Keine durchgeführten Trainings gefunden.</td>
+                        <td colspan="4" class="table__empty">Keine durchgeführten Trainings gefunden.</td>
                     </tr>
                 </tbody>
             </table>
