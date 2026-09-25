@@ -339,15 +339,14 @@ def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
         )
     else:
         form = ModellKonfigurationForm()
+    # Nur Nummer und Bezeichnung, damit der Klartext des Tokens die Seite nie erreicht.
+    vorlage_kopf: dict[str, object] | None = (
+        {"pk": vorlage.pk, "bezeichnung": vorlage.bezeichnung} if vorlage else None
+    )
     return render(
         request,
         "simulation/modell_konfiguration_neu.html",
-        {
-            "form": form,
-            "vorlage": {"pk": vorlage.pk, "bezeichnung": vorlage.bezeichnung}
-            if vorlage
-            else None,
-        },
+        {"form": form, "vorlage": vorlage_kopf},
     )
 
 
