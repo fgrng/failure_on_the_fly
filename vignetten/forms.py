@@ -4,7 +4,7 @@ from typing import Any
 
 from django.forms import ClearableFileInput, Form, ModelForm
 
-from .models import Vignette
+from .models import FELDBESCHRIFTUNGEN, Vignette
 
 _BILDTEILE: tuple[str, ...] = ("lernauftrag", "arbeitsheft")
 
@@ -46,24 +46,7 @@ class VignetteForm(ModelForm):
             "budget_typ",
             "budget_wert",
         ]
-        labels: dict[str, str] = {
-            "fehlermuster_beschreibung": "Fehlermuster Beschreibung",
-            "lernauftrag_text": "Lernauftrag Text",
-            "lernauftrag_bild": "Lernauftrag Bild",
-            "lernauftrag_bildbeschreibung": "Lernauftrag Bildbeschreibung",
-            "lernauftrag_simulationshinweise": "Lernauftrag Simulationshinweise (optional)",
-            "arbeitsheft_text": "Arbeitsheft Text",
-            "arbeitsheft_bild": "Arbeitsheft Bild",
-            "arbeitsheft_bildbeschreibung": "Arbeitsheft Bildbeschreibung",
-            "arbeitsheft_simulationshinweise": "Arbeitsheft Simulationshinweise (optional)",
-            "schuelerin_name": "Schüler:in Vorname",
-            "schuelerin_geschlecht": "Schüler:in Geschlecht",
-            "lehrperson_name": "Lehrperson Nachname (Frau/Herr …)",
-            "lehrperson_geschlecht": "Lehrperson Geschlecht",
-            "referenzdiagnose": "Referenzdiagnose (optional)",
-            "budget_typ": "Budget Typ",
-            "budget_wert": "Budget Wert",
-        }
+        labels: dict[str, str] = FELDBESCHRIFTUNGEN
         widgets: dict[str, type[Bildeingabe]] = {
             f"{teil}_bild": Bildeingabe for teil in _BILDTEILE
         }

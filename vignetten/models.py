@@ -85,6 +85,30 @@ _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "budget_typ",
 )
 
+# Gekoppelt geschrieben wie in CONTEXT.md (#314); Formular, Detailansicht und
+# Finalisieren nennen die Felder gleich.
+FELDBESCHRIFTUNGEN: dict[str, str] = {
+    "fehlermuster_beschreibung": "Fehlermuster-Beschreibung",
+    "lernauftrag_text": "Lernauftrag-Text",
+    "lernauftrag_bild": "Lernauftrag-Bild",
+    "lernauftrag_bildbeschreibung": "Lernauftrag-Bildbeschreibung",
+    "lernauftrag_simulationshinweise": "Lernauftrag-Simulationshinweise (optional)",
+    "arbeitsheft_text": "Arbeitsheft-Text",
+    "arbeitsheft_bild": "Arbeitsheft-Bild",
+    "arbeitsheft_bildbeschreibung": "Arbeitsheft-Bildbeschreibung",
+    "arbeitsheft_simulationshinweise": "Arbeitsheft-Simulationshinweise (optional)",
+    "schuelerin_name": "Vorname der Schüler:in",
+    "schuelerin_geschlecht": "Schüler:in Geschlecht",
+    "lehrperson_name": "Lehrperson Nachname (Frau/Herr …)",
+    "lehrperson_geschlecht": "Lehrperson Geschlecht",
+    "fach": "Fach",
+    "thema": "Thema",
+    "klassenstufe": "Klassenstufe",
+    "referenzdiagnose": "Referenzdiagnose (optional)",
+    "budget_typ": "Budget-Typ",
+    "budget_wert": "Budget-Wert",
+}
+
 if TYPE_CHECKING:
     from konten.models import Konto
 
@@ -557,7 +581,9 @@ class Vignette(models.Model):
         if self.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können finalisiert werden.")
         fehlende_felder: list[str] = [
-            feldname for feldname in _PFLICHTFELD_NAMEN if not getattr(self, feldname)
+            FELDBESCHRIFTUNGEN[feldname]
+            for feldname in _PFLICHTFELD_NAMEN
+            if not getattr(self, feldname)
         ]
         if fehlende_felder:
             raise ValidationError(

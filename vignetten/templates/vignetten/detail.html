@@ -75,14 +75,10 @@
             <b>02</b><span><h2 id="detail-actors">Akteure</h2><small>Personen der Rahmenhandlung</small></span>
         </header>
         <dl class="field-grid">
-            <div>
-                <dt>Simulierte Schüler:in</dt>
-                <dd>{{ vignette.schuelerin_name|default:"—" }}{% if vignette.schuelerin_geschlecht %} ({{ vignette.get_schuelerin_geschlecht_display }}){% endif %}</dd>
-            </div>
-            <div>
-                <dt>Erfahrene Lehrperson</dt>
-                <dd>{{ vignette.lehrperson_name|default:"—" }}{% if vignette.lehrperson_geschlecht %} ({{ vignette.get_lehrperson_geschlecht_display }}){% endif %}</dd>
-            </div>
+            <div><dt>Vorname der Schüler:in</dt><dd>{{ vignette.schuelerin_name|default:"—" }}</dd></div>
+            <div><dt>Schüler:in Geschlecht</dt><dd>{{ vignette.get_schuelerin_geschlecht_display|default:"—" }}</dd></div>
+            <div><dt>Lehrperson Nachname (Frau/Herr …)</dt><dd>{{ vignette.lehrperson_name|default:"—" }}</dd></div>
+            <div><dt>Lehrperson Geschlecht</dt><dd>{{ vignette.get_lehrperson_geschlecht_display|default:"—" }}</dd></div>
         </dl>
     </section>
 
@@ -92,15 +88,15 @@
         </header>
         <div class="field-grid">
             <section class="page-field page-field--wide">
-                <h3>Lernauftrag Text</h3>
+                <h3>Lernauftrag-Text</h3>
                 {% if vignette.lernauftrag_text or vignette.lernauftrag_bild %}
                     {% include "vignetten/includes/aufgabenkontext_inhalt.html" with teil=vignette.lernauftrag %}
                 {% else %}
                     <p class="prose">—</p>
                 {% endif %}
             </section>
-            <section class="page-field page-field--wide"><h3>Lernauftrag Bildbeschreibung</h3><p class="prose">{{ vignette.lernauftrag_bildbeschreibung|default:"—" }}</p></section>
-            <section class="page-field page-field--wide"><h3>Lernauftrag Simulationshinweise (optional)</h3><p class="prose">{{ vignette.lernauftrag_simulationshinweise|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Lernauftrag-Bildbeschreibung</h3><p class="prose">{{ vignette.lernauftrag_bildbeschreibung|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Lernauftrag-Simulationshinweise (optional)</h3><p class="prose">{{ vignette.lernauftrag_simulationshinweise|default:"—" }}</p></section>
         </div>
     </section>
 
@@ -110,15 +106,15 @@
         </header>
         <div class="field-grid">
             <section class="page-field page-field--wide">
-                <h3>Arbeitsheft Text</h3>
+                <h3>Arbeitsheft-Text</h3>
                 {% if vignette.arbeitsheft_text or vignette.arbeitsheft_bild %}
                     {% include "vignetten/includes/aufgabenkontext_inhalt.html" with teil=vignette.arbeitsheft %}
                 {% else %}
                     <p class="prose">—</p>
                 {% endif %}
             </section>
-            <section class="page-field page-field--wide"><h3>Arbeitsheft Bildbeschreibung</h3><p class="prose">{{ vignette.arbeitsheft_bildbeschreibung|default:"—" }}</p></section>
-            <section class="page-field page-field--wide"><h3>Arbeitsheft Simulationshinweise (optional)</h3><p class="prose">{{ vignette.arbeitsheft_simulationshinweise|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Arbeitsheft-Bildbeschreibung</h3><p class="prose">{{ vignette.arbeitsheft_bildbeschreibung|default:"—" }}</p></section>
+            <section class="page-field page-field--wide"><h3>Arbeitsheft-Simulationshinweise (optional)</h3><p class="prose">{{ vignette.arbeitsheft_simulationshinweise|default:"—" }}</p></section>
         </div>
     </section>
 
@@ -127,7 +123,7 @@
             <b>05</b><span><h2 id="detail-pattern">Fehlermuster</h2><small>Fachliche Modellierung und optionale Notiz</small></span>
         </header>
         <div class="field-grid">
-            <section class="page-field"><h3>Fehlermuster Beschreibung</h3><p class="prose">{{ vignette.fehlermuster_beschreibung|default:"—" }}</p></section>
+            <section class="page-field"><h3>Fehlermuster-Beschreibung</h3><p class="prose">{{ vignette.fehlermuster_beschreibung|default:"—" }}</p></section>
             <section class="page-field"><h3>Referenzdiagnose (optional)</h3><p class="prose">{{ vignette.referenzdiagnose|default:"—" }}</p></section>
         </div>
     </section>
@@ -138,8 +134,8 @@
         </header>
         <div>
             <dl class="field-grid">
-                <div><dt>Budget Typ</dt><dd>{{ vignette.get_budget_typ_display|default:"—" }}</dd></div>
-                <div><dt>Budget Wert</dt><dd>{{ vignette.budget_wert|default:"—" }}</dd></div>
+                <div><dt>Budget-Typ</dt><dd>{{ vignette.get_budget_typ_display|default:"—" }}</dd></div>
+                <div><dt>Budget-Wert</dt><dd>{{ vignette.budget_wert|default:"—" }}</dd></div>
             </dl>
             <p class="vignette-detail-kern">Gepinnter Simulationskern: {{ vignette.gepinnter_kern.pk|default:"—" }}</p>
         </div>
