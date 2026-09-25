@@ -23,10 +23,14 @@
                 <b>01</b><span><h2 id="section-name">Name</h2><small>Wie soll die Erhebung heißen?</small></span>
             </header>
             <div class="field-grid">
+                {% with feld=formular.name %}
                 <div class="vignette-field">
-                    <label for="id_name">Name</label>
-                    <input id="id_name" name="name" required>
+                    <label for="{{ feld.id_for_label }}">{{ feld.label }}</label>
+                    {{ feld }}
+                    <small id="{{ feld.auto_id }}_helptext">{{ feld.help_text }}</small>
+                    {{ feld.errors }}
                 </div>
+                {% endwith %}
             </div>
         </section>
         <div class="vignette-form-actions">

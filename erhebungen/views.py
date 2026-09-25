@@ -48,7 +48,7 @@ from .ablauf import (
     vignette_beginnen,
 )
 from .export import datenspur_zip
-from .forms import ItemblockFormular
+from .forms import ErhebungAnlegenFormular, ItemblockFormular
 from .models import (
     Erhebung,
     Erhebungsbindung,
@@ -267,13 +267,14 @@ def liste(request: HttpRequest) -> HttpResponse:
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine neue Erhebung als Entwurf an."""
 
-    if request.method == "POST":
+    formular = ErhebungAnlegenFormular(request.POST or None)
+    if formular.is_valid():
         erhebung: Erhebung = Erhebung.objects.anlegen(
             request.user,
-            name=request.POST.get("name", "Neue Erhebung"),
+            name=formular.cleaned_data["name"],
         )
         return redirect("erhebungen:detail", pk=erhebung.pk)
-    return render(request, "erhebungen/anlegen.html")
+    return render(request, "erhebungen/anlegen.html", {"formular": formular})
 
 
 @login_required

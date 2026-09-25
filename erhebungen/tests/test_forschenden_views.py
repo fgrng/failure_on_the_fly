@@ -250,6 +250,71 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         erhebung: Erhebung = Erhebung.objects.get(eigentuemerinnen=administratorin)
         self.assertRedirects(angelegt, reverse("erhebungen:detail", args=[erhebung.pk]))
 
+    def test_anlegen_speichert_den_namen_ohne_randleerzeichen(self) -> None:
+        """Leerzeichen am Rand gehören nicht zum Namen der Erhebung."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.client.force_login(ada)
+
+        angelegt: HttpResponse = self.client.post(
+            reverse("erhebungen:anlegen"), {"name": "  Brüche erforschen  "}
+        )
+
+        erhebung: Erhebung = Erhebung.objects.get(eigentuemerinnen=ada)
+        self.assertEqual(erhebung.name, "Brüche erforschen")
+        self.assertRedirects(angelegt, reverse("erhebungen:detail", args=[erhebung.pk]))
+
+    def test_anlegen_lehnt_ungueltige_namen_mit_meldung_am_feld_ab(self) -> None:
+        """Leere und zu lange Namen enden in einer Meldung statt im Serverfehler."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.client.force_login(ada)
+
+        for eingabe, meldung in (
+            ("   ", "Bitte geben Sie einen Namen ein."),
+            ("x" * 256, "Höchstens 255 Zeichen."),
+        ):
+            with self.subTest(eingabe=eingabe[:10]):
+                abgelehnt: HttpResponse = self.client.post(
+                    reverse("erhebungen:anlegen"), {"name": eingabe}
+                )
+
+                self.assertEqual(abgelehnt.status_code, 200)
+                self.assertFalse(Erhebung.objects.filter(eigentuemerinnen=ada).exists())
+                self.assertEqual(
+                    abgelehnt.context["formular"]["name"].errors, [meldung]
+                )
+                self.assertContains(abgelehnt, meldung)
+
+    def test_anlegen_laesst_die_eingabe_nach_einem_fehler_stehen(self) -> None:
+        """Wer sich um ein Zeichen vertippt, muss den Namen nicht neu schreiben."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.client.force_login(ada)
+        zu_lang: str = "Brüche " + "x" * 250
+
+        abgelehnt: HttpResponse = self.client.post(
+            reverse("erhebungen:anlegen"), {"name": zu_lang}
+        )
+
+        self.assertContains(abgelehnt, f'value="{zu_lang}"')
+
+    def test_anlegen_nennt_am_feld_wo_der_name_erscheint(self) -> None:
+        """Der Hilfetext hängt per aria-describedby am Namensfeld."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.client.force_login(ada)
+
+        seite: HttpResponse = self.client.get(reverse("erhebungen:anlegen"))
+
+        self.assertContains(
+            seite,
+            "Erscheint in Ihrer Erhebungsliste, im Dateinamen der Datenspur und "
+            "in den Abschriften der Teilnehmenden.",
+        )
+        self.assertContains(seite, 'aria-describedby="id_name_helptext"')
+        self.assertContains(seite, 'id="id_name_helptext"')
+
     def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
         """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""
         grace: Konto = get_user_model().objects.create_user(username="grace")
