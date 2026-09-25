@@ -220,6 +220,36 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertNotContains(liste, "badge--entwurf")
         self.assertNotContains(liste, "badge--archiviert")
 
+    def test_zeilen_sind_ueber_den_namen_verlinkt_und_nur_entwuerfe_haben_loeschknopf(
+        self,
+    ) -> None:
+        """Der Name ist der Link der Zeile; nur Entwürfe tragen den Lösch-Icon-Knopf."""
+
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ModellKonfiguration.objects.aktivieren(
+            _forschungskonfiguration(), Verwendung.SCHUELERIN
+        )
+        entwurf: Erhebung = Erhebung.objects.anlegen(ada, name="Noch Entwurf")
+        finale: Erhebung = Erhebung.objects.anlegen(ada, name="Schon final")
+        finale.finalisieren()
+        self.client.force_login(ada)
+
+        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
+
+        self.assertContains(liste, "table--zeilenlink")
+        for erhebung in (entwurf, finale):
+            detail: str = reverse("erhebungen:detail", args=[erhebung.pk])
+            self.assertContains(
+                liste, f'<a class="zeilenlink" href="{detail}">{erhebung.name}</a>'
+            )
+        self.assertContains(liste, 'aria-label="Noch Entwurf löschen"')
+        self.assertNotContains(liste, 'aria-label="Schon final löschen"')
+        self.assertContains(liste, "zeilenaktion--gefahr", count=1)
+        self.assertNotContains(liste, "button--secondary")
+        self.assertNotContains(liste, "button--danger")
+        self.assertNotContains(liste, ">Aktion<")
+
     def test_liste_zeigt_kein_teilnahme_token_aus_der_browsersession(self) -> None:
         """Ein selbst getesteter Teilnahme-Link spielt kein Token in die Sidebar."""
 

@@ -278,3 +278,16 @@ def test_zeilenlink_tabelle_ist_opt_in_und_behaelt_trennlinien(main_css: str) ->
     )
     assert ".zeilenlink::after" in main_css
     assert "vignette-index-table tbody" not in main_css
+
+
+def test_zeilenaktion_liegt_ueber_dem_zeilenlink(main_css: str) -> None:
+    """Die Zweitaktion einer klickbaren Zeile fängt den Klick vor dem ::after ab."""
+
+    aktion: str = main_css.partition(".zeilenaktion {")[2].partition("}")[0]
+    assert "position: relative;" in aktion
+    assert "z-index: 1;" in aktion
+    assert "color: var(--color-text-muted);" in aktion
+    assert (
+        ".zeilenaktion--gefahr:hover { border-color: currentColor; "
+        "color: var(--color-danger); }" in main_css
+    )

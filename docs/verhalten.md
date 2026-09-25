@@ -72,6 +72,13 @@ zeichnet zusätzlich den grünen Fokus-Ring um die Zeile. Die Trennlinien
 zwischen den Zeilen bleiben dabei sichtbar. Suche, Filter und Sortierung
 bleiben unverändert.
 
+Die Erhebungsliste hat dieselben klickbaren Zeilen. Entwürfe tragen am
+Zeilenende zusätzlich einen Lösch-Knopf mit Mülleimer-Symbol, in Ruhe
+gedämpft, beim Überfahren rot umrandet. Er ist ein eigenes Element mit der
+Beschriftung »<Name> löschen«: Mit Tab erreicht man ihn nach dem Namen, ein
+Klick darauf löscht den Entwurf sofort und öffnet nicht die Detailseite.
+Finale und archivierte Erhebungen haben keinen Lösch-Knopf.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen

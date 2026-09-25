@@ -20,25 +20,26 @@
 
     {% if erhebungen %}
         <div class="table-wrap vignette-index-table">
-            <table class="table">
+            <table class="table table--zeilenlink">
                 <thead>
                     <tr>
                         <th scope="col">Name</th>
                         <th scope="col">Zustand</th>
-                        <th scope="col">Aktion</th>
+                        <th scope="col"><span class="visually-hidden">Öffnen</span></th>
+                        <th scope="col"><span class="visually-hidden">Löschen</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for erhebung in erhebungen %}
                         <tr>
-                            <td>{{ erhebung.name }}</td>
+                            <td><a class="zeilenlink" href="{% url 'erhebungen:detail' erhebung.pk %}">{{ erhebung.name }}</a></td>
                             <td><span class="badge badge--{{ erhebung.status_badge }}">{{ erhebung.get_status_display }}</span></td>
-                            <td>
-                                <a class="button button--secondary" href="{% url 'erhebungen:detail' erhebung.pk %}">Öffnen</a>
+                            <td class="table__zeilenhinweis" aria-hidden="true">Öffnen ›</td>
+                            <td class="table__zeilenaktionen">
                                 {% if erhebung.status == erhebung.Status.ENTWURF %}
-                                    <form method="post" action="{% url 'erhebungen:loeschen' erhebung.pk %}" style="display:inline-block; margin-left: 0.5rem;">
+                                    <form method="post" action="{% url 'erhebungen:loeschen' erhebung.pk %}">
                                         {% csrf_token %}
-                                        <button class="button button--danger" type="submit">Löschen</button>
+                                        <button class="zeilenaktion zeilenaktion--gefahr" type="submit" aria-label="{{ erhebung.name }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
                                     </form>
                                 {% endif %}
                             </td>
