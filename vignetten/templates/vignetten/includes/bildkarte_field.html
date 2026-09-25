@@ -5,10 +5,8 @@
 {% endcomment %}
 {% with bild=karte.bild beschreibung=karte.beschreibung %}
 <fieldset class="bildkarte page-field--wide" x-data="bildkarte"
-          data-zustand="{% if bild.errors %}fehler{% elif karte.verlorene_datei %}verloren{% elif karte.entfernen %}entfernen{% elif karte.gespeichert_url %}gespeichert{% else %}leer{% endif %}"
+          data-zustand="{{ karte.zustand }}"
           data-gespeichert="{{ karte.gespeichert_url }}"
-          data-fehlerhaft="{{ karte.fehlerhafte_datei }}"
-          data-verloren="{{ karte.verlorene_datei }}"
           data-text-id="{{ karte.text_id }}"
           :data-zustand="zustand"
           @input.window="if ($event.target.id === textId) text = $event.target.value">

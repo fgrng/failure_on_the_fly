@@ -1,13 +1,13 @@
 // Bildkarte im Vignettenformular (#288): Vorschau, Ablegen, Ersetzen und Entfernen
 // über dem echten <input type="file">. Der Startzustand kommt vom Server als
-// data-Attribute der Karte (vignetten/includes/bildkarte_field.html).
+// data-Attribute und vorbefüllte Felder der Karte
+// (vignetten/includes/bildkarte_field.html).
 
 document.addEventListener("alpine:init", () => {
     Alpine.data("bildkarte", () => ({
         zustand: "leer",
         gespeichertUrl: "",
         vorschau: "",
-        dateiname: "",
         beschreibung: "",
         beschreibungVorher: "",
         textId: "",
@@ -20,15 +20,11 @@ document.addEventListener("alpine:init", () => {
             this.zustand = daten.zustand;
             this.gespeichertUrl = daten.gespeichert;
             this.textId = daten.textId;
-            // Vor der x-model-Bindung lesen, sonst überschreibt "" den Serverwert;
-            // $refs gibt es in init() noch nicht.
+            // Vor den x-model- und x-text-Bindungen lesen, sonst überschreibt ""
+            // die Serverwerte; $refs gibt es in init() noch nicht.
             this.beschreibung = this.$el.querySelector("textarea").value;
+            this.meldung = this.$el.querySelector(".bildkarte__meldung").textContent;
             this.text = document.getElementById(this.textId)?.value ?? "";
-            if (daten.fehlerhaft) {
-                this.meldung = `»${daten.fehlerhaft}« ist kein Bild. Erlaubt sind zum Beispiel PNG, JPG, GIF und WebP.`;
-            } else if (daten.verloren) {
-                this.meldung = `Ihre Auswahl »${daten.verloren}« wurde nicht übernommen, weil das Formular noch Fehler enthält. Bitte wählen Sie das Bild erneut aus.`;
-            }
         },
 
         get bildUrl() {
@@ -57,7 +53,6 @@ document.addEventListener("alpine:init", () => {
             }
             if (this.wirdEntfernt) this.beschreibung = this.beschreibungVorher;
             this.vorschau = URL.createObjectURL(datei);
-            this.dateiname = datei.name;
             this.zustand = "gewaehlt";
             this.meldung = `»${datei.name}« gewählt. Das Bild wird beim Speichern hochgeladen.`;
         },

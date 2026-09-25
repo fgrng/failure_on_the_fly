@@ -121,14 +121,29 @@ class VignetteForm(ModelForm):
                 else None
             )
             dateiname: str = datei.name if datei else ""
+            fehlerhafte_datei: str = dateiname if bild.errors else ""
+            verlorene_datei: str = "" if bild.errors else dateiname
+            gespeichert_url: str = bild.initial.url if bild.initial else ""
+            entfernen: bool = f"{bild.html_name}-clear" in self.data
+            if bild.errors:
+                zustand: str = "fehler"
+            elif verlorene_datei:
+                zustand = "verloren"
+            elif entfernen:
+                zustand = "entfernen"
+            elif gespeichert_url:
+                zustand = "gespeichert"
+            else:
+                zustand = "leer"
             karten[teil] = {
                 "bild": bild,
                 "beschreibung": self[f"{teil}_bildbeschreibung"],
                 "text_id": self[f"{teil}_text"].id_for_label,
-                "gespeichert_url": bild.initial.url if bild.initial else "",
-                "fehlerhafte_datei": dateiname if bild.errors else "",
-                "verlorene_datei": "" if bild.errors else dateiname,
-                "entfernen": f"{bild.html_name}-clear" in self.data,
+                "zustand": zustand,
+                "gespeichert_url": gespeichert_url,
+                "fehlerhafte_datei": fehlerhafte_datei,
+                "verlorene_datei": verlorene_datei,
+                "entfernen": entfernen,
             }
         return karten
 
