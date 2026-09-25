@@ -1,0 +1,35 @@
+{% load texte %}
+{% comment %}
+    Hülle um markdown_feld.html: Der Text steht gerendert und gekürzt zum Lesen,
+    »Bearbeiten« (bei leerem Text »Text schreiben«) öffnet das Markdown-Feld.
+    Die Hülle steht in einem Formular; ihr »Speichern« sendet es ganz, mit allen
+    übrigen Feldern. »Abbrechen« setzt nur diesen Text auf den geladenen Stand
+    zurück. Erwartet feld_id, feld_name, label, wert und profil wie
+    markdown_feld.html.
+{% endcomment %}
+<div class="vignette-field page-field--wide markdown-lesefeld"
+     x-data="{ bearbeiten: false, ganz: false, lang: false }">
+    <div class="markdown-lesefeld__kopf">
+        <label for="{{ feld_id }}">{{ label }}</label>
+        <button type="button" class="button button--secondary button--small" x-show="!bearbeiten"
+                @click="bearbeiten = true; $nextTick(() => document.getElementById('{{ feld_id }}').focus())">{% if wert %}Bearbeiten{% else %}Text schreiben{% endif %}</button>
+    </div>
+    <div class="markdown-lesefeld__lesen" x-show="!bearbeiten">
+        {% if wert %}
+            <div class="markdown-text markdown-lesefeld__text" :class="{ 'markdown-lesefeld__text--ganz': ganz }"
+                 x-init="lang = $el.scrollHeight > $el.clientHeight">{{ wert|markdown:profil }}</div>
+            <button type="button" class="markdown-lesefeld__umfang" x-show="lang" x-cloak @click="ganz = !ganz"
+                    x-text="ganz ? 'Weniger anzeigen' : 'Ganz anzeigen'">Ganz anzeigen</button>
+        {% else %}
+            <p class="markdown-lesefeld__leer">Noch kein Text</p>
+        {% endif %}
+    </div>
+    <div class="markdown-lesefeld__bearbeiten" x-show="bearbeiten" x-cloak>
+        {% include "texte/includes/markdown_feld.html" with ohne_label=True %}
+        <div class="markdown-lesefeld__aktionen">
+            <button type="button" class="button button--secondary"
+                    @click="const feld = document.getElementById('{{ feld_id }}'); feld.value = feld.defaultValue; bearbeiten = false">Abbrechen</button>
+            <button type="submit" class="button">Speichern</button>
+        </div>
+    </div>
+</div>

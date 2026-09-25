@@ -15,3 +15,10 @@ def markdown_hinweis(profil: str) -> SafeString:
     """Liefert den Markdown-Hinweis, der unter einem Editorfeld des Profils steht."""
 
     return markdown.PROFILE[profil].hinweis
+
+
+@register.filter("markdown")
+def im_profil(quelle: str, profil: str) -> SafeString:
+    """Rendert eine Quelle im genannten Profil, etwa `wert|markdown:profil`."""
+
+    return markdown.PROFILE[profil].rendern(quelle)
