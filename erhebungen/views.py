@@ -673,7 +673,10 @@ def _feste_reihenfolge_setzen(
 def _konfiguration_uebernehmen(
     request: HttpRequest, erhebung: Erhebung
 ) -> HttpResponse | None:
-    """Übernimmt die gesendeten Felder in den Entwurf; liefert nur Fehlerantworten."""
+    """Übernimmt die gesendeten Felder in den Entwurf.
+
+    Liefert bei ungültiger Eingabe eine Fehlerantwort, sonst None.
+    """
 
     randomisierung: str = request.POST.get("randomisierung", erhebung.randomisierung)
     if randomisierung not in Erhebung.Randomisierung.values:
@@ -710,9 +713,10 @@ def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.ENTWURF:
         return redirect("erhebungen:detail", pk=erhebung.pk)
-    return _konfiguration_uebernehmen(request, erhebung) or redirect(
-        "erhebungen:detail", pk=erhebung.pk
-    )
+    fehler: HttpResponse | None = _konfiguration_uebernehmen(request, erhebung)
+    if fehler is not None:
+        return fehler
+    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
