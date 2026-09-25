@@ -100,8 +100,6 @@ _ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
 }
 
 
-
-
 # Eine einzige Tür für den gesamten Forschungsbereich, wie in fragebogen_items
 # und vignetten: Die Administration sieht eine Erhebung nicht nur, sie kann sie
 # auch anlegen und bearbeiten (ADR-0033).

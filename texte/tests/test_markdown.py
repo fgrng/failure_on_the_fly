@@ -100,7 +100,9 @@ class GemeinsamerUmfangTests(SimpleTestCase):
     def test_eingerueckter_codeblock_behaelt_seine_einrueckung(self) -> None:
         for profil in _PROFILE:
             with self.subTest(profil=profil.__name__):
-                html: str = profil("Rechnung:\n\n    3x + 4 = 10\n      3x = 6\n\nfertig")
+                html: str = profil(
+                    "Rechnung:\n\n    3x + 4 = 10\n      3x = 6\n\nfertig"
+                )
 
                 self.assertIn("<pre><code>3x + 4 = 10\n  3x = 6\n</code></pre>", html)
                 self.assertIn("<p>fertig</p>", html)
@@ -134,7 +136,9 @@ class InformationstextLinkTests(SimpleTestCase):
                 self.assertIn("öffnet in neuem Tab", html)
 
     def test_email_links_oeffnen_ohne_neuen_tab(self) -> None:
-        html: str = informationstext("[Schreiben Sie uns](mailto:forschung@example.org)")
+        html: str = informationstext(
+            "[Schreiben Sie uns](mailto:forschung@example.org)"
+        )
 
         self.assertIn('href="mailto:forschung@example.org"', html)
         self.assertNotIn("target=", html)
