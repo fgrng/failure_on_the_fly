@@ -7,7 +7,11 @@ Bezeichnung (ADR-0013).
 from django.db import migrations, models
 
 
-def bezeichnungen_ableiten(apps, schema_editor) -> None:
+def bezeichnungen_ableiten(
+    apps: migrations.StateApps, schema_editor: migrations.BaseDatabaseSchemaEditor
+) -> None:
+    """Benennt jede Bestandskonfiguration nach Sprachmodell und Nummer."""
+
     ModellKonfiguration = apps.get_model("simulation", "ModellKonfiguration")
     for konfiguration in ModellKonfiguration.objects.all():
         ModellKonfiguration.objects.filter(pk=konfiguration.pk).update(
@@ -16,6 +20,8 @@ def bezeichnungen_ableiten(apps, schema_editor) -> None:
 
 
 class Migration(migrations.Migration):
+    """Führt die Bezeichnung ein und benennt den Bestand."""
+
     dependencies = [
         ("simulation", "0006_transkriptionskonfiguration"),
     ]
