@@ -29,10 +29,10 @@ from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
-    AktiveModellKonfiguration,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    Verwendung,
 )
 from .standardkern import STANDARDKERN_VORLAGEN
 
@@ -52,12 +52,9 @@ def _archivierte_fassungen() -> QuerySet[Simulationskern]:
 
 
 def _aktive_konfiguration() -> ModellKonfiguration | None:
-    # Liefert die aktive Konfiguration, solange der Zeiger schon gesetzt ist.
+    # Liefert die Konfiguration der Schüler:in, solange der Zeiger gesetzt ist.
 
-    try:
-        return ModellKonfiguration.objects.aktive()
-    except AktiveModellKonfiguration.DoesNotExist:
-        return None
+    return ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN)
 
 
 def _kern_kontext() -> dict[str, object]:
@@ -327,9 +324,9 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
 @administratorin_erforderlich
 @require_POST
 def modell_konfiguration_aktivieren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Richtet den einzigen aktiven Zeiger auf eine bestehende Fassung."""
+    """Richtet den Zeiger der Schüler:in auf eine bestehende Fassung."""
     ModellKonfiguration.objects.aktivieren(
-        get_object_or_404(ModellKonfiguration, pk=pk)
+        get_object_or_404(ModellKonfiguration, pk=pk), Verwendung.SCHUELERIN
     )
     return redirect("simulation:modell_konfiguration")
 

@@ -23,7 +23,7 @@ from django.db import transaction
 
 from konten.apps import KONTOROLLEN
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 from training.models import Training
 from vignetten.models import Vignette
@@ -227,7 +227,7 @@ class Command(BaseCommand):
         fake: ModellKonfiguration = ModellKonfiguration.objects.filter(
             **werte
         ).first() or ModellKonfiguration.objects.create(**werte)
-        ModellKonfiguration.objects.aktivieren(fake)
+        ModellKonfiguration.objects.aktivieren(fake, Verwendung.SCHUELERIN)
         self.stdout.write("  Modell-Konfiguration 'fake' für Offline-Tests aktiv.")
 
     def _vignetten_anlegen(

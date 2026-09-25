@@ -14,6 +14,7 @@ from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
     ModellKonfiguration,
+    Verwendung,
 )
 from simulation.modellverzeichnis import (
     INFOMANIAK_MODELLE_URL,
@@ -108,7 +109,7 @@ class ZweiFassungenTestCase(TestCase):
         """Legt zwei Konfigurationen an und aktiviert die ältere."""
         self.aeltere: ModellKonfiguration = _openrouter("openrouter/altes-modell")
         self.neuere: ModellKonfiguration = _openrouter("openrouter/neues-modell")
-        ModellKonfiguration.objects.aktivieren(self.aeltere)
+        ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.SCHUELERIN)
         self.client.force_login(_administratorin())
 
 
@@ -311,7 +312,22 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
         )
 
         self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
-        self.assertEqual(ModellKonfiguration.objects.aktive(), self.neuere)
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), self.neuere
+        )
+
+    def test_schaltet_nur_die_schuelerin_um(self) -> None:
+        """Lehrperson und Bewerter bleiben, bis es Aktivieren je Verwendung gibt."""
+        ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.BEWERTER)
+
+        self.client.post(
+            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
+        )
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.BEWERTER), self.aeltere
+        )
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON))
 
     def test_verschiebt_nur_den_zeiger_ohne_zeile_zu_mutieren(self) -> None:
         """Das Umschalten geht über aktivieren() und lässt beide Zeilen unberührt."""

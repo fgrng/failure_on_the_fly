@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
 from training.models import Training
 from vignetten.models import Vignette, Vignettenhistorie
@@ -43,7 +43,7 @@ class TrainingssitzungTests(TestCase):
             sprachmodell="fake",
             parameter={"skript": skript},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
@@ -93,6 +93,25 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertContains(self.start_response, "Spracheingabe starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
+
+    def test_training_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
+        self,
+    ) -> None:
+        """Ein Wechsel der Eval-Verwendungen ändert am Training nichts."""
+
+        andere: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Andere", sprachmodell="fake"
+        )
+        ModellKonfiguration.objects.aktivieren(andere, Verwendung.LEHRPERSON)
+        ModellKonfiguration.objects.aktivieren(andere, Verwendung.BEWERTER)
+
+        self._sitzung_starten([])
+
+        self.assertEqual(
+            Sitzung.objects.get().modell_konfiguration,
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+        )
+        self.assertNotEqual(Sitzung.objects.get().modell_konfiguration, andere)
 
     def test_training_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
         self,

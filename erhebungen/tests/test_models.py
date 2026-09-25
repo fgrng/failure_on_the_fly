@@ -22,7 +22,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
+from simulation.models import Anbieter, ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -660,7 +660,8 @@ def _entwurf_mit_zuordnungen(konto: Konto) -> Erhebung:
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
+        Verwendung.SCHUELERIN,
     )
     for art in _ZUORDNUNGSARTEN:
         _zuordnung_anlegen(erhebung, konto, art)
@@ -785,12 +786,34 @@ def test_finalisieren_pinnt_die_aktive_modell_konfiguration() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
 
     erhebung.finalisieren()
 
     assert erhebung.status == Erhebung.Status.FINAL
     assert erhebung.modell_konfiguration == konfiguration
+
+
+@pytest.mark.django_db
+def test_finalisieren_pinnt_die_schuelerin_nicht_lehrperson_oder_bewerter() -> None:
+    """Ein Wechsel der Eval-Verwendungen ändert am Pin der Erhebung nichts."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    schuelerin: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Schüler:in", sprachmodell="fake"
+    )
+    andere: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Andere", sprachmodell="fake"
+    )
+    ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(andere, Verwendung.LEHRPERSON)
+    ModellKonfiguration.objects.aktivieren(andere, Verwendung.BEWERTER)
+
+    erhebung.finalisieren()
+
+    assert erhebung.modell_konfiguration == schuelerin
 
 
 @pytest.mark.django_db
@@ -812,11 +835,11 @@ def test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration() 
         sprachmodell="openrouter/zweite",
         anbieter_token="sk-or-geheim",
     )
-    ModellKonfiguration.objects.aktivieren(erste)
+    ModellKonfiguration.objects.aktivieren(erste, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.zurueckziehen()
-    ModellKonfiguration.objects.aktivieren(zweite)
+    ModellKonfiguration.objects.aktivieren(zweite, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     assert erhebung.status == Erhebung.Status.FINAL
@@ -833,7 +856,7 @@ def test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     Stichprobe.objects.create(
         erhebung=erhebung,
@@ -855,7 +878,7 @@ def test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     jetzt: datetime = timezone.now()
     Stichprobe.objects.create(
@@ -890,7 +913,7 @@ def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.archivieren()
@@ -910,7 +933,7 @@ def test_eigentuemerlose_erhebung_kann_nicht_entarchiviert_werden() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.archivieren()
     erhebung.eigentuemerinnen.clear()
@@ -929,7 +952,7 @@ def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.name = "Addition"
@@ -949,7 +972,7 @@ def test_finale_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.eigentuemerinnen.add(grace)
 
@@ -966,7 +989,7 @@ def test_laufende_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.eigentuemerinnen.add(grace)
     Stichprobe.objects.create(
@@ -990,7 +1013,7 @@ def test_archivierte_erhebung_ist_auch_per_bulk_update_eingefroren() -> None:
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
         bezeichnung="Test", sprachmodell="fake"
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.archivieren()
 

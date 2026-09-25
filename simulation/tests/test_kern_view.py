@@ -16,6 +16,7 @@ from simulation.models import (
     Anbieter,
     ModellKonfiguration,
     Simulationskern,
+    Verwendung,
 )
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
@@ -75,7 +76,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
             anbieter_token="sk-or-geheim",
             parameter={"temperature": 0.2},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         self.client.force_login(konto)
 
     def test_zeigt_den_system_prompt_der_neuesten_finalen_fassung(self) -> None:
@@ -233,7 +234,9 @@ class ModellKonfigurationAnzeigeTests(TestCase):
             anbieter_token="sk-infomaniak-geheim1234",
             parameter={"temperature": 0.2},
         )
-        ModellKonfiguration.objects.aktivieren(self.konfiguration)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         self.client.force_login(_administratorin("linus"))
 
     def test_zeigt_anbieter_basis_url_und_parameter(self) -> None:

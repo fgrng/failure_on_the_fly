@@ -67,7 +67,7 @@ Eigentümer:innen.
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
-aktive Modell-Konfiguration schreibgeschützt unter `/system/kern/` einsehen. Ist noch
+Modell-Konfiguration der Schüler:in schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, stellt die Ansicht das nur fest. Administrator:innen
 erhalten unter `/system/kern/verwalten/` außerdem den Überblick über den Entwurf, die
 finale Fassung und die eingeklappten archivierten Kern-Fassungen. Solange es überhaupt
@@ -123,8 +123,15 @@ dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
 prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
 bevor es eine Erhebung erreicht.
 Die Seite listet alle je angelegten Konfigurationen mit Bezeichnung, Anbieter,
-Modellnamen, Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
-genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
+Modellnamen, Basis-URL, maskiertem Token und Parametern. Aktiv ist je Verwendung
+(Schüler:in, Lehrperson, Bewerter) höchstens eine Konfiguration; dieselbe darf
+mehreren Verwendungen dienen, und eine einmal belegte Verwendung bleibt belegt.
+Sitzungen, Probelauf, Training und der Pin der Erhebung lesen allein die
+Verwendung Schüler:in; Lehrperson und Bewerter sind den Evals vorbehalten und
+bleiben unbelegt, bis die Administration sie setzt. Die Liste markiert vorerst
+die Konfiguration der Schüler:in. Sie bietet
+genau zwei Gesten: Anlegen und Aktivieren; Aktivieren schaltet vorerst die
+Schüler:in um. Bearbeiten und Löschen gibt es nicht —
 eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt. Ein
 Umschalten trifft laufende Trainings sofort und laufende Erhebungen gar nicht; eine
 Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren. Das
@@ -319,8 +326,8 @@ angemeldeten Autor:innen, Forschenden und Administrator:innen offen. Finale und
 archivierte Erhebungen zeigen die drei Texte gerendert als Leseansicht, ein
 leerer Text erscheint als »—«. Reine Entwürfe lassen sich löschen; das Design
 finaler Erhebungen bleibt unveränderlich, ihr Eigentümer-Kreis änderbar. Das
-Finalisieren pinnt die aktive
-Modell-Konfiguration sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
+Finalisieren pinnt die Modell-Konfiguration der Verwendung Schüler:in
+sichtbar; ein Rückzug ist nur ohne nicht-archivierte oder
 datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
 Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung

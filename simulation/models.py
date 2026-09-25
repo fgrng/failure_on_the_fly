@@ -488,24 +488,54 @@ class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
         raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
 
 
+class Verwendung(models.TextChoices):
+    """Wofür eine Modell-Konfiguration aktiv ist; je Verwendung höchstens eine."""
+
+    SCHUELERIN = "schuelerin", "Schüler:in"
+    LEHRPERSON = "lehrperson", "Lehrperson"
+    BEWERTER = "bewerter", "Bewerter"
+
+
 class ModellKonfigurationManager(
     models.Manager.from_queryset(ModellKonfigurationQuerySet),
 ):
-    """Zugang zur aktiven Modell-Konfiguration."""
+    """Zugang zu den aktiven Modell-Konfigurationen je Verwendung.
 
-    def aktive(self) -> "ModellKonfiguration":
-        """Liefert die Konfiguration, auf die der aktive Zeiger verweist."""
+    Die Verwendung hat bewusst keinen Default: Keine neue Stelle soll
+    versehentlich die Schüler:innen-Konfiguration erwischen.
+    """
 
-        return AktiveModellKonfiguration.objects.get(singleton=1).konfiguration
+    def aktive(self, verwendung: Verwendung) -> "ModellKonfiguration | None":
+        """Liefert die Konfiguration der Verwendung; keine, solange sie unbelegt ist."""
+
+        try:
+            return self.belegte(verwendung)
+        except AktiveModellKonfiguration.DoesNotExist:
+            return None
+
+    def belegte(self, verwendung: Verwendung) -> "ModellKonfiguration":
+        """Liefert die Konfiguration der Verwendung und scheitert, wenn sie fehlt.
+
+        Für Aufrufer, die ohne Konfiguration nicht weiterkommen: Eine unbelegte
+        Verwendung wirft ``AktiveModellKonfiguration.DoesNotExist``, statt dass
+        ein leerer Pin still weiterwandert.
+        """
+
+        return (
+            AktiveModellKonfiguration.objects.select_related("konfiguration")
+            .get(verwendung=verwendung)
+            .konfiguration
+        )
 
     def aktivieren(
         self,
         konfiguration: "ModellKonfiguration",
+        verwendung: Verwendung,
     ) -> "ModellKonfiguration":
-        """Setzt die einzige aktive Konfiguration."""
+        """Richtet den Zeiger der Verwendung auf die Konfiguration."""
 
         AktiveModellKonfiguration.objects.update_or_create(
-            singleton=1,
+            verwendung=verwendung,
             defaults={"konfiguration": konfiguration},
         )
         return konfiguration
@@ -577,25 +607,17 @@ class ModellKonfiguration(AnbieterFeldgruppe):
 
 
 class AktiveModellKonfiguration(models.Model):
-    """Der einzige, veränderliche Zeiger auf eine Modell-Konfiguration."""
+    """Der veränderliche Zeiger einer Verwendung auf eine Modell-Konfiguration."""
 
     konfiguration: models.ForeignKey = models.ForeignKey(
         ModellKonfiguration,
         on_delete=models.PROTECT,
     )
-    singleton: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
-        default=1,
+    verwendung: models.CharField = models.CharField(
+        max_length=10,
+        choices=Verwendung,
         unique=True,
-        editable=False,
     )
-
-    class Meta:
-        constraints: list[models.BaseConstraint] = [
-            models.CheckConstraint(
-                condition=Q(singleton=1),
-                name="simulation_aktive_modell_konfiguration_ist_singleton",
-            ),
-        ]
 
 
 class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):

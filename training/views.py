@@ -22,7 +22,7 @@ from konten.navigation import (
 )
 
 from .forms import TrainingForm
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     sitzung_abbrechen,
@@ -564,7 +564,7 @@ def _sitzung_starten(
         sitzung_starten(
             sink,
             vignette,
-            ModellKonfiguration.objects.aktive(),
+            ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         )
         kern: Simulationskern = sink.sitzung.simulationskern
     request.session["training_sitzung_pk"] = sink.sitzung.pk

@@ -1,11 +1,18 @@
 """Anbieterbindung und Parameter-Allowlist der Modell-Konfiguration."""
 
+import inspect
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from simulation.models import Anbieter, ModellKonfiguration
+from simulation.models import (
+    AktiveModellKonfiguration,
+    Anbieter,
+    ModellKonfiguration,
+    Verwendung,
+)
 
 
 def _openrouter(**werte: object) -> ModellKonfiguration:
@@ -277,3 +284,101 @@ def test_migration_benennt_den_bestand_nach_sprachmodell_und_nummer() -> None:
         executor.migrate(executor.loader.graph.leaf_nodes())
 
     assert konfiguration.bezeichnung == f"fake (Nr. {konfiguration.pk})"
+
+
+@pytest.mark.django_db
+def test_nach_dem_aktivieren_liefert_die_verwendung_genau_diese() -> None:
+    """Der Zeiger einer Verwendung zeigt auf die zuletzt aktivierte."""
+
+    erste: ModellKonfiguration = _openrouter()
+    zweite: ModellKonfiguration = _openrouter(bezeichnung="Zweite")
+    ModellKonfiguration.objects.aktivieren(erste, Verwendung.LEHRPERSON)
+
+    ModellKonfiguration.objects.aktivieren(zweite, Verwendung.LEHRPERSON)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) == zweite
+    assert AktiveModellKonfiguration.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_unbelegte_verwendung_liefert_keine() -> None:
+    """Solange die Administration nichts gesetzt hat, gibt es keine Konfiguration."""
+
+    ModellKonfiguration.objects.aktivieren(_openrouter(), Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) is None
+    with pytest.raises(AktiveModellKonfiguration.DoesNotExist):
+        ModellKonfiguration.objects.belegte(Verwendung.BEWERTER)
+
+
+@pytest.mark.django_db
+def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
+    """Eine kleine Instanz braucht nicht drei gleiche Datensätze."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    for verwendung in Verwendung:
+        ModellKonfiguration.objects.aktivieren(konfiguration, verwendung)
+
+    for verwendung in Verwendung:
+        assert ModellKonfiguration.objects.belegte(verwendung) == konfiguration
+
+
+@pytest.mark.django_db
+def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
+    """Je Verwendung ein Zeiger; ein Wechsel bewegt nur den eigenen."""
+
+    schuelerin: ModellKonfiguration = _openrouter()
+    bewerter: ModellKonfiguration = _openrouter(bezeichnung="Bewerter")
+    ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.BEWERTER)
+
+    ModellKonfiguration.objects.aktivieren(bewerter, Verwendung.BEWERTER)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == schuelerin
+    assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) == bewerter
+    assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) is None
+
+
+def test_die_verwendung_hat_keinen_default() -> None:
+    """Keine neue Stelle erwischt versehentlich die Schüler:innen-Konfiguration."""
+
+    for methode in ("aktive", "belegte", "aktivieren"):
+        parameter = inspect.signature(
+            getattr(ModellKonfiguration.objects, methode)
+        ).parameters["verwendung"]
+        assert parameter.default is inspect.Parameter.empty
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_macht_die_aktive_zur_schuelerin() -> None:
+    """Der Umstieg auf Verwendungen verliert keine aktive Konfiguration."""
+
+    vorher = [("simulation", "0007_modellkonfiguration_bezeichnung")]
+    nachher = [("simulation", "0008_aktivemodellkonfiguration_verwendung")]
+    executor: MigrationExecutor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        alte_apps = executor.loader.project_state(vorher).apps
+        alte_konfiguration = alte_apps.get_model(
+            "simulation", "ModellKonfiguration"
+        ).objects.create(bezeichnung="Bestand", sprachmodell="fake")
+        alte_apps.get_model("simulation", "AktiveModellKonfiguration").objects.create(
+            konfiguration=alte_konfiguration
+        )
+        MigrationExecutor(connection).migrate(nachher)
+        schuelerin: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
+        )
+        lehrperson: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+            Verwendung.LEHRPERSON
+        )
+        bewerter: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+            Verwendung.BEWERTER
+        )
+    finally:
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    assert schuelerin is not None and schuelerin.pk == alte_konfiguration.pk
+    assert lehrperson is None
+    assert bewerter is None

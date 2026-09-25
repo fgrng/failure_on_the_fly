@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import (
     Diagnose,
     Fehlversuch,
@@ -148,7 +148,7 @@ class TrainingskatalogTests(TestCase):
                 ]
             },
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(
             name="Brüche vergleichen"
@@ -229,7 +229,7 @@ class TrainingskatalogTests(TestCase):
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake"
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
@@ -301,7 +301,7 @@ class TrainingsabbruchTests(TestCase):
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake", parameter={"skript": skript or []}
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),

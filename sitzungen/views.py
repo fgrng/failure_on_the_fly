@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from konten.navigation import ist_administratorin
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     LeeresTranskript,
@@ -206,7 +206,9 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
         pk=pk,
     )
     kern: Simulationskern = vignette.gepinnter_kern
-    modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.aktive()
+    modell_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.belegte(
+        Verwendung.SCHUELERIN
+    )
     return _probelauf_starten(request, vignette, kern, modell_konfiguration)
 
 

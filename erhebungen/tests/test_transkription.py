@@ -14,7 +14,7 @@ from django.utils import timezone
 from erhebungen.models import Erhebung, Erhebungsbindung, Stichprobe
 from erhebungen.views import sitzung_fuer_transkription
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.transkription import FakeTranskription
 from sitzungen.models import Sitzung
 from sitzungen.views import transkriptions_endpunkt
@@ -33,7 +33,7 @@ class ErhebungsTranskriptionTests(TestCase):
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake"
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(name="Brüche")
         vignette: Vignette = Vignette.objects._erstellen(
             historie=historie,

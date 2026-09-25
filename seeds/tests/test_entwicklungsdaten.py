@@ -6,7 +6,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration
+from simulation.models import ModellKonfiguration, Verwendung
 from texte.markdown import szenentext
 from training.models import Training
 from vignetten.models import Vignette
@@ -74,7 +74,8 @@ class EntwicklungsdatenTests(TestCase):
         call_command("entwicklungsdaten_anlegen", stdout=StringIO())
 
         self.assertEqual(
-            ModellKonfiguration.objects.aktive().bezeichnung, "Offline (fake)"
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN).bezeichnung,
+            "Offline (fake)",
         )
 
     def test_zweiter_lauf_ist_idempotent(self) -> None:

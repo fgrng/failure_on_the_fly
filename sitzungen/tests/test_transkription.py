@@ -13,7 +13,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
@@ -41,7 +41,8 @@ class ProbelaufTranskriptionTests(TestCase):
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(
                 bezeichnung="Test", sprachmodell="fake", parameter={"skript": []}
-            )
+            ),
+            Verwendung.SCHUELERIN,
         )
         self.entwurf: Vignette = Vignette.objects.anlegen(self.autorin)
         # Die Rahmenhandlung braucht beide Akteure für ihre Grammatikformen.
