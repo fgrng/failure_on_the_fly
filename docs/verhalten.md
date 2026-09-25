@@ -428,8 +428,8 @@ Reihenfolge der Erhebung, ein eigenes Positionsfeld gibt es nicht. Über jeder
 Liste wählt man unter »Hinzufügen …« eine Fassung und die Stelle, an der sie
 eingefügt wird (»am Ende«, »am Anfang« oder »nach …«). Jede Zeile trägt
 Symbolknöpfe mit Beschriftung für Hilfstechnik: ↑ und ↓ verschieben um eine
-Stelle, 🗑 entfernt; ein Item hat zusätzlich ⇄ zum Umhängen ans Ende des anderen
-Andockpunkts, solange es dort nicht schon hängt. Umsortieren lässt sich auch
+Stelle, der Papierkorb entfernt; ein Item hat zusätzlich ⇄ zum Umhängen ans
+Ende des anderen Andockpunkts, solange es dort nicht schon hängt. Umsortieren lässt sich auch
 durch Ziehen am Griff, mit Maus wie mit Touch, aber nur innerhalb einer Liste;
 ohne Maus reichen die Knöpfe und Auswahlfelder. Jede Änderung gilt sofort, beim
 Entfernen und Umhängen schließt sich die Reihenfolge. Ist eine Fassung bereits

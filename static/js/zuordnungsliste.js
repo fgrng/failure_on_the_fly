@@ -109,7 +109,10 @@ function zuordnungsliste({ datenId, verfuegbarId, randomisierungId, fest }) {
             ? andere[index].getBoundingClientRect()
             : andere.at(-1)?.getBoundingClientRect();
         const lr = zug.liste.getBoundingClientRect();
-        const top = !r ? lr.top + 4 : index < andere.length ? r.top - 3 : r.bottom + 1;
+        let top;
+        if (!r) top = lr.top + 4;
+        else if (index < andere.length) top = r.top - 3;
+        else top = r.bottom + 1;
         Object.assign(marke.style, { top: `${top}px`, left: `${lr.left}px`, width: `${lr.width}px` });
         return index;
     }

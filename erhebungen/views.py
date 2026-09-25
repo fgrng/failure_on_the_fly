@@ -230,6 +230,14 @@ def _position(request: HttpRequest) -> int | None:
         return None
 
 
+def _hoechste_position(
+    zugehoerigkeiten: QuerySet[Erhebungsvignette] | QuerySet[Erhebungsitem],
+) -> int:
+    """Liefert die höchste belegte Position einer Liste, für eine leere Liste 0."""
+
+    return zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
+
+
 def _reihenfolge_schreiben(
     zugehoerigkeiten: QuerySet[Erhebungsvignette] | QuerySet[Erhebungsitem],
     ids: list[int],
@@ -240,10 +248,7 @@ def _reihenfolge_schreiben(
     Zeile ihren Platz. So verletzt kein Zwischenstand die Eindeutigkeit.
     """
 
-    versatz: int = max(
-        zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0,
-        len(ids),
-    )
+    versatz: int = max(_hoechste_position(zugehoerigkeiten), len(ids))
     zugehoerigkeiten.update(position=F("position") + versatz)
     for position, zugehoerigkeit_id in enumerate(ids, start=1):
         zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
@@ -346,24 +351,24 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     itemzugehoerigkeiten: list[Erhebungsitem] = list(
         erhebung.itemzugehoerigkeiten.select_related("item")
     )
-    item_ids: dict[str, set[int]] = {
-        andockpunkt: {
-            zugehoerigkeit.item_id
+    zugehoerigkeiten_je_andockpunkt: dict[str, list[Erhebungsitem]] = {
+        andockpunkt: [
+            zugehoerigkeit
             for zugehoerigkeit in itemzugehoerigkeiten
             if zugehoerigkeit.andockpunkt == andockpunkt
-        }
+        ]
         for andockpunkt in Erhebungsitem.Andockpunkt.values
+    }
+    item_ids: dict[str, set[int]] = {
+        andockpunkt: {zugehoerigkeit.item_id for zugehoerigkeit in zugehoerigkeiten}
+        for andockpunkt, zugehoerigkeiten in zugehoerigkeiten_je_andockpunkt.items()
     }
     itemdaten: dict[str, dict[str, object]] = {}
     for andockpunkt in Erhebungsitem.Andockpunkt.values:
         anderer_andockpunkt: str = _ANDERE_ANDOCKPUNKTE[andockpunkt]
         itemdaten[andockpunkt] = {
             "aufgenommene": _aufgenommene_itemzeilen(
-                [
-                    zugehoerigkeit
-                    for zugehoerigkeit in itemzugehoerigkeiten
-                    if zugehoerigkeit.andockpunkt == andockpunkt
-                ],
+                zugehoerigkeiten_je_andockpunkt[andockpunkt],
                 erhebung,
                 item_ids[anderer_andockpunkt],
                 bearbeitbar,
@@ -544,12 +549,7 @@ def vignette_hinzufuegen(
     zugehoerigkeit, angelegt = Erhebungsvignette.objects.get_or_create(
         erhebung=erhebung,
         vignette=vignette,
-        defaults={
-            "position": (
-                zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
-            )
-            + 1
-        },
+        defaults={"position": _hoechste_position(zugehoerigkeiten) + 1},
     )
     if angelegt:
         _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
@@ -651,8 +651,7 @@ def item_hinzufuegen(
         erhebung=erhebung,
         item=item,
         andockpunkt=andockpunkt,
-        position=(zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0)
-        + 1,
+        position=_hoechste_position(zugehoerigkeiten) + 1,
     )
     _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
     return detail(request, pk)
@@ -730,15 +729,14 @@ def item_umhaengen(
         erhebung.itemzugehoerigkeiten.select_for_update(), pk=zugehoerigkeit_pk
     )
     bisheriger_andockpunkt: str = zugehoerigkeit.andockpunkt
+    ziel_andockpunkt: str = _ANDERE_ANDOCKPUNKTE[bisheriger_andockpunkt]
     ziel: QuerySet[Erhebungsitem] = erhebung.itemzugehoerigkeiten.filter(
-        andockpunkt=_ANDERE_ANDOCKPUNKTE[bisheriger_andockpunkt]
+        andockpunkt=ziel_andockpunkt
     )
     if ziel.filter(item_id=zugehoerigkeit.item_id).exists():
         return HttpResponse(status=409)
-    zugehoerigkeit.andockpunkt = _ANDERE_ANDOCKPUNKTE[bisheriger_andockpunkt]
-    zugehoerigkeit.position = (
-        ziel.aggregate(Max("position"))["position__max"] or 0
-    ) + 1
+    zugehoerigkeit.andockpunkt = ziel_andockpunkt
+    zugehoerigkeit.position = _hoechste_position(ziel) + 1
     zugehoerigkeit.save(update_fields=["andockpunkt", "position"])
     _einreihen(
         erhebung.itemzugehoerigkeiten.select_for_update().filter(
