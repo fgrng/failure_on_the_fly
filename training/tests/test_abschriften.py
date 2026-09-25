@@ -383,6 +383,27 @@ def test_eingegebenes_token_erzeugt_die_abschrift_und_listet_sie(
 
 
 @pytest.mark.django_db
+def test_abschriften_sind_ueber_den_erhebungsnamen_verlinkt(client: Client) -> None:
+    """Der Erhebungsname führt zur Abschrift; der Zeilenhinweis nennt »Lesen ›«."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung(
+        name="Brüche im Herbst"
+    )
+    abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+    client.force_login(teilnehmerin)
+
+    inhalt: str = client.get(reverse("training:abschriften")).content.decode()
+
+    url: str = reverse("training:abschrift", args=[abschrift.pk])
+    assert f'<a class="zeilenlink" href="{url}">Brüche im Herbst</a>' in inhalt
+    assert '<td class="table__zeilenhinweis" aria-hidden="true">Lesen ›</td>' in inhalt
+    assert "table--zeilenlink" in inhalt
+    assert ">Lesen</a>" not in inhalt
+    assert ">Aktion<" not in inhalt
+
+
+@pytest.mark.django_db
 def test_abgelehntes_token_meldet_den_grundlosen_hinweis(client: Client) -> None:
     """Die View gibt die eine Meldung des Kommandos weiter."""
 
@@ -447,6 +468,23 @@ def test_abschrift_zaehlt_nicht_zur_trainingshistorie(client: Client) -> None:
     antwort: HttpResponse = client.get(reverse("training:historie"))
 
     assert "Brüche im Herbst" not in antwort.content.decode()
+
+
+@pytest.mark.django_db
+def test_historie_ist_ueber_den_trainingsnamen_verlinkt(client: Client) -> None:
+    """Der Trainingsname ist der Link; der Zeilenhinweis nennt »Ansehen ›«."""
+
+    client.force_login(Konto.objects.create_user(username="grace"))
+
+    inhalt: str = client.get(reverse("training:historie")).content.decode()
+
+    assert '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>' in inhalt
+    assert (
+        '<td class="table__zeilenhinweis" aria-hidden="true">Ansehen ›</td>' in inhalt
+    )
+    assert "table--zeilenlink" in inhalt
+    assert "button--secondary" not in inhalt
+    assert ">Aktion<" not in inhalt
 
 
 def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:

@@ -72,6 +72,15 @@ zeichnet zusätzlich den grünen Fokus-Ring um die Zeile. Die Trennlinien
 zwischen den Zeilen bleiben dabei sichtbar. Suche, Filter und Sortierung
 bleiben unverändert.
 
+Genauso funktionieren die Trainingskataloge, »Meine Trainings« der
+Ausbilder:innen, die Trainingshistorie und »Meine Abschriften«. Dort nennt der
+Hinweis am Zeilenende die jeweilige Aktion statt »Öffnen ›«: in den
+Trainingskatalogen je Zeile »Kuratieren ›« (Trainings, die man kuratieren darf)
+oder »Öffnen ›«, in »Meine Trainings« »Kuratieren ›«, in der Historie
+»Ansehen ›« und in »Meine Abschriften« »Lesen ›«. Der Link führt jeweils zum
+bisherigen Ziel. Tabellen mit echten Aktionen statt Navigation, etwa auf der
+Kuratieren-Seite oder in der Trainingsdetailansicht, bleiben unverändert.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen

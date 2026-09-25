@@ -25,20 +25,20 @@
     </form>
 
     <div class="table-wrap vignette-index-table">
-        <table class="table">
+        <table class="table table--zeilenlink">
             <thead>
                 <tr>
                     <th scope="col">Erhebung</th>
                     <th scope="col">Importiert am</th>
-                    <th scope="col">Aktion</th>
+                    <th scope="col"><span class="visually-hidden">Lesen</span></th>
                 </tr>
             </thead>
             <tbody>
                 {% for abschrift in abschriften %}
                     <tr>
-                        <td>{{ abschrift.erhebungsname }}</td>
+                        <td><a class="zeilenlink" href="{% url 'training:abschrift' abschrift.pk %}">{{ abschrift.erhebungsname }}</a></td>
                         <td>{{ abschrift.importiert_am|date:"d.m.Y H:i" }}</td>
-                        <td><a class="button" href="{% url 'training:abschrift' abschrift.pk %}">Lesen</a></td>
+                        <td class="table__zeilenhinweis" aria-hidden="true">Lesen ›</td>
                     </tr>
                 {% empty %}
                     <tr>
