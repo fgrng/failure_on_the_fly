@@ -1078,6 +1078,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def test_umschalten_bewahrt_die_reihenfolge_hin_und_zurueck(self) -> None:
         """Die Regel wechselt, die festgelegte Reihenfolge bleibt erhalten."""
 
+        def positionen() -> list[tuple[int, int]]:
+            return list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", "position"
+                )
+            )
+
         zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
         for vignette in (self.eigene_finale, zweite):
             self.client.post(
@@ -1102,13 +1109,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             },
         )
         erwartet: list[tuple[int, int]] = [(zweite.pk, 1), (self.eigene_finale.pk, 2)]
-
-        def positionen() -> list[tuple[int, int]]:
-            return list(
-                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
-                    "vignette_id", "position"
-                )
-            )
 
         self.client.post(
             reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),

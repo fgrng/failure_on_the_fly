@@ -19,7 +19,7 @@ _reihenfolge_migration = import_module(
     "erhebungen.migrations.0013_erhebungsvignette_eigentuemerinnen"
 )
 
-_TRIGGER_LOESCHEN_SQL = """
+_ALTE_TRIGGER_LOESCHEN_SQL = """
     DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_einfuegen;
     DROP TRIGGER erhebungen_gueltige_vignettenzugehoerigkeit_aendern;
     DROP TRIGGER erhebungen_reihenfolgeregel_bewahren;
@@ -126,7 +126,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(_TRIGGER_LOESCHEN_SQL, _ALTE_TRIGGER_ERSTELLEN_SQL),
+        migrations.RunSQL(_ALTE_TRIGGER_LOESCHEN_SQL, _ALTE_TRIGGER_ERSTELLEN_SQL),
         migrations.RemoveConstraint(
             model_name="erhebungsvignette",
             name="erhebungen_feste_position_ist_eindeutig",

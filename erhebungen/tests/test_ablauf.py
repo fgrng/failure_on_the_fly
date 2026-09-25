@@ -251,7 +251,9 @@ def test_zufaellige_ziehung_mischt_ohne_die_positionen_zu_aendern() -> None:
     )
     assert list(
         erhebung.vignettenzugehoerigkeiten.values_list("vignette_id", "position")
-    ) == [(vignette.pk, position) for position, vignette in enumerate(vignetten, 1)]
+    ) == [
+        (vignette.pk, position) for position, vignette in enumerate(vignetten, start=1)
+    ]
 
 
 @pytest.mark.django_db
