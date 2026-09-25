@@ -1,5 +1,7 @@
 """Unit-Tests für den sequenzierten Erhebungsablauf."""
 
+from random import Random
+
 import pytest
 from django.utils import timezone
 
@@ -192,8 +194,10 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(3)]
-    for vignette in vignetten:
-        Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
+    for position, vignette in enumerate(vignetten, start=1):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=vignette, position=position
+        )
     stichprobe: Stichprobe = Stichprobe.objects.create(
         erhebung=erhebung, beginn=timezone.now(), ende=timezone.now()
     )
@@ -217,6 +221,37 @@ def test_zufaellige_ziehung_ist_mit_gespeichertem_seed_reproduzierbar() -> None:
         erste_bindung.vignettenziehungen.values_list("vignette_id", flat=True)
     ) == list(zweite_bindung.vignettenziehungen.values_list("vignette_id", flat=True))
     assert Vignettenziehung.objects.filter(erhebungsbindung=erste_bindung).count() == 3
+
+
+@pytest.mark.django_db
+def test_zufaellige_ziehung_mischt_ohne_die_positionen_zu_aendern() -> None:
+    """Die Teilnahme folgt dem Seed, die Liste der Erhebung behält ihre Positionen."""
+
+    konto: Konto = Konto.objects.create_user(username="ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
+    )
+    vignetten: list[Vignette] = [_finale_vignette_anlegen(konto) for _ in range(5)]
+    for position, vignette in enumerate(vignetten, start=1):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=vignette, position=position
+        )
+    bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
+    bindung.randomisierungs_seed = 17
+    bindung.save(update_fields=["randomisierungs_seed"])
+    erwartet: list[int] = [vignette.pk for vignette in vignetten]
+    Random(17).shuffle(erwartet)
+
+    ziehung_festschreiben(bindung)
+
+    assert erwartet != [vignette.pk for vignette in vignetten]
+    assert (
+        list(bindung.vignettenziehungen.values_list("vignette_id", flat=True))
+        == erwartet
+    )
+    assert list(
+        erhebung.vignettenzugehoerigkeiten.values_list("vignette_id", "position")
+    ) == [(vignette.pk, position) for position, vignette in enumerate(vignetten, 1)]
 
 
 @pytest.mark.django_db
@@ -316,7 +351,7 @@ def test_abfrage_nach_dem_naechsten_schritt_schreibt_keine_zeile() -> None:
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
     vignette: Vignette = _finale_vignette_anlegen(konto)
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette)
+    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=vignette, position=1)
     item: FragebogenItem = _finales_item_anlegen(konto)
     Erhebungsitem.objects.create(
         erhebung=erhebung,
@@ -394,9 +429,11 @@ def test_ziehung_bleibt_nach_dem_ersten_festschreiben_unveraendert() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         konto, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    for _ in range(4):
+    for position in range(1, 5):
         Erhebungsvignette.objects.create(
-            erhebung=erhebung, vignette=_finale_vignette_anlegen(konto)
+            erhebung=erhebung,
+            vignette=_finale_vignette_anlegen(konto),
+            position=position,
         )
     bindung: Erhebungsbindung = _bindung_anlegen(erhebung)
 

@@ -328,7 +328,10 @@ die Daten der Erhebung unberührt bleiben.
 Forschende und Administrator:innen erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
 Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. In einem Entwurf wählen sie finale Vignetten,
-bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
+bestimmen eine feste oder zufällige Reihenfolge. Neu aufgenommene Vignetten
+stehen am Ende der Liste. Bei zufälliger Reihenfolge wird je Teilnahme gemischt,
+die Reihenfolge der Liste bleibt aber gespeichert: Beim Wechsel zurück zu fest
+gilt wieder die zuvor festgelegte Reihenfolge. Außerdem pflegen sie Instruktions-,
 Einwilligungs- und Abschlusstext. Unter jedem dieser drei Felder steht ein
 kurzer Markdown-Hinweis samt Link-Syntax; der Umschalter »Bearbeiten |
 Vorschau« zeigt den ungespeicherten Text so, wie die Teilnahmeseite ihn

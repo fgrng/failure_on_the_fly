@@ -1075,6 +1075,94 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertContains(detail, 'value="zufällig" selected')
         self.assertNotContains(detail, "Reihenfolge der aufgenommenen Vignetten:")
 
+    def test_umschalten_bewahrt_die_reihenfolge_hin_und_zurueck(self) -> None:
+        """Die Regel wechselt, die festgelegte Reihenfolge bleibt erhalten."""
+
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+        zugehoerigkeiten: dict[int, int] = dict(
+            Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                "vignette_id", "pk"
+            )
+        )
+        self.client.post(
+            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
+            {
+                "randomisierung": Erhebung.Randomisierung.FEST,
+                "vignetten": [
+                    str(zugehoerigkeiten[zweite.pk]),
+                    str(zugehoerigkeiten[self.eigene_finale.pk]),
+                ],
+            },
+        )
+        erwartet: list[tuple[int, int]] = [(zweite.pk, 1), (self.eigene_finale.pk, 2)]
+
+        def positionen() -> list[tuple[int, int]]:
+            return list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", "position"
+                )
+            )
+
+        self.client.post(
+            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
+        )
+        self.erhebung.refresh_from_db()
+        self.assertEqual(
+            self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG
+        )
+        self.assertEqual(positionen(), erwartet)
+
+        self.client.post(
+            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
+            {"randomisierung": Erhebung.Randomisierung.FEST},
+        )
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
+        self.assertEqual(positionen(), erwartet)
+
+    def test_zufaellige_reihenfolge_nimmt_am_ende_der_liste_auf(self) -> None:
+        """Auch bei zufälliger Reihenfolge bekommt eine neue Vignette die letzte Position."""
+
+        self.erhebung.randomisierung = Erhebung.Randomisierung.ZUFAELLIG
+        self.erhebung.save(update_fields=["randomisierung"])
+        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        dritte: Vignette = _finale_vignette_anlegen(self.ada, "Physik")
+        for vignette in (self.eigene_finale, zweite):
+            self.client.post(
+                reverse(
+                    "erhebungen:vignette_hinzufuegen",
+                    args=[self.erhebung.pk, vignette.pk],
+                )
+            )
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_entfernen",
+                args=[self.erhebung.pk, self.eigene_finale.pk],
+            )
+        )
+        self.client.post(
+            reverse(
+                "erhebungen:vignette_hinzufuegen", args=[self.erhebung.pk, dritte.pk]
+            )
+        )
+
+        self.assertEqual(
+            list(
+                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
+                    "vignette_id", flat=True
+                )
+            ),
+            [zweite.pk, dritte.pk],
+        )
+
     def test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen(self) -> None:
         """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
 

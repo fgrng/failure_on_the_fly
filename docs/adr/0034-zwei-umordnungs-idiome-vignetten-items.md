@@ -1,6 +1,8 @@
 ---
-status: accepted
+status: superseded by ADR-0048
 ---
+
+> Abgelöst durch ADR-0048: Die Position der Vignetten ist von der Reihenfolgeregel getrennt; damit entfällt der Grund für zwei Idiome.
 
 # Zwei Umordnungs-Idiome nebeneinander: Positions-Select für Vignetten, Hoch/Runter für Items
 
