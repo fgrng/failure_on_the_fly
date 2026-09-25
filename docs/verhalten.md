@@ -52,6 +52,17 @@ Administratorin als Eigentümer:in hinzufügen oder eine vorhandene entfernen. D
 Kreis bleibt dabei immer besetzt; die eigene Entfernung übergibt die Historie an
 die verbleibenden Eigentümer:innen.
 
+Der Abschnitt »Eigentümer:innen« sieht auf Vignette, Fragebogen-Item, Erhebung
+und Training gleich aus und nennt jeweils das Artefakt. Eine Tabelle führt Name,
+alle Rollen des Kontos (etwa »Autor:in, Administrator:in«) und die Aktion. Das
+Entfernen ist ein roter Textlink. Die eigene Zeile trägt »(Sie)«, dort heißt
+die Aktion »Mich entfernen«, und ein Satz erklärt, dass das Artefakt bei den
+übrigen Eigentümer:innen bleibt. Bei nur einer Eigentümer:in steht statt einer
+Aktion »Letzte Eigentümer:in«, darunter der Hinweis, zuerst jemanden
+hinzuzufügen. Das Hinzufügen folgt nach einer Trennlinie unter eigener
+Unterüberschrift. Gibt es niemanden mehr, steht dort ein Satz statt eines
+leeren Auswahlfelds.
+
 Im Lernauftrag- und Arbeitsheft-Text legt der Positionsmarker `[bild]` fest, wo
 das hochgeladene Bild steht und wo das Sprachmodell die Bildbeschreibung
 erhält. Er zählt nur allein auf einer Zeile (Leerraum und Groß- und

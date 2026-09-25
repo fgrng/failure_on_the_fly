@@ -202,6 +202,7 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "Eigentümer:innen")
         self.assertContains(response, "Eigentümer:in hinzufügen")
         self.assertContains(response, ada.username)
+        self.assertContains(response, "Wer diese Vignette sehen und bearbeiten darf")
 
     def test_rendert_die_rohfelder_des_aufgabenkontexts(self) -> None:
         """Die Ansicht zeigt Lernauftrag und Arbeitsheft ohne Rahmen-Rendering."""

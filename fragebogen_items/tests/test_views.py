@@ -464,6 +464,24 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 
         self.assertContains(response, self.ada.username)
 
+    def test_editor_nennt_das_fragebogen_item(self) -> None:
+        """Unterzeile und Erklärung sprechen vom Fragebogen-Item."""
+        self.item.historie.eigentuemerinnen.add(self.grace)
+        self.client.force_login(self.ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+
+        self.assertContains(
+            response, "Wer dieses Fragebogen-Item sehen und bearbeiten darf"
+        )
+        self.assertContains(
+            response,
+            "Sie verlieren den Zugriff; das Fragebogen-Item bleibt bei den übrigen "
+            "Eigentümer:innen.",
+        )
+
     def test_editor_zeigt_administration_als_moegliche_koautorin(self) -> None:
         """Ein Superuser erscheint in der Ko-Autorinnenliste des Editors."""
         administratorin: Konto = get_user_model().objects.create_user(

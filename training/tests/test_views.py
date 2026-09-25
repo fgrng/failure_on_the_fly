@@ -122,6 +122,7 @@ class TrainingKuratierenTests(TestCase):
         self.assertContains(response, "Eigentümer:innen")
         self.assertContains(response, "Eigentümer:in hinzufügen")
         self.assertContains(response, ada.username)
+        self.assertContains(response, "Wer dieses Training sehen und bearbeiten darf")
 
     def test_nimmt_nur_eigene_finale_vignetten_auf_und_entfernt_sie_wieder(
         self,

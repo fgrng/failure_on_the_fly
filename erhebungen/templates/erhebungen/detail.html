@@ -50,7 +50,7 @@
         </div>
     {% endif %}
 
-    {% include "includes/eigentuemerinnen.html" with eigentuemerinnen_abschnitt_nummer="01" eigentuemerin_hinzufuegen_url="erhebungen:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="erhebungen:eigentuemerin_entfernen" kreis=erhebung objekt_pk=erhebung.pk %}
+    {% include "includes/eigentuemerinnen.html" with dieses_artefakt="diese Erhebung" das_artefakt="die Erhebung" eigentuemerinnen_abschnitt_nummer="01" eigentuemerin_hinzufuegen_url="erhebungen:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="erhebungen:eigentuemerin_entfernen" kreis=erhebung objekt_pk=erhebung.pk %}
 
     {% if erhebung.status == erhebung.Status.ENTWURF %}
         <div id="erhebung-entwurf-editor" x-data="{ randomisierung: '{{ erhebung.randomisierung }}' }">

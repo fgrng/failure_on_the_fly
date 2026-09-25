@@ -146,6 +146,6 @@
     </section>
 
     {# Der Kreis hängt an der Historie, die Routen gehen über die Fassung. #}
-    {% include "includes/eigentuemerinnen.html" with eigentuemerinnen_abschnitt_nummer="07" eigentuemerin_hinzufuegen_url="vignetten:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="vignetten:eigentuemerin_entfernen" kreis=vignette.historie objekt_pk=vignette.pk %}
+    {% include "includes/eigentuemerinnen.html" with dieses_artefakt="diese Vignette" das_artefakt="die Vignette" eigentuemerinnen_abschnitt_nummer="07" eigentuemerin_hinzufuegen_url="vignetten:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="vignetten:eigentuemerin_entfernen" kreis=vignette.historie objekt_pk=vignette.pk %}
 </section>
 {% endblock %}

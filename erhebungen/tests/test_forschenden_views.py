@@ -422,6 +422,27 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
 class ErhebungenKoForschendenViewTests(TestCase):
     """Forschende teilen Erhebungen mit gleichrangigen Ko-Forschenden."""
 
+    def test_detail_nennt_die_erhebung(self) -> None:
+        """Unterzeile und Erklärung sprechen von der Erhebung."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
+        erhebung.eigentuemerinnen.add(grace)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[erhebung.pk])
+        )
+
+        self.assertContains(response, "Wer diese Erhebung sehen und bearbeiten darf")
+        self.assertContains(
+            response,
+            "Sie verlieren den Zugriff; die Erhebung bleibt bei den übrigen "
+            "Eigentümer:innen.",
+        )
+
     def test_hinzufuegen_gibt_ko_forschender_listen_und_editorzugriff(self) -> None:
         """Eine eingetragene Ko-Forschende sieht und bearbeitet den Entwurf."""
         ada: Konto = get_user_model().objects.create_user(username="ada")
