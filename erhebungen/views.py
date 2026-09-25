@@ -267,7 +267,7 @@ def liste(request: HttpRequest) -> HttpResponse:
 def anlegen(request: HttpRequest) -> HttpResponse:
     """Legt eine neue Erhebung als Entwurf an."""
 
-    formular = ErhebungAnlegenFormular(request.POST or None)
+    formular: ErhebungAnlegenFormular = ErhebungAnlegenFormular(request.POST or None)
     if formular.is_valid():
         erhebung: Erhebung = Erhebung.objects.anlegen(
             request.user,
