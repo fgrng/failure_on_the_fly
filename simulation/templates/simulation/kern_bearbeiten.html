@@ -6,6 +6,7 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <script src="{% static 'js/ungespeichert.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -19,7 +20,7 @@
         <span class="badge badge--authoring">{{ simulationskern.get_zustand_display }}</span>
     </header>
 
-    <form method="post">
+    <form id="kern-formular" method="post" data-ungespeichert-warnen>
         {% csrf_token %}
         {{ form.non_field_errors }}
 
@@ -29,9 +30,9 @@
             </header>
             <div class="system-page-fields">
                 <div class="system-page-field-list">
-                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_einleitung profil="szenentext" %}
-                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_gespraechseinleitung profil="szenentext" %}
-                    {% include "texte/includes/markdown_formularfeld.html" with field=form.rahmenhandlung_debrief profil="szenentext" %}
+                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.rahmenhandlung_einleitung profil="szenentext" %}
+                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.rahmenhandlung_gespraechseinleitung profil="szenentext" %}
+                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.rahmenhandlung_debrief profil="szenentext" %}
                 </div>
                 {% include "simulation/includes/rahmen_platzhalter.html" %}
             </div>
@@ -43,8 +44,8 @@
             </header>
             <div class="system-page-fields">
                 <div class="system-page-field-list">
-                    {% include "vignetten/includes/form_field.html" with field=form.system_prompt_vorlage %}
-                    {% include "vignetten/includes/form_field.html" with field=form.user_prompt_vorlage %}
+                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.system_prompt_vorlage %}
+                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.user_prompt_vorlage %}
                 </div>
                 {% include "simulation/includes/prompt_platzhalter.html" %}
             </div>

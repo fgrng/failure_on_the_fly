@@ -1,5 +1,6 @@
 """Tests für die geteilte Lese-Hülle um das Markdown-Feld."""
 
+from django import forms
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
@@ -52,3 +53,80 @@ class MarkdownLesefeldTests(SimpleTestCase):
 
         self.assertIn('<button type="submit" class="button">Speichern</button>', html)
         self.assertIn("feld.value = feld.defaultValue", html)
+
+
+class _Formular(forms.Form):
+    """Ein Markdown-Text und ein Klartext, beide optional."""
+
+    lernauftrag = forms.CharField(
+        label="Lernauftrag", required=False, widget=forms.Textarea
+    )
+    hinweise = forms.CharField(
+        label="Hinweise",
+        required=False,
+        widget=forms.Textarea,
+        help_text="Nur für die Simulation.",
+    )
+
+
+def _formularfeld(feld: forms.BoundField, profil: str = "") -> str:
+    return render_to_string(
+        "texte/includes/lesefeld_formularfeld.html",
+        {"field": feld, "profil": profil},
+    )
+
+
+class LesefeldFormularfeldTests(SimpleTestCase):
+    """Die Hülle nimmt auch Django-Formularfelder, mit oder ohne Markdown."""
+
+    def test_markdown_feld_liest_wert_und_label_aus_dem_formularfeld(self) -> None:
+        """Label, ID und Wert kommen aus dem Feld, die Vorschau aus dem Profil."""
+
+        feld: forms.BoundField = _Formular(initial={"lernauftrag": "**27**"})[
+            "lernauftrag"
+        ]
+
+        html: str = _formularfeld(feld, "szenentext")
+
+        self.assertIn('<label for="id_lernauftrag">Lernauftrag</label>', html)
+        self.assertIn("<strong>27</strong>", html)
+        self.assertIn('name="lernauftrag"', html)
+        self.assertIn(">Vorschau</button>", html)
+        self.assertIn(">Bearbeiten</button>", html)
+
+    def test_klartext_steht_ohne_markdown_und_ohne_vorschau(self) -> None:
+        """Ohne Profil bleibt der Text wörtlich, Absätze bleiben erhalten."""
+
+        feld: forms.BoundField = _Formular(
+            initial={"hinweise": "Zählt **einzeln**\nund laut"}
+        )["hinweise"]
+
+        html: str = _formularfeld(feld)
+
+        self.assertIn("<p>Zählt **einzeln**<br>und laut</p>", html)
+        self.assertNotIn(">Vorschau</button>", html)
+        self.assertIn('<textarea name="hinweise"', html)
+        self.assertIn("Nur für die Simulation.", html)
+        self.assertIn('<button type="submit" class="button">Speichern</button>', html)
+
+    def test_leerer_klartext_laedt_zum_schreiben_ein(self) -> None:
+        """Auch ohne Markdown zeigt ein leerer Text »Text schreiben«."""
+
+        html: str = _formularfeld(_Formular()["hinweise"])
+
+        self.assertIn("Noch kein Text", html)
+        self.assertIn(">Text schreiben</button>", html)
+
+    def test_feld_mit_fehler_startet_offen(self) -> None:
+        """Ein Fehler steht sichtbar am geöffneten Feld."""
+
+        formular: _Formular = _Formular(data={"hinweise": "x"})
+        formular.is_valid()
+        formular.add_error("hinweise", "Enthält ungültige Platzhalter.")
+
+        offen: str = _formularfeld(formular["hinweise"])
+        zu: str = _formularfeld(formular["lernauftrag"])
+
+        self.assertIn("bearbeiten: true", offen)
+        self.assertIn("Enthält ungültige Platzhalter.", offen)
+        self.assertIn("bearbeiten: false", zu)

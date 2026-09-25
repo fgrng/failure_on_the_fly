@@ -4,7 +4,6 @@ import csv
 import json
 import re
 from datetime import UTC, datetime, timedelta
-from html.parser import HTMLParser
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
 
@@ -18,6 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.tests.dokumentation import exportkontrakt_aus_adr_0029
+from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
@@ -147,46 +147,6 @@ def _item_zuordnen(
     return Erhebungsitem.objects.create(
         erhebung=erhebung, item=item, andockpunkt=andockpunkt, position=position
     )
-
-
-class _Knopfsammler(HTMLParser):
-    """Sammelt Submit-Knöpfe mit Beschriftung und zugehörigem Formular."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.knoepfe: list[tuple[str, str | None]] = []
-        self._formulare: list[str | None] = []
-        self._knopf: tuple[str | None, list[str]] | None = None
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        werte: dict[str, str | None] = dict(attrs)
-        if tag == "form":
-            self._formulare.append(werte.get("id"))
-        elif tag == "button" and werte.get("type", "submit") == "submit":
-            formular: str | None = werte.get("form") or (
-                self._formulare[-1] if self._formulare else None
-            )
-            self._knopf = (formular, [])
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "form" and self._formulare:
-            self._formulare.pop()
-        elif tag == "button" and self._knopf is not None:
-            formular, text = self._knopf
-            self.knoepfe.append(("".join(text).strip(), formular))
-            self._knopf = None
-
-    def handle_data(self, data: str) -> None:
-        if self._knopf is not None:
-            self._knopf[1].append(data)
-
-
-def _submit_knoepfe(antwort: HttpResponse) -> list[tuple[str, str | None]]:
-    """Liefert Beschriftung und Formular-ID aller Submit-Knöpfe einer Seite."""
-
-    sammler: _Knopfsammler = _Knopfsammler()
-    sammler.feed(antwort.content.decode())
-    return sammler.knoepfe
 
 
 class ErhebungenForschendenRollenTests(TestCase):
@@ -1168,7 +1128,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         speichern: list[str | None] = [
             formular
-            for beschriftung, formular in _submit_knoepfe(detail)
+            for beschriftung, formular in submit_knoepfe(detail)
             if "speichern" in beschriftung.lower()
         ]
         self.assertEqual(len(speichern), 3 + 1)
@@ -1499,7 +1459,7 @@ class ErhebungenFinalisierenTests(TestCase):
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
         self.assertIn(
-            ("Finalisieren", "erhebung-konfiguration"), _submit_knoepfe(detail)
+            ("Finalisieren", "erhebung-konfiguration"), submit_knoepfe(detail)
         )
 
         self.client.post(
