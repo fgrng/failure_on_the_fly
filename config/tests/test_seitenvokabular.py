@@ -58,8 +58,8 @@ class SeitenvokabularTests(TestCase):
             re.DOTALL,
         ).group(1)
         ueberzeile: str = re.search(r"<p>(.*?)</p>", kopf, re.DOTALL).group(1)
-        titel: re.Match[str] | None = re.search(r"<h1>(.*?)</h1>", kopf, re.DOTALL)
-        return _text(ueberzeile), _text(titel.group(1)) if titel else ""
+        titel: str = re.search(r"<h1>(.*?)</h1>", kopf, re.DOTALL).group(1)
+        return _text(ueberzeile), _text(titel)
 
     def _knoepfe(self, antwort: HttpResponse) -> list[str]:
         """Nennt die Beschriftungen aller Absendeknöpfe der Seite."""

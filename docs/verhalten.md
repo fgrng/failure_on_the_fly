@@ -52,12 +52,12 @@ Vorbelegung zeigen »Bitte wählen …«.
 
 In den Formularen zum Anlegen und Bearbeiten (Vignetten, Trainings, Erhebungen,
 Fragebogen-Items, Simulationskern, Modell- und Transkriptions-Konfiguration)
-stehen die Aktionen wie »Abbrechen« und »Änderungen speichern« oben im Formular und bleiben
-beim Scrollen sichtbar, solange das Formular im Bild ist. Die Tab-Reihenfolge
-führt weiter erst durch die Felder. Auf den Seiten der Teilnahme stehen die
-Aktionen weiterhin am Ende, etwa »Einwilligen« nach der Wahl zur
-Audioverarbeitung. Aktionen außerhalb eines Formulars, etwa auf Detailseiten,
-bleiben an ihrer Stelle.
+stehen die Aktionen wie »Abbrechen« und »Änderungen speichern« oben im
+Formular und bleiben beim Scrollen sichtbar, solange das Formular im Bild ist.
+Die Tab-Reihenfolge führt weiter erst durch die Felder. Auf den Seiten der
+Teilnahme stehen die Aktionen weiterhin am Ende, etwa »Einwilligen« nach der
+Wahl zur Audioverarbeitung. Aktionen außerhalb eines Formulars, etwa auf
+Detailseiten, bleiben an ihrer Stelle.
 
 ## Vignetten verwalten
 
