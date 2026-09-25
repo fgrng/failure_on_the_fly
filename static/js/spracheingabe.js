@@ -19,10 +19,10 @@
         const tastatureingabe = document.getElementById(bereich.dataset.tastatureingabeId);
         const steuerung = bereich.querySelector(".spracheingabe__steuerung");
         const status = bereich.querySelector(".spracheingabe__status");
-        const senden = formular?.querySelector(".gespraechseingabe__senden");
+        if (!formular || !eingabe || !steuerung || !status) return;
+        const senden = formular.querySelector(".gespraechseingabe__senden");
         // Das Feld, in das getippt wird; im Debrief nicht das Transkriptfeld.
         const schreibfeld = tastatureingabe || eingabe;
-        if (!formular || !eingabe || !steuerung || !status) return;
         const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
         // Dieselbe Grenze hält der Endpunkt; hier erspart sie die vergebliche Anfrage.
         const maximaleBytes = Number(bereich.dataset.maximaleBytes);
@@ -64,10 +64,10 @@
             if (formular.elements.eingabemodus) formular.elements.eingabemodus.value = modus;
         };
         const transkribieren = async () => {
-            zustand(grenzeErreicht
+            const hinweis = grenzeErreicht
                 ? "Die maximale Aufnahmelänge ist erreicht. Ihre Aufnahme wird transkribiert."
-                : "Ihre Aufnahme wird transkribiert.",
-            "transkription");
+                : "Ihre Aufnahme wird transkribiert.";
+            zustand(hinweis, "transkription");
             const daten = new FormData();
             daten.append("audio", new Blob(audioTeile, { type: recorder.mimeType || "audio/webm" }), "aufnahme.webm");
             if (bereich.dataset.sitzungPk) daten.append("sitzung_pk", bereich.dataset.sitzungPk);
