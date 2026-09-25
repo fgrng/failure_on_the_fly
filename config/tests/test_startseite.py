@@ -45,8 +45,8 @@ class StartseiteTests(TestCase):
         self.assertNotIn("Entwicklung", sidebar)
         self.assertNotIn("Forschung", sidebar)
         self.assertNotIn("System", sidebar)
-        self.assertNotIn("Trainingskataloge ansehen", sidebar)
-        self.assertNotIn("Trainingskatalog erstellen", sidebar)
+        self.assertNotIn("Trainings ansehen", sidebar)
+        self.assertNotIn("Neues Training anlegen", sidebar)
 
     def test_sonderrollen_sehen_ihre_bereiche(self) -> None:
         """Jede Sonderrolle erhält nur die zugehörigen Navigationslinks."""
@@ -54,24 +54,24 @@ class StartseiteTests(TestCase):
             (
                 "Autor:in",
                 ("Vignetten ansehen", "Simulationskern ansehen"),
-                ("Trainingskataloge ansehen", "Meine Erhebungen", "Administration"),
+                ("Trainings ansehen", "Meine Erhebungen", "Administration"),
             ),
             (
                 "Ausbilder:in",
-                ("Trainingskataloge ansehen", "Trainingskatalog erstellen"),
+                ("Trainings ansehen", "Neues Training anlegen"),
                 ("Vignetten ansehen", "Training starten", "Meine Erhebungen"),
             ),
             (
                 "Forschende:r",
                 ("Meine Erhebungen", "Neue Erhebung anlegen"),
-                ("Vignetten ansehen", "Trainingskataloge ansehen", "Administration"),
+                ("Vignetten ansehen", "Trainings ansehen", "Administration"),
             ),
             (
                 "Administration",
                 (
                     "Simulationskern verwalten",
                     "Administration",
-                    "Trainingskataloge ansehen",
+                    "Trainings ansehen",
                     "Meine Erhebungen",
                 ),
                 ("Training starten", "Meine Trainings"),

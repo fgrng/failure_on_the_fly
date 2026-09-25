@@ -190,3 +190,28 @@ def test_markdown_text_is_shielded_against_page_heading_rules() -> None:
     for ebene in ("h3", "h4", "h5"):
         assert f".markdown-text.markdown-text {ebene} {{" in markdown_css
     assert ".markdown-text.markdown-text p {" in markdown_css
+
+
+def test_aktive_navigation_traegt_die_bereichsfarbe() -> None:
+    """Aktiv und Hover der Sidebar tönen im Bereich statt in Grün (ADR-0024)."""
+
+    navigation_css: str = (STATIC / "css" / "navigation.css").read_text()
+
+    for gruppe, bereich in (
+        ("development", "authoring"),
+        ("education", "participant"),
+        ("research", "research"),
+        ("system", "system"),
+    ):
+        assert (
+            f".sidebar-nav__group--{gruppe} {{\n"
+            f"    --nav-solid: var(--color-area-{bereich}-solid);\n"
+            f"    --nav-tint: var(--color-area-{bereich}-tint);\n"
+            "}"
+        ) in navigation_css
+    assert "box-shadow: inset 3px 0 var(--nav-solid);" in navigation_css
+    assert "background: var(--nav-tint);" in navigation_css
+    assert (
+        "color: var(--color-accent"
+        not in navigation_css.partition(".sidebar-account")[0]
+    )
