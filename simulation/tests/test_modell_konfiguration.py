@@ -1,11 +1,13 @@
 """Anbieterbindung und Parameter-Allowlist der Modell-Konfiguration."""
 
 import inspect
+from datetime import datetime
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.utils import timezone
 
 from simulation.models import (
     AktiveModellKonfiguration,
@@ -276,12 +278,13 @@ def test_migration_benennt_den_bestand_nach_sprachmodell_und_nummer() -> None:
             "simulation", "ModellKonfiguration"
         ).objects.create(sprachmodell="fake")
         MigrationExecutor(connection).migrate(nachher)
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
-            pk=alte_konfiguration.pk
-        )
     finally:
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
+    # Erst nach der letzten Migration passt das aktuelle Modell zur Tabelle.
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
+        pk=alte_konfiguration.pk
+    )
 
     assert konfiguration.bezeichnung == f"fake (Nr. {konfiguration.pk})"
 
@@ -339,6 +342,32 @@ def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
     assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) is None
 
 
+@pytest.mark.django_db
+def test_aktive_je_verwendung_nennt_nur_belegte_verwendungen() -> None:
+    """Die Tabelle erfährt in einer Abfrage, welche Verwendung wohin zeigt."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
+
+    assert ModellKonfiguration.objects.aktive_je_verwendung() == {
+        Verwendung.SCHUELERIN: konfiguration.pk,
+        Verwendung.BEWERTER: konfiguration.pk,
+    }
+
+
+@pytest.mark.django_db
+def test_haelt_den_anlagezeitpunkt_fest() -> None:
+    """Das Anlagedatum unterscheidet gleichnamige Fassungen in der Tabelle."""
+
+    vorher: datetime = timezone.now()
+
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    assert konfiguration.angelegt_am is not None
+    assert vorher <= konfiguration.angelegt_am <= timezone.now()
+
+
 def test_die_verwendung_hat_keinen_default() -> None:
     """Keine neue Stelle erwischt versehentlich die Schüler:innen-Konfiguration."""
 
@@ -366,19 +395,43 @@ def test_migration_macht_die_aktive_zur_schuelerin() -> None:
             konfiguration=alte_konfiguration
         )
         MigrationExecutor(connection).migrate(nachher)
-        schuelerin: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-            Verwendung.SCHUELERIN
-        )
-        lehrperson: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-            Verwendung.LEHRPERSON
-        )
-        bewerter: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-            Verwendung.BEWERTER
+    finally:
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+    # Erst nach der letzten Migration passt das aktuelle Modell zur Tabelle.
+    schuelerin: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+        Verwendung.SCHUELERIN
+    )
+    lehrperson: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+        Verwendung.LEHRPERSON
+    )
+    bewerter: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+        Verwendung.BEWERTER
+    )
+
+    assert schuelerin is not None and schuelerin.pk == alte_konfiguration.pk
+    assert lehrperson is None
+    assert bewerter is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_laesst_das_anlagedatum_des_bestands_leer() -> None:
+    """Der Migrationszeitpunkt wird nicht als Anlagedatum ausgegeben."""
+
+    vorher = [("simulation", "0008_aktivemodellkonfiguration_verwendung")]
+    executor: MigrationExecutor = MigrationExecutor(connection)
+    executor.migrate(vorher)
+    try:
+        alte_konfiguration = (
+            executor.loader.project_state(vorher)
+            .apps.get_model("simulation", "ModellKonfiguration")
+            .objects.create(bezeichnung="Bestand", sprachmodell="fake")
         )
     finally:
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
 
-    assert schuelerin is not None and schuelerin.pk == alte_konfiguration.pk
-    assert lehrperson is None
-    assert bewerter is None
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
+        pk=alte_konfiguration.pk
+    )
+    assert konfiguration.angelegt_am is None

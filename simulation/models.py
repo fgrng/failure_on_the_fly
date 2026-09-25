@@ -527,6 +527,15 @@ class ModellKonfigurationManager(
             .konfiguration
         )
 
+    def aktive_je_verwendung(self) -> dict[str, int]:
+        """Liefert je belegter Verwendung den Primärschlüssel ihrer Konfiguration."""
+
+        return dict(
+            AktiveModellKonfiguration.objects.values_list(
+                "verwendung", "konfiguration_id"
+            )
+        )
+
     def aktivieren(
         self,
         konfiguration: "ModellKonfiguration",
@@ -549,6 +558,11 @@ class ModellKonfiguration(AnbieterFeldgruppe):
     bezeichnung: models.CharField = models.CharField(max_length=120)
     sprachmodell: models.CharField = models.CharField(max_length=255)
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
+    # Leer nur für den Bestand vor Einführung des Feldes: Ein erfundenes Datum
+    # wäre schlimmer als keines.
+    angelegt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True, null=True
+    )
 
     objects: ModellKonfigurationManager = ModellKonfigurationManager()
 

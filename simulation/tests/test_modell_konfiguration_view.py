@@ -5,8 +5,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
+from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from konten.models import Konto
 from simulation.forms import ModellKonfigurationForm, TranskriptionsKonfigurationForm
@@ -46,6 +48,14 @@ def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=sprachmodell,
         anbieter_token=token,
+    )
+
+
+def _aktivieren_url(konfiguration: ModellKonfiguration, verwendung: str) -> str:
+    """Liefert die Route, die eine Verwendung auf die Konfiguration richtet."""
+    return reverse(
+        "simulation:modell_konfiguration_aktivieren",
+        args=[konfiguration.pk, verwendung],
     )
 
 
@@ -94,12 +104,22 @@ class ModellKonfigurationRollenTests(TestCase):
         self.client.force_login(_autorin("ada"))
 
         response: HttpResponse = self.client.post(
-            reverse(
-                "simulation:modell_konfiguration_aktivieren", args=[konfiguration.pk]
-            )
+            _aktivieren_url(konfiguration, Verwendung.BEWERTER)
         )
 
         self.assertEqual(response.status_code, 403)
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.BEWERTER))
+
+    def test_aktivieren_weist_nicht_angemeldetes_konto_ab(self) -> None:
+        """Ohne Anmeldung schaltet niemand eine Verwendung um."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
 
 
 class ZweiFassungenTestCase(TestCase):
@@ -142,18 +162,132 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
         self.assertContains(response, "Bezeichnung openrouter/altes-modell")
         self.assertContains(response, "Bezeichnung openrouter/neues-modell")
 
-    def test_markiert_die_aktive_konfiguration(self) -> None:
-        """Die Liste sagt, welche Fassung neue Sitzungen bedient."""
+    def test_nennt_die_kuerzel_der_verwendungen_je_zeile(self) -> None:
+        """Die Tabelle sagt, für welche Verwendungen eine Zeile gerade aktiv ist."""
+        ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.BEWERTER)
+        ModellKonfiguration.objects.aktivieren(self.neuere, Verwendung.LEHRPERSON)
+
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )
-        zeilen: list[dict[str, object]] = response.context["konfigurationen"]
+        kuerzel: dict[object, list[str]] = {
+            zeile["pk"]: [v["kuerzel"] for v in zeile["verwendungen"]]
+            for zeile in response.context["konfigurationen"]
+        }
 
-        self.assertContains(response, '<span class="badge badge--system">Aktiv</span>')
-        self.assertEqual(
-            {zeile["pk"] for zeile in zeilen if zeile["ist_aktiv"]},
-            {self.aeltere.pk},
+        self.assertEqual(kuerzel, {self.aeltere.pk: ["S", "B"], self.neuere.pk: ["L"]})
+        self.assertContains(
+            response, '<abbr class="verwendungskuerzel" title="Schüler:in">S</abbr>'
         )
+
+    def test_nennt_das_anlagedatum(self) -> None:
+        """Gleichnamige Fassungen unterscheidet das Anlagedatum."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(
+            response, timezone.localtime(self.neuere.angelegt_am).strftime("%d.%m.%Y")
+        )
+
+    def test_zeigt_fuer_den_bestand_ohne_anlagedatum_einen_strich(self) -> None:
+        """Ein fehlendes Datum wird nicht erfunden."""
+        # Bestand vor dem Anlagedatum; die Sperre des QuerySets umgeht der Test.
+        QuerySet.update(ModellKonfiguration.objects.all(), angelegt_am=None)
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(response, "<td>—</td>", count=2, html=True)
+        self.assertContains(response, "angelegt —")
+
+
+class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
+    """Rechts steht das Detail der gewählten Zeile."""
+
+    def test_zeigt_ohne_wahl_die_konfiguration_der_schuelerin(self) -> None:
+        """Ohne Angabe beginnt die Seite bei dem, was Teilnehmende spielen."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertEqual(response.context["gewaehlt"]["pk"], self.aeltere.pk)
+
+    def test_zeigt_die_gewaehlte_zeile(self) -> None:
+        """Die Zeile der Tabelle führt über die Anfrage ins Detail."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": self.neuere.pk},
+        )
+
+        self.assertEqual(response.context["gewaehlt"]["pk"], self.neuere.pk)
+        self.assertContains(response, f"Nr. {self.neuere.pk}")
+        self.assertContains(response, f'href="?konfiguration={self.aeltere.pk}"')
+
+    def test_faellt_bei_unbekannter_wahl_auf_die_schuelerin_zurueck(self) -> None:
+        """Eine veraltete oder unsinnige Angabe führt nicht auf eine Fehlerseite."""
+        for genannt in ("999", "abc"):
+            response: HttpResponse = self.client.get(
+                reverse("simulation:modell_konfiguration"), {"konfiguration": genannt}
+            )
+
+            self.assertEqual(response.context["gewaehlt"]["pk"], self.aeltere.pk)
+
+    def test_zeigt_ohne_aktive_schuelerin_die_neueste(self) -> None:
+        """Solange nichts aktiv ist, steht die zuletzt angelegte im Detail."""
+        AktiveModellKonfiguration.objects.all().delete()
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertEqual(response.context["gewaehlt"]["pk"], self.neuere.pk)
+
+    def test_bietet_je_verwendung_einen_knopf(self) -> None:
+        """Unbelegte Verwendungen nennen keinen abgelösten Vorgänger."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": self.neuere.pk},
+        )
+
+        self.assertContains(
+            response,
+            "Für Schüler:in aktivieren (statt Bezeichnung openrouter/altes-modell)",
+        )
+        self.assertContains(response, "Für Lehrperson aktivieren</button>")
+        self.assertContains(response, "Für Bewerter aktivieren</button>")
+        self.assertContains(
+            response, f'action="{_aktivieren_url(self.neuere, Verwendung.BEWERTER)}"'
+        )
+
+    def test_zeigt_eine_schon_aktive_verwendung_als_deaktivierten_knopf(self) -> None:
+        """Wofür die Konfiguration schon aktiv ist, lässt sich nicht erneut schalten."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(
+            response,
+            '<button class="button" type="button" disabled>✓ Aktiv für Schüler:in</button>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            f'action="{_aktivieren_url(self.aeltere, Verwendung.SCHUELERIN)}"',
+        )
+
+    def test_zeigt_einen_leerhinweis_ohne_konfiguration(self) -> None:
+        """Ohne Konfiguration gibt es weder Tabelle noch Detail."""
+        AktiveModellKonfiguration.objects.all().delete()
+        ModellKonfiguration.objects.all().delete()
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertIsNone(response.context["gewaehlt"])
+        self.assertContains(response, "Noch keine Modell-Konfiguration angelegt.")
 
     def test_bietet_weder_bearbeiten_noch_loeschen_an(self) -> None:
         """Die Oberfläche verspricht nicht, was das append-only-Modell verbietet."""
@@ -180,13 +314,17 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
         )
 
         self.assertNotIn(TOKEN, str(response.context["konfigurationen"]))
+        self.assertNotIn(TOKEN, str(response.context["gewaehlt"]))
 
     def test_zeigt_einen_leerhinweis_ohne_token(self) -> None:
         """Eine Konfiguration ohne Zugangsdaten fällt vor dem ersten Aufruf auf."""
-        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
+        ohne_token: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test", sprachmodell="fake"
+        )
 
         response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration")
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": ohne_token.pk},
         )
 
         self.assertContains(response, "Kein Token hinterlegt")
@@ -303,31 +441,50 @@ class ModellKonfigurationAnlegenTests(TestCase):
 
 
 class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
-    """Das Umschalten läuft über die Manager-Geste."""
+    """Das Umschalten je Verwendung läuft über die Manager-Geste."""
 
-    def test_aktiviert_eine_bestehende_konfiguration(self) -> None:
-        """Nach dem Umschalten zeigt die Liste die neue als aktiv."""
-        response: HttpResponse = self.client.post(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
-        )
+    def test_aktiviert_fuer_die_genannte_verwendung(self) -> None:
+        """Danach liefert aktive() genau diese, das Detail bleibt bei ihr."""
+        for verwendung in Verwendung:
+            with self.subTest(verwendung=verwendung):
+                response: HttpResponse = self.client.post(
+                    _aktivieren_url(self.neuere, verwendung)
+                )
 
-        self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
-        self.assertEqual(
-            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), self.neuere
-        )
+                self.assertRedirects(
+                    response,
+                    f"{reverse('simulation:modell_konfiguration')}"
+                    f"?konfiguration={self.neuere.pk}",
+                )
+                self.assertEqual(
+                    ModellKonfiguration.objects.aktive(verwendung), self.neuere
+                )
 
-    def test_schaltet_nur_die_schuelerin_um(self) -> None:
-        """Lehrperson und Bewerter bleiben, bis es Aktivieren je Verwendung gibt."""
+    def test_laesst_die_anderen_verwendungen_unberuehrt(self) -> None:
+        """Ein Umschalten bewegt nur den Zeiger der genannten Verwendung."""
         ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.BEWERTER)
 
-        self.client.post(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
-        )
+        self.client.post(_aktivieren_url(self.neuere, Verwendung.LEHRPERSON))
 
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), self.aeltere
+        )
         self.assertEqual(
             ModellKonfiguration.objects.aktive(Verwendung.BEWERTER), self.aeltere
         )
-        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON))
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON), self.neuere
+        )
+
+    def test_dieselbe_konfiguration_fuer_mehrere_verwendungen(self) -> None:
+        """Eine kleine Instanz kommt mit einer Konfiguration für alle aus."""
+        self.client.post(_aktivieren_url(self.aeltere, Verwendung.LEHRPERSON))
+        self.client.post(_aktivieren_url(self.aeltere, Verwendung.BEWERTER))
+
+        for verwendung in Verwendung:
+            self.assertEqual(
+                ModellKonfiguration.objects.aktive(verwendung), self.aeltere
+            )
 
     def test_verschiebt_nur_den_zeiger_ohne_zeile_zu_mutieren(self) -> None:
         """Das Umschalten geht über aktivieren() und lässt beide Zeilen unberührt."""
@@ -335,19 +492,44 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
             ModellKonfiguration.objects.order_by("pk").values_list()
         )
 
-        self.client.post(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
-        )
+        with patch.object(
+            ModellKonfiguration.objects,
+            "aktivieren",
+            wraps=ModellKonfiguration.objects.aktivieren,
+        ) as aktivieren:
+            self.client.post(_aktivieren_url(self.neuere, Verwendung.BEWERTER))
 
+        aktivieren.assert_called_once_with(self.neuere, Verwendung.BEWERTER)
         self.assertEqual(
             list(ModellKonfiguration.objects.order_by("pk").values_list()), vorher
         )
+        self.assertEqual(AktiveModellKonfiguration.objects.count(), 2)
+
+    def test_lehnt_eine_unbekannte_verwendung_ab(self) -> None:
+        """Nur die drei festen Verwendungen haben einen Zeiger."""
+        response: HttpResponse = self.client.post(
+            _aktivieren_url(self.neuere, "hausmeister")
+        )
+
+        self.assertEqual(response.status_code, 404)
         self.assertEqual(AktiveModellKonfiguration.objects.count(), 1)
+
+    def test_lehnt_eine_unbekannte_konfiguration_ab(self) -> None:
+        """Ein Zeiger zeigt nur auf eine bestehende Konfiguration."""
+        response: HttpResponse = self.client.post(
+            reverse(
+                "simulation:modell_konfiguration_aktivieren",
+                args=[999, Verwendung.BEWERTER],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.BEWERTER))
 
     def test_aktivieren_ist_der_post_route_vorbehalten(self) -> None:
         """Eine Zustandsänderung entsteht nicht durch einen Aufruf per GET."""
         response: HttpResponse = self.client.get(
-            reverse("simulation:modell_konfiguration_aktivieren", args=[self.neuere.pk])
+            _aktivieren_url(self.neuere, Verwendung.SCHUELERIN)
         )
 
         self.assertEqual(response.status_code, 405)

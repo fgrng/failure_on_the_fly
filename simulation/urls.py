@@ -37,7 +37,7 @@ urlpatterns: list[URLPattern] = [
         name="modellvorschlaege",
     ),
     path(
-        "modell-konfiguration/<int:pk>/aktivieren/",
+        "modell-konfiguration/<int:pk>/aktivieren/<str:verwendung>/",
         views.modell_konfiguration_aktivieren,
         name="modell_konfiguration_aktivieren",
     ),
