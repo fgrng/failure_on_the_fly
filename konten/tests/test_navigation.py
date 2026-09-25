@@ -16,6 +16,9 @@ from konten.navigation import (
     navigation,
 )
 from konten.models import Konto
+from simulation.models import Simulationskern
+from training.models import Training
+from vignetten.models import Vignette
 
 
 @pytest.mark.django_db
@@ -161,7 +164,7 @@ class SidebarNavigationTests(TestCase):
         self.assertIn("Training starten", sidebar)
         self.assertIn("Meine Trainings", sidebar)
         self.assertNotIn("Vignetten ansehen", sidebar)
-        self.assertNotIn("Trainingskatalog erstellen", sidebar)
+        self.assertNotIn("Neues Training anlegen", sidebar)
         self.assertNotIn("Meine Erhebungen", sidebar)
         self.assertNotIn("Administration", sidebar)
 
@@ -169,8 +172,8 @@ class SidebarNavigationTests(TestCase):
         """Die Ausbilderrolle enthält nicht automatisch die Teilnahme."""
         sidebar: str = self._sidebar_fuer("Ausbilder:in")
 
-        self.assertIn("Trainingskataloge ansehen", sidebar)
-        self.assertIn("Trainingskatalog erstellen", sidebar)
+        self.assertIn("Trainings ansehen", sidebar)
+        self.assertIn("Neues Training anlegen", sidebar)
         self.assertIn("Trainingsdaten <small>geplant</small>", sidebar)
         self.assertNotIn("Training starten", sidebar)
         self.assertNotIn("Meine Trainings", sidebar)
@@ -180,6 +183,7 @@ class SidebarNavigationTests(TestCase):
         sidebar: str = self._sidebar_fuer("Autor:in")
 
         self.assertIn("Vignetten ansehen", sidebar)
+        self.assertIn("Neue Vignette anlegen", sidebar)
         self.assertIn("Simulationskern ansehen", sidebar)
         self.assertNotIn("Simulationskern verwalten", sidebar)
         self.assertNotIn("Training starten", sidebar)
@@ -206,7 +210,7 @@ class SidebarNavigationTests(TestCase):
             "Vignetten ansehen",
             "Simulationskern ansehen",
             "Simulationskern verwalten",
-            "Trainingskatalog erstellen",
+            "Neues Training anlegen",
             "Meine Erhebungen",
             "Fragebogen-Items",
             "Administration",
@@ -215,3 +219,56 @@ class SidebarNavigationTests(TestCase):
 
         self.assertNotIn("Training starten", sidebar)
         self.assertNotIn("Meine Trainings", sidebar)
+
+    def test_simulationskern_verwalten_steht_unter_entwicklung(self) -> None:
+        """Die Kernverwaltung gehört zur Gruppe Entwicklung, nicht zu System."""
+        sidebar: str = self._sidebar_fuer(is_superuser=True)
+        entwicklung: str = sidebar.partition("sidebar-nav__group--development")[2]
+        entwicklung = entwicklung.partition("</section>")[0]
+        system: str = sidebar.partition("sidebar-nav__group--system")[2]
+
+        self.assertIn("Simulationskern verwalten", entwicklung)
+        self.assertNotIn("Simulationskern verwalten", system)
+
+
+class BereichszuordnungTests(TestCase):
+    """Jede Seite trägt den Bereich ihrer Sidebar-Gruppe (ADR-0024)."""
+
+    def test_seiten_tragen_den_bereich_ihrer_sidebar_gruppe(self) -> None:
+        """Seiten ohne eigene Farbe erben die Gruppe, unter der sie stehen."""
+        linus: Konto = get_user_model().objects.create_user(
+            username="linus", is_superuser=True
+        )
+        kern: Simulationskern = Simulationskern.objects.anlegen()
+        kern.finalisieren()
+        kern_entwurf: Simulationskern = kern.bearbeiten()
+        vignette: Vignette = Vignette.objects.anlegen(linus)
+        training_entwurf: Training = Training.objects.anlegen(linus, name="Brüche")
+        training_veroeffentlicht: Training = Training.objects.anlegen(
+            linus, name="Prozente"
+        )
+        training_veroeffentlicht.veroeffentlichen()
+        self.client.force_login(linus)
+
+        for url, bereich in (
+            (reverse("vignetten:liste"), "authoring"),
+            (reverse("vignetten:detail", args=[vignette.pk]), "authoring"),
+            (reverse("simulation:kern_verwalten"), "authoring"),
+            (
+                reverse("simulation:kern_bearbeiten", args=[kern_entwurf.pk]),
+                "authoring",
+            ),
+            (reverse("training:katalog"), "participant"),
+            (reverse("training:liste"), "participant"),
+            (reverse("training:anlegen"), "participant"),
+            (reverse("training:kuratieren", args=[training_entwurf.pk]), "participant"),
+            (
+                reverse("training:detail", args=[training_veroeffentlicht.pk]),
+                "participant",
+            ),
+        ):
+            with self.subTest(url=url):
+                seite: str = self.client.get(url).content.decode()
+                self.assertRegex(
+                    seite, rf'<section class="page[^"]* area--{bereich}[ "]'
+                )

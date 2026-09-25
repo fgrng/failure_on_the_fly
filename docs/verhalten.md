@@ -20,6 +20,14 @@ vergibt die drei fachlichen Rollen als Groups und kann weitere Superuser ernenne
 Konten lassen sich dort bewusst nicht löschen, solange #156 den Umgang mit
 Löschbegehren noch nicht festlegt.
 
+Die Sidebar gliedert die Links in die Gruppen Entwicklung (gelb), Ausbildung
+(grün), Forschung (violett) und System (blau). Die aktive Seite trägt die
+Fläche und einen Balken links im Ton ihrer Gruppe, beim Überfahren erscheint
+die halbe Tönung; die Schrift bleibt dunkel. Jede Seite trägt die Bereichsfarbe
+der Gruppe, unter der sie in der Sidebar steht: Vignetten und der
+Simulationskern samt Verwaltung gehören zu Entwicklung, Trainingskatalog,
+eigene Trainings, Training anlegen und kuratieren zu Ausbildung.
+
 Die gesamte Oberfläche ist deutschsprachig, auch Djangos eigene Texte:
 Formularfehler (»Dieses Feld ist zwingend erforderlich.«), die Bedienelemente
 bereits hochgeladener Bilder und die Datumsanzeige. Auswahlfelder ohne
@@ -80,7 +88,7 @@ Eigentümer:innen.
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
 Modell-Konfiguration der Schüler:in schreibgeschützt unter `/system/kern/` einsehen. Ist noch
 kein finaler Kern vorhanden, stellt die Ansicht das nur fest. Administrator:innen
-erhalten unter `/system/kern/verwalten/` außerdem den Überblick über den Entwurf, die
+erhalten unter `/system/kern/verwalten/` (Sidebar: Entwicklung) außerdem den Überblick über den Entwurf, die
 finale Fassung und die eingeklappten archivierten Kern-Fassungen. Solange es überhaupt
 keine Fassung gibt, legen sie die erste dort als Entwurf an — leer oder aus dem
 Standardkern. Danach ziehen sie aus der finalen Fassung einen Entwurf, bearbeiten

@@ -372,11 +372,11 @@ class SimulationskernVerwaltungTests(TestCase):
         entwurf.save()
         self.client.force_login(_administratorin("linus"))
 
-    def test_traegt_die_system_farbfläche(self) -> None:
-        """Die Verwaltungsübersicht gehört zum System-Bereich."""
+    def test_traegt_die_entwicklungs_farbfläche(self) -> None:
+        """Die Verwaltungsübersicht gehört zum Entwicklungsbereich (ADR-0024)."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
-        self.assertContains(response, 'class="page system-page area--system"')
+        self.assertContains(response, 'class="page system-page area--authoring"')
 
     def test_zeigt_den_entwurf(self) -> None:
         """Die Verwaltungsübersicht zeigt den vorhandenen Entwurf."""
