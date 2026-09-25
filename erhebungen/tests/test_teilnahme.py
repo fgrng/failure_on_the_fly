@@ -475,6 +475,28 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(debrief, "Spracheingabe starten")
 
     @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
+    def test_ohne_audioeinwilligung_steht_ein_stiller_hinweis_statt_des_knopfs(
+        self,
+    ) -> None:
+        """Gespräch und Debrief sagen still, dass nur die Tastatur bleibt."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+
+        gespraech: HttpResponse = self.client.get(gespraech_url)
+        debrief: HttpResponse = self.client.post(
+            reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+        )
+
+        for seite in (gespraech, debrief):
+            self.assertNotContains(seite, "Spracheingabe starten")
+            self.assertContains(
+                seite, "Spracheingabe nicht freigegeben. Sie nutzen die Tastatur."
+            )
+
+    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_nach_zustimmung_zu_sprachmodellen_ist_die_entscheidung_endgueltig(
         self,
     ) -> None:

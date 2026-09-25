@@ -162,18 +162,18 @@
     border-top: 1px solid var(--color-border);
 }
 
-/* Eingabefeld links, Senden und Aufnahme rechts daneben, Hinweise darunter. */
+/* Feld in voller Breite; darunter die Eingabezeile: Spracheingabe und Status
+   links, Senden als einzige Hauptaktion rechts. */
 .gespraechseingabe__formular {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-        "beschriftung beschriftung"
-        "eingabe      senden"
-        "eingabe      aufnahme"
-        "hinweis      hinweis"
-        "verarbeitung verarbeitung";
+        "beschriftung beschriftung beschriftung"
+        "eingabe      eingabe      eingabe"
+        "aufnahme     hinweis      senden"
+        "verarbeitung verarbeitung verarbeitung";
     gap: var(--space-2);
-    align-items: start;
+    align-items: center;
 }
 
 .gespraechseingabe label,
@@ -181,9 +181,9 @@
 .gespraechseingabe label { grid-area: beschriftung; margin-bottom: 0; }
 .gespraechseingabe textarea { grid-area: eingabe; min-height: 104px; padding: var(--space-2); border-radius: 14px; }
 .gespraechseingabe textarea:read-only { background: var(--color-surface-muted); color: var(--color-text-muted); }
-.gespraechseingabe__senden { grid-area: senden; }
-.gespraechseingabe .spracheingabe__steuerung { grid-area: aufnahme; }
-.gespraechseingabe .spracheingabe__status { grid-area: hinweis; }
+.gespraechseingabe__senden { grid-area: senden; justify-self: end; }
+.gespraechseingabe .spracheingabe__steuerung { grid-area: aufnahme; justify-self: start; }
+.gespraechseingabe .spracheingabe__status { grid-area: hinweis; margin: 0; }
 .gespraechseingabe :disabled { opacity: .6; cursor: progress; }
 
 .spracheingabe {
@@ -202,13 +202,72 @@
 .spracheingabe--aufnahme { background: var(--color-area-participant-tint); }
 .gespraechseingabe .spracheingabe--aufnahme { background: none; }
 
-/* Laufende Aufnahme: der Knopf selbst wechselt die Farbe. */
-.spracheingabe--aufnahme .spracheingabe__steuerung {
-    background: var(--color-danger);
-    color: var(--color-text-on-accent);
+/* Mikrofon vor dem Knopftext, in der Farbe des Knopfs. */
+.spracheingabe__steuerung {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
 }
 
-.spracheingabe--aufnahme .spracheingabe__steuerung:hover { background: var(--color-danger-emphasis); }
+.spracheingabe__steuerung::before {
+    content: "";
+    flex: none;
+    width: 1em;
+    height: 1em;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round'%3E%3Crect x='5.5' y='1.5' width='5' height='8' rx='2.5'/%3E%3Cpath d='M3 7.5a5 5 0 0 0 10 0M8 12.5v2.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Laufende Aufnahme: rot umrandet, das Symbol wird zum Stopp-Quadrat. */
+.spracheingabe--aufnahme .spracheingabe__steuerung {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.spracheingabe--aufnahme .spracheingabe__steuerung:hover {
+    background: var(--color-danger-tint);
+    color: var(--color-danger-emphasis);
+}
+
+.spracheingabe--aufnahme .spracheingabe__steuerung::before {
+    mask: none;
+    transform: scale(.7);
+    border-radius: 2px;
+}
+
+.spracheingabe--aufnahme .spracheingabe__status { color: var(--color-text); font-weight: 650; }
+.spracheingabe--fehler .spracheingabe__status { color: var(--color-danger); }
+
+/* Vor dem Status: pulsierender Punkt bei Aufnahme, Spinner bei Transkription. */
+.spracheingabe--aufnahme .spracheingabe__status::before,
+.spracheingabe--transkription .spracheingabe__status::before {
+    content: "";
+    display: inline-block;
+    width: .75rem;
+    height: .75rem;
+    margin-right: var(--space-1);
+    border-radius: 50%;
+    vertical-align: -.05em;
+}
+
+.spracheingabe--aufnahme .spracheingabe__status::before {
+    background: var(--color-danger);
+    animation: spracheingabe-pulsiert 1.2s ease-in-out infinite;
+}
+
+.spracheingabe--transkription .spracheingabe__status::before {
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-accent);
+    animation: gespraechseingabe-dreht 900ms linear infinite;
+}
+
+@keyframes spracheingabe-pulsiert {
+    50% { opacity: .3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spracheingabe--aufnahme .spracheingabe__status::before { animation: none; }
+}
 
 /* Sichtbar nur, solange htmx die Antwort holt. */
 .gespraechseingabe__verarbeitung {
@@ -236,7 +295,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .gespraechseingabe__spinner { animation-duration: 3s; }
+    .gespraechseingabe__spinner,
+    .spracheingabe--transkription .spracheingabe__status::before { animation-duration: 3s; }
 }
 
 .gespraechseingabe--fehler {
@@ -252,14 +312,13 @@
 .sitzung-aktion-link { border: 0; background: transparent; color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer; }
 .sitzung-aktion-link--ruhig { color: var(--color-text-muted); font-weight: 500; }
 
-/* Dasselbe Raster wie im Gespräch, erweitert um das Transkriptfeld darunter. */
+/* Dasselbe Raster wie im Gespräch, erweitert um das Transkriptfeld darüber. */
 .diagnose {
     grid-template-areas:
-        "beschriftung beschriftung"
-        "eingabe      senden"
-        "eingabe      aufnahme"
-        "transkript   transkript"
-        "hinweis      hinweis";
+        "beschriftung beschriftung beschriftung"
+        "eingabe      eingabe      eingabe"
+        "transkript   transkript   transkript"
+        "aufnahme     hinweis      senden";
 }
 
 .diagnose__transkript { grid-area: transkript; padding: var(--space-2); border-radius: 14px; }
@@ -280,25 +339,24 @@
     .sitzung-illustration { width: min(100%, 360px); }
 }
 
+/* Schmal: Spracheingabe und Senden teilen sich eine Zeile, der Status bricht darunter um. */
 @media (max-width: 560px) {
     .gespraechseingabe__formular {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            "beschriftung"
-            "eingabe"
-            "senden"
-            "aufnahme"
-            "hinweis"
-            "verarbeitung";
+            "beschriftung beschriftung"
+            "eingabe      eingabe"
+            "aufnahme     senden"
+            "hinweis      hinweis"
+            "verarbeitung verarbeitung";
     }
 
     .diagnose {
         grid-template-areas:
-            "beschriftung"
-            "eingabe"
-            "senden"
-            "aufnahme"
-            "transkript"
-            "hinweis";
+            "beschriftung beschriftung"
+            "eingabe      eingabe"
+            "transkript   transkript"
+            "aufnahme     senden"
+            "hinweis      hinweis";
     }
 }

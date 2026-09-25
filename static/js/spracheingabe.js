@@ -19,6 +19,9 @@
         const tastatureingabe = document.getElementById(bereich.dataset.tastatureingabeId);
         const steuerung = bereich.querySelector(".spracheingabe__steuerung");
         const status = bereich.querySelector(".spracheingabe__status");
+        const senden = formular?.querySelector(".gespraechseingabe__senden");
+        // Das Feld, in das getippt wird; im Debrief nicht das Transkriptfeld.
+        const schreibfeld = tastatureingabe || eingabe;
         if (!formular || !eingabe || !steuerung || !status) return;
         const automatischAbsenden = bereich.dataset.automatischAbsenden === "true";
         // Dieselbe Grenze hält der Endpunkt; hier erspart sie die vergebliche Anfrage.
@@ -30,18 +33,26 @@
         let aufgenommeneBytes = 0;
         let grenzeErreicht = false;
 
-        const zustand = (text, aufnahme = false) => {
+        // art: "aufnahme", "transkription", "fehler" oder leer für bereit.
+        const zustand = (text, art = "") => {
             status.textContent = text;
-            bereich.classList.toggle("spracheingabe--aufnahme", aufnahme);
+            for (const moeglich of ["aufnahme", "transkription", "fehler"]) {
+                bereich.classList.toggle(`spracheingabe--${moeglich}`, art === moeglich);
+            }
+            // Während Aufnahme und Transkription gibt es nichts abzuschicken.
+            if (senden) senden.disabled = art === "aufnahme" || art === "transkription";
+            if (art === "transkription") schreibfeld.readOnly = true;
         };
         const zuruecksetzen = () => {
+            schreibfeld.readOnly = false;
             steuerung.disabled = false;
             steuerung.textContent = "Spracheingabe starten";
             steuerung.setAttribute("aria-pressed", "false");
         };
         const aufnahme_deaktivieren = (text) => {
             steuerung.hidden = true;
-            zustand(text);
+            schreibfeld.readOnly = false;
+            zustand(text, "fehler");
         };
         const mikrofon_verweigert = () => aufnahme_deaktivieren(
             "Der Mikrofonzugriff wurde nicht erteilt. Nutzen Sie die Tastatureingabe."
@@ -55,8 +66,8 @@
         const transkribieren = async () => {
             zustand(grenzeErreicht
                 ? "Die maximale Aufnahmelänge ist erreicht. Ihre Aufnahme wird transkribiert."
-                : "Ihre Aufnahme wird transkribiert."
-            );
+                : "Ihre Aufnahme wird transkribiert.",
+            "transkription");
             const daten = new FormData();
             daten.append("audio", new Blob(audioTeile, { type: recorder.mimeType || "audio/webm" }), "aufnahme.webm");
             if (bereich.dataset.sitzungPk) daten.append("sitzung_pk", bereich.dataset.sitzungPk);
@@ -76,6 +87,7 @@
                 } else {
                     textAnhaengen(eingabe, ergebnis.text);
                     if (tastatureingabe) tastatureingabe.required = false;
+                    schreibfeld.readOnly = false;
                 }
                 eingabe.hidden = false;
                 zustand("Das Transkript wurde hinzugefügt. Sie können weiter aufnehmen oder tippen.");
@@ -85,7 +97,7 @@
                     aufnahme_deaktivieren("Die Transkription ist nicht verfügbar. Nutzen Sie die Tastatureingabe.");
                     return;
                 }
-                zustand(meldungen[fehler.message] || "Die Transkription ist fehlgeschlagen. Nehmen Sie bitte erneut auf.");
+                zustand(meldungen[fehler.message] || "Die Transkription ist fehlgeschlagen. Nehmen Sie bitte erneut auf.", "fehler");
                 zuruecksetzen();
             }
         };
@@ -118,7 +130,7 @@
                 recorder.start(AUFNAHME_ZEITSCHEIBE_MS);
                 steuerung.textContent = "Spracheingabe beenden";
                 steuerung.setAttribute("aria-pressed", "true");
-                zustand("Die Spracheingabe läuft. Beenden Sie sie, wenn Ihre Eingabe vollständig ist.", true);
+                zustand("Die Spracheingabe läuft. Beenden Sie sie, wenn Ihre Eingabe vollständig ist.", "aufnahme");
             } catch {
                 mikrofon_verweigert();
             }
