@@ -118,6 +118,21 @@ CONTEXT.md, etwa »Fehlermuster-Beschreibung«, »Lernauftrag-Bild«,
 gilt auch für Legende und Felder der Bildkarte. Scheitert das Finalisieren an
 leeren Pflichtfeldern, nennt die Meldung sie mit diesen Beschriftungen.
 
+Die großen Texte des Formulars (Lernauftrag- und Arbeitsheft-Text, beide
+Simulationshinweise, Fehlermuster-Beschreibung und Referenzdiagnose) stehen wie
+die Erhebungstexte zunächst zum Lesen, auf wenige Zeilen gekürzt; »Ganz
+anzeigen« klappt einen langen Text auf. Die beiden Szenentexte erscheinen als
+gerendertes Markdown, die übrigen als reiner Text. Ein leerer Text zeigt »Noch
+kein Text« und statt »Bearbeiten« den Knopf »Text schreiben«; beim Anlegen gilt
+das für alle. »Bearbeiten« öffnet nur diesen Text, bei den Szenentexten im
+Markdown-Feld mit Vorschau, mit eigenen Knöpfen »Speichern« und »Abbrechen«.
+Jeder Speichern-Knopf, am Text wie »Änderungen speichern« oder »Vignette
+anlegen«, speichert die ganze Vignette mit allen Feldern und allen geöffneten
+Texten; beim Anlegen legt er sie an. »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein Text mit
+Fehler steht nach dem Speichern offen. Wer die Seite mit ungespeicherten
+Änderungen verlässt, wird vom Browser gewarnt. Die Bildbeschreibung bleibt Teil
+der Bildkarte.
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
@@ -156,6 +171,15 @@ Abschnitt zeigt »—«. Auf der
 Bearbeitungsseite des Entwurfs tragen die drei Felder denselben Markdown-Hinweis
 und Umschalter »Bearbeiten | Vorschau« wie das Vignettenformular; auch dort
 bleiben die Platzhalter in der Vorschau wörtlich stehen.
+
+Auf der Bearbeitungsseite stehen die drei Abschnitte der Rahmenhandlung und die
+beiden Prompt-Vorlagen wie die großen Texte des Vignettenformulars zunächst
+gekürzt zum Lesen, die Rahmenhandlung gerendert, die Prompt-Vorlagen als reiner
+Text. »Bearbeiten« bzw. bei leerem Text »Text schreiben« öffnet nur diesen
+Text. Jeder Speichern-Knopf, am Text wie »Kern-Entwurf speichern«, speichert den
+ganzen Entwurf; »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein
+Text mit ungültigem Platzhalter steht nach dem Speichern offen. Wer die Seite
+mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
 
 ## Modell-Konfiguration
 

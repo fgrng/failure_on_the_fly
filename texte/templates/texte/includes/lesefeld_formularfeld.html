@@ -1,0 +1,5 @@
+{% comment %}
+    markdown_lesefeld.html für ein Django-Formularfeld; erwartet field und,
+    wenn der Text Markdown ist, profil. Hat das Feld Fehler, startet es offen.
+{% endcomment %}
+{% include "texte/includes/markdown_lesefeld.html" with feld_id=field.id_for_label label=field.label wert=field.value|default_if_none:"" offen=field.errors %}

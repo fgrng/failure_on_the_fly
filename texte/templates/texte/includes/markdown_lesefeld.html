@@ -1,14 +1,18 @@
 {% load texte %}
 {% comment %}
-    Hülle um markdown_feld.html: Der Text steht gerendert und gekürzt zum Lesen,
-    »Bearbeiten« (bei leerem Text »Text schreiben«) öffnet das Markdown-Feld.
-    Die Hülle steht in einem Formular; ihr »Speichern« sendet es ganz, mit allen
-    übrigen Feldern. »Abbrechen« setzt nur diesen Text auf den geladenen Stand
-    zurück. Erwartet feld_id, feld_name, label, wert und profil wie
-    markdown_feld.html.
+    Lese-Hülle um einen großen Text: Er steht gerendert und gekürzt zum Lesen,
+    »Bearbeiten« (bei leerem Text »Text schreiben«) öffnet das Eingabefeld.
+    Mit profil ist der Text Markdown und das Eingabefeld markdown_feld.html
+    samt Vorschau; ohne profil steht er als Klartext und das Eingabefeld ist
+    das Formularfeld field. Die Hülle steht in einem Formular; ihr »Speichern«
+    sendet es ganz, mit allen übrigen Feldern. »Abbrechen« setzt nur diesen
+    Text auf den geladenen Stand zurück. Mit offen startet sie im Bearbeiten.
+    Erwartet feld_id, label, wert und dazu feld_name oder field wie
+    markdown_feld.html; für Formularfelder nimmt lesefeld_formularfeld.html
+    die Werte aus dem Feld.
 {% endcomment %}
 <div class="vignette-field page-field--wide markdown-lesefeld"
-     x-data="{ bearbeiten: false, ganz: false, lang: false }">
+     x-data="{ bearbeiten: {% if offen %}true{% else %}false{% endif %}, ganz: false, lang: false }">
     <div class="markdown-lesefeld__kopf">
         <label for="{{ feld_id }}">{{ label }}</label>
         <button type="button" class="button button--secondary button--small" x-show="!bearbeiten"
@@ -16,8 +20,8 @@
     </div>
     <div class="markdown-lesefeld__lesen" x-show="!bearbeiten">
         {% if wert %}
-            <div class="markdown-text markdown-lesefeld__text" :class="{ 'markdown-lesefeld__text--ganz': ganz }"
-                 x-init="lang = $el.scrollHeight > $el.clientHeight">{{ wert|markdown:profil }}</div>
+            <div class="{% if profil %}markdown-text {% endif %}markdown-lesefeld__text" :class="{ 'markdown-lesefeld__text--ganz': ganz }"
+                 x-init="lang = $el.scrollHeight > $el.clientHeight">{% if profil %}{{ wert|markdown:profil }}{% else %}{{ wert|linebreaks }}{% endif %}</div>
             <button type="button" class="markdown-lesefeld__umfang" x-show="lang" x-cloak @click="ganz = !ganz"
                     x-text="ganz ? 'Weniger anzeigen' : 'Ganz anzeigen'">Ganz anzeigen</button>
         {% else %}
@@ -25,10 +29,16 @@
         {% endif %}
     </div>
     <div class="markdown-lesefeld__bearbeiten" x-show="bearbeiten" x-cloak>
-        {% include "texte/includes/markdown_feld.html" with ohne_label=True %}
+        {% if profil %}
+            {% include "texte/includes/markdown_feld.html" with ohne_label=True %}
+        {% else %}
+            {{ field }}
+            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+            {{ field.errors }}
+        {% endif %}
         <div class="markdown-lesefeld__aktionen">
             <button type="button" class="button button--secondary"
-                    @click="const feld = document.getElementById('{{ feld_id }}'); feld.value = feld.defaultValue; bearbeiten = false">Abbrechen</button>
+                    @click="const feld = document.getElementById('{{ feld_id }}'); feld.value = feld.defaultValue; feld.dispatchEvent(new Event('input', { bubbles: true })); bearbeiten = false">Abbrechen</button>
             <button type="submit" class="button">Speichern</button>
         </div>
     </div>

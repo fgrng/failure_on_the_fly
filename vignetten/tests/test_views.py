@@ -13,6 +13,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation.models import Simulationskern
 from vignetten.forms import VignetteForm
@@ -1034,7 +1035,6 @@ class VignetteMarkdownVorschauViewTests(TestCase):
         ):
             response: HttpResponse = self.client.get(url)
 
-            self.assertContains(response, ">Bearbeiten</button>", count=2)
             self.assertContains(response, ">Vorschau</button>", count=2)
             self.assertContains(
                 response, f'hx-post="{reverse("texte:vorschau")}"', count=2
@@ -1129,6 +1129,112 @@ class VignetteFeldbeschriftungenTests(TestCase):
         ):
             self.assertContains(response, beschriftung)
         self.assertNotContains(response, "Fehlermuster Beschreibung")
+
+
+class VignetteLangeTexteViewTests(TestCase):
+    """Große Texte stehen im Formular zum Lesen und öffnen sich einzeln (#315)."""
+
+    _TEXTE: tuple[str, ...] = (
+        "lernauftrag_text",
+        "lernauftrag_simulationshinweise",
+        "arbeitsheft_text",
+        "arbeitsheft_simulationshinweise",
+        "fehlermuster_beschreibung",
+        "referenzdiagnose",
+    )
+
+    def setUp(self) -> None:
+        """Legt einen angemeldeten Eigentümer mit teils gefülltem Entwurf an."""
+        ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(ada)
+        self.vignette: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            lernauftrag_text="Addiere **27** und 15.",
+            fehlermuster_beschreibung="Zählt **Stellen**\neinzeln.",
+        )
+        self.client.force_login(ada)
+
+    def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
+        self,
+    ) -> None:
+        """Markdown wird gerendert, Klartext bleibt wörtlich, leere laden ein."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk])
+        )
+
+        self.assertContains(response, "Addiere <strong>27</strong> und 15.")
+        self.assertContains(response, "<p>Zählt **Stellen**<br>einzeln.</p>")
+        self.assertContains(
+            response, 'page-field--wide markdown-lesefeld"', count=len(self._TEXTE)
+        )
+        self.assertContains(response, "Noch kein Text", count=4)
+        self.assertContains(response, ">Text schreiben</button>", count=4)
+        self.assertContains(response, ">Bearbeiten</button>", count=2 + 2)
+        self.assertNotContains(response, 'id="id_referenzdiagnose_vorschau"')
+
+    def test_anlegen_zeigt_nur_leere_texte(self) -> None:
+        """Beim Anlegen gibt es noch nichts zu lesen, jeder Text lädt ein."""
+        response: HttpResponse = self.client.get(reverse("vignetten:anlegen"))
+
+        self.assertContains(
+            response, ">Text schreiben</button>", count=len(self._TEXTE)
+        )
+
+    def test_jeder_speichern_knopf_speichert_die_ganze_vignette(self) -> None:
+        """Alle Speichern-Knöpfe senden dasselbe Formular mit allen Feldern."""
+        for url in (
+            reverse("vignetten:anlegen"),
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+        ):
+            response: HttpResponse = self.client.get(url)
+
+            speichern: list[str | None] = [
+                formular
+                for beschriftung, formular in submit_knoepfe(response)
+                if beschriftung.endswith(("speichern", "Speichern", "anlegen"))
+            ]
+            self.assertEqual(len(speichern), len(self._TEXTE) + 1)
+            self.assertEqual(set(speichern), {"vignette-formular"})
+
+        response = self.client.post(
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+            {
+                "lernauftrag_text": "Neuer Lernauftrag",
+                "referenzdiagnose": "Neue Diagnose",
+                "schuelerin_geschlecht": self.vignette.schuelerin_geschlecht,
+                "lehrperson_geschlecht": self.vignette.lehrperson_geschlecht,
+                "fach": "Deutsch",
+            },
+        )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+        self.vignette.refresh_from_db()
+        self.assertEqual(
+            (
+                self.vignette.lernauftrag_text,
+                self.vignette.referenzdiagnose,
+                self.vignette.fehlermuster_beschreibung,
+                self.vignette.fach,
+            ),
+            ("Neuer Lernauftrag", "Neue Diagnose", "", "Deutsch"),
+        )
+
+    def test_seite_warnt_vor_dem_verlassen_mit_ungespeicherten_aenderungen(
+        self,
+    ) -> None:
+        """Das Formular meldet sich für die Verlassen-Warnung an."""
+        for url in (
+            reverse("vignetten:anlegen"),
+            reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
+        ):
+            response: HttpResponse = self.client.get(url)
+
+            self.assertContains(response, "js/ungespeichert.js")
+            self.assertContains(response, 'id="vignette-formular"')
+            self.assertContains(response, "data-ungespeichert-warnen")
 
 
 class VignetteFinalisierenViewTests(TestCase):

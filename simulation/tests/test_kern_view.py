@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation import views
 from simulation.models import (
@@ -449,7 +450,6 @@ class SimulationskernVerwaltungTests(TestCase):
             reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
         )
 
-        self.assertContains(response, ">Bearbeiten</button>", count=3)
         self.assertContains(response, ">Vorschau</button>", count=3)
         self.assertContains(response, '"profil": "szenentext"', count=3)
         for feld in (
@@ -727,6 +727,92 @@ class SimulationskernVerwaltungTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
         self.assertEqual(response.status_code, 403)
+
+
+class SimulationskernLangeTexteTests(TestCase):
+    """Große Texte des Kern-Entwurfs stehen zum Lesen und öffnen sich einzeln (#315)."""
+
+    def setUp(self) -> None:
+        """Legt einen Entwurf mit Rahmenhandlung und System-Prompt an."""
+        self.entwurf: Simulationskern = Simulationskern.objects.anlegen(
+            rahmenhandlung_einleitung="Frau **$lehrperson_name** unterrichtet.",
+            system_prompt_vorlage="Du bist **$schuelerin_name**.",
+        )
+        self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
+        self.client.force_login(_administratorin("linus"))
+
+    def _daten(self, **werte: str) -> dict[str, str]:
+        # POST-Daten mit den gespeicherten Texten, überschrieben durch werte.
+        daten: dict[str, str] = {
+            feld: getattr(self.entwurf, feld)
+            for feld in (
+                "rahmenhandlung_einleitung",
+                "rahmenhandlung_gespraechseinleitung",
+                "rahmenhandlung_debrief",
+                "system_prompt_vorlage",
+                "user_prompt_vorlage",
+            )
+        }
+        return {**daten, **werte}
+
+    def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
+        self,
+    ) -> None:
+        """Rahmenhandlung als Markdown, Prompt-Vorlagen wörtlich, leere laden ein."""
+        response: HttpResponse = self.client.get(self.url)
+
+        self.assertContains(
+            response, "Frau <strong>$lehrperson_name</strong> unterrichtet."
+        )
+        self.assertContains(response, "<p>Du bist **$schuelerin_name**.</p>")
+        self.assertContains(response, 'page-field--wide markdown-lesefeld"', count=5)
+        self.assertContains(response, "Noch kein Text", count=3)
+        self.assertContains(response, ">Text schreiben</button>", count=3)
+
+    def test_jeder_speichern_knopf_speichert_den_ganzen_kern(self) -> None:
+        """Alle Speichern-Knöpfe senden dasselbe Formular mit allen Feldern."""
+        response: HttpResponse = self.client.get(self.url)
+
+        speichern: list[str | None] = [
+            formular
+            for beschriftung, formular in submit_knoepfe(response)
+            if "speichern" in beschriftung.lower()
+        ]
+        self.assertEqual(len(speichern), 5 + 1)
+        self.assertEqual(set(speichern), {"kern-formular"})
+
+        self.client.post(
+            self.url,
+            self._daten(
+                rahmenhandlung_debrief="Neuer Debrief",
+                user_prompt_vorlage="Neue Eingabe",
+            ),
+        )
+
+        self.entwurf.refresh_from_db()
+        self.assertEqual(
+            (self.entwurf.rahmenhandlung_debrief, self.entwurf.user_prompt_vorlage),
+            ("Neuer Debrief", "Neue Eingabe"),
+        )
+
+    def test_text_mit_fehler_startet_offen(self) -> None:
+        """Nach einem Platzhalterfehler steht nur der betroffene Text offen."""
+        response: HttpResponse = self.client.post(
+            self.url, self._daten(system_prompt_vorlage="$unbekannt")
+        )
+
+        self.assertContains(response, "bearbeiten: true", count=1)
+        self.assertContains(response, "Enthält ungültige Platzhalter.")
+
+    def test_seite_warnt_vor_dem_verlassen_mit_ungespeicherten_aenderungen(
+        self,
+    ) -> None:
+        """Das Formular meldet sich für die Verlassen-Warnung an."""
+        response: HttpResponse = self.client.get(self.url)
+
+        self.assertContains(response, "js/ungespeichert.js")
+        self.assertContains(response, 'id="kern-formular"')
+        self.assertContains(response, "data-ungespeichert-warnen")
 
 
 class SimulationskernSeitennavigationTests(TestCase):

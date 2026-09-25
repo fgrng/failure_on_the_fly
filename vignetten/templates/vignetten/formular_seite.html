@@ -4,6 +4,7 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
     <script src="{% static 'js/bildkarte.js' %}" defer></script>
+    <script src="{% static 'js/ungespeichert.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -20,7 +21,7 @@
         wieder her, während die Namensfelder frisch vom Server kommen – Name und
         Geschlecht der Akteure passen dann nicht mehr zueinander.
     {% endcomment %}
-    <form method="post" enctype="multipart/form-data" autocomplete="off">
+    <form id="vignette-formular" method="post" enctype="multipart/form-data" autocomplete="off" data-ungespeichert-warnen>
         {% csrf_token %}
         {{ form.non_field_errors }}
         {{ fach_werte|json_script:"fach-werte" }}
@@ -54,9 +55,9 @@
                 <b>03</b><span><h2 id="section-lernauftrag">Lernauftrag</h2><small>Was hat die Lehrperson der Schüler:in aufgegeben?</small></span>
             </header>
             <div class="field-grid">
-                {% include "texte/includes/markdown_formularfeld.html" with field=form.lernauftrag_text profil="szenentext" %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.lernauftrag_text profil="szenentext" %}
                 {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.lernauftrag %}
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_simulationshinweise wide=True %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.lernauftrag_simulationshinweise %}
             </div>
         </section>
 
@@ -65,9 +66,9 @@
                 <b>04</b><span><h2 id="section-arbeitsheft">Arbeitsheft</h2><small>Was hat die Schüler:in bereits bearbeitet?</small></span>
             </header>
             <div class="field-grid">
-                {% include "texte/includes/markdown_formularfeld.html" with field=form.arbeitsheft_text profil="szenentext" %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.arbeitsheft_text profil="szenentext" %}
                 {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.arbeitsheft %}
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_simulationshinweise wide=True %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.arbeitsheft_simulationshinweise %}
             </div>
         </section>
 
@@ -76,8 +77,8 @@
                 <b>05</b><span><h2 id="section-pattern">Fehlermuster</h2><small>Wie denkt die simulierte Schüler:in?</small></span>
             </header>
             <div class="field-grid">
-                {% include "vignetten/includes/form_field.html" with field=form.fehlermuster_beschreibung %}
-                {% include "vignetten/includes/form_field.html" with field=form.referenzdiagnose %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.fehlermuster_beschreibung %}
+                {% include "texte/includes/lesefeld_formularfeld.html" with field=form.referenzdiagnose %}
             </div>
         </section>
 
