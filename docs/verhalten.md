@@ -300,6 +300,17 @@ in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie b
 und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann
 die Aufnahme wiederholt werden.
 
+In Gespräch und Debrief steht das Feld in voller Breite. Darunter liegt die
+Eingabezeile: links der umrandete Knopf der Spracheingabe mit Mikrofon-Symbol,
+daneben ihr Status, rechts „Senden“ bzw. „Diagnose abgeben“ als einzige gefüllte
+Hauptaktion. Während einer Aufnahme ist der Knopf rot umrandet („Spracheingabe
+beenden“) und vor dem Status pulsiert ein roter Punkt. Während der Transkription
+ist der Knopf gesperrt, vor dem Status dreht sich ein Spinner und das Feld ist
+schreibgeschützt. In beiden Phasen ist Senden gesperrt. Fehler erscheinen rot im
+Status. Ohne Einwilligung gibt es keinen Knopf; an seiner Stelle steht still
+„Spracheingabe nicht freigegeben. Sie nutzen die Tastatur.“ Auf schmalen
+Bildschirmen stehen Spracheingabe und Senden in einer Zeile, der Status darunter.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der

@@ -94,6 +94,20 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Spracheingabe starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
 
+    def test_senden_ist_die_einzige_hauptaktion_der_eingabezeile(self) -> None:
+        """Die Spracheingabe tritt als umrandeter Zweitknopf zurück (#293)."""
+
+        self._sitzung_starten([])
+
+        self.assertContains(
+            self.start_response,
+            'class="button button--secondary spracheingabe__steuerung"',
+        )
+        self.assertContains(
+            self.start_response, 'class="button gespraechseingabe__senden"'
+        )
+        self.assertNotContains(self.start_response, "Spracheingabe nicht freigegeben")
+
     def test_training_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
         self,
     ) -> None:
@@ -158,6 +172,10 @@ class TrainingssitzungTests(TestCase):
 
         self.assertContains(self.start_response, "Ihre nächste Frage")
         self.assertNotContains(self.start_response, "Spracheingabe starten")
+        self.assertContains(
+            self.start_response,
+            "Spracheingabe nicht freigegeben. Sie nutzen die Tastatur.",
+        )
 
     def test_debrief_ohne_audioeinwilligung_zeigt_nur_tastatureingabe(self) -> None:
         """Auch die Diagnose bleibt ohne Einwilligung per Tastatur abschließbar."""
@@ -167,6 +185,9 @@ class TrainingssitzungTests(TestCase):
 
         self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
         self.assertNotContains(debrief, "Spracheingabe starten")
+        self.assertContains(
+            debrief, "Spracheingabe nicht freigegeben. Sie nutzen die Tastatur."
+        )
 
     def test_endgueltiger_fehlschlag_bleibt_gescheitert(self) -> None:
         """Ein answerless Schritt zeigt den Fehler und lässt keine Diagnose mehr zu."""

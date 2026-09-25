@@ -17,10 +17,8 @@
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>
             <input type="hidden" name="eingabemodus" value="getippt">
+            {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=navigation.transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Optional: Starten Sie die Spracheingabe und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
             <button class="button gespraechseingabe__senden" type="submit">Senden</button>
-            {% if spracheingabe_verfuegbar %}
-                {% include "sitzungen/includes/spracheingabe.html" with formular_id="gespraechseingabe-formular" eingabe_id="eingabe" tastatureingabe_id="" transkription_url=navigation.transkription_url automatisch_absenden="true" aufnahme_titel="Frage aufnehmen" aufnahme_hinweis="Optional: Starten Sie die Spracheingabe und beenden Sie sie, wenn Ihre Frage vollständig ist." %}
-            {% endif %}
             <p class="gespraechseingabe__verarbeitung" aria-live="polite">
                 <span class="gespraechseingabe__spinner" aria-hidden="true"></span>
                 Ihre Frage ist abgeschickt und wird gerade beantwortet …
