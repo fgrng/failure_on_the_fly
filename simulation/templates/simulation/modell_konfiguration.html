@@ -5,8 +5,7 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
-    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
-{% endblock %}
+    {% endblock %}
 
 {% block content %}
 <section class="page system-page area--system">
@@ -16,6 +15,7 @@
             <h1>Modell-Konfiguration</h1>
             <span>Alle je angelegten Konfigurationen des Sprachmodells und je Verwendung die aktive.</span>
         </div>
+        <a class="button" href="{% url 'simulation:modell_konfiguration_neu' %}">Neue Konfiguration</a>
     </header>
 
     <section class="page-section" aria-label="Betriebsfolge">
@@ -79,6 +79,7 @@
                             {% endif %}
                         {% endfor %}
                     </div>
+                    <a class="button button--secondary" href="{% url 'simulation:modell_konfiguration_neu' %}?vorlage={{ gewaehlt.pk }}">Als Vorlage für eine neue Konfiguration</a>
                 </aside>
             </div>
         {% else %}
@@ -86,32 +87,5 @@
         {% endif %}
     </section>
 
-    <section class="page-section" aria-label="Neue Konfiguration anlegen">
-        <header class="page-section__head">
-            <b>03</b><span><h2>Neue Konfiguration anlegen</h2><small>Eine neue Fassung entsteht; bestehende bleiben unverändert</small></span>
-        </header>
-        <form method="post">
-            {% csrf_token %}
-            {{ form.non_field_errors }}
-            {% comment %}
-                Der Anbieter steht im Alpine-Zustand, weil zwei Dinge an ihm
-                hängen: Beim Anbieter »fake« gibt es nichts zu laden, und ein
-                Wechsel darf keine Liste des vorigen Anbieters stehen lassen.
-            {% endcomment %}
-            <div class="system-page-field-list"
-                 x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
-                 @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
-                {% include "vignetten/includes/form_field.html" with field=form.bezeichnung %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
-                {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
-                {% include "vignetten/includes/form_field.html" with field=form.parameter %}
-            </div>
-            <div class="vignette-form-actions">
-                <button class="button" type="submit">Konfiguration anlegen</button>
-            </div>
-        </form>
-    </section>
 </section>
 {% endblock %}

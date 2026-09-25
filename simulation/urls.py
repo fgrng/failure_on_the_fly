@@ -32,6 +32,11 @@ urlpatterns: list[URLPattern] = [
         name="modell_konfiguration",
     ),
     path(
+        "modell-konfiguration/neu/",
+        views.modell_konfiguration_neu,
+        name="modell_konfiguration_neu",
+    ),
+    path(
         "modellvorschlaege/",
         views.modellvorschlaege,
         name="modellvorschlaege",

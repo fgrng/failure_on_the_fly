@@ -272,20 +272,17 @@ def _schalter(
     ]
 
 
+def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
+    # Führt zurück zur Liste, die Konfiguration im Detail.
+
+    return redirect(
+        f"{reverse('simulation:modell_konfiguration')}?konfiguration={konfiguration.pk}"
+    )
+
+
 @administratorin_erforderlich
 def modell_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben.
-
-    Das Anlegeformular steht vorerst noch auf derselben Seite.
-    """
-    form: ModellKonfigurationForm
-    if request.method == "POST":
-        form = ModellKonfigurationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("simulation:modell_konfiguration")
-    else:
-        form = ModellKonfigurationForm()
+    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
     aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
     zeilen: list[dict[str, object]] = _konfigurationszeilen(aktive)
     gewaehlt: dict[str, object] | None = _gewaehlte_zeile(request, zeilen, aktive)
@@ -293,10 +290,63 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
         request,
         "simulation/modell_konfiguration.html",
         {
-            "form": form,
             "konfigurationen": zeilen,
             "gewaehlt": gewaehlt,
             "schalter": _schalter(gewaehlt, zeilen, aktive) if gewaehlt else [],
+        },
+    )
+
+
+def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
+    # Die unter ?vorlage= genannte Konfiguration; eine unbekannte ergibt 404.
+
+    genannt: str = request.GET.get("vorlage", "")
+    if not genannt:
+        return None
+    if not genannt.isdigit():
+        raise Http404("Unbekannte Vorlage.")
+    return get_object_or_404(ModellKonfiguration, pk=int(genannt))
+
+
+@administratorin_erforderlich
+def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
+    """Legt eine neue Konfiguration an, auf Wunsch aus einer Vorlage.
+
+    Die Vorlage füllt alles vor außer dem Token: Das bleibt write-only und wird
+    für jede neue Konfiguration neu eingegeben. Aktiviert wird allein in der
+    Liste.
+    """
+    vorlage: ModellKonfiguration | None = _vorlage(request)
+    form: ModellKonfigurationForm
+    if request.method == "POST":
+        form = ModellKonfigurationForm(request.POST)
+        if form.is_valid():
+            konfiguration: ModellKonfiguration = form.save()
+            messages.success(
+                request,
+                f"Die Konfiguration »{konfiguration.bezeichnung}« ist angelegt.",
+            )
+            return _zur_konfiguration(konfiguration)
+    elif vorlage:
+        form = ModellKonfigurationForm(
+            initial={
+                "bezeichnung": f"{vorlage.bezeichnung} (Kopie)",
+                "anbieter": vorlage.anbieter,
+                "anbieter_basis_url": vorlage.anbieter_basis_url,
+                "sprachmodell": vorlage.sprachmodell,
+                "parameter": vorlage.parameter,
+            }
+        )
+    else:
+        form = ModellKonfigurationForm()
+    return render(
+        request,
+        "simulation/modell_konfiguration_neu.html",
+        {
+            "form": form,
+            "vorlage": {"pk": vorlage.pk, "bezeichnung": vorlage.bezeichnung}
+            if vorlage
+            else None,
         },
     )
 
@@ -379,9 +429,7 @@ def modell_konfiguration_aktivieren(
         raise Http404("Unbekannte Verwendung.")
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
-    return redirect(
-        f"{reverse('simulation:modell_konfiguration')}?konfiguration={konfiguration.pk}"
-    )
+    return _zur_konfiguration(konfiguration)
 
 
 @administratorin_erforderlich

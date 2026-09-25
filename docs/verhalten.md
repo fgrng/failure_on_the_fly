@@ -104,8 +104,8 @@ Konfigurationen, die vor Einführung der Bezeichnung angelegt wurden, heißen
 Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —,
 der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
-Modellverhaltens auf, bei `fake` ausschließlich das Skript. Neben dem
-Sprachmodell schlägt der Knopf „Modelle und Basis-URL laden“ die Modelle des
+Modellverhaltens auf, bei `fake` ausschließlich das Skript. Im Editor schlägt
+neben dem Sprachmodell der Knopf „Modelle und Basis-URL laden“ die Modelle des
 gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
 `infomaniak` die Sprachmodelle des Kontos. Die beiden unterscheiden sich darin,
 was der Abruf verlangt: `openrouter` beantwortet seine Modellliste öffentlich,
@@ -142,8 +142,17 @@ gewählte Konfiguration für eine Verwendung schon aktiv, steht dort ein
 deaktivierter Knopf „✓ Aktiv für …“. Das Umschalten fragt nicht nach, bewegt nur
 den Zeiger der genannten Verwendung und führt zurück auf dieselbe Konfiguration;
 eine unbekannte Verwendung ergibt 404.
-Die Seite bietet genau zwei Gesten: Anlegen und Aktivieren. Das Anlegeformular
-steht vorerst unter der Tabelle. Bearbeiten und Löschen gibt es nicht —
+Die Seite bietet genau zwei Gesten: Anlegen und Aktivieren. Angelegt wird in
+einem getrennten Editor unter `/system/modell-konfiguration/neu/`, erreichbar
+über „Neue Konfiguration“ im Kopf der Liste. Die Bezeichnung steht dort zuerst.
+„Als Vorlage für eine neue Konfiguration“ im Detail öffnet den Editor mit
+Anbieter, Basis-URL, Sprachmodell und Parametern der gewählten Zeile und der
+Bezeichnung mit dem Zusatz „(Kopie)“; eine unbekannte Vorlage ergibt 404. Das
+Token übernimmt die Vorlage nie, es wird jedes Mal neu eingegeben. Die Vorlage
+bleibt unverändert, angelegt wird immer eine neue Zeile. Der Editor prüft die
+Anbieterbindung wie zuvor am Feld und aktiviert nichts: Nach dem Anlegen führt er
+mit einer Meldung zurück zur Liste, die neue Konfiguration im Detail, und alle
+Verwendungen bleiben, wie sie waren. Bearbeiten und Löschen gibt es nicht —
 eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt. Ein
 Umschalten der Schüler:in trifft laufende Trainings sofort und laufende Erhebungen
 gar nicht; eine Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen
