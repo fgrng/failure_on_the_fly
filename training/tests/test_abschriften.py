@@ -80,7 +80,7 @@ def _erhebung_anlegen(konto: Konto, name: str = "Brüche") -> Erhebung:
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name=name)
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
     )
     Erhebungsvignette.objects.create(
         erhebung=erhebung, vignette=_finale_vignette_anlegen(konto), position=1

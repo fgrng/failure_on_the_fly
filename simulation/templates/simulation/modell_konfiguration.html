@@ -37,11 +37,12 @@
             {% for konfiguration in konfigurationen %}
                 <section class="page-field">
                     <h3>
-                        {{ konfiguration.sprachmodell }}
+                        {{ konfiguration.bezeichnung }}
                         {% if konfiguration.ist_aktiv %}<span class="badge badge--system">Aktiv</span>{% endif %}
                     </h3>
                     <dl class="field-grid">
                         <div><dt>Anbieter</dt><dd>{{ konfiguration.anbieter }}</dd></div>
+                        <div><dt>Sprachmodell</dt><dd>{{ konfiguration.sprachmodell }}</dd></div>
                         <div><dt>Basis-URL</dt><dd>{{ konfiguration.anbieter_basis_url|default:"—" }}</dd></div>
                         <div><dt>Token</dt><dd>{{ konfiguration.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
                         <div><dt>Parameter</dt><dd><pre>{{ konfiguration.parameter }}</pre></dd></div>
@@ -76,6 +77,7 @@
             <div class="system-page-field-list"
                  x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
                  @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
+                {% include "vignetten/includes/form_field.html" with field=form.bezeichnung %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}

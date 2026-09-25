@@ -69,6 +69,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         kern.save()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             anbieter=Anbieter.OPENROUTER,
             sprachmodell="openrouter/gpt-test",
             anbieter_token="sk-or-geheim",
@@ -225,6 +226,7 @@ class ModellKonfigurationAnzeigeTests(TestCase):
     def setUp(self) -> None:
         """Aktiviert eine Infomaniak-Konfiguration mit Basis-URL und Token."""
         self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             anbieter=Anbieter.INFOMANIAK,
             sprachmodell="openai/mistral24b",
             anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",

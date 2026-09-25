@@ -137,6 +137,7 @@ class TrainingskatalogTests(TestCase):
         )
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -226,7 +227,7 @@ class TrainingskatalogTests(TestCase):
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
@@ -298,7 +299,7 @@ class TrainingsabbruchTests(TestCase):
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": skript or []}
+            bezeichnung="Test", sprachmodell="fake", parameter={"skript": skript or []}
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")

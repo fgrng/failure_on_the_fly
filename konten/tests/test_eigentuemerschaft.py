@@ -78,7 +78,7 @@ def test_erhebung_ist_archiviert_nicht_mehr_aktiv() -> None:
     """Die Erhebung leitet ihren Haken aus ihrem Status ab."""
     konto: Konto = Konto.objects.create_user(username="ada")
     ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
     )
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Studie")
 

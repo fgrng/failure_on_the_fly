@@ -97,6 +97,10 @@ bleiben die Platzhalter in der Vorschau wörtlich stehen.
 ## Modell-Konfiguration
 
 Administrator:innen setzen das Sprachmodell unter `/system/modell-konfiguration/`.
+Jede Konfiguration trägt eine Bezeichnung, die beim Anlegen Pflicht ist und
+danach wie alle Felder unveränderlich bleibt; eindeutig muss sie nicht sein.
+Konfigurationen, die vor Einführung der Bezeichnung angelegt wurden, heißen
+»<Sprachmodell> (Nr. <Nummer>)«.
 Der Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —,
 der Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
@@ -118,14 +122,16 @@ ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
 dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
 prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
 bevor es eine Erhebung erreicht.
-Die Seite listet alle je angelegten Konfigurationen mit Anbieter, Modellnamen,
-Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
+Die Seite listet alle je angelegten Konfigurationen mit Bezeichnung, Anbieter,
+Modellnamen, Basis-URL, maskiertem Token und Parametern und markiert die aktive. Sie bietet
 genau zwei Gesten: Anlegen und Aktivieren. Bearbeiten und Löschen gibt es nicht —
 eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt. Ein
 Umschalten trifft laufende Trainings sofort und laufende Erhebungen gar nicht; eine
 Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren. Das
 Token wird eingegeben, aber nie zurückgegeben: Die Liste zeigt es nur maskiert mit
 seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte.
+Im freien Probelauf der Administration steht jede Konfiguration zur Auswahl als
+»Bezeichnung (Sprachmodell)«.
 
 ## Transkriptions-Konfiguration
 

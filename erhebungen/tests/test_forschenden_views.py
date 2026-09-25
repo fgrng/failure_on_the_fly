@@ -73,6 +73,7 @@ def _forschungskonfiguration(
     """Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt."""
 
     return ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=f"openrouter/{name}",
         anbieter_token="sk-or-geheim",
@@ -84,6 +85,7 @@ def _infomaniak_konfiguration() -> ModellKonfiguration:
     """Legt eine Konfiguration an, die Basis-URL und Token wirklich trägt."""
 
     return ModellKonfiguration.objects.create(
+        bezeichnung="Mistral bei Infomaniak",
         anbieter=Anbieter.INFOMANIAK,
         sprachmodell="openai/mistral24b",
         anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
@@ -298,7 +300,7 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
         )
         finale: Erhebung = Erhebung.objects.anlegen(self.ada, name="Finale Erhebung")
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         finale.finalisieren()
@@ -843,7 +845,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             self.ada, "Wie sicher fühlten Sie sich?"
         )
         ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="fake")
+            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
         )
         self.erhebung.finalisieren()
         gesperrt: HttpResponse = self.client.post(
@@ -878,7 +880,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             erhebung=self.erhebung, item=zweites_item
         )
         ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="fake")
+            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
         )
         self.erhebung.finalisieren()
 
@@ -900,7 +902,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             self.ada, "Wie sicher fühlten Sie sich?"
         )
         ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="fake")
+            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
         )
         self.erhebung.finalisieren()
         self.erhebung.zurueckziehen()
@@ -1070,7 +1072,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.erhebung.finalisieren()
@@ -1887,13 +1889,14 @@ class ErhebungsExportTests(TestCase):
 
         self.assertEqual(
             list(konfigurationen[0].keys()),
-            ["id", "anbieter", "sprachmodell", "parameter"],
+            ["id", "bezeichnung", "anbieter", "sprachmodell", "parameter"],
         )
         self.assertEqual(
             konfigurationen,
             [
                 {
                     "id": str(konfiguration.pk),
+                    "bezeichnung": "Mistral bei Infomaniak",
                     "anbieter": "infomaniak",
                     "sprachmodell": "openai/mistral24b",
                     "parameter": '{"temperature": 0.2}',
@@ -2090,6 +2093,7 @@ class ErhebungsExportTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -2900,7 +2904,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
             position=1,
         )
         ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="fake")
+            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
         )
         erhebung.finalisieren()
         self.client.force_login(ada)
@@ -2933,7 +2937,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         ada.groups.add(Group.objects.get(name="Forschende:r"))
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(sprachmodell="fake")
+            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
         )
         erhebung.finalisieren()
         erhebung.archivieren()

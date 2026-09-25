@@ -30,7 +30,7 @@ def _sitzungen_anlegen(teilnahme: Teilnahme, anzahl: int) -> list[Sitzung]:
     kern.finalisieren()
     autorin: Konto = Konto.objects.create_user(username="ada")
     konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        sprachmodell="fake"
+        bezeichnung="Test", sprachmodell="fake"
     )
     return [
         Sitzung.objects.create(

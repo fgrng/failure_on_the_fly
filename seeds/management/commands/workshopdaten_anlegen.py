@@ -98,7 +98,9 @@ class Command(BaseCommand):
         ).first()
         if konfiguration is None:
             konfiguration = ModellKonfiguration.objects.create(
-                sprachmodell=SIMULATIONSMODELL, parameter={}
+                bezeichnung=f"Workshop ({SIMULATIONSMODELL})",
+                sprachmodell=SIMULATIONSMODELL,
+                parameter={},
             )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         self.stdout.write(f"  Modell-Konfiguration '{SIMULATIONSMODELL}' aktiv.")

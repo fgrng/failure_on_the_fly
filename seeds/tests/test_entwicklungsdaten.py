@@ -6,6 +6,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 
 from konten.models import Konto
+from simulation.models import ModellKonfiguration
 from texte.markdown import szenentext
 from training.models import Training
 from vignetten.models import Vignette
@@ -66,6 +67,15 @@ class EntwicklungsdatenTests(TestCase):
                     html: str = szenentext(text)
                     for auszeichnung in ("<strong>", "<em>", "<ul>", "<ol>", "<h"):
                         self.assertNotIn(auszeichnung, html, text)
+
+    def test_aktive_modell_konfiguration_traegt_eine_bezeichnung(self) -> None:
+        """Auch die Offline-Konfiguration ist in Liste und Auswahl erkennbar."""
+
+        call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive().bezeichnung, "Offline (fake)"
+        )
 
     def test_zweiter_lauf_ist_idempotent(self) -> None:
         """Ein wiederholter Aufruf wirft keine Fehler und dupliziert nichts."""

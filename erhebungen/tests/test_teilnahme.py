@@ -86,6 +86,7 @@ class ErhebungsteilnahmeTests(TestCase):
         """Legt den Entwurf an, den jeder Test um sein Design ergänzt."""
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [{"denkspur": "Geheime Regel.", "aeusserung": "Ich addiere."}]
@@ -213,6 +214,7 @@ class ErhebungsteilnahmeTests(TestCase):
         # Tauscht aktive Modellkonfiguration und Entwurf gegen einen eigenen Aufbau.
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         )

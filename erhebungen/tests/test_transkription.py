@@ -31,7 +31,7 @@ class ErhebungsTranskriptionTests(TestCase):
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(konfiguration)
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(name="Brüche")

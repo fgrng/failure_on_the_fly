@@ -59,7 +59,7 @@ class ProbelaufStartTests(TestCase):
         )
         self.kern.finalisieren()
         self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": []}
+            bezeichnung="Test", sprachmodell="fake", parameter={"skript": []}
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.entwurf: Vignette = Vignette.objects.anlegen(self.ada)
@@ -314,6 +314,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Richtet den Fake für einen erfolgreichen Schritt ein."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -341,7 +342,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
 
         self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+            bezeichnung="Test",
+            sprachmodell="fake",
+            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
@@ -532,6 +535,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Nur Äußerungen erreichen den nächsten Modellaufruf."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -697,7 +701,9 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self.konfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG}
+            bezeichnung="Test",
+            sprachmodell="fake",
+            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
         )
         ModellKonfiguration.objects.aktivieren(self.konfiguration)
         domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
@@ -776,6 +782,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": [{"denkspur": "still", "aeusserung": ""}]},
         )
@@ -874,6 +881,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
 
         self.konfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={
                 "skript": [
@@ -940,11 +948,12 @@ class AdministratorinProbelaufTests(TestCase):
         )
         self.kern_entwurf.save()
         aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         ModellKonfiguration.objects.aktivieren(aktive_konfiguration)
         self.test_konfiguration: ModellKonfiguration = (
             ModellKonfiguration.objects.create(
+                bezeichnung="Skript Bruchfehler",
                 sprachmodell="fake",
                 parameter={
                     "skript": [
@@ -988,7 +997,7 @@ class AdministratorinProbelaufTests(TestCase):
         )
 
         self.assertContains(auswahl, str(self.kern_entwurf.pk))
-        self.assertContains(auswahl, str(self.test_konfiguration.pk))
+        self.assertContains(auswahl, "Skript Bruchfehler (fake)")
         self.assertContains(auswahl, str(self.vignette.pk))
         response: HttpResponse = self.client.post(
             reverse("sitzungen:administratorin_probelauf_starten"),
@@ -1043,6 +1052,7 @@ class GeteiltesKontoTests(ProbelaufStartTests):
 
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(
+                bezeichnung="Test",
                 sprachmodell="fake",
                 parameter={
                     "skript": [

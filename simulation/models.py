@@ -514,6 +514,9 @@ class ModellKonfigurationManager(
 class ModellKonfiguration(AnbieterFeldgruppe):
     """Unveränderliche Konfiguration eines Sprachmodells."""
 
+    # Nicht eindeutig: Sie benennt eine Fassung für Menschen, der Primärschlüssel
+    # bleibt die Identität.
+    bezeichnung: models.CharField = models.CharField(max_length=120)
     sprachmodell: models.CharField = models.CharField(max_length=255)
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
 

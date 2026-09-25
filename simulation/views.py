@@ -226,6 +226,7 @@ def _konfigurationszeilen() -> list[dict[str, object]]:
     return [
         {
             "pk": konfiguration.pk,
+            "bezeichnung": konfiguration.bezeichnung,
             "anbieter": konfiguration.anbieter,
             "sprachmodell": konfiguration.sprachmodell,
             "anbieter_basis_url": konfiguration.anbieter_basis_url,

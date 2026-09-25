@@ -160,6 +160,7 @@ def test_antwort_versuchen_persistiert_nichts() -> None:
     """Der Funktionsaufruf verändert keine Modell-Konfiguration."""
 
     konfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         sprachmodell="fake",
         parameter={"skript": [{"denkspur": "Ich addiere.", "aeusserung": "2/5."}]},
     )

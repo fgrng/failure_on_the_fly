@@ -219,12 +219,14 @@ class Command(BaseCommand):
 
     def _modell_konfiguration_sicherstellen(self) -> None:
         """Legt die Fake-Konfiguration an und aktiviert sie für Offline-Klicktests."""
-        fake_parameter: dict[str, object] = {"skript": FAKE_SKRIPT}
+        werte: dict[str, object] = {
+            "bezeichnung": "Offline (fake)",
+            "sprachmodell": "fake",
+            "parameter": {"skript": FAKE_SKRIPT},
+        }
         fake: ModellKonfiguration = ModellKonfiguration.objects.filter(
-            sprachmodell="fake", parameter=fake_parameter
-        ).first() or ModellKonfiguration.objects.create(
-            sprachmodell="fake", parameter=fake_parameter
-        )
+            **werte
+        ).first() or ModellKonfiguration.objects.create(**werte)
         ModellKonfiguration.objects.aktivieren(fake)
         self.stdout.write("  Modell-Konfiguration 'fake' für Offline-Tests aktiv.")
 

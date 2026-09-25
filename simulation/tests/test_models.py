@@ -354,6 +354,7 @@ def _openrouter_konfiguration(name: str) -> ModellKonfiguration:
     # Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt.
 
     return ModellKonfiguration.objects.create(
+        bezeichnung="Test",
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=f"openrouter/{name}",
         anbieter_token="sk-or-geheim",

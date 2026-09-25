@@ -60,6 +60,7 @@ class WorkshopdatenTests(TestCase):
         aktive: ModellKonfiguration = ModellKonfiguration.objects.aktive()
         self.assertEqual(aktive.sprachmodell, SIMULATIONSMODELL)
         self.assertEqual(aktive.parameter, {})
+        self.assertEqual(aktive.bezeichnung, "Workshop (fake)")
 
     def test_zweiter_lauf_legt_nichts_doppelt_an_und_laesst_passwoerter_stehen(
         self,

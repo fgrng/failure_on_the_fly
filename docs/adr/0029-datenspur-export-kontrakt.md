@@ -72,13 +72,15 @@ Pfade statt als Inhalt.
 | `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
-| `modellkonfigurationen.csv` | `id`, `anbieter`, `sprachmodell`, `parameter` |
+| `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter` |
 | `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |
 | `likert_skala.csv` | `stufe`, `pol` |
 
 ## Die Modell-Konfiguration im Export
 
-`modellkonfigurationen.csv` trägt `id`, `anbieter`, `sprachmodell`, `parameter`.
+`modellkonfigurationen.csv` trägt `id`, `bezeichnung`, `anbieter`, `sprachmodell`,
+`parameter`. Die Bezeichnung ist so unveränderlich wie der Rest der
+Konfiguration (ADR-0013) und gibt der Auswertung einen Namen für sie.
 Der Anbieter steht **vor** dem Modellnamen, weil derselbe Modellstring bei
 verschiedenen Anbietern Verschiedenes bedeutet: Ohne ihn ist der Name nicht
 vollständig interpretierbar, die Lesereihenfolge folgt also der Abhängigkeit.

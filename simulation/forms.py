@@ -89,6 +89,7 @@ class ModellKonfigurationForm(ModelForm):
         # Die Reihenfolge der Eingabe, nicht die des Modells: Das Token steht
         # beim Anbieter, weil der Ladeknopf der Modellliste es braucht.
         fields: list[str] = [
+            "bezeichnung",
             "anbieter",
             "anbieter_token",
             "anbieter_basis_url",
@@ -96,6 +97,7 @@ class ModellKonfigurationForm(ModelForm):
             "parameter",
         ]
         labels: dict[str, str] = {
+            "bezeichnung": "Bezeichnung",
             "anbieter": "Anbieter",
             "anbieter_token": "Token",
             "anbieter_basis_url": "Basis-URL",
@@ -103,6 +105,10 @@ class ModellKonfigurationForm(ModelForm):
             "parameter": "Parameter",
         }
         help_texts: dict[str, str] = {
+            "bezeichnung": (
+                "Unter ihr findet man die Konfiguration wieder. Nach dem Anlegen "
+                "nicht mehr änderbar."
+            ),
             "anbieter_token": (
                 "Der Ladeknopf unten braucht es. Wird gespeichert, aber nie "
                 "wieder angezeigt."

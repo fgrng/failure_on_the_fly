@@ -41,7 +41,7 @@ class TranskriptionsEndpointTests(TestCase):
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            sprachmodell="fake"
+            bezeichnung="Test", sprachmodell="fake"
         )
         historie: Vignettenhistorie = Vignettenhistorie.objects.create(name="Brüche")
         vignette: Vignette = Vignette.objects._erstellen(

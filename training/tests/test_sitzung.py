@@ -39,6 +39,7 @@ class TrainingssitzungTests(TestCase):
         if kern_ueberholen:
             kern.bearbeiten().finalisieren()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         )

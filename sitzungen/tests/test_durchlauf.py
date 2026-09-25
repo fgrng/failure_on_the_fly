@@ -38,6 +38,7 @@ def _persistierbares_tripel(
         Vignette.objects.anlegen(Konto.objects.create_user(username="ada")),
         kern,
         ModellKonfiguration.objects.create(
+            bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         ),

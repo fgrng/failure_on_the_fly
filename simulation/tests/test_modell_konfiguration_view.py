@@ -41,6 +41,7 @@ def _administratorin(username: str = "linus") -> Konto:
 def _openrouter(sprachmodell: str, token: str = TOKEN) -> ModellKonfiguration:
     """Legt eine gültige Konfiguration an, wie sie die Seite auflistet."""
     return ModellKonfiguration.objects.create(
+        bezeichnung=f"Bezeichnung {sprachmodell}",
         anbieter=Anbieter.OPENROUTER,
         sprachmodell=sprachmodell,
         anbieter_token=token,
@@ -55,6 +56,7 @@ def _formularfelder() -> list[str]:
 def _anlegedaten(**werte: object) -> dict[str, object]:
     """Liefert einen gültigen Formularbeutel, geändert um die Testwerte."""
     return {
+        "bezeichnung": "Opus für die Schüler:in",
         "anbieter": Anbieter.OPENROUTER,
         "sprachmodell": "openrouter/anthropic/claude-opus-4-8",
         "anbieter_basis_url": "",
@@ -130,6 +132,15 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
         self.assertContains(response, "openrouter/altes-modell")
         self.assertContains(response, "openrouter/neues-modell")
 
+    def test_zeigt_die_bezeichnung_jeder_konfiguration(self) -> None:
+        """Man erkennt eine Fassung an ihrem Namen, nicht nur am Modell."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(response, "Bezeichnung openrouter/altes-modell")
+        self.assertContains(response, "Bezeichnung openrouter/neues-modell")
+
     def test_markiert_die_aktive_konfiguration(self) -> None:
         """Die Liste sagt, welche Fassung neue Sitzungen bedient."""
         response: HttpResponse = self.client.get(
@@ -171,7 +182,7 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
 
     def test_zeigt_einen_leerhinweis_ohne_token(self) -> None:
         """Eine Konfiguration ohne Zugangsdaten fällt vor dem ersten Aufruf auf."""
-        ModellKonfiguration.objects.create(sprachmodell="fake")
+        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake")
 
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
@@ -205,6 +216,7 @@ class ModellKonfigurationAnlegenTests(TestCase):
 
         self.assertRedirects(response, reverse("simulation:modell_konfiguration"))
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertEqual(konfiguration.bezeichnung, "Opus für die Schüler:in")
         self.assertEqual(konfiguration.anbieter, Anbieter.OPENROUTER)
         self.assertEqual(konfiguration.anbieter_token, TOKEN)
         self.assertEqual(konfiguration.parameter, {"temperature": 0.2})
@@ -252,6 +264,19 @@ class ModellKonfigurationAnlegenTests(TestCase):
             "anbieter_token",
             "Ohne Token bedient der Anbieter keinen Aufruf.",
         )
+
+    def test_verlangt_eine_bezeichnung(self) -> None:
+        """Ohne Bezeichnung entsteht keine Fassung."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:modell_konfiguration"), _anlegedaten(bezeichnung="")
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "bezeichnung",
+            "Dieses Feld ist zwingend erforderlich.",
+        )
+        self.assertFalse(ModellKonfiguration.objects.exists())
 
     def test_meldet_fehlendes_praefix_am_modellnamen(self) -> None:
         """Der Modellname trägt die Anbieterbindung, die er verletzt."""
@@ -341,6 +366,7 @@ class ModellKonfigurationFakeTests(TestCase):
         response: HttpResponse = self.client.post(
             reverse("simulation:modell_konfiguration"),
             {
+                "bezeichnung": "Offline",
                 "anbieter": Anbieter.FAKE,
                 "sprachmodell": "fake",
                 "anbieter_basis_url": "",

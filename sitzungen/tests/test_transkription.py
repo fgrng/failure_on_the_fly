@@ -40,7 +40,7 @@ class ProbelaufTranskriptionTests(TestCase):
         kern.finalisieren()
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(
-                sprachmodell="fake", parameter={"skript": []}
+                bezeichnung="Test", sprachmodell="fake", parameter={"skript": []}
             )
         )
         self.entwurf: Vignette = Vignette.objects.anlegen(self.autorin)
