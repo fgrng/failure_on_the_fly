@@ -1074,6 +1074,63 @@ class VignetteMarkdownVorschauViewTests(TestCase):
         )
 
 
+_GEKOPPELTE_BESCHRIFTUNGEN: tuple[str, ...] = (
+    "Fehlermuster-Beschreibung",
+    "Lernauftrag-Text",
+    "Lernauftrag-Simulationshinweise (optional)",
+    "Arbeitsheft-Text",
+    "Arbeitsheft-Simulationshinweise (optional)",
+    "Vorname der Schüler:in",
+    "Budget-Typ",
+    "Budget-Wert",
+)
+
+
+class VignetteFeldbeschriftungenTests(TestCase):
+    """Formular und Detailansicht schreiben die Beschriftungen gekoppelt (#314)."""
+
+    def setUp(self) -> None:
+        """Legt einen eigenen Entwurf mit Bildern an."""
+        self.ada: Konto = _autorin("ada")
+        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
+        historie.eigentuemerinnen.add(self.ada)
+        self.entwurf: Vignette = Vignette.objects._erstellen(
+            historie=historie,
+            lernauftrag_bild="vignettenbilder/auftrag.gif",
+            arbeitsheft_bild="vignettenbilder/heft.gif",
+        )
+        self.client.force_login(self.ada)
+
+    def test_formulare_zeigen_gekoppelte_beschriftungen(self) -> None:
+        """Anlegen und Bearbeiten nennen die Felder wie CONTEXT.md."""
+        for url in (
+            reverse("vignetten:anlegen"),
+            reverse("vignetten:bearbeiten", args=[self.entwurf.pk]),
+        ):
+            response: HttpResponse = self.client.get(url)
+            for beschriftung in _GEKOPPELTE_BESCHRIFTUNGEN:
+                self.assertContains(response, beschriftung)
+            for teil in ("Lernauftrag", "Arbeitsheft"):
+                self.assertContains(response, f"<legend>{teil}-Bild</legend>")
+                self.assertContains(response, f"{teil}-Bildbeschreibung</label>")
+            self.assertNotContains(response, "Schüler:in Vorname")
+            self.assertNotContains(response, "Budget Typ")
+
+    def test_detail_zeigt_dieselben_beschriftungen(self) -> None:
+        """Die Detailansicht nutzt die Beschriftungen des Formulars."""
+        response: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[self.entwurf.pk])
+        )
+
+        for beschriftung in (
+            *_GEKOPPELTE_BESCHRIFTUNGEN,
+            "Lernauftrag-Bildbeschreibung",
+            "Arbeitsheft-Bildbeschreibung",
+        ):
+            self.assertContains(response, beschriftung)
+        self.assertNotContains(response, "Fehlermuster Beschreibung")
+
+
 class VignetteFinalisierenViewTests(TestCase):
     """Entwürfe lassen sich mit lesbaren Fehlermeldungen finalisieren."""
 
@@ -1175,6 +1232,15 @@ class VignetteFinalisierenViewTests(TestCase):
         self.vignette.arbeitsheft_bildbeschreibung = ""
         self._assert_finalisieren_zeigt_fehler(
             "arbeitsheft_bildbeschreibung", "", "Arbeitsheft-Bild"
+        )
+
+    def test_nennt_fehlende_pflichtfelder_mit_ihrer_beschriftung(self) -> None:
+        """Die Meldung nutzt die Beschriftungen des Formulars, keine Feldnamen."""
+        self.vignette.schuelerin_name = ""
+        self._assert_finalisieren_zeigt_fehler(
+            "fehlermuster_beschreibung",
+            "",
+            "Zum Finalisieren fehlen: Fehlermuster-Beschreibung, Vorname der Schüler:in.",
         )
 
     def test_zeigt_fehler_fuer_budget_null(self) -> None:
