@@ -1,4 +1,4 @@
-"""Das Formular, über das Teilnehmende einen Itemblock beantworten."""
+"""Formulare zum Anlegen einer Erhebung und zum Beantworten eines Itemblocks."""
 
 from typing import Any
 
@@ -8,6 +8,23 @@ from django.db import transaction
 from fragebogen_items.models import FragebogenItem, LikertSkalenpol
 
 from .models import ItemAntwort, Itemblock
+
+
+class ErhebungAnlegenFormular(forms.Form):
+    """Nimmt den Namen einer neuen Erhebung entgegen; umbenennen lässt sie sich nicht."""
+
+    name = forms.CharField(
+        label="Name",
+        max_length=255,
+        help_text=(
+            "Erscheint in Ihrer Erhebungsliste, im Dateinamen der Datenspur und "
+            "in den Abschriften der Teilnehmenden."
+        ),
+        error_messages={
+            "required": "Bitte geben Sie einen Namen ein.",
+            "max_length": "Höchstens 255 Zeichen.",
+        },
+    )
 
 
 def _feldname(antwort: ItemAntwort) -> str:

@@ -336,7 +336,13 @@ die Daten der Erhebung unberührt bleiben.
 
 Forschende und Administrator:innen erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
-Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. In einem Entwurf wählen sie finale Vignetten,
+Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. Eine neue
+Erhebung bekommt auf einer eigenen Anlegen-Seite ihren Namen: höchstens 255
+Zeichen, Leerzeichen am Rand werden abgeschnitten, ein leerer Name wird
+abgelehnt. Ein Hilfetext am Feld nennt, wo der Name erscheint (Erhebungsliste,
+Dateiname der Datenspur, Abschriften der Teilnehmenden). Meldungen stehen am
+Feld, die Eingabe bleibt nach einem Fehler stehen. Umbenennen lässt sich eine
+Erhebung nicht. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
 Einwilligungs- und Abschlusstext. Unter jedem dieser drei Felder steht ein
 kurzer Markdown-Hinweis samt Link-Syntax; der Umschalter »Bearbeiten |
