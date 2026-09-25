@@ -115,6 +115,54 @@ def test_main_layout_exposes_eight_column_grid() -> None:
     assert "--content-max-width: 1440px;" in tokens_css
 
 
+def test_page_sections_follow_the_main_area_not_the_viewport() -> None:
+    """Abschnitte stehen im Achterraster und brechen an der Breite des Hauptbereichs um."""
+
+    page_css: str = (STATIC / "css" / "page.css").read_text()
+    media_blocks: list[str] = re.findall(
+        r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", page_css
+    )
+
+    assert "container: hauptbereich / inline-size;" in page_css
+    assert (
+        ".page-section > .page-section__head { grid-column: 1 / span 2; }" in page_css
+    )
+    assert ".page-section > .field-grid { grid-template-columns: subgrid; }" in page_css
+    assert "@container hauptbereich (max-width: 900px)" in page_css
+    assert "@container hauptbereich (max-width: 520px)" in page_css
+    assert not any(
+        ".page-section" in block or ".field-grid" in block for block in media_blocks
+    )
+
+
+def test_three_fields_keep_three_columns_at_medium_width() -> None:
+    """In der Vierer-Stufe behalten drei Felder drei eigene Spalten."""
+
+    page_css: str = (STATIC / "css" / "page.css").read_text()
+    stufe: str = page_css.split("@container hauptbereich (max-width: 900px)")[1].split(
+        "@container"
+    )[0]
+
+    assert (
+        ".page-section > .field-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }"
+        in stufe
+    )
+
+
+def test_form_actions_stay_visible_at_the_top() -> None:
+    """Die Aktionszeile eines Formulars rückt nach oben und klebt, außer bei der Teilnahme."""
+
+    vignette_form_css: str = (STATIC / "css" / "vignette-form.css").read_text()
+    leiste: str = vignette_form_css.split(
+        ".page:not(.area--participant) form > .vignette-form-actions {"
+    )[1].split("}")[0]
+
+    assert "order: -1;" in leiste
+    assert "position: sticky;" in leiste
+    assert "z-index: 2;" in leiste
+    assert "box-shadow" not in leiste
+
+
 def test_feature_styles_use_spacing_tokens() -> None:
     """Layout-Abstände verwenden das öffentliche 8-px-Abstandsraster."""
 
