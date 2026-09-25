@@ -121,7 +121,7 @@ def _gespielte_teilnahme(
         teilnahme=bindung.teilnahme,
         vignette=vignette,
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGESCHLOSSEN,
     )
     schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
@@ -467,7 +467,7 @@ def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
         teilnahme=bindung.teilnahme,
         vignette=_finale_vignette_anlegen(forschende, name="Zuerst gespielt"),
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
     Gespraechsschritt.objects.create(
@@ -524,7 +524,7 @@ def test_ansicht_zeigt_auch_eine_sitzung_ohne_vignettenposition(
         teilnahme=bindung.teilnahme,
         vignette=_finale_vignette_anlegen(forschende, name="Ohne Position"),
         simulationskern=_finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
     abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)

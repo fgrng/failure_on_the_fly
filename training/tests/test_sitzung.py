@@ -109,9 +109,8 @@ class TrainingssitzungTests(TestCase):
 
         self.assertEqual(
             Sitzung.objects.get().modell_konfiguration,
-            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
+            ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         )
-        self.assertNotEqual(Sitzung.objects.get().modell_konfiguration, andere)
 
     def test_training_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
         self,

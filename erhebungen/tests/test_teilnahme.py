@@ -204,7 +204,7 @@ class ErhebungsteilnahmeTests(TestCase):
             teilnahme=teilnahme,
             vignette=vignette,
             simulationskern=vignette.gepinnter_kern,
-            modell_konfiguration=ModellKonfiguration.objects.aktive(
+            modell_konfiguration=ModellKonfiguration.objects.belegte(
                 Verwendung.SCHUELERIN
             ),
             verbrauchte_zeit=sekunden,
