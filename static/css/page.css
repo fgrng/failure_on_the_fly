@@ -189,9 +189,7 @@
     .page-section { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .page-section > *,
     .page-section > .page-section__head { grid-column: 1 / -1; }
-    .page-section > .field-grid > *,
-    .page-section > .field-grid--three > *,
-    .page-section--gestapelt > .field-grid > * { grid-column: span 2; }
+    .page-section > .field-grid > * { grid-column: span 2; }
     .page-section > .field-grid > .page-field--wide { grid-column: 1 / -1; }
     .page-section > .field-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .page-section > .field-grid--three > * { grid-column: auto; }
@@ -201,12 +199,8 @@
 @container hauptbereich (max-width: 520px) {
     .page-section,
     .field-grid,
-    .field-grid--three,
-    .page-section > .field-grid,
-    .page-section > .field-grid--three { grid-template-columns: minmax(0, 1fr); }
+    .page-section > .field-grid { grid-template-columns: minmax(0, 1fr); }
     .page-section > .field-grid > *,
-    .page-section > .field-grid--three > *,
-    .page-section--gestapelt > .field-grid > *,
     .page-field--wide,
     .page-section > .field-grid > .page-field--wide { grid-column: auto; }
 }
