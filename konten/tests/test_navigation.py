@@ -241,23 +241,31 @@ class BereichszuordnungTests(TestCase):
         )
         kern: Simulationskern = Simulationskern.objects.anlegen()
         kern.finalisieren()
-        entwurf: Simulationskern = kern.bearbeiten()
+        kern_entwurf: Simulationskern = kern.bearbeiten()
         vignette: Vignette = Vignette.objects.anlegen(linus)
-        training: Training = Training.objects.anlegen(linus, name="Brüche")
-        veroeffentlicht: Training = Training.objects.anlegen(linus, name="Prozente")
-        veroeffentlicht.veroeffentlichen()
+        training_entwurf: Training = Training.objects.anlegen(linus, name="Brüche")
+        training_veroeffentlicht: Training = Training.objects.anlegen(
+            linus, name="Prozente"
+        )
+        training_veroeffentlicht.veroeffentlichen()
         self.client.force_login(linus)
 
         for url, bereich in (
             (reverse("vignetten:liste"), "authoring"),
             (reverse("vignetten:detail", args=[vignette.pk]), "authoring"),
             (reverse("simulation:kern_verwalten"), "authoring"),
-            (reverse("simulation:kern_bearbeiten", args=[entwurf.pk]), "authoring"),
+            (
+                reverse("simulation:kern_bearbeiten", args=[kern_entwurf.pk]),
+                "authoring",
+            ),
             (reverse("training:katalog"), "participant"),
             (reverse("training:liste"), "participant"),
             (reverse("training:anlegen"), "participant"),
-            (reverse("training:kuratieren", args=[training.pk]), "participant"),
-            (reverse("training:detail", args=[veroeffentlicht.pk]), "participant"),
+            (reverse("training:kuratieren", args=[training_entwurf.pk]), "participant"),
+            (
+                reverse("training:detail", args=[training_veroeffentlicht.pk]),
+                "participant",
+            ),
         ):
             with self.subTest(url=url):
                 seite: str = self.client.get(url).content.decode()
