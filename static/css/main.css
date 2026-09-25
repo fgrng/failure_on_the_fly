@@ -89,21 +89,25 @@ a:hover {
 .card--participant {
     --area-solid: var(--color-area-participant-solid);
     --area-on-solid: var(--color-area-participant-on-solid);
+    --area-tint: var(--color-area-participant-tint);
 }
 .area--authoring,
 .card--authoring {
     --area-solid: var(--color-area-authoring-solid);
     --area-on-solid: var(--color-area-authoring-on-solid);
+    --area-tint: var(--color-area-authoring-tint);
 }
 .area--research,
 .card--research {
     --area-solid: var(--color-area-research-solid);
     --area-on-solid: var(--color-area-research-on-solid);
+    --area-tint: var(--color-area-research-tint);
 }
 .area--system,
 .card--system {
     --area-solid: var(--color-area-system-solid);
     --area-on-solid: var(--color-area-system-on-solid);
+    --area-tint: var(--color-area-system-tint);
 }
 
 .area-band {
@@ -323,6 +327,54 @@ select:focus {
 .table__empty {
     text-align: center;
     color: var(--color-text-muted);
+}
+
+/* ---- Klickbare Zeilen (Opt-in): der Name ist der einzige Link, sein ::after deckt die Zeile ab ---- */
+.table--zeilenlink tbody tr { position: relative; }
+/* Linie als Schatten: bleibt über dem Hover-Hintergrund der positionierten Zeile sichtbar. */
+.table--zeilenlink tbody td {
+    border-bottom: 0;
+    box-shadow: inset 0 -1px 0 var(--color-border);
+}
+.table--zeilenlink tbody tr:last-child td { box-shadow: none; }
+.table--zeilenlink tbody tr:is(:hover, :has(.zeilenlink:focus-visible)) {
+    background: color-mix(in srgb, var(--area-tint) 50%, var(--color-surface));
+}
+.table--zeilenlink tbody tr:has(.zeilenlink:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+}
+.zeilenlink {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: none;
+}
+.zeilenlink:hover { color: inherit; text-decoration: none; }
+.zeilenlink:focus-visible { outline: none; }
+.zeilenlink::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+.table__zeilenhinweis {
+    width: 1%;
+    color: var(--color-accent);
+    font-weight: 600;
+    white-space: nowrap;
+    visibility: hidden;
+}
+.table--zeilenlink tbody tr:is(:hover, :has(.zeilenlink:focus-visible)) .table__zeilenhinweis {
+    visibility: visible;
+}
+
+/* Nur für Screenreader sichtbar. */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 /* ---- Fließtext ---- */

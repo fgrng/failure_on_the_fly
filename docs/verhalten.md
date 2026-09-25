@@ -59,6 +59,19 @@ Teilnahme stehen die Aktionen weiterhin am Ende, etwa »Einwilligen« nach der
 Wahl zur Audioverarbeitung. Aktionen außerhalb eines Formulars, etwa auf
 Detailseiten, bleiben an ihrer Stelle.
 
+## Listen
+
+In »Meine Vignetten« und der Fragebogen-Item-Liste ist die ganze Zeile
+klickbar und öffnet die Detailseite; eine Spalte »Aktion« mit einem Knopf
+»Öffnen« je Zeile gibt es dort nicht mehr. Der Name in der ersten Spalte ist
+der einzige Link der Zeile, fett in Textfarbe. Mit Tab erreicht man je Zeile
+genau diesen Link, ein Mittelklick öffnet die Detailseite in einem neuen Tab.
+Beim Überfahren und beim Tastaturfokus tönt sich die Zeile halb im Bereichston
+der Seite, am Zeilenende erscheint in Grün »Öffnen ›«. Der Tastaturfokus
+zeichnet zusätzlich den grünen Fokus-Ring um die Zeile. Die Trennlinien
+zwischen den Zeilen bleiben dabei sichtbar. Suche, Filter und Sortierung
+bleiben unverändert.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen

@@ -20,22 +20,22 @@
 
     {% if item_zeilen %}
         <div class="table-wrap vignette-index-table">
-            <table class="table">
+            <table class="table table--zeilenlink">
                 <thead>
                     <tr>
                         <th scope="col">Name</th>
                         <th scope="col">Typ</th>
                         <th scope="col">Zustand</th>
-                        <th scope="col">Aktion</th>
+                        <th scope="col"><span class="visually-hidden">Öffnen</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for zeile in item_zeilen %}
                         <tr>
-                            <td>{{ zeile.bezeichnung }}</td>
+                            <td><a class="zeilenlink" href="{% url 'fragebogen_items:detail' zeile.item.pk %}">{{ zeile.bezeichnung }}</a></td>
                             <td>{{ zeile.item.get_typ_display }}</td>
                             <td><span class="badge badge--{{ zeile.zustand_badge }} badge--research">{{ zeile.item.get_zustand_display }}</span></td>
-                            <td><a class="button button--secondary" href="{% url 'fragebogen_items:detail' zeile.item.pk %}">Öffnen</a></td>
+                            <td class="table__zeilenhinweis" aria-hidden="true">Öffnen ›</td>
                         </tr>
                     {% endfor %}
                 </tbody>

@@ -263,3 +263,18 @@ def test_aktive_navigation_traegt_die_bereichsfarbe() -> None:
         "color: var(--color-accent"
         not in navigation_css.partition(".sidebar-account")[0]
     )
+
+
+def test_zeilenlink_tabelle_ist_opt_in_und_behaelt_trennlinien(main_css: str) -> None:
+    """Klickbare Zeilen hängen an einer eigenen Klasse und zeichnen Linien als Schatten."""
+
+    for bereich in ("participant", "authoring", "research", "system"):
+        assert f"--area-tint: var(--color-area-{bereich}-tint);" in main_css
+    assert ".table--zeilenlink tbody tr { position: relative; }" in main_css
+    assert "box-shadow: inset 0 -1px 0 var(--color-border);" in main_css
+    assert (
+        "background: color-mix(in srgb, var(--area-tint) 50%, var(--color-surface));"
+        in main_css
+    )
+    assert ".zeilenlink::after" in main_css
+    assert "vignette-index-table tbody" not in main_css

@@ -186,6 +186,24 @@ class VignetteListeViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content.decode().count("Bruchrechnung"), 1)
 
+    def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
+        """Der Name ist der einzige Link der Zeile; »Öffnen« und »Aktion« entfallen."""
+        ada: Konto = _autorin("ada")
+        vignette: Vignette = _vignette_mit_eigentuemerinnen(ada)
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("vignetten:liste"))
+
+        self.assertContains(
+            response,
+            '<a class="zeilenlink" :href="r.url" x-text="r.label"></a>',
+            html=False,
+        )
+        self.assertContains(response, reverse("vignetten:detail", args=[vignette.pk]))
+        self.assertContains(response, "table--zeilenlink")
+        self.assertNotContains(response, "button--secondary")
+        self.assertNotContains(response, ">Aktion<")
+
 
 class VignetteDetailViewTests(TestCase):
     """Die Detailansicht zeigt den Aufgabenkontext einer sichtbaren Fassung."""

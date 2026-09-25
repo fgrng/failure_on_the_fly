@@ -72,7 +72,7 @@
             </div>
 
             <div class="table-wrap vignette-index-table">
-                <table class="table table--sortable">
+                <table class="table table--sortable table--zeilenlink">
                     <thead>
                         <tr>
                             <th scope="col"><button type="button" class="table__sort" @click="sortiere('label')">Name<span class="table__sort-arrow" :class="pfeilKlasse('label')"></span></button></th>
@@ -80,18 +80,18 @@
                             <th scope="col"><button type="button" class="table__sort" @click="sortiere('thema')">Thema<span class="table__sort-arrow" :class="pfeilKlasse('thema')"></span></button></th>
                             <th scope="col"><button type="button" class="table__sort" @click="sortiere('klassenstufe')">Klasse<span class="table__sort-arrow" :class="pfeilKlasse('klassenstufe')"></span></button></th>
                             <th scope="col"><button type="button" class="table__sort" @click="sortiere('zustand')">Zustand<span class="table__sort-arrow" :class="pfeilKlasse('zustand')"></span></button></th>
-                            <th scope="col">Aktion</th>
+                            <th scope="col"><span class="visually-hidden">Öffnen</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="r in sichtbar" :key="r.url">
                             <tr>
-                                <td x-text="r.label"></td>
+                                <td><a class="zeilenlink" :href="r.url" x-text="r.label"></a></td>
                                 <td x-text="r.fach"></td>
                                 <td x-text="r.thema"></td>
                                 <td x-text="r.klassenstufe"></td>
                                 <td><span class="badge" :class="'badge--' + r.zustand_badge" x-text="r.zustand"></span></td>
-                                <td><a class="button button--secondary" :href="r.url">Öffnen</a></td>
+                                <td class="table__zeilenhinweis" aria-hidden="true">Öffnen ›</td>
                             </tr>
                         </template>
                         <tr x-show="sichtbar.length === 0">
