@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
     <script src="{% static 'js/zuordnungstabelle.js' %}" defer></script>
+    <script src="{% static 'js/ungespeichert.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -21,10 +22,7 @@
 
     <div class="vignette-detail-actions">
         {% if erhebung.status == erhebung.Status.ENTWURF %}
-            <form method="post" action="{% url 'erhebungen:finalisieren' erhebung.pk %}">
-                {% csrf_token %}
-                <button class="button" type="submit">Finalisieren</button>
-            </form>
+            <button class="button" type="submit" form="erhebung-konfiguration" formaction="{% url 'erhebungen:finalisieren' erhebung.pk %}">Finalisieren</button>
         {% else %}
             {% if kann_zurueckziehen %}
                 <form method="post" action="{% url 'erhebungen:zurueckziehen' erhebung.pk %}">
@@ -63,16 +61,16 @@
         <div data-zuordnung-daten>{{ am_ende_aufgenommene_daten|json_script:"am-ende-aufgenommene-daten" }}</div>
         <div data-zuordnung-daten>{{ am_ende_verfuegbare_daten|json_script:"am-ende-verfuegbare-daten" }}</div>
 
-        <form id="erhebung-konfiguration" method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}">
+        <form id="erhebung-konfiguration" method="post" action="{% url 'erhebungen:konfiguration_speichern' erhebung.pk %}" data-ungespeichert-warnen>
             {% csrf_token %}
             <section class="page-section" aria-labelledby="section-config">
                 <header class="page-section__head">
                     <b>01</b><span><h2 id="section-config">Konfiguration</h2><small>Instruktion, Einwilligung und Abschluss definieren.</small></span>
                 </header>
                 <div class="field-grid">
-                    {% include "texte/includes/markdown_feld.html" with feld_id="id_instruktionstext" feld_name="instruktionstext" label="Instruktion" wert=erhebung.instruktionstext profil="informationstext" %}
-                    {% include "texte/includes/markdown_feld.html" with feld_id="id_einwilligungstext" feld_name="einwilligungstext" label="Einwilligung" wert=erhebung.einwilligungstext profil="informationstext" %}
-                    {% include "texte/includes/markdown_feld.html" with feld_id="id_abschlusstext" feld_name="abschlusstext" label="Abschluss" wert=erhebung.abschlusstext profil="informationstext" %}
+                    {% include "texte/includes/markdown_lesefeld.html" with feld_id="id_instruktionstext" feld_name="instruktionstext" label="Instruktion" wert=erhebung.instruktionstext profil="informationstext" %}
+                    {% include "texte/includes/markdown_lesefeld.html" with feld_id="id_einwilligungstext" feld_name="einwilligungstext" label="Einwilligung" wert=erhebung.einwilligungstext profil="informationstext" %}
+                    {% include "texte/includes/markdown_lesefeld.html" with feld_id="id_abschlusstext" feld_name="abschlusstext" label="Abschluss" wert=erhebung.abschlusstext profil="informationstext" %}
                 </div>
             </section>
 

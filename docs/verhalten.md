@@ -329,10 +329,20 @@ Forschende und Administrator:innen erreichen unter `/erhebungen/eigene/` die
 Erhebungen ihres Eigentümer-Kreises; Administrator:innen sehen dort alle
 Erhebungen und arbeiten an ihnen mit denselben Gesten wie Forschende. In einem Entwurf wählen sie finale Vignetten,
 bestimmen eine feste oder zufällige Reihenfolge und pflegen Instruktions-,
-Einwilligungs- und Abschlusstext. Unter jedem dieser drei Felder steht ein
-kurzer Markdown-Hinweis samt Link-Syntax; der Umschalter »Bearbeiten |
-Vorschau« zeigt den ungespeicherten Text so, wie die Teilnahmeseite ihn
-rendert. Die Vorschau holt das Fragment vom Endpunkt `/texte/vorschau/`, der
+Einwilligungs- und Abschlusstext. Die drei Texte stehen im Entwurf zunächst
+gerendert zum Lesen, auf wenige Zeilen gekürzt; »Ganz anzeigen« klappt einen
+langen Text auf. Ein leerer Text zeigt »Noch kein Text« und statt
+»Bearbeiten« den Knopf »Text schreiben«. »Bearbeiten« öffnet nur diesen Text
+im Markdown-Feld, mit eigenen Knöpfen »Speichern« und »Abbrechen«. Jeder
+Speichern-Knopf der Seite, am Text wie unten »Konfiguration speichern«,
+speichert die ganze Erhebung: alle Felder und alle geöffneten Texte.
+»Abbrechen« verwirft nur die Änderungen an diesem Text. Auch »Finalisieren«
+speichert vorher alles, offene Texte eingeschlossen. Wer die Seite mit
+ungespeicherten Änderungen verlässt, wird vom Browser gewarnt. Die drei Texte
+bleiben optional und sperren das Finalisieren nicht. Unter jedem Markdown-Feld
+steht ein kurzer Markdown-Hinweis samt Link-Syntax; der Umschalter
+»Bearbeiten | Vorschau« zeigt den ungespeicherten Text so, wie die
+Teilnahmeseite ihn rendert. Die Vorschau holt das Fragment vom Endpunkt `/texte/vorschau/`, der
 Quelle und Profil (Informations- oder Szenentext) annimmt, mit derselben
 Funktion wie die Anzeigeseite rendert und nichts speichert; er steht nur
 angemeldeten Autor:innen, Forschenden und Administrator:innen offen. Finale und

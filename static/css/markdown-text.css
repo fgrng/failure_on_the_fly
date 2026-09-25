@@ -105,6 +105,7 @@
 
 .markdown-feld__umschalter {
     display: inline-flex;
+    margin-left: auto;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -139,4 +140,61 @@
     margin-top: var(--space-1);
     color: var(--color-text-muted);
     font-size: .75rem;
+}
+
+/* Lese-Hülle um das Editorfeld (texte/includes/markdown_lesefeld.html): Der
+   gerenderte Text steht gekürzt auf gut vier Zeilen und lässt sich ganz
+   anzeigen; die Kante links hält Lese- und Bearbeitungsstand zusammen. */
+.markdown-lesefeld__kopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+}
+
+.markdown-lesefeld__kopf label {
+    margin: 0;
+}
+
+.markdown-lesefeld__lesen {
+    padding-left: var(--space-2);
+    border-left: 3px solid var(--color-border);
+}
+
+.markdown-lesefeld__text {
+    max-height: 6.5em;
+    overflow: hidden;
+    mask-image: linear-gradient(#000 60%, transparent);
+}
+
+.markdown-lesefeld__text--ganz {
+    max-height: none;
+    mask-image: none;
+}
+
+.markdown-lesefeld__umfang {
+    margin-top: var(--space-1);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-size: .84rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.markdown-lesefeld__leer {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.markdown-lesefeld__aktionen {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
 }

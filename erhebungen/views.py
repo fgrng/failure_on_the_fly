@@ -670,17 +670,11 @@ def _feste_reihenfolge_setzen(
         zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-@transaction.atomic
-def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
-    """Speichert die konfigurierbaren Texte, Regel und feste Reihenfolge eines Entwurfs."""
+def _konfiguration_uebernehmen(
+    request: HttpRequest, erhebung: Erhebung
+) -> HttpResponse | None:
+    """Übernimmt die gesendeten Felder in den Entwurf; liefert nur Fehlerantworten."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        return redirect("erhebungen:detail", pk=erhebung.pk)
     randomisierung: str = request.POST.get("randomisierung", erhebung.randomisierung)
     if randomisierung not in Erhebung.Randomisierung.values:
         return HttpResponseBadRequest("Unbekannte Randomisierungsregel.")
@@ -702,7 +696,23 @@ def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
     )
     if randomisierung == Erhebung.Randomisierung.FEST and "vignetten" in request.POST:
         _feste_reihenfolge_setzen(erhebung, request.POST.getlist("vignetten"))
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    return None
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+@transaction.atomic
+def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
+    """Speichert die konfigurierbaren Texte, Regel und feste Reihenfolge eines Entwurfs."""
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+    return _konfiguration_uebernehmen(request, erhebung) or redirect(
+        "erhebungen:detail", pk=erhebung.pk
+    )
 
 
 @login_required
@@ -720,12 +730,17 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
+@transaction.atomic
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Finalisiert einen eigenen Entwurf über dessen Domänenmethode."""
+    """Speichert die gesendeten Felder eines Entwurfs und finalisiert ihn dann."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    if erhebung.status == Erhebung.Status.ENTWURF:
+        fehler: HttpResponse | None = _konfiguration_uebernehmen(request, erhebung)
+        if fehler is not None:
+            return fehler
     _validierte_aktion_ausfuehren(request, erhebung.finalisieren)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 

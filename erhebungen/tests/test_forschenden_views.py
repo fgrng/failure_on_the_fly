@@ -4,6 +4,7 @@ import csv
 import json
 import re
 from datetime import UTC, datetime, timedelta
+from html.parser import HTMLParser
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
 
@@ -146,6 +147,46 @@ def _item_zuordnen(
     return Erhebungsitem.objects.create(
         erhebung=erhebung, item=item, andockpunkt=andockpunkt, position=position
     )
+
+
+class _Knopfsammler(HTMLParser):
+    """Sammelt Submit-Knöpfe mit Beschriftung und zugehörigem Formular."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.knoepfe: list[tuple[str, str | None]] = []
+        self._formulare: list[str | None] = []
+        self._knopf: tuple[str | None, list[str]] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        werte: dict[str, str | None] = dict(attrs)
+        if tag == "form":
+            self._formulare.append(werte.get("id"))
+        elif tag == "button" and werte.get("type", "submit") == "submit":
+            formular: str | None = werte.get("form") or (
+                self._formulare[-1] if self._formulare else None
+            )
+            self._knopf = (formular, [])
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form" and self._formulare:
+            self._formulare.pop()
+        elif tag == "button" and self._knopf is not None:
+            formular, text = self._knopf
+            self.knoepfe.append(("".join(text).strip(), formular))
+            self._knopf = None
+
+    def handle_data(self, data: str) -> None:
+        if self._knopf is not None:
+            self._knopf[1].append(data)
+
+
+def _submit_knoepfe(antwort: HttpResponse) -> list[tuple[str, str | None]]:
+    """Liefert Beschriftung und Formular-ID aller Submit-Knöpfe einer Seite."""
+
+    sammler: _Knopfsammler = _Knopfsammler()
+    sammler.feed(antwort.content.decode())
+    return sammler.knoepfe
 
 
 class ErhebungenForschendenRollenTests(TestCase):
@@ -1011,6 +1052,81 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertContains(detail, "badge--draft")
         self.assertNotContains(detail, "badge--entwurf")
 
+    def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
+        self,
+    ) -> None:
+        """Gefüllte Texte stehen gerendert zum Lesen, leere laden zum Schreiben ein."""
+
+        self.erhebung.instruktionstext = "Bitte **genau** lesen."
+        self.erhebung.save(update_fields=["instruktionstext"])
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "Bitte <strong>genau</strong> lesen.")
+        self.assertContains(detail, ">Bearbeiten</button>", count=1 + 3)
+        self.assertContains(detail, "Noch kein Text", count=2)
+        self.assertContains(detail, ">Text schreiben</button>", count=2)
+        self.assertContains(detail, "Ganz anzeigen")
+        self.assertContains(
+            detail, '<textarea id="id_instruktionstext" name="instruktionstext"'
+        )
+
+    def test_jeder_speichern_knopf_speichert_die_ganze_erhebung(self) -> None:
+        """Alle Speichern-Knöpfe senden dasselbe Formular mit allen Feldern."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        speichern: list[str | None] = [
+            formular
+            for beschriftung, formular in _submit_knoepfe(detail)
+            if "speichern" in beschriftung.lower()
+        ]
+        self.assertEqual(len(speichern), 3 + 1)
+        self.assertEqual(set(speichern), {"erhebung-konfiguration"})
+        self.assertContains(detail, 'name="randomisierung"')
+
+        self.client.post(
+            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
+            {
+                "randomisierung": Erhebung.Randomisierung.ZUFAELLIG,
+                "instruktionstext": "Neue Instruktion",
+                "einwilligungstext": "Neue Einwilligung",
+                "abschlusstext": "Neuer Abschluss",
+            },
+        )
+
+        self.erhebung.refresh_from_db()
+        self.assertEqual(
+            (
+                self.erhebung.instruktionstext,
+                self.erhebung.einwilligungstext,
+                self.erhebung.abschlusstext,
+                self.erhebung.randomisierung,
+            ),
+            (
+                "Neue Instruktion",
+                "Neue Einwilligung",
+                "Neuer Abschluss",
+                Erhebung.Randomisierung.ZUFAELLIG,
+            ),
+        )
+
+    def test_seite_warnt_vor_dem_verlassen_mit_ungespeicherten_aenderungen(
+        self,
+    ) -> None:
+        """Das Konfigurationsformular meldet sich für die Verlassen-Warnung an."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+
+        self.assertContains(detail, "js/ungespeichert.js")
+        self.assertContains(detail, "data-ungespeichert-warnen")
+
     def test_speichert_texte_und_feste_reihenfolge(self) -> None:
         """Ein Entwurf zeigt die gespeicherten Texte und Reihenfolge wieder an."""
 
@@ -1201,6 +1317,35 @@ class ErhebungenFinalisierenTests(TestCase):
         self.assertNotContains(response, "Konfiguration speichern")
         self.assertNotContains(response, "Finale Vignetten aufnehmen")
         self.assertNotContains(response, ">Entfernen<")
+
+    def test_finalisieren_speichert_vorher_alle_felder(self) -> None:
+        """Offene Texte und übrige Felder gehen beim Finalisieren nicht verloren."""
+
+        detail: HttpResponse = self.client.get(
+            reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertIn(
+            ("Finalisieren", "erhebung-konfiguration"), _submit_knoepfe(detail)
+        )
+
+        self.client.post(
+            reverse("erhebungen:finalisieren", args=[self.erhebung.pk]),
+            {
+                "randomisierung": Erhebung.Randomisierung.ZUFAELLIG,
+                "instruktionstext": "Offene Instruktion",
+                "einwilligungstext": "Offene Einwilligung",
+                "abschlusstext": "Offener Abschluss",
+            },
+        )
+
+        self.erhebung.refresh_from_db()
+        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
+        self.assertEqual(self.erhebung.instruktionstext, "Offene Instruktion")
+        self.assertEqual(self.erhebung.einwilligungstext, "Offene Einwilligung")
+        self.assertEqual(self.erhebung.abschlusstext, "Offener Abschluss")
+        self.assertEqual(
+            self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG
+        )
 
     def test_nicht_archivierte_stichprobe_versteckt_zurueckziehen(self) -> None:
         """Eine laufende Stichprobe sperrt den Rückweg schon in der UI."""
@@ -2996,14 +3141,13 @@ class ErhebungstexteVorschauUndLeseansichtTests(TestCase):
 
         detail: HttpResponse = self._detail()
 
-        self.assertContains(detail, ">Bearbeiten</button>", count=3)
         self.assertContains(detail, ">Vorschau</button>", count=3)
         self.assertContains(detail, f'hx-post="{reverse("texte:vorschau")}"', count=3)
         self.assertContains(detail, '"profil": "informationstext"', count=3)
         self.assertContains(detail, "[Linktext](https://…)", count=3)
         for feld in ("instruktionstext", "einwilligungstext", "abschlusstext"):
             self.assertContains(detail, f'name="{feld}"')
-        self.assertNotContains(detail, "<h3>Ablauf</h3>")
+        self.assertContains(detail, "<h3>Ablauf</h3>", count=1)
 
     def test_vorschau_entspricht_der_teilnahmeseite(self) -> None:
         """Endpunkt und Teilnahmeseite liefern dasselbe Rendering."""
