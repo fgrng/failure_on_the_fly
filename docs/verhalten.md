@@ -25,6 +25,17 @@ Formularfehler (»Dieses Feld ist zwingend erforderlich.«), die Bedienelemente
 bereits hochgeladener Bilder und die Datumsanzeige. Auswahlfelder ohne
 Vorbelegung zeigen »Bitte wählen …«.
 
+## Formulare
+
+In den Formularen zum Anlegen und Bearbeiten (Vignetten, Trainings, Erhebungen,
+Fragebogen-Items, Simulationskern, Modell- und Transkriptions-Konfiguration)
+stehen die Aktionen wie »Abbrechen« und »Speichern« oben im Formular und bleiben
+beim Scrollen sichtbar, solange das Formular im Bild ist. Die Tab-Reihenfolge
+führt weiter erst durch die Felder. Auf den Seiten der Teilnahme stehen die
+Aktionen weiterhin am Ende, etwa »Einwilligen« nach der Wahl zur
+Audioverarbeitung. Aktionen außerhalb eines Formulars, etwa auf Detailseiten,
+bleiben an ihrer Stelle.
+
 ## Vignetten verwalten
 
 Autor:innen sehen die Vignetten ihres Eigentümer-Kreises; Administrator:innen
