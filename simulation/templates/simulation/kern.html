@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Simulationskern{% endblock %}
+{% block title %}Aktueller Kern{% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
@@ -11,8 +11,8 @@
 <section class="page system-page area--authoring">
     <header class="page-head">
         <div>
-            <p>Entwicklung</p>
-            <h1>Simulationskern</h1>
+            <p>Entwicklung / Simulationskern</p>
+            <h1>Aktueller Kern</h1>
             <span>Aktuelle Verhaltensspezifikation und aktive Modell-Konfiguration.</span>
         </div>
         {% if simulationskern %}<span class="badge badge--authoring">{{ simulationskern.get_zustand_display }}</span>{% endif %}

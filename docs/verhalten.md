@@ -28,6 +28,21 @@ der Gruppe, unter der sie in der Sidebar steht: Vignetten und der
 Simulationskern samt Verwaltung gehören zu Entwicklung, Trainingskatalog,
 eigene Trainings, Training anlegen und kuratieren zu Ausbildung.
 
+Die Seitenköpfe folgen einem Vokabular. Die Überzeile nennt Sidebar-Gruppe
+und Eintrag, etwa »Entwicklung / Vignetten«, »Entwicklung / Simulationskern«,
+»Ausbildung / Trainings«, »Ausbildung / Training starten«, »Forschung / Meine
+Erhebungen«, »Forschung / Fragebogen-Items« oder »System /
+Modell-Konfiguration«; Trainingskatalog und eigene Trainings tragen nur
+»Ausbildung«. Der Titel nennt die Aktion oder das Objekt: »Vignette anlegen«,
+»Vignette bearbeiten«, »Aktueller Kern«, »Kern verwalten«, »Kern-Entwurf
+bearbeiten«, »Training anlegen«, »Erhebung anlegen«, »Fragebogen-Item anlegen«,
+»Modell-Konfiguration anlegen«; Detailseiten tragen den Namen des Objekts. Das
+Verb heißt überall »anlegen«, nie »erstellen«. Der Absendeknopf einer
+Anlegen-Seite wiederholt den Titel (»Vignette anlegen«, »Training anlegen«,
+»Erhebung anlegen«, »Fragebogen-Item anlegen«; im Editor der
+Modell-Konfiguration »Konfiguration anlegen«). Auf Bearbeiten-Seiten heißt er
+»Änderungen speichern«, ebenso auf der Transkriptions-Konfiguration.
+
 Die gesamte Oberfläche ist deutschsprachig, auch Djangos eigene Texte:
 Formularfehler (»Dieses Feld ist zwingend erforderlich.«), die Bedienelemente
 bereits hochgeladener Bilder und die Datumsanzeige. Auswahlfelder ohne
@@ -37,7 +52,7 @@ Vorbelegung zeigen »Bitte wählen …«.
 
 In den Formularen zum Anlegen und Bearbeiten (Vignetten, Trainings, Erhebungen,
 Fragebogen-Items, Simulationskern, Modell- und Transkriptions-Konfiguration)
-stehen die Aktionen wie »Abbrechen« und »Speichern« oben im Formular und bleiben
+stehen die Aktionen wie »Abbrechen« und »Änderungen speichern« oben im Formular und bleiben
 beim Scrollen sichtbar, solange das Formular im Bild ist. Die Tab-Reihenfolge
 führt weiter erst durch die Felder. Auf den Seiten der Teilnahme stehen die
 Aktionen weiterhin am Ende, etwa »Einwilligen« nach der Wahl zur

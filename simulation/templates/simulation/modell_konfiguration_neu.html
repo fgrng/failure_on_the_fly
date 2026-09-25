@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Neue Modell-Konfiguration{% endblock %}
+{% block title %}Modell-Konfiguration anlegen{% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
@@ -12,8 +12,8 @@
 <section class="page system-page area--system">
     <header class="page-head">
         <div>
-            <p><a href="{% url 'simulation:modell_konfiguration' %}">← Modell-Konfigurationen</a></p>
-            <h1>Neue Modell-Konfiguration</h1>
+            <p>System / Modell-Konfiguration</p>
+            <h1>Modell-Konfiguration anlegen</h1>
             <span>
                 {% if vorlage %}Vorlage: <strong>{{ vorlage.bezeichnung }}</strong> (Nr. {{ vorlage.pk }}). Die Vorlage bleibt unverändert; das Token wird neu eingegeben.
                 {% else %}Eine neue Konfiguration entsteht; bestehende bleiben unverändert.{% endif %}

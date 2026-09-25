@@ -10,8 +10,8 @@
 <section class="page area--authoring">
     <header class="page-head">
         <div>
-            <p>{% block kicker %}{% endblock %}</p>
-            <h1>Schritt für Schritt zur Trainingssituation</h1>
+            <p>Entwicklung / Vignetten</p>
+            <h1>{% block titel %}{% endblock %}</h1>
             <span>Die Angaben sind nach ihrem fachlichen Zusammenhang geordnet.</span>
         </div>
     </header>
@@ -93,7 +93,7 @@
 
         <div class="vignette-form-actions">
             <a href="{% block abbrechen %}{% url 'vignetten:liste' %}{% endblock %}">Abbrechen</a>
-            <button class="button" type="submit">Vignette speichern</button>
+            <button class="button" type="submit">{% block knopf %}{% endblock %}</button>
         </div>
     </form>
 </section>
