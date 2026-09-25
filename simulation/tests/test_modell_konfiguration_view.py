@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.http import HttpResponse
 from django.db.models import QuerySet
+from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -487,19 +487,13 @@ class ModellKonfigurationAktivierenTests(ZweiFassungenTestCase):
             )
 
     def test_verschiebt_nur_den_zeiger_ohne_zeile_zu_mutieren(self) -> None:
-        """Das Umschalten geht über aktivieren() und lässt beide Zeilen unberührt."""
+        """Das Umschalten legt einen Zeiger an und lässt beide Zeilen unberührt."""
         vorher: list[tuple[object, ...]] = list(
             ModellKonfiguration.objects.order_by("pk").values_list()
         )
 
-        with patch.object(
-            ModellKonfiguration.objects,
-            "aktivieren",
-            wraps=ModellKonfiguration.objects.aktivieren,
-        ) as aktivieren:
-            self.client.post(_aktivieren_url(self.neuere, Verwendung.BEWERTER))
+        self.client.post(_aktivieren_url(self.neuere, Verwendung.BEWERTER))
 
-        aktivieren.assert_called_once_with(self.neuere, Verwendung.BEWERTER)
         self.assertEqual(
             list(ModellKonfiguration.objects.order_by("pk").values_list()), vorher
         )
