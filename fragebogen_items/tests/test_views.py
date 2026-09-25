@@ -126,16 +126,6 @@ class FragebogenItemFinalisierenViewTests(TestCase):
 
         self.assertContains(response, "Final")
 
-    def test_zeilen_der_bibliothek_sind_ueber_den_namen_verlinkt(self) -> None:
-        """Der Name ist der einzige Link der Zeile; »Öffnen« und »Aktion« entfallen."""
-        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
-
-        detail: str = reverse("fragebogen_items:detail", args=[self.item.pk])
-        self.assertContains(response, f'<a class="zeilenlink" href="{detail}">')
-        self.assertContains(response, "table--zeilenlink")
-        self.assertNotContains(response, "button--secondary")
-        self.assertNotContains(response, ">Aktion<")
-
     def test_finalisieren_akzeptiert_keine_bereits_finale_fassung(self) -> None:
         """Die zustandsgebundene Aktion ist nach dem Finalisieren nicht erneut nutzbar."""
         self.item.finalisieren()
@@ -724,3 +714,19 @@ class FragebogenItemListeViewTests(TestCase):
         self.assertContains(response, "Final")
         self.assertContains(response, "badge--final")
         self.assertContains(response, "badge--research")
+
+    def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
+        """Der Name ist der einzige Link der Zeile; »Öffnen« und »Aktion« entfallen."""
+        ada: Konto = _forschende("ada")
+        item: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada, wortlaut="Die Aufgaben waren verständlich."
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
+
+        detail: str = reverse("fragebogen_items:detail", args=[item.pk])
+        self.assertContains(response, f'<a class="zeilenlink" href="{detail}">')
+        self.assertContains(response, "table--zeilenlink")
+        self.assertNotContains(response, "button--secondary")
+        self.assertNotContains(response, ">Aktion<")

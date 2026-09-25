@@ -195,9 +195,7 @@ class VignetteListeViewTests(TestCase):
         response: HttpResponse = self.client.get(reverse("vignetten:liste"))
 
         self.assertContains(
-            response,
-            '<a class="zeilenlink" :href="r.url" x-text="r.label"></a>',
-            html=False,
+            response, '<a class="zeilenlink" :href="r.url" x-text="r.label"></a>'
         )
         self.assertContains(response, reverse("vignetten:detail", args=[vignette.pk]))
         self.assertContains(response, "table--zeilenlink")
