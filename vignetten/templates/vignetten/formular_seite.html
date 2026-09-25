@@ -3,6 +3,7 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <script src="{% static 'js/bildkarte.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -54,8 +55,7 @@
             </header>
             <div class="field-grid">
                 {% include "texte/includes/markdown_formularfeld.html" with field=form.lernauftrag_text profil="szenentext" %}
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bild %}
-                {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_bildbeschreibung wide=True %}
+                {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.lernauftrag %}
                 {% include "vignetten/includes/form_field.html" with field=form.lernauftrag_simulationshinweise wide=True %}
             </div>
         </section>
@@ -66,8 +66,7 @@
             </header>
             <div class="field-grid">
                 {% include "texte/includes/markdown_formularfeld.html" with field=form.arbeitsheft_text profil="szenentext" %}
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bild %}
-                {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_bildbeschreibung wide=True %}
+                {% include "vignetten/includes/bildkarte_field.html" with karte=form.bildkarten.arbeitsheft %}
                 {% include "vignetten/includes/form_field.html" with field=form.arbeitsheft_simulationshinweise wide=True %}
             </div>
         </section>
