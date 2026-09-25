@@ -580,14 +580,14 @@ class Vignette(models.Model):
         """Prüft einen Entwurf und friert ihn als finale Fassung ein."""
         if self.zustand != self.Zustand.ENTWURF:
             raise ValidationError("Nur Entwürfe können finalisiert werden.")
-        fehlende_felder: list[str] = [
+        fehlende_beschriftungen: list[str] = [
             FELDBESCHRIFTUNGEN[feldname]
             for feldname in _PFLICHTFELD_NAMEN
             if not getattr(self, feldname)
         ]
-        if fehlende_felder:
+        if fehlende_beschriftungen:
             raise ValidationError(
-                f"Zum Finalisieren fehlen: {', '.join(fehlende_felder)}."
+                f"Zum Finalisieren fehlen: {', '.join(fehlende_beschriftungen)}."
             )
         for teil in (self.lernauftrag, self.arbeitsheft):
             if not teil.text and not teil.bild:
