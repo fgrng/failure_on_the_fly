@@ -315,6 +315,21 @@ class ProbelaufStartTests(TestCase):
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
 
+    def test_aktionszeile_im_probelauf_ohne_abbrechen(self) -> None:
+        """Der Probelauf zeigt nur Erklärsatz und »Gespräch beenden →«."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(
+            einleitung, 'class="button button--neutral sitzung-aktionen__beenden"'
+        )
+        self.assertContains(
+            einleitung, "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose."
+        )
+        self.assertNotContains(einleitung, "Sitzung abbrechen")
+
 
 class ProbelaufGespraechTests(ProbelaufStartTests):
     """Die HTTP-Naht führt das Diagnosegespräch schreibfrei Zug um Zug."""

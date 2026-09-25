@@ -28,16 +28,18 @@
 {% endif %}
 
 {% if not ist_gescheitert %}
+    {# Abgesetzte Aktionszeile (#293, Variante B): links destruktiv, rechts der reguläre Weg zum Debrief. #}
     <div class="sitzung-aktionen">
-        <form method="post" action="{{ navigation.beenden_url }}" hx-post="{{ navigation.beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#sitzung-debrief:top">
-            {% csrf_token %}
-            <button class="sitzung-aktion-link" type="submit">Gespräch beenden{% if erneute_eingabe is not None %} und Debrief anzeigen{% endif %}</button>
-        </form>
         {% if navigation.abbrechen_url %}
-            <form method="post" action="{{ navigation.abbrechen_url }}">
+            <form class="sitzung-aktionen__abbrechen" method="post" action="{{ navigation.abbrechen_url }}">
                 {% csrf_token %}
-                <button class="sitzung-aktion-link sitzung-aktion-link--ruhig" type="submit">Sitzung abbrechen</button>
+                <button class="sitzung-aktion-link sitzung-aktion-link--gefahr" type="submit">Sitzung abbrechen</button>
             </form>
         {% endif %}
+        <p class="sitzung-aktionen__hinweis">Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose.</p>
+        <form method="post" action="{{ navigation.beenden_url }}" hx-post="{{ navigation.beenden_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#sitzung-debrief:top">
+            {% csrf_token %}
+            <button class="button button--neutral sitzung-aktionen__beenden" type="submit">{% if erneute_eingabe is not None %}Gespräch beenden und Debrief anzeigen{% else %}Gespräch beenden <span aria-hidden="true">→</span>{% endif %}</button>
+        </form>
     </div>
 {% endif %}

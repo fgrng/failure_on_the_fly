@@ -108,6 +108,27 @@ class TrainingssitzungTests(TestCase):
         )
         self.assertNotContains(self.start_response, "Spracheingabe nicht freigegeben")
 
+    def test_aktionszeile_traegt_beenden_erklaersatz_und_abbrechen(self) -> None:
+        """Beenden grau umrandet, Abbrechen als roter Textlink (#293, Variante B)."""
+
+        self._sitzung_starten([])
+
+        self.assertContains(self.start_response, 'class="sitzung-aktionen"')
+        self.assertContains(
+            self.start_response,
+            'class="button button--neutral sitzung-aktionen__beenden"',
+        )
+        self.assertContains(self.start_response, "Gespräch beenden")
+        self.assertContains(
+            self.start_response,
+            "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose.",
+        )
+        self.assertContains(
+            self.start_response,
+            'class="sitzung-aktion-link sitzung-aktion-link--gefahr"',
+        )
+        self.assertContains(self.start_response, reverse("training:abbrechen"))
+
     def test_training_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
         self,
     ) -> None:
