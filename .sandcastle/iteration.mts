@@ -195,17 +195,29 @@ async function mergeMainInto(
   if ((await repo.mergeMain(branch)) === "clean") return true;
 
   log(`  ${branch}: conflict with ${MAIN_REF}, starting the merger.`);
-  const before = await repo.head(branch);
-  let resolved = false;
+  return mergeOrReset(deps, branch, [MAIN_REF], log, () => repo.contains(branch, MAIN_REF));
+}
+
+// Lässt den Merger `branches` in `into` mergen. Liefert, ob er mit
+// Abschlusssignal endete und `verified` zutrifft; sonst steht `into` wieder
+// auf dem Stand davor, damit kein Ticket eine halbe Auflösung erbt.
+async function mergeOrReset(
+  deps: UpdateDeps,
+  into: string,
+  branches: string[],
+  log: (message: string) => void,
+  verified: () => Promise<boolean> = async () => true,
+): Promise<boolean> {
+  const { repo, agents } = deps;
+  const before = await repo.head(into);
+  let merged = false;
   try {
-    const run = await agents.merge(branch, [MAIN_REF]);
-    resolved = run.completed && (await repo.contains(branch, MAIN_REF));
+    merged = (await agents.merge(into, branches)).completed && (await verified());
   } catch (error) {
-    log(`  ! Merger on ${branch} failed: ${error}`);
+    log(`  ! Merger on ${into} failed: ${error}`);
   }
-  // Eine halbe Auflösung soll kein Ticket als Ausgangsstand erben.
-  if (!resolved) await repo.resetBranch(branch, before);
-  return resolved;
+  if (!merged) await repo.resetBranch(into, before);
+  return merged;
 }
 
 /** Die Integrations-Branches, in die main zu Laufbeginn nicht gemergt werden konnte. */
@@ -289,15 +301,12 @@ async function planImplementAndMerge(
   const byIntegrationBranch = Map.groupBy(readyIssues, (i) => i.integrationBranch);
   for (const [into, group] of byIntegrationBranch) {
     // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
-    try {
-      await agents.merge(
-        into,
-        group.map((i) => i.branch),
-      );
-      log(`\nBranches merged into ${into}.`);
-    } catch (error) {
-      log(`  ! Merging into ${into} failed: ${error}`);
+    const branches = group.map((i) => i.branch);
+    if (!(await mergeOrReset(deps, into, branches, log))) {
+      log(`  ! ${into}: merger did not finish, branch reset - no ticket closed.`);
+      continue;
     }
+    log(`\nBranches merged into ${into}.`);
     landed.push(...(await closeMergedIssues(deps, group, log)));
   }
   return { planned: issues.length, landed };

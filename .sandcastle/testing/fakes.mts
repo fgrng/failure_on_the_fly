@@ -286,6 +286,8 @@ export class FakeAgents implements Agents {
   readonly implementers = new Map<string, ImplementerScript>();
   /** Branches, deren Merge der Merger nicht schafft. */
   readonly unmergeable = new Set<string>();
+  /** Branches, die der Merger auslässt, obwohl er das Abschlusssignal gibt. */
+  readonly skipped = new Set<string>();
   /** Ticket-IDs, die der Planner wegen Überschneidungen zurückstellt. */
   readonly deferred = new Set<string>();
   /** Ticket-IDs, deren Sandbox mit einem Fehler abbricht. */
@@ -340,7 +342,7 @@ export class FakeAgents implements Agents {
   async merge(into: string, branches: string[]): Promise<AgentRun> {
     this.mergedWith.push({ into, branches });
     for (const branch of branches) {
-      if (!this.unmergeable.has(branch)) this.repo.merge(branch, into);
+      if (!this.unmergeable.has(branch) && !this.skipped.has(branch)) this.repo.merge(branch, into);
     }
     // Scheitert der Merger, hinterlässt er einen halbfertigen Commit und kein Abschlusssignal.
     if (branches.some((b) => this.unmergeable.has(b))) {

@@ -60,7 +60,7 @@ test("geschlossen werden nur Tickets, deren Branch nachweislich gemergt ist", as
   const { tracker, agents, run } = setup();
   tracker.addTicket(ticket(7));
   tracker.addTicket(ticket(8));
-  agents.unmergeable.add("sandcastle/issue-8");
+  agents.skipped.add("sandcastle/issue-8");
 
   await run();
 
@@ -68,6 +68,37 @@ test("geschlossen werden nur Tickets, deren Branch nachweislich gemergt ist", as
     tracker.closed.map((c) => c.number),
     [7],
   );
+});
+
+test("ohne Abschlusssignal des Mergers wird kein Ticket seines Integrations-Branches geschlossen", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(32), { parent: 30 });
+  tracker.addTicket(ticket(7));
+  agents.unmergeable.add("sandcastle/issue-32");
+
+  await run();
+
+  assert.deepEqual(
+    tracker.closed.map((c) => c.number),
+    [7],
+  );
+});
+
+test("ohne Abschlusssignal des Mergers steht der Integrations-Branch wieder auf seinem Stand davor", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(32), { parent: 30 });
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commit("spec/30");
+  const before = await repo.head("spec/30");
+  agents.unmergeable.add("sandcastle/issue-32");
+
+  await run();
+
+  assert.equal(await repo.head("spec/30"), before);
 });
 
 test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits gemergt", async () => {
