@@ -62,7 +62,7 @@ class Bindung(models.Model):
     objects: models.Manager["Bindung"] = BindungQuerySet.as_manager()
 
     class Meta:
-        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+        """Keine eigene Tabelle: Jede Bindung lebt in der Tabelle ihres Kontexts."""
 
         abstract: bool = True
 

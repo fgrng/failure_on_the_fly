@@ -52,7 +52,7 @@ class EigentuemerKreis(models.Model):
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     class Meta:
-        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+        """Keine eigene Tabelle: Jeder Bestand hält seine Eigentümerinnen in eigener M2M."""
 
         abstract: bool = True
 

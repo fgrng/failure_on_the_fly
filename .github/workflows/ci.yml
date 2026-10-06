@@ -1,4 +1,3 @@
-# Prüft jeden PR und jeden Push auf main mit Ruff und der pytest-Suite.
 name: CI
 
 on:

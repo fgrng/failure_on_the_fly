@@ -89,7 +89,7 @@ class OpenAITranskription:
     """Transkribiert Aufnahmen sofort über eine OpenAI-kompatible Route."""
 
     def __init__(self, client: Any, modell: str, sprache: str) -> None:
-        """Bindet OpenAI-kompatiblen Client, Modell und Sprache."""
+        """Nimmt den Client fertig konfiguriert entgegen, damit Tests ihn ersetzen."""
 
         self.client: Any = client
         self.modell: str = modell
@@ -128,7 +128,7 @@ class InfomaniakTranskription:
     """
 
     def __init__(self, client: Any, basis_url: str, modell: str, sprache: str) -> None:
-        """Bindet HTTP-Client, Endpunktwurzel, Modell und Sprache."""
+        """Nimmt den HTTP-Client samt Token entgegen; ein Schrägstrich am Wurzelende fällt weg."""
 
         self.client: Any = client
         self.basis_url: str = basis_url.rstrip("/")

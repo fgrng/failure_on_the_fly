@@ -447,7 +447,7 @@ class AnbieterFeldgruppe(models.Model):
     )
 
     class Meta:
-        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+        """Keine eigene Tabelle: Beide Konfigurationen tragen die Felder als Singleton."""
 
         abstract: bool = True
 

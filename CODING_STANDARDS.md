@@ -6,6 +6,8 @@ NEVER use emoji, or unicode that emulates emoji (e.g. ✓, ✗). The only except
 
 Always write documentation files, issues and comments in German.
 
+Ruff enforces formatting, lint, type hints in signatures and docstrings for public objects (`[tool.ruff.lint]` in `pyproject.toml`, pre-commit hook in `.githooks/`).
+
 Non-public methods need no docstring, but they should have a comment that describes what the method does. This comment should appear after the def line.
 
 Keep comments up-to-date with code changes.
