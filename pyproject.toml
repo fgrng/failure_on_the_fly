@@ -24,6 +24,7 @@ dev = [
     "django-stubs>=6.1.2",
     "pytest>=9.1.1",
     "pytest-django>=4.12.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.15.20",
     "ty>=0.0.84",
 ]
@@ -31,6 +32,12 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
+# Parallel über pytest-xdist. `loadscope` hält eine Testklasse auf einem
+# Worker, sonst baut jeder Worker ihr setUpTestData erneut auf. Mehr als vier
+# Worker bringen kaum Zeit, kosten aber CPU, vor allem wenn Sandcastle mehrere
+# Agents gleichzeitig testen lässt. Seriell, schneller für einzelne Dateien:
+# `pytest -n 0`.
+addopts = "-n 4 --dist loadscope"
 
 [tool.ruff]
 line-length = 88
