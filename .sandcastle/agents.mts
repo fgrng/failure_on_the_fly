@@ -95,7 +95,7 @@ const hooks = {
     // `uv run pytest` the prompts ask for would die with KeyError: 'SECRET_KEY'.
     // .env.example carries a placeholder secret, which is all the test suite
     // needs. Guarded by `test -f` so the phases that run against the host
-    // checkout directly (planner, and the merger into the host branch —
+    // checkout directly (planner, and a merger into the host branch —
     // branch strategy "head") never
     // overwrite the developer's real .env.
     onWorktreeReady: [{ command: "test -f .env || cp .env.example .env" }],
@@ -221,9 +221,9 @@ export function sandcastleAgents(lineup: Lineup): Agents {
 
     async merge(into: string, branches: string[]): Promise<AgentRun> {
       // Ein Integrations-Branch bekommt einen eigenen Worktree, damit der
-      // Checkout des Hosts unberührt bleibt. Nur der aktive Branch des Hosts
-      // (Tickets ohne Spec) wird direkt im Checkout gemergt, weil git einen
-      // Branch nicht in zwei Worktrees zugleich auscheckt.
+      // Checkout des Hosts unberührt bleibt. Steht der Host selbst auf dem
+      // Ziel, wird direkt im Checkout gemergt, weil git einen Branch nicht in
+      // zwei Worktrees zugleich auscheckt.
       const branchStrategy: sandcastle.BranchStrategy =
         into === currentBranch() ? { type: "head" } : { type: "branch", branch: into };
       return agentRun(

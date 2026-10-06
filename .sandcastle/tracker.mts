@@ -1,7 +1,7 @@
 // Tracker über die GitHub-CLI `gh`.
 
 import { execFileSync } from "node:child_process";
-import type { IssueSummary, Ticket, Tracker } from "./iteration.mts";
+import type { IssueSummary, PullRequest, Ticket, Tracker } from "./iteration.mts";
 
 function gh(args: string[]): string {
   return execFileSync("gh", args, { encoding: "utf8", stdio: "pipe" });
@@ -76,5 +76,53 @@ export const githubTracker: Tracker = {
 
   async close(issue: number, comment: string): Promise<void> {
     gh(["issue", "close", String(issue), "--comment", comment]);
+  },
+
+  async pullRequest(head: string): Promise<PullRequest | undefined> {
+    // gh listet die neuesten PRs zuerst.
+    const prs: {
+      number: number;
+      headRefName: string;
+      baseRefName: string;
+      title: string;
+      body: string;
+      state: "OPEN" | "MERGED" | "CLOSED";
+    }[] = JSON.parse(
+      gh([
+        "pr",
+        "list",
+        "--head",
+        head,
+        "--state",
+        "all",
+        "--limit",
+        "20",
+        "--json",
+        "number,headRefName,baseRefName,title,body,state",
+      ]),
+    );
+    const pr = prs.find((p) => p.state === "OPEN") ?? prs[0];
+    if (!pr) return undefined;
+    return {
+      number: pr.number,
+      head: pr.headRefName,
+      base: pr.baseRefName,
+      title: pr.title,
+      body: pr.body,
+      state: pr.state === "OPEN" ? "open" : pr.state === "MERGED" ? "merged" : "closed",
+    };
+  },
+
+  async createPullRequest(pr: {
+    head: string;
+    base: string;
+    title: string;
+    body: string;
+  }): Promise<void> {
+    gh(["pr", "create", "--head", pr.head, "--base", pr.base, "--title", pr.title, "--body", pr.body]);
+  },
+
+  async updatePullRequest(number: number, text: { title: string; body: string }): Promise<void> {
+    gh(["pr", "edit", String(number), "--title", text.title, "--body", text.body]);
   },
 };

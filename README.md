@@ -81,7 +81,10 @@ Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattp
 dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
 abarbeitet: planen, implementieren, reviewen, mergen. Tickets einer Spec `<n>`
 laufen über den Integrations-Branch `spec/<n>`, den das Skript bei Bedarf von
-`main` anlegt; Tickets ohne Spec gehen vorerst direkt in den aktiven Branch.
+`main` anlegt; Tickets ohne Spec sammeln sich auf `sandcastle/standalone`.
+Hat dieser Branch Commits, die nicht auf `main` liegen, pusht ihn das Skript
+und legt einen PR nach `main` an oder ergänzt den offenen. Ist der PR gemergt,
+beginnt der Branch im nächsten Lauf neu von `main`.
 Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
 ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
 schließt das Skript nicht. Voraussetzung sind Node, Docker

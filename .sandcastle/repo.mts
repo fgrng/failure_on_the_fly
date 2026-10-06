@@ -38,4 +38,32 @@ export const gitRepo: Repo = {
     // `git branch` setzt nur die Ref; der Checkout des Hosts bleibt, wo er ist.
     execFileSync("git", ["branch", branch, base], { stdio: "ignore" });
   },
+
+  async resetBranch(branch: string, base: string): Promise<void> {
+    // Scheitert, solange der Branch in einem Worktree ausgecheckt ist.
+    execFileSync("git", ["branch", "--force", branch, base], { stdio: "ignore" });
+  },
+
+  async isPushed(branch: string): Promise<boolean> {
+    try {
+      const [local, remote] = execFileSync(
+        "git",
+        ["rev-parse", `refs/heads/${branch}`, `refs/remotes/origin/${branch}`],
+        { encoding: "utf8", stdio: "pipe" },
+      )
+        .trim()
+        .split("\n");
+      return local === remote;
+    } catch {
+      return false;
+    }
+  },
+
+  async push(branch: string): Promise<void> {
+    // Nach einem Neustart von main ist der Push kein Fast-Forward. Die Lease
+    // schützt Commits auf origin, die dieser Checkout noch nicht kennt.
+    execFileSync("git", ["push", "--force-with-lease", "origin", `${branch}:${branch}`], {
+      stdio: "pipe",
+    });
+  },
 };

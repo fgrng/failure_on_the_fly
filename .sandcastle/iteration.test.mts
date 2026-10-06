@@ -8,7 +8,7 @@ function setup() {
   const repo = new FakeRepo("main");
   const agents = new FakeAgents(repo);
   const run = () =>
-    runIteration({ tracker, repo, agents, targetBranch: "main", log: () => {} });
+    runIteration({ tracker, repo, agents, log: () => {} });
   return { tracker, repo, agents, run };
 }
 
@@ -35,7 +35,7 @@ test("ein fertiges Ticket wird reviewt, gemergt und geschlossen", async () => {
     { reviewed: agents.reviewed, merged: agents.mergedWith, open: tracker.isOpen(7) },
     {
       reviewed: ["7"],
-      merged: [{ into: "main", branches: ["sandcastle/issue-7"] }],
+      merged: [{ into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] }],
       open: false,
     },
   );
@@ -71,13 +71,16 @@ test("geschlossen werden nur Tickets, deren Branch nachweislich gemergt ist", as
 test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits gemergt", async () => {
   const { tracker, repo, agents, run } = setup();
   tracker.addTicket(ticket(7));
-  await repo.createBranch("sandcastle/issue-7", "main");
+  await repo.createBranch("sandcastle/standalone", "main");
+  await repo.createBranch("sandcastle/issue-7", "sandcastle/standalone");
   repo.commit("sandcastle/issue-7");
   agents.implementers.set("7", { commits: 0, completed: true });
 
   await run();
 
-  assert.deepEqual(agents.mergedWith, [{ into: "main", branches: ["sandcastle/issue-7"] }]);
+  assert.deepEqual(agents.mergedWith, [
+    { into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] },
+  ]);
 });
 
 test("ein Branch ohne Arbeit wird weder reviewt noch gemergt", async () => {
@@ -150,7 +153,7 @@ test("ein Ticket einer Spec zweigt von spec/<n> ab, das von main entsteht, und w
   );
 });
 
-test("je Integrations-Branch läuft ein eigener Merger, Tickets ohne Spec gehen nach main", async () => {
+test("je Integrations-Branch läuft ein eigener Merger", async () => {
   const { tracker, agents, run } = setup();
   tracker.addSpec(30);
   tracker.addSpec(40);
@@ -164,9 +167,135 @@ test("je Integrations-Branch läuft ein eigener Merger, Tickets ohne Spec gehen 
   assert.deepEqual(
     new Map(agents.mergedWith.map((m) => [m.into, m.branches.toSorted()])),
     new Map([
-      ["main", ["sandcastle/issue-7"]],
+      ["sandcastle/standalone", ["sandcastle/issue-7"]],
       ["spec/30", ["sandcastle/issue-31", "sandcastle/issue-32"]],
       ["spec/40", ["sandcastle/issue-41"]],
     ]),
+  );
+});
+
+test("ein Ticket ohne Spec zweigt von sandcastle/standalone ab, das von main entsteht, und wird dorthin gemergt", async () => {
+  const { tracker, repo, agents, run } = setup();
+  repo.commit("main");
+  tracker.addTicket(ticket(7));
+
+  await run();
+
+  assert.deepEqual(
+    {
+      startedFrom: agents.startedFrom,
+      standaloneHasMain: await repo.contains("sandcastle/standalone", "main"),
+      standaloneHasTicket: await repo.contains("sandcastle/standalone", "sandcastle/issue-7"),
+      mainHasTicket: await repo.contains("main", "sandcastle/issue-7"),
+    },
+    {
+      startedFrom: [{ id: "7", base: "sandcastle/standalone" }],
+      standaloneHasMain: true,
+      standaloneHasTicket: true,
+      mainHasTicket: false,
+    },
+  );
+});
+
+test("neue Commits auf sandcastle/standalone werden gepusht und bekommen einen PR nach main", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addTicket(ticket(7, "Tippfehler beheben"));
+
+  await run();
+
+  assert.deepEqual(
+    {
+      pushed: await repo.isPushed("sandcastle/standalone"),
+      prs: tracker.pullRequests.map(({ head, base, state }) => ({ head, base, state })),
+      mentionsTicket: tracker.pullRequests[0]?.body.includes("#7: Tippfehler beheben"),
+    },
+    {
+      pushed: true,
+      prs: [{ head: "sandcastle/standalone", base: "main", state: "open" }],
+      mentionsTicket: true,
+    },
+  );
+});
+
+test("ein offener Standalone-PR wird aktualisiert statt neu angelegt", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addTicket(ticket(7, "Erstes"));
+  await run();
+  tracker.addTicket(ticket(8, "Zweites"));
+
+  await run();
+
+  assert.deepEqual(
+    {
+      pushed: await repo.isPushed("sandcastle/standalone"),
+      prs: tracker.pullRequests.map((pr) => pr.body.split("\n").filter((l) => l.startsWith("- "))),
+    },
+    { pushed: true, prs: [["- #7: Erstes", "- #8: Zweites"]] },
+  );
+});
+
+test("ohne neue Commits auf sandcastle/standalone gibt es weder Push noch PR", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(7));
+  agents.implementers.set("7", { commits: 1, completed: false });
+
+  await run();
+
+  assert.deepEqual(
+    { pushed: await repo.isPushed("sandcastle/standalone"), prs: tracker.pullRequests },
+    { pushed: false, prs: [] },
+  );
+});
+
+test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone frisch von main ab", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addTicket(ticket(7, "Erstes"));
+  await run();
+  tracker.mergePullRequest(tracker.pullRequests[0]!.number);
+  tracker.addTicket(ticket(8, "Zweites"));
+
+  await run();
+
+  assert.deepEqual(
+    {
+      hasOldTicket: await repo.contains("sandcastle/standalone", "sandcastle/issue-7"),
+      hasNewTicket: await repo.contains("sandcastle/standalone", "sandcastle/issue-8"),
+      prs: tracker.pullRequests.map((pr) => ({
+        state: pr.state,
+        tickets: pr.body.split("\n").filter((l) => l.startsWith("- ")),
+      })),
+    },
+    {
+      hasOldTicket: false,
+      hasNewTicket: true,
+      prs: [
+        { state: "merged", tickets: ["- #7: Erstes"] },
+        { state: "open", tickets: ["- #8: Zweites"] },
+      ],
+    },
+  );
+});
+
+test("scheitert der Push nach einem Neustart, gehen die neuen Commits nicht verloren", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addTicket(ticket(7));
+  await run();
+  tracker.mergePullRequest(tracker.pullRequests[0]!.number);
+  tracker.addTicket(ticket(8));
+  repo.pushFails = true;
+  await run();
+  repo.pushFails = false;
+
+  await run();
+
+  assert.deepEqual(
+    {
+      hasTicket: await repo.contains("sandcastle/standalone", "sandcastle/issue-8"),
+      pushed: await repo.isPushed("sandcastle/standalone"),
+      prStates: tracker.pullRequests.map((pr) => pr.state),
+    },
+    { hasTicket: true, pushed: true, prStates: ["merged", "open"] },
   );
 });

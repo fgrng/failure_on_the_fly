@@ -7,6 +7,7 @@ import type {
   Agents,
   IssueSummary,
   PlannedIssue,
+  PullRequest,
   Repo,
   Ticket,
   TicketSession,
@@ -29,6 +30,8 @@ export class FakeTracker implements Tracker {
   private issues = new Map<number, TrackedIssue>();
   /** Jedes Schließen mit seinem Kommentar, in Aufrufreihenfolge. */
   readonly closed: { number: number; comment: string }[] = [];
+  /** Alle PRs, in der Reihenfolge ihres Anlegens. */
+  readonly pullRequests: PullRequest[] = [];
 
   addTicket(t: Ticket, options: { parent?: number } = {}): void {
     this.issues.set(t.number, {
@@ -76,6 +79,33 @@ export class FakeTracker implements Tracker {
     this.closed.push({ number, comment });
   }
 
+  async pullRequest(head: string): Promise<PullRequest | undefined> {
+    const prs = this.pullRequests.filter((pr) => pr.head === head);
+    return prs.find((pr) => pr.state === "open") ?? prs.at(-1);
+  }
+
+  async createPullRequest(pr: {
+    head: string;
+    base: string;
+    title: string;
+    body: string;
+  }): Promise<void> {
+    this.pullRequests.push({ ...pr, number: 1000 + this.pullRequests.length, state: "open" });
+  }
+
+  async updatePullRequest(number: number, text: { title: string; body: string }): Promise<void> {
+    const pr = this.pullRequests.find((p) => p.number === number);
+    if (!pr) throw new Error(`FakeTracker: PR #${number} unbekannt`);
+    Object.assign(pr, text);
+  }
+
+  /** Die Maintainerin bzw. der Maintainer mergt den PR auf GitHub. */
+  mergePullRequest(number: number): void {
+    const pr = this.pullRequests.find((p) => p.number === number);
+    if (!pr) throw new Error(`FakeTracker: PR #${number} unbekannt`);
+    pr.state = "merged";
+  }
+
   private get(number: number): TrackedIssue {
     const issue = this.issues.get(number);
     if (!issue) throw new Error(`FakeTracker: Issue #${number} unbekannt`);
@@ -83,10 +113,13 @@ export class FakeTracker implements Tracker {
   }
 }
 
-// Ein Branch ist die Menge der Commits, die er enthält.
+// Ein Branch ist die Menge der Commits, die er enthält. Ein Push legt den
+// Stand des Branches unter origin/<branch> ab.
 export class FakeRepo implements Repo {
   private branches = new Map<string, Set<string>>();
   private nextSha = 1;
+  /** Solange gesetzt, scheitert jeder Push. */
+  pushFails = false;
 
   constructor(...branches: string[]) {
     for (const branch of branches) this.branches.set(branch, new Set());
@@ -98,6 +131,23 @@ export class FakeRepo implements Repo {
 
   async createBranch(branch: string, base: string): Promise<void> {
     if (!this.branches.has(branch)) this.branches.set(branch, new Set(this.commits(base)));
+  }
+
+  async resetBranch(branch: string, base: string): Promise<void> {
+    this.commits(branch);
+    this.branches.set(branch, new Set(this.commits(base)));
+  }
+
+  async push(branch: string): Promise<void> {
+    if (this.pushFails) throw new Error(`FakeRepo: Push von ${branch} abgewiesen`);
+    this.branches.set(`origin/${branch}`, new Set(this.commits(branch)));
+  }
+
+  /** Ob der Branch genau so gepusht ist, wie er lokal steht. */
+  async isPushed(branch: string): Promise<boolean> {
+    const remote = this.branches.get(`origin/${branch}`);
+    const local = this.commits(branch);
+    return remote !== undefined && remote.size === local.size && [...local].every((sha) => remote.has(sha));
   }
 
   commit(branch: string): string {

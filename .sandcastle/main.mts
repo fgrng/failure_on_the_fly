@@ -8,12 +8,15 @@
 //   Implement: One implementer per ticket, up to MAX_PARALLEL concurrently.
 //              A ticket with parent Spec <n> branches off its integration
 //              branch `spec/<n>` (created from main if missing); a ticket
-//              without a Spec still branches off the host branch.
+//              without a Spec branches off `sandcastle/standalone`.
 //   Review:    Only for branches whose implementer signalled completion.
 //   Merge:     One merger per integration branch merges its reviewed ticket
 //              branches; spec branches get their own worktree, so the host
 //              checkout stays untouched. The driver then closes every ticket
 //              whose branch landed. A Spec stays open; its PR closes it.
+//   Publish:   If `sandcastle/standalone` is ahead of main, the driver pushes
+//              it and opens or updates its PR. Once that PR is merged, the
+//              next iteration restarts the branch from main.
 //
 // The outer loop repeats up to MAX_ITERATIONS times, stopping early once the
 // backlog is exhausted (a plan with no issues).
@@ -26,7 +29,7 @@
 import { parseArgs } from "node:util";
 import { DEFAULT_LINEUP, LINEUPS, sandcastleAgents } from "./agents.mts";
 import { runIteration } from "./iteration.mts";
-import { currentBranch, gitRepo } from "./repo.mts";
+import { gitRepo } from "./repo.mts";
 import { githubTracker } from "./tracker.mts";
 
 // Maximum number of plan→execute→merge iterations to run before stopping.
@@ -55,7 +58,6 @@ const deps = {
   tracker: githubTracker,
   repo: gitRepo,
   agents: sandcastleAgents(lineup),
-  targetBranch: currentBranch(),
   maxParallel: MAX_PARALLEL,
 };
 

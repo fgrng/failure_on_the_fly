@@ -24,6 +24,16 @@ export type PlannedIssue = { id: string; title: string; branch: string };
 /** Ergebnis eines Agent-Laufs: neue Commits (SHAs) und ob das Abschlusssignal kam. */
 export type AgentRun = { commits: string[]; completed: boolean };
 
+/** Ein Pull Request; `head` ist der Branch, der gemergt werden soll. */
+export type PullRequest = {
+  number: number;
+  head: string;
+  base: string;
+  title: string;
+  body: string;
+  state: "open" | "merged" | "closed";
+};
+
 export interface Tracker {
   /** Offene Tickets mit `ready-for-agent`, ohne `Spec`, ohne offenen Blocker. */
   readyTickets(): Promise<Ticket[]>;
@@ -31,6 +41,10 @@ export interface Tracker {
   parentOf(issue: number): Promise<IssueSummary | undefined>;
   issue(issue: number): Promise<IssueSummary>;
   close(issue: number, comment: string): Promise<void>;
+  /** Der offene PR von `head`, sonst der zuletzt angelegte, sonst undefined. */
+  pullRequest(head: string): Promise<PullRequest | undefined>;
+  createPullRequest(pr: { head: string; base: string; title: string; body: string }): Promise<void>;
+  updatePullRequest(number: number, text: { title: string; body: string }): Promise<void>;
 }
 
 export interface Repo {
@@ -39,6 +53,12 @@ export interface Repo {
   branchExists(branch: string): Promise<boolean>;
   /** Legt `branch` auf dem Stand von `base` an, ohne den Checkout des Hosts zu berühren. */
   createBranch(branch: string, base: string): Promise<void>;
+  /** Setzt einen bestehenden `branch` auf den Stand von `base` zurück. */
+  resetBranch(branch: string, base: string): Promise<void>;
+  /** Ob `branch` genau auf seinem Stand in origin steht. */
+  isPushed(branch: string): Promise<boolean>;
+  /** Pusht `branch` nach origin; eine neu begonnene Historie ersetzt die alte. */
+  push(branch: string): Promise<void>;
 }
 
 /** Implementer und Review eines Tickets teilen sich eine Sandbox. */
@@ -66,12 +86,13 @@ export interface Agents {
 /** Von hier zweigen neue Integrations-Branches ab. */
 export const MAIN_BRANCH = "main";
 
+/** Fortlaufender Integrations-Branch der Tickets ohne Eltern-Spec. */
+export const STANDALONE_BRANCH = "sandcastle/standalone";
+
 export type IterationDeps = {
   tracker: Tracker;
   repo: Repo;
   agents: Agents;
-  /** Ziel-Branch der Tickets ohne Eltern-Spec: der aktive Branch des Hosts. */
-  targetBranch: string;
   log?: (message: string) => void;
   /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden. */
   maxParallel?: number;
@@ -91,10 +112,12 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
   const { tracker, agents } = deps;
   const log = deps.log ?? console.log;
 
+  await restartStandaloneAfterMerge(deps, log);
   const tickets = await tracker.readyTickets();
   const issues = await agents.plan(tickets);
   if (issues.length === 0) {
     log("No issues to work on.");
+    await publishStandalone(deps, [], log);
     return { planned: 0 };
   }
 
@@ -108,9 +131,11 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
   for (const issue of readyIssues) log(`  ${issue.branch} -> ${issue.integrationBranch}`);
   if (readyIssues.length === 0) {
     log("No completed branches. Nothing to merge.");
+    await publishStandalone(deps, [], log);
     return { planned: issues.length };
   }
 
+  const landed: Assignment[] = [];
   const byIntegrationBranch = Map.groupBy(readyIssues, (i) => i.integrationBranch);
   for (const [into, group] of byIntegrationBranch) {
     // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
@@ -123,12 +148,13 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
     } catch (error) {
       log(`  ! Merging into ${into} failed: ${error}`);
     }
-    await closeMergedIssues(deps, group, log);
+    landed.push(...(await closeMergedIssues(deps, group, log)));
   }
+  await publishStandalone(deps, landed, log);
   return { planned: issues.length };
 }
 
-// Ticket mit Eltern-Spec n -> spec/<n>, sonst der Ziel-Branch des Hosts.
+// Ticket mit Eltern-Spec n -> spec/<n>, sonst sandcastle/standalone.
 // Fehlt ein Integrations-Branch, entsteht er von main. Ein Ticket, dessen
 // Eltern-Issue sich nicht lesen lässt, wird ausgelassen statt falsch geleitet.
 async function assignIntegrationBranches(
@@ -136,13 +162,13 @@ async function assignIntegrationBranches(
   issues: PlannedIssue[],
   log: (message: string) => void,
 ): Promise<Assignment[]> {
-  const { tracker, repo, targetBranch } = deps;
+  const { tracker, repo } = deps;
   const assignments: Assignment[] = [];
   for (const issue of issues) {
     let integrationBranch: string;
     try {
       const parent = await tracker.parentOf(Number(issue.id));
-      integrationBranch = parent && isSpec(parent) ? `spec/${parent.number}` : targetBranch;
+      integrationBranch = parent && isSpec(parent) ? `spec/${parent.number}` : STANDALONE_BRANCH;
       if (!(await repo.branchExists(integrationBranch))) {
         await repo.createBranch(integrationBranch, MAIN_BRANCH);
         log(`  ${integrationBranch}: created from ${MAIN_BRANCH}.`);
@@ -211,19 +237,22 @@ async function implementAndReview(
 }
 
 // Schließt jedes Ticket, dessen Branch nachweislich in seinem
-// Integrations-Branch liegt. Die Spec bleibt offen; sie schließt ihr PR.
+// Integrations-Branch liegt, und liefert diese Tickets. Die Spec bleibt
+// offen; sie schließt ihr PR.
 async function closeMergedIssues(
   deps: IterationDeps,
   issues: Assignment[],
   log: (message: string) => void,
-): Promise<void> {
+): Promise<Assignment[]> {
   const { tracker, repo } = deps;
+  const landed: Assignment[] = [];
   for (const issue of issues) {
     const into = issue.integrationBranch;
     if (!(await repo.contains(into, issue.branch))) {
       log(`  #${issue.id}: ${issue.branch} is not in ${into} - leaving the issue open.`);
       continue;
     }
+    landed.push(issue);
     try {
       await tracker.close(Number(issue.id), `Completed by Sandcastle, merged into ${into}`);
       log(`  #${issue.id}: closed.`);
@@ -231,6 +260,69 @@ async function closeMergedIssues(
       log(`  ! Could not close #${issue.id}: ${error}`);
     }
   }
+  return landed;
+}
+
+// Ist der letzte PR von sandcastle/standalone gemergt, beginnt der Branch
+// neu von main, damit der nächste PR nur neue Tickets enthält. Commits, die
+// noch nicht gepusht sind, gehören nicht zu diesem PR; dann bleibt er stehen.
+async function restartStandaloneAfterMerge(
+  deps: IterationDeps,
+  log: (message: string) => void,
+): Promise<void> {
+  const { tracker, repo } = deps;
+  if (!(await repo.branchExists(STANDALONE_BRANCH))) return;
+  if ((await tracker.pullRequest(STANDALONE_BRANCH))?.state !== "merged") return;
+  if (!(await repo.isPushed(STANDALONE_BRANCH))) {
+    log(`  ! ${STANDALONE_BRANCH} has unpushed commits - not restarting from ${MAIN_BRANCH}.`);
+    return;
+  }
+  await repo.resetBranch(STANDALONE_BRANCH, MAIN_BRANCH);
+  log(`${STANDALONE_BRANCH}: pull request merged, restarted from ${MAIN_BRANCH}.`);
+}
+
+// Hat sandcastle/standalone Commits, die nicht auf main liegen, wird der
+// Branch gepusht. Sein PR wird angelegt oder, wenn er offen ist, um die
+// gelandeten Tickets ergänzt.
+async function publishStandalone(
+  deps: IterationDeps,
+  landed: Assignment[],
+  log: (message: string) => void,
+): Promise<void> {
+  const { tracker, repo } = deps;
+  if (!(await repo.branchExists(STANDALONE_BRANCH))) return;
+  if (await repo.contains(MAIN_BRANCH, STANDALONE_BRANCH)) return;
+  try {
+    await repo.push(STANDALONE_BRANCH);
+    const tickets = landed
+      .filter((i) => i.integrationBranch === STANDALONE_BRANCH)
+      .map((i) => `- #${i.id}: ${i.title}`);
+    const pr = await tracker.pullRequest(STANDALONE_BRANCH);
+    if (pr?.state === "open") {
+      const listed = pr.body.split("\n").filter((line) => line.startsWith("- #"));
+      const body = standalonePrBody([...new Set([...listed, ...tickets])]);
+      await tracker.updatePullRequest(pr.number, { title: pr.title, body });
+      log(`\n${STANDALONE_BRANCH}: pushed, pull request #${pr.number} updated.`);
+    } else {
+      await tracker.createPullRequest({
+        head: STANDALONE_BRANCH,
+        base: MAIN_BRANCH,
+        title: "Sandcastle: Tickets ohne Spec",
+        body: standalonePrBody(tickets),
+      });
+      log(`\n${STANDALONE_BRANCH}: pushed, pull request opened.`);
+    }
+  } catch (error) {
+    log(`  ! Publishing ${STANDALONE_BRANCH} failed: ${error}`);
+  }
+}
+
+function standalonePrBody(ticketLines: string[]): string {
+  return [
+    "Von Sandcastle umgesetzte Tickets ohne Eltern-Spec, je Ticket reviewt:",
+    "",
+    ...ticketLines,
+  ].join("\n");
 }
 
 function isSpec(issue: IssueSummary): boolean {
