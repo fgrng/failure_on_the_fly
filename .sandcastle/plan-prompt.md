@@ -8,7 +8,7 @@ Here are the open issues in the repo:
 
 </issues-json>
 
-The list above has already been filtered to issues ready for work. Issues with an open blocked-by dependency are excluded, so every listed issue is unblocked.
+The list above has already been filtered to issues ready for work. Blocked-by dependencies are already resolved: every listed issue is unblocked, and its `blockedBy` entries are done. Do not query the issue tracker and do not reorder issues by dependencies you read from their text; your only judgement is file overlap.
 
 # TASK
 

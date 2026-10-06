@@ -15,7 +15,7 @@ import type {
 } from "../iteration.mts";
 
 export function ticket(number: number, title = `Ticket ${number}`): Ticket {
-  return { number, title, body: "", labels: ["ready-for-agent"], comments: [] };
+  return { number, title, body: "", labels: ["ready-for-agent"], comments: [], blockedBy: [] };
 }
 
 type TrackedIssue = {
@@ -23,6 +23,7 @@ type TrackedIssue = {
   open: boolean;
   labels: string[];
   parent?: number;
+  blockedBy?: number[];
   ticket?: Ticket;
 };
 
@@ -33,13 +34,14 @@ export class FakeTracker implements Tracker {
   /** Alle PRs, in der Reihenfolge ihres Anlegens. */
   readonly pullRequests: PullRequest[] = [];
 
-  addTicket(t: Ticket, options: { parent?: number } = {}): void {
+  addTicket(t: Ticket, options: { parent?: number; blockedBy?: number[] } = {}): void {
     this.issues.set(t.number, {
       number: t.number,
       open: true,
       labels: t.labels,
       parent: options.parent,
-      ticket: t,
+      blockedBy: options.blockedBy ?? [],
+      ticket: { ...t, blockedBy: options.blockedBy ?? [] },
     });
   }
 
@@ -51,8 +53,11 @@ export class FakeTracker implements Tracker {
     return this.get(number).open;
   }
 
+  /** Wie `-is:blocked`: Tickets mit offenem Blocker fehlen. */
   async readyTickets(): Promise<Ticket[]> {
-    return [...this.issues.values()].flatMap((i) => (i.open && i.ticket ? [i.ticket] : []));
+    return [...this.issues.values()].flatMap((i) =>
+      i.open && i.ticket && i.blockedBy?.every((b) => !this.isOpen(b)) ? [i.ticket] : [],
+    );
   }
 
   async parentOf(number: number): Promise<IssueSummary | undefined> {

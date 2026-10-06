@@ -34,6 +34,7 @@ export const githubTracker: Tracker = {
       body: string;
       labels: { name: string }[];
       comments: { body: string }[];
+      blockedBy: { nodes: { number: number }[] };
     }[] = JSON.parse(
       gh([
         "issue",
@@ -47,7 +48,7 @@ export const githubTracker: Tracker = {
         "--limit",
         "100",
         "--json",
-        "number,title,body,labels,comments",
+        "number,title,body,labels,comments,blockedBy",
       ]),
     );
     return issues.map((i) => ({
@@ -56,6 +57,7 @@ export const githubTracker: Tracker = {
       body: i.body,
       labels: i.labels.map((l) => l.name),
       comments: i.comments.map((c) => c.body),
+      blockedBy: i.blockedBy.nodes.map((b) => b.number),
     }));
   },
 
