@@ -92,7 +92,7 @@ Docker und die Zugangsdaten aus `.sandcastle/.env.example`, kopiert nach
 
 ```
 npm install
-npx sandcastle docker build-image
+npm run sandcastle:build-image
 npm run sandcastle
 ```
 
@@ -101,6 +101,10 @@ bricht der Lauf mit `Image 'sandcastle:failure_on_the_fly' not found locally`
 ab. Zu wiederholen ist er nach jeder Änderung an `.sandcastle/Dockerfile` und
 nach jeder an `uv.lock` — das Image hält den vorgewärmten uv-Cache, aus dem
 die Sandbox ihre Abhängigkeiten zieht, statt sie neu zu laden.
+
+Codex und Claude Code friert der Docker-Cache auf dem Stand des ersten Builds
+ein. `npm run sandcastle:refresh-tools` baut nur diese beiden Schichten neu und
+holt die aktuellen Versionen; Python und der uv-Cache bleiben gecacht.
 
 Welche Modelle die vier Rollen (Planner, Implementer, Reviewer, Merger)
 fahren, wählt `--agent`:
