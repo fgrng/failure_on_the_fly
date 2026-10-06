@@ -85,6 +85,8 @@ laufen über den Integrations-Branch `spec/<n>`, den das Skript bei Bedarf von
 Hat dieser Branch Commits, die nicht auf `main` liegen, pusht ihn das Skript
 und legt einen PR nach `main` an oder ergänzt den offenen. Ist der PR gemergt,
 beginnt der Branch im nächsten Lauf neu von `main`.
+Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
+Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
 Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
 ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
 schließt das Skript nicht. Voraussetzung sind Node, Docker

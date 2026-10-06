@@ -121,36 +121,43 @@ export class FakeTracker implements Tracker {
 // Ein Branch ist die Menge der Commits, die er enthält. Ein Push legt den
 // Stand des Branches unter origin/<branch> ab.
 export class FakeRepo implements Repo {
-  private branches = new Map<string, Set<string>>();
+  private refs = new Map<string, Set<string>>();
   private nextSha = 1;
   /** Solange gesetzt, scheitert jeder Push. */
   pushFails = false;
+  /** Branches, deren Merge mit main einen Konflikt ergibt. */
+  readonly conflicting = new Set<string>();
 
   constructor(...branches: string[]) {
-    for (const branch of branches) this.branches.set(branch, new Set());
+    for (const branch of branches) this.refs.set(branch, new Set());
   }
 
   async branchExists(branch: string): Promise<boolean> {
-    return this.branches.has(branch);
+    return this.refs.has(branch);
   }
 
   async createBranch(branch: string, base: string): Promise<void> {
-    if (!this.branches.has(branch)) this.branches.set(branch, new Set(this.commits(base)));
+    if (!this.refs.has(branch)) this.refs.set(branch, new Set(this.commits(base)));
   }
 
-  async resetBranch(branch: string, base: string): Promise<void> {
-    this.commits(branch);
-    this.branches.set(branch, new Set(this.commits(base)));
+  async branches(prefix: string): Promise<string[]> {
+    return [...this.refs.keys()].filter((b) => b.startsWith(prefix));
+  }
+
+  async mergeMain(branch: string): Promise<"clean" | "conflict"> {
+    if (this.conflicting.has(branch)) return "conflict";
+    this.merge("main", branch);
+    return "clean";
   }
 
   async push(branch: string): Promise<void> {
     if (this.pushFails) throw new Error(`FakeRepo: Push von ${branch} abgewiesen`);
-    this.branches.set(`origin/${branch}`, new Set(this.commits(branch)));
+    this.refs.set(`origin/${branch}`, new Set(this.commits(branch)));
   }
 
   /** Ob der Branch genau so gepusht ist, wie er lokal steht. */
   async isPushed(branch: string): Promise<boolean> {
-    const remote = this.branches.get(`origin/${branch}`);
+    const remote = this.refs.get(`origin/${branch}`);
     const local = this.commits(branch);
     return remote !== undefined && remote.size === local.size && [...local].every((sha) => remote.has(sha));
   }
@@ -165,13 +172,22 @@ export class FakeRepo implements Repo {
     for (const sha of this.commits(source)) this.commits(into).add(sha);
   }
 
+  // Der Stand eines Branches: seine Commits, sortiert und verkettet.
+  async head(branch: string): Promise<string> {
+    return [...this.commits(branch)].sort().join(",");
+  }
+
+  async resetBranch(branch: string, head: string): Promise<void> {
+    this.refs.set(branch, new Set(head ? head.split(",") : []));
+  }
+
   async contains(branch: string, ref: string): Promise<boolean> {
     const target = this.commits(branch);
     return [...this.commits(ref)].every((sha) => target.has(sha));
   }
 
   private commits(branch: string): Set<string> {
-    const commits = this.branches.get(branch);
+    const commits = this.refs.get(branch);
     if (!commits) throw new Error(`FakeRepo: Branch ${branch} unbekannt`);
     return commits;
   }
@@ -242,6 +258,10 @@ export class FakeAgents implements Agents {
     this.mergedWith.push({ into, branches });
     for (const branch of branches) {
       if (!this.unmergeable.has(branch)) this.repo.merge(branch, into);
+    }
+    // Scheitert der Merger, hinterlässt er einen halbfertigen Commit und kein Abschlusssignal.
+    if (branches.some((b) => this.unmergeable.has(b))) {
+      return { commits: [this.repo.commit(into)], completed: false };
     }
     return { commits: [], completed: true };
   }
