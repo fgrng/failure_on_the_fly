@@ -15,7 +15,7 @@ import type {
   Ticket,
   TicketSession,
 } from "./iteration.mts";
-import { DOC_TESTS, FULL_TESTS, ticketBranch } from "./iteration.mts";
+import { FULL_TESTS, ticketBranch } from "./iteration.mts";
 
 // Mounts für die Ordner .codex und .claude mit den Zugangsdaten des Hosts.
 // <user>
@@ -250,12 +250,12 @@ export function sandcastleAgents(lineup: Lineup): Agents {
               maxIterations: MAX_IMPLEMENT_ITERATIONS,
               agent: lineup.implementer,
               promptFile: "./.sandcastle/implement-prompt.md",
-              // Welche Tests betroffen sind, zeigt erst der Diff; der Implementer
-              // wählt sie selbst, die ganze Suite lässt erst der Merger laufen.
-              promptArgs: { ...promptArgs, DOC_TESTS, FULL_TESTS },
+              // Der Implementer wählt die betroffenen Tests selbst, die ganze
+              // Suite lässt erst der Merger laufen.
+              promptArgs: { ...promptArgs, FULL_TESTS },
             }),
           ),
-        review: async (tests) =>
+        review: async () =>
           agentRun(
             await sandbox.run({
               name: "Reviewer #" + issue.id,
@@ -263,13 +263,13 @@ export function sandcastleAgents(lineup: Lineup): Agents {
               maxIterations: 1,
               agent: lineup.reviewer,
               promptFile: "./.sandcastle/review-prompt.md",
-              promptArgs: { ...promptArgs, TESTS: tests, FULL_TESTS },
+              promptArgs: { ...promptArgs, FULL_TESTS },
             }),
           ),
       });
     },
 
-    async merge(into: string, branches: string[], tests: string): Promise<AgentRun> {
+    async merge(into: string, branches: string[]): Promise<AgentRun> {
       return agentRun(
         await sandcastle.run({
           ...runSettings(into),
@@ -280,7 +280,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           promptArgs: {
             BRANCHES: branches.map((b) => `- ${b}`).join("\n"),
             INTEGRATION_BRANCH: into,
-            TESTS: tests,
+            FULL_TESTS,
           },
         }),
       );
@@ -304,12 +304,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
       return review.output;
     },
 
-    async fixFindings(
-      spec: number,
-      branch: string,
-      findings: string[],
-      tests: string,
-    ): Promise<AgentRun> {
+    async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
       return agentRun(
         await sandcastle.run({
           ...runSettings(branch),
@@ -321,21 +316,20 @@ export function sandcastleAgents(lineup: Lineup): Agents {
             SPEC: spec,
             INTEGRATION_BRANCH: branch,
             FINDINGS: findings.map((f) => `- ${f}`).join("\n"),
-            TESTS: tests,
             FULL_TESTS,
           },
         }),
       );
     },
 
-    async writePullRequest(spec: number, branch: string, tests: string): Promise<PullRequestText> {
+    async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
       const text = await sandcastle.run({
         ...runSettings(branch),
         name: `PR-Text #${spec}`,
         maxIterations: 1,
         agent: lineup.reviewer,
         promptFile: "./.sandcastle/pr-prompt.md",
-        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch, TESTS: tests },
+        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch, FULL_TESTS },
         output: sandcastle.Output.object({
           tag: "pull-request",
           schema: pullRequestSchema,

@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  DOC_TESTS,
-  FULL_TESTS,
-  runIteration,
-  testCommand,
-  updateIntegrationBranches,
-} from "./iteration.mts";
+import { runIteration, updateIntegrationBranches } from "./iteration.mts";
 import { FakeAgents, FakeRepo, FakeTracker, ticket } from "./testing/fakes.mts";
 
 function setup(options: { spec?: number } = {}) {
@@ -984,53 +978,4 @@ test("ein gemergter oder fehlender Spec-PR sperrt kein Ticket", async () => {
     },
     { planned: [[31, 41]], comments: [] },
   );
-});
-
-test("ein Diff nur aus Markdown braucht nur die Doku-Tests, jeder andere die ganze Suite", () => {
-  assert.deepEqual(
-    [
-      testCommand(["docs/verhalten.md", "GLOSSARY.md"]),
-      testCommand(["docs/verhalten.md", "vignetten/models.py"]),
-      testCommand([]),
-    ],
-    [DOC_TESTS, FULL_TESTS, FULL_TESTS],
-  );
-});
-
-test("eine Spec, die nur Markdown ändert, läuft in Review, Merger, Fix und PR-Text nur mit den Doku-Tests", async () => {
-  const { tracker, agents, run } = setup();
-  tracker.addSpec(30);
-  tracker.addTicket(ticket(31), { parent: 30 });
-  agents.implementers.set("31", { commits: 1, completed: true, files: ["docs/verhalten.md"] });
-  agents.specReviews.set(30, { standards: ["Satz unklar"], correctness: [], spec: [] });
-
-  await run();
-
-  assert.deepEqual(agents.testsRun, [
-    `review #31: ${DOC_TESTS}`,
-    `merge spec/30: ${DOC_TESTS}`,
-    `fix #30: ${DOC_TESTS}`,
-    `pr-text #30: ${DOC_TESTS}`,
-  ]);
-});
-
-test("ändert ein Ticket neben Markdown auch Code, läuft überall die ganze Suite", async () => {
-  const { tracker, agents, run } = setup();
-  tracker.addSpec(30);
-  tracker.addTicket(ticket(31), { parent: 30 });
-  agents.implementers.set("31", {
-    commits: 1,
-    completed: true,
-    files: ["docs/verhalten.md", "vignetten/models.py"],
-  });
-  agents.specReviews.set(30, { standards: ["Name unklar"], correctness: [], spec: [] });
-
-  await run();
-
-  assert.deepEqual(agents.testsRun, [
-    `review #31: ${FULL_TESTS}`,
-    `merge spec/30: ${FULL_TESTS}`,
-    `fix #30: ${FULL_TESTS}`,
-    `pr-text #30: ${FULL_TESTS}`,
-  ]);
 });

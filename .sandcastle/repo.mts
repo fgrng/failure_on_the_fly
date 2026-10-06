@@ -70,10 +70,6 @@ export const gitRepo: Repo = {
     return "clean";
   },
 
-  async changedFiles(base: string, ref: string): Promise<string[]> {
-    return git(["diff", "--name-only", `${base}...${ref}`]).split("\n").filter(Boolean);
-  },
-
   async head(branch: string): Promise<string> {
     // Lokaler Branch oder Remote-Ref wie origin/main.
     return git(["rev-parse", "--verify", `${branch}^{commit}`]).trim();
