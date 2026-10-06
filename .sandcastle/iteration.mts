@@ -9,6 +9,8 @@ export type Ticket = {
   body: string;
   labels: string[];
   comments: string[];
+  /** Die Issues, die dieses Ticket blockieren (Blocked-by-Kanten). */
+  blockedBy: number[];
 };
 
 /** Ein Issue mit dem Stand seiner Sub-Issues, etwa eine Spec. */
@@ -75,6 +77,8 @@ export type IterationDeps = {
   log?: (message: string) => void;
   /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden. */
   maxParallel?: number;
+  /** Beschränkt den Lauf auf die Sub-Issues dieser Spec (`--spec <n>`). */
+  spec?: number;
 };
 
 /** `planned == 0` heißt: der Backlog ist leer, die äußere Schleife kann enden. */
@@ -88,11 +92,10 @@ type Assignment = PlannedIssue & { integrationBranch: string };
  * Integrations-Branch mergen und gemergte Tickets schließen.
  */
 export async function runIteration(deps: IterationDeps): Promise<IterationResult> {
-  const { tracker, agents } = deps;
+  const { agents } = deps;
   const log = deps.log ?? console.log;
 
-  const tickets = await tracker.readyTickets();
-  const issues = await agents.plan(tickets);
+  const issues = await agents.plan(await frontier(deps, log));
   if (issues.length === 0) {
     log("No issues to work on.");
     return { planned: 0 };
@@ -126,6 +129,60 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
     await closeMergedIssues(deps, group, log);
   }
   return { planned: issues.length };
+}
+
+// Die Tickets, die der Planner zu sehen bekommt: die bereiten Tickets des
+// Trackers, mit `--spec` nur die Sub-Issues dieser Spec. Offene Blocker hat
+// der Tracker schon ausgefiltert; ein geschlossener Blocker aus einem anderen
+// Integrations-Branch zählt erst, wenn er auf main liegt. Ein Ticket, dessen
+// Eltern-Issues sich nicht lesen lassen, fällt heraus.
+async function frontier(deps: IterationDeps, log: (message: string) => void): Promise<Ticket[]> {
+  const { tracker } = deps;
+  const tickets: Ticket[] = [];
+  for (const ticket of await tracker.readyTickets()) {
+    try {
+      const spec = specOf(await tracker.parentOf(ticket.number));
+      if (deps.spec !== undefined && spec !== deps.spec) continue;
+      const pending = await blockersNotOnMain(deps, ticket, spec);
+      if (pending.length > 0) {
+        log(`  #${ticket.number}: waiting for ${pending.map((b) => `#${b}`).join(", ")} on ${MAIN_BRANCH}.`);
+        continue;
+      }
+    } catch (error) {
+      log(`  ! #${ticket.number}: parent unreadable, skipping: ${error}`);
+      continue;
+    }
+    tickets.push(ticket);
+  }
+  return tickets;
+}
+
+// Die Blocker des Tickets aus einer anderen Spec (oder von außerhalb jeder
+// Spec), deren Ticket-Branch noch nicht in main liegt. Eine geschlossene Spec
+// hat ihr PR nach main gebracht; ihre Tickets zählen auch ohne Ticket-Branch.
+async function blockersNotOnMain(
+  deps: IterationDeps,
+  ticket: Ticket,
+  spec: number | undefined,
+): Promise<number[]> {
+  const { tracker, repo } = deps;
+  const pending: number[] = [];
+  for (const blocker of ticket.blockedBy) {
+    const parent = await tracker.parentOf(blocker);
+    if (specOf(parent) === spec) continue;
+    if (parent && isSpec(parent) && !parent.open) continue;
+    if (!(await repo.contains(MAIN_BRANCH, ticketBranch(blocker)))) pending.push(blocker);
+  }
+  return pending;
+}
+
+// Der Planner vergibt diesen Namen deterministisch (siehe plan-prompt.md).
+function ticketBranch(issue: number): string {
+  return `sandcastle/issue-${issue}`;
+}
+
+function specOf(parent: IssueSummary | undefined): number | undefined {
+  return parent && isSpec(parent) ? parent.number : undefined;
 }
 
 // Ticket mit Eltern-Spec n -> spec/<n>, sonst der Ziel-Branch des Hosts.

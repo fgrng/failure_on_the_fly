@@ -3,12 +3,12 @@ import { test } from "node:test";
 import { runIteration } from "./iteration.mts";
 import { FakeAgents, FakeRepo, FakeTracker, ticket } from "./testing/fakes.mts";
 
-function setup() {
+function setup(options: { spec?: number } = {}) {
   const tracker = new FakeTracker();
   const repo = new FakeRepo("main");
   const agents = new FakeAgents(repo);
   const run = () =>
-    runIteration({ tracker, repo, agents, targetBranch: "main", log: () => {} });
+    runIteration({ tracker, repo, agents, targetBranch: "main", log: () => {}, ...options });
   return { tracker, repo, agents, run };
 }
 
@@ -168,5 +168,85 @@ test("je Integrations-Branch läuft ein eigener Merger, Tickets ohne Spec gehen 
       ["spec/30", ["sandcastle/issue-31", "sandcastle/issue-32"]],
       ["spec/40", ["sandcastle/issue-41"]],
     ]),
+  );
+});
+
+test("mit --spec <n> plant der Lauf nur die Sub-Issues von #n", async () => {
+  const { tracker, agents, run } = setup({ spec: 30 });
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(7));
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40 });
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[31]],
+  );
+});
+
+test("ein geschlossener Blocker aus derselben Spec gibt sein Ticket frei", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(32), { parent: 30, blockedBy: [31] });
+
+  await run();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[31], [32]],
+  );
+});
+
+test("ein geschlossener Blocker aus einer anderen Spec hält sein Ticket zurück, bis er auf main liegt", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [31] });
+
+  await run();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[31], []],
+  );
+});
+
+test("ein Blocker aus einer anderen Spec gibt sein Ticket frei, sobald er auf main liegt", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [31] });
+
+  await run();
+  repo.merge("spec/30", "main");
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[31], [41]],
+  );
+});
+
+test("ein Blocker aus einer geschlossenen Spec gilt als erledigt, auch ohne Sandcastle-Branch", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(20, { open: false });
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(21), { parent: 20 });
+  await tracker.close(21, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[41]],
   );
 });
