@@ -38,16 +38,17 @@
                 <div class="table-wrap">
                     <table class="table">
                         <thead>
-                            <tr><th>Bezeichnung</th><th>Angelegt</th></tr>
+                            <tr><th>Bezeichnung</th><th>Anbieter</th><th>Angelegt</th></tr>
                         </thead>
                         <tbody>
                             {% for konfiguration in konfigurationen %}
                                 <tr class="modell-konfigurationen__zeile{% if konfiguration.pk == gewaehlt.pk %} modell-konfigurationen__zeile--gewaehlt{% endif %}">
                                     <td>
-                                        {% for verwendung in konfiguration.verwendungen %}<abbr class="verwendungskuerzel" title="{{ verwendung.label }}">{{ verwendung.kuerzel }}</abbr>{% endfor %}
+                                        {% for verwendung in konfiguration.verwendungen %}<abbr class="verwendungskuerzel" title="{{ verwendung.label }}">{{ verwendung.label|slice:":1" }}</abbr>{% endfor %}
                                         <a href="?konfiguration={{ konfiguration.pk }}"{% if konfiguration.pk == gewaehlt.pk %} aria-current="true"{% endif %}><strong>{{ konfiguration.bezeichnung }}</strong></a>
                                         <small>{{ konfiguration.sprachmodell }}</small>
                                     </td>
+                                    <td>{{ konfiguration.anbieter }}</td>
                                     <td>{{ konfiguration.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
                                 </tr>
                             {% endfor %}
@@ -68,13 +69,13 @@
                         <div><dt>Parameter</dt><dd><pre>{{ gewaehlt.parameter }}</pre></dd></div>
                     </dl>
                     <div class="modell-konfiguration-detail__schalter">
-                        {% for verwendung in schalter %}
-                            {% if verwendung.ist_aktiv %}
-                                <button class="button" type="button" disabled>✓ Aktiv für {{ verwendung.label }}</button>
+                        {% for eintrag in schalter %}
+                            {% if eintrag.ist_aktiv %}
+                                <button class="button" type="button" disabled>Aktiv für {{ eintrag.verwendung.label }}</button>
                             {% else %}
-                                <form method="post" action="{% url 'simulation:modell_konfiguration_aktivieren' gewaehlt.pk verwendung.wert %}">
+                                <form method="post" action="{% url 'simulation:modell_konfiguration_aktivieren' gewaehlt.pk eintrag.verwendung.value %}">
                                     {% csrf_token %}
-                                    <button class="button button--secondary" type="submit">Für {{ verwendung.label }} aktivieren{% if verwendung.statt %} (statt {{ verwendung.statt }}){% endif %}</button>
+                                    <button class="button button--secondary" type="submit">Für {{ eintrag.verwendung.label }} aktivieren{% if eintrag.statt %} (statt {{ eintrag.statt }}){% endif %}</button>
                                 </form>
                             {% endif %}
                         {% endfor %}

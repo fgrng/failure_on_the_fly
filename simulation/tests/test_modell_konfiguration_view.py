@@ -192,15 +192,29 @@ class ModellKonfigurationListeTests(ZweiFassungenTestCase):
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )
-        kuerzel: dict[object, list[str]] = {
-            zeile["pk"]: [v["kuerzel"] for v in zeile["verwendungen"]]
+        verwendungen: dict[int, list[Verwendung]] = {
+            zeile.pk: list(zeile.verwendungen)
             for zeile in response.context["konfigurationen"]
         }
 
-        self.assertEqual(kuerzel, {self.aeltere.pk: ["S", "B"], self.neuere.pk: ["L"]})
+        self.assertEqual(
+            verwendungen,
+            {
+                self.aeltere.pk: [Verwendung.SCHUELERIN, Verwendung.BEWERTER],
+                self.neuere.pk: [Verwendung.LEHRPERSON],
+            },
+        )
         self.assertContains(
             response, '<abbr class="verwendungskuerzel" title="Schüler:in">S</abbr>'
         )
+
+    def test_nennt_den_anbieter_je_zeile(self) -> None:
+        """Gleichnamige Fassungen unterscheidet auch der Anbieter."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(response, "<td>OpenRouter</td>", count=2, html=True)
 
     def test_nennt_das_anlagedatum(self) -> None:
         """Gleichnamige Fassungen unterscheidet das Anlagedatum."""
@@ -234,7 +248,7 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
             reverse("simulation:modell_konfiguration")
         )
 
-        self.assertEqual(response.context["gewaehlt"]["pk"], self.aeltere.pk)
+        self.assertEqual(response.context["gewaehlt"].pk, self.aeltere.pk)
 
     def test_zeigt_die_gewaehlte_zeile(self) -> None:
         """Die Zeile der Tabelle führt über die Anfrage ins Detail."""
@@ -243,7 +257,7 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
             {"konfiguration": self.neuere.pk},
         )
 
-        self.assertEqual(response.context["gewaehlt"]["pk"], self.neuere.pk)
+        self.assertEqual(response.context["gewaehlt"].pk, self.neuere.pk)
         self.assertContains(response, f"Nr. {self.neuere.pk}")
         self.assertContains(response, f'href="?konfiguration={self.aeltere.pk}"')
 
@@ -254,7 +268,7 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
                 reverse("simulation:modell_konfiguration"), {"konfiguration": genannt}
             )
 
-            self.assertEqual(response.context["gewaehlt"]["pk"], self.aeltere.pk)
+            self.assertEqual(response.context["gewaehlt"].pk, self.aeltere.pk)
 
     def test_zeigt_ohne_aktive_schuelerin_die_neueste(self) -> None:
         """Solange nichts aktiv ist, steht die zuletzt angelegte im Detail."""
@@ -264,7 +278,7 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
             reverse("simulation:modell_konfiguration")
         )
 
-        self.assertEqual(response.context["gewaehlt"]["pk"], self.neuere.pk)
+        self.assertEqual(response.context["gewaehlt"].pk, self.neuere.pk)
 
     def test_bietet_je_verwendung_einen_knopf(self) -> None:
         """Unbelegte Verwendungen nennen keinen abgelösten Vorgänger."""
@@ -291,7 +305,7 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
 
         self.assertContains(
             response,
-            '<button class="button" type="button" disabled>✓ Aktiv für Schüler:in</button>',
+            '<button class="button" type="button" disabled>Aktiv für Schüler:in</button>',
             html=True,
         )
         self.assertNotContains(
@@ -603,7 +617,7 @@ class ModellKonfigurationEditorTests(ZweiFassungenTestCase):
 
         self.assertContains(response, "»Opus für die Schüler:in« ist angelegt.")
         self.assertEqual(
-            response.context["gewaehlt"]["bezeichnung"], "Opus für die Schüler:in"
+            response.context["gewaehlt"].bezeichnung, "Opus für die Schüler:in"
         )
 
     def test_markiert_den_sidebar_eintrag(self) -> None:

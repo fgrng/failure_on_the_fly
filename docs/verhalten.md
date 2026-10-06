@@ -244,9 +244,11 @@ belegte Verwendung bleibt belegt. Sitzungen, Probelauf, Training und der Pin der
 Erhebung lesen allein die Verwendung Schüler:in; Lehrperson und Bewerter sind den
 Evals vorbehalten und bleiben unbelegt, bis die Administration sie setzt.
 Die Seite zeigt alle je angelegten Konfigurationen als schmale Tabelle, die
-neueste zuerst: Bezeichnung, darunter das Sprachmodell, dazu das Anlagedatum.
-Konfigurationen, die vor Einführung des Anlagedatums entstanden, zeigen dort
-»—«, statt den Zeitpunkt der Umstellung als Datum auszugeben. Die Kürzel S, L
+neueste zuerst: Bezeichnung, darunter das Sprachmodell, dazu Anbieter und
+Anlagedatum. Konfigurationen, die vor Einführung des Anlagedatums entstanden,
+tragen dort den Zeitpunkt ihrer frühesten Sitzung — da bestand sie nachweislich
+schon; nie gebrauchte zeigen »—«, statt den Zeitpunkt der Umstellung als Datum
+auszugeben. Die Kürzel S, L
 und B vor der Bezeichnung nennen die Verwendungen, für die eine Konfiguration
 gerade aktiv ist. Neben der Tabelle steht das Detail der gewählten Zeile: Nr.,
 Anlagezeitpunkt, Bezeichnung, Anbieter, Sprachmodell, Basis-URL, maskiertes Token
@@ -255,7 +257,7 @@ aktiv ist die neueste. Im Detail steht je Verwendung ein Knopf, etwa „Für
 Bewerter aktivieren (statt …)“ mit der Bezeichnung der bisher aktiven
 Konfiguration; bei einer unbelegten Verwendung entfällt der „statt“-Teil. Ist die
 gewählte Konfiguration für eine Verwendung schon aktiv, steht dort ein
-deaktivierter Knopf „✓ Aktiv für …“. Das Umschalten fragt nicht nach, bewegt nur
+deaktivierter Knopf „Aktiv für …“. Das Umschalten fragt nicht nach, bewegt nur
 den Zeiger der genannten Verwendung und führt zurück auf dieselbe Konfiguration;
 eine unbekannte Verwendung ergibt 404.
 Die Seite bietet genau zwei Gesten: Anlegen und Aktivieren. Angelegt wird in

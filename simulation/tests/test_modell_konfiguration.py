@@ -1,20 +1,25 @@
 """Anbieterbindung und Parameter-Allowlist der Modell-Konfiguration."""
 
 import inspect
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.db.models import QuerySet
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
+from konten.models import Konto
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
     ModellKonfiguration,
+    Simulationskern,
     Verwendung,
 )
+from sitzungen.models import Sitzung, Teilnahme
+from vignetten.models import Vignette
 
 
 def _openrouter(**werte: object) -> ModellKonfiguration:
@@ -435,3 +440,36 @@ def test_migration_laesst_das_anlagedatum_des_bestands_leer() -> None:
         pk=alte_konfiguration.pk
     )
     assert konfiguration.angelegt_am is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_datiert_den_bestand_auf_seine_frueheste_sitzung() -> None:
+    """Bestand mit Sitzung trägt deren Beginn, Bestand ohne Sitzung bleibt leer."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+    autorin: Konto = Konto.objects.create_user(username="ada")
+    gebraucht: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Gebraucht", sprachmodell="fake"
+    )
+    ungebraucht: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Ungebraucht", sprachmodell="fake"
+    )
+    fruehe: datetime = datetime(2025, 3, 4, 9, 30, tzinfo=UTC)
+    for beginn in (datetime(2025, 5, 6, 10, 0, tzinfo=UTC), fruehe):
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=Teilnahme.objects.create(),
+            vignette=Vignette.objects.anlegen(autorin),
+            simulationskern=kern,
+            modell_konfiguration=gebraucht,
+        )
+        Sitzung.objects.filter(pk=sitzung.pk).update(erstellt_am=beginn)
+    # Bestand vor dem Anlagedatum; die Sperre des QuerySets umgeht der Test.
+    QuerySet.update(ModellKonfiguration.objects.all(), angelegt_am=None)
+    executor: MigrationExecutor = MigrationExecutor(connection)
+    executor.migrate([("simulation", "0009_modellkonfiguration_angelegt_am")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+    assert ModellKonfiguration.objects.get(pk=gebraucht.pk).angelegt_am == fruehe
+    assert ModellKonfiguration.objects.get(pk=ungebraucht.pk).angelegt_am is None

@@ -1,6 +1,8 @@
 """Ansichten für den Simulationskern."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -52,16 +54,12 @@ def _archivierte_fassungen() -> QuerySet[Simulationskern]:
     ).order_by("-finalisiert_am", "-pk")
 
 
-def _aktive_konfiguration() -> ModellKonfiguration | None:
-    # Liefert die Konfiguration der Schüler:in, solange der Zeiger gesetzt ist.
-
-    return ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN)
-
-
 def _kern_kontext() -> dict[str, object]:
     """Liefert die gemeinsame Anzeige-Referenz für Kern-Ansichten."""
     return {
-        "modell_konfiguration": _aktive_konfiguration(),
+        "modell_konfiguration": ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
+        ),
         "prompt_platzhalter": sorted(VERTRAG_PROMPT),
         "prompt_platzhalter_mit_umgebung": PROMPT_PLATZHALTER_MIT_UMGEBUNG,
         "rahmen_platzhalter": sorted(VERTRAG_RAHMEN),
@@ -216,60 +214,93 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _konfigurationszeilen(aktive: dict[str, int]) -> list[dict[str, object]]:
+@dataclass(frozen=True)
+class _Konfigurationszeile:
+    # Eine Zeile der Liste; das Token trägt sie nur maskiert.
+
+    pk: int
+    bezeichnung: str
+    angelegt_am: datetime | None
+    anbieter: str
+    sprachmodell: str
+    anbieter_basis_url: str
+    anbieter_token_maskiert: str
+    parameter: object
+    verwendungen: tuple[Verwendung, ...]
+
+
+@dataclass(frozen=True)
+class _Schalter:
+    # Je Verwendung: schon aktiv für die gewählte Zeile, oder wen sie ablöst.
+
+    verwendung: Verwendung
+    ist_aktiv: bool
+    statt: str
+
+
+def _konfigurationszeilen() -> list[_Konfigurationszeile]:
     # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
 
+    aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
     return [
-        {
-            "pk": konfiguration.pk,
-            "bezeichnung": konfiguration.bezeichnung,
-            "angelegt_am": konfiguration.angelegt_am,
-            "anbieter": konfiguration.anbieter,
-            "sprachmodell": konfiguration.sprachmodell,
-            "anbieter_basis_url": konfiguration.anbieter_basis_url,
-            "anbieter_token_maskiert": konfiguration.anbieter_token_maskiert,
-            "parameter": konfiguration.parameter,
-            "verwendungen": [
-                {"kuerzel": verwendung.label[0], "label": verwendung.label}
+        _Konfigurationszeile(
+            pk=konfiguration.pk,
+            bezeichnung=konfiguration.bezeichnung,
+            angelegt_am=konfiguration.angelegt_am,
+            anbieter=konfiguration.get_anbieter_display(),
+            sprachmodell=konfiguration.sprachmodell,
+            anbieter_basis_url=konfiguration.anbieter_basis_url,
+            anbieter_token_maskiert=konfiguration.anbieter_token_maskiert,
+            parameter=konfiguration.parameter,
+            verwendungen=tuple(
+                verwendung
                 for verwendung in Verwendung
                 if aktive.get(verwendung) == konfiguration.pk
-            ],
-        }
+            ),
+        )
         for konfiguration in ModellKonfiguration.objects.order_by("-pk")
     ]
 
 
+def _aktive_zeile(
+    zeilen: list[_Konfigurationszeile], verwendung: Verwendung
+) -> _Konfigurationszeile | None:
+    # Die Zeile, die gerade für die Verwendung aktiv ist; keine, solange unbelegt.
+
+    return next((zeile for zeile in zeilen if verwendung in zeile.verwendungen), None)
+
+
 def _gewaehlte_zeile(
-    request: HttpRequest, zeilen: list[dict[str, object]], aktive: dict[str, int]
-) -> dict[str, object] | None:
+    request: HttpRequest, zeilen: list[_Konfigurationszeile]
+) -> _Konfigurationszeile | None:
     # Die genannte Zeile, sonst die der Schüler:in, sonst die neueste.
 
-    je_pk: dict[object, dict[str, object]] = {zeile["pk"]: zeile for zeile in zeilen}
     genannt: str = request.GET.get("konfiguration", "")
-    if genannt.isdigit() and int(genannt) in je_pk:
-        return je_pk[int(genannt)]
-    if aktive.get(Verwendung.SCHUELERIN) in je_pk:
-        return je_pk[aktive[Verwendung.SCHUELERIN]]
-    return zeilen[0] if zeilen else None
+    if genannt.isdigit():
+        for zeile in zeilen:
+            if zeile.pk == int(genannt):
+                return zeile
+    return _aktive_zeile(zeilen, Verwendung.SCHUELERIN) or (
+        zeilen[0] if zeilen else None
+    )
 
 
 def _schalter(
-    gewaehlt: dict[str, object], zeilen: list[dict[str, object]], aktive: dict[str, int]
-) -> list[dict[str, object]]:
-    # Je Verwendung: schon aktiv für die gewählte Zeile, oder wen sie ablöst.
+    gewaehlt: _Konfigurationszeile, zeilen: list[_Konfigurationszeile]
+) -> list[_Schalter]:
+    # Je Verwendung ein Schalter für die gewählte Zeile.
 
-    bezeichnung_je_pk: dict[object, object] = {
-        zeile["pk"]: zeile["bezeichnung"] for zeile in zeilen
-    }
-    return [
-        {
-            "wert": verwendung.value,
-            "label": verwendung.label,
-            "ist_aktiv": aktive.get(verwendung) == gewaehlt["pk"],
-            "statt": bezeichnung_je_pk.get(aktive.get(verwendung), ""),
-        }
-        for verwendung in Verwendung
-    ]
+    schalter: list[_Schalter] = []
+    for verwendung in Verwendung:
+        aktiv: _Konfigurationszeile | None = _aktive_zeile(zeilen, verwendung)
+        schalter.append(
+            _Schalter(
+                verwendung=verwendung,
+                ist_aktiv=aktiv is not None and aktiv.pk == gewaehlt.pk,
+                statt=aktiv.bezeichnung if aktiv else "",
+            )
+        )
+    return schalter
 
 
 def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
@@ -283,16 +314,15 @@ def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
 @administratorin_erforderlich
 def modell_konfiguration(request: HttpRequest) -> HttpResponse:
     """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
-    aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
-    zeilen: list[dict[str, object]] = _konfigurationszeilen(aktive)
-    gewaehlt: dict[str, object] | None = _gewaehlte_zeile(request, zeilen, aktive)
+    zeilen: list[_Konfigurationszeile] = _konfigurationszeilen()
+    gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(request, zeilen)
     return render(
         request,
         "simulation/modell_konfiguration.html",
         {
             "konfigurationen": zeilen,
             "gewaehlt": gewaehlt,
-            "schalter": _schalter(gewaehlt, zeilen, aktive) if gewaehlt else [],
+            "schalter": _schalter(gewaehlt, zeilen) if gewaehlt else [],
         },
     )
 

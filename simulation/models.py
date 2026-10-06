@@ -558,8 +558,8 @@ class ModellKonfiguration(AnbieterFeldgruppe):
     bezeichnung: models.CharField = models.CharField(max_length=120)
     sprachmodell: models.CharField = models.CharField(max_length=255)
     parameter: models.JSONField = models.JSONField(default=dict, blank=True)
-    # Leer nur für den Bestand vor Einführung des Feldes: Ein erfundenes Datum
-    # wäre schlimmer als keines.
+    # Für den Bestand vor Einführung des Feldes der Beginn seiner frühesten
+    # Sitzung, ohne Sitzung leer: Ein erfundenes Datum wäre schlimmer als keines.
     angelegt_am: models.DateTimeField = models.DateTimeField(
         auto_now_add=True, null=True
     )

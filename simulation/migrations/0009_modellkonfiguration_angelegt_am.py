@@ -1,7 +1,7 @@
 """Anlagedatum an der Modell-Konfiguration.
 
-Bestandszeilen bleiben leer, statt den Migrationszeitpunkt als Datum zu
-erfinden.
+Bestandszeilen bleiben hier leer, statt den Migrationszeitpunkt als Datum zu
+erfinden; was belegt ist, trägt 0010 nach.
 """
 
 from django.db import migrations, models
