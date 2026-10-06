@@ -34,6 +34,20 @@ test("der Planner bekommt die Tickets aus dem Tracker-Filter", async () => {
   );
 });
 
+test("ein gerade geschlossenes Ticket, das die Suche noch als offen führt, wird nicht erneut eingeplant", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addTicket(ticket(7));
+  await run();
+  tracker.staleSearch = true;
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[7], []],
+  );
+});
+
 test("ein fertiges Ticket wird reviewt, gemergt und geschlossen", async () => {
   const { tracker, agents, run } = setup();
   tracker.addTicket(ticket(7));

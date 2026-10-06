@@ -19,9 +19,11 @@
 //              deren Blocker aus einer anderen Spec stammt, die noch offen
 //              oder nicht nach origin/main gemergt ist, oder deren Blocker ohne
 //              Spec noch nicht auf origin/main liegt, und mit `--spec <n>`
-//              jedes Ticket außerhalb von Spec <n>. Der Planner bekommt diese
-//              Liste, stellt Tickets zurück, die einander wohl in die Quere
-//              kommen, und benennt jeden Branch.
+//              jedes Ticket außerhalb von Spec <n>, ebenso Tickets, die die
+//              Suche noch führt, obwohl sie schon geschlossen sind. Der Planner
+//              bekommt diese Liste, stellt Tickets zurück, die einander wohl in
+//              die Quere kommen, und benennt jeden Branch; bei höchstens einem
+//              Ticket entfällt er.
 //   Implement: Ein Implementer je Ticket, mehrere zugleich. Ein Ticket mit
 //              Eltern-Spec <n> zweigt von seinem Integrations-Branch `spec/<n>`
 //              ab (fehlt er, entsteht er von origin/main); ein Ticket ohne

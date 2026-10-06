@@ -15,6 +15,7 @@ import type {
   Ticket,
   TicketSession,
 } from "./iteration.mts";
+import { ticketBranch } from "./iteration.mts";
 
 // Mounts für die Ordner .codex und .claude mit den Zugangsdaten des Hosts.
 // <user>
@@ -195,6 +196,15 @@ function agentRun(result: {
 export function sandcastleAgents(lineup: Lineup): Agents {
   return {
     async plan(tickets: Ticket[]): Promise<PlannedIssue[]> {
+      // Ohne zweites Ticket gibt es keine Überschneidung abzuwägen; dafür
+      // lohnt kein Container.
+      if (tickets.length <= 1) {
+        return tickets.map((t) => ({
+          id: String(t.number),
+          title: t.title,
+          branch: ticketBranch(t.number),
+        }));
+      }
       const plan = await sandcastle.run({
         ...runSettings(),
         name: "Planner",

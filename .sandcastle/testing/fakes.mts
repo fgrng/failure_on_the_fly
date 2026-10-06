@@ -57,10 +57,16 @@ export class FakeTracker implements Tracker {
     return this.get(number).open;
   }
 
+  /**
+   * Wie die GitHub-Suche kurz nach dem Schließen: Der Index führt geschlossene
+   * Tickets noch als offen.
+   */
+  staleSearch = false;
+
   /** Wie `--label ready-for-agent -is:blocked`: Tickets ohne das Label oder mit offenem Blocker fehlen. */
   async readyTickets(): Promise<Ticket[]> {
     return [...this.issues.values()].flatMap((i) =>
-      i.open &&
+      (i.open || this.staleSearch) &&
       i.ticket &&
       i.labels.includes("ready-for-agent") &&
       i.blockedBy?.every((b) => !this.isOpen(b))

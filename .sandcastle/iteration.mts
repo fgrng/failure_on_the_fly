@@ -345,8 +345,9 @@ async function planImplementAndMerge(
 }
 
 // Die Tickets, die der Planner zu sehen bekommt: die bereiten Tickets des
-// Trackers, mit `--spec` nur die Sub-Issues dieser Spec. Offene Blocker hat
-// der Tracker schon ausgefiltert; ein geschlossener Blocker aus einem anderen
+// Trackers, die laut ihrem eigenen Status noch offen sind, mit `--spec` nur
+// die Sub-Issues dieser Spec. Offene Blocker hat der Tracker schon
+// ausgefiltert; ein geschlossener Blocker aus einem anderen
 // Integrations-Branch zählt erst, wenn er auf main liegt. Hat die Spec schon
 // einen offenen PR, geht das Ticket an einen Menschen. Ein Ticket, dessen
 // Eltern-Issues sich nicht lesen lassen oder dessen Integrations-Branch der
@@ -357,6 +358,12 @@ async function frontier(deps: WithLog<IterationDeps>): Promise<Ticket[]> {
   const tickets: Ticket[] = [];
   for (const ticket of await tracker.readyTickets()) {
     try {
+      // Der Suchindex hinkt nach dem Schließen hinterher; maßgeblich ist der
+      // Status des Issues selbst.
+      if (!(await tracker.issue(ticket.number)).open) {
+        log(`  #${ticket.number}: already closed, search index is stale - skipping.`);
+        continue;
+      }
       const spec = specOf(await tracker.parentOf(ticket.number));
       if (deps.spec !== undefined && spec !== deps.spec) continue;
       if (integrationBranchOf(spec) === host) {
@@ -685,8 +692,8 @@ function standalonePrBody(ticketLines: string[]): string {
   ].join("\n");
 }
 
-// Der Planner vergibt diesen Namen deterministisch (siehe plan-prompt.md).
-function ticketBranch(issue: number): string {
+/** Der Branch eines Tickets; der Planner vergibt ihn deterministisch (siehe plan-prompt.md). */
+export function ticketBranch(issue: number): string {
   return `sandcastle/issue-${issue}`;
 }
 
