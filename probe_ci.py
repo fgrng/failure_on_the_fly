@@ -1,3 +1,1 @@
-"""Probe für die CI: absichtlicher Lint-Fehler (F401)."""
-
-import os
+"""Probe für die CI: Lint-Fehler behoben."""
