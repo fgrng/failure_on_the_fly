@@ -75,7 +75,7 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 
    Die Anwendung ist dann unter http://127.0.0.1:8000/ erreichbar.
 
-Die Testsuite läuft mit `uv run python manage.py test`.
+Die Testsuite läuft mit `uv run pytest`.
 
 Der Seed aktiviert das Fake-Sprachmodell, damit sich Diagnosegespräche ohne
 Zugangsdaten durchklicken lassen. Für echte Antworten wird unter

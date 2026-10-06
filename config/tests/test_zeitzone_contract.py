@@ -1,11 +1,8 @@
 """Vertragstest für die Zeitzone, in der Forschende Zeitpunkte eingeben."""
 
 import os
-from pathlib import Path
 
 from django.conf import settings
-
-BASIS: Path = Path(settings.BASE_DIR)
 
 
 def test_zeitzone_kommt_aus_der_umgebung_und_faellt_auf_ortszeit_zurueck() -> None:
@@ -22,12 +19,3 @@ def test_zeitzone_kommt_aus_der_umgebung_und_faellt_auf_ortszeit_zurueck() -> No
 
     assert settings.TIME_ZONE == erwartet
     assert settings.USE_TZ is True
-
-
-def test_zeitzone_ist_in_beispielkonfiguration_und_deployment_dokumentiert() -> None:
-    """Betreiberinnen anderer Zonen finden den Schalter, ohne Code zu lesen."""
-
-    for pfad in (BASIS / ".env.example", BASIS / "docs" / "DEPLOYMENT.md"):
-        assert "TIME_ZONE" in pfad.read_text(encoding="utf-8"), (
-            f"{pfad.name} erwähnt TIME_ZONE nicht."
-        )

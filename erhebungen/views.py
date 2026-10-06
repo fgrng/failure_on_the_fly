@@ -84,40 +84,12 @@ _BADGE_BESCHRIFTUNGEN: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: "schon nach jeder Sitzung",
     Erhebungsitem.Andockpunkt.AM_ENDE: "schon am Ende",
 }
-_ITEMSEITEN_PROTOTYP_VARIANTEN: dict[str, tuple[str, str, str]] = {
-    "a": ("A · Skalenband", "c", "b"),
-    "b": ("B · Entscheidungsleiter", "a", "c"),
-    "c": ("C · Antwortkarten", "b", "a"),
-    "vergleich": ("Vergleich · alle Varianten", "c", "a"),
-}
 
 
 # Eine einzige Tür für den gesamten Forschungsbereich, wie in fragebogen_items
 # und vignetten: Die Administration sieht eine Erhebung nicht nur, sie kann sie
 # auch anlegen und bearbeiten (ADR-0033).
 _forschende_oder_administratorin_erforderlich = rolle_erforderlich(ist_forschende)
-
-
-def itemseite_prototype(request: HttpRequest) -> HttpResponse:
-    """Zeigt drei rein statische Varianten der Teilnehmer:innen-Itemseite."""
-
-    variante: str = request.GET.get("variant", "a")
-    if variante not in _ITEMSEITEN_PROTOTYP_VARIANTEN:
-        variante = "a"
-    bezeichnung, vorherige_variante, naechste_variante = _ITEMSEITEN_PROTOTYP_VARIANTEN[
-        variante
-    ]
-
-    return render(
-        request,
-        "erhebungen/prototype_itemseite.html",
-        {
-            "variante": variante,
-            "variantenbezeichnung": bezeichnung,
-            "vorherige_variante": vorherige_variante,
-            "naechste_variante": naechste_variante,
-        },
-    )
 
 
 def _sichtbare_erhebung(request: HttpRequest, pk: int) -> Erhebung:
