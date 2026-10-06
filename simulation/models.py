@@ -158,9 +158,9 @@ class Simulationskern(models.Model):
     class Zustand(models.TextChoices):
         """Mögliche Zustände einer Simulationskern-Fassung."""
 
-        ENTWURF: tuple[str, str] = "entwurf", "Entwurf"
-        FINAL: tuple[str, str] = "final", "Final"
-        ARCHIVIERT: tuple[str, str] = "archiviert", "Archiviert"
+        ENTWURF = "entwurf", "Entwurf"
+        FINAL = "final", "Final"
+        ARCHIVIERT = "archiviert", "Archiviert"
 
     zustand: models.CharField = models.CharField(
         max_length=11,
@@ -364,9 +364,9 @@ class Simulationskern(models.Model):
 class Anbieter(models.TextChoices):
     """Die Anbieter, die eine Naht dieser Anwendung bedienen können."""
 
-    FAKE: tuple[str, str] = "fake", "Fake (ohne Netz)"
-    OPENROUTER: tuple[str, str] = "openrouter", "OpenRouter"
-    INFOMANIAK: tuple[str, str] = "infomaniak", "Infomaniak"
+    FAKE = "fake", "Fake (ohne Netz)"
+    OPENROUTER = "openrouter", "OpenRouter"
+    INFOMANIAK = "infomaniak", "Infomaniak"
 
 
 # Der Anbieter `fake` bedient genau ein Modell, das seinen Namen trägt.

@@ -56,15 +56,15 @@ class Erhebung(EigentuemerKreis):
     class Status(models.TextChoices):
         """Die Zustände einer Erhebung."""
 
-        ENTWURF: tuple[str, str] = "entwurf", "Entwurf"
-        FINAL: tuple[str, str] = "final", "Final"
-        ARCHIVIERT: tuple[str, str] = "archiviert", "Archiviert"
+        ENTWURF = "entwurf", "Entwurf"
+        FINAL = "final", "Final"
+        ARCHIVIERT = "archiviert", "Archiviert"
 
     class Randomisierung(models.TextChoices):
         """Die Reihenfolgeregel der Vignetten in einer Erhebung."""
 
-        FEST: tuple[str, str] = "fest", "Feste Reihenfolge"
-        ZUFAELLIG: tuple[str, str] = "zufällig", "Zufällige Reihenfolge"
+        FEST = "fest", "Feste Reihenfolge"
+        ZUFAELLIG = "zufällig", "Zufällige Reihenfolge"
 
     name: models.CharField = models.CharField(max_length=255)
     status: models.CharField = models.CharField(
@@ -411,9 +411,9 @@ class Stichprobe(models.Model):
     class Phase(models.TextChoices):
         """Die aus dem Erhebungszeitraum abgeleiteten Phasen."""
 
-        VOR: tuple[str, str] = "vor", "Geplant"
-        LAUFEND: tuple[str, str] = "laufend", "Läuft"
-        NACH: tuple[str, str] = "nach", "Abgeschlossen"
+        VOR = "vor", "Geplant"
+        LAUFEND = "laufend", "Läuft"
+        NACH = "nach", "Abgeschlossen"
 
     erhebung: models.ForeignKey = models.ForeignKey(Erhebung, on_delete=models.PROTECT)
     beginn: models.DateTimeField = models.DateTimeField()

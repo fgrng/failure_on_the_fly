@@ -23,3 +23,8 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run ruff check
       - run: uv run pytest
+
+      # ty läuft vorerst nur beratend: Befunde sind sichtbar, scheitern lässt
+      # der Schritt die CI nicht (Spec #336, Ticket #347).
+      - run: uv run ty check
+        continue-on-error: true

@@ -21,9 +21,11 @@ deploy = [
     "gunicorn>=23.0.0",
 ]
 dev = [
+    "django-stubs>=6.1.2",
     "pytest>=9.1.1",
     "pytest-django>=4.12.0",
     "ruff>=0.15.20",
+    "ty>=0.0.84",
 ]
 
 [tool.pytest.ini_options]
@@ -52,3 +54,7 @@ ignore = ["ANN401"]
 # Der Linter prüft sie weiterhin, nur der Formatter lässt sie in Ruhe.
 # Ruff 0.16 formatiert auch Codeblöcke in Markdown; die ADRs bleiben unberührt.
 exclude = ["**/migrations/**", "**/*.md"]
+
+[tool.ty.src]
+# Migrationen generiert Django; ihre Typen prüft ty nicht.
+exclude = ["**/migrations/**"]
