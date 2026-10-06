@@ -145,6 +145,7 @@ export class FakeRepo implements Repo {
   private refs = new Map<string, Set<string>>();
   private remote = new Map<string, Set<string>>();
   private messages = new Map<string, string>();
+  private files = new Map<string, string[]>();
   private nextSha = 1;
   /** Solange gesetzt, scheitert jeder Push. */
   pushFails = false;
@@ -210,9 +211,10 @@ export class FakeRepo implements Repo {
     return remote !== undefined && remote.size === local.size && [...local].every((sha) => remote.has(sha));
   }
 
-  commit(branch: string, message = ""): string {
+  commit(branch: string, message = "", files: string[] = []): string {
     const sha = `c${this.nextSha++}`;
     this.messages.set(sha, message);
+    this.files.set(sha, files);
     this.commits(branch).add(sha);
     return sha;
   }
@@ -237,6 +239,13 @@ export class FakeRepo implements Repo {
   /** Ob `branch` den Commit `sha` enthält. */
   hasCommit(branch: string, sha: string): boolean {
     return this.commits(branch).has(sha);
+  }
+
+  // Die Dateien der Commits in `ref`, die `base` fehlen.
+  async changedFiles(base: string, ref: string): Promise<string[]> {
+    const known = this.commits(base);
+    const shas = [...this.commits(ref)].filter((sha) => !known.has(sha));
+    return [...new Set(shas.flatMap((sha) => this.files.get(sha) ?? []))];
   }
 
   // Der Stand eines Branches: seine Commits, sortiert und verkettet.
@@ -269,7 +278,7 @@ export class FakeRepo implements Repo {
 }
 
 /** Was der Implementer für ein Ticket tut: neue Commits und Abschlusssignal. */
-export type ImplementerScript = { commits: number; completed: boolean };
+export type ImplementerScript = { commits: number; completed: boolean; files?: string[] };
 
 export class FakeAgents implements Agents {
   /** Die Ticketliste jedes Planner-Aufrufs. */
@@ -296,6 +305,8 @@ export class FakeAgents implements Agents {
 
   /** Die Agent-Schritte der Abschlussphasen, etwa `review #30`, in Aufrufreihenfolge. */
   readonly specSteps: string[] = [];
+  /** Das Testkommando jedes Reviews, Mergers, Fixes und PR-Texts, etwa `merge spec/30: uv run pytest`. */
+  readonly testsRun: string[] = [];
   /** Die Befunde, die jeder Fix-Implementer bekam. */
   readonly fixedWith: { spec: number; findings: string[] }[] = [];
   /** Befunde des Spec-Reviews je Spec. Default: keine. */
@@ -329,19 +340,21 @@ export class FakeAgents implements Agents {
       implement: async (): Promise<AgentRun> => {
         this.implemented.push(issue.id);
         const commits = Array.from({ length: script.commits }, () =>
-          this.repo.commit(issue.branch),
+          this.repo.commit(issue.branch, "", script.files),
         );
         return { commits, completed: script.completed };
       },
-      review: async (): Promise<AgentRun> => {
+      review: async (tests): Promise<AgentRun> => {
         this.reviewed.push(issue.id);
+        this.testsRun.push(`review #${issue.id}: ${tests}`);
         return { commits: [], completed: true };
       },
     });
   }
 
-  async merge(into: string, branches: string[]): Promise<AgentRun> {
+  async merge(into: string, branches: string[], tests: string): Promise<AgentRun> {
     this.mergedWith.push({ into, branches });
+    this.testsRun.push(`merge ${into}: ${tests}`);
     for (const branch of branches) {
       if (!this.unmergeable.has(branch) && !this.skipped.has(branch)) this.repo.merge(branch, into);
     }
@@ -357,14 +370,21 @@ export class FakeAgents implements Agents {
     return this.specReviews.get(spec) ?? { standards: [], correctness: [], spec: [] };
   }
 
-  async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
+  async fixFindings(
+    spec: number,
+    branch: string,
+    findings: string[],
+    tests: string,
+  ): Promise<AgentRun> {
     this.specSteps.push(`fix #${spec}`);
+    this.testsRun.push(`fix #${spec}: ${tests}`);
     this.fixedWith.push({ spec, findings });
     return { commits: [this.repo.commit(branch)], completed: !this.unfixable.has(spec) };
   }
 
-  async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
+  async writePullRequest(spec: number, branch: string, tests: string): Promise<PullRequestText> {
     this.specSteps.push(`pr-text #${spec}`);
+    this.testsRun.push(`pr-text #${spec}: ${tests}`);
     return { title: `Spec #${spec}`, body: `## Summary\n\nAlles zu #${spec}.` };
   }
 }

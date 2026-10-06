@@ -50,9 +50,10 @@ If you cannot start sub-agents, run the two axes one after the other and keep th
 
 # EXECUTION
 
-1. Run `uv run pytest` to see the starting state.
-2. Make the changes and commit them in one commit whose message starts with `RALPH: Review -`.
-3. Run `uv run pytest` again and fix whatever fails, so the branch ends green.
+The implementer left the branch green, so there is no starting run.
+
+1. Make the changes and commit them in one commit whose message starts with `RALPH: Review -`.
+2. Run `{{TESTS}}` and fix whatever fails, so the branch ends green. If your changes touch anything other than Markdown files, run `{{FULL_TESTS}}` instead.
 
 If the skill reports nothing to fix, make no commit.
 

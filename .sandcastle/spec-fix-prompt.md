@@ -19,8 +19,9 @@ Do not comment on or close any issue; the driver script opens the pull request.
 
 # FEEDBACK LOOPS
 
-1. Run `uv run pytest` to see the starting state.
-2. Make the changes and commit them in one commit whose message starts with `RALPH: Spec-Review -` and references `(Spec #{{SPEC}})`.
-3. Run `uv run pytest` again and fix whatever fails. The branch must end green.
+The merger left the branch green, so there is no starting run.
 
-Once complete, and only if `uv run pytest` is green, output <promise>COMPLETE</promise>.
+1. Make the changes and commit them in one commit whose message starts with `RALPH: Spec-Review -` and references `(Spec #{{SPEC}})`.
+2. Run `{{TESTS}}` and fix whatever fails. If your changes touch anything other than Markdown files, run `{{FULL_TESTS}}` instead. The branch must end green.
+
+Once complete, and only if these tests are green, output <promise>COMPLETE</promise>.

@@ -82,6 +82,8 @@ export interface Repo {
    * einem Konflikt bleibt `branch` unverändert.
    */
   mergeMain(branch: string): Promise<"clean" | "conflict">;
+  /** Die Dateien, die `ref` seit dem gemeinsamen Vorfahren mit `base` ändert (`base...ref`). */
+  changedFiles(base: string, ref: string): Promise<string[]>;
   /** Der Commit, auf dem `branch` steht; auch für Remote-Refs wie MAIN_REF. */
   head(branch: string): Promise<string>;
   /** Setzt `branch` auf `head` zurück, ohne den Checkout des Hosts zu berühren. */
@@ -96,8 +98,8 @@ export interface Repo {
 export interface TicketSession {
   /** Der Implementer arbeitet das Ticket auf seinem Ticket-Branch ab. */
   implement(): Promise<AgentRun>;
-  /** Das Review je Ticket über den Diff gegen den Integrations-Branch. */
-  review(): Promise<AgentRun>;
+  /** Das Review je Ticket über den Diff gegen den Integrations-Branch; prüft mit `tests`. */
+  review(tests: string): Promise<AgentRun>;
 }
 
 /** Die Agent-Läufe der einzelnen Phasen. */
@@ -113,14 +115,14 @@ export interface Agents {
     integrationBranch: string,
     work: (session: TicketSession) => Promise<T>,
   ): Promise<T>;
-  /** Der Merger mergt die Branches in `into`, in einem eigenen Worktree. */
-  merge(into: string, branches: string[]): Promise<AgentRun>;
+  /** Der Merger mergt die Branches in `into`, in einem eigenen Worktree; prüft mit `tests`. */
+  merge(into: string, branches: string[], tests: string): Promise<AgentRun>;
   /** Reviewt `branch` gegen MAIN_REF mit `code-review`, Maßstab ist die Spec. */
   reviewSpec(spec: number, branch: string): Promise<SpecReview>;
-  /** Ein Implementer behebt die Befunde auf `branch`. */
-  fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
-  /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`. */
-  writePullRequest(spec: number, branch: string): Promise<PullRequestText>;
+  /** Ein Implementer behebt die Befunde auf `branch`; prüft mit `tests`. */
+  fixFindings(spec: number, branch: string, findings: string[], tests: string): Promise<AgentRun>;
+  /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`; `tests` lief zuletzt grün. */
+  writePullRequest(spec: number, branch: string, tests: string): Promise<PullRequestText>;
 }
 
 /**
@@ -138,6 +140,28 @@ export const MAIN_BRANCH = "main";
  * ab; das lokale main des Hosts bleibt dabei außen vor.
  */
 export const MAIN_REF = `origin/${MAIN_BRANCH}`;
+
+/** Die ganze Testsuite. */
+export const FULL_TESTS = "uv run pytest";
+
+/**
+ * Die Tests, die Markdown-Dateien lesen (Namenskonvention in config/tests).
+ * Ändert ein Diff nur Markdown, kann er nur diese Tests brechen.
+ */
+export const DOC_TESTS =
+  "uv run pytest config/tests/test_*_documentation.py config/tests/test_*_contract.py";
+
+/** Das Testkommando für einen Diff: nur Markdown -> DOC_TESTS, sonst FULL_TESTS. */
+export function testCommand(changedFiles: string[]): string {
+  const docsOnly = changedFiles.length > 0 && changedFiles.every((f) => f.endsWith(".md"));
+  return docsOnly ? DOC_TESTS : FULL_TESTS;
+}
+
+// Das Testkommando für alles, was `refs` gegenüber `base` ändern.
+async function testsFor(repo: Repo, base: string, refs: string[]): Promise<string> {
+  const files = await Promise.all(refs.map((ref) => repo.changedFiles(base, ref)));
+  return testCommand(files.flat());
+}
 
 /** Der fortlaufende Integrations-Branch der Tickets ohne Eltern-Spec. */
 export const STANDALONE_BRANCH = "sandcastle/standalone";
@@ -274,7 +298,8 @@ async function mergeOrReset(
   const before = await repo.head(into);
   let merged = false;
   try {
-    merged = (await agents.merge(into, branches)).completed && (await verified());
+    const tests = await testsFor(repo, into, branches);
+    merged = (await agents.merge(into, branches, tests)).completed && (await verified());
   } catch (error) {
     log(`  ! Merger on ${into} failed: ${error}`);
   }
@@ -503,7 +528,7 @@ async function implementAndReview(
               `  #${current.id}: no new commits, but ${current.branch} is ahead of ${into} - reviewing anyway.`,
             );
           }
-          await session.review();
+          await session.review(await testsFor(repo, into, [current.branch]));
           return true;
         });
         if (readyToMerge) ready.push(current);
@@ -652,16 +677,17 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
   log(`\n=== Finishing spec #${spec} on ${branch} ===`);
 
   const review = await agents.reviewSpec(spec, branch);
+  const tests = await testsFor(repo, MAIN_REF, [branch]);
   const toFix = [...review.standards, ...review.correctness];
   if (toFix.length > 0) {
-    const fix = await agents.fixFindings(spec, branch, toFix);
+    const fix = await agents.fixFindings(spec, branch, toFix, tests);
     if (!fix.completed) {
       log(`  ! ${branch}: findings not fixed (no completion signal) - no pull request yet.`);
       return;
     }
   }
 
-  const text = await agents.writePullRequest(spec, branch);
+  const text = await agents.writePullRequest(spec, branch, tests);
   await repo.push(branch);
   await tracker.createPullRequest({
     head: branch,

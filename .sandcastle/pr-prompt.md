@@ -31,7 +31,7 @@ Read the actual changes per file with `git diff origin/main...HEAD -- <path>`.
 Call the Skill tool with `pr` and write the body with its template. Write in German, in the domain language of `GLOSSARY.md`.
 
 - The title names the spec in a few words and ends with `(Spec #{{SPEC}})`.
-- As evidence, run `uv run pytest` and show its result.
+- Do not run tests. The merger and, if there were findings, the spec fix ran `{{TESTS}}` green on this branch, and CI runs `uv run pytest` on the pull request. State that as evidence.
 - Leave out open points and any `Closes` line. The driver script appends the spec review's open points and `Closes #{{SPEC}}` to your body.
 
 # OUTPUT
