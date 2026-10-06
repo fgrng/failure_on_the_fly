@@ -35,7 +35,7 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Before committing, run `uv run ruff format .`, then `uv run ruff check .` and `uv run pytest` to ensure formatting, linting and tests pass.
+Before committing, run `uv run pytest` to ensure tests pass.
 
 # COMMIT
 

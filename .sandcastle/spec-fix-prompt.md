@@ -19,8 +19,8 @@ Do not comment on or close any issue; the driver script opens the pull request.
 
 # FEEDBACK LOOPS
 
-1. Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest` to see the starting state.
+1. Run `uv run pytest` to see the starting state.
 2. Make the changes and commit them in one commit whose message starts with `RALPH: Spec-Review -` and references `(Spec #{{SPEC}})`.
-3. Run the three commands again and fix whatever fails. The branch must end with `uv run pytest` green.
+3. Run `uv run pytest` again and fix whatever fails. The branch must end green.
 
 Once complete, and only if `uv run pytest` is green, output <promise>COMPLETE</promise>.

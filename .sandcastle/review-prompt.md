@@ -50,9 +50,9 @@ If you cannot start sub-agents, run the two axes one after the other and keep th
 
 # EXECUTION
 
-1. Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest` to see the starting state.
+1. Run `uv run pytest` to see the starting state.
 2. Make the changes and commit them in one commit whose message starts with `RALPH: Review -`.
-3. Run the three commands again and fix whatever fails, so the branch ends green.
+3. Run `uv run pytest` again and fix whatever fails, so the branch ends green.
 
 If the skill reports nothing to fix, make no commit.
 
