@@ -19,7 +19,9 @@ Sandcastle runs `git fetch origin` at the start of every run and measures everyt
 Each issue closes at its own merge:
 
 - **Ticket**: closes once its branch is in its integration branch, not `main`. Sandcastle closes it itself after verifying the merge with `git merge-base --is-ancestor`; agents leave it open. If the merger ends without its completion signal, Sandcastle resets the integration branch to its state before the merger and closes none of its tickets.
-- **Blocker from another spec**: counts as done once it is on `main`: its `sandcastle/issue-<n>` branch is there, a commit there references it as `(#<n>` (keep this commit convention), or its spec is closed.
+- **Blocker from the same spec**: counts as done once it is merged into `spec/<n>` (the script then closes it).
+- **Blocker from another spec**: counts as done only once that spec is closed and merged into `main`, via its PR or, if merged by hand, because `spec/<m>` is contained in `main`.
+- **Blocker without a spec**: counts as done once it is on `main`: its `sandcastle/issue-<n>` branch is there, or a commit there references it as `(#<n>` (keep this commit convention).
 - **Spec**: closes when its PR merges into `main`, through the `Closes #<n>` that ends the PR body. That PR is the only way a spec closes, so leave parent issues untouched (state, body, labels) while writing, implementing or closing tickets.
 
 When every sub-issue of a spec is closed and `spec/<n>` has no open PR, Sandcastle runs the spec's **closing phase**: `code-review` over the whole spec against `main`, a fix of its standards and correctness findings, a PR text from the `pr` skill with the spec findings as "Offene Punkte", then push and PR from `spec/<n>` to `main`. A failed closing phase is retried by the next run, not by later iterations of the same run. From then on the spec is **locked**: Sandcastle comments on its remaining tickets and moves them from `ready-for-agent` to `ready-for-human`. Late work goes into a new spec.

@@ -107,10 +107,12 @@ npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
 Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
 `npm run sandcastle -- --spec <n>` beschränkt ihn auf die Sub-Issues der
 Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
-Blocker derselben Spec gibt sein Ticket frei, sobald er geschlossen ist, ein
-Blocker aus einer anderen Spec erst, wenn sein Code auf `main` liegt, also
-sein Ticket-Branch dort enthalten ist, ein Commit dort auf ihn verweist
-(`(#<n>` in der Commit-Nachricht) oder seine Spec geschlossen ist.
+Blocker derselben Spec gibt sein Ticket frei, sobald er in `spec/<n>`
+gemergt und damit geschlossen ist. Ein Blocker aus einer anderen Spec gibt es
+erst frei, wenn diese Spec geschlossen und nach `main` gemergt ist, über ihren
+PR oder von Hand. Ein Blocker ohne Spec zählt, sobald sein Code auf `main`
+liegt, also sein Ticket-Branch dort enthalten ist oder ein Commit dort auf
+ihn verweist (`(#<n>` in der Commit-Nachricht).
 
 Zu Beginn jedes Laufs holt das Skript mit `git fetch origin` den Stand von
 GitHub. „`main`“ heißt im Folgenden immer `origin/main`; das lokale `main`

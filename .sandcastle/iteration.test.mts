@@ -376,7 +376,7 @@ test("ein geschlossener Blocker aus derselben Spec gibt sein Ticket frei", async
   );
 });
 
-test("ein geschlossener Blocker aus einer anderen Spec hält sein Ticket zurück, bis er auf main liegt", async () => {
+test("ein geschlossener Blocker aus einer anderen Spec hält sein Ticket zurück, solange seine Spec offen ist", async () => {
   const { tracker, agents, run } = setup();
   tracker.addSpec(30);
   tracker.addSpec(40);
@@ -392,7 +392,7 @@ test("ein geschlossener Blocker aus einer anderen Spec hält sein Ticket zurück
   );
 });
 
-test("ein Blocker aus einer anderen Spec gibt sein Ticket frei, sobald er auf main liegt", async () => {
+test("ein Blocker aus einer anderen Spec zählt nicht, solange seine Spec offen ist, auch wenn ihr Branch auf main liegt", async () => {
   const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addSpec(40);
@@ -406,11 +406,64 @@ test("ein Blocker aus einer anderen Spec gibt sein Ticket frei, sobald er auf ma
 
   assert.deepEqual(
     agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[31], []],
+  );
+});
+
+test("ein Blocker aus einer geschlossenen Spec, deren Branch auf main liegt, gibt sein Ticket frei", async () => {
+  const { tracker, repo, agents, run, update } = setup();
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [31] });
+
+  await run();
+  repo.mergeOnOrigin("spec/30", "main");
+  await tracker.close(30, "PR gemergt");
+  await update();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
     [[31], [41]],
   );
 });
 
-test("ein Blocker aus einer offenen Spec gilt als erledigt, wenn ein Commit auf main auf ihn verweist", async () => {
+test("ein Blocker aus einer geschlossenen Spec, deren PR gemergt ist, gibt sein Ticket frei", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(20, { open: false });
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(21), { parent: 20 });
+  await tracker.close(21, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
+  await tracker.createPullRequest({ head: "spec/20", base: "main", title: "Spec 20", body: "Closes #20" });
+  tracker.mergePullRequest(tracker.pullRequests[0].number);
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[41]],
+  );
+});
+
+test("ein Blocker aus einer geschlossenen Spec, die nie nach main gemergt wurde, hält sein Ticket zurück", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(20, { open: false });
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(21), { parent: 20 });
+  await tracker.close(21, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[]],
+  );
+});
+
+test("ein Blocker aus einer offenen Spec zählt nicht, auch wenn ein Commit auf main auf ihn verweist", async () => {
   const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(20);
   tracker.addSpec(40);
@@ -424,18 +477,34 @@ test("ein Blocker aus einer offenen Spec gilt als erledigt, wenn ein Commit auf 
 
   assert.deepEqual(
     agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[]],
+  );
+});
+
+test("ein Blocker ohne Spec gibt ein Spec-Ticket frei, wenn ein Commit auf main auf ihn verweist", async () => {
+  const { tracker, repo, agents, run, update } = setup();
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(7));
+  await tracker.close(7, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [7] });
+  repo.commitOnOrigin("main", "Tippfehler beheben (#7)");
+
+  await update();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
     [[41]],
   );
 });
 
-test("ein Verweis auf ein anderes Issue mit gleichem Anfang gibt den Blocker nicht frei", async () => {
+test("ein Verweis auf ein anderes Issue mit gleichem Anfang gibt den Blocker ohne Spec nicht frei", async () => {
   const { tracker, repo, agents, run, update } = setup();
-  tracker.addSpec(20);
   tracker.addSpec(40);
-  tracker.addTicket(ticket(21), { parent: 20 });
-  await tracker.close(21, "von Hand umgesetzt");
-  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
-  repo.commitOnOrigin("main", "Export ergänzen (#210)");
+  tracker.addTicket(ticket(7));
+  await tracker.close(7, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [7] });
+  repo.commitOnOrigin("main", "Tippfehler beheben (#70)");
 
   await update();
   await run();
@@ -443,22 +512,6 @@ test("ein Verweis auf ein anderes Issue mit gleichem Anfang gibt den Blocker nic
   assert.deepEqual(
     agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
     [[]],
-  );
-});
-
-test("ein Blocker aus einer geschlossenen Spec gilt als erledigt, auch ohne Sandcastle-Branch", async () => {
-  const { tracker, agents, run } = setup();
-  tracker.addSpec(20, { open: false });
-  tracker.addSpec(40);
-  tracker.addTicket(ticket(21), { parent: 20 });
-  await tracker.close(21, "von Hand umgesetzt");
-  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
-
-  await run();
-
-  assert.deepEqual(
-    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
-    [[41]],
   );
 });
 

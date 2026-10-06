@@ -391,11 +391,12 @@ async function handOverLateTicket(tracker: Tracker, issue: number, spec: number)
   await tracker.swapLabel(issue, "ready-for-agent", "ready-for-human");
 }
 
-// Die Blocker des Tickets aus einer anderen Spec (oder von außerhalb jeder
-// Spec), die noch nicht auf main liegen. Auf main liegt ein Blocker, wenn sein
-// Ticket-Branch dort enthalten ist oder ein Commit auf ihn verweist (`(#<n>`).
-// Eine geschlossene Spec hat ihr PR nach main gebracht; ihre Tickets zählen
-// auch ohne beides.
+// Die Blocker des Tickets aus einem anderen Integrations-Branch, die noch
+// nicht auf main liegen. Ein Blocker derselben Spec zählt schon mit dem Merge
+// in deren Branch (dann ist er geschlossen). Ein Blocker aus einer anderen
+// Spec zählt erst, wenn diese Spec geschlossen und nach main gemergt ist. Ein
+// Blocker ohne Spec zählt, wenn sein Ticket-Branch auf main liegt oder ein
+// Commit dort auf ihn verweist (`(#<n>`).
 async function blockersNotOnMain(
   deps: IterationDeps,
   ticket: Ticket,
@@ -405,13 +406,24 @@ async function blockersNotOnMain(
   const pending: number[] = [];
   for (const blocker of ticket.blockedBy) {
     const parent = await tracker.parentOf(blocker);
-    if (specOf(parent) === spec) continue;
-    if (parent && isSpec(parent) && !parent.open) continue;
-    if (await repo.contains(MAIN_REF, ticketBranch(blocker))) continue;
-    if (await repo.mentionsIssue(MAIN_REF, blocker)) continue;
+    const blockerSpec = specOf(parent);
+    if (blockerSpec === spec) continue;
+    if (parent && blockerSpec !== undefined) {
+      if (!parent.open && (await specOnMain(deps, blockerSpec))) continue;
+    } else {
+      if (await repo.contains(MAIN_REF, ticketBranch(blocker))) continue;
+      if (await repo.mentionsIssue(MAIN_REF, blocker)) continue;
+    }
     pending.push(blocker);
   }
   return pending;
+}
+
+// Ob eine Spec nach main gemergt ist: über ihren PR oder, bei einem Merge von
+// Hand, weil ihr Integrations-Branch in main liegt.
+async function specOnMain(deps: IterationDeps, spec: number): Promise<boolean> {
+  if ((await deps.tracker.pullRequest(specBranch(spec)))?.state === "merged") return true;
+  return deps.repo.contains(MAIN_REF, specBranch(spec));
 }
 
 // Leitet jedes Ticket in seinen Integrations-Branch. Fehlt der Branch,
