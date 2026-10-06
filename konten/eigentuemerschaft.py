@@ -52,6 +52,8 @@ class EigentuemerKreis(models.Model):
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     class Meta:
+        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+
         abstract: bool = True
 
     def ist_aktiv(self) -> bool:

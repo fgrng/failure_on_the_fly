@@ -400,7 +400,7 @@ def persistierten_debrief_anzeigen(
     navigation: Sitzungsnavigation,
     anhang: str | None = None,
 ) -> HttpResponse:
-    # Rendert den Debrief einer persistierten Sitzung.
+    """Rendert den Debrief einer persistierten Sitzung."""
 
     sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
     # Liegt die Diagnose bereits vor, zeigt das Formular sie nur noch an:
@@ -426,7 +426,7 @@ def persistierten_fehler_anzeigen(
     navigation: Sitzungsnavigation,
     anhang: str | None = None,
 ) -> HttpResponse:
-    # Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung.
+    """Rendert den abgebrochenen Verlauf einer gescheiterten Sitzung."""
 
     return _persistiertes_gespraech_anzeigen(
         request,

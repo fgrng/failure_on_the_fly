@@ -97,6 +97,8 @@ class Trainingsbindung(Bindung):
     )
 
     class Meta:
+        """Erlaubt je Training und Konto höchstens eine Bindung."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["training", "konto"],

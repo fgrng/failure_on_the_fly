@@ -150,6 +150,8 @@ class OpenRouterVerzeichnis:
     """Liest OpenRouters öffentliche Modellliste über den eingesetzten Client."""
 
     def __init__(self, client: Any) -> None:
+        """Nimmt den HTTP-Client entgegen, der OpenRouters Liste abfragt."""
+
         self.client: Any = client
 
     def vorschlaege(self, naht: str) -> list[Modellvorschlag]:
@@ -212,6 +214,8 @@ class InfomaniakVerzeichnis:
     """Liest Infomaniaks kontoweite Modellliste über den eingesetzten Client."""
 
     def __init__(self, client: Any) -> None:
+        """Nimmt den HTTP-Client entgegen, der Infomaniaks Liste abfragt."""
+
         self.client: Any = client
 
     def vorschlaege(self, naht: str) -> list[Modellvorschlag]:

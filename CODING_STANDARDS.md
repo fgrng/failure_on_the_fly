@@ -1,16 +1,12 @@
 # Coding Standards
 
-MUST follow PEP 8 style guidelines
-
 NEVER use emoji, or unicode that emulates emoji (e.g. ✓, ✗). The only exception is when writing tests and testing the impact of multibyte characters.
-
-Always use Python type hints for function signatures and variables.
 
 ## Documentation and Comments
 
 Always write documentation files, issues and comments in German.
 
-Write docstrings for all public modules, functions, classes, and methods. Docstrings are not necessary for non-public methods, but you should have a comment that describes what the method does. This comment should appear after the def line.
+Non-public methods need no docstring, but they should have a comment that describes what the method does. This comment should appear after the def line.
 
 Keep comments up-to-date with code changes.
 

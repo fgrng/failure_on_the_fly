@@ -72,6 +72,8 @@ class FakeTranskription:
     """Spielt konfigurierte Transkripte und Fehler deterministisch ab."""
 
     def __init__(self, skript: Sequence[str | Exception]) -> None:
+        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden."""
+
         self.skript: list[str | Exception] = list(skript)
 
     def transkribieren(self, audio: bytes) -> str:
@@ -87,6 +89,8 @@ class OpenAITranskription:
     """Transkribiert Aufnahmen sofort über eine OpenAI-kompatible Route."""
 
     def __init__(self, client: Any, modell: str, sprache: str) -> None:
+        """Bindet OpenAI-kompatiblen Client, Modell und Sprache."""
+
         self.client: Any = client
         self.modell: str = modell
         self.sprache: str = sprache
@@ -124,6 +128,8 @@ class InfomaniakTranskription:
     """
 
     def __init__(self, client: Any, basis_url: str, modell: str, sprache: str) -> None:
+        """Bindet HTTP-Client, Endpunktwurzel, Modell und Sprache."""
+
         self.client: Any = client
         self.basis_url: str = basis_url.rstrip("/")
         self.modell: str = modell

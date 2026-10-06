@@ -279,6 +279,8 @@ class Zuordnung(models.Model):
     objects: models.Manager["Zuordnung"] = ZuordnungQuerySet.as_manager()
 
     class Meta:
+        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+
         abstract: bool = True
 
     def _einfriersperre(self) -> dict[str, str]:

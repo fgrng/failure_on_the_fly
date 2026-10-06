@@ -64,6 +64,8 @@ class KernHistorie(models.Model):
     )
 
     class Meta:
+        """Hält die Kern-Historie als einzige Zeile."""
+
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),
@@ -331,6 +333,8 @@ class Simulationskern(models.Model):
             raise ValidationError(fehler)
 
     class Meta:
+        """Sichert die Lebenszyklus-Invarianten der Kern-Fassungen."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["historie"],
@@ -443,6 +447,8 @@ class AnbieterFeldgruppe(models.Model):
     )
 
     class Meta:
+        """Markiert das Modell als abstrakte Basis ohne eigene Tabelle."""
+
         abstract: bool = True
 
     @property
@@ -680,6 +686,8 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
             raise ValidationError(fehler)
 
     class Meta:
+        """Hält die Transkriptions-Konfiguration als einzige Zeile."""
+
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),

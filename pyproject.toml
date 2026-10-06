@@ -36,7 +36,16 @@ target-version = "py314"
 
 [tool.ruff.lint]
 # Ruff 0.16 hat seinen Standard-Regelsatz erweitert; wir bleiben beim bisherigen.
-select = ["E4", "E7", "E9", "F"]
+# ANN und D1 erzwingen Typ-Hinweise und Docstrings öffentlicher Objekte. Die
+# Stilregeln D2/D4 bleiben aus, damit Kommentare nach der def-Zeile erlaubt sind.
+select = ["E4", "E7", "E9", "F", "ANN", "D1"]
+# Any bleibt erlaubt, wo es gewollt ist.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests und generierte Migrationen brauchen keine Docstrings.
+"**/tests/**" = ["D1"]
+"**/migrations/**" = ["D1"]
 
 [tool.ruff.format]
 # Django generiert Migrationen; ihr Umbruch ist nicht unsere Entscheidung.
