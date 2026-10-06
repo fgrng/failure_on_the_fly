@@ -16,15 +16,15 @@ You improve the code on this branch yourself; a review that only lists findings 
 
 A summary of the diff, changed files with line counts only:
 
-!`git diff {{TARGET_BRANCH}}...{{BRANCH}} --stat`
+!`git diff {{INTEGRATION_BRANCH}}...{{BRANCH}} --stat`
 
-Read the actual changes per file with `git diff {{TARGET_BRANCH}}...{{BRANCH}} -- <path>`.
+Read the actual changes per file with `git diff {{INTEGRATION_BRANCH}}...{{BRANCH}} -- <path>`.
 
 </diff-stat>
 
 <commits>
 
-!`git log {{TARGET_BRANCH}}..{{BRANCH}} --oneline`
+!`git log {{INTEGRATION_BRANCH}}..{{BRANCH}} --oneline`
 
 </commits>
 
@@ -36,7 +36,7 @@ Fetch the parent spec with `gh api repos/{owner}/{repo}/issues/{{TASK_ID}}/paren
 
 Call the Skill tool with `code-review`. Its report is your worklist. Hand it everything up front so it runs straight through without a question:
 
-- **Fixed point:** `{{TARGET_BRANCH}}`. The diff is `git diff {{TARGET_BRANCH}}...{{BRANCH}}`.
+- **Fixed point:** `{{INTEGRATION_BRANCH}}`. The diff is `git diff {{INTEGRATION_BRANCH}}...{{BRANCH}}`.
 - **Spec:** issue #{{TASK_ID}} above. The parent spec is context. Code that belongs to another *open* sub-issue of that spec is scope creep.
 - **Standards:** `CODING_STANDARDS.md`, plus the skill's smell baseline, plus three checks: new or changed behaviour is covered by tests; exceptions are caught narrowly and assumptions are checked; the change keeps inputs safe from injection and secrets out of code and logs.
 

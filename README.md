@@ -79,11 +79,9 @@ und Token angelegt und aktiviert.
 
 Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattpocock/sandcastle), das offene Issues mit
 dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
-abarbeitet: planen, implementieren, reviewen, mergen. Gemergt und geschlossen
-werden nur Tickets, deren Implementierung abgeschlossen ist; eine Spec schließt
-das Skript, sobald alle ihre Tickets zu sind. Voraussetzung sind Node, Docker
-und die Zugangsdaten aus
-`.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
+abarbeitet: planen, implementieren, reviewen, mergen. Voraussetzung sind Node,
+Docker und die Zugangsdaten aus `.sandcastle/.env.example`, kopiert nach
+`.sandcastle/.env`. Dann:
 
 ```
 npm install
@@ -97,7 +95,8 @@ ab. Zu wiederholen ist er nach jeder Änderung an `.sandcastle/Dockerfile` und
 nach jeder an `uv.lock` — das Image hält den vorgewärmten uv-Cache, aus dem
 die Sandbox ihre Abhängigkeiten zieht, statt sie neu zu laden.
 
-Welche Modelle die vier Phasen fahren, wählt `--agent`:
+Welche Modelle die vier Rollen (Planner, Implementer, Reviewer, Merger)
+fahren, wählt `--agent`:
 
 ```
 npm run sandcastle                    # Claude Code, der Default
@@ -105,8 +104,63 @@ npm run sandcastle:codex              # Codex
 npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
 ```
 
-Prompts, Coding-Standards und das Dockerfile der Sandbox liegen ebenfalls in
-`.sandcastle/`; Logs und Worktrees des Laufs bleiben dort unversioniert.
+Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
+`npm run sandcastle -- --spec <n>` beschränkt ihn auf die Sub-Issues der
+Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
+Blocker derselben Spec gibt sein Ticket frei, sobald er in `spec/<n>`
+gemergt und damit geschlossen ist. Ein Blocker aus einer anderen Spec gibt es
+erst frei, wenn diese Spec geschlossen und nach `main` gemergt ist, über ihren
+PR oder von Hand. Ein Blocker ohne Spec zählt, sobald sein Code auf `main`
+liegt, also sein Ticket-Branch dort enthalten ist oder ein Commit dort auf
+ihn verweist (`(#<n>` in der Commit-Nachricht).
+
+Zu Beginn jedes Laufs holt das Skript mit `git fetch origin` den Stand von
+GitHub. „`main`“ heißt im Folgenden immer `origin/main`; das lokale `main`
+bleibt unberührt und darf veraltet sein. Den Checkout, in dem der Lauf
+gestartet wurde, fasst das Skript nicht an. Steht er auf einem
+Integrations-Branch, lässt der Lauf diesen Branch aus: kein Update, keine
+Tickets seiner Spec, keine Abschlussphase. Das Log meldet das.
+
+Code kommt nur über einen Pull Request von einem Integrations-Branch nach
+`main`:
+
+- Tickets einer Spec `<n>` zweigen vom Integrations-Branch `spec/<n>` ab und
+  werden dorthin gemergt; das Skript legt ihn bei Bedarf von `main` an.
+  Tickets ohne Spec sammeln sich auf `sandcastle/standalone`.
+- Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
+  Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
+- Gemergt und geschlossen werden nur Tickets, deren Implementer sein
+  Abschlusssignal gegeben hat und deren Branch nachweislich im
+  Integrations-Branch liegt. Das Schließen übernimmt das Skript. Endet der
+  Merger ohne Abschlusssignal, setzt das Skript den Integrations-Branch auf
+  seinen Stand davor zurück und schließt keines seiner Tickets.
+- Sind alle Tickets einer Spec geschlossen, folgt ihre Abschlussphase: ein
+  `code-review` über die ganze Spec gegen `main`, die Behebung der Standards-
+  und Korrektheitsbefunde, ein PR-Text mit dem Skill `pr`. Spec-Befunde stehen
+  darin als „Offene Punkte“, am Ende `Closes #<n>`. Das Skript pusht
+  `spec/<n>` und legt den PR an; die Spec schließt GitHub beim Merge.
+  Scheitert die Abschlussphase, versucht sie erst der nächste Lauf erneut.
+- Hat eine Spec schon einen offenen PR, plant das Skript ihre übrigen Tickets
+  nicht mehr ein, sondern kommentiert sie und stellt sie auf
+  `ready-for-human`: Nachzügler gehören in eine neue Spec.
+- `sandcastle/standalone` hat keine Abschlussphase. Hat der Branch Commits,
+  die nicht auf `main` liegen, pusht ihn das Skript und legt einen PR an oder
+  ergänzt den offenen. Ist der PR gemergt, beginnt der Branch im nächsten Lauf
+  neu von `main`. Nur dieser Branch wird mit `--force-with-lease` gepusht.
+
+Die PRs mergt die Maintainerin bzw. der Maintainer von Hand, mit Merge-Commit
+und erst bei grüner CI. So bleiben die Commits je Ticket samt
+Issue-Referenzen in der Historie von `main`. Die Regeln für Agents stehen in
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md#closing-work).
+
+Prompts und das Dockerfile der Sandbox liegen ebenfalls in `.sandcastle/`;
+Logs und Worktrees des Laufs bleiben dort unversioniert. Die Ablauflogik einer
+Iteration (`.sandcastle/iteration.mts`) ist gegen Fakes für Tracker, Repo und
+Agents getestet, ohne Docker und ohne Agents:
+
+```
+npm run test:sandcastle
+```
 
 ## Deployment auf Uberspace
 
