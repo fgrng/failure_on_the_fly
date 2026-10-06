@@ -108,16 +108,11 @@ export class FakeTracker implements Tracker {
     return prs.find((pr) => pr.state === "open") ?? prs.at(-1);
   }
 
-  async createPullRequest(pr: {
-    head: string;
-    base: string;
-    title: string;
-    body: string;
-  }): Promise<void> {
+  async createPullRequest(pr: PullRequestText & { head: string; base: string }): Promise<void> {
     this.pullRequests.push({ ...pr, number: 1000 + this.pullRequests.length, state: "open" });
   }
 
-  async updatePullRequest(number: number, text: { title: string; body: string }): Promise<void> {
+  async updatePullRequest(number: number, text: PullRequestText): Promise<void> {
     const pr = this.pullRequests.find((p) => p.number === number);
     if (!pr) throw new Error(`FakeTracker: PR #${number} unbekannt`);
     Object.assign(pr, text);

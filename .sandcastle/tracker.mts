@@ -1,12 +1,20 @@
 // Tracker über die GitHub-CLI `gh`.
 
 import { execFileSync } from "node:child_process";
-import type { IssueSummary, PullRequest, Ticket, Tracker } from "./iteration.mts";
+import type {
+  IssueSummary,
+  PullRequest,
+  PullRequestText,
+  Ticket,
+  Tracker,
+} from "./iteration.mts";
 
+// Führt gh aus und liefert stdout; wirft bei einem Exit-Code ungleich 0.
 function gh(args: string[]): string {
   return execFileSync("gh", args, { encoding: "utf8", stdio: "pipe" });
 }
 
+// Die Felder eines Issues aus der REST-API, die der Tracker braucht.
 type ApiIssue = {
   number: number;
   state: string;
@@ -14,6 +22,7 @@ type ApiIssue = {
   sub_issues_summary: { total: number; completed: number };
 };
 
+// Übersetzt ein Issue der REST-API in eine IssueSummary.
 function summary(issue: ApiIssue): IssueSummary {
   return {
     number: issue.number,
@@ -26,6 +35,7 @@ function summary(issue: ApiIssue): IssueSummary {
   };
 }
 
+/** Der Tracker des Repos auf GitHub, über die Anmeldung von `gh`. */
 export const githubTracker: Tracker = {
   async readyTickets(): Promise<Ticket[]> {
     const issues: {
@@ -123,16 +133,11 @@ export const githubTracker: Tracker = {
     };
   },
 
-  async createPullRequest(pr: {
-    head: string;
-    base: string;
-    title: string;
-    body: string;
-  }): Promise<void> {
+  async createPullRequest(pr: PullRequestText & { head: string; base: string }): Promise<void> {
     gh(["pr", "create", "--head", pr.head, "--base", pr.base, "--title", pr.title, "--body", pr.body]);
   },
 
-  async updatePullRequest(number: number, text: { title: string; body: string }): Promise<void> {
+  async updatePullRequest(number: number, text: PullRequestText): Promise<void> {
     gh(["pr", "edit", String(number), "--title", text.title, "--body", text.body]);
   },
 };

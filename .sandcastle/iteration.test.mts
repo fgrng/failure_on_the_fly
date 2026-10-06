@@ -799,26 +799,48 @@ test("mit --spec <n> wird nur Spec #n abgeschlossen", async () => {
   );
 });
 
-test("hat die Spec eines Tickets einen offenen PR, fehlt es in der Frontier, wird einmal kommentiert und auf ready-for-human gestellt", async () => {
-  const { tracker, agents, run } = setup();
-  tracker.addSpec(30);
-  tracker.addTicket(ticket(31), { parent: 30 });
-  tracker.addTicket(ticket(7));
-  await tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
+// Spec #30 hat einen offenen PR, Ticket 31 kommt als Nachzügler, Ticket 7 ist unabhängig.
+async function setupLateTicket() {
+  const context = setup();
+  context.tracker.addSpec(30);
+  context.tracker.addTicket(ticket(31), { parent: 30 });
+  context.tracker.addTicket(ticket(7));
+  await context.tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
+  return context;
+}
+
+test("hat die Spec eines Tickets einen offenen PR, fehlt das Ticket in der Frontier", async () => {
+  const { agents, run } = await setupLateTicket();
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[7]],
+  );
+});
+
+test("ein Nachzügler einer Spec mit offenem PR wird über zwei Iterationen nur einmal kommentiert, mit Verweis auf eine neue Spec", async () => {
+  const { tracker, run } = await setupLateTicket();
 
   await run();
   await run();
 
   assert.deepEqual(
-    {
-      planned: agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
-      comments: tracker.comments.map((c) => c.number),
-      labels: (await tracker.issue(31)).labels,
-      open: tracker.isOpen(31),
-    },
-    { planned: [[7], []], comments: [31], labels: ["ready-for-human"], open: true },
+    tracker.comments.map((c) => ({ number: c.number, pointsToNewSpec: /neue Spec/.test(c.comment) })),
+    [{ number: 31, pointsToNewSpec: true }],
   );
-  assert.match(tracker.comments[0].comment, /neue Spec/);
+});
+
+test("ein Nachzügler einer Spec mit offenem PR bleibt offen und steht auf ready-for-human", async () => {
+  const { tracker, run } = await setupLateTicket();
+
+  await run();
+
+  assert.deepEqual(
+    { labels: (await tracker.issue(31)).labels, open: tracker.isOpen(31) },
+    { labels: ["ready-for-human"], open: true },
+  );
 });
 
 test("ein gemergter oder fehlender Spec-PR sperrt kein Ticket", async () => {

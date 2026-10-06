@@ -3,6 +3,7 @@
 // Fakes testen lässt. Die echten Implementierungen liegen in tracker.mts,
 // repo.mts und agents.mts, verdrahtet in main.mts.
 
+/** Ein bereites Ticket, wie es der Planner zu sehen bekommt. */
 export type Ticket = {
   number: number;
   title: string;
@@ -21,37 +22,46 @@ export type IssueSummary = {
   subIssues: { total: number; completed: number };
 };
 
+/** Ein Ticket, das der Planner für diese Iteration freigibt, mit seinem Ticket-Branch. */
 export type PlannedIssue = { id: string; title: string; branch: string };
 
 /** Ergebnis eines Agent-Laufs: neue Commits (SHAs) und ob das Abschlusssignal kam. */
 export type AgentRun = { commits: string[]; completed: boolean };
 
+/** Titel und Text eines Pull Requests. */
+export type PullRequestText = { title: string; body: string };
+
 /** Ein Pull Request; `head` ist der Branch, der gemergt werden soll. */
-export type PullRequest = {
+export type PullRequest = PullRequestText & {
   number: number;
   head: string;
   base: string;
-  title: string;
-  body: string;
   state: "open" | "merged" | "closed";
 };
 
+/** Issues und Pull Requests auf GitHub. */
 export interface Tracker {
   /** Offene Tickets mit `ready-for-agent`, ohne `Spec`, ohne offenen Blocker. */
   readyTickets(): Promise<Ticket[]>;
   /** Das Eltern-Issue, oder undefined, wenn es keines gibt. */
   parentOf(issue: number): Promise<IssueSummary | undefined>;
+  /** Das Issue mit dem Stand seiner Sub-Issues. */
   issue(issue: number): Promise<IssueSummary>;
+  /** Schließt das Issue mit einem Kommentar. */
   close(issue: number, comment: string): Promise<void>;
+  /** Kommentiert das Issue, ohne es zu schließen. */
   comment(issue: number, comment: string): Promise<void>;
   /** Ersetzt das Label `remove` durch `add`. */
   swapLabel(issue: number, remove: string, add: string): Promise<void>;
   /** Der offene PR von `head`, sonst der zuletzt angelegte, sonst undefined. */
   pullRequest(head: string): Promise<PullRequest | undefined>;
-  createPullRequest(pr: { head: string; base: string; title: string; body: string }): Promise<void>;
-  updatePullRequest(number: number, text: { title: string; body: string }): Promise<void>;
+  /** Legt einen PR von `head` nach `base` an. */
+  createPullRequest(pr: PullRequestText & { head: string; base: string }): Promise<void>;
+  /** Ersetzt Titel und Text eines bestehenden PRs. */
+  updatePullRequest(number: number, text: PullRequestText): Promise<void>;
 }
 
+/** Das git-Repo des Hosts; kein Aufruf ändert dessen Checkout. */
 export interface Repo {
   /** Holt den Stand von origin, ohne den Checkout des Hosts zu berühren. */
   fetch(): Promise<void>;
@@ -59,7 +69,7 @@ export interface Repo {
   hostBranch(): Promise<string>;
   /** Ob `ref` vollständig in `branch` enthalten ist (`merge-base --is-ancestor`). */
   contains(branch: string, ref: string): Promise<boolean>;
-  /** Ob eine Commit-Nachricht in `ref` auf das Issue verweist, etwa `(#12` oder `(#12,`. */
+  /** Ob eine Commit-Nachricht in `ref` auf das Issue verweist, etwa `(#12)` oder `(#12,`. */
   mentionsIssue(ref: string, issue: number): Promise<boolean>;
   /** Ob es den lokalen Branch gibt. */
   branchExists(branch: string): Promise<boolean>;
@@ -72,22 +82,25 @@ export interface Repo {
    * einem Konflikt bleibt `branch` unverändert.
    */
   mergeMain(branch: string): Promise<"clean" | "conflict">;
-  /** Der Commit, auf dem `branch` steht. */
+  /** Der Commit, auf dem `branch` steht; auch für Remote-Refs wie MAIN_REF. */
   head(branch: string): Promise<string>;
   /** Setzt `branch` auf `head` zurück, ohne den Checkout des Hosts zu berühren. */
   resetBranch(branch: string, head: string): Promise<void>;
   /** Ob `branch` genau auf seinem Stand in origin steht. */
   isPushed(branch: string): Promise<boolean>;
-  /** Pusht `branch` nach origin; eine neu begonnene Historie ersetzt die alte. */
+  /** Pusht `branch` nach origin; nur sandcastle/standalone darf dabei Historie ersetzen. */
   push(branch: string): Promise<void>;
 }
 
 /** Implementer und Review eines Tickets teilen sich eine Sandbox. */
 export interface TicketSession {
+  /** Der Implementer arbeitet das Ticket auf seinem Ticket-Branch ab. */
   implement(): Promise<AgentRun>;
+  /** Das Review je Ticket über den Diff gegen den Integrations-Branch. */
   review(): Promise<AgentRun>;
 }
 
+/** Die Agent-Läufe der einzelnen Phasen. */
 export interface Agents {
   /** Der Planner stellt Tickets mit überlappenden Dateien zurück. */
   plan(tickets: Ticket[]): Promise<PlannedIssue[]>;
@@ -100,9 +113,9 @@ export interface Agents {
     integrationBranch: string,
     work: (session: TicketSession) => Promise<T>,
   ): Promise<T>;
-  /** Der Merger mergt die Branches in `into`. */
+  /** Der Merger mergt die Branches in `into`, in einem eigenen Worktree. */
   merge(into: string, branches: string[]): Promise<AgentRun>;
-  /** Reviewt `branch` gegen main mit `code-review`, Maßstab ist die Spec. */
+  /** Reviewt `branch` gegen MAIN_REF mit `code-review`, Maßstab ist die Spec. */
   reviewSpec(spec: number, branch: string): Promise<SpecReview>;
   /** Ein Implementer behebt die Befunde auf `branch`. */
   fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
@@ -115,8 +128,6 @@ export interface Agents {
  * Spec-Befunde gehen als offene Punkte in den PR-Text.
  */
 export type SpecReview = { standards: string[]; correctness: string[]; spec: string[] };
-
-export type PullRequestText = { title: string; body: string };
 
 /** Ziel jedes PRs. */
 export const MAIN_BRANCH = "main";
@@ -131,14 +142,19 @@ export const MAIN_REF = `origin/${MAIN_BRANCH}`;
 /** Der fortlaufende Integrations-Branch der Tickets ohne Eltern-Spec. */
 export const STANDALONE_BRANCH = "sandcastle/standalone";
 
+const SPEC_PREFIX = "spec/";
+
 const DEFAULT_MAX_PARALLEL = 4;
+
+type Log = (message: string) => void;
 
 /** Die Schnittstellen und Einstellungen, mit denen eine Iteration läuft. */
 export type IterationDeps = {
   tracker: Tracker;
   repo: Repo;
   agents: Agents;
-  log?: (message: string) => void;
+  /** Ziel der Fortschrittsmeldungen, Default `console.log`. */
+  log?: Log;
   /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden (Default 4). */
   maxParallel?: number;
   /** Beschränkt den Lauf auf die Sub-Issues dieser Spec (`--spec <n>`). */
@@ -151,7 +167,24 @@ export type IterationDeps = {
   finishAttempted: Set<number>;
 };
 
+/** Was der Laufbeginn braucht: die Schnittstellen und das Log. */
 export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "log">;
+
+/** Die Integrations-Branches, in die main zu Laufbeginn nicht gemergt werden konnte. */
+export type UpdateResult = { failed: string[] };
+
+/** `planned == 0` heißt: der Backlog ist leer, die äußere Schleife kann enden. */
+export type IterationResult = { planned: number };
+
+// Die Abhängigkeiten mit gesetztem Log, wie sie die Helfer bekommen.
+type WithLog<T extends { log?: Log }> = T & { log: Log };
+
+function withLog<T extends { log?: Log }>(deps: T): WithLog<T> {
+  return { ...deps, log: deps.log ?? console.log };
+}
+
+/** Ein geplantes Ticket mit dem Branch, in den es gemergt wird. */
+type Assignment = PlannedIssue & { integrationBranch: string };
 
 /**
  * Laufbeginn: holt den Stand von origin und mergt MAIN_REF in jeden aktiven
@@ -159,29 +192,30 @@ export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "lo
  * bei einem Konflikt startet der Merger. Scheitert er, bleibt der Branch
  * unverändert und steht in `failed`. Ohne Fetch bricht der Lauf ab.
  */
-export async function updateIntegrationBranches(deps: UpdateDeps): Promise<UpdateResult> {
-  const log = deps.log ?? console.log;
+export async function updateIntegrationBranches(options: UpdateDeps): Promise<UpdateResult> {
+  const deps = withLog(options);
+  const { repo, log } = deps;
   const failed: string[] = [];
   // Nur hier, nicht je Iteration: Was der Lauf gegen MAIN_REF misst, soll zu
   // dem Stand passen, der in den Integrations-Branches steckt.
-  await deps.repo.fetch();
-  const host = await deps.repo.hostBranch();
+  await repo.fetch();
+  const host = await repo.hostBranch();
   // Vor dem Merge von main, sonst wäre der Branch nicht mehr auf seinem
   // gepushten Stand und bliebe stehen.
   try {
-    if (host === STANDALONE_BRANCH) log(checkedOutByHost(STANDALONE_BRANCH));
-    else await restartStandaloneAfterMerge(deps, log);
+    if (host === STANDALONE_BRANCH) log(`  ! ${checkedOutByHost(host)}`);
+    else await restartStandaloneAfterMerge(deps);
   } catch (error) {
     log(`  ! ${STANDALONE_BRANCH}: restart failed: ${error}`);
   }
-  for (const branch of await activeIntegrationBranches(deps, log)) {
+  for (const branch of await activeIntegrationBranches(deps)) {
     if (branch === host) {
-      log(checkedOutByHost(branch));
+      log(`  ! ${checkedOutByHost(host)}`);
       continue;
     }
     let updated = false;
     try {
-      updated = await mergeMainInto(deps, branch, log);
+      updated = await mergeMainInto(deps, branch);
     } catch (error) {
       log(`  ! ${branch}: ${error}`);
     }
@@ -193,31 +227,46 @@ export async function updateIntegrationBranches(deps: UpdateDeps): Promise<Updat
   return { failed };
 }
 
-// Mergt main in `branch`, bei Konflikt über den Merger. Liefert, ob main
-// danach enthalten ist; sonst steht `branch` wieder auf seinem alten Stand.
-async function mergeMainInto(
-  deps: UpdateDeps,
-  branch: string,
-  log: (message: string) => void,
-): Promise<boolean> {
-  const { repo, agents } = deps;
+/**
+ * Eine Iteration: planen, je Ticket implementieren und reviewen, je
+ * Integrations-Branch mergen und gemergte Tickets schließen. Am Ende werden
+ * sandcastle/standalone veröffentlicht und fertige Specs abgeschlossen.
+ */
+export async function runIteration(options: IterationDeps): Promise<IterationResult> {
+  const deps = withLog(options);
+  const { planned, landed } = await planImplementAndMerge(deps);
+  await publishStandalone(deps, landed);
+  await finishCompletedSpecs(deps);
+  return { planned };
+}
+
+// Den Branch, den der Host ausgecheckt hat, fasst der Lauf nicht an: kein
+// Update, keine Tickets, keine Abschlussphase. Ein Worktree dafür ginge
+// nicht, und ein Agent im Checkout des Hosts störte dessen Arbeit.
+function checkedOutByHost(branch: string): string {
+  return `${branch} is checked out in the host checkout - skipped in this run.`;
+}
+
+// Mergt MAIN_REF in `branch`, bei Konflikt über den Merger. Liefert, ob
+// MAIN_REF danach enthalten ist; sonst steht `branch` wieder auf seinem alten Stand.
+async function mergeMainInto(deps: WithLog<UpdateDeps>, branch: string): Promise<boolean> {
+  const { repo, log } = deps;
   if ((await repo.mergeMain(branch)) === "clean") return true;
 
   log(`  ${branch}: conflict with ${MAIN_REF}, starting the merger.`);
-  return mergeOrReset(deps, branch, [MAIN_REF], log, () => repo.contains(branch, MAIN_REF));
+  return mergeOrReset(deps, branch, [MAIN_REF], () => repo.contains(branch, MAIN_REF));
 }
 
 // Lässt den Merger `branches` in `into` mergen. Liefert, ob er mit
 // Abschlusssignal endete und `verified` zutrifft; sonst steht `into` wieder
 // auf dem Stand davor, damit kein Ticket eine halbe Auflösung erbt.
 async function mergeOrReset(
-  deps: UpdateDeps,
+  deps: WithLog<UpdateDeps>,
   into: string,
   branches: string[],
-  log: (message: string) => void,
   verified: () => Promise<boolean> = async () => true,
 ): Promise<boolean> {
-  const { repo, agents } = deps;
+  const { repo, agents, log } = deps;
   const before = await repo.head(into);
   let merged = false;
   try {
@@ -229,29 +278,16 @@ async function mergeOrReset(
   return merged;
 }
 
-/** Die Integrations-Branches, in die main zu Laufbeginn nicht gemergt werden konnte. */
-export type UpdateResult = { failed: string[] };
-
-// Den Branch, den der Host ausgecheckt hat, fasst der Lauf nicht an: kein
-// Update, keine Tickets, keine Abschlussphase. Ein Worktree dafür ginge
-// nicht, und ein Agent im Checkout des Hosts störte dessen Arbeit.
-function checkedOutByHost(branch: string): string {
-  return `  ! ${branch} is checked out in the host checkout - skipped.`;
-}
-
 // Aktiv ist jeder bestehende `spec/<n>`, dessen Spec noch offen ist, und
 // `sandcastle/standalone`, falls es ihn gibt. Den Branch einer geschlossenen
 // Spec hat ihr PR schon nach main gebracht.
-async function activeIntegrationBranches(
-  deps: UpdateDeps,
-  log: (message: string) => void,
-): Promise<string[]> {
-  const { tracker, repo } = deps;
+async function activeIntegrationBranches(deps: WithLog<UpdateDeps>): Promise<string[]> {
+  const { tracker, repo, log } = deps;
   const active: string[] = [];
   if (await repo.branchExists(STANDALONE_BRANCH)) active.push(STANDALONE_BRANCH);
-  for (const branch of await repo.branches("spec/")) {
-    const spec = Number(branch.slice("spec/".length));
-    if (!Number.isInteger(spec)) continue;
+  for (const branch of await repo.branches(SPEC_PREFIX)) {
+    const spec = specOfBranch(branch);
+    if (spec === undefined) continue;
     try {
       if ((await tracker.issue(spec)).open) active.push(branch);
     } catch (error) {
@@ -261,33 +297,13 @@ async function activeIntegrationBranches(
   return active;
 }
 
-/** `planned == 0` heißt: der Backlog ist leer, die äußere Schleife kann enden. */
-export type IterationResult = { planned: number };
-
-/** Ein geplantes Ticket mit dem Branch, in den es gemergt wird. */
-type Assignment = PlannedIssue & { integrationBranch: string };
-
-/**
- * Eine Iteration: planen, je Ticket implementieren und reviewen, je
- * Integrations-Branch mergen und gemergte Tickets schließen. Am Ende werden
- * sandcastle/standalone veröffentlicht und fertige Specs abgeschlossen.
- */
-export async function runIteration(deps: IterationDeps): Promise<IterationResult> {
-  const log = deps.log ?? console.log;
-  const { planned, landed } = await planImplementAndMerge(deps, log);
-  await publishStandalone(deps, landed, log);
-  await finishCompletedSpecs(deps, log);
-  return { planned };
-}
-
 // Liefert die Zahl der geplanten Tickets und die Tickets, die in ihrem
 // Integrations-Branch gelandet sind.
 async function planImplementAndMerge(
-  deps: IterationDeps,
-  log: (message: string) => void,
+  deps: WithLog<IterationDeps>,
 ): Promise<{ planned: number; landed: Assignment[] }> {
-  const { agents } = deps;
-  const issues = await agents.plan(await frontier(deps, log));
+  const { agents, log } = deps;
+  const issues = await agents.plan(await frontier(deps));
   if (issues.length === 0) {
     log("No issues to work on.");
     return { planned: 0, landed: [] };
@@ -296,8 +312,8 @@ async function planImplementAndMerge(
   log(`Planning complete. ${issues.length} issue(s) to work in parallel:`);
   for (const issue of issues) log(`  #${issue.id}: ${issue.title} -> ${issue.branch}`);
 
-  const assignments = await assignIntegrationBranches(deps, issues, log);
-  const readyIssues = await implementAndReview(deps, assignments, log);
+  const assignments = await assignIntegrationBranches(deps, issues);
+  const readyIssues = await implementAndReview(deps, assignments);
 
   log(`\nExecution complete. ${readyIssues.length} branch(es) to merge:`);
   for (const issue of readyIssues) log(`  ${issue.branch} -> ${issue.integrationBranch}`);
@@ -311,12 +327,12 @@ async function planImplementAndMerge(
   for (const [into, group] of byIntegrationBranch) {
     // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
     const branches = group.map((i) => i.branch);
-    if (!(await mergeOrReset(deps, into, branches, log))) {
+    if (!(await mergeOrReset(deps, into, branches))) {
       log(`  ! ${into}: merger did not finish, branch reset - no ticket closed.`);
       continue;
     }
     log(`\nBranches merged into ${into}.`);
-    landed.push(...(await closeMergedIssues(deps, group, log)));
+    landed.push(...(await closeMergedIssues(deps, group)));
   }
   return { planned: issues.length, landed };
 }
@@ -328,8 +344,8 @@ async function planImplementAndMerge(
 // einen offenen PR, geht das Ticket an einen Menschen. Ein Ticket, dessen
 // Eltern-Issues sich nicht lesen lassen oder dessen Integrations-Branch der
 // Host ausgecheckt hat, fällt heraus.
-async function frontier(deps: IterationDeps, log: (message: string) => void): Promise<Ticket[]> {
-  const { tracker, repo } = deps;
+async function frontier(deps: WithLog<IterationDeps>): Promise<Ticket[]> {
+  const { tracker, repo, log } = deps;
   const host = await repo.hostBranch();
   const tickets: Ticket[] = [];
   for (const ticket of await tracker.readyTickets()) {
@@ -337,7 +353,7 @@ async function frontier(deps: IterationDeps, log: (message: string) => void): Pr
       const spec = specOf(await tracker.parentOf(ticket.number));
       if (deps.spec !== undefined && spec !== deps.spec) continue;
       if (integrationBranchOf(spec) === host) {
-        log(`  #${ticket.number}: ${checkedOutByHost(host).trim()}`);
+        log(`  #${ticket.number}: ${checkedOutByHost(host)}`);
         continue;
       }
       if (spec !== undefined && (await hasOpenPullRequest(tracker, spec))) {
@@ -359,8 +375,9 @@ async function frontier(deps: IterationDeps, log: (message: string) => void): Pr
   return tickets;
 }
 
+// Ob die Spec schon einen offenen PR hat; dann ist sie im Review beim Menschen.
 async function hasOpenPullRequest(tracker: Tracker, spec: number): Promise<boolean> {
-  return (await tracker.pullRequest(`spec/${spec}`))?.state === "open";
+  return (await tracker.pullRequest(specBranch(spec)))?.state === "open";
 }
 
 // Ein Nachzügler würde still den PR im Review vergrößern. Der Label-Wechsel
@@ -397,45 +414,14 @@ async function blockersNotOnMain(
   return pending;
 }
 
-// Der Planner vergibt diesen Namen deterministisch (siehe plan-prompt.md).
-function ticketBranch(issue: number): string {
-  return `sandcastle/issue-${issue}`;
-}
-
-// Die Nummer der Eltern-Spec, oder undefined, wenn das Eltern-Issue fehlt
-// oder keine Spec ist.
-function specOf(parent: IssueSummary | undefined): number | undefined {
-  return parent && isSpec(parent) ? parent.number : undefined;
-}
-
-const SPEC_PREFIX = "spec/";
-
-// Der Integrations-Branch einer Spec.
-function specBranch(spec: number): string {
-  return `${SPEC_PREFIX}${spec}`;
-}
-
-// Die Spec-Nummer eines Branches `spec/<n>`, sonst undefined.
-function specOfBranch(branch: string): number | undefined {
-  if (!branch.startsWith(SPEC_PREFIX)) return undefined;
-  const spec = Number(branch.slice(SPEC_PREFIX.length));
-  return Number.isInteger(spec) ? spec : undefined;
-}
-
-// Ticket mit Eltern-Spec n -> spec/<n>, sonst sandcastle/standalone.
-function integrationBranchOf(spec: number | undefined): string {
-  return spec === undefined ? STANDALONE_BRANCH : specBranch(spec);
-}
-
 // Leitet jedes Ticket in seinen Integrations-Branch. Fehlt der Branch,
-// entsteht er von main. Ein Ticket, dessen Eltern-Issue sich nicht lesen
+// entsteht er von MAIN_REF. Ein Ticket, dessen Eltern-Issue sich nicht lesen
 // lässt, wird ausgelassen statt falsch geleitet.
 async function assignIntegrationBranches(
-  deps: IterationDeps,
+  deps: WithLog<IterationDeps>,
   issues: PlannedIssue[],
-  log: (message: string) => void,
 ): Promise<Assignment[]> {
-  const { tracker, repo } = deps;
+  const { tracker, repo, log } = deps;
   const assignments: Assignment[] = [];
   for (const issue of issues) {
     let integrationBranch: string;
@@ -457,11 +443,10 @@ async function assignIntegrationBranches(
 // Implementiert und reviewt die Tickets mit einem Pool von maxParallel
 // Workern und liefert die Tickets, deren Branch bereit zum Merge ist.
 async function implementAndReview(
-  deps: IterationDeps,
+  deps: WithLog<IterationDeps>,
   issues: Assignment[],
-  log: (message: string) => void,
 ): Promise<Assignment[]> {
-  const { agents, repo } = deps;
+  const { agents, repo, log } = deps;
   const queue = [...issues];
   const ready: Assignment[] = [];
 
@@ -512,11 +497,10 @@ async function implementAndReview(
 // Integrations-Branch liegt, und liefert diese Tickets. Die Spec bleibt
 // offen; sie schließt ihr PR.
 async function closeMergedIssues(
-  deps: IterationDeps,
+  deps: WithLog<IterationDeps>,
   issues: Assignment[],
-  log: (message: string) => void,
 ): Promise<Assignment[]> {
-  const { tracker, repo } = deps;
+  const { tracker, repo, log } = deps;
   const landed: Assignment[] = [];
   for (const issue of issues) {
     const into = issue.integrationBranch;
@@ -536,13 +520,10 @@ async function closeMergedIssues(
 }
 
 // Ist der letzte PR von sandcastle/standalone gemergt, beginnt der Branch
-// neu von main, damit der nächste PR nur neue Tickets enthält. Commits, die
-// noch nicht gepusht sind, gehören nicht zu diesem PR; dann bleibt er stehen.
-async function restartStandaloneAfterMerge(
-  deps: UpdateDeps,
-  log: (message: string) => void,
-): Promise<void> {
-  const { tracker, repo } = deps;
+// neu von MAIN_REF, damit der nächste PR nur neue Tickets enthält. Commits,
+// die noch nicht gepusht sind, gehören nicht zu diesem PR; dann bleibt er stehen.
+async function restartStandaloneAfterMerge(deps: WithLog<UpdateDeps>): Promise<void> {
+  const { tracker, repo, log } = deps;
   if (!(await repo.branchExists(STANDALONE_BRANCH))) return;
   if ((await tracker.pullRequest(STANDALONE_BRANCH))?.state !== "merged") return;
   if (!(await repo.isPushed(STANDALONE_BRANCH))) {
@@ -553,15 +534,14 @@ async function restartStandaloneAfterMerge(
   log(`${STANDALONE_BRANCH}: pull request merged, restarted from ${MAIN_REF}.`);
 }
 
-// Hat sandcastle/standalone Commits, die nicht auf main liegen, wird der
-// Branch gepusht. Sein PR wird angelegt oder, wenn er offen ist, um die
-// gelandeten Tickets ergänzt.
+// Hat sandcastle/standalone Commits, die MAIN_REF fehlen, wird der Branch
+// gepusht. Sein PR wird angelegt oder, wenn er offen ist, um die gelandeten
+// Tickets ergänzt.
 async function publishStandalone(
-  deps: IterationDeps,
+  deps: WithLog<IterationDeps>,
   landed: Assignment[],
-  log: (message: string) => void,
 ): Promise<void> {
-  const { tracker, repo } = deps;
+  const { tracker, repo, log } = deps;
   if (!(await repo.branchExists(STANDALONE_BRANCH))) return;
   if (await repo.contains(MAIN_REF, STANDALONE_BRANCH)) return;
   try {
@@ -590,19 +570,18 @@ async function publishStandalone(
 }
 
 // Abschlussphase für jede Spec, deren Sub-Issues alle geschlossen sind und
-// die noch keinen offenen PR hat. Scheitert eine, kommen die anderen trotzdem dran.
-async function finishCompletedSpecs(
-  deps: IterationDeps,
-  log: (message: string) => void,
-): Promise<void> {
-  for (const spec of await completedSpecs(deps, log)) {
+// die noch keinen offenen PR hat, höchstens einmal je Lauf. Scheitert eine,
+// kommen die anderen trotzdem dran.
+async function finishCompletedSpecs(deps: WithLog<IterationDeps>): Promise<void> {
+  const { log } = deps;
+  for (const spec of await completedSpecs(deps)) {
     if (deps.finishAttempted.has(spec)) {
       log(`  spec #${spec}: closing phase already attempted in this run - next run retries.`);
       continue;
     }
     deps.finishAttempted.add(spec);
     try {
-      await finishSpec(deps, spec, log);
+      await finishSpec(deps, spec);
     } catch (error) {
       log(`  ! Finishing spec #${spec} failed: ${error}`);
     }
@@ -610,13 +589,10 @@ async function finishCompletedSpecs(
 }
 
 // Die Specs, deren Integrations-Branch bereit für den PR ist: Spec offen,
-// alle Sub-Issues geschlossen, kein offener PR, Commits, die main noch fehlen,
-// und nicht im Checkout des Hosts ausgecheckt.
-async function completedSpecs(
-  deps: IterationDeps,
-  log: (message: string) => void,
-): Promise<number[]> {
-  const { tracker, repo } = deps;
+// alle Sub-Issues geschlossen, kein offener PR, Commits, die MAIN_REF noch
+// fehlen, und nicht im Checkout des Hosts ausgecheckt.
+async function completedSpecs(deps: WithLog<IterationDeps>): Promise<number[]> {
+  const { tracker, repo, log } = deps;
   const host = await repo.hostBranch();
   const specs: number[] = [];
   for (const branch of await repo.branches(SPEC_PREFIX)) {
@@ -624,7 +600,7 @@ async function completedSpecs(
     if (spec === undefined) continue;
     if (deps.spec !== undefined && spec !== deps.spec) continue;
     if (branch === host) {
-      log(checkedOutByHost(branch));
+      log(`  ! ${checkedOutByHost(host)}`);
       continue;
     }
     try {
@@ -644,13 +620,9 @@ async function completedSpecs(
 // Spec-Review, Behebung der Standards- und Korrektheitsbefunde, PR-Text,
 // dann Push und PR. Endet die Behebung ohne Abschlusssignal, bleibt der PR
 // aus; der nächste Lauf beginnt die Abschlussphase von vorn.
-async function finishSpec(
-  deps: IterationDeps,
-  spec: number,
-  log: (message: string) => void,
-): Promise<void> {
-  const { tracker, repo, agents } = deps;
-  const branch = `spec/${spec}`;
+async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<void> {
+  const { tracker, repo, agents, log } = deps;
+  const branch = specBranch(spec);
   log(`\n=== Finishing spec #${spec} on ${branch} ===`);
 
   const review = await agents.reviewSpec(spec, branch);
@@ -685,6 +657,7 @@ function specPrBody(body: string, openPoints: string[], spec: number): string {
   return parts.join("\n\n");
 }
 
+// Der Text des Standalone-PRs: eine Zeile `- #<n>: <Titel>` je Ticket.
 function standalonePrBody(ticketLines: string[]): string {
   return [
     "Von Sandcastle umgesetzte Tickets ohne Eltern-Spec, je Ticket reviewt:",
@@ -693,6 +666,35 @@ function standalonePrBody(ticketLines: string[]): string {
   ].join("\n");
 }
 
+// Der Planner vergibt diesen Namen deterministisch (siehe plan-prompt.md).
+function ticketBranch(issue: number): string {
+  return `sandcastle/issue-${issue}`;
+}
+
+// Der Integrations-Branch einer Spec.
+function specBranch(spec: number): string {
+  return `${SPEC_PREFIX}${spec}`;
+}
+
+// Die Spec-Nummer eines Branches `spec/<n>`, sonst undefined.
+function specOfBranch(branch: string): number | undefined {
+  if (!branch.startsWith(SPEC_PREFIX)) return undefined;
+  const spec = Number(branch.slice(SPEC_PREFIX.length));
+  return Number.isInteger(spec) ? spec : undefined;
+}
+
+// Ticket mit Eltern-Spec n -> spec/<n>, sonst sandcastle/standalone.
+function integrationBranchOf(spec: number | undefined): string {
+  return spec === undefined ? STANDALONE_BRANCH : specBranch(spec);
+}
+
+// Die Nummer der Eltern-Spec, oder undefined, wenn das Eltern-Issue fehlt
+// oder keine Spec ist.
+function specOf(parent: IssueSummary | undefined): number | undefined {
+  return parent && isSpec(parent) ? parent.number : undefined;
+}
+
+// Ob das Issue eine Spec ist (Label `Spec`).
 function isSpec(issue: IssueSummary): boolean {
   return issue.labels.includes("Spec");
 }
