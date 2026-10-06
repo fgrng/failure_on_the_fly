@@ -14,12 +14,15 @@ Code reaches `main` only through a pull request from an **integration branch**:
 - Spec `<n>` (labelled `Spec`) has its own integration branch `spec/<n>`, created from `main` on first use. Its tickets branch off it and merge back into it.
 - Tickets without a parent spec share the rolling integration branch `sandcastle/standalone`.
 
+Sandcastle runs `git fetch origin` at the start of every run and measures everything against `origin/main`; below, `main` means `origin/main`. It never touches the checkout it was started from: an integration branch checked out there is skipped for the whole run (no update, none of its tickets, no closing phase), and the log says so.
+
 Each issue closes at its own merge:
 
-- **Ticket**: closes once its branch is in its integration branch, not `main`. Sandcastle closes it itself after verifying the merge with `git merge-base --is-ancestor`; agents leave it open.
+- **Ticket**: closes once its branch is in its integration branch, not `main`. Sandcastle closes it itself after verifying the merge with `git merge-base --is-ancestor`; agents leave it open. If the merger ends without its completion signal, Sandcastle resets the integration branch to its state before the merger and closes none of its tickets.
+- **Blocker from another spec**: counts as done once it is on `main`: its `sandcastle/issue-<n>` branch is there, a commit there references it as `(#<n>` (keep this commit convention), or its spec is closed.
 - **Spec**: closes when its PR merges into `main`, through the `Closes #<n>` that ends the PR body. That PR is the only way a spec closes, so leave parent issues untouched (state, body, labels) while writing, implementing or closing tickets.
 
-When every sub-issue of a spec is closed and `spec/<n>` has no open PR, Sandcastle runs the spec's **closing phase**: `code-review` over the whole spec against `main`, a fix of its standards and correctness findings, a PR text from the `pr` skill with the spec findings as "Offene Punkte", then push and PR from `spec/<n>` to `main`. From then on the spec is **locked**: Sandcastle comments on its remaining tickets and moves them from `ready-for-agent` to `ready-for-human`. Late work goes into a new spec.
+When every sub-issue of a spec is closed and `spec/<n>` has no open PR, Sandcastle runs the spec's **closing phase**: `code-review` over the whole spec against `main`, a fix of its standards and correctness findings, a PR text from the `pr` skill with the spec findings as "Offene Punkte", then push and PR from `spec/<n>` to `main`. A failed closing phase is retried by the next run, not by later iterations of the same run. From then on the spec is **locked**: Sandcastle comments on its remaining tickets and moves them from `ready-for-agent` to `ready-for-human`. Late work goes into a new spec.
 
 `sandcastle/standalone` has no closing phase. Whenever it has commits not on `main`, Sandcastle pushes it and opens or extends its PR; after that PR merges, the next run restarts the branch from `main`.
 

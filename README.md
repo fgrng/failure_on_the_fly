@@ -108,7 +108,16 @@ Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
 `npm run sandcastle -- --spec <n>` beschränkt ihn auf die Sub-Issues der
 Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
 Blocker derselben Spec gibt sein Ticket frei, sobald er geschlossen ist, ein
-Blocker aus einer anderen Spec erst, wenn sein Code auf `main` liegt.
+Blocker aus einer anderen Spec erst, wenn sein Code auf `main` liegt, also
+sein Ticket-Branch dort enthalten ist, ein Commit dort auf ihn verweist
+(`(#<n>` in der Commit-Nachricht) oder seine Spec geschlossen ist.
+
+Zu Beginn jedes Laufs holt das Skript mit `git fetch origin` den Stand von
+GitHub. „`main`“ heißt im Folgenden immer `origin/main`; das lokale `main`
+bleibt unberührt und darf veraltet sein. Den Checkout, in dem der Lauf
+gestartet wurde, fasst das Skript nicht an. Steht er auf einem
+Integrations-Branch, lässt der Lauf diesen Branch aus: kein Update, keine
+Tickets seiner Spec, keine Abschlussphase. Das Log meldet das.
 
 Code kommt nur über einen Pull Request von einem Integrations-Branch nach
 `main`:
@@ -120,19 +129,22 @@ Code kommt nur über einen Pull Request von einem Integrations-Branch nach
   Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
 - Gemergt und geschlossen werden nur Tickets, deren Implementer sein
   Abschlusssignal gegeben hat und deren Branch nachweislich im
-  Integrations-Branch liegt. Das Schließen übernimmt das Skript.
+  Integrations-Branch liegt. Das Schließen übernimmt das Skript. Endet der
+  Merger ohne Abschlusssignal, setzt das Skript den Integrations-Branch auf
+  seinen Stand davor zurück und schließt keines seiner Tickets.
 - Sind alle Tickets einer Spec geschlossen, folgt ihre Abschlussphase: ein
   `code-review` über die ganze Spec gegen `main`, die Behebung der Standards-
   und Korrektheitsbefunde, ein PR-Text mit dem Skill `pr`. Spec-Befunde stehen
   darin als „Offene Punkte“, am Ende `Closes #<n>`. Das Skript pusht
   `spec/<n>` und legt den PR an; die Spec schließt GitHub beim Merge.
+  Scheitert die Abschlussphase, versucht sie erst der nächste Lauf erneut.
 - Hat eine Spec schon einen offenen PR, plant das Skript ihre übrigen Tickets
   nicht mehr ein, sondern kommentiert sie und stellt sie auf
   `ready-for-human`: Nachzügler gehören in eine neue Spec.
 - `sandcastle/standalone` hat keine Abschlussphase. Hat der Branch Commits,
   die nicht auf `main` liegen, pusht ihn das Skript und legt einen PR an oder
   ergänzt den offenen. Ist der PR gemergt, beginnt der Branch im nächsten Lauf
-  neu von `main`.
+  neu von `main`. Nur dieser Branch wird mit `--force-with-lease` gepusht.
 
 Die PRs mergt die Maintainerin bzw. der Maintainer von Hand, mit Merge-Commit
 und erst bei grüner CI. So bleiben die Commits je Ticket samt
