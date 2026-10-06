@@ -89,7 +89,9 @@ Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
 Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
 Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
 ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
-schließt das Skript nicht. Voraussetzung sind Node, Docker
+schließt das Skript nicht. Hat eine Spec schon einen offenen PR, plant das
+Skript ihre übrigen Tickets nicht mehr ein, sondern kommentiert sie und stellt
+sie auf `ready-for-human`: Nachzügler gehören in eine neue Spec. Voraussetzung sind Node, Docker
 und die Zugangsdaten aus
 `.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
 

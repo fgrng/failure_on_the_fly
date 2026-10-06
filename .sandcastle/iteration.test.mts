@@ -524,7 +524,7 @@ test("hat die Spec schon einen offenen PR, startet keine Abschlussphase", async 
   agents.deferred.add("32");
   await run();
   await tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
-  agents.deferred.clear();
+  await tracker.close(32, "von Hand umgesetzt");
 
   await run();
 
@@ -636,5 +636,47 @@ test("mit --spec <n> wird nur Spec #n abgeschlossen", async () => {
   assert.deepEqual(
     tracker.pullRequests.map((pr) => pr.head),
     ["spec/40"],
+  );
+});
+
+test("hat die Spec eines Tickets einen offenen PR, fehlt es in der Frontier, wird einmal kommentiert und auf ready-for-human gestellt", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(7));
+  await tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
+
+  await run();
+  await run();
+
+  assert.deepEqual(
+    {
+      planned: agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+      comments: tracker.comments.map((c) => c.number),
+      labels: (await tracker.issue(31)).labels,
+      open: tracker.isOpen(31),
+    },
+    { planned: [[7], []], comments: [31], labels: ["ready-for-human"], open: true },
+  );
+  assert.match(tracker.comments[0].comment, /neue Spec/);
+});
+
+test("ein gemergter oder fehlender Spec-PR sperrt kein Ticket", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40 });
+  await tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
+  tracker.mergePullRequest(tracker.pullRequests[0].number);
+
+  await run();
+
+  assert.deepEqual(
+    {
+      planned: agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+      comments: tracker.comments,
+    },
+    { planned: [[31, 41]], comments: [] },
   );
 });

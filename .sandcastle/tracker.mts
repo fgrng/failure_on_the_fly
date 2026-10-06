@@ -80,6 +80,14 @@ export const githubTracker: Tracker = {
     gh(["issue", "close", String(issue), "--comment", comment]);
   },
 
+  async comment(issue: number, comment: string): Promise<void> {
+    gh(["issue", "comment", String(issue), "--body", comment]);
+  },
+
+  async swapLabel(issue: number, remove: string, add: string): Promise<void> {
+    gh(["issue", "edit", String(issue), "--remove-label", remove, "--add-label", add]);
+  },
+
   async pullRequest(head: string): Promise<PullRequest | undefined> {
     // gh listet die neuesten PRs zuerst.
     const prs: {

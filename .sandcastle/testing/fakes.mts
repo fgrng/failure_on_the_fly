@@ -33,6 +33,8 @@ export class FakeTracker implements Tracker {
   private issues = new Map<number, TrackedIssue>();
   /** Jedes Schließen mit seinem Kommentar, in Aufrufreihenfolge. */
   readonly closed: { number: number; comment: string }[] = [];
+  /** Jeder Kommentar ohne Schließen, in Aufrufreihenfolge. */
+  readonly comments: { number: number; comment: string }[] = [];
   /** Alle PRs, in der Reihenfolge ihres Anlegens. */
   readonly pullRequests: PullRequest[] = [];
 
@@ -55,10 +57,15 @@ export class FakeTracker implements Tracker {
     return this.get(number).open;
   }
 
-  /** Wie `-is:blocked`: Tickets mit offenem Blocker fehlen. */
+  /** Wie `--label ready-for-agent -is:blocked`: Tickets ohne das Label oder mit offenem Blocker fehlen. */
   async readyTickets(): Promise<Ticket[]> {
     return [...this.issues.values()].flatMap((i) =>
-      i.open && i.ticket && i.blockedBy?.every((b) => !this.isOpen(b)) ? [i.ticket] : [],
+      i.open &&
+      i.ticket &&
+      i.labels.includes("ready-for-agent") &&
+      i.blockedBy?.every((b) => !this.isOpen(b))
+        ? [{ ...i.ticket, labels: i.labels }]
+        : [],
     );
   }
 
@@ -84,6 +91,16 @@ export class FakeTracker implements Tracker {
   async close(number: number, comment: string): Promise<void> {
     this.get(number).open = false;
     this.closed.push({ number, comment });
+  }
+
+  async comment(number: number, comment: string): Promise<void> {
+    this.get(number);
+    this.comments.push({ number, comment });
+  }
+
+  async swapLabel(number: number, remove: string, add: string): Promise<void> {
+    const issue = this.get(number);
+    issue.labels = [...issue.labels.filter((l) => l !== remove && l !== add), add];
   }
 
   async pullRequest(head: string): Promise<PullRequest | undefined> {

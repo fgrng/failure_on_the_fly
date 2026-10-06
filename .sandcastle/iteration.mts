@@ -43,6 +43,9 @@ export interface Tracker {
   parentOf(issue: number): Promise<IssueSummary | undefined>;
   issue(issue: number): Promise<IssueSummary>;
   close(issue: number, comment: string): Promise<void>;
+  comment(issue: number, comment: string): Promise<void>;
+  /** Ersetzt das Label `remove` durch `add`. */
+  swapLabel(issue: number, remove: string, add: string): Promise<void>;
   /** Der offene PR von `head`, sonst der zuletzt angelegte, sonst undefined. */
   pullRequest(head: string): Promise<PullRequest | undefined>;
   createPullRequest(pr: { head: string; base: string; title: string; body: string }): Promise<void>;
@@ -272,7 +275,8 @@ async function planImplementAndMerge(
 // Die Tickets, die der Planner zu sehen bekommt: die bereiten Tickets des
 // Trackers, mit `--spec` nur die Sub-Issues dieser Spec. Offene Blocker hat
 // der Tracker schon ausgefiltert; ein geschlossener Blocker aus einem anderen
-// Integrations-Branch zählt erst, wenn er auf main liegt. Ein Ticket, dessen
+// Integrations-Branch zählt erst, wenn er auf main liegt. Hat die Spec schon
+// einen offenen PR, geht das Ticket an einen Menschen. Ein Ticket, dessen
 // Eltern-Issues sich nicht lesen lassen, fällt heraus.
 async function frontier(deps: IterationDeps, log: (message: string) => void): Promise<Ticket[]> {
   const { tracker } = deps;
@@ -281,6 +285,11 @@ async function frontier(deps: IterationDeps, log: (message: string) => void): Pr
     try {
       const spec = specOf(await tracker.parentOf(ticket.number));
       if (deps.spec !== undefined && spec !== deps.spec) continue;
+      if (spec !== undefined && (await hasOpenPullRequest(tracker, spec))) {
+        await handOverLateTicket(tracker, ticket.number, spec);
+        log(`  #${ticket.number}: spec #${spec} already has an open PR, handed over to a human.`);
+        continue;
+      }
       const pending = await blockersNotOnMain(deps, ticket, spec);
       if (pending.length > 0) {
         log(`  #${ticket.number}: waiting for ${pending.map((b) => `#${b}`).join(", ")} on ${MAIN_BRANCH}.`);
@@ -293,6 +302,21 @@ async function frontier(deps: IterationDeps, log: (message: string) => void): Pr
     tickets.push(ticket);
   }
   return tickets;
+}
+
+async function hasOpenPullRequest(tracker: Tracker, spec: number): Promise<boolean> {
+  return (await tracker.pullRequest(`spec/${spec}`))?.state === "open";
+}
+
+// Ein Nachzügler würde still den PR im Review vergrößern. Der Label-Wechsel
+// nimmt ihn aus der Frontier, damit der Kommentar nur einmal entsteht.
+async function handOverLateTicket(tracker: Tracker, issue: number, spec: number): Promise<void> {
+  await tracker.comment(
+    issue,
+    `Sandcastle plant dieses Ticket nicht ein: Spec #${spec} hat schon einen offenen PR. ` +
+      "Nachzügler gehören in eine neue Spec. Das Label steht deshalb jetzt auf `ready-for-human`.",
+  );
+  await tracker.swapLabel(issue, "ready-for-agent", "ready-for-human");
 }
 
 // Die Blocker des Tickets aus einer anderen Spec (oder von außerhalb jeder
@@ -516,7 +540,7 @@ async function completedSpecs(
     try {
       const { open, subIssues } = await tracker.issue(spec);
       if (!open || subIssues.total === 0 || subIssues.completed !== subIssues.total) continue;
-      if ((await tracker.pullRequest(branch))?.state === "open") continue;
+      if (await hasOpenPullRequest(tracker, spec)) continue;
       if (await repo.contains(MAIN_BRANCH, branch)) continue;
     } catch (error) {
       log(`  ! ${branch}: could not check spec #${spec}, skipping: ${error}`);
