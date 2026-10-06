@@ -110,6 +110,12 @@ npm run sandcastle:codex              # Codex
 npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
 ```
 
+Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
+`npm run sandcastle -- --spec <n>` beschränkt ihn auf die Sub-Issues der
+Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
+Blocker derselben Spec gibt sein Ticket frei, sobald er geschlossen ist, ein
+Blocker aus einer anderen Spec erst, wenn sein Code auf `main` liegt.
+
 Prompts und das Dockerfile der Sandbox liegen ebenfalls in `.sandcastle/`;
 Logs und Worktrees des Laufs bleiben dort unversioniert. Die Ablauflogik einer
 Iteration (`.sandcastle/iteration.mts`) ist gegen Fakes für Tracker, Repo und

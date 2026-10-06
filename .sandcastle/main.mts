@@ -7,9 +7,12 @@
 //              `sandcastle/standalone` if present) without touching the host
 //              checkout. Only a conflict starts a merger; if it fails, the
 //              branch stays as it was and the run reports it.
-//   Plan:     The tracker yields the unblocked tickets (`ready-for-agent`,
-//              not `Spec`, not `is:blocked`); the planner drops those likely
-//              to conflict with each other and names each branch.
+//   Plan:      The tracker yields the unblocked tickets (`ready-for-agent`,
+//              not `Spec`, not `is:blocked`). The driver drops tickets whose
+//              closed blocker from another spec is not on main yet and, with
+//              `--spec <n>`, every ticket outside spec <n>. The planner gets
+//              that list, drops tickets likely to conflict with each other
+//              and names each branch.
 //   Implement: One implementer per ticket, up to MAX_PARALLEL concurrently.
 //              A ticket with parent Spec <n> branches off its integration
 //              branch `spec/<n>` (created from main if missing); a ticket
@@ -27,6 +30,7 @@
 //   npm run sandcastle                  — Claude Code line-up (default)
 //   npm run sandcastle -- --agent codex — Codex line-up
 //   npm run sandcastle:codex            — same, without the `--` dance
+//   npm run sandcastle -- --spec 321    — only the sub-issues of spec #321
 
 import { parseArgs } from "node:util";
 import { DEFAULT_LINEUP, LINEUPS, sandcastleAgents } from "./agents.mts";
@@ -41,7 +45,10 @@ const MAX_ITERATIONS = 10;
 const MAX_PARALLEL = 4;
 
 const { values: cliArgs } = parseArgs({
-  options: { agent: { type: "string", short: "a", default: DEFAULT_LINEUP } },
+  options: {
+    agent: { type: "string", short: "a", default: DEFAULT_LINEUP },
+    spec: { type: "string" },
+  },
 });
 
 const lineupName = cliArgs.agent ?? DEFAULT_LINEUP;
@@ -54,7 +61,14 @@ if (!lineup) {
   process.exit(1);
 }
 
+const spec = cliArgs.spec === undefined ? undefined : Number(cliArgs.spec);
+if (spec !== undefined && !Number.isInteger(spec)) {
+  console.error(`--spec expects an issue number, got "${cliArgs.spec}".`);
+  process.exit(1);
+}
+
 console.log(`Agent line-up: ${lineupName}`);
+if (spec !== undefined) console.log(`Limited to the sub-issues of spec #${spec}.`);
 
 const deps = {
   tracker: githubTracker,
@@ -62,6 +76,7 @@ const deps = {
   agents: sandcastleAgents(lineup),
   targetBranch: currentBranch(),
   maxParallel: MAX_PARALLEL,
+  spec,
 };
 
 console.log(`\n=== Updating integration branches from main ===\n`);
