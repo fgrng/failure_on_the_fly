@@ -15,9 +15,8 @@ import type {
   Ticket,
   TicketSession,
 } from "./iteration.mts";
-import { currentBranch } from "./repo.mts";
 
-// Configure mounts for the .codex / .claude folders containing auth info.
+// Mounts für die Ordner .codex und .claude mit den Zugangsdaten des Hosts.
 // <user>
 const hostCodexHome = path.join(os.homedir(), ".codex");
 const sandboxCodexMount = "/mnt/host-codex";
@@ -28,21 +27,22 @@ const sandboxClaudeMount = "/mnt/host-claude";
 const sandboxClaudeHome = "/home/agent/.claude";
 // </user>
 
-// Maximum agent invocations the implementer gets per issue. The implement
-// prompt is written as a Ralph loop ("REPEAT until done", "notes for next
-// iteration"), which only works if the agent is re-invoked after a run that
-// ends without the completion signal. Sandcastle's default is 1, which would
-// silently cut the loop after a single invocation.
+// Höchstzahl der Agent-Aufrufe des Implementers je Ticket. Der
+// Implement-Prompt ist als Ralph-Schleife geschrieben („REPEAT until done“,
+// Notizen für die nächste Iteration); das trägt nur, wenn der Agent nach
+// einem Lauf ohne Abschlusssignal erneut startet. Sandcastles Default von 1
+// bräche die Schleife still nach dem ersten Aufruf ab.
 const MAX_IMPLEMENT_ITERATIONS = 20;
 
 // ---------------------------------------------------------------------------
-// Line-ups — one place to swap models per phase
+// Line-ups: hier werden die Modelle je Phase getauscht
 // ---------------------------------------------------------------------------
 //
-// One line-up per CLI, picked at startup with `--agent`. Both CLIs are
-// installed in the image and both are authenticated by the hooks below, so
-// either line-up works as-is.
+// Ein Line-up je CLI, gewählt beim Start mit `--agent`. Beide CLIs sind im
+// Image installiert und werden von den Hooks unten angemeldet, also läuft
+// jedes Line-up ohne weitere Einrichtung.
 
+/** Die Agent-CLI und das Modell je Phase. */
 export type Lineup = {
   planner: sandcastle.AgentProvider;
   implementer: sandcastle.AgentProvider;
@@ -50,6 +50,7 @@ export type Lineup = {
   merger: sandcastle.AgentProvider;
 };
 
+/** Die wählbaren Line-ups, nach dem Namen für `--agent`. */
 export const LINEUPS: Record<string, Lineup> = {
   claude: {
     planner: sandcastle.claudeCode("claude-sonnet-5", { effort: "medium" }),
@@ -65,11 +66,12 @@ export const LINEUPS: Record<string, Lineup> = {
   },
 };
 
+/** Das Line-up ohne `--agent`. */
 export const DEFAULT_LINEUP = "claude";
 
-// Shape the planner must emit inside its <plan> tag. Validated by Sandcastle,
-// so a malformed or missing plan fails with a schema error instead of a raw
-// JSON.parse crash.
+// Die Form, die der Planner in seinem <plan>-Tag ausgeben muss. Sandcastle
+// prüft sie, sodass ein fehlerhafter oder fehlender Plan mit einem
+// Schema-Fehler scheitert statt mit einem rohen JSON.parse-Absturz.
 const planSchema = z.object({
   issues: z.array(
     z.object({ id: z.string(), title: z.string(), branch: z.string() }),
@@ -93,18 +95,10 @@ const pullRequestSchema = z.object({
 // bekommt den Fehler zurück und gibt neu aus.
 const OUTPUT_RETRIES = 2;
 
-// Ein Integrations-Branch bekommt einen eigenen Worktree, damit der Checkout
-// des Hosts unberührt bleibt. Steht der Host selbst auf dem Branch, läuft der
-// Agent direkt im Checkout, weil git einen Branch nicht in zwei Worktrees
-// zugleich auscheckt.
-function onIntegrationBranch(branch: string): sandcastle.BranchStrategy {
-  return branch === currentBranch() ? { type: "head" } : { type: "branch", branch };
-}
-
-// docker() sandbox config wiring the read-only host auth mounts and CODEX_HOME.
-// Called fresh per sandbox so each phase gets its own configured container.
-// Claude Code needs no equivalent env var — /home/agent/.claude is already the
-// default config location for the agent user inside the sandbox.
+// Die docker()-Sandbox mit den schreibgeschützten Auth-Mounts des Hosts und
+// CODEX_HOME. Jede Phase bekommt einen frisch konfigurierten Container.
+// Claude Code braucht keine entsprechende Variable: /home/agent/.claude ist
+// für den Agent-User in der Sandbox ohnehin der Standardort.
 const agentSandbox = () =>
   docker({
     env: { CODEX_HOME: sandboxCodexHome },
@@ -114,31 +108,31 @@ const agentSandbox = () =>
     ],
   });
 
-// Hooks run inside the sandbox before the agent starts. uv sync ensures fresh
-// dependencies; both the managed Python 3.14 toolchain and the project's locked
-// wheels are pre-provisioned in the image (see .sandcastle/Dockerfile), so sync
-// installs from uv's warm cache and only links the .venv instead of downloading
-// the interpreter and dependencies. The second and third commands copy the
-// Codex and Claude Code auth material from the read-only mounts into the
-// respective config directories so both CLIs are authenticated.
+// Die Hooks laufen in der Sandbox, bevor der Agent startet. `uv sync` sorgt
+// für aktuelle Abhängigkeiten; das verwaltete Python 3.14 und die gesperrten
+// Wheels des Projekts liegen schon im Image (siehe .sandcastle/Dockerfile),
+// also installiert sync aus dem warmen Cache von uv und verlinkt nur die
+// .venv, statt Interpreter und Abhängigkeiten herunterzuladen. Der zweite und
+// dritte Befehl kopieren die Zugangsdaten von Codex und Claude Code aus den
+// schreibgeschützten Mounts in deren Konfigurationsordner, damit beide CLIs
+// angemeldet sind.
 const hooks = {
   host: {
-    // config/settings.py reads SECRET_KEY from the environment via .env, but
-    // .env is gitignored and therefore absent from a fresh worktree — every
-    // `uv run pytest` the prompts ask for would die with KeyError: 'SECRET_KEY'.
-    // .env.example carries a placeholder secret, which is all the test suite
-    // needs. Guarded by `test -f` so the phases that run against the host
-    // checkout directly (planner, and a merger into the host branch —
-    // branch strategy "head") never
-    // overwrite the developer's real .env.
+    // config/settings.py liest SECRET_KEY über .env aus der Umgebung, aber .env
+    // ist gitignoriert und fehlt in einem frischen Worktree; jedes
+    // `uv run pytest` aus den Prompts stürbe mit KeyError: 'SECRET_KEY'.
+    // .env.example enthält ein Platzhalter-Secret, mehr braucht die
+    // Testsuite nicht. Der Planner läuft direkt im Checkout des Hosts;
+    // `test -f` verhindert, dass dort die echte .env überschrieben wird.
     onWorktreeReady: [{ command: "test -f .env || cp .env.example .env" }],
   },
   sandbox: {
     onSandboxReady: [
-      // The image (see .sandcastle/Dockerfile) pre-warms uv's cache, so this
-      // normally installs from cache in seconds. The raised timeout is a safety
-      // net for a cold cache (first run after a uv.lock change / image rebuild),
-      // where wheels are still downloaded.
+      // Das Image (siehe .sandcastle/Dockerfile) wärmt den Cache von uv vor,
+      // normalerweise installiert dies also in Sekunden aus dem Cache. Das
+      // erhöhte Timeout sichert einen kalten Cache ab (erster Lauf nach einer
+      // Änderung an uv.lock oder einem Neubau des Images), bei dem noch Wheels
+      // heruntergeladen werden.
       { command: "uv sync", timeoutMs: 120_000 },
       {
         command: [
@@ -153,16 +147,16 @@ const hooks = {
           `mkdir -p "${sandboxClaudeHome}"`,
           `test -f "${sandboxClaudeMount}/.credentials.json"`,
           `cp "${sandboxClaudeMount}/.credentials.json" "${sandboxClaudeHome}/.credentials.json"`,
-          // The host settings.json carries three host-only keys that break or
-          // mislead inside the container, so they are stripped rather than
-          // copied verbatim:
-          //   sandbox       — enables a nested bubblewrap/socat sandbox that is
-          //                   absent from the image and, with failIfUnavailable
-          //                   set, aborts the agent. It would also be redundant
-          //                   next to the Docker sandbox we already run in.
-          //   statusLine    — shells out to a script under the host's home.
-          //   enabledPlugins— resolves against ~/.claude/plugins, which is not
-          //                   copied into the sandbox.
+          // Die settings.json des Hosts enthält drei Schlüssel, die nur auf dem
+          // Host gelten und im Container stören oder in die Irre führen; sie
+          // werden entfernt statt wörtlich kopiert:
+          //   sandbox       — schaltet eine verschachtelte bubblewrap/socat-
+          //                   Sandbox ein, die im Image fehlt und mit
+          //                   failIfUnavailable den Agent abbricht. Neben der
+          //                   Docker-Sandbox wäre sie ohnehin überflüssig.
+          //   statusLine    — ruft ein Skript im Home des Hosts auf.
+          //   enabledPlugins— verweist auf ~/.claude/plugins, das nicht in die
+          //                   Sandbox kopiert wird.
           `if [ -f "${sandboxClaudeMount}/settings.json" ]; then jq 'del(.sandbox, .statusLine, .enabledPlugins)' "${sandboxClaudeMount}/settings.json" > "${sandboxClaudeHome}/settings.json"; fi`,
         ].join(" && "),
       },
@@ -170,10 +164,23 @@ const hooks = {
   },
 };
 
-// Nothing to copy from the host into the worktree — the uv sync hook above
-// provisions the virtualenv and managed Python from scratch inside the sandbox.
+// Nichts aus dem Host in den Worktree kopieren: Der Hook `uv sync` oben legt
+// virtualenv und verwaltetes Python in der Sandbox von Grund auf an.
 const copyToWorktree: string[] = [];
 
+// Die gemeinsamen Einstellungen jedes Agent-Laufs. Mit `branch` arbeitet der
+// Agent in einem eigenen Worktree auf diesem Branch, nie im Checkout des
+// Hosts; den Branch, den der Host ausgecheckt hat, lässt iteration.mts aus.
+function runSettings(branch?: string) {
+  return {
+    sandbox: agentSandbox(),
+    hooks,
+    copyToWorktree,
+    ...(branch === undefined ? {} : { branchStrategy: { type: "branch" as const, branch } }),
+  };
+}
+
+// Die Commits und das Abschlusssignal eines Sandcastle-Laufs.
 function agentRun(result: {
   commits: readonly { sha: string }[];
   completionSignal?: string;
@@ -189,12 +196,10 @@ export function sandcastleAgents(lineup: Lineup): Agents {
   return {
     async plan(tickets: Ticket[]): Promise<PlannedIssue[]> {
       const plan = await sandcastle.run({
-        sandbox: agentSandbox(),
-        hooks,
-        copyToWorktree,
+        ...runSettings(),
         name: "Planner",
-        // Reading and reasoning only, no code to write. Structured output
-        // requires exactly one iteration, so this is not merely a default.
+        // Nur lesen und abwägen, kein Code. Strukturierte Ausgabe verlangt
+        // genau eine Iteration; das ist also mehr als ein Default.
         maxIterations: 1,
         agent: lineup.planner,
         promptFile: "./.sandcastle/plan-prompt.md",
@@ -221,10 +226,10 @@ export function sandcastleAgents(lineup: Lineup): Agents {
         TASK_ID: issue.id,
         ISSUE_TITLE: issue.title,
         BRANCH: issue.branch,
-        // TARGET_BRANCH is a built-in prompt arg (auto-injected as the host's
-        // active branch at run() time) and must not be passed explicitly —
-        // doing so throws PromptError. The branch the ticket merges into
-        // therefore travels as its own argument.
+        // TARGET_BRANCH ist ein eingebautes Prompt-Argument (beim run() als
+        // aktiver Branch des Hosts gesetzt) und darf nicht übergeben werden,
+        // sonst wirft Sandcastle einen PromptError. Der Branch, in den das
+        // Ticket gemergt wird, reist deshalb als eigenes Argument.
         INTEGRATION_BRANCH: integrationBranch,
       };
       return await work({
@@ -242,7 +247,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           agentRun(
             await sandbox.run({
               name: "Reviewer #" + issue.id,
-              // A single pass over the finished diff, matching the prompt.
+              // Ein Durchgang über den fertigen Diff, wie im Prompt.
               maxIterations: 1,
               agent: lineup.reviewer,
               promptFile: "./.sandcastle/review-prompt.md",
@@ -255,10 +260,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
     async merge(into: string, branches: string[]): Promise<AgentRun> {
       return agentRun(
         await sandcastle.run({
-          sandbox: agentSandbox(),
-          branchStrategy: onIntegrationBranch(into),
-          hooks,
-          copyToWorktree,
+          ...runSettings(into),
           name: `Merger ${into}`,
           maxIterations: 10,
           agent: lineup.merger,
@@ -273,10 +275,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
 
     async reviewSpec(spec: number, branch: string): Promise<SpecReview> {
       const review = await sandcastle.run({
-        sandbox: agentSandbox(),
-        branchStrategy: onIntegrationBranch(branch),
-        hooks,
-        copyToWorktree,
+        ...runSettings(branch),
         name: `Spec-Review #${spec}`,
         // Strukturierte Ausgabe verlangt genau eine Iteration.
         maxIterations: 1,
@@ -295,10 +294,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
     async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
       return agentRun(
         await sandcastle.run({
-          sandbox: agentSandbox(),
-          branchStrategy: onIntegrationBranch(branch),
-          hooks,
-          copyToWorktree,
+          ...runSettings(branch),
           name: `Spec-Fix #${spec}`,
           maxIterations: MAX_IMPLEMENT_ITERATIONS,
           agent: lineup.implementer,
@@ -314,10 +310,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
 
     async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
       const text = await sandcastle.run({
-        sandbox: agentSandbox(),
-        branchStrategy: onIntegrationBranch(branch),
-        hooks,
-        copyToWorktree,
+        ...runSettings(branch),
         name: `PR-Text #${spec}`,
         maxIterations: 1,
         agent: lineup.reviewer,

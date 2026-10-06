@@ -137,18 +137,37 @@ export class FakeTracker implements Tracker {
   }
 }
 
-// Ein Branch ist die Menge der Commits, die er enthält. Ein Push legt den
-// Stand des Branches unter origin/<branch> ab.
+// Ein Branch ist die Menge der Commits, die er enthält. `origin/<branch>`
+// ist der Stand, den der letzte Fetch oder Push von GitHub kennt; was auf
+// GitHub selbst liegt, steht getrennt davon und kommt erst per Fetch herein.
 export class FakeRepo implements Repo {
   private refs = new Map<string, Set<string>>();
+  private remote = new Map<string, Set<string>>();
+  private messages = new Map<string, string>();
   private nextSha = 1;
   /** Solange gesetzt, scheitert jeder Push. */
   pushFails = false;
-  /** Branches, deren Merge mit main einen Konflikt ergibt. */
+  /** Branches, deren Merge mit origin/main einen Konflikt ergibt. */
   readonly conflicting = new Set<string>();
+  /** Der Branch, den der Checkout des Hosts gerade ausgecheckt hat. */
+  checkedOut = "main";
 
   constructor(...branches: string[]) {
-    for (const branch of branches) this.refs.set(branch, new Set());
+    for (const branch of branches) {
+      this.refs.set(branch, new Set());
+      this.refs.set(`origin/${branch}`, new Set());
+      this.remote.set(branch, new Set());
+    }
+  }
+
+  async fetch(): Promise<void> {
+    for (const [branch, commits] of this.remote) {
+      this.refs.set(`origin/${branch}`, new Set(commits));
+    }
+  }
+
+  async hostBranch(): Promise<string> {
+    return this.checkedOut;
   }
 
   async branchExists(branch: string): Promise<boolean> {
@@ -163,18 +182,24 @@ export class FakeRepo implements Repo {
     return [...this.refs.keys()].filter((b) => b.startsWith(prefix));
   }
 
-  // Bringt main etwas Neues, entsteht wie bei git ein Merge-Commit.
+  // Bringt origin/main etwas Neues, entsteht wie bei git ein Merge-Commit.
   async mergeMain(branch: string): Promise<"clean" | "conflict"> {
     if (this.conflicting.has(branch)) return "conflict";
-    if (await this.contains(branch, "main")) return "clean";
-    this.merge("main", branch);
+    if (await this.contains(branch, "origin/main")) return "clean";
+    this.merge("origin/main", branch);
     this.commit(branch);
     return "clean";
   }
 
   async push(branch: string): Promise<void> {
     if (this.pushFails) throw new Error(`FakeRepo: Push von ${branch} abgewiesen`);
+    this.remote.set(branch, new Set(this.commits(branch)));
     this.refs.set(`origin/${branch}`, new Set(this.commits(branch)));
+  }
+
+  async mentionsIssue(ref: string, issue: number): Promise<boolean> {
+    const pattern = new RegExp(`\\(#${issue}[,)]`);
+    return [...this.commits(ref)].some((sha) => pattern.test(this.messages.get(sha) ?? ""));
   }
 
   /** Ob der Branch genau so gepusht ist, wie er lokal steht. */
@@ -184,14 +209,33 @@ export class FakeRepo implements Repo {
     return remote !== undefined && remote.size === local.size && [...local].every((sha) => remote.has(sha));
   }
 
-  commit(branch: string): string {
+  commit(branch: string, message = ""): string {
     const sha = `c${this.nextSha++}`;
+    this.messages.set(sha, message);
     this.commits(branch).add(sha);
     return sha;
   }
 
   merge(source: string, into: string): void {
     for (const sha of this.commits(source)) this.commits(into).add(sha);
+  }
+
+  /** Ein Commit landet auf GitHub, etwa von einem anderen Rechner. */
+  commitOnOrigin(branch: string, message = ""): string {
+    const sha = `c${this.nextSha++}`;
+    this.messages.set(sha, message);
+    this.remoteCommits(branch).add(sha);
+    return sha;
+  }
+
+  /** Die Maintainerin bzw. der Maintainer mergt `source` auf GitHub in `into`. */
+  mergeOnOrigin(source: string, into: string): void {
+    for (const sha of this.commits(source)) this.remoteCommits(into).add(sha);
+  }
+
+  /** Ob `branch` den Commit `sha` enthält. */
+  hasCommit(branch: string, sha: string): boolean {
+    return this.commits(branch).has(sha);
   }
 
   // Der Stand eines Branches: seine Commits, sortiert und verkettet.
@@ -203,7 +247,9 @@ export class FakeRepo implements Repo {
     this.refs.set(branch, new Set(head ? head.split(",") : []));
   }
 
+  // Wie gitRepo: ein unbekannter Ref ist nirgends enthalten.
   async contains(branch: string, ref: string): Promise<boolean> {
+    if (!this.refs.has(ref)) return false;
     const target = this.commits(branch);
     return [...this.commits(ref)].every((sha) => target.has(sha));
   }
@@ -211,6 +257,12 @@ export class FakeRepo implements Repo {
   private commits(branch: string): Set<string> {
     const commits = this.refs.get(branch);
     if (!commits) throw new Error(`FakeRepo: Branch ${branch} unbekannt`);
+    return commits;
+  }
+
+  private remoteCommits(branch: string): Set<string> {
+    const commits = this.remote.get(branch);
+    if (!commits) throw new Error(`FakeRepo: Branch ${branch} auf origin unbekannt`);
     return commits;
   }
 }

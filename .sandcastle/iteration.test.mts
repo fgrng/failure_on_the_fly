@@ -9,7 +9,9 @@ function setup(options: { spec?: number } = {}) {
   const agents = new FakeAgents(repo);
   const run = () =>
     runIteration({ tracker, repo, agents, log: () => {}, ...options });
-  return { tracker, repo, agents, run };
+  // Laufbeginn wie in main.mts: Fetch und Update der Integrations-Branches.
+  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  return { tracker, repo, agents, run, update };
 }
 
 test("der Planner bekommt die Tickets aus dem Tracker-Filter", async () => {
@@ -69,9 +71,9 @@ test("geschlossen werden nur Tickets, deren Branch nachweislich gemergt ist", as
 });
 
 test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits gemergt", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addTicket(ticket(7));
-  await repo.createBranch("sandcastle/standalone", "main");
+  await repo.createBranch("sandcastle/standalone", "origin/main");
   await repo.createBranch("sandcastle/issue-7", "sandcastle/standalone");
   repo.commit("sandcastle/issue-7");
   agents.implementers.set("7", { commits: 0, completed: true });
@@ -128,20 +130,21 @@ test("ein Fehler bei einem Ticket hält die übrigen nicht auf", async () => {
 });
 
 test("ein Ticket einer Spec zweigt von spec/<n> ab, das von main entsteht, und wird dorthin gemergt", async () => {
-  const { tracker, repo, agents, run } = setup();
-  repo.commit("main");
+  const { tracker, repo, agents, run, update } = setup();
+  repo.commitOnOrigin("main");
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
 
+  await update();
   await run();
 
   assert.deepEqual(
     {
       startedFrom: agents.startedFrom,
       merged: agents.mergedWith,
-      specHasMain: await repo.contains("spec/30", "main"),
+      specHasMain: await repo.contains("spec/30", "origin/main"),
       specHasTicket: await repo.contains("spec/30", "sandcastle/issue-31"),
-      mainHasTicket: await repo.contains("main", "sandcastle/issue-31"),
+      mainHasTicket: await repo.contains("origin/main", "sandcastle/issue-31"),
     },
     {
       startedFrom: [{ id: "31", base: "spec/30" }],
@@ -174,49 +177,54 @@ test("je Integrations-Branch läuft ein eigener Merger", async () => {
   );
 });
 
-function setupUpdate() {
-  const { tracker, repo, agents } = setup();
-  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
-  return { tracker, repo, agents, update };
-}
-
 test("zu Laufbeginn bekommt ein Spec-Branch main sauber hineingemergt, ohne Agent", async () => {
-  const { tracker, repo, agents, update } = setupUpdate();
+  const { tracker, repo, agents, update } = setup();
   tracker.addSpec(30);
-  await repo.createBranch("spec/30", "main");
-  repo.commit("main");
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commitOnOrigin("main");
 
   await update();
 
   assert.deepEqual(
-    { specHasMain: await repo.contains("spec/30", "main"), merged: agents.mergedWith },
+    { specHasMain: await repo.contains("spec/30", "origin/main"), merged: agents.mergedWith },
     { specHasMain: true, merged: [] },
   );
 });
 
-test("bei einem Konflikt mit main löst der Merger auf genau diesem Branch auf", async () => {
-  const { tracker, repo, agents, update } = setupUpdate();
+test("zu Laufbeginn holt der Lauf main von origin und mergt diesen Stand in den Spec-Branch", async () => {
+  const { tracker, repo, update } = setup();
   tracker.addSpec(30);
-  await repo.createBranch("spec/30", "main");
-  repo.commit("main");
+  await repo.createBranch("spec/30", "origin/main");
+  const merged = repo.commitOnOrigin("main");
+
+  await update();
+
+  assert.equal(repo.hasCommit("spec/30", merged), true);
+});
+
+test("bei einem Konflikt mit main löst der Merger auf genau diesem Branch auf", async () => {
+  const { tracker, repo, agents, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commitOnOrigin("main");
   repo.conflicting.add("spec/30");
 
   await update();
 
   assert.deepEqual(
-    { specHasMain: await repo.contains("spec/30", "main"), merged: agents.mergedWith },
-    { specHasMain: true, merged: [{ into: "spec/30", branches: ["main"] }] },
+    { specHasMain: await repo.contains("spec/30", "origin/main"), merged: agents.mergedWith },
+    { specHasMain: true, merged: [{ into: "spec/30", branches: ["origin/main"] }] },
   );
 });
 
 test("scheitert die Auflösung, bleibt der Branch unverändert und der Lauf meldet ihn", async () => {
-  const { tracker, repo, agents, update } = setupUpdate();
+  const { tracker, repo, agents, update } = setup();
   tracker.addSpec(30);
-  await repo.createBranch("spec/30", "main");
+  await repo.createBranch("spec/30", "origin/main");
   repo.commit("spec/30");
-  repo.commit("main");
+  repo.commitOnOrigin("main");
   repo.conflicting.add("spec/30");
-  agents.unmergeable.add("main");
+  agents.unmergeable.add("origin/main");
   const before = await repo.head("spec/30");
 
   const result = await update();
@@ -228,24 +236,77 @@ test("scheitert die Auflösung, bleibt der Branch unverändert und der Lauf meld
 });
 
 test("der Branch einer geschlossenen Spec bekommt main nicht mehr hineingemergt", async () => {
-  const { tracker, repo, update } = setupUpdate();
+  const { tracker, repo, update } = setup();
   tracker.addSpec(30, { open: false });
-  await repo.createBranch("spec/30", "main");
-  repo.commit("main");
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commitOnOrigin("main");
 
   await update();
 
-  assert.equal(await repo.contains("spec/30", "main"), false);
+  assert.equal(await repo.contains("spec/30", "origin/main"), false);
 });
 
 test("ein bestehender sandcastle/standalone bekommt main hineingemergt", async () => {
-  const { repo, update } = setupUpdate();
-  await repo.createBranch("sandcastle/standalone", "main");
-  repo.commit("main");
+  const { repo, update } = setup();
+  await repo.createBranch("sandcastle/standalone", "origin/main");
+  repo.commitOnOrigin("main");
 
   await update();
 
-  assert.equal(await repo.contains("sandcastle/standalone", "main"), true);
+  assert.equal(await repo.contains("sandcastle/standalone", "origin/main"), true);
+});
+
+test("steht der Host auf spec/<n>, plant der Lauf die Tickets dieser Spec nicht ein", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(7));
+  repo.checkedOut = "spec/30";
+
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[7]],
+  );
+});
+
+test("steht der Host auf spec/<n>, bekommt der Branch zu Laufbeginn main nicht hineingemergt", async () => {
+  const { tracker, repo, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+  const merged = repo.commitOnOrigin("main");
+  repo.checkedOut = "spec/30";
+
+  await update();
+
+  assert.equal(repo.hasCommit("spec/30", merged), false);
+});
+
+test("steht der Host auf spec/<n>, startet für die fertige Spec keine Abschlussphase", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  await tracker.close(31, "von Hand umgesetzt");
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commit("spec/30");
+  repo.checkedOut = "spec/30";
+
+  await run();
+
+  assert.deepEqual(agents.specSteps, []);
+});
+
+test("steht der Host auf sandcastle/standalone, beginnt der Branch nach dem Merge seines PRs nicht neu", async () => {
+  const { tracker, repo, run, update } = setup();
+  tracker.addTicket(ticket(7));
+  await run();
+  tracker.mergePullRequest(tracker.pullRequests[0]!.number);
+  repo.checkedOut = "sandcastle/standalone";
+
+  await update();
+
+  assert.equal(await repo.contains("sandcastle/standalone", "sandcastle/issue-7"), true);
 });
 
 test("mit --spec <n> plant der Lauf nur die Sub-Issues von #n", async () => {
@@ -296,19 +357,56 @@ test("ein geschlossener Blocker aus einer anderen Spec hält sein Ticket zurück
 });
 
 test("ein Blocker aus einer anderen Spec gibt sein Ticket frei, sobald er auf main liegt", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addSpec(40);
   tracker.addTicket(ticket(31), { parent: 30 });
   tracker.addTicket(ticket(41), { parent: 40, blockedBy: [31] });
 
   await run();
-  repo.merge("spec/30", "main");
+  repo.mergeOnOrigin("spec/30", "main");
+  await update();
   await run();
 
   assert.deepEqual(
     agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
     [[31], [41]],
+  );
+});
+
+test("ein Blocker aus einer offenen Spec gilt als erledigt, wenn ein Commit auf main auf ihn verweist", async () => {
+  const { tracker, repo, agents, run, update } = setup();
+  tracker.addSpec(20);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(21), { parent: 20 });
+  await tracker.close(21, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
+  repo.commitOnOrigin("main", "Export ergänzen (#21, Spec #20)");
+
+  await update();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[41]],
+  );
+});
+
+test("ein Verweis auf ein anderes Issue mit gleichem Anfang gibt den Blocker nicht frei", async () => {
+  const { tracker, repo, agents, run, update } = setup();
+  tracker.addSpec(20);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(21), { parent: 20 });
+  await tracker.close(21, "von Hand umgesetzt");
+  tracker.addTicket(ticket(41), { parent: 40, blockedBy: [21] });
+  repo.commitOnOrigin("main", "Export ergänzen (#210)");
+
+  await update();
+  await run();
+
+  assert.deepEqual(
+    agents.plannedWith.map((tickets) => tickets.map((t) => t.number)),
+    [[]],
   );
 });
 
@@ -329,18 +427,19 @@ test("ein Blocker aus einer geschlossenen Spec gilt als erledigt, auch ohne Sand
 });
 
 test("ein Ticket ohne Spec zweigt von sandcastle/standalone ab, das von main entsteht, und wird dorthin gemergt", async () => {
-  const { tracker, repo, agents, run } = setup();
-  repo.commit("main");
+  const { tracker, repo, agents, run, update } = setup();
+  repo.commitOnOrigin("main");
   tracker.addTicket(ticket(7));
 
+  await update();
   await run();
 
   assert.deepEqual(
     {
       startedFrom: agents.startedFrom,
-      standaloneHasMain: await repo.contains("sandcastle/standalone", "main"),
+      standaloneHasMain: await repo.contains("sandcastle/standalone", "origin/main"),
       standaloneHasTicket: await repo.contains("sandcastle/standalone", "sandcastle/issue-7"),
-      mainHasTicket: await repo.contains("main", "sandcastle/issue-7"),
+      mainHasTicket: await repo.contains("origin/main", "sandcastle/issue-7"),
     },
     {
       startedFrom: [{ id: "7", base: "sandcastle/standalone" }],
@@ -389,7 +488,7 @@ test("ein offener Standalone-PR wird aktualisiert statt neu angelegt", async () 
 });
 
 test("ohne neue Commits auf sandcastle/standalone gibt es weder Push noch PR", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
   tracker.addTicket(ticket(7));
@@ -407,13 +506,13 @@ test("ohne neue Commits auf sandcastle/standalone gibt es weder Push noch PR", a
 });
 
 test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone im nächsten Lauf frisch von main ab", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addTicket(ticket(7, "Erstes"));
   await run();
   tracker.mergePullRequest(tracker.pullRequests[0]!.number);
   tracker.addTicket(ticket(8, "Zweites"));
 
-  await updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  await update();
   await run();
 
   assert.deepEqual(
@@ -437,8 +536,7 @@ test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone im nächste
 });
 
 test("scheitert der Push nach einem Neustart, gehen die neuen Commits nicht verloren", async () => {
-  const { tracker, repo, agents, run } = setup();
-  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addTicket(ticket(7));
   await run();
   tracker.mergePullRequest(tracker.pullRequests[0]!.number);
@@ -462,14 +560,13 @@ test("scheitert der Push nach einem Neustart, gehen die neuen Commits nicht verl
 });
 
 test("nach dem Merge des Standalone-PRs entsteht ohne neue Tickets kein weiterer PR, auch wenn main weiter ist", async () => {
-  const { tracker, repo, agents, run } = setup();
-  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addTicket(ticket(7));
   await update();
   await run();
   tracker.mergePullRequest(tracker.pullRequests[0]!.number);
-  repo.merge("sandcastle/standalone", "main");
-  repo.commit("main");
+  repo.mergeOnOrigin("sandcastle/standalone", "main");
+  repo.commitOnOrigin("main");
 
   await update();
   await run();
@@ -517,7 +614,7 @@ test("solange ein Sub-Issue der Spec offen ist, startet keine Abschlussphase", a
 });
 
 test("hat die Spec schon einen offenen PR, startet keine Abschlussphase", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
   tracker.addTicket(ticket(32), { parent: 30 });
@@ -529,7 +626,7 @@ test("hat die Spec schon einen offenen PR, startet keine Abschlussphase", async 
   await run();
 
   assert.deepEqual(
-    { steps: agents.specSteps, prs: tracker.pullRequests.length, specBranchAhead: !(await repo.contains("main", "spec/30")) },
+    { steps: agents.specSteps, prs: tracker.pullRequests.length, specBranchAhead: !(await repo.contains("origin/main", "spec/30")) },
     { steps: [], prs: 1, specBranchAhead: true },
   );
 });
@@ -553,7 +650,7 @@ test("werden zwei Specs im selben Lauf fertig, bekommt jede ihre eigene Abschlus
 });
 
 test("die Abschlussphase reviewt, behebt Standards- und Korrektheitsbefunde, schreibt den PR-Text und legt den PR an", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
   agents.specReviews.set(30, {
@@ -606,7 +703,7 @@ test("ohne Standards- und Korrektheitsbefunde läuft kein Fix-Implementer", asyn
 });
 
 test("endet die Behebung ohne Abschlusssignal, gibt es weder Push noch PR", async () => {
-  const { tracker, repo, agents, run } = setup();
+  const { tracker, repo, agents, run, update } = setup();
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
   agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
@@ -627,7 +724,7 @@ test("mit --spec <n> wird nur Spec #n abgeschlossen", async () => {
   tracker.addTicket(ticket(31), { parent: 30 });
   tracker.addSpec(40);
   tracker.addTicket(ticket(41), { parent: 40 });
-  await repo.createBranch("spec/30", "main");
+  await repo.createBranch("spec/30", "origin/main");
   repo.commit("spec/30");
   await tracker.close(31, "von Hand umgesetzt");
 

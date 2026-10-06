@@ -22,15 +22,15 @@ Read each closed sub-issue with `gh issue view <n> --comments`.
 
 <diff-stat>
 
-!`git diff main...HEAD --stat`
+!`git diff origin/main...HEAD --stat`
 
-Read the actual changes per file with `git diff main...HEAD -- <path>`.
+Read the actual changes per file with `git diff origin/main...HEAD -- <path>`.
 
 </diff-stat>
 
 <commits>
 
-!`git log main..HEAD --oneline`
+!`git log origin/main..HEAD --oneline`
 
 </commits>
 
@@ -38,7 +38,7 @@ Read the actual changes per file with `git diff main...HEAD -- <path>`.
 
 Call the Skill tool with `code-review`. Hand it everything up front so it runs straight through without a question:
 
-- **Fixed point:** `main`. The diff is `git diff main...HEAD`.
+- **Fixed point:** `origin/main`. The diff is `git diff origin/main...HEAD`.
 - **Spec:** spec #{{SPEC}} above together with its closed sub-issues. Judge the spec as a whole: does every user story land, and do the tickets fit together?
 - **Standards:** `CODING_STANDARDS.md`, plus the skill's smell baseline, plus three checks: new or changed behaviour is covered by tests; exceptions are caught narrowly and assumptions are checked; the change keeps inputs safe from injection and secrets out of code and logs.
 

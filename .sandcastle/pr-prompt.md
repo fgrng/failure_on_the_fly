@@ -14,15 +14,15 @@ You only write text. Do not change, commit, push or comment on anything, and do 
 
 <diff-stat>
 
-!`git diff main...HEAD --stat`
+!`git diff origin/main...HEAD --stat`
 
-Read the actual changes per file with `git diff main...HEAD -- <path>`.
+Read the actual changes per file with `git diff origin/main...HEAD -- <path>`.
 
 </diff-stat>
 
 <commits>
 
-!`git log main..HEAD --oneline`
+!`git log origin/main..HEAD --oneline`
 
 </commits>
 

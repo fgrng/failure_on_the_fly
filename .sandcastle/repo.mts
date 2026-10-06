@@ -1,42 +1,37 @@
 // Repo über `git` im Checkout des Hosts.
 
 import { execFileSync } from "node:child_process";
-import { MAIN_BRANCH, type Repo } from "./iteration.mts";
+import { MAIN_REF, type Repo, STANDALONE_BRANCH } from "./iteration.mts";
 
-/** Der aktive Branch des Hosts, bei Sandcastle zugleich TARGET_BRANCH der Prompts. */
-export function currentBranch(): string {
-  return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-    encoding: "utf8",
-  }).trim();
-}
-
+/** Das Repo des Hosts; kein Aufruf ändert dessen Checkout oder Arbeitsverzeichnis. */
 export const gitRepo: Repo = {
+  async fetch(): Promise<void> {
+    git(["fetch", "--quiet", "origin"]);
+  },
+
+  async hostBranch(): Promise<string> {
+    return git(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+  },
+
   async contains(branch: string, ref: string): Promise<boolean> {
-    try {
-      execFileSync("git", ["merge-base", "--is-ancestor", ref, branch], {
-        stdio: "ignore",
-      });
-      return true;
-    } catch {
-      // Exit-Code 1 heißt „nicht enthalten“; ein unbekannter Ref zählt ebenso.
-      return false;
-    }
+    // Exit-Code 1 heißt „nicht enthalten“; ein unbekannter Ref zählt ebenso.
+    return succeeds(["merge-base", "--is-ancestor", ref, branch]);
+  },
+
+  async mentionsIssue(ref: string, issue: number): Promise<boolean> {
+    // In der einfachen Regex ist `(` ein Zeichen; `[,)]` trennt #12 von #120.
+    const grep = ["--basic-regexp", `--grep=(#${issue}[,)]`];
+    return git(["log", "--format=%H", "-1", ...grep, ref]).trim() !== "";
   },
 
   async branchExists(branch: string): Promise<boolean> {
-    try {
-      execFileSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], {
-        stdio: "ignore",
-      });
-      return true;
-    } catch {
-      return false;
-    }
+    return succeeds(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]);
   },
 
   async createBranch(branch: string, base: string): Promise<void> {
     // `git branch` setzt nur die Ref; der Checkout des Hosts bleibt, wo er ist.
-    execFileSync("git", ["branch", branch, base], { stdio: "ignore" });
+    // Ohne Upstream, auch wenn `base` ein Remote-Branch ist.
+    git(["branch", "--no-track", branch, base]);
   },
 
   async branches(prefix: string): Promise<string[]> {
@@ -46,7 +41,7 @@ export const gitRepo: Repo = {
   },
 
   async mergeMain(branch: string): Promise<"clean" | "conflict"> {
-    if (await gitRepo.contains(branch, MAIN_BRANCH)) return "clean";
+    if (await gitRepo.contains(branch, MAIN_REF)) return "clean";
     // Ein Branch, der in einem Worktree ausgecheckt ist, würde dort hinter dem
     // Rücken des Checkouts verschoben.
     if (checkedOutBranches().has(branch)) {
@@ -56,7 +51,7 @@ export const gitRepo: Repo = {
     let tree: string;
     try {
       // Mergt ohne Worktree und ohne Index; Exit-Code 1 heißt Konflikt.
-      tree = git(["merge-tree", "--write-tree", head, MAIN_BRANCH]).split("\n")[0];
+      tree = git(["merge-tree", "--write-tree", head, MAIN_REF]).split("\n")[0];
     } catch (error) {
       if ((error as { status?: number }).status === 1) return "conflict";
       throw error;
@@ -67,16 +62,17 @@ export const gitRepo: Repo = {
       "-p",
       head,
       "-p",
-      MAIN_BRANCH,
+      MAIN_REF,
       "-m",
-      `Merge branch '${MAIN_BRANCH}' into ${branch}`,
+      `Merge branch '${MAIN_REF}' into ${branch}`,
     ]).trim();
     git(["update-ref", `refs/heads/${branch}`, commit, head]);
     return "clean";
   },
 
   async head(branch: string): Promise<string> {
-    return git(["rev-parse", `refs/heads/${branch}`]).trim();
+    // Lokaler Branch oder Remote-Ref wie origin/main.
+    return git(["rev-parse", "--verify", `${branch}^{commit}`]).trim();
   },
 
   async resetBranch(branch: string, head: string): Promise<void> {
@@ -85,11 +81,11 @@ export const gitRepo: Repo = {
 
   async isPushed(branch: string): Promise<boolean> {
     try {
-      const [local, remote] = execFileSync(
-        "git",
-        ["rev-parse", `refs/heads/${branch}`, `refs/remotes/origin/${branch}`],
-        { encoding: "utf8", stdio: "pipe" },
-      )
+      const [local, remote] = git([
+        "rev-parse",
+        `refs/heads/${branch}`,
+        `refs/remotes/origin/${branch}`,
+      ])
         .trim()
         .split("\n");
       return local === remote;
@@ -99,16 +95,27 @@ export const gitRepo: Repo = {
   },
 
   async push(branch: string): Promise<void> {
-    // Nach einem Neustart von main ist der Push kein Fast-Forward. Die Lease
-    // schützt Commits auf origin, die dieser Checkout noch nicht kennt.
-    execFileSync("git", ["push", "--force-with-lease", "origin", `${branch}:${branch}`], {
-      stdio: "pipe",
-    });
+    // Nur sandcastle/standalone beginnt nach einem gemergten PR neu von main;
+    // sein Push ist dann kein Fast-Forward. Die Lease schützt Commits auf
+    // origin, die dieser Checkout noch nicht kennt. Ein Spec-Branch wächst nur.
+    const force = branch === STANDALONE_BRANCH ? ["--force-with-lease"] : [];
+    git(["push", ...force, "origin", `${branch}:${branch}`]);
   },
 };
 
+// Führt git aus und liefert stdout; wirft bei einem Exit-Code ungleich 0.
 function git(args: string[]): string {
   return execFileSync("git", args, { encoding: "utf8", stdio: "pipe" });
+}
+
+// Ob git mit Exit-Code 0 endet.
+function succeeds(args: string[]): boolean {
+  try {
+    git(args);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Die Branches, die in irgendeinem Worktree des Repos ausgecheckt sind.
