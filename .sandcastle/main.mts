@@ -1,59 +1,66 @@
-// Parallel Planner with Codex auth — plan → implement → review → merge
+// Paralleler Planner: Plan → Implement → Review → Merge
 //
-// The driver wires the real Tracker (gh), Repo (git) and Agents (Sandcastle)
-// into the iteration flow in iteration.mts and runs the outer loop:
-//   Update:    Once at the start of the run, main is merged into every active
-//              integration branch (`spec/<n>` of an open Spec, and
-//              `sandcastle/standalone` if present) without touching the host
-//              checkout. Only a conflict starts a merger; if it fails, the
-//              branch stays as it was and the run reports it.
-//   Plan:      The tracker yields the unblocked tickets (`ready-for-agent`,
-//              not `Spec`, not `is:blocked`). The driver drops tickets whose
-//              closed blocker from another spec is not on main yet and, with
-//              `--spec <n>`, every ticket outside spec <n>. The planner gets
-//              that list, drops tickets likely to conflict with each other
-//              and names each branch.
-//   Implement: One implementer per ticket, up to MAX_PARALLEL concurrently.
-//              A ticket with parent Spec <n> branches off its integration
-//              branch `spec/<n>` (created from main if missing); a ticket
-//              without a Spec branches off `sandcastle/standalone`.
-//   Review:    Only for branches whose implementer signalled completion.
-//   Merge:     One merger per integration branch merges its reviewed ticket
-//              branches; spec branches get their own worktree, so the host
-//              checkout stays untouched. The driver then closes every ticket
-//              whose branch landed. A Spec stays open; its PR closes it.
-//   Publish:   At the end of every iteration, if `sandcastle/standalone` is
-//              ahead of main, the driver pushes it and opens or updates its
-//              PR. Once that PR is merged, the next run restarts the branch
-//              from main before the update step.
-//   Finish:    At the end of every iteration, each Spec whose sub-issues are
-//              all closed and whose `spec/<n>` has no open PR gets its closing
-//              phase: a `code-review` of the whole spec against main, a
-//              fix-implementer for the standards and correctness findings, a
-//              PR text written with the `pr` skill, then the driver pushes and
-//              opens the PR. Spec findings land as "Offene Punkte" in the PR
-//              text, which ends with `Closes #<n>`.
+// Der Treiber verdrahtet die echten Schnittstellen Tracker (gh), Repo (git)
+// und Agents (Sandcastle) mit dem Ablauf in iteration.mts und führt die
+// äußere Schleife:
+//   Update:    Einmal zu Laufbeginn holt `git fetch origin` den Stand von
+//              GitHub. Gemessen wird danach immer gegen origin/main, nie gegen
+//              das lokale main. origin/main wird in jeden aktiven
+//              Integrations-Branch gemergt (`spec/<n>` einer offenen Spec und
+//              `sandcastle/standalone`, falls vorhanden), ohne den Checkout
+//              des Hosts zu berühren. Nur ein Konflikt startet einen Merger;
+//              scheitert er, bleibt der Branch, wie er war, und der Lauf
+//              meldet ihn.
+//   Host:      Einen Integrations-Branch, den der Checkout des Hosts gerade
+//              ausgecheckt hat, lässt der Lauf aus: kein Update, keine Tickets,
+//              keine Abschlussphase. Das Log meldet ihn.
+//   Plan:      Der Tracker liefert die unblockierten Tickets (`ready-for-agent`,
+//              nicht `Spec`, nicht `is:blocked`). Der Treiber verwirft Tickets,
+//              deren geschlossener Blocker aus einer anderen Spec noch nicht
+//              auf origin/main liegt, und mit `--spec <n>` jedes Ticket
+//              außerhalb von Spec <n>. Der Planner bekommt diese Liste, stellt
+//              Tickets zurück, die einander wohl in die Quere kommen, und
+//              benennt jeden Branch.
+//   Implement: Ein Implementer je Ticket, mehrere zugleich. Ein Ticket mit
+//              Eltern-Spec <n> zweigt von seinem Integrations-Branch `spec/<n>`
+//              ab (fehlt er, entsteht er von origin/main); ein Ticket ohne
+//              Spec zweigt von `sandcastle/standalone` ab.
+//   Review:    Nur für Branches, deren Implementer das Abschlusssignal gab.
+//   Merge:     Ein Merger je Integrations-Branch mergt dessen reviewte
+//              Ticket-Branches, immer in einem eigenen Worktree. Endet er ohne
+//              Abschlusssignal, steht der Integrations-Branch wieder auf dem
+//              Stand davor. Sonst schließt der Treiber jedes Ticket, dessen
+//              Branch gelandet ist. Eine Spec bleibt offen; ihr PR schließt sie.
+//   Publish:   Am Ende jeder Iteration pusht der Treiber `sandcastle/standalone`,
+//              wenn es Commits trägt, die origin/main fehlen, und legt dessen
+//              PR an oder ergänzt ihn. Ist der PR gemergt, beginnt der Branch
+//              im nächsten Lauf vor dem Update neu von origin/main.
+//   Finish:    Am Ende jeder Iteration bekommt jede Spec, deren Sub-Issues alle
+//              geschlossen sind und deren `spec/<n>` keinen offenen PR hat,
+//              ihre Abschlussphase, höchstens einmal je Lauf: ein
+//              `code-review` der ganzen Spec gegen origin/main, ein
+//              Fix-Implementer für die Standards- und Korrektheitsbefunde, ein
+//              PR-Text mit dem Skill `pr`, dann pusht der Treiber und legt den
+//              PR an. Spec-Befunde landen als „Offene Punkte“ im PR-Text, der
+//              mit `Closes #<n>` endet.
 //
-// The outer loop repeats up to MAX_ITERATIONS times, stopping early once the
-// backlog is exhausted (a plan with no issues).
+// Die äußere Schleife läuft höchstens MAX_ITERATIONS-mal und endet früher,
+// sobald der Backlog leer ist (ein Plan ohne Tickets).
 //
-// Usage:
-//   npm run sandcastle                  — Claude Code line-up (default)
-//   npm run sandcastle -- --agent codex — Codex line-up
-//   npm run sandcastle:codex            — same, without the `--` dance
-//   npm run sandcastle -- --spec 321    — only the sub-issues of spec #321
+// Aufruf:
+//   npm run sandcastle                  — Line-up Claude Code (Default)
+//   npm run sandcastle -- --agent codex — Line-up Codex
+//   npm run sandcastle:codex            — dasselbe, ohne `--`
+//   npm run sandcastle -- --spec 321    — nur die Sub-Issues von Spec #321
 
 import { parseArgs } from "node:util";
 import { DEFAULT_LINEUP, LINEUPS, sandcastleAgents } from "./agents.mts";
-import { runIteration, updateIntegrationBranches } from "./iteration.mts";
+import { type IterationDeps, runIteration, updateIntegrationBranches } from "./iteration.mts";
 import { gitRepo } from "./repo.mts";
 import { githubTracker } from "./tracker.mts";
 
-// Maximum number of plan→execute→merge iterations to run before stopping.
+// Höchstzahl der Iterationen aus Plan, Ausführung und Merge je Lauf.
 const MAX_ITERATIONS = 10;
-
-// Maximum number of issues to implement+review concurrently within one iteration.
-const MAX_PARALLEL = 4;
 
 const { values: cliArgs } = parseArgs({
   options: {
@@ -81,18 +88,18 @@ if (spec !== undefined && !Number.isInteger(spec)) {
 console.log(`Agent line-up: ${lineupName}`);
 if (spec !== undefined) console.log(`Limited to the sub-issues of spec #${spec}.`);
 
-const deps = {
+const deps: IterationDeps = {
   tracker: githubTracker,
   repo: gitRepo,
   agents: sandcastleAgents(lineup),
-  maxParallel: MAX_PARALLEL,
   spec,
+  finishAttempted: new Set(),
 };
 
-console.log(`\n=== Updating integration branches from main ===\n`);
+console.log(`\n=== Fetching origin, updating integration branches ===\n`);
 const { failed } = await updateIntegrationBranches(deps);
 if (failed.length > 0) {
-  console.log(`main could not be merged into: ${failed.join(", ")}`);
+  console.log(`origin/main could not be merged into: ${failed.join(", ")}`);
 }
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {

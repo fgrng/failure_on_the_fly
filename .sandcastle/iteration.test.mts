@@ -7,11 +7,16 @@ function setup(options: { spec?: number } = {}) {
   const tracker = new FakeTracker();
   const repo = new FakeRepo("main");
   const agents = new FakeAgents(repo);
+  // Ein Lauf merkt sich wie in main.mts, welche Abschlussphasen er schon versucht hat.
+  let finishAttempted = new Set<number>();
+  const startNewRun = () => {
+    finishAttempted = new Set();
+  };
   const run = () =>
-    runIteration({ tracker, repo, agents, log: () => {}, ...options });
+    runIteration({ tracker, repo, agents, log: () => {}, finishAttempted, ...options });
   // Laufbeginn wie in main.mts: Fetch und Update der Integrations-Branches.
   const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
-  return { tracker, repo, agents, run, update };
+  return { tracker, repo, agents, run, update, startNewRun };
 }
 
 test("der Planner bekommt die Tickets aus dem Tracker-Filter", async () => {
@@ -748,9 +753,36 @@ test("endet die Behebung ohne Abschlusssignal, gibt es weder Push noch PR", asyn
   );
 });
 
+test("scheitert die Abschlussphase, versucht der Lauf sie in späteren Iterationen nicht erneut", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
+  agents.unfixable.add(30);
+
+  await run();
+  await run();
+
+  assert.deepEqual(agents.specSteps, ["review #30", "fix #30"]);
+});
+
+test("nach einer gescheiterten Abschlussphase beginnt der nächste Lauf sie von vorn", async () => {
+  const { tracker, agents, run, startNewRun } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
+  agents.unfixable.add(30);
+  await run();
+  agents.unfixable.clear();
+
+  startNewRun();
+  await run();
+
+  assert.deepEqual(tracker.pullRequests.map((pr) => pr.head), ["spec/30"]);
+});
+
 test("mit --spec <n> wird nur Spec #n abgeschlossen", async () => {
-  const { tracker, repo, agents } = setup();
-  const run = () => runIteration({ tracker, repo, agents, log: () => {}, spec: 40 });
+  const { tracker, repo, run } = setup({ spec: 40 });
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
   tracker.addSpec(40);

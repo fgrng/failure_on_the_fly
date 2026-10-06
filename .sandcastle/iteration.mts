@@ -131,15 +131,24 @@ export const MAIN_REF = `origin/${MAIN_BRANCH}`;
 /** Der fortlaufende Integrations-Branch der Tickets ohne Eltern-Spec. */
 export const STANDALONE_BRANCH = "sandcastle/standalone";
 
+const DEFAULT_MAX_PARALLEL = 4;
+
+/** Die Schnittstellen und Einstellungen, mit denen eine Iteration läuft. */
 export type IterationDeps = {
   tracker: Tracker;
   repo: Repo;
   agents: Agents;
   log?: (message: string) => void;
-  /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden. */
+  /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden (Default 4). */
   maxParallel?: number;
   /** Beschränkt den Lauf auf die Sub-Issues dieser Spec (`--spec <n>`). */
   spec?: number;
+  /**
+   * Die Specs, deren Abschlussphase dieser Lauf schon versucht hat. Eine
+   * gescheiterte Abschlussphase beginnt erst der nächste Lauf von vorn; ein
+   * Lauf legt die Menge einmal an und reicht sie jeder Iteration weiter.
+   */
+  finishAttempted: Set<number>;
 };
 
 export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "log">;
@@ -494,7 +503,7 @@ async function implementAndReview(
     }
   };
 
-  const workers = Math.min(deps.maxParallel ?? 4, queue.length);
+  const workers = Math.min(deps.maxParallel ?? DEFAULT_MAX_PARALLEL, queue.length);
   await Promise.all(Array.from({ length: workers }, worker));
   return ready;
 }
@@ -587,6 +596,11 @@ async function finishCompletedSpecs(
   log: (message: string) => void,
 ): Promise<void> {
   for (const spec of await completedSpecs(deps, log)) {
+    if (deps.finishAttempted.has(spec)) {
+      log(`  spec #${spec}: closing phase already attempted in this run - next run retries.`);
+      continue;
+    }
+    deps.finishAttempted.add(spec);
     try {
       await finishSpec(deps, spec, log);
     } catch (error) {
@@ -629,7 +643,7 @@ async function completedSpecs(
 
 // Spec-Review, Behebung der Standards- und Korrektheitsbefunde, PR-Text,
 // dann Push und PR. Endet die Behebung ohne Abschlusssignal, bleibt der PR
-// aus; die nächste Iteration beginnt die Abschlussphase von vorn.
+// aus; der nächste Lauf beginnt die Abschlussphase von vorn.
 async function finishSpec(
   deps: IterationDeps,
   spec: number,
