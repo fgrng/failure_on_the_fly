@@ -22,4 +22,20 @@ export const gitRepo: Repo = {
       return false;
     }
   },
+
+  async branchExists(branch: string): Promise<boolean> {
+    try {
+      execFileSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], {
+        stdio: "ignore",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async createBranch(branch: string, base: string): Promise<void> {
+    // `git branch` setzt nur die Ref; der Checkout des Hosts bleibt, wo er ist.
+    execFileSync("git", ["branch", branch, base], { stdio: "ignore" });
+  },
 };

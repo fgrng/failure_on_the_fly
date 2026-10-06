@@ -6,7 +6,7 @@ Pull in the issue using `gh issue view <ID>`. If it has a parent PRD, pull that 
 
 Only work on the issue specified.
 
-Work on branch {{BRANCH}}. Make commits and run tests.
+Work on branch {{BRANCH}}. It branched off `{{INTEGRATION_BRANCH}}` and will be merged back into it. Make commits and run tests.
 
 # CONTEXT
 

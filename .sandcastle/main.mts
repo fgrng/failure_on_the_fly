@@ -6,10 +6,14 @@
 //              not `Spec`, not `is:blocked`); the planner drops those likely
 //              to conflict with each other and names each branch.
 //   Implement: One implementer per ticket, up to MAX_PARALLEL concurrently.
+//              A ticket with parent Spec <n> branches off its integration
+//              branch `spec/<n>` (created from main if missing); a ticket
+//              without a Spec still branches off the host branch.
 //   Review:    Only for branches whose implementer signalled completion.
-//   Merge:     The merger merges every reviewed branch into the host branch.
-//              The driver then closes every ticket whose branch landed, and a
-//              parent Spec once all its sub-issues are closed.
+//   Merge:     One merger per integration branch merges its reviewed ticket
+//              branches; spec branches get their own worktree, so the host
+//              checkout stays untouched. The driver then closes every ticket
+//              whose branch landed. A Spec stays open; its PR closes it.
 //
 // The outer loop repeats up to MAX_ITERATIONS times, stopping early once the
 // backlog is exhausted (a plan with no issues).

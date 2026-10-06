@@ -7,6 +7,7 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { z } from "zod";
 import type { AgentRun, Agents, PlannedIssue, Ticket, TicketSession } from "./iteration.mts";
+import { currentBranch } from "./repo.mts";
 
 // Configure mounts for the .codex / .claude folders containing auth info.
 // <user>
@@ -94,7 +95,8 @@ const hooks = {
     // `uv run pytest` the prompts ask for would die with KeyError: 'SECRET_KEY'.
     // .env.example carries a placeholder secret, which is all the test suite
     // needs. Guarded by `test -f` so the phases that run against the host
-    // checkout directly (planner, merger — branch strategy "head") never
+    // checkout directly (planner, and the merger into the host branch —
+    // branch strategy "head") never
     // overwrite the developer's real .env.
     onWorktreeReady: [{ command: "test -f .env || cp .env.example .env" }],
   },
@@ -171,11 +173,14 @@ export function sandcastleAgents(lineup: Lineup): Agents {
 
     async onTicketBranch<T>(
       issue: PlannedIssue,
+      integrationBranch: string,
       work: (session: TicketSession) => Promise<T>,
     ): Promise<T> {
       await using sandbox = await sandcastle.createSandbox({
         sandbox: agentSandbox(),
         branch: issue.branch,
+        // Nur für einen neuen Ticket-Branch; ein bestehender behält seinen Stand.
+        baseBranch: integrationBranch,
         hooks,
         copyToWorktree,
       });
@@ -185,7 +190,9 @@ export function sandcastleAgents(lineup: Lineup): Agents {
         BRANCH: issue.branch,
         // TARGET_BRANCH is a built-in prompt arg (auto-injected as the host's
         // active branch at run() time) and must not be passed explicitly —
-        // doing so throws PromptError.
+        // doing so throws PromptError. The branch the ticket merges into
+        // therefore travels as its own argument.
+        INTEGRATION_BRANCH: integrationBranch,
       };
       return await work({
         implement: async () =>
@@ -212,17 +219,27 @@ export function sandcastleAgents(lineup: Lineup): Agents {
       });
     },
 
-    async merge(branches: string[]): Promise<AgentRun> {
+    async merge(into: string, branches: string[]): Promise<AgentRun> {
+      // Ein Integrations-Branch bekommt einen eigenen Worktree, damit der
+      // Checkout des Hosts unberührt bleibt. Nur der aktive Branch des Hosts
+      // (Tickets ohne Spec) wird direkt im Checkout gemergt, weil git einen
+      // Branch nicht in zwei Worktrees zugleich auscheckt.
+      const branchStrategy: sandcastle.BranchStrategy =
+        into === currentBranch() ? { type: "head" } : { type: "branch", branch: into };
       return agentRun(
         await sandcastle.run({
           sandbox: agentSandbox(),
+          branchStrategy,
           hooks,
           copyToWorktree,
-          name: "Merger",
+          name: `Merger ${into}`,
           maxIterations: 10,
           agent: lineup.merger,
           promptFile: "./.sandcastle/merge-prompt.md",
-          promptArgs: { BRANCHES: branches.map((b) => `- ${b}`).join("\n") },
+          promptArgs: {
+            BRANCHES: branches.map((b) => `- ${b}`).join("\n"),
+            INTEGRATION_BRANCH: into,
+          },
         }),
       );
     },

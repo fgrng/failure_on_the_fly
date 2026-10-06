@@ -36,6 +36,9 @@ export interface Tracker {
 export interface Repo {
   /** Ob `ref` vollständig in `branch` enthalten ist (`merge-base --is-ancestor`). */
   contains(branch: string, ref: string): Promise<boolean>;
+  branchExists(branch: string): Promise<boolean>;
+  /** Legt `branch` auf dem Stand von `base` an, ohne den Checkout des Hosts zu berühren. */
+  createBranch(branch: string, base: string): Promise<void>;
 }
 
 /** Implementer und Review eines Tickets teilen sich eine Sandbox. */
@@ -47,20 +50,27 @@ export interface TicketSession {
 export interface Agents {
   /** Der Planner stellt Tickets mit überlappenden Dateien zurück. */
   plan(tickets: Ticket[]): Promise<PlannedIssue[]>;
-  /** Öffnet eine Sandbox auf dem Ticket-Branch und gibt sie nach `work` wieder frei. */
+  /**
+   * Öffnet eine Sandbox auf dem Ticket-Branch und gibt sie nach `work` wieder
+   * frei. Fehlt der Ticket-Branch, zweigt er von `integrationBranch` ab.
+   */
   onTicketBranch<T>(
     issue: PlannedIssue,
+    integrationBranch: string,
     work: (session: TicketSession) => Promise<T>,
   ): Promise<T>;
-  /** Der Merger mergt die Branches in den aktiven Branch des Hosts. */
-  merge(branches: string[]): Promise<AgentRun>;
+  /** Der Merger mergt die Branches in `into`. */
+  merge(into: string, branches: string[]): Promise<AgentRun>;
 }
+
+/** Von hier zweigen neue Integrations-Branches ab. */
+export const MAIN_BRANCH = "main";
 
 export type IterationDeps = {
   tracker: Tracker;
   repo: Repo;
   agents: Agents;
-  /** Branch, in den gemergt wird und gegen den Ticket-Branches gemessen werden. */
+  /** Ziel-Branch der Tickets ohne Eltern-Spec: der aktive Branch des Hosts. */
   targetBranch: string;
   log?: (message: string) => void;
   /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden. */
@@ -70,12 +80,15 @@ export type IterationDeps = {
 /** `planned == 0` heißt: der Backlog ist leer, die äußere Schleife kann enden. */
 export type IterationResult = { planned: number };
 
+/** Ein geplantes Ticket mit dem Branch, in den es gemergt wird. */
+type Assignment = PlannedIssue & { integrationBranch: string };
+
 /**
- * Eine Iteration: planen, je Ticket implementieren und reviewen, mergen,
- * gemergte Tickets schließen und Specs schließen, deren Sub-Issues alle zu sind.
+ * Eine Iteration: planen, je Ticket implementieren und reviewen, je
+ * Integrations-Branch mergen und gemergte Tickets schließen.
  */
 export async function runIteration(deps: IterationDeps): Promise<IterationResult> {
-  const { tracker, agents, targetBranch } = deps;
+  const { tracker, agents } = deps;
   const log = deps.log ?? console.log;
 
   const tickets = await tracker.readyTickets();
@@ -88,45 +101,84 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
   log(`Planning complete. ${issues.length} issue(s) to work in parallel:`);
   for (const issue of issues) log(`  #${issue.id}: ${issue.title} -> ${issue.branch}`);
 
-  const readyIssues = await implementAndReview(deps, issues, log);
-  const branches = readyIssues.map((i) => i.branch);
+  const assignments = await assignIntegrationBranches(deps, issues, log);
+  const readyIssues = await implementAndReview(deps, assignments, log);
 
-  log(`\nExecution complete. ${branches.length} branch(es) to merge:`);
-  for (const branch of branches) log(`  ${branch}`);
-  if (branches.length === 0) {
+  log(`\nExecution complete. ${readyIssues.length} branch(es) to merge:`);
+  for (const issue of readyIssues) log(`  ${issue.branch} -> ${issue.integrationBranch}`);
+  if (readyIssues.length === 0) {
     log("No completed branches. Nothing to merge.");
     return { planned: issues.length };
   }
 
-  await agents.merge(branches);
-  log("\nBranches merged.");
-
-  await closeMergedIssues(deps, readyIssues, log);
+  const byIntegrationBranch = Map.groupBy(readyIssues, (i) => i.integrationBranch);
+  for (const [into, group] of byIntegrationBranch) {
+    // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
+    try {
+      await agents.merge(
+        into,
+        group.map((i) => i.branch),
+      );
+      log(`\nBranches merged into ${into}.`);
+    } catch (error) {
+      log(`  ! Merging into ${into} failed: ${error}`);
+    }
+    await closeMergedIssues(deps, group, log);
+  }
   return { planned: issues.length };
+}
+
+// Ticket mit Eltern-Spec n -> spec/<n>, sonst der Ziel-Branch des Hosts.
+// Fehlt ein Integrations-Branch, entsteht er von main. Ein Ticket, dessen
+// Eltern-Issue sich nicht lesen lässt, wird ausgelassen statt falsch geleitet.
+async function assignIntegrationBranches(
+  deps: IterationDeps,
+  issues: PlannedIssue[],
+  log: (message: string) => void,
+): Promise<Assignment[]> {
+  const { tracker, repo, targetBranch } = deps;
+  const assignments: Assignment[] = [];
+  for (const issue of issues) {
+    let integrationBranch: string;
+    try {
+      const parent = await tracker.parentOf(Number(issue.id));
+      integrationBranch = parent && isSpec(parent) ? `spec/${parent.number}` : targetBranch;
+      if (!(await repo.branchExists(integrationBranch))) {
+        await repo.createBranch(integrationBranch, MAIN_BRANCH);
+        log(`  ${integrationBranch}: created from ${MAIN_BRANCH}.`);
+      }
+    } catch (error) {
+      log(`  ! #${issue.id}: no integration branch, skipping: ${error}`);
+      continue;
+    }
+    assignments.push({ ...issue, integrationBranch });
+  }
+  return assignments;
 }
 
 // Implementiert und reviewt die Tickets mit einem Pool von maxParallel
 // Workern und liefert die Tickets, deren Branch bereit zum Merge ist.
 async function implementAndReview(
   deps: IterationDeps,
-  issues: PlannedIssue[],
+  issues: Assignment[],
   log: (message: string) => void,
-): Promise<PlannedIssue[]> {
-  const { agents, repo, targetBranch } = deps;
+): Promise<Assignment[]> {
+  const { agents, repo } = deps;
   const queue = [...issues];
-  const ready: PlannedIssue[] = [];
+  const ready: Assignment[] = [];
 
   const worker = async (): Promise<void> => {
     for (let issue = queue.shift(); issue; issue = queue.shift()) {
       const current = issue;
+      const into = current.integrationBranch;
       try {
-        const readyToMerge = await agents.onTicketBranch(current, async (session) => {
+        const readyToMerge = await agents.onTicketBranch(current, into, async (session) => {
           const implement = await session.implement();
           const producedCommits = implement.commits.length > 0;
           // Ein Branch kann fertige Arbeit aus einer früheren Iteration tragen,
           // auch wenn der Implementer diesmal nichts committet hat.
           const hasUnmergedWork =
-            producedCommits || !(await repo.contains(targetBranch, current.branch));
+            producedCommits || !(await repo.contains(into, current.branch));
 
           // Ohne Abschlusssignal ist der Branch halbfertig: Er behält seine
           // Commits für eine spätere Iteration, wird aber weder reviewt noch gemergt.
@@ -139,7 +191,7 @@ async function implementAndReview(
 
           if (!producedCommits) {
             log(
-              `  #${current.id}: no new commits, but ${current.branch} is ahead of ${targetBranch} - reviewing anyway.`,
+              `  #${current.id}: no new commits, but ${current.branch} is ahead of ${into} - reviewing anyway.`,
             );
           }
           await session.review();
@@ -158,51 +210,29 @@ async function implementAndReview(
   return ready;
 }
 
-// Schließt jedes Ticket, dessen Branch nachweislich im Ziel-Branch liegt, und
-// danach jede berührte Spec, deren Sub-Issues alle geschlossen sind.
+// Schließt jedes Ticket, dessen Branch nachweislich in seinem
+// Integrations-Branch liegt. Die Spec bleibt offen; sie schließt ihr PR.
 async function closeMergedIssues(
   deps: IterationDeps,
-  issues: PlannedIssue[],
+  issues: Assignment[],
   log: (message: string) => void,
 ): Promise<void> {
-  const { tracker, repo, targetBranch } = deps;
-  const touchedSpecs = new Set<number>();
-
+  const { tracker, repo } = deps;
   for (const issue of issues) {
-    if (!(await repo.contains(targetBranch, issue.branch))) {
-      log(`  #${issue.id}: ${issue.branch} is not in ${targetBranch} - leaving the issue open.`);
+    const into = issue.integrationBranch;
+    if (!(await repo.contains(into, issue.branch))) {
+      log(`  #${issue.id}: ${issue.branch} is not in ${into} - leaving the issue open.`);
       continue;
     }
     try {
-      await tracker.close(Number(issue.id), "Completed by Sandcastle");
+      await tracker.close(Number(issue.id), `Completed by Sandcastle, merged into ${into}`);
       log(`  #${issue.id}: closed.`);
     } catch (error) {
       log(`  ! Could not close #${issue.id}: ${error}`);
-      continue;
-    }
-    try {
-      const parent = await tracker.parentOf(Number(issue.id));
-      if (parent && isOpenSpec(parent)) touchedSpecs.add(parent.number);
-    } catch (error) {
-      log(`  ! Could not fetch parent of #${issue.id}: ${error}`);
-    }
-  }
-
-  // Jede Spec wird erst gelesen, wenn alle Tickets dieser Iteration zu sind.
-  for (const specNumber of touchedSpecs) {
-    try {
-      const spec = await tracker.issue(specNumber);
-      const { total, completed } = spec.subIssues;
-      if (isOpenSpec(spec) && total > 0 && completed === total) {
-        await tracker.close(specNumber, "All sub-issues completed by Sandcastle");
-        log(`  Spec #${specNumber}: all sub-issues closed - closed.`);
-      }
-    } catch (error) {
-      log(`  ! Could not check Spec #${specNumber}: ${error}`);
     }
   }
 }
 
-function isOpenSpec(issue: IssueSummary): boolean {
-  return issue.open && issue.labels.includes("Spec");
+function isSpec(issue: IssueSummary): boolean {
+  return issue.labels.includes("Spec");
 }

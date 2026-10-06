@@ -1,6 +1,6 @@
 # TASK
 
-Merge the following branches into the current branch:
+Merge the following branches into the current branch, `{{INTEGRATION_BRANCH}}`:
 
 {{BRANCHES}}
 

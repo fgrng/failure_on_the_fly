@@ -92,11 +92,11 @@ export class FakeRepo implements Repo {
     for (const branch of branches) this.branches.set(branch, new Set());
   }
 
-  hasBranch(branch: string): boolean {
+  async branchExists(branch: string): Promise<boolean> {
     return this.branches.has(branch);
   }
 
-  createBranch(branch: string, base: string): void {
+  async createBranch(branch: string, base: string): Promise<void> {
     if (!this.branches.has(branch)) this.branches.set(branch, new Set(this.commits(base)));
   }
 
@@ -132,8 +132,10 @@ export class FakeAgents implements Agents {
   readonly implemented: string[] = [];
   /** Ticket-IDs, für die das Review lief. */
   readonly reviewed: string[] = [];
-  /** Die Branch-Liste jedes Merger-Aufrufs. */
-  readonly mergedWith: string[][] = [];
+  /** Ziel und Branch-Liste jedes Merger-Aufrufs. */
+  readonly mergedWith: { into: string; branches: string[] }[] = [];
+  /** Integrations-Branch, von dem jede geöffnete Ticket-Sandbox ausging. */
+  readonly startedFrom: { id: string; base: string }[] = [];
 
   /** Implementer-Verhalten je Ticket-ID. Default: ein Commit mit Abschlusssignal. */
   readonly implementers = new Map<string, ImplementerScript>();
@@ -144,10 +146,7 @@ export class FakeAgents implements Agents {
   /** Ticket-IDs, deren Sandbox mit einem Fehler abbricht. */
   readonly failing = new Set<string>();
 
-  constructor(
-    private repo: FakeRepo,
-    private targetBranch = "main",
-  ) {}
+  constructor(private repo: FakeRepo) {}
 
   async plan(tickets: Ticket[]): Promise<PlannedIssue[]> {
     this.plannedWith.push(tickets);
@@ -162,10 +161,12 @@ export class FakeAgents implements Agents {
 
   async onTicketBranch<T>(
     issue: PlannedIssue,
+    integrationBranch: string,
     work: (session: TicketSession) => Promise<T>,
   ): Promise<T> {
     if (this.failing.has(issue.id)) throw new Error(`Sandbox für #${issue.id} abgebrochen`);
-    this.repo.createBranch(issue.branch, this.targetBranch);
+    this.startedFrom.push({ id: issue.id, base: integrationBranch });
+    await this.repo.createBranch(issue.branch, integrationBranch);
     const script = this.implementers.get(issue.id) ?? { commits: 1, completed: true };
     return work({
       implement: async (): Promise<AgentRun> => {
@@ -182,10 +183,10 @@ export class FakeAgents implements Agents {
     });
   }
 
-  async merge(branches: string[]): Promise<AgentRun> {
-    this.mergedWith.push(branches);
+  async merge(into: string, branches: string[]): Promise<AgentRun> {
+    this.mergedWith.push({ into, branches });
     for (const branch of branches) {
-      if (!this.unmergeable.has(branch)) this.repo.merge(branch, this.targetBranch);
+      if (!this.unmergeable.has(branch)) this.repo.merge(branch, into);
     }
     return { commits: [], completed: true };
   }

@@ -33,7 +33,11 @@ test("ein fertiges Ticket wird reviewt, gemergt und geschlossen", async () => {
 
   assert.deepEqual(
     { reviewed: agents.reviewed, merged: agents.mergedWith, open: tracker.isOpen(7) },
-    { reviewed: ["7"], merged: [["sandcastle/issue-7"]], open: false },
+    {
+      reviewed: ["7"],
+      merged: [{ into: "main", branches: ["sandcastle/issue-7"] }],
+      open: false,
+    },
   );
 });
 
@@ -67,13 +71,13 @@ test("geschlossen werden nur Tickets, deren Branch nachweislich gemergt ist", as
 test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits gemergt", async () => {
   const { tracker, repo, agents, run } = setup();
   tracker.addTicket(ticket(7));
-  repo.createBranch("sandcastle/issue-7", "main");
+  await repo.createBranch("sandcastle/issue-7", "main");
   repo.commit("sandcastle/issue-7");
   agents.implementers.set("7", { commits: 0, completed: true });
 
   await run();
 
-  assert.deepEqual(agents.mergedWith, [["sandcastle/issue-7"]]);
+  assert.deepEqual(agents.mergedWith, [{ into: "main", branches: ["sandcastle/issue-7"] }]);
 });
 
 test("ein Branch ohne Arbeit wird weder reviewt noch gemergt", async () => {
@@ -86,7 +90,7 @@ test("ein Branch ohne Arbeit wird weder reviewt noch gemergt", async () => {
   assert.deepEqual({ reviewed: agents.reviewed, merged: agents.mergedWith }, { reviewed: [], merged: [] });
 });
 
-test("die Spec wird geschlossen, sobald ihr letztes Sub-Issue gemergt ist", async () => {
+test("Tickets einer Spec werden nach dem Merge in spec/<n> geschlossen, die Spec bleibt offen", async () => {
   const { tracker, agents, run } = setup();
   tracker.addSpec(30);
   tracker.addTicket(ticket(31), { parent: 30 });
@@ -94,11 +98,13 @@ test("die Spec wird geschlossen, sobald ihr letztes Sub-Issue gemergt ist", asyn
   agents.deferred.add("32");
 
   await run();
-  const afterFirst = tracker.isOpen(30);
   agents.deferred.clear();
   await run();
 
-  assert.deepEqual({ afterFirst, afterSecond: tracker.isOpen(30) }, { afterFirst: true, afterSecond: false });
+  assert.deepEqual(
+    { closed: tracker.closed.map((c) => c.number), specOpen: tracker.isOpen(30) },
+    { closed: [31, 32], specOpen: true },
+  );
 });
 
 test("ohne Tickets meldet die Iteration einen leeren Backlog", async () => {
@@ -116,4 +122,51 @@ test("ein Fehler bei einem Ticket hält die übrigen nicht auf", async () => {
   await run();
 
   assert.deepEqual(tracker.closed.map((c) => c.number), [8]);
+});
+
+test("ein Ticket einer Spec zweigt von spec/<n> ab, das von main entsteht, und wird dorthin gemergt", async () => {
+  const { tracker, repo, agents, run } = setup();
+  repo.commit("main");
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+
+  await run();
+
+  assert.deepEqual(
+    {
+      startedFrom: agents.startedFrom,
+      merged: agents.mergedWith,
+      specHasMain: await repo.contains("spec/30", "main"),
+      specHasTicket: await repo.contains("spec/30", "sandcastle/issue-31"),
+      mainHasTicket: await repo.contains("main", "sandcastle/issue-31"),
+    },
+    {
+      startedFrom: [{ id: "31", base: "spec/30" }],
+      merged: [{ into: "spec/30", branches: ["sandcastle/issue-31"] }],
+      specHasMain: true,
+      specHasTicket: true,
+      mainHasTicket: false,
+    },
+  );
+});
+
+test("je Integrations-Branch läuft ein eigener Merger, Tickets ohne Spec gehen nach main", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(7));
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(41), { parent: 40 });
+  tracker.addTicket(ticket(32), { parent: 30 });
+
+  await run();
+
+  assert.deepEqual(
+    new Map(agents.mergedWith.map((m) => [m.into, m.branches.toSorted()])),
+    new Map([
+      ["main", ["sandcastle/issue-7"]],
+      ["spec/30", ["sandcastle/issue-31", "sandcastle/issue-32"]],
+      ["spec/40", ["sandcastle/issue-41"]],
+    ]),
+  );
 });

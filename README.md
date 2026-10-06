@@ -79,9 +79,12 @@ und Token angelegt und aktiviert.
 
 Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattpocock/sandcastle), das offene Issues mit
 dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
-abarbeitet: planen, implementieren, reviewen, mergen. Gemergt und geschlossen
-werden nur Tickets, deren Implementierung abgeschlossen ist; eine Spec schließt
-das Skript, sobald alle ihre Tickets zu sind. Voraussetzung sind Node, Docker
+abarbeitet: planen, implementieren, reviewen, mergen. Tickets einer Spec `<n>`
+laufen über den Integrations-Branch `spec/<n>`, den das Skript bei Bedarf von
+`main` anlegt; Tickets ohne Spec gehen vorerst direkt in den aktiven Branch.
+Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
+ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
+schließt das Skript nicht. Voraussetzung sind Node, Docker
 und die Zugangsdaten aus
 `.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
 
