@@ -167,8 +167,8 @@ export type IterationDeps = {
   finishAttempted: Set<number>;
 };
 
-/** Was der Laufbeginn braucht: die Schnittstellen und das Log. */
-export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "log">;
+/** Was der Laufbeginn braucht: die Schnittstellen, das Log und `--spec`. */
+export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "log" | "spec">;
 
 /** Die Integrations-Branches, in die main zu Laufbeginn nicht gemergt werden konnte. */
 export type UpdateResult = { failed: string[] };
@@ -190,7 +190,8 @@ type Assignment = PlannedIssue & { integrationBranch: string };
  * Laufbeginn: holt den Stand von origin und mergt MAIN_REF in jeden aktiven
  * Integrations-Branch, damit Tickets von einem aktuellen Stand abzweigen. Nur
  * bei einem Konflikt startet der Merger. Scheitert er, bleibt der Branch
- * unverändert und steht in `failed`. Ohne Fetch bricht der Lauf ab.
+ * unverändert und steht in `failed`. Ohne Fetch bricht der Lauf ab. Mit
+ * `--spec <n>` ist nur `spec/<n>` aktiv; sandcastle/standalone bleibt liegen.
  */
 export async function updateIntegrationBranches(options: UpdateDeps): Promise<UpdateResult> {
   const deps = withLog(options);
@@ -203,8 +204,10 @@ export async function updateIntegrationBranches(options: UpdateDeps): Promise<Up
   // Vor dem Merge von main, sonst wäre der Branch nicht mehr auf seinem
   // gepushten Stand und bliebe stehen.
   try {
-    if (host === STANDALONE_BRANCH) log(`  ! ${checkedOutByHost(host)}`);
-    else await restartStandaloneAfterMerge(deps);
+    if (deps.spec === undefined) {
+      if (host === STANDALONE_BRANCH) log(`  ! ${checkedOutByHost(host)}`);
+      else await restartStandaloneAfterMerge(deps);
+    }
   } catch (error) {
     log(`  ! ${STANDALONE_BRANCH}: restart failed: ${error}`);
   }
@@ -230,12 +233,13 @@ export async function updateIntegrationBranches(options: UpdateDeps): Promise<Up
 /**
  * Eine Iteration: planen, je Ticket implementieren und reviewen, je
  * Integrations-Branch mergen und gemergte Tickets schließen. Am Ende werden
- * sandcastle/standalone veröffentlicht und fertige Specs abgeschlossen.
+ * sandcastle/standalone veröffentlicht (nicht mit `--spec`) und fertige Specs
+ * abgeschlossen.
  */
 export async function runIteration(options: IterationDeps): Promise<IterationResult> {
   const deps = withLog(options);
   const { planned, landed } = await planImplementAndMerge(deps);
-  await publishStandalone(deps, landed);
+  if (deps.spec === undefined) await publishStandalone(deps, landed);
   await finishCompletedSpecs(deps);
   return { planned };
 }
@@ -280,14 +284,17 @@ async function mergeOrReset(
 
 // Aktiv ist jeder bestehende `spec/<n>`, dessen Spec noch offen ist, und
 // `sandcastle/standalone`, falls es ihn gibt. Den Branch einer geschlossenen
-// Spec hat ihr PR schon nach main gebracht.
+// Spec hat ihr PR schon nach main gebracht. Mit `--spec <n>` zählt nur `spec/<n>`.
 async function activeIntegrationBranches(deps: WithLog<UpdateDeps>): Promise<string[]> {
   const { tracker, repo, log } = deps;
   const active: string[] = [];
-  if (await repo.branchExists(STANDALONE_BRANCH)) active.push(STANDALONE_BRANCH);
+  if (deps.spec === undefined && (await repo.branchExists(STANDALONE_BRANCH))) {
+    active.push(STANDALONE_BRANCH);
+  }
   for (const branch of await repo.branches(SPEC_PREFIX)) {
     const spec = specOfBranch(branch);
     if (spec === undefined) continue;
+    if (deps.spec !== undefined && spec !== deps.spec) continue;
     try {
       if ((await tracker.issue(spec)).open) active.push(branch);
     } catch (error) {

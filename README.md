@@ -105,8 +105,10 @@ npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
 ```
 
 Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
-`npm run sandcastle -- --spec <n>` beschränkt ihn auf die Sub-Issues der
-Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
+`npm run sandcastle -- --spec <n>` beschränkt ihn auf Spec `<n>`: Er plant
+nur ihre Sub-Issues ein, aktualisiert nur `spec/<n>` und schließt nur diese
+Spec ab; `sandcastle/standalone` und andere Spec-Branches bleiben unberührt.
+Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
 Blocker derselben Spec gibt sein Ticket frei, sobald er in `spec/<n>`
 gemergt und damit geschlossen ist. Ein Blocker aus einer anderen Spec gibt es
 erst frei, wenn diese Spec geschlossen und nach `main` gemergt ist, über ihren
@@ -121,8 +123,10 @@ gestartet wurde, fasst das Skript nicht an. Steht er auf einem
 Integrations-Branch, lässt der Lauf diesen Branch aus: kein Update, keine
 Tickets seiner Spec, keine Abschlussphase. Das Log meldet das.
 
-Code kommt nur über einen Pull Request von einem Integrations-Branch nach
-`main`:
+Aus Sandcastle kommt Code nur über einen Pull Request von einem
+Integrations-Branch nach `main`. Tickets ohne Spec, die interaktiv umgesetzt
+werden, landen dagegen direkt auf `main`, mit `(#<n>` in der Commit-Nachricht.
+Für Sandcastle gilt:
 
 - Tickets einer Spec `<n>` zweigen vom Integrations-Branch `spec/<n>` ab und
   werden dorthin gemergt; das Skript legt ihn bei Bedarf von `main` an.
@@ -151,7 +155,7 @@ Code kommt nur über einen Pull Request von einem Integrations-Branch nach
 Die PRs mergt die Maintainerin bzw. der Maintainer von Hand, mit Merge-Commit
 und erst bei grüner CI. So bleiben die Commits je Ticket samt
 Issue-Referenzen in der Historie von `main`. Die Regeln für Agents stehen in
-[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md#closing-work).
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md#abschluss-von-arbeit).
 
 Prompts und das Dockerfile der Sandbox liegen ebenfalls in `.sandcastle/`;
 Logs und Worktrees des Laufs bleiben dort unversioniert. Die Ablauflogik einer

@@ -52,7 +52,7 @@
 //   npm run sandcastle                  — Line-up Claude Code (Default)
 //   npm run sandcastle -- --agent codex — Line-up Codex
 //   npm run sandcastle:codex            — dasselbe, ohne `--`
-//   npm run sandcastle -- --spec 321    — nur die Sub-Issues von Spec #321
+//   npm run sandcastle -- --spec 321    — nur Spec #321: ihre Sub-Issues, nur spec/321
 
 import { parseArgs } from "node:util";
 import { DEFAULT_LINEUP, LINEUPS, sandcastleAgents } from "./agents.mts";

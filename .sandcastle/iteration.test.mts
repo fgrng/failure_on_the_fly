@@ -12,10 +12,12 @@ function setup(options: { spec?: number } = {}) {
   const startNewRun = () => {
     finishAttempted = new Set();
   };
-  const run = () =>
-    runIteration({ tracker, repo, agents, log: () => {}, finishAttempted, ...options });
+  // `overrides` ändert die Optionen für einen einzelnen Lauf, etwa `--spec`.
+  const run = (overrides: { spec?: number } = {}) =>
+    runIteration({ tracker, repo, agents, log: () => {}, finishAttempted, ...options, ...overrides });
   // Laufbeginn wie in main.mts: Fetch und Update der Integrations-Branches.
-  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  const update = (overrides: { spec?: number } = {}) =>
+    updateIntegrationBranches({ tracker, repo, agents, log: () => {}, ...options, ...overrides });
   return { tracker, repo, agents, run, update, startNewRun };
 }
 
@@ -290,6 +292,54 @@ test("ein bestehender sandcastle/standalone bekommt main hineingemergt", async (
   await update();
 
   assert.equal(await repo.contains("sandcastle/standalone", "origin/main"), true);
+});
+
+test("mit --spec bekommt zu Laufbeginn nur dieser Spec-Branch main hineingemergt", async () => {
+  const { tracker, repo, update } = setup({ spec: 30 });
+  tracker.addSpec(30);
+  tracker.addSpec(40);
+  await repo.createBranch("spec/30", "origin/main");
+  await repo.createBranch("spec/40", "origin/main");
+  await repo.createBranch("sandcastle/standalone", "origin/main");
+  repo.commitOnOrigin("main");
+
+  await update();
+
+  assert.deepEqual(
+    {
+      spec30: await repo.contains("spec/30", "origin/main"),
+      spec40: await repo.contains("spec/40", "origin/main"),
+      standalone: await repo.contains("sandcastle/standalone", "origin/main"),
+    },
+    { spec30: true, spec40: false, standalone: false },
+  );
+});
+
+test("mit --spec beginnt sandcastle/standalone nach dem Merge seines PRs nicht neu", async () => {
+  const { tracker, repo, run, update } = setup();
+  tracker.addTicket(ticket(7));
+  await run();
+  tracker.mergePullRequest(tracker.pullRequests[0]!.number);
+
+  await update({ spec: 30 });
+
+  assert.equal(await repo.contains("sandcastle/standalone", "sandcastle/issue-7"), true);
+});
+
+test("mit --spec wird sandcastle/standalone weder gepusht noch bekommt es einen PR", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(7));
+  repo.pushFails = true;
+  await run();
+  repo.pushFails = false;
+
+  await run({ spec: 30 });
+
+  assert.deepEqual(
+    { pushed: await repo.isPushed("sandcastle/standalone"), prs: tracker.pullRequests },
+    { pushed: false, prs: [] },
+  );
 });
 
 test("steht der Host auf spec/<n>, plant der Lauf die Tickets dieser Spec nicht ein", async () => {
