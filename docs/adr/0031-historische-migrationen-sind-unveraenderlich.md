@@ -76,6 +76,24 @@ Ein Test kann die verletzte Invariante nicht prüfen: Die nötige Information �
 welche Abhängigkeit galt, als eine Migration lief — steht in keiner Datei und
 in keiner Tabelle. Diese ADR ist der Guard.
 
+## Migrationstests enden mit der Auslieferung
+
+Ausgeliefert ist eine Migration, sobald sie mit dem PR ihrer Spec nach `main`
+geht. Ab dann wird sie nicht mehr verändert, und ein Test, der sie vor- und
+zurückmigriert, kann nichts mehr fangen. Er ist ein Werkzeug der Entwicklung,
+kein Bestand der Suite.
+
+Deshalb streicht die Abschlussphase einer Spec die Tests der Migrationen, die
+die Spec selbst neu anlegt, bevor ihr PR entsteht. Der Schritt läuft nur, wenn
+der Integrations-Branch gegenüber `origin/main` neue Migrationsdateien
+enthält. Migrationen aus Tickets ohne Spec (`sandcastle/standalone`,
+interaktiv auf `main`) räumt die Maintainerin bzw. der Maintainer von Hand ab.
+
+Der Auslöser ist der PR nach `main` und nicht die Produktivinstanz: Was dort
+gelaufen ist, fließt nicht verlässlich ins Repo zurück. Bestehende
+Entwicklungsdatenbanken, die Lücke aus den beiden Brüchen oben, erreicht ein
+Test ohnehin nicht, weil Test-Datenbanken immer frisch migriert werden.
+
 ## Reparatur einer betroffenen Entwicklungsdatenbank
 
 Wer eine Datenbank aus der Zeit vor #138 hat, benennt die beiden Spalten von
