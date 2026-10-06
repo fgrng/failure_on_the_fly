@@ -1,0 +1,5 @@
+# Der Build des Sandcastle-Images braucht aus dem Repo nur diese zwei Dateien;
+# alles andere (node_modules, .venv, Datenbank, Worktrees) bleibt draußen.
+*
+!pyproject.toml
+!uv.lock

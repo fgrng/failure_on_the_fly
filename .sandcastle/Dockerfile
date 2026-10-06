@@ -31,18 +31,13 @@ ARG AGENT_GID=1000
 # Rename the base image's "node" user to "agent" and align UID/GID.
 RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d /home/agent -m -l agent node
 
-# Install Codex CLI (run as root before USER agent)
-RUN npm install -g @openai/codex
-
 USER ${AGENT_UID}:${AGENT_GID}
 
 WORKDIR /home/agent
 
-# Install Claude Code CLI as the agent user so it lands in the agent's
-# ~/.local/bin (installing as root would put it in /root, invisible to agent).
-# Add that dir to PATH so `claude` resolves for the merge-phase agent.
+# Add the agent's ~/.local/bin to PATH so the Claude Code CLI installed below
+# resolves for the merge-phase agent.
 ENV PATH="/home/agent/.local/bin:${PATH}"
-RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Pre-provision uv's managed CPython 3.14 into the image (matches pyproject's
 # requires-python >=3.14). The per-sandbox `uv sync` hook in main.mts otherwise
@@ -57,11 +52,26 @@ RUN uv python install 3.14
 # 60s hook timeout. The workspace is bind-mounted at runtime, so a .venv built
 # here would be shadowed — but the uv cache (~/.local/share/uv) survives, so the
 # runtime `uv sync` installs from cache (offline, fast) instead of downloading.
-# Rebuild the image (sandcastle docker build-image) after changing uv.lock.
+# Rebuild the image (npm run sandcastle:build-image) after changing uv.lock.
 COPY --chown=agent:agent pyproject.toml uv.lock /home/agent/prime/
 RUN cd /home/agent/prime \
   && uv sync --frozen \
   && rm -rf /home/agent/prime
+
+# Codex and Claude Code install their latest release, which Docker's layer
+# cache then freezes. They come last so that a new TOOLS_REFRESH value
+# (npm run sandcastle:refresh-tools) rebuilds only these layers; Python and
+# the warmed uv cache above stay cached.
+ARG TOOLS_REFRESH=0
+
+# Install Codex CLI as root, then switch back to the agent user.
+USER root
+RUN npm install -g @openai/codex
+USER ${AGENT_UID}:${AGENT_GID}
+
+# Install Claude Code CLI as the agent user so it lands in the agent's
+# ~/.local/bin (installing as root would put it in /root, invisible to agent).
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
 # and overrides the working directory to /home/agent/workspace at container start.

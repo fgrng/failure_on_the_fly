@@ -6,6 +6,8 @@
   "scripts": {
     "sandcastle": "tsx .sandcastle/main.mts",
     "sandcastle:codex": "tsx .sandcastle/main.mts --agent codex",
+    "sandcastle:build-image": "docker build --file .sandcastle/Dockerfile --tag sandcastle:failure_on_the_fly --build-arg AGENT_UID=$(id -u) --build-arg AGENT_GID=$(id -g) .",
+    "sandcastle:refresh-tools": "docker build --file .sandcastle/Dockerfile --tag sandcastle:failure_on_the_fly --build-arg AGENT_UID=$(id -u) --build-arg AGENT_GID=$(id -g) --build-arg TOOLS_REFRESH=$(date +%s) .",
     "test:sandcastle": "tsx --test .sandcastle/*.test.mts"
   },
   "devDependencies": {
