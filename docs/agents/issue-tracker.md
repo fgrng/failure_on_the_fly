@@ -1,56 +1,60 @@
-# Issue tracker: GitHub
+# Issue-Tracker: GitHub
 
-Issues and specs live as GitHub issues in this repo; use the `gh` CLI.
+Issues und Specs liegen als GitHub-Issues in diesem Repo; Zugriff über die `gh`-CLI.
 
-- **Read**: `gh issue view <n> --comments`.
-- **List**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`, filtered with `--label` / `--state`.
-- **Closing work**: `gh issue close <n> --comment "..."`, following [Closing work](#closing-work) below.
-- **PRs as a request surface: no.** _(`/triage` reads this flag.)_ PRs here come from integration branches and are the maintainer's own work.
+- **Lesen**: `gh issue view <n> --comments`.
+- **Auflisten**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`, gefiltert mit `--label` / `--state`.
+- **Arbeit abschließen**: `gh issue close <n> --comment "..."`, nach den Regeln unter [Abschluss von Arbeit](#abschluss-von-arbeit).
+- **PRs as a request surface: no.** _(`/triage` liest dieses Flag.)_ PRs kommen hier aus Integrations-Branches und sind Arbeit der Maintainerin bzw. des Maintainers, keine Anfragen von außen.
 
-## Closing work
+## Abschluss von Arbeit
 
-Code reaches `main` only through a pull request from an **integration branch**:
+Aus Sandcastle kommt Code nur über einen Pull Request von einem **Integrations-Branch** nach `main`:
 
-- Spec `<n>` (labelled `Spec`) has its own integration branch `spec/<n>`, created from `main` on first use. Its tickets branch off it and merge back into it.
-- Tickets without a parent spec share the rolling integration branch `sandcastle/standalone`.
+- Spec `<n>` (Label `Spec`) hat einen eigenen Integrations-Branch `spec/<n>`, der beim ersten Gebrauch von `main` entsteht. Ihre Tickets zweigen davon ab und werden dorthin zurückgemergt.
+- Tickets ohne Eltern-Spec teilen sich den fortlaufenden Integrations-Branch `sandcastle/standalone`.
 
-Sandcastle runs `git fetch origin` at the start of every run and measures everything against `origin/main`; below, `main` means `origin/main`. It never touches the checkout it was started from: an integration branch checked out there is skipped for the whole run (no update, none of its tickets, no closing phase), and the log says so.
+Tickets ohne Spec, die interaktiv statt über Sandcastle umgesetzt werden, landen direkt auf `main`. Die Commit-Nachricht verweist als `(#<n>` auf das Ticket; daran erkennt Sandcastle, dass ein solcher Blocker auf `main` liegt.
 
-Each issue closes at its own merge:
+Sandcastle führt zu Beginn jedes Laufs `git fetch origin` aus und misst alles gegen `origin/main`; `main` heißt im Folgenden `origin/main`. Den Checkout, aus dem der Lauf gestartet wurde, fasst Sandcastle nie an: Ein dort ausgecheckter Integrations-Branch wird für den ganzen Lauf ausgelassen (kein Update, keine seiner Tickets, keine Abschlussphase), und das Log meldet das.
 
-- **Ticket**: closes once its branch is in its integration branch, not `main`. Sandcastle closes it itself after verifying the merge with `git merge-base --is-ancestor`; agents leave it open. If the merger ends without its completion signal, Sandcastle resets the integration branch to its state before the merger and closes none of its tickets.
-- **Blocker from the same spec**: counts as done once it is merged into `spec/<n>` (the script then closes it).
-- **Blocker from another spec**: counts as done only once that spec is closed and merged into `main`, via its PR or, if merged by hand, because `spec/<m>` is contained in `main`.
-- **Blocker without a spec**: counts as done once it is on `main`: its `sandcastle/issue-<n>` branch is there, or a commit there references it as `(#<n>` (keep this commit convention).
-- **Spec**: closes when its PR merges into `main`, through the `Closes #<n>` that ends the PR body. That PR is the only way a spec closes, so leave parent issues untouched (state, body, labels) while writing, implementing or closing tickets.
+`npm run sandcastle -- --spec <n>` wirkt nur auf Spec `<n>`: Der Lauf plant nur ihre Sub-Issues ein, aktualisiert nur `spec/<n>` und schließt nur diese Spec ab. `sandcastle/standalone` und andere `spec/<m>` bleiben unberührt: kein Update, kein Neustart, kein Push, kein PR.
 
-When every sub-issue of a spec is closed and `spec/<n>` has no open PR, Sandcastle runs the spec's **closing phase**: `code-review` over the whole spec against `main`, a fix of its standards and correctness findings, a PR text from the `pr` skill with the spec findings as "Offene Punkte", then push and PR from `spec/<n>` to `main`. A failed closing phase is retried by the next run, not by later iterations of the same run. From then on the spec is **locked**: Sandcastle comments on its remaining tickets and moves them from `ready-for-agent` to `ready-for-human`. Late work goes into a new spec.
+Jedes Issue schließt bei seinem eigenen Merge:
 
-`sandcastle/standalone` has no closing phase. Whenever it has commits not on `main`, Sandcastle pushes it and opens or extends its PR; after that PR merges, the next run restarts the branch from `main`.
+- **Ticket**: schließt, sobald sein Branch im Integrations-Branch liegt, nicht erst auf `main`. Sandcastle schließt es selbst, nachdem es den Merge mit `git merge-base --is-ancestor` geprüft hat; Agents lassen es offen. Endet der Merger ohne Abschlusssignal, setzt Sandcastle den Integrations-Branch auf den Stand vor dem Merger zurück und schließt keines seiner Tickets.
+- **Blocker aus derselben Spec**: gilt als erledigt, sobald er in `spec/<n>` gemergt ist (dann schließt ihn das Skript).
+- **Blocker aus einer anderen Spec**: gilt erst als erledigt, wenn diese Spec geschlossen und nach `main` gemergt ist, über ihren PR oder, bei einem Merge von Hand, weil `spec/<m>` in `main` enthalten ist.
+- **Blocker ohne Spec**: gilt als erledigt, sobald er auf `main` liegt: Sein Branch `sandcastle/issue-<n>` ist dort enthalten, oder ein Commit dort verweist als `(#<n>` auf ihn (diese Commit-Konvention beibehalten).
+- **Spec**: schließt, wenn ihr PR nach `main` gemergt wird, über das `Closes #<n>` am Ende des PR-Texts. Dieser PR ist der einzige Weg, auf dem eine Spec schließt. Eltern-Issues bleiben deshalb beim Schreiben, Umsetzen und Schließen von Tickets unangetastet (Status, Text, Labels).
 
-The maintainer merges every PR by hand, with a merge commit, once CI is green. The merge commit keeps each ticket's commits and issue references in `main`'s history for `code-review` and `retro`.
+Sind alle Sub-Issues einer Spec geschlossen und hat `spec/<n>` keinen offenen PR, führt Sandcastle die **Abschlussphase** der Spec aus: `code-review` über die ganze Spec gegen `main`, Behebung der Standards- und Korrektheitsbefunde, PR-Text mit dem Skill `pr` und den Spec-Befunden als „Offene Punkte“, dann Push und PR von `spec/<n>` nach `main`. Eine gescheiterte Abschlussphase versucht erst der nächste Lauf erneut, nicht eine spätere Iteration desselben Laufs. Ab dann ist die Spec **gesperrt**: Sandcastle kommentiert ihre übrigen Tickets und stellt sie von `ready-for-agent` auf `ready-for-human` um. Spätere Arbeit gehört in eine neue Spec.
 
-## Relationships: sub-issues and blocking edges
+`sandcastle/standalone` hat keine Abschlussphase. Hat der Branch Commits, die nicht auf `main` liegen, pusht Sandcastle ihn und legt seinen PR an oder ergänzt ihn; nach dem Merge dieses PRs beginnt der Branch im nächsten Lauf neu von `main`.
 
-Both endpoints take the other issue's numeric **database `id`** (`gh api repos/{owner}/{repo}/issues/<n> --jq .id`, not the `#number` or `node_id`) as a typed integer (`-F`, not `-f`). Publish parents and blockers first. `gh api` fills in `{owner}/{repo}` itself.
+Die Maintainerin bzw. der Maintainer mergt jeden PR von Hand, mit Merge-Commit und erst bei grüner CI. Der Merge-Commit hält die Commits je Ticket samt Issue-Referenzen in der Historie von `main`, für `code-review` und `retro`.
+
+## Beziehungen: Sub-Issues und Blocker-Kanten
+
+Beide Endpunkte erwarten die numerische **Datenbank-`id`** des anderen Issues (`gh api repos/{owner}/{repo}/issues/<n> --jq .id`, nicht die `#number` und nicht die `node_id`) als typisierte Ganzzahl (`-F`, nicht `-f`). Eltern-Issues und Blocker zuerst anlegen. `gh api` setzt `{owner}/{repo}` selbst ein.
 
 ```bash
-# child as sub-issue of a spec or wayfinder map
+# Kind als Sub-Issue einer Spec oder einer Wayfinder-Map
 gh api --method POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id=<child-id>
-# blocking edge (native dependency, not "Blocked by #N" body text)
+# Blocker-Kante (native Abhängigkeit, kein „Blocked by #N“ im Text)
 gh api --method POST repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker-id>
-# verify (gh issue view --json blockedBy has no .number)
+# prüfen (gh issue view --json blockedBy liefert kein .number)
 gh api repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by --jq '[.[].number]'
 ```
 
-A ticket is unblocked when `issue_dependencies_summary.blocked_by` is 0 (it counts open blockers only).
+Ein Ticket ist unblockiert, wenn `issue_dependencies_summary.blocked_by` 0 ist (gezählt werden nur offene Blocker).
 
-## Wayfinding operations
+## Wayfinding
 
-Used by `/wayfinder`.
+Für `/wayfinder`.
 
-- **Map**: one issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body.
-- **Child ticket**: a sub-issue of the map, labelled `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`).
-- **Frontier**: the map's open, unassigned sub-issues with zero open blockers; first in map order wins.
-- **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
-- **Resolve**: comment the answer, close the ticket, then append a context pointer (gist + link) to the map's Decisions-so-far.
+- **Map**: ein Issue mit Label `wayfinder:map`; sein Text hat die Abschnitte Notes / Decisions-so-far / Fog.
+- **Kind-Ticket**: ein Sub-Issue der Map mit Label `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`).
+- **Frontier**: die offenen, nicht zugewiesenen Sub-Issues der Map ohne offene Blocker; das erste in Map-Reihenfolge gewinnt.
+- **Beanspruchen**: `gh issue edit <n> --add-assignee @me`, der erste Schreibzugriff der Sitzung.
+- **Auflösen**: die Antwort kommentieren, das Ticket schließen, dann einen Kontext-Zeiger (Kern + Link) an Decisions-so-far der Map anhängen.
