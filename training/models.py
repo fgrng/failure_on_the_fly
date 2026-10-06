@@ -42,8 +42,8 @@ class Training(EigentuemerKreis):
     class Zustand(models.TextChoices):
         """Die Zustände eines Trainings."""
 
-        ENTWURF: tuple[str, str] = "entwurf", "Entwurf"
-        VEROEFFENTLICHT: tuple[str, str] = "veröffentlicht", "Veröffentlicht"
+        ENTWURF = "entwurf", "Entwurf"
+        VEROEFFENTLICHT = "veröffentlicht", "Veröffentlicht"
 
     name: models.CharField = models.CharField(max_length=255)
     zustand: models.CharField = models.CharField(
@@ -97,6 +97,8 @@ class Trainingsbindung(Bindung):
     )
 
     class Meta:
+        """Erlaubt je Training und Konto höchstens eine Bindung."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["training", "konto"],

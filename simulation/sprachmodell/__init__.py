@@ -95,6 +95,8 @@ class FakeSprachmodell:
     letzte_anfragen: list[tuple[list[dict[str, str]], Mapping[str, object]]] = []
 
     def __init__(self, skript: Sequence[Mapping[str, Any]]) -> None:
+        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden."""
+
         self.skript: list[Mapping[str, Any]] = list(skript)
 
     def antworten(
@@ -147,6 +149,8 @@ class LiteLLMSprachmodell:
         parameter: Mapping[str, Any],
         completion: Callable[..., Any] | None = None,
     ) -> None:
+        """Bindet Modell und Parameter; `completion` ersetzt den LiteLLM-Aufruf."""
+
         self.modell: str = modell
         self.parameter: dict[str, Any] = dict(parameter)
         self.completion: Callable[..., Any] = completion or litellm.completion

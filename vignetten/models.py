@@ -234,21 +234,21 @@ class Vignette(models.Model):
     class Zustand(models.TextChoices):
         """Mögliche Zustände einer Vignettenfassung."""
 
-        ENTWURF: tuple[str, str] = "entwurf", "Entwurf"
-        FINAL: tuple[str, str] = "final", "Final"
-        ARCHIVIERT: tuple[str, str] = "archiviert", "Archiviert"
+        ENTWURF = "entwurf", "Entwurf"
+        FINAL = "final", "Final"
+        ARCHIVIERT = "archiviert", "Archiviert"
 
     class Geschlecht(models.TextChoices):
         """Die kanonischen Geschlechter für die Rahmenhandlungsgrammatik."""
 
-        MAENNLICH: tuple[str, str] = "männlich", "Männlich"
-        WEIBLICH: tuple[str, str] = "weiblich", "Weiblich"
+        MAENNLICH = "männlich", "Männlich"
+        WEIBLICH = "weiblich", "Weiblich"
 
     class BudgetTyp(models.TextChoices):
         """Mögliche Maße des Gesprächsbudgets."""
 
-        SCHRITTE: tuple[str, str] = "schritte", "Schritte"
-        ZEIT: tuple[str, str] = "zeit", "Zeit"
+        SCHRITTE = "schritte", "Schritte"
+        ZEIT = "zeit", "Zeit"
 
     zustand: models.CharField = models.CharField(
         max_length=11, choices=Zustand, default=Zustand.ENTWURF

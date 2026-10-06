@@ -49,10 +49,10 @@ class Sitzung(models.Model):
     class Status(models.TextChoices):
         """Die möglichen Ausgänge einer Sitzung."""
 
-        LAUFEND: tuple[str, str] = "laufend", "Laufend"
-        ABGESCHLOSSEN: tuple[str, str] = "abgeschlossen", "Abgeschlossen"
-        ABGEBROCHEN: tuple[str, str] = "abgebrochen", "Abgebrochen"
-        GESCHEITERT: tuple[str, str] = "gescheitert", "Gescheitert"
+        LAUFEND = "laufend", "Laufend"
+        ABGESCHLOSSEN = "abgeschlossen", "Abgeschlossen"
+        ABGEBROCHEN = "abgebrochen", "Abgebrochen"
+        GESCHEITERT = "gescheitert", "Gescheitert"
 
     teilnahme: models.ForeignKey = models.ForeignKey(
         Teilnahme,
@@ -92,9 +92,9 @@ class Sitzung(models.Model):
 class Eingabemodus(models.TextChoices):
     """Die Herkunft eines abgeschickten Textes der Teilnehmer:in."""
 
-    GETIPPT: tuple[str, str] = "getippt", "Getippt"
-    TRANSKRIBIERT: tuple[str, str] = "transkribiert", "Transkribiert"
-    GEMISCHT: tuple[str, str] = "gemischt", "Gemischt"
+    GETIPPT = "getippt", "Getippt"
+    TRANSKRIBIERT = "transkribiert", "Transkribiert"
+    GEMISCHT = "gemischt", "Gemischt"
 
     @classmethod
     def aus_formular(cls, wert: str | None) -> "Eingabemodus":

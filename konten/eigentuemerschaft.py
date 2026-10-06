@@ -52,6 +52,8 @@ class EigentuemerKreis(models.Model):
     eigentuemerinnen: models.ManyToManyField = models.ManyToManyField("konten.Konto")
 
     class Meta:
+        """Keine eigene Tabelle: Jeder Bestand hält seine Eigentümerinnen in eigener M2M."""
+
         abstract: bool = True
 
     def ist_aktiv(self) -> bool:

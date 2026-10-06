@@ -60,7 +60,14 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
    | --------- | ----------------------- |
    | `autor` | alle Rollen (Superuser) |
    | `studi` | ohne Rolle              |
-5. **Server starten:**
+5. **Pre-commit-Hook aktivieren.** Der Hook in `.githooks/` prüft vor jedem
+   Commit Formatierung und Lint mit Ruff. Die Einstellung gilt auch für alle
+   Worktrees des Klons:
+
+   ```
+   git config core.hooksPath .githooks
+   ```
+6. **Server starten:**
 
    ```
    uv run python manage.py runserver

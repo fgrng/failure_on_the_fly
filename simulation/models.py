@@ -64,6 +64,8 @@ class KernHistorie(models.Model):
     )
 
     class Meta:
+        """Hält die Kern-Historie als einzige Zeile."""
+
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),
@@ -156,9 +158,9 @@ class Simulationskern(models.Model):
     class Zustand(models.TextChoices):
         """Mögliche Zustände einer Simulationskern-Fassung."""
 
-        ENTWURF: tuple[str, str] = "entwurf", "Entwurf"
-        FINAL: tuple[str, str] = "final", "Final"
-        ARCHIVIERT: tuple[str, str] = "archiviert", "Archiviert"
+        ENTWURF = "entwurf", "Entwurf"
+        FINAL = "final", "Final"
+        ARCHIVIERT = "archiviert", "Archiviert"
 
     zustand: models.CharField = models.CharField(
         max_length=11,
@@ -331,6 +333,8 @@ class Simulationskern(models.Model):
             raise ValidationError(fehler)
 
     class Meta:
+        """Sichert die Lebenszyklus-Invarianten der Kern-Fassungen."""
+
         constraints: list[models.BaseConstraint] = [
             models.UniqueConstraint(
                 fields=["historie"],
@@ -360,9 +364,9 @@ class Simulationskern(models.Model):
 class Anbieter(models.TextChoices):
     """Die Anbieter, die eine Naht dieser Anwendung bedienen können."""
 
-    FAKE: tuple[str, str] = "fake", "Fake (ohne Netz)"
-    OPENROUTER: tuple[str, str] = "openrouter", "OpenRouter"
-    INFOMANIAK: tuple[str, str] = "infomaniak", "Infomaniak"
+    FAKE = "fake", "Fake (ohne Netz)"
+    OPENROUTER = "openrouter", "OpenRouter"
+    INFOMANIAK = "infomaniak", "Infomaniak"
 
 
 # Der Anbieter `fake` bedient genau ein Modell, das seinen Namen trägt.
@@ -443,6 +447,8 @@ class AnbieterFeldgruppe(models.Model):
     )
 
     class Meta:
+        """Keine eigene Tabelle: Beide Konfigurationen tragen die Felder als Singleton."""
+
         abstract: bool = True
 
     @property
@@ -680,6 +686,8 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
             raise ValidationError(fehler)
 
     class Meta:
+        """Hält die Transkriptions-Konfiguration als einzige Zeile."""
+
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),
