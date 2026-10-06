@@ -398,7 +398,10 @@ test("ohne neue Commits auf sandcastle/standalone gibt es weder Push noch PR", a
   await run();
 
   assert.deepEqual(
-    { pushed: await repo.isPushed("sandcastle/standalone"), prs: tracker.pullRequests },
+    {
+      pushed: await repo.isPushed("sandcastle/standalone"),
+      prs: tracker.pullRequests.filter((pr) => pr.head === "sandcastle/standalone"),
+    },
     { pushed: false, prs: [] },
   );
 });
@@ -474,5 +477,164 @@ test("nach dem Merge des Standalone-PRs entsteht ohne neue Tickets kein weiterer
   assert.deepEqual(
     tracker.pullRequests.map((pr) => pr.state),
     ["merged"],
+  );
+});
+
+test("ist das letzte Ticket einer Spec geschlossen, wird spec/<n> gepusht und bekommt einen PR nach main", async () => {
+  const { tracker, repo, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+
+  await run();
+
+  assert.deepEqual(
+    {
+      pushed: await repo.isPushed("spec/30"),
+      prs: tracker.pullRequests.map(({ head, base, state }) => ({ head, base, state })),
+      closesSpec: tracker.pullRequests[0]?.body.trimEnd().endsWith("Closes #30"),
+    },
+    {
+      pushed: true,
+      prs: [{ head: "spec/30", base: "main", state: "open" }],
+      closesSpec: true,
+    },
+  );
+});
+
+test("solange ein Sub-Issue der Spec offen ist, startet keine Abschlussphase", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(32), { parent: 30 });
+  agents.deferred.add("32");
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, prs: tracker.pullRequests },
+    { steps: [], prs: [] },
+  );
+});
+
+test("hat die Spec schon einen offenen PR, startet keine Abschlussphase", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addTicket(ticket(32), { parent: 30 });
+  agents.deferred.add("32");
+  await run();
+  await tracker.createPullRequest({ head: "spec/30", base: "main", title: "Spec #30", body: "" });
+  agents.deferred.clear();
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, prs: tracker.pullRequests.length, specBranchAhead: !(await repo.contains("main", "spec/30")) },
+    { steps: [], prs: 1, specBranchAhead: true },
+  );
+});
+
+test("werden zwei Specs im selben Lauf fertig, bekommt jede ihre eigene Abschlussphase", async () => {
+  const { tracker, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(41), { parent: 40 });
+
+  await run();
+
+  assert.deepEqual(
+    tracker.pullRequests.map((pr) => ({ head: pr.head, last: pr.body.split("\n").at(-1) })),
+    [
+      { head: "spec/30", last: "Closes #30" },
+      { head: "spec/40", last: "Closes #40" },
+    ],
+  );
+});
+
+test("die Abschlussphase reviewt, behebt Standards- und Korrektheitsbefunde, schreibt den PR-Text und legt den PR an", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, {
+    standards: ["Docstring fehlt"],
+    correctness: ["Grenzfall falsch"],
+    spec: ["Export fehlt"],
+  });
+
+  await run();
+
+  assert.deepEqual(
+    {
+      steps: agents.specSteps,
+      fixedWith: agents.fixedWith,
+      prs: tracker.pullRequests.length,
+      pushedWithFix: await repo.isPushed("spec/30"),
+    },
+    {
+      steps: ["review #30", "fix #30", "pr-text #30"],
+      fixedWith: [{ spec: 30, findings: ["Docstring fehlt", "Grenzfall falsch"] }],
+      prs: 1,
+      pushedWithFix: true,
+    },
+  );
+});
+
+test("Spec-Befunde stehen als offene Punkte im PR-Text vor Closes #<spec>", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, { standards: [], correctness: [], spec: ["Export fehlt"] });
+
+  await run();
+
+  assert.equal(
+    tracker.pullRequests[0]?.body,
+    "## Summary\n\nAlles zu #30.\n\n## Offene Punkte\n\n- Export fehlt\n\nCloses #30",
+  );
+});
+
+test("ohne Standards- und Korrektheitsbefunde läuft kein Fix-Implementer", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, { standards: [], correctness: [], spec: ["Export fehlt"] });
+
+  await run();
+
+  assert.deepEqual(agents.specSteps, ["review #30", "pr-text #30"]);
+});
+
+test("endet die Behebung ohne Abschlusssignal, gibt es weder Push noch PR", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
+  agents.unfixable.add(30);
+
+  await run();
+
+  assert.deepEqual(
+    { pushed: await repo.isPushed("spec/30"), prs: tracker.pullRequests },
+    { pushed: false, prs: [] },
+  );
+});
+
+test("mit --spec <n> wird nur Spec #n abgeschlossen", async () => {
+  const { tracker, repo, agents } = setup();
+  const run = () => runIteration({ tracker, repo, agents, log: () => {}, spec: 40 });
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  tracker.addSpec(40);
+  tracker.addTicket(ticket(41), { parent: 40 });
+  await repo.createBranch("spec/30", "main");
+  repo.commit("spec/30");
+  await tracker.close(31, "von Hand umgesetzt");
+
+  await run();
+
+  assert.deepEqual(
+    tracker.pullRequests.map((pr) => pr.head),
+    ["spec/40"],
   );
 });

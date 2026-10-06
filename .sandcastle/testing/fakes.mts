@@ -8,7 +8,9 @@ import type {
   IssueSummary,
   PlannedIssue,
   PullRequest,
+  PullRequestText,
   Repo,
+  SpecReview,
   Ticket,
   TicketSession,
   Tracker,
@@ -220,6 +222,15 @@ export class FakeAgents implements Agents {
   /** Ticket-IDs, deren Sandbox mit einem Fehler abbricht. */
   readonly failing = new Set<string>();
 
+  /** Die Agent-Schritte der Abschlussphasen, etwa `review #30`, in Aufrufreihenfolge. */
+  readonly specSteps: string[] = [];
+  /** Die Befunde, die jeder Fix-Implementer bekam. */
+  readonly fixedWith: { spec: number; findings: string[] }[] = [];
+  /** Befunde des Spec-Reviews je Spec. Default: keine. */
+  readonly specReviews = new Map<number, SpecReview>();
+  /** Specs, deren Fix-Implementer ohne Abschlusssignal endet. */
+  readonly unfixable = new Set<number>();
+
   constructor(private repo: FakeRepo) {}
 
   async plan(tickets: Ticket[]): Promise<PlannedIssue[]> {
@@ -267,5 +278,21 @@ export class FakeAgents implements Agents {
       return { commits: [this.repo.commit(into)], completed: false };
     }
     return { commits: [], completed: true };
+  }
+
+  async reviewSpec(spec: number, branch: string): Promise<SpecReview> {
+    this.specSteps.push(`review #${spec}`);
+    return this.specReviews.get(spec) ?? { standards: [], correctness: [], spec: [] };
+  }
+
+  async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
+    this.specSteps.push(`fix #${spec}`);
+    this.fixedWith.push({ spec, findings });
+    return { commits: [this.repo.commit(branch)], completed: !this.unfixable.has(spec) };
+  }
+
+  async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
+    this.specSteps.push(`pr-text #${spec}`);
+    return { title: `Spec #${spec}`, body: `## Summary\n\nAlles zu #${spec}.` };
   }
 }

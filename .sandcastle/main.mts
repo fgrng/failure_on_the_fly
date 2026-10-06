@@ -26,6 +26,13 @@
 //              ahead of main, the driver pushes it and opens or updates its
 //              PR. Once that PR is merged, the next run restarts the branch
 //              from main before the update step.
+//   Finish:    At the end of every iteration, each Spec whose sub-issues are
+//              all closed and whose `spec/<n>` has no open PR gets its closing
+//              phase: a `code-review` of the whole spec against main, a
+//              fix-implementer for the standards and correctness findings, a
+//              PR text written with the `pr` skill, then the driver pushes and
+//              opens the PR. Spec findings land as "Offene Punkte" in the PR
+//              text, which ends with `Closes #<n>`.
 //
 // The outer loop repeats up to MAX_ITERATIONS times, stopping early once the
 // backlog is exhausted (a plan with no issues).

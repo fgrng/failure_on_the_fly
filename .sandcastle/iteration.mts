@@ -92,7 +92,21 @@ export interface Agents {
   ): Promise<T>;
   /** Der Merger mergt die Branches in `into`. */
   merge(into: string, branches: string[]): Promise<AgentRun>;
+  /** Reviewt `branch` gegen main mit `code-review`, Maßstab ist die Spec. */
+  reviewSpec(spec: number, branch: string): Promise<SpecReview>;
+  /** Ein Implementer behebt die Befunde auf `branch`. */
+  fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
+  /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`. */
+  writePullRequest(spec: number, branch: string): Promise<PullRequestText>;
 }
+
+/**
+ * Befunde des Spec-Reviews: Standards und Korrektheit werden behoben,
+ * Spec-Befunde gehen als offene Punkte in den PR-Text.
+ */
+export type SpecReview = { standards: string[]; correctness: string[]; spec: string[] };
+
+export type PullRequestText = { title: string; body: string };
 
 /** Von hier zweigen neue Integrations-Branches ab. */
 export const MAIN_BRANCH = "main";
@@ -200,17 +214,28 @@ type Assignment = PlannedIssue & { integrationBranch: string };
 
 /**
  * Eine Iteration: planen, je Ticket implementieren und reviewen, je
- * Integrations-Branch mergen und gemergte Tickets schließen.
+ * Integrations-Branch mergen und gemergte Tickets schließen. Am Ende werden
+ * sandcastle/standalone veröffentlicht und fertige Specs abgeschlossen.
  */
 export async function runIteration(deps: IterationDeps): Promise<IterationResult> {
-  const { agents } = deps;
   const log = deps.log ?? console.log;
+  const { planned, landed } = await planImplementAndMerge(deps, log);
+  await publishStandalone(deps, landed, log);
+  await finishCompletedSpecs(deps, log);
+  return { planned };
+}
 
+// Liefert die Zahl der geplanten Tickets und die Tickets, die in ihrem
+// Integrations-Branch gelandet sind.
+async function planImplementAndMerge(
+  deps: IterationDeps,
+  log: (message: string) => void,
+): Promise<{ planned: number; landed: Assignment[] }> {
+  const { agents } = deps;
   const issues = await agents.plan(await frontier(deps, log));
   if (issues.length === 0) {
     log("No issues to work on.");
-    await publishStandalone(deps, [], log);
-    return { planned: 0 };
+    return { planned: 0, landed: [] };
   }
 
   log(`Planning complete. ${issues.length} issue(s) to work in parallel:`);
@@ -223,8 +248,7 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
   for (const issue of readyIssues) log(`  ${issue.branch} -> ${issue.integrationBranch}`);
   if (readyIssues.length === 0) {
     log("No completed branches. Nothing to merge.");
-    await publishStandalone(deps, [], log);
-    return { planned: issues.length };
+    return { planned: issues.length, landed: [] };
   }
 
   const landed: Assignment[] = [];
@@ -242,8 +266,7 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
     }
     landed.push(...(await closeMergedIssues(deps, group, log)));
   }
-  await publishStandalone(deps, landed, log);
-  return { planned: issues.length };
+  return { planned: issues.length, landed };
 }
 
 // Die Tickets, die der Planner zu sehen bekommt: die bereiten Tickets des
@@ -461,6 +484,91 @@ async function publishStandalone(
   } catch (error) {
     log(`  ! Publishing ${STANDALONE_BRANCH} failed: ${error}`);
   }
+}
+
+// Abschlussphase für jede Spec, deren Sub-Issues alle geschlossen sind und
+// die noch keinen offenen PR hat. Scheitert eine, kommen die anderen trotzdem dran.
+async function finishCompletedSpecs(
+  deps: IterationDeps,
+  log: (message: string) => void,
+): Promise<void> {
+  for (const spec of await completedSpecs(deps, log)) {
+    try {
+      await finishSpec(deps, spec, log);
+    } catch (error) {
+      log(`  ! Finishing spec #${spec} failed: ${error}`);
+    }
+  }
+}
+
+// Die Specs, deren Integrations-Branch bereit für den PR ist: Spec offen,
+// alle Sub-Issues geschlossen, kein offener PR, Commits, die main noch fehlen.
+async function completedSpecs(
+  deps: IterationDeps,
+  log: (message: string) => void,
+): Promise<number[]> {
+  const { tracker, repo } = deps;
+  const specs: number[] = [];
+  for (const branch of await repo.branches("spec/")) {
+    const spec = Number(branch.slice("spec/".length));
+    if (!Number.isInteger(spec)) continue;
+    if (deps.spec !== undefined && spec !== deps.spec) continue;
+    try {
+      const { open, subIssues } = await tracker.issue(spec);
+      if (!open || subIssues.total === 0 || subIssues.completed !== subIssues.total) continue;
+      if ((await tracker.pullRequest(branch))?.state === "open") continue;
+      if (await repo.contains(MAIN_BRANCH, branch)) continue;
+    } catch (error) {
+      log(`  ! ${branch}: could not check spec #${spec}, skipping: ${error}`);
+      continue;
+    }
+    specs.push(spec);
+  }
+  return specs;
+}
+
+// Spec-Review, Behebung der Standards- und Korrektheitsbefunde, PR-Text,
+// dann Push und PR. Endet die Behebung ohne Abschlusssignal, bleibt der PR
+// aus; die nächste Iteration beginnt die Abschlussphase von vorn.
+async function finishSpec(
+  deps: IterationDeps,
+  spec: number,
+  log: (message: string) => void,
+): Promise<void> {
+  const { tracker, repo, agents } = deps;
+  const branch = `spec/${spec}`;
+  log(`\n=== Finishing spec #${spec} on ${branch} ===`);
+
+  const review = await agents.reviewSpec(spec, branch);
+  const toFix = [...review.standards, ...review.correctness];
+  if (toFix.length > 0) {
+    const fix = await agents.fixFindings(spec, branch, toFix);
+    if (!fix.completed) {
+      log(`  ! ${branch}: findings not fixed (no completion signal) - no pull request yet.`);
+      return;
+    }
+  }
+
+  const text = await agents.writePullRequest(spec, branch);
+  await repo.push(branch);
+  await tracker.createPullRequest({
+    head: branch,
+    base: MAIN_BRANCH,
+    title: text.title,
+    body: specPrBody(text.body, review.spec, spec),
+  });
+  log(`${branch}: pushed, pull request opened.`);
+}
+
+// Spec-Befunde entscheidet ein Mensch; sie stehen deshalb wörtlich im PR.
+// `Closes` am Ende schließt die Spec beim Merge des PRs.
+function specPrBody(body: string, openPoints: string[], spec: number): string {
+  const parts = [body.trim()];
+  if (openPoints.length > 0) {
+    parts.push(["## Offene Punkte", "", ...openPoints.map((p) => `- ${p}`)].join("\n"));
+  }
+  parts.push(`Closes #${spec}`);
+  return parts.join("\n\n");
 }
 
 function standalonePrBody(ticketLines: string[]): string {

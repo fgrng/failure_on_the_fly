@@ -6,7 +6,15 @@ import path from "node:path";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { z } from "zod";
-import type { AgentRun, Agents, PlannedIssue, Ticket, TicketSession } from "./iteration.mts";
+import type {
+  AgentRun,
+  Agents,
+  PlannedIssue,
+  PullRequestText,
+  SpecReview,
+  Ticket,
+  TicketSession,
+} from "./iteration.mts";
 import { currentBranch } from "./repo.mts";
 
 // Configure mounts for the .codex / .claude folders containing auth info.
@@ -67,6 +75,31 @@ const planSchema = z.object({
     z.object({ id: z.string(), title: z.string(), branch: z.string() }),
   ),
 });
+
+// Befunde des Spec-Reviews im <spec-review>-Tag, siehe spec-review-prompt.md.
+const specReviewSchema = z.object({
+  standards: z.array(z.string()),
+  correctness: z.array(z.string()),
+  spec: z.array(z.string()),
+});
+
+// Titel und Text des Spec-PRs im <pull-request>-Tag, siehe pr-prompt.md.
+const pullRequestSchema = z.object({
+  title: z.string().min(1),
+  body: z.string().min(1),
+});
+
+// Ein ungültiger Tag kostete sonst die ganze Abschlussphase; der Agent
+// bekommt den Fehler zurück und gibt neu aus.
+const OUTPUT_RETRIES = 2;
+
+// Ein Integrations-Branch bekommt einen eigenen Worktree, damit der Checkout
+// des Hosts unberührt bleibt. Steht der Host selbst auf dem Branch, läuft der
+// Agent direkt im Checkout, weil git einen Branch nicht in zwei Worktrees
+// zugleich auscheckt.
+function onIntegrationBranch(branch: string): sandcastle.BranchStrategy {
+  return branch === currentBranch() ? { type: "head" } : { type: "branch", branch };
+}
 
 // docker() sandbox config wiring the read-only host auth mounts and CODEX_HOME.
 // Called fresh per sandbox so each phase gets its own configured container.
@@ -220,16 +253,10 @@ export function sandcastleAgents(lineup: Lineup): Agents {
     },
 
     async merge(into: string, branches: string[]): Promise<AgentRun> {
-      // Ein Integrations-Branch bekommt einen eigenen Worktree, damit der
-      // Checkout des Hosts unberührt bleibt. Steht der Host selbst auf dem
-      // Ziel, wird direkt im Checkout gemergt, weil git einen Branch nicht in
-      // zwei Worktrees zugleich auscheckt.
-      const branchStrategy: sandcastle.BranchStrategy =
-        into === currentBranch() ? { type: "head" } : { type: "branch", branch: into };
       return agentRun(
         await sandcastle.run({
           sandbox: agentSandbox(),
-          branchStrategy,
+          branchStrategy: onIntegrationBranch(into),
           hooks,
           copyToWorktree,
           name: `Merger ${into}`,
@@ -242,6 +269,67 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           },
         }),
       );
+    },
+
+    async reviewSpec(spec: number, branch: string): Promise<SpecReview> {
+      const review = await sandcastle.run({
+        sandbox: agentSandbox(),
+        branchStrategy: onIntegrationBranch(branch),
+        hooks,
+        copyToWorktree,
+        name: `Spec-Review #${spec}`,
+        // Strukturierte Ausgabe verlangt genau eine Iteration.
+        maxIterations: 1,
+        agent: lineup.reviewer,
+        promptFile: "./.sandcastle/spec-review-prompt.md",
+        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch },
+        output: sandcastle.Output.object({
+          tag: "spec-review",
+          schema: specReviewSchema,
+          maxRetries: OUTPUT_RETRIES,
+        }),
+      });
+      return review.output;
+    },
+
+    async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
+      return agentRun(
+        await sandcastle.run({
+          sandbox: agentSandbox(),
+          branchStrategy: onIntegrationBranch(branch),
+          hooks,
+          copyToWorktree,
+          name: `Spec-Fix #${spec}`,
+          maxIterations: MAX_IMPLEMENT_ITERATIONS,
+          agent: lineup.implementer,
+          promptFile: "./.sandcastle/spec-fix-prompt.md",
+          promptArgs: {
+            SPEC: spec,
+            INTEGRATION_BRANCH: branch,
+            FINDINGS: findings.map((f) => `- ${f}`).join("\n"),
+          },
+        }),
+      );
+    },
+
+    async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
+      const text = await sandcastle.run({
+        sandbox: agentSandbox(),
+        branchStrategy: onIntegrationBranch(branch),
+        hooks,
+        copyToWorktree,
+        name: `PR-Text #${spec}`,
+        maxIterations: 1,
+        agent: lineup.reviewer,
+        promptFile: "./.sandcastle/pr-prompt.md",
+        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch },
+        output: sandcastle.Output.object({
+          tag: "pull-request",
+          schema: pullRequestSchema,
+          maxRetries: OUTPUT_RETRIES,
+        }),
+      });
+      return text.output;
     },
   };
 }
