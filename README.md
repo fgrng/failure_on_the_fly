@@ -79,21 +79,9 @@ und Token angelegt und aktiviert.
 
 Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattpocock/sandcastle), das offene Issues mit
 dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
-abarbeitet: planen, implementieren, reviewen, mergen. Tickets einer Spec `<n>`
-laufen über den Integrations-Branch `spec/<n>`, den das Skript bei Bedarf von
-`main` anlegt; Tickets ohne Spec sammeln sich auf `sandcastle/standalone`.
-Hat dieser Branch Commits, die nicht auf `main` liegen, pusht ihn das Skript
-und legt einen PR nach `main` an oder ergänzt den offenen. Ist der PR gemergt,
-beginnt der Branch im nächsten Lauf neu von `main`.
-Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
-Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
-Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
-ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
-schließt das Skript nicht. Hat eine Spec schon einen offenen PR, plant das
-Skript ihre übrigen Tickets nicht mehr ein, sondern kommentiert sie und stellt
-sie auf `ready-for-human`: Nachzügler gehören in eine neue Spec. Voraussetzung sind Node, Docker
-und die Zugangsdaten aus
-`.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
+abarbeitet: planen, implementieren, reviewen, mergen. Voraussetzung sind Node,
+Docker und die Zugangsdaten aus `.sandcastle/.env.example`, kopiert nach
+`.sandcastle/.env`. Dann:
 
 ```
 npm install
@@ -107,7 +95,8 @@ ab. Zu wiederholen ist er nach jeder Änderung an `.sandcastle/Dockerfile` und
 nach jeder an `uv.lock` — das Image hält den vorgewärmten uv-Cache, aus dem
 die Sandbox ihre Abhängigkeiten zieht, statt sie neu zu laden.
 
-Welche Modelle die vier Phasen fahren, wählt `--agent`:
+Welche Modelle die vier Rollen (Planner, Implementer, Reviewer, Merger)
+fahren, wählt `--agent`:
 
 ```
 npm run sandcastle                    # Claude Code, der Default
@@ -120,6 +109,35 @@ Ohne weitere Argumente arbeitet ein Lauf alle bereiten Tickets ab;
 Spec `<n>`. Die Reihenfolge folgt den Blocked-by-Kanten im Tracker: Ein
 Blocker derselben Spec gibt sein Ticket frei, sobald er geschlossen ist, ein
 Blocker aus einer anderen Spec erst, wenn sein Code auf `main` liegt.
+
+Code kommt nur über einen Pull Request von einem Integrations-Branch nach
+`main`:
+
+- Tickets einer Spec `<n>` zweigen vom Integrations-Branch `spec/<n>` ab und
+  werden dorthin gemergt; das Skript legt ihn bei Bedarf von `main` an.
+  Tickets ohne Spec sammeln sich auf `sandcastle/standalone`.
+- Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
+  Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
+- Gemergt und geschlossen werden nur Tickets, deren Implementer sein
+  Abschlusssignal gegeben hat und deren Branch nachweislich im
+  Integrations-Branch liegt. Das Schließen übernimmt das Skript.
+- Sind alle Tickets einer Spec geschlossen, folgt ihre Abschlussphase: ein
+  `code-review` über die ganze Spec gegen `main`, die Behebung der Standards-
+  und Korrektheitsbefunde, ein PR-Text mit dem Skill `pr`. Spec-Befunde stehen
+  darin als „Offene Punkte“, am Ende `Closes #<n>`. Das Skript pusht
+  `spec/<n>` und legt den PR an; die Spec schließt GitHub beim Merge.
+- Hat eine Spec schon einen offenen PR, plant das Skript ihre übrigen Tickets
+  nicht mehr ein, sondern kommentiert sie und stellt sie auf
+  `ready-for-human`: Nachzügler gehören in eine neue Spec.
+- `sandcastle/standalone` hat keine Abschlussphase. Hat der Branch Commits,
+  die nicht auf `main` liegen, pusht ihn das Skript und legt einen PR an oder
+  ergänzt den offenen. Ist der PR gemergt, beginnt der Branch im nächsten Lauf
+  neu von `main`.
+
+Die PRs mergt die Maintainerin bzw. der Maintainer von Hand, mit Merge-Commit
+und erst bei grüner CI. So bleiben die Commits je Ticket samt
+Issue-Referenzen in der Historie von `main`. Die Regeln für Agents stehen in
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md#closing-work).
 
 Prompts und das Dockerfile der Sandbox liegen ebenfalls in `.sandcastle/`;
 Logs und Worktrees des Laufs bleiben dort unversioniert. Die Ablauflogik einer
