@@ -9,7 +9,7 @@ For each branch:
 1. Run `git merge <branch> --no-edit`
 2. If there are merge conflicts, resolve them intelligently by reading both sides and choosing the correct resolution
 
-After all branches are merged, run `{{FULL_TESTS}}` once and fix whatever fails. Then make a single commit summarizing the merge.
+After all branches are merged, run `uv run pytest` once and fix whatever fails; skip the run if the merged branches change only Markdown files. Then make a single commit summarizing the merge.
 
 Do not close any issues; the driver script closes them after verifying each merge.
 

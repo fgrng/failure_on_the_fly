@@ -35,9 +35,11 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Run only the tests your change can affect, never the whole suite; the merger runs `{{FULL_TESTS}}` after you.
+Run only the tests your change can affect, never the whole suite; the merger runs `uv run pytest` after you.
 
 Run the test modules of the apps you touched, e.g. `uv run pytest vignetten/tests` or a single test file. Before committing, make sure these tests pass.
+
+If you changed only Markdown files, run no tests: no test reads them.
 
 # COMMIT
 

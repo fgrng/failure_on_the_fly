@@ -139,9 +139,6 @@ export const MAIN_BRANCH = "main";
  */
 export const MAIN_REF = `origin/${MAIN_BRANCH}`;
 
-/** Die ganze Testsuite. */
-export const FULL_TESTS = "uv run pytest";
-
 /** Der fortlaufende Integrations-Branch der Tickets ohne Eltern-Spec. */
 export const STANDALONE_BRANCH = "sandcastle/standalone";
 

@@ -22,6 +22,6 @@ Do not comment on or close any issue; the driver script opens the pull request.
 The merger left the branch green, so there is no starting run.
 
 1. Make the changes and commit them in one commit whose message starts with `RALPH: Spec-Review -` and references `(Spec #{{SPEC}})`.
-2. Run `{{FULL_TESTS}}` and fix whatever fails. The branch must end green.
+2. Run `uv run pytest` and fix whatever fails. The branch must end green. Skip this if your commit changes only Markdown files.
 
-Once complete, and only if these tests are green, output <promise>COMPLETE</promise>.
+Once complete, and only if these tests are green or were skipped, output <promise>COMPLETE</promise>.

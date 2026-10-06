@@ -16,7 +16,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.dokumentation import exportkontrakt_aus_adr_0029
+from config.tests.exportkontrakt import exportkontrakt_aus_adr_0029
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from erhebungen.models import (

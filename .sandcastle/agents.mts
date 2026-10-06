@@ -15,7 +15,7 @@ import type {
   Ticket,
   TicketSession,
 } from "./iteration.mts";
-import { FULL_TESTS, ticketBranch } from "./iteration.mts";
+import { ticketBranch } from "./iteration.mts";
 
 // Mounts für die Ordner .codex und .claude mit den Zugangsdaten des Hosts.
 // <user>
@@ -250,9 +250,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
               maxIterations: MAX_IMPLEMENT_ITERATIONS,
               agent: lineup.implementer,
               promptFile: "./.sandcastle/implement-prompt.md",
-              // Der Implementer wählt die betroffenen Tests selbst, die ganze
-              // Suite lässt erst der Merger laufen.
-              promptArgs: { ...promptArgs, FULL_TESTS },
+              promptArgs,
             }),
           ),
         review: async () =>
@@ -263,7 +261,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
               maxIterations: 1,
               agent: lineup.reviewer,
               promptFile: "./.sandcastle/review-prompt.md",
-              promptArgs: { ...promptArgs, FULL_TESTS },
+              promptArgs,
             }),
           ),
       });
@@ -280,7 +278,6 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           promptArgs: {
             BRANCHES: branches.map((b) => `- ${b}`).join("\n"),
             INTEGRATION_BRANCH: into,
-            FULL_TESTS,
           },
         }),
       );
@@ -316,7 +313,6 @@ export function sandcastleAgents(lineup: Lineup): Agents {
             SPEC: spec,
             INTEGRATION_BRANCH: branch,
             FINDINGS: findings.map((f) => `- ${f}`).join("\n"),
-            FULL_TESTS,
           },
         }),
       );
@@ -329,7 +325,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
         maxIterations: 1,
         agent: lineup.reviewer,
         promptFile: "./.sandcastle/pr-prompt.md",
-        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch, FULL_TESTS },
+        promptArgs: { SPEC: spec, INTEGRATION_BRANCH: branch },
         output: sandcastle.Output.object({
           tag: "pull-request",
           schema: pullRequestSchema,
