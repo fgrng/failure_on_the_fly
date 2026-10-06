@@ -105,8 +105,14 @@ npm run sandcastle:codex              # Codex
 npm run sandcastle -- --agent codex   # dasselbe ausgeschrieben
 ```
 
-Prompts, Coding-Standards und das Dockerfile der Sandbox liegen ebenfalls in
-`.sandcastle/`; Logs und Worktrees des Laufs bleiben dort unversioniert.
+Prompts und das Dockerfile der Sandbox liegen ebenfalls in `.sandcastle/`;
+Logs und Worktrees des Laufs bleiben dort unversioniert. Die Ablauflogik einer
+Iteration (`.sandcastle/iteration.mts`) ist gegen Fakes für Tracker, Repo und
+Agents getestet, ohne Docker und ohne Agents:
+
+```
+npm run test:sandcastle
+```
 
 ## Deployment auf Uberspace
 
