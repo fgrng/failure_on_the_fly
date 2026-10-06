@@ -2,7 +2,7 @@
 
 Dieses Dokument beschreibt das sichtbare Verhalten der Plattform je Bereich so,
 wie es heute umgesetzt ist. Es ist die Referenz für die Frage »Was tut die
-Anwendung an dieser Stelle genau?« — für Begriffe siehe [CONTEXT.md](../CONTEXT.md),
+Anwendung an dieser Stelle genau?« — für Begriffe siehe [GLOSSARY.md](../GLOSSARY.md),
 für die Gründe hinter dem Verhalten [docs/adr/](adr/). Wer das Verhalten ändert,
 ändert diesen Text mit.
 
@@ -142,7 +142,7 @@ Speichern einen Fehler, geht eine gerade gewählte Datei verloren; die Karte
 nennt sie dann und bittet, sie erneut zu wählen.
 
 Formular und Detailansicht beschriften die Felder gleich und gekoppelt wie in
-CONTEXT.md, etwa »Fehlermuster-Beschreibung«, »Lernauftrag-Bild«,
+GLOSSARY.md, etwa »Fehlermuster-Beschreibung«, »Lernauftrag-Bild«,
 »Arbeitsheft-Bildbeschreibung«, »Vorname der Schüler:in« und »Budget-Typ«. Das
 gilt auch für Legende und Felder der Bildkarte. Scheitert das Finalisieren an
 leeren Pflichtfeldern, nennt die Meldung sie mit diesen Beschriftungen.

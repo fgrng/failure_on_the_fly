@@ -1,55 +1,59 @@
 # TASK
 
-Review the code changes on branch `{{BRANCH}}` and improve code clarity, consistency, and maintainability while preserving exact functionality.
+Review branch `{{BRANCH}}` for issue #{{TASK_ID}}: {{ISSUE_TITLE}}
+
+You improve the code on this branch yourself; a review that only lists findings is half done.
 
 # CONTEXT
 
-## Branch diff
+<issue>
 
-!`git diff {{TARGET_BRANCH}}...{{BRANCH}}`
+!`gh issue view {{TASK_ID}} --comments`
 
-## Commits on this branch
+</issue>
+
+<diff-stat>
+
+A summary of the diff, changed files with line counts only:
+
+!`git diff {{TARGET_BRANCH}}...{{BRANCH}} --stat`
+
+Read the actual changes per file with `git diff {{TARGET_BRANCH}}...{{BRANCH}} -- <path>`.
+
+</diff-stat>
+
+<commits>
 
 !`git log {{TARGET_BRANCH}}..{{BRANCH}} --oneline`
 
-# REVIEW PROCESS
+</commits>
 
-1. **Understand the change**: Read the diff and commits above to understand the intent.
+Fetch the parent spec with `gh api repos/{owner}/{repo}/issues/{{TASK_ID}}/parent`; HTTP 404 means the issue has no parent. If it has one, read it with `gh issue view <parent>` and list its sub-issues with `gh api repos/{owner}/{repo}/issues/<parent>/sub_issues --jq '[.[] | {number, title, state}]'`.
 
-2. **Analyze for improvements**: Look for opportunities to:
-   - Reduce unnecessary complexity and nesting
-   - Eliminate redundant code and abstractions
-   - Improve readability through clear variable and function names
-   - Consolidate related logic
-   - Remove unnecessary comments that describe obvious code
-   - Avoid nested ternary operators - prefer switch statements or if/else chains
-   - Choose clarity over brevity - explicit code is often better than overly compact code
+# REVIEW
 
-3. **Check correctness**:
-   - Does the implementation match the intent? Are edge cases handled?
-   - Are new/changed behaviours covered by tests?
-   - Are there unsafe casts, overly broad exception handling, or unchecked assumptions?
-   - Does the change introduce injection vulnerabilities, credential leaks, or other security issues?
+## 1. Analyse with the `code-review` skill
 
-4. **Maintain balance**: Avoid over-simplification that could:
-   - Reduce code clarity or maintainability
-   - Create overly clever solutions that are hard to understand
-   - Combine too many concerns into single functions or components
-   - Remove helpful abstractions that improve code organization
-   - Make the code harder to debug or extend
+Call the Skill tool with `code-review`. Its report is your worklist. Hand it everything up front so it runs straight through without a question:
 
-5. **Apply project standards**: Follow the coding standards defined in @.sandcastle/CODING_STANDARDS.md
+- **Fixed point:** `{{TARGET_BRANCH}}`. The diff is `git diff {{TARGET_BRANCH}}...{{BRANCH}}`.
+- **Spec:** issue #{{TASK_ID}} above. The parent spec is context. Code that belongs to another *open* sub-issue of that spec is scope creep.
+- **Standards:** `CODING_STANDARDS.md`, plus the skill's smell baseline, plus three checks: new or changed behaviour is covered by tests; exceptions are caught narrowly and assumptions are checked; the change keeps inputs safe from injection and secrets out of code and logs.
 
-6. **Preserve functionality**: Never change what the code does - only how it does it. All original features, outputs, and behaviors must remain intact.
+If you cannot start sub-agents, run the two axes one after the other and keep their reports separate.
+
+## 2. Act on the findings
+
+- **Standards:** fix them on this branch. Behaviour stays exactly as it is; only the shape of the code changes.
+- **Correctness:** write a test that shows the bug first, then fix it.
+- **Spec** (missing requirement, scope creep, misread requirement): report it for a human to decide. Post one comment on the issue, in German, listing every spec finding with the quoted spec line: `gh issue comment {{TASK_ID}} --body-file -`. Leave the code for these findings as it is.
 
 # EXECUTION
 
-If you find improvements to make:
+1. Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest` to see the starting state.
+2. Make the changes and commit them in one commit whose message starts with `RALPH: Review -`.
+3. Run the three commands again and fix whatever fails, so the branch ends green.
 
-1. Make the changes directly on this branch
-2. Run `uv run ruff format .`, then `uv run ruff check .` and `uv run pytest` to ensure nothing is broken
-3. Commit describing the refinements
-
-If the code is already clean and well-structured, do nothing.
+If the skill reports nothing to fix, make no commit.
 
 Once complete, output <promise>COMPLETE</promise>.

@@ -18,7 +18,7 @@ status: accepted
 > Sie steht bei der Teilnahme, weil `erhebungen` nach ADR-0006 nichts von Konten
 > und damit nichts von `training` wissen darf.
 
-Die **Teilnahme** ist genau ein Objekt, so wie `CONTEXT.md` sie definiert: die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind. Sie trägt ihre Identität und ihre Sitzungen — und sonst nichts. Weder Training noch Stichprobe, weder Nutzerkonto noch Teilnahme-Token.
+Die **Teilnahme** ist genau ein Objekt, so wie `GLOSSARY.md` sie definiert: die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind. Sie trägt ihre Identität und ihre Sitzungen — und sonst nichts. Weder Training noch Stichprobe, weder Nutzerkonto noch Teilnahme-Token.
 
 Woran eine Teilnahme hängt und wer hinter ihr steht, liegt in zwei **Bindungen**, die jeweils ihrer eigenen App gehören:
 

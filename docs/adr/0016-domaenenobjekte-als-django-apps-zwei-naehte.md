@@ -31,9 +31,9 @@ status: accepted
 > *des übergebenen* Schemas. Der Evallauf hat nur einen Speicherort und braucht
 > keinen Sink. Es bleiben zwei Nähte.
 
-Die Module des Projekts werden entlang der **Domänenobjekte aus `CONTEXT.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
+Die Module des Projekts werden entlang der **Domänenobjekte aus `GLOSSARY.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 
-Die App- und Modulnamen sind **deutsch**, weil das Glossar deutsch ist. Ein englischer Verzeichnisname zwänge zu einer Übersetzungstabelle zwischen Glossar und Code, in der genau die Unterscheidungen verschwimmen, die `CONTEXT.md` mühsam aufgestellt hat — `studies` etwa trüge den Begriff, den der Eintrag **Erhebung** ausdrücklich vermeidet.
+Die App- und Modulnamen sind **deutsch**, weil das Glossar deutsch ist. Ein englischer Verzeichnisname zwänge zu einer Übersetzungstabelle zwischen Glossar und Code, in der genau die Unterscheidungen verschwimmen, die `GLOSSARY.md` mühsam aufgestellt hat — `studies` etwa trüge den Begriff, den der Eintrag **Erhebung** ausdrücklich vermeidet.
 
 ```
 apps/
@@ -108,7 +108,7 @@ Nicht bindend sind der konkrete Baum oben und die Ablage von Views, Templates un
 
 - **Ein framework-freier Domänenkern mit Ports und Adaptern** — verworfen. Er verlangt Repository-Interfaces, hinter denen genau ein Adapter steht. Die Testbarkeit, die er verspricht, liefert `pytest-django` mit einer Datenbank billiger.
 - **Eine App je Persona** (`teilnahme`, `autorenschaft`, `forschung`, `verwaltung`) — verworfen. Vignette und Sitzung würden von mehreren Apps geteilt und landeten in einem `shared`, das den eigentlichen Schnitt trüge. Rollen sind Sichten auf Objekte, keine Objekte.
-- **Englische App-Namen mit einer Übersetzungstabelle im Glossar** — verworfen. Die Tabelle wäre ein zweites, stillschweigend driftendes Glossar, und die _Avoid_-Listen aus `CONTEXT.md` verlören im Code ihre Kraft.
+- **Englische App-Namen mit einer Übersetzungstabelle im Glossar** — verworfen. Die Tabelle wäre ein zweites, stillschweigend driftendes Glossar, und die _Avoid_-Listen aus `GLOSSARY.md` verlören im Code ihre Kraft.
 - **Der Ablauf liegt in den Views von `training` und `erhebungen`** — verworfen. Er wäre nur über HTTP testbar, und die gezogene Randomisierungsreihenfolge hätte keinen Ort außerhalb einer View, obwohl sie zur Datenspur gehört.
 
 ## Consequences

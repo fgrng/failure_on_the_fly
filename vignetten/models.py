@@ -85,7 +85,7 @@ _PFLICHTFELD_NAMEN: tuple[str, ...] = (
     "budget_typ",
 )
 
-# Gekoppelt geschrieben wie in CONTEXT.md (#314); Formular, Detailansicht und
+# Gekoppelt geschrieben wie in GLOSSARY.md (#314); Formular, Detailansicht und
 # Finalisieren nennen die Felder gleich.
 FELDBESCHRIFTUNGEN: dict[str, str] = {
     "fehlermuster_beschreibung": "Fehlermuster-Beschreibung",

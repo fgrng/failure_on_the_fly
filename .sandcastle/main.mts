@@ -2,16 +2,20 @@
 //
 // This template drives a four-phase workflow, processing multiple issues in
 // parallel per iteration:
-//   Phase 1 (Plan):      The planner agent inspects the open issues, builds a
-//                        dependency graph, and emits a <plan> of unblocked
-//                        issues, each with a deterministic branch name.
+//   Phase 1 (Plan):      The planner agent gets the unblocked issues (GitHub's
+//                        native blocked-by edges, filtered by the query), drops
+//                        those likely to conflict with each other, and emits a
+//                        <plan>, each issue with a deterministic branch name.
 //   Phase 2 (Implement): One implementer agent per issue implements the change
 //                        on the issue's branch (using RGR) and commits. Runs up
 //                        to MAX_PARALLEL issues concurrently.
-//   Phase 2b (Review):   The reviewer agent reviews each branch that carries
-//                        unmerged work — in the same sandbox — and refines it.
+//   Phase 2b (Review):   The reviewer agent reviews each branch whose
+//                        implementer emitted the completion signal and that
+//                        carries unmerged work — in the same sandbox.
 //   Phase 3 (Merge):     The merger agent merges every reviewed branch back
-//                        together and closes the corresponding issues.
+//                        together. The script then closes the issue of every
+//                        branch that actually landed, and closes a parent Spec
+//                        once all its sub-issues are closed.
 //
 // Which model runs which phase is configured in one place below (see "Agents").
 // Every sandbox mounts the host ~/.codex and ~/.claude directories read-only
@@ -80,9 +84,9 @@ type Lineup = {
 const LINEUPS: Record<string, Lineup> = {
   claude: {
     planner: sandcastle.claudeCode("claude-sonnet-5", { effort: "medium" }),
-    implementer: sandcastle.claudeCode("claude-opus-5", { effort: "medium" }),
-    reviewer: sandcastle.claudeCode("claude-opus-5", { effort: "high" }),
-    merger: sandcastle.claudeCode("claude-opus-5", { effort: "high" }),
+    implementer: sandcastle.claudeCode("claude-opus-5-5", { effort: "medium" }),
+    reviewer: sandcastle.claudeCode("claude-opus-5-5", { effort: "high" }),
+    merger: sandcastle.claudeCode("claude-opus-5-5", { effort: "high" }),
   },
   codex: {
     planner: sandcastle.codex("gpt-5.6-terra"),
@@ -220,6 +224,51 @@ function branchIsAheadOfTarget(branch: string): boolean {
   }
 }
 
+// True when the branch is fully contained in the target branch. The merger
+// runs against the host checkout, so the local target ref reflects its work.
+function isMerged(branch: string): boolean {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", branch, targetBranch], {
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function gh(args: string[]): string {
+  return execFileSync("gh", args, { encoding: "utf8", stdio: "pipe" });
+}
+
+type ParentIssue = {
+  number: number;
+  state: string;
+  labels: { name: string }[];
+  sub_issues_summary: { total: number; completed: number };
+};
+
+// The issue's parent, or undefined if it has none (GitHub answers 404).
+function parentOf(issueNumber: string | number): ParentIssue | undefined {
+  try {
+    return JSON.parse(
+      gh(["api", `repos/{owner}/{repo}/issues/${issueNumber}/parent`]),
+    );
+  } catch (error) {
+    const stderr = String((error as { stderr?: unknown }).stderr ?? "");
+    if (!stderr.includes("HTTP 404")) {
+      console.error(`  ! Could not fetch parent of #${issueNumber}:`, error);
+    }
+    return undefined;
+  }
+}
+
+function isOpenSpec(issue: ParentIssue): boolean {
+  return (
+    issue.state === "open" && issue.labels.some((l) => l.name === "Spec")
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
@@ -294,8 +343,20 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const producedCommits = implement.commits.length > 0;
         const hasUnmergedWork =
           producedCommits || branchIsAheadOfTarget(issue.branch);
+        // Undefined when the implementer hit MAX_IMPLEMENT_ITERATIONS without
+        // signalling completion. Such a branch is half-done: it keeps its
+        // commits for a later iteration but is neither reviewed nor merged —
+        // including work left on the branch by an earlier iteration.
+        const completed = implement.completionSignal !== undefined;
+        const readyToMerge = completed && hasUnmergedWork;
 
-        if (hasUnmergedWork) {
+        if (hasUnmergedWork && !completed) {
+          console.log(
+            `  #${issue.id}: no completion signal — ${issue.branch} keeps its progress, skipping review and merge.`
+          );
+        }
+
+        if (readyToMerge) {
           if (!producedCommits) {
             console.log(
               `  #${issue.id}: no new commits, but ${issue.branch} is ahead of ${targetBranch} — reviewing anyway.`
@@ -308,6 +369,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             agent: reviewerAgent,
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
+              TASK_ID: issue.id,
+              ISSUE_TITLE: issue.title,
               BRANCH: issue.branch,
               // TARGET_BRANCH is a built-in prompt arg (auto-injected as the
               // host's active branch at run() time, i.e. main) and must not be
@@ -316,7 +379,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           });
         }
 
-        outcomes.push({ issue, merge: hasUnmergedWork });
+        outcomes.push({ issue, merge: readyToMerge });
       } catch (error) {
         // Keep the worker alive so one broken issue does not starve the rest
         // of the queue.
@@ -350,7 +413,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   }
 
   if (completedBranches.length === 0) {
-    console.log("No commits produced. Nothing to merge.");
+    console.log("No completed branches. Nothing to merge.");
     continue;
   }
 
@@ -367,13 +430,55 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     promptFile: "./.sandcastle/merge-prompt.md",
     promptArgs: {
       BRANCHES: completedBranches.map((b) => `- ${b}`).join("\n"),
-      ISSUES: completedIssues
-        .map((i) => `- #${i.id}: ${i.title}`)
-        .join("\n"),
     },
   });
 
   console.log("\nBranches merged.");
+
+  // -------------------------------------------------------------------------
+  // Close issues — done here rather than by the merger agent, so an issue is
+  // closed exactly when its branch landed on the target branch.
+  // -------------------------------------------------------------------------
+  const touchedSpecs = new Set<number>();
+  for (const issue of completedIssues) {
+    if (!isMerged(issue.branch)) {
+      console.log(
+        `  #${issue.id}: ${issue.branch} is not in ${targetBranch} — leaving the issue open.`
+      );
+      continue;
+    }
+    try {
+      gh(["issue", "close", issue.id, "--comment", "Completed by Sandcastle"]);
+      console.log(`  #${issue.id}: closed.`);
+      const parent = parentOf(issue.id);
+      if (parent && isOpenSpec(parent)) touchedSpecs.add(parent.number);
+    } catch (error) {
+      console.error(`  ! Could not close #${issue.id}:`, error);
+    }
+  }
+
+  // Re-read each Spec once, after all of this iteration's tickets are closed,
+  // and close it when its last sub-issue is done.
+  for (const specNumber of touchedSpecs) {
+    try {
+      const spec: ParentIssue = JSON.parse(
+        gh(["api", `repos/{owner}/{repo}/issues/${specNumber}`]),
+      );
+      const { total, completed } = spec.sub_issues_summary;
+      if (isOpenSpec(spec) && total > 0 && completed === total) {
+        gh([
+          "issue",
+          "close",
+          String(specNumber),
+          "--comment",
+          "All sub-issues completed by Sandcastle",
+        ]);
+        console.log(`  Spec #${specNumber}: all sub-issues closed — closed.`);
+      }
+    } catch (error) {
+      console.error(`  ! Could not check Spec #${specNumber}:`, error);
+    }
+  }
 }
 
 console.log("\nAll done.");

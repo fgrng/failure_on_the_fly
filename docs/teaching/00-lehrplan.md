@@ -26,11 +26,11 @@ Vertiefungsaufgaben.
 | Datei | Inhalt |
 |-------|--------|
 | [Quellenverzeichnis](quellen.md) | Alle referenzierten Paper und Frameworks |
-| [Glossar](glossar.md) | Fachbegriffe aus der Forschung, die ueber CONTEXT.md hinausgehen |
+| [Glossar](glossar.md) | Fachbegriffe aus der Forschung, die ueber GLOSSARY.md hinausgehen |
 
 ## Voraussetzungen
 
-- Vertrautheit mit dem Projekt (CONTEXT.md, standardkern.py, ADR-0004, ADR-0005)
+- Vertrautheit mit dem Projekt (GLOSSARY.md, standardkern.py, ADR-0004, ADR-0005)
 - Grundverstaendnis von LLM-Prompting (System-Prompt, User-Prompt, Structured Output)
 - Keine ML-Vorkenntnisse fuer Lektionen 1--3 und 5--6; Lektion 4 fuehrt
   die noetigen Grundlagen ein

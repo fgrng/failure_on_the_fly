@@ -13,14 +13,6 @@ For each branch:
 
 After all branches are merged, make a single commit summarizing the merge.
 
-# CLOSE ISSUES
-
-For each branch that was merged, close its issue using the following command:
-
-`gh issue close <ID> --comment "Completed by Sandcastle"`
-
-Here are all the issues:
-
-{{ISSUES}}
+Do not close any issues; the driver script closes them after verifying each merge.
 
 Once you've merged everything you can, output <promise>COMPLETE</promise>.

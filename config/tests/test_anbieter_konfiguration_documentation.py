@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from config.tests.dokumentation import (
-    CONTEXT_PATH,
+    GLOSSARY_PATH,
     README_PATH,
     REPO_ROOT,
     VERHALTEN_PATH,
@@ -63,7 +63,7 @@ def test_env_beispiel_fuehrt_nur_noch_die_zero_retention_einstellung() -> None:
 
 def test_keine_dokumentationsstelle_nennt_zugangsdaten_in_der_umgebung() -> None:
     """Zugangsdaten für das Sprachmodell stehen nirgends als Umgebungsvariable."""
-    for pfad in (README_PATH, VERHALTEN_PATH, CONTEXT_PATH, ENV_BEISPIEL_PATH):
+    for pfad in (README_PATH, VERHALTEN_PATH, GLOSSARY_PATH, ENV_BEISPIEL_PATH):
         assert "API_KEY" not in pfad.read_text()
 
 

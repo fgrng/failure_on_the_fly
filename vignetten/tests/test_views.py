@@ -1118,7 +1118,7 @@ class VignetteFeldbeschriftungenTests(TestCase):
         self.client.force_login(self.ada)
 
     def test_formulare_zeigen_gekoppelte_beschriftungen(self) -> None:
-        """Anlegen und Bearbeiten nennen die Felder wie CONTEXT.md."""
+        """Anlegen und Bearbeiten nennen die Felder wie GLOSSARY.md."""
         for url in (
             reverse("vignetten:anlegen"),
             reverse("vignetten:bearbeiten", args=[self.entwurf.pk]),

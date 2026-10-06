@@ -48,7 +48,7 @@ formatierte Zitationsliste liegt in [quellen.md](quellen.md); hier steht,
 
 ## Interne Quellen (höchstes Vertrauen, weil verifizierbar)
 
-- `CONTEXT.md` — verbindliche Projektsprache
+- `GLOSSARY.md` — verbindliche Projektsprache
 - `docs/adr/` — ADR-0004 (Simulationskern), ADR-0005 (Denkspur),
   ADR-0010 (Prompt-Vertrag), ADR-0011 (atomarer Gesprächsschritt)
 - `simulation/standardkern.py` — der Prompt, um den sich alles dreht

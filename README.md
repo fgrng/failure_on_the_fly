@@ -78,8 +78,11 @@ und Token angelegt und aktiviert.
 ## Entwicklungsarbeit mit Coding Agents
 
 Unter `.sandcastle/` liegt ein Skript für [Sandcastle](https://github.com/mattpocock/sandcastle), das offene Issues mit
-dem Label `AFK` in Docker-Sandboxen abarbeitet: planen, implementieren,
-reviewen, mergen. Voraussetzung sind Node, Docker und die Zugangsdaten aus
+dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
+abarbeitet: planen, implementieren, reviewen, mergen. Gemergt und geschlossen
+werden nur Tickets, deren Implementierung abgeschlossen ist; eine Spec schließt
+das Skript, sobald alle ihre Tickets zu sind. Voraussetzung sind Node, Docker
+und die Zugangsdaten aus
 `.sandcastle/.env.example`, kopiert nach `.sandcastle/.env`. Dann:
 
 ```
@@ -132,7 +135,7 @@ Versuche, eine Transkription auf höchstens 120 s.
 
 ## Weitere Dokumentation
 
-- [CONTEXT.md](CONTEXT.md) — Glossar der verwendeten Domänensprache
+- [GLOSSARY.md](GLOSSARY.md) — Glossar der verwendeten Domänensprache
 - [docs/verhalten.md](docs/verhalten.md) — Verhalten der Plattform je Bereich
 - [docs/adr/](docs/adr/) — Architekturentscheidungen mit Begründung
 - [docs/vision.md](docs/vision.md) — Produktvision und Scope

@@ -1,6 +1,6 @@
 # Glossar: Forschungsbegriffe zur LLM-basierten Schueler:innensimulation
 
-Dieses Glossar ergaenzt CONTEXT.md um Fachbegriffe aus der Forschung,
+Dieses Glossar ergaenzt GLOSSARY.md um Fachbegriffe aus der Forschung,
 die in den Lektionen verwendet werden.
 
 ---

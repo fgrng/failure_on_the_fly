@@ -2,7 +2,7 @@
 
 **Frage:** Welchen Illustrationsstil soll die Bildsprache der App tragen? Ausgangspunkt
 sind drei feste Rahmenhandlungs-Bilder (Einstieg, Hospitation, Debrief) — laut
-`CONTEXT.md` gehört die Rahmenhandlung dem Simulationskern, nicht der einzelnen Vignette,
+`GLOSSARY.md` gehört die Rahmenhandlung dem Simulationskern, nicht der einzelnen Vignette,
 also sind es *wenige feste* Bilder, kein pro-Vignette-Bedarf.
 
 **Stand:** offen. Erste Vergleichsrunde an *einer* Szene (der Hospitation) generiert.
@@ -21,7 +21,7 @@ Originale (1024²) in `originale/`.
 ## Vorgaben an alle Bilder
 
 - Möglichst abstrakt, **keine** Geschlechts-, Alters- oder Herkunftshinweise; kein Gesicht
-  (vgl. `CONTEXT.md`, _Avoid: Avatar_).
+  (vgl. `GLOSSARY.md`, _Avoid: Avatar_).
 - PHSG-Palette aus `static/css/tokens.css`; Grün als einzige Akzentfarbe, warmer Papier-Grund.
 - Keine lesbare Schrift im Bild (verhunzen Bildmodelle).
 

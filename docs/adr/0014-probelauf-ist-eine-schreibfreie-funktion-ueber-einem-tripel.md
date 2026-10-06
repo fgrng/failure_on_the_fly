@@ -13,7 +13,7 @@ Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegesprä
 
 ## Consequences
 
-- `CONTEXT.md` definiert die Diagnose als etwas, das „erfasst, nicht bewertet" wird (ADR-0009). Im Probelauf wird sie **weder** erfasst noch bewertet: Sie wird eingegeben, damit die Autor:in den Debrief so erlebt wie die Teilnehmer:in, und dann verworfen. Das „erfasst" von ADR-0009 grenzt gegen *bewerten* ab, nicht gegen *verwerfen*, und gilt für Sitzungen einer Teilnahme.
+- `GLOSSARY.md` definiert die Diagnose als etwas, das „erfasst, nicht bewertet" wird (ADR-0009). Im Probelauf wird sie **weder** erfasst noch bewertet: Sie wird eingegeben, damit die Autor:in den Debrief so erlebt wie die Teilnehmer:in, und dann verworfen. Das „erfasst" von ADR-0009 grenzt gegen *bewerten* ab, nicht gegen *verwerfen*, und gilt für Sitzungen einer Teilnahme.
 
 - Das System weiß nicht, ob eine Vignette je getestet wurde. „Finalisieren nur nach erfolgreichem Probelauf" ist damit nicht erzwingbar und bleibt Disziplin der Autor:in. Dasselbe gilt für den Kern.
 - Ein Probelauf einer Administrator:in gegen einen Kern-Entwurf läuft mit einer Vignette, die für einen anderen Kern geschrieben wurde. Ihre Felder passen, weil der Vertrag fest ist (ADR-0010) — ihr Fehlermuster wurde gegen diesen Kern nie geprüft. Das ist richtig so: Die Administrator:in prüft den Kern, nicht die Vignette.

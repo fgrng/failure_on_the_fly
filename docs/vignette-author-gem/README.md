@@ -52,4 +52,4 @@ Wenn sich die Felder von `vignetten.models.Vignette`, die Labels in
 ändern, müssen `knowledge/01-editor-felder-und-schema.md` und
 `knowledge/02-prompt-und-sichtbarkeit.md` nachgezogen werden. Der
 Platzhaltervertrag steht in `simulation/models.py` (`VERTRAG_PROMPT`,
-`VERTRAG_RAHMEN`); die Projektterminologie in `CONTEXT.md`.
+`VERTRAG_RAHMEN`); die Projektterminologie in `GLOSSARY.md`.

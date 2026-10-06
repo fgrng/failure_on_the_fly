@@ -129,7 +129,7 @@ chronologisch sortiert.
 
 ## Interne Referenzen (FailureOnTheFly)
 
-- CONTEXT.md -- Glossar
+- GLOSSARY.md -- Glossar
 - ADR-0004 -- Zentraler, fach-agnostischer Simulationskern
 - ADR-0005 -- Denkspur pro Antwort und ihre Sichtbarkeit
 - ADR-0010 -- Fester Vertrag zwischen Vignette und Prompt-Vorlagen

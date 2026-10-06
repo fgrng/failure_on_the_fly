@@ -14,7 +14,7 @@ bleibt der Forschenden und ihrer Auswertungssoftware überlassen.
 
 Die Erhebung ist die Exporteinheit, über alle ihre Stichproben hinweg. Die
 Stichprobe ist als Spalte an der Teilnahme enthalten und bildet damit die in
-`CONTEXT.md` gemeinte Gruppenstruktur im Export ab. Ein Export je Stichprobe
+`GLOSSARY.md` gemeinte Gruppenstruktur im Export ab. Ein Export je Stichprobe
 wäre kein Abbild des Untersuchungsdesigns, sondern ein willkürlicher Ausschnitt.
 
 Der Export ist selbsttragend: Die tatsächlich verwendeten Vignetten- und

@@ -1,21 +1,8 @@
-Check ./CONTEXT.md for terminology questions.
-
 When changing public-facing behavior, update docs/verhalten.md (behaviour per area); check README.md only for setup and deployment changes.
 
-# Agent Skills
+## Agent skills
 
-## Issue Tracker
-
-Issues and Specs live as GitHub issues in fgrng/failure_on_the_fly, managed via the gh CLI. See docs/agents/issue-tracker.md.
-
-## Issue Labels
-
-The `ready-for-agent` / `ready-for-human` roles are spelled `AFK` / `HITL` in this repo. See docs/agents/issue-labels.md for the full label set.
-
-## Domain Docs
-
-Single-context layout: CONTEXT.md + docs/adr/ at the repo root. See docs/agents/domain.md.
-
-## Image Generation
-
-Framing-story illustrations (`static/images/session/`) are generated with the `agy` CLI (Nano Banana, quota-limited). See docs/agents/image-generation.md.
+- **Domain docs**: terminology in GLOSSARY.md, decisions in docs/adr/ (single-context). See docs/agents/domain.md.
+- **Issue tracker**: GitHub issues via `gh`. See docs/agents/issue-tracker.md.
+- **Triage labels**: canonical names plus `Spec`. See docs/agents/triage-labels.md.
+- **Image generation**: framing-story illustrations (`static/images/session/`) via the quota-limited `agy` CLI. See docs/agents/image-generation.md.

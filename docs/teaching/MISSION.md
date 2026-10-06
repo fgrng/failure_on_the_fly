@@ -26,7 +26,7 @@ gestalten und die Designentscheidungen wissenschaftlich verteidigen kann
 
 ## Was ich schon mitbringe
 
-- Tiefe Kenntnis des eigenen Systems (CONTEXT.md, ADRs, Prompt-Vertrag).
+- Tiefe Kenntnis des eigenen Systems (GLOSSARY.md, ADRs, Prompt-Vertrag).
 - Solides Verständnis von LLM-Prompting; keine ML-Vorkenntnisse nötig
   ausser für Lektion 4 (Fine-Tuning).
 - Sechs selbst verfasste Wissenslektionen in `docs/teaching/0X-*.md` —
