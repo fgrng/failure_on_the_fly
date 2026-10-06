@@ -2,7 +2,12 @@
 //
 // The driver wires the real Tracker (gh), Repo (git) and Agents (Sandcastle)
 // into the iteration flow in iteration.mts and runs the outer loop:
-//   Plan:      The tracker yields the unblocked tickets (`ready-for-agent`,
+//   Update:    Once at the start of the run, main is merged into every active
+//              integration branch (`spec/<n>` of an open Spec, and
+//              `sandcastle/standalone` if present) without touching the host
+//              checkout. Only a conflict starts a merger; if it fails, the
+//              branch stays as it was and the run reports it.
+//   Plan:     The tracker yields the unblocked tickets (`ready-for-agent`,
 //              not `Spec`, not `is:blocked`); the planner drops those likely
 //              to conflict with each other and names each branch.
 //   Implement: One implementer per ticket, up to MAX_PARALLEL concurrently.
@@ -25,7 +30,7 @@
 
 import { parseArgs } from "node:util";
 import { DEFAULT_LINEUP, LINEUPS, sandcastleAgents } from "./agents.mts";
-import { runIteration } from "./iteration.mts";
+import { runIteration, updateIntegrationBranches } from "./iteration.mts";
 import { currentBranch, gitRepo } from "./repo.mts";
 import { githubTracker } from "./tracker.mts";
 
@@ -58,6 +63,12 @@ const deps = {
   targetBranch: currentBranch(),
   maxParallel: MAX_PARALLEL,
 };
+
+console.log(`\n=== Updating integration branches from main ===\n`);
+const { failed } = await updateIntegrationBranches(deps);
+if (failed.length > 0) {
+  console.log(`main could not be merged into: ${failed.join(", ")}`);
+}
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);

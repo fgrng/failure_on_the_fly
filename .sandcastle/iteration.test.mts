@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runIteration } from "./iteration.mts";
+import { runIteration, updateIntegrationBranches } from "./iteration.mts";
 import { FakeAgents, FakeRepo, FakeTracker, ticket } from "./testing/fakes.mts";
 
 function setup() {
@@ -169,4 +169,78 @@ test("je Integrations-Branch läuft ein eigener Merger, Tickets ohne Spec gehen 
       ["spec/40", ["sandcastle/issue-41"]],
     ]),
   );
+});
+
+function setupUpdate() {
+  const { tracker, repo, agents } = setup();
+  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  return { tracker, repo, agents, update };
+}
+
+test("zu Laufbeginn bekommt ein Spec-Branch main sauber hineingemergt, ohne Agent", async () => {
+  const { tracker, repo, agents, update } = setupUpdate();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "main");
+  repo.commit("main");
+
+  await update();
+
+  assert.deepEqual(
+    { specHasMain: await repo.contains("spec/30", "main"), merged: agents.mergedWith },
+    { specHasMain: true, merged: [] },
+  );
+});
+
+test("bei einem Konflikt mit main löst der Merger auf genau diesem Branch auf", async () => {
+  const { tracker, repo, agents, update } = setupUpdate();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "main");
+  repo.commit("main");
+  repo.conflicting.add("spec/30");
+
+  await update();
+
+  assert.deepEqual(
+    { specHasMain: await repo.contains("spec/30", "main"), merged: agents.mergedWith },
+    { specHasMain: true, merged: [{ into: "spec/30", branches: ["main"] }] },
+  );
+});
+
+test("scheitert die Auflösung, bleibt der Branch unverändert und der Lauf meldet ihn", async () => {
+  const { tracker, repo, agents, update } = setupUpdate();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "main");
+  repo.commit("spec/30");
+  repo.commit("main");
+  repo.conflicting.add("spec/30");
+  agents.unmergeable.add("main");
+  const before = await repo.head("spec/30");
+
+  const result = await update();
+
+  assert.deepEqual(
+    { head: await repo.head("spec/30"), failed: result.failed },
+    { head: before, failed: ["spec/30"] },
+  );
+});
+
+test("der Branch einer geschlossenen Spec bekommt main nicht mehr hineingemergt", async () => {
+  const { tracker, repo, update } = setupUpdate();
+  tracker.addSpec(30, { open: false });
+  await repo.createBranch("spec/30", "main");
+  repo.commit("main");
+
+  await update();
+
+  assert.equal(await repo.contains("spec/30", "main"), false);
+});
+
+test("ein bestehender sandcastle/standalone bekommt main hineingemergt", async () => {
+  const { repo, update } = setupUpdate();
+  await repo.createBranch("sandcastle/standalone", "main");
+  repo.commit("main");
+
+  await update();
+
+  assert.equal(await repo.contains("sandcastle/standalone", "main"), true);
 });

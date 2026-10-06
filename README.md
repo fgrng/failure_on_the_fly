@@ -82,6 +82,8 @@ dem Label `ready-for-agent` (ohne `Spec`, nicht blockiert) in Docker-Sandboxen
 abarbeitet: planen, implementieren, reviewen, mergen. Tickets einer Spec `<n>`
 laufen über den Integrations-Branch `spec/<n>`, den das Skript bei Bedarf von
 `main` anlegt; Tickets ohne Spec gehen vorerst direkt in den aktiven Branch.
+Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
+Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
 Gemergt und geschlossen werden nur Tickets, deren Implementierung abgeschlossen
 ist und deren Branch nachweislich im Integrations-Branch liegt. Die Spec selbst
 schließt das Skript nicht. Voraussetzung sind Node, Docker

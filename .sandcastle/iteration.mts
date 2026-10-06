@@ -39,6 +39,17 @@ export interface Repo {
   branchExists(branch: string): Promise<boolean>;
   /** Legt `branch` auf dem Stand von `base` an, ohne den Checkout des Hosts zu berühren. */
   createBranch(branch: string, base: string): Promise<void>;
+  /** Die lokalen Branches, deren Name mit `prefix` beginnt. */
+  branches(prefix: string): Promise<string[]>;
+  /**
+   * Mergt main in `branch`, ohne den Checkout des Hosts zu berühren. Bei
+   * einem Konflikt bleibt `branch` unverändert.
+   */
+  mergeMain(branch: string): Promise<"clean" | "conflict">;
+  /** Der Commit, auf dem `branch` steht. */
+  head(branch: string): Promise<string>;
+  /** Setzt `branch` auf `head` zurück, ohne den Checkout des Hosts zu berühren. */
+  resetBranch(branch: string, head: string): Promise<void>;
 }
 
 /** Implementer und Review eines Tickets teilen sich eine Sandbox. */
@@ -66,6 +77,9 @@ export interface Agents {
 /** Von hier zweigen neue Integrations-Branches ab. */
 export const MAIN_BRANCH = "main";
 
+/** Der fortlaufende Integrations-Branch der Tickets ohne Eltern-Spec. */
+export const STANDALONE_BRANCH = "sandcastle/standalone";
+
 export type IterationDeps = {
   tracker: Tracker;
   repo: Repo;
@@ -76,6 +90,80 @@ export type IterationDeps = {
   /** Höchstzahl der Tickets, die gleichzeitig implementiert und reviewt werden. */
   maxParallel?: number;
 };
+
+export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "log">;
+
+/**
+ * Laufbeginn: mergt main in jeden aktiven Integrations-Branch, damit Tickets
+ * von einem aktuellen Stand abzweigen. Nur bei einem Konflikt startet der
+ * Merger. Scheitert er, bleibt der Branch unverändert und steht in `failed`.
+ */
+export async function updateIntegrationBranches(deps: UpdateDeps): Promise<UpdateResult> {
+  const log = deps.log ?? console.log;
+  const failed: string[] = [];
+  for (const branch of await activeIntegrationBranches(deps, log)) {
+    let updated = false;
+    try {
+      updated = await mergeMainInto(deps, branch, log);
+    } catch (error) {
+      log(`  ! ${branch}: ${error}`);
+    }
+    if (!updated) {
+      failed.push(branch);
+      log(`  ! ${branch}: could not merge ${MAIN_BRANCH}, branch left unchanged.`);
+    }
+  }
+  return { failed };
+}
+
+// Mergt main in `branch`, bei Konflikt über den Merger. Liefert, ob main
+// danach enthalten ist; sonst steht `branch` wieder auf seinem alten Stand.
+async function mergeMainInto(
+  deps: UpdateDeps,
+  branch: string,
+  log: (message: string) => void,
+): Promise<boolean> {
+  const { repo, agents } = deps;
+  if ((await repo.mergeMain(branch)) === "clean") return true;
+
+  log(`  ${branch}: conflict with ${MAIN_BRANCH}, starting the merger.`);
+  const before = await repo.head(branch);
+  let resolved = false;
+  try {
+    const run = await agents.merge(branch, [MAIN_BRANCH]);
+    resolved = run.completed && (await repo.contains(branch, MAIN_BRANCH));
+  } catch (error) {
+    log(`  ! Merger on ${branch} failed: ${error}`);
+  }
+  // Eine halbe Auflösung soll kein Ticket als Ausgangsstand erben.
+  if (!resolved) await repo.resetBranch(branch, before);
+  return resolved;
+}
+
+/** Die Integrations-Branches, in die main zu Laufbeginn nicht gemergt werden konnte. */
+export type UpdateResult = { failed: string[] };
+
+// Aktiv ist jeder bestehende `spec/<n>`, dessen Spec noch offen ist, und
+// `sandcastle/standalone`, falls es ihn gibt. Den Branch einer geschlossenen
+// Spec hat ihr PR schon nach main gebracht.
+async function activeIntegrationBranches(
+  deps: UpdateDeps,
+  log: (message: string) => void,
+): Promise<string[]> {
+  const { tracker, repo } = deps;
+  const active: string[] = [];
+  if (await repo.branchExists(STANDALONE_BRANCH)) active.push(STANDALONE_BRANCH);
+  for (const branch of await repo.branches("spec/")) {
+    const spec = Number(branch.slice("spec/".length));
+    if (!Number.isInteger(spec)) continue;
+    try {
+      if ((await tracker.issue(spec)).open) active.push(branch);
+    } catch (error) {
+      log(`  ! ${branch}: could not read spec #${spec}, skipping: ${error}`);
+    }
+  }
+  return active;
+}
 
 /** `planned == 0` heißt: der Backlog ist leer, die äußere Schleife kann enden. */
 export type IterationResult = { planned: number };
