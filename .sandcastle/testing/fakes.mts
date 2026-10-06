@@ -144,9 +144,12 @@ export class FakeRepo implements Repo {
     return [...this.refs.keys()].filter((b) => b.startsWith(prefix));
   }
 
+  // Bringt main etwas Neues, entsteht wie bei git ein Merge-Commit.
   async mergeMain(branch: string): Promise<"clean" | "conflict"> {
     if (this.conflicting.has(branch)) return "conflict";
+    if (await this.contains(branch, "main")) return "clean";
     this.merge("main", branch);
+    this.commit(branch);
     return "clean";
   }
 

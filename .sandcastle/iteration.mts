@@ -121,6 +121,13 @@ export type UpdateDeps = Pick<IterationDeps, "tracker" | "repo" | "agents" | "lo
 export async function updateIntegrationBranches(deps: UpdateDeps): Promise<UpdateResult> {
   const log = deps.log ?? console.log;
   const failed: string[] = [];
+  // Vor dem Merge von main, sonst wäre der Branch nicht mehr auf seinem
+  // gepushten Stand und bliebe stehen.
+  try {
+    await restartStandaloneAfterMerge(deps, log);
+  } catch (error) {
+    log(`  ! ${STANDALONE_BRANCH}: restart failed: ${error}`);
+  }
   for (const branch of await activeIntegrationBranches(deps, log)) {
     let updated = false;
     try {
@@ -199,7 +206,6 @@ export async function runIteration(deps: IterationDeps): Promise<IterationResult
   const { agents } = deps;
   const log = deps.log ?? console.log;
 
-  await restartStandaloneAfterMerge(deps, log);
   const issues = await agents.plan(await frontier(deps, log));
   if (issues.length === 0) {
     log("No issues to work on.");
@@ -407,7 +413,7 @@ async function closeMergedIssues(
 // neu von main, damit der nächste PR nur neue Tickets enthält. Commits, die
 // noch nicht gepusht sind, gehören nicht zu diesem PR; dann bleibt er stehen.
 async function restartStandaloneAfterMerge(
-  deps: IterationDeps,
+  deps: UpdateDeps,
   log: (message: string) => void,
 ): Promise<void> {
   const { tracker, repo } = deps;

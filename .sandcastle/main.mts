@@ -22,9 +22,10 @@
 //              branches; spec branches get their own worktree, so the host
 //              checkout stays untouched. The driver then closes every ticket
 //              whose branch landed. A Spec stays open; its PR closes it.
-//   Publish:   If `sandcastle/standalone` is ahead of main, the driver pushes
-//              it and opens or updates its PR. Once that PR is merged, the
-//              next iteration restarts the branch from main.
+//   Publish:   At the end of every iteration, if `sandcastle/standalone` is
+//              ahead of main, the driver pushes it and opens or updates its
+//              PR. Once that PR is merged, the next run restarts the branch
+//              from main before the update step.
 //
 // The outer loop repeats up to MAX_ITERATIONS times, stopping early once the
 // backlog is exhausted (a plan with no issues).

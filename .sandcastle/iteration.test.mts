@@ -403,13 +403,14 @@ test("ohne neue Commits auf sandcastle/standalone gibt es weder Push noch PR", a
   );
 });
 
-test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone frisch von main ab", async () => {
-  const { tracker, repo, run } = setup();
+test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone im nächsten Lauf frisch von main ab", async () => {
+  const { tracker, repo, agents, run } = setup();
   tracker.addTicket(ticket(7, "Erstes"));
   await run();
   tracker.mergePullRequest(tracker.pullRequests[0]!.number);
   tracker.addTicket(ticket(8, "Zweites"));
 
+  await updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
   await run();
 
   assert.deepEqual(
@@ -433,15 +434,18 @@ test("nach dem Merge des Standalone-PRs zweigt sandcastle/standalone frisch von 
 });
 
 test("scheitert der Push nach einem Neustart, gehen die neuen Commits nicht verloren", async () => {
-  const { tracker, repo, run } = setup();
+  const { tracker, repo, agents, run } = setup();
+  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
   tracker.addTicket(ticket(7));
   await run();
   tracker.mergePullRequest(tracker.pullRequests[0]!.number);
   tracker.addTicket(ticket(8));
   repo.pushFails = true;
+  await update();
   await run();
   repo.pushFails = false;
 
+  await update();
   await run();
 
   assert.deepEqual(
@@ -451,5 +455,24 @@ test("scheitert der Push nach einem Neustart, gehen die neuen Commits nicht verl
       prStates: tracker.pullRequests.map((pr) => pr.state),
     },
     { hasTicket: true, pushed: true, prStates: ["merged", "open"] },
+  );
+});
+
+test("nach dem Merge des Standalone-PRs entsteht ohne neue Tickets kein weiterer PR, auch wenn main weiter ist", async () => {
+  const { tracker, repo, agents, run } = setup();
+  const update = () => updateIntegrationBranches({ tracker, repo, agents, log: () => {} });
+  tracker.addTicket(ticket(7));
+  await update();
+  await run();
+  tracker.mergePullRequest(tracker.pullRequests[0]!.number);
+  repo.merge("sandcastle/standalone", "main");
+  repo.commit("main");
+
+  await update();
+  await run();
+
+  assert.deepEqual(
+    tracker.pullRequests.map((pr) => pr.state),
+    ["merged"],
   );
 });
