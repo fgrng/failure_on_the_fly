@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect
 
 from konten.eigentuemerschaft import EigentuemerKreis
@@ -28,6 +28,14 @@ def eigentuemer_views(
     das sichtbare Objekt lädt, und ihre Liste als Rückweg nach dem
     Selbstaustritt. So zeigt die Kante weiter von der App auf `konten`
     (ADR-0016, ADR-0037).
+
+    Beispiel::
+
+        eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+            rolle_erforderlich=_ausbilderin_erforderlich,
+            aufloesen=_kreis_des_trainings,
+            liste="training:liste",
+        )
     """
 
     @login_required
@@ -37,9 +45,10 @@ def eigentuemer_views(
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
         kreis, rueckweg = aufloesen(request, pk)
-        konto = get_object_or_404(
-            kreis.moegliche_ergaenzungen(), pk=request.POST.get("konto")
-        )
+        genannt: str = request.POST.get("konto", "")
+        if not genannt.isdigit():
+            raise Http404("Unbekanntes Konto.")
+        konto = get_object_or_404(kreis.moegliche_ergaenzungen(), pk=int(genannt))
         kreis.eigentuemerinnen.add(konto)
         return redirect(rueckweg)
 
