@@ -44,7 +44,8 @@ line-length = 88
 target-version = "py314"
 
 [tool.ruff.lint]
-# Ruff 0.16 hat seinen Standard-Regelsatz erweitert; wir bleiben beim bisherigen.
+# Ruff 0.16 hat seinen Standard-Regelsatz erweitert; wir übernehmen ihn nicht und
+# wählen die Regeln einzeln.
 # ANN und D1 erzwingen Typ-Hinweise und Docstrings öffentlicher Objekte. Die
 # Stilregeln D2/D4 bleiben aus, damit Kommentare nach der def-Zeile erlaubt sind.
 # SLF001 und PLC2701 verbieten Zugriffe auf private Attribute und Importe

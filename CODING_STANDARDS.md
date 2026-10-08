@@ -44,6 +44,8 @@ Red flags:
 - Test name describes HOW not WHAT
 - Verifying through external means (e.g. querying a DB) instead of through the interface
 
+Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike. Exempt are migrations and a transition list in `pyproject.toml` that only gets shorter.
+
 ### What Tests Never Check
 
 **Never the wording of documentation** (ADRs, GLOSSARY.md, README, verhalten.md). An acceptance criterion "the docs name X" is met by updating the docs, not by a test.
@@ -65,8 +67,6 @@ Red flags:
 
 - Bad: `assert not hasattr(Vignette, "titel")`
 - Good: no test; if the removal changes behaviour, test the behaviour.
-
-Ruff enforces the related rule mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike.
 
 ### Mocking
 
