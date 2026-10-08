@@ -151,7 +151,9 @@ Für Sandcastle gilt:
   seinen Stand davor zurück und schließt keines seiner Tickets.
 - Sind alle Tickets einer Spec geschlossen, folgt ihre Abschlussphase: ein
   `code-review` über die ganze Spec gegen `main`, die Behebung der Standards-
-  und Korrektheitsbefunde, ein PR-Text mit dem Skill `pr`. Spec-Befunde stehen
+  und Korrektheitsbefunde, das Streichen der Tests auf die Migrationen, die
+  die Spec neu anlegt (nur wenn es welche gibt), ein PR-Text mit dem Skill
+  `pr`. Spec-Befunde stehen
   darin als „Offene Punkte“, am Ende `Closes #<n>`. Das Skript pusht
   `spec/<n>` und legt den PR an; die Spec schließt GitHub beim Merge.
   Scheitert die Abschlussphase, versucht sie erst der nächste Lauf erneut.

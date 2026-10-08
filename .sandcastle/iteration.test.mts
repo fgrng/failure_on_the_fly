@@ -979,3 +979,56 @@ test("ein gemergter oder fehlender Spec-PR sperrt kein Ticket", async () => {
     { planned: [[31, 41]], comments: [] },
   );
 });
+
+test("ohne neue Migrationsdateien läuft kein Agent für Migrationstests", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", { commits: 1, completed: true, files: ["vignetten/models.py"] });
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, prs: tracker.pullRequests.length },
+    { steps: ["review #30", "pr-text #30"], prs: 1 },
+  );
+});
+
+test("neue Migrationsdateien der Spec gehen nach der Behebung und vor dem PR-Text an den Agent für Migrationstests", async () => {
+  const { tracker, repo, agents, run } = setup();
+  repo.commitOnOrigin("main", "", ["vignetten/migrations/0001_initial.py"]);
+  await repo.fetch();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", {
+    commits: 1,
+    completed: true,
+    files: ["vignetten/migrations/0002_anlass.py", "vignetten/models.py", "konten/migrations/__init__.py"],
+  });
+  agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, migrations: agents.migrationTestsRemovedFor },
+    {
+      steps: ["review #30", "fix #30", "migration-tests #30", "pr-text #30"],
+      migrations: [{ spec: 30, migrations: ["vignetten/migrations/0002_anlass.py"] }],
+    },
+  );
+});
+
+test("endet der Agent für Migrationstests ohne Abschlusssignal, gibt es weder Push noch PR", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", { commits: 1, completed: true, files: ["vignetten/migrations/0002_anlass.py"] });
+  agents.migrationTestsStuck.add(30);
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, pushed: await repo.isPushed("spec/30"), prs: tracker.pullRequests },
+    { steps: ["review #30", "migration-tests #30"], pushed: false, prs: [] },
+  );
+});

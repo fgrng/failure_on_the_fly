@@ -192,6 +192,11 @@ function agentRun(result: {
   };
 }
 
+// Eine Markdown-Aufzählung für ein Prompt-Argument.
+function bulletList(items: string[]): string {
+  return items.map((item) => `- ${item}`).join("\n");
+}
+
 /** Die echten Agents eines Line-ups, jeder Lauf in einer eigenen Docker-Sandbox. */
 export function sandcastleAgents(lineup: Lineup): Agents {
   return {
@@ -276,7 +281,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           agent: lineup.merger,
           promptFile: "./.sandcastle/merge-prompt.md",
           promptArgs: {
-            BRANCHES: branches.map((b) => `- ${b}`).join("\n"),
+            BRANCHES: bulletList(branches),
             INTEGRATION_BRANCH: into,
           },
         }),
@@ -312,7 +317,24 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           promptArgs: {
             SPEC: spec,
             INTEGRATION_BRANCH: branch,
-            FINDINGS: findings.map((f) => `- ${f}`).join("\n"),
+            FINDINGS: bulletList(findings),
+          },
+        }),
+      );
+    },
+
+    async removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun> {
+      return agentRun(
+        await sandcastle.run({
+          ...runSettings(branch),
+          name: `Migrationstests #${spec}`,
+          maxIterations: MAX_IMPLEMENT_ITERATIONS,
+          agent: lineup.implementer,
+          promptFile: "./.sandcastle/migration-tests-prompt.md",
+          promptArgs: {
+            SPEC: spec,
+            INTEGRATION_BRANCH: branch,
+            MIGRATIONS: bulletList(migrations),
           },
         }),
       );

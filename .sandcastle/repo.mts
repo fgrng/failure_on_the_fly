@@ -94,6 +94,15 @@ export const gitRepo: Repo = {
     }
   },
 
+  async addedFiles(branch: string): Promise<string[]> {
+    // Drei Punkte: gemessen ab der Merge-Basis, nicht gegen den heutigen Stand von main.
+    // Ohne Umbenennungen bleibt eine Datei, die eine gelöschte ersetzt, neu;
+    // `-z` liefert Pfade mit Umlauten unmaskiert.
+    return git(["diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", `${MAIN_REF}...${branch}`])
+      .split("\0")
+      .filter(Boolean);
+  },
+
   async push(branch: string): Promise<void> {
     // Nur sandcastle/standalone beginnt nach einem gemergten PR neu von main;
     // sein Push ist dann kein Fast-Forward. Die Lease schützt Commits auf
