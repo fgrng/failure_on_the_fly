@@ -44,6 +44,30 @@ Red flags:
 - Test name describes HOW not WHAT
 - Verifying through external means (e.g. querying a DB) instead of through the interface
 
+### What Tests Never Check
+
+**Never the wording of documentation** (ADRs, GLOSSARY.md, README, verhalten.md). An acceptance criterion "the docs name X" is met by updating the docs, not by a test.
+
+- Bad: `assert "Selbsteinsicht" in Path("GLOSSARY.md").read_text()`
+- Good: no test; the commit updates GLOSSARY.md.
+
+**Never source code** (CSS declarations, JS expressions, Python AST). Exceptions: import-graph guards (ADR-0016) and lint-style rules over _all_ files of a kind (e.g. "feature CSS uses only semantic tokens").
+
+- Bad: `assert "display: none" in Path("static/css/vignette.css").read_text()`
+- Good: render the page and assert on what the user gets, e.g. the element is missing from the response.
+
+**Never expected values from the module under test.** Take them from a fixed literal, a worked example or a spec, not from the module's constants or calculations.
+
+- Bad: `assert ergebnis == MAX_VERSUCHE` with `MAX_VERSUCHE` imported from the module, or an expected value recomputed with the module's own helper.
+- Good: `assert ergebnis == 3`, with the 3 taken from the spec.
+
+**Never the absence of fields or methods.** Removed code is gone; a test for `not hasattr(Vignette, "titel")` guards nothing a caller can observe.
+
+- Bad: `assert not hasattr(Vignette, "titel")`
+- Good: no test; if the removal changes behaviour, test the behaviour.
+
+Ruff enforces the related rule mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike.
+
 ### Mocking
 
 Mock at **system boundaries** only:

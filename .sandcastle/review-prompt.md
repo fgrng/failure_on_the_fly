@@ -39,6 +39,7 @@ Call the Skill tool with `code-review`. Its report is your worklist. Hand it eve
 - **Fixed point:** `{{INTEGRATION_BRANCH}}`. The diff is `git diff {{INTEGRATION_BRANCH}}...{{BRANCH}}`.
 - **Spec:** issue #{{TASK_ID}} above. The parent spec is context. Code that belongs to another *open* sub-issue of that spec is scope creep.
 - **Standards:** `CODING_STANDARDS.md`, plus the skill's smell baseline, plus three checks: new or changed behaviour is covered by tests; exceptions are caught narrowly and assumptions are checked; the change keeps inputs safe from injection and secrets out of code and logs.
+- **Tests:** check every new or changed test against "What Tests Never Check" in `CODING_STANDARDS.md`: no wording of documentation, no source code outside import-graph guards and lint-style rules over all files, no expected values from the module's own constants or calculations, no absence of fields or methods.
 
 If you cannot start sub-agents, run the two axes one after the other and keep their reports separate.
 

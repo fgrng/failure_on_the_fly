@@ -47,14 +47,46 @@ target-version = "py314"
 # Ruff 0.16 hat seinen Standard-Regelsatz erweitert; wir bleiben beim bisherigen.
 # ANN und D1 erzwingen Typ-Hinweise und Docstrings öffentlicher Objekte. Die
 # Stilregeln D2/D4 bleiben aus, damit Kommentare nach der def-Zeile erlaubt sind.
-select = ["E4", "E7", "E9", "F", "ANN", "D1"]
+# SLF001 und PLC2701 verbieten Zugriffe auf private Attribute und Importe
+# privater Namen, im Produktionscode wie in Tests (#321).
+select = ["E4", "E7", "E9", "F", "ANN", "D1", "SLF001", "PLC2701"]
 # Any bleibt erlaubt, wo es gewollt ist.
 ignore = ["ANN401"]
+# PLC2701 gibt es in Ruff 0.16 nur als Preview. explicit-preview-rules hält
+# alle übrigen Preview-Regeln draußen; der Formatter bleibt unberührt.
+preview = true
+explicit-preview-rules = true
+
+[tool.ruff.lint.flake8-self]
+# _meta ist Djangos öffentliche Modell-API, trotz Unterstrich.
+extend-ignore-names = ["_meta"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests und generierte Migrationen brauchen keine Docstrings.
 "**/tests/**" = ["D1"]
-"**/migrations/**" = ["D1"]
+# Migrationen werden nach ADR-0031 nicht mehr angefasst; historische laden
+# private Trigger-SQL-Konstanten früherer Migrationen.
+"**/migrations/**" = ["D1", "SLF001", "PLC2701"]
+# Übergangsliste (#321): Bestandstreffer von SLF001, dateiweise statt per Glob,
+# damit neue Dateien der Regel sofort unterliegen. Die Liste wird nur kürzer;
+# die Testreviews #326 bis #332 streichen bereinigte Dateien.
+"config/tests/test_eigentuemerinnen_abschnitt.py" = ["SLF001"]
+"config/tests/test_seitenvokabular.py" = ["SLF001"]
+"erhebungen/tests/test_teilnahme.py" = ["SLF001"]
+"erhebungen/tests/test_transkription.py" = ["SLF001"]
+"fragebogen_items/models.py" = ["SLF001"]
+"fragebogen_items/tests/test_fragebogen_item_models.py" = ["SLF001"]
+"konten/tests/test_model.py" = ["SLF001"]
+"simulation/models.py" = ["SLF001"]
+"sitzungen/bindungen.py" = ["SLF001"]
+"training/tests/test_katalog.py" = ["SLF001"]
+"training/tests/test_models.py" = ["SLF001"]
+"training/tests/test_sitzung.py" = ["SLF001"]
+"training/tests/test_transkription.py" = ["SLF001"]
+"training/tests/test_views.py" = ["SLF001"]
+"vignetten/models.py" = ["SLF001"]
+"vignetten/tests/test_views.py" = ["SLF001"]
+"vignetten/tests/test_vignetten_models.py" = ["SLF001"]
 
 [tool.ruff.format]
 # Django generiert Migrationen; ihr Umbruch ist nicht unsere Entscheidung.
