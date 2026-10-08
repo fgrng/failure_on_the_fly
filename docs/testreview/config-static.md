@@ -12,7 +12,7 @@ Bereich aus #332 (Spec #321). Geprüft sind `static/tests/test_design_system.py`
   - Feature-CSS liest nur semantische Farb-Tokens, nie `--phsg-…`.
   - Abstände (`margin`, `padding`, `gap`, `inset`, `top` …) stehen nie in Pixeln, sondern im Raster.
   - Die Überschriften h3–h5 in Markdown-Texten sind fallend gestaffelt: auf Seitenfeldern kleiner als der Abschnittskopf, in der Sitzung nie kleiner als der Fließtext.
-- **Fehlerfälle:** Eine Deklaration mit einer nicht deklarierten Custom Property verwirft der Browser stillschweigend. Das passiert heute mit `--radius-sm` (#374) und mit den Inline-Styles in `training/detail.html` (#375).
+- **Fehlerfälle:** Eine Deklaration mit einer nicht deklarierten Custom Property verwirft der Browser stillschweigend. Das passiert heute mit `--radius-sm` (#374) und mit den Inline-Styles in `training/templates/training/detail.html` (#375).
 - **Konfiguration:** keine.
 
 ### Seitenvokabular (Templates aller Apps)
@@ -73,7 +73,7 @@ Bereich aus #332 (Spec #321). Geprüft sind `static/tests/test_design_system.py`
 - **Invarianten:**
   - Jeder Vertragsname hat einen Wert.
   - Die Platzhalter in `PROMPT_PLATZHALTER_MIT_UMGEBUNG` erzeugen eine XML-artige Umgebung `<name>…</name>`. Das Formular und die Platzhalteranzeige der Kern-Bearbeitung nennen sie so.
-- **Fehlerfälle:** Fehlt einem Vertragsnamen der Wert, wirft `vorlage_rendern` beim Rendern einen `KeyError`. Das passiert erst im Gespräch, nicht schon beim Speichern des Kerns.
+- **Fehlerfälle:** Fehlt einem Vertragsnamen der Wert, wirft `vorlage_rendern` beim Rendern einen `KeyError`. Das passiert erst in der Sitzung, nicht schon beim Speichern des Kerns.
 
 ### Zeitzone (`config/settings.py`)
 
@@ -82,7 +82,7 @@ Bereich aus #332 (Spec #321). Geprüft sind `static/tests/test_design_system.py`
   - `USE_TZ = True`.
 - **Invariante:** Nackte Wanduhrzeit aus `datetime-local`-Feldern gilt als Ortszeit.
 
-### Gemeinsame Test-Helfer
+### Gemeinsame Test-Helfer (`config/tests/`, `conftest.py`)
 
 - `config/tests/formular.py`: `submit_knoepfe(antwort)` liefert Beschriftung und Formular-ID jedes Absendeknopfs. Ein `button` ohne `type` zählt als Absendeknopf, und das `form`-Attribut geht dem umschließenden Formular vor. Genutzt in `vignetten`, `simulation` und `erhebungen`.
 - `config/tests/exportkontrakt.py`: `exportkontrakt_aus_adr_0029()` liest die Dateitabelle aus ADR-0029. Genutzt vom Export-Test in `erhebungen`.
@@ -100,10 +100,10 @@ Bereich aus #332 (Spec #321). Geprüft sind `static/tests/test_design_system.py`
 | `test_form_controls_are_styled_without_a_form_wrapper` | streichen | Quelltext samt Zeilenumbruch (`"input,\ntextarea,\nselect {"`); ein Umformatieren bricht den Test. | Keiner. |
 | `test_feature_styles_only_consume_semantic_color_tokens` | behalten | Lint-Regel über alle Dateien einer Art, ausdrücklich erlaubt (CODING_STANDARDS). | Inline-Styles in Templates prüft sie nicht, siehe #375. |
 | `test_main_layout_exposes_eight_column_grid` | streichen | Startbefund bestätigt: Rasterspalten, `column-gap` und `max-width` sind wörtlich aus drei Dateien abgeschrieben. | Keiner. |
-| `test_page_sections_follow_the_main_area_not_the_viewport` | umschreiben | Vier der fünf Zusicherungen sind abgeschriebene Deklarationen. Die letzte („keine `@media`-Regel nennt `.page-section`/`.field-grid`“) ist eine echte Regel, prüft aber nur `page.css`. | Lint-Regel über alle CSS-Dateien: Kein `@media`-Block nennt `.page-section` oder `.field-grid`, denn Seitenabschnitte brechen am Hauptbereich um, nicht am Viewport. Die übrigen Zusicherungen fallen weg. |
+| `test_page_sections_follow_the_main_area_not_the_viewport` | umschreiben | Fünf der sechs Zusicherungen sind abgeschriebene Deklarationen. Die letzte („keine `@media`-Regel nennt `.page-section`/`.field-grid`“) ist eine echte Regel, prüft aber nur `page.css`. | Lint-Regel über alle CSS-Dateien: Kein `@media`-Block nennt `.page-section` oder `.field-grid`, denn Seitenabschnitte brechen am Hauptbereich um, nicht am Viewport. Die übrigen Zusicherungen fallen weg. |
 | `test_three_fields_keep_three_columns_at_medium_width` | streichen | Quelltext; hängt zusätzlich an der Reihenfolge der `@container`-Blöcke (`split`). | Keiner. |
 | `test_form_actions_stay_visible_at_the_top` | streichen | Startbefund bestätigt: `z-index: 2`, `order: -1` und `position: sticky` sind wörtlich abgeschrieben. `"box-shadow" not in` prüft eine Abwesenheit. | Keiner. |
-| `test_feature_styles_use_spacing_tokens` | behalten | Lint-Regel über alle Dateien. | Inline-Styles sieht sie nicht, siehe #375. |
+| `test_feature_styles_use_spacing_tokens` | behalten | Lint-Regel über alle Dateien. | Sie liest nur `static/css/` und erkennt nur `px`. Feste `rem`-Abstände wie in den Inline-Styles aus #375 fielen ihr auch dort nicht auf. |
 | `test_markdown_text_steps_its_headings_below_the_section_head` | behalten | Relationale Regel (fallend, verschieden, kleiner als der Kopf). Die Erwartung ist nicht abgeschrieben. Der Regex hängt am Selektor `.markdown-text.markdown-text hN`; das ist der Preis, eine Größenrelation überhaupt zu prüfen. | – |
 | `test_szenentext_headings_stand_above_the_scene_text` | behalten | Wie oben, für `sitzung.css`. | – |
 | `test_markdown_text_is_shielded_against_page_heading_rules` | streichen | Quelltext: Selektoren in `markdown-text.css` und der Pfad im `<link>` von `base.html`. | Die doppelten Selektoren setzen die beiden Staffeltests voraus; ihr Regex findet sonst keine Größe und der Test bricht. Das Einbinden in `base.html` ist Template-Quelltext; ohne Browsertest beobachtet es niemand. |
@@ -122,7 +122,7 @@ Bereich aus #332 (Spec #321). Geprüft sind `static/tests/test_design_system.py`
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
 | `test_anlegen_traegt_genau_eine_eigentuemerin_ein`, `test_austritt_entfernt_solange_eine_eigentuemerin_bleibt`, `test_sichtbar_sind_die_eigenen_bestaende_und_der_administration_alle`, `test_kandidatenliste_nennt_die_rolle_und_die_administration`, `test_einzige_eigentuemerin_eines_aktiven_bestands_ist_nicht_loeschbar`, `test_eine_von_zwei_eigentuemerinnen_ist_loeschbar` | behalten | Startbefund bestätigt: Vorbild der Suite. Parametrisiert über `bestandsmodelle()`, nur äußeres Verhalten, Erwartungen aus festen Konten. | – |
-| `test_austritt_der_letzten_eigentuemerin_aendert_nichts` | umschreiben | Implementation-coupled: Der Fall `stillgelegt` patcht `ist_aktiv` am eigenen Modell (`monkeypatch.setattr(modell, "ist_aktiv", …)`). Damit hält er fest, dass `austreten` die Methode nicht ruft. | Nur den Fall `aktiv` behalten, ohne Patch. Den stillgelegten Bestand deckt `konten/tests/test_eigentuemerschaft.py::test_archivierter_bestand_behaelt_seine_letzte_eigentuemerin` über einen echt archivierten Bestand. |
+| `test_austritt_der_letzten_eigentuemerin_aendert_nichts` | umschreiben | Implementation-coupled: Der Fall `stillgelegt` patcht `ist_aktiv` am eigenen Modell (`monkeypatch.setattr(modell, "ist_aktiv", …)`). Damit hält er fest, dass `austreten` die Methode nicht ruft. | Nur den Fall `aktiv` behalten, ohne Patch. Den stillgelegten Bestand deckt `konten/tests/test_eigentuemerschaft.py::test_archivierter_bestand_behaelt_seine_letzte_eigentuemerin` über einen echt archivierten Bestand. Ein Modell reicht, weil `austreten` nur einmal in der gemeinsamen Basis in `konten/eigentuemerschaft.py` steht. |
 
 Hinweis für die App-Reviews (#326 bis #331): Diese Datei ist der deckende Ersatz für die einzelnen `sichtbar_fuer`-Tests der Historien und Bestände:
 
@@ -145,7 +145,7 @@ Die Fassungs-Querysets (`Vignette.objects`, `FragebogenItem.objects`) haben eine
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
-| Hilfsfunktion `_vignette_mit_eigentuemerinnen` | umschreiben | Legt die Vignette über die private Naht `Vignette.objects._erstellen` an. Die Datei steht deshalb auf der SLF001-Übergangsliste in `pyproject.toml`. Es wird keine DB-Invariante geprüft, die die Naht rechtfertigen würde. | `Vignette.objects.anlegen(erste)` und danach `vignette.historie.eigentuemerinnen.add(*weitere)`. Danach den Eintrag aus der Übergangsliste streichen. |
+| Hilfsfunktion `_vignette_mit_eigentuemerinnen` | umschreiben | Legt die Vignette über die private Naht `Vignette.objects._erstellen` an. Die Datei steht deshalb auf der SLF001-Übergangsliste in `pyproject.toml`. Es wird keine DB-Invariante geprüft, die die Naht rechtfertigen würde. | Einen finalen Simulationskern anlegen (`Simulationskern.objects.anlegen()`, `finalisieren()`), denn `anlegen` pinnt den aktuellen finalen Kern. Dann `Vignette.objects.anlegen(erste)` und danach `vignette.historie.eigentuemerinnen.add(*weitere)`. Danach den Eintrag aus der Übergangsliste streichen. |
 | `test_tabelle_nennt_name_und_alle_rollen` | behalten | HTTP, Erwartungen als Literale. | – |
 | `test_eigene_zeile_heisst_mich_entfernen_mit_erklaerung` | umschreiben | Leicht implementation-coupled: Die Markierung „(Sie)“ wird über den Klassennamen `eigentuemerinnen__sie` gesucht. | Den Zeilentext ohne Tags prüfen („ada (Sie)“). Der Rest bleibt: Entfernen-Route, „Mich entfernen“, Erklärsatz, `aria-label`. |
 | `test_letzte_eigentuemerin_hat_keine_aktion` | behalten | – | – |
@@ -159,7 +159,7 @@ Keine Schichtdoppelung: `vignetten/tests/test_views.py::VignetteDetailViewTests:
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
 | `test_vignettenwerte_decken_sich_mit_beiden_vertraegen` | umschreiben | Vergleicht zwei Modulkonstanten miteinander. Die Richtung „Wert ohne Vertragsnamen“ ist nicht beobachtbar, weil `vorlage_rendern` nur benutzte Platzhalter einsetzt. Der echte Fehlerfall ist der `KeyError` beim Rendern. | Über die Schnittstelle: Ein Kern, dessen Prompt-Vorlage jeden Namen aus `VERTRAG_PROMPT` benutzt, besteht `full_clean()`. `vorlage_rendern(vorlage, prompt_platzhalter(vignette))` liefert dann einen Text ohne `$`. Für die Rahmenhandlung dasselbe mit `VERTRAG_RAHMEN` über `sitzungen.durchlauf.rahmenhandlung_rendern`. Der Vertrag dient dabei als Eingabe, nicht als Erwartung. |
-| `test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe` | behalten | Die Erwartung kommt aus der erzeugten Ausgabe, nicht aus der Konstante. Der Test hält zwei von Hand gepflegte Listen über die App-Grenze zusammen, und die Liste speist einen sichtbaren Hinweis in der Kern-Bearbeitung. | Die zweite Zusicherung (`<= VERTRAG_PROMPT`) streichen. Sie folgt aus der ersten zusammen mit dem Zieltest oben. |
+| `test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe` | behalten | Die Erwartung kommt aus der erzeugten Ausgabe, nicht aus der Konstante. Der Test hält zwei von Hand gepflegte Listen über die App-Grenze zusammen, und die Liste speist einen sichtbaren Hinweis in der Kern-Bearbeitung. | Beide Zusicherungen bleiben. Die zweite (`<= VERTRAG_PROMPT`) folgt nicht aus dem Zieltest oben, denn der sichert nur „jeder Vertragsname hat einen Wert“. Sie hält fest, dass der Hinweis nur Platzhalter nennt, die `clean()` in einer Vorlage zulässt. |
 
 ### `config/tests/test_seitenvokabular.py`
 
@@ -194,7 +194,7 @@ Keine Schichtdoppelung: `vignetten/tests/test_views.py::VignetteDetailViewTests:
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
-| `test_zeitzone_kommt_aus_der_umgebung_und_faellt_auf_ortszeit_zurueck` | streichen | Startbefund bestätigt: Die Erwartung wird wie in `settings.py` berechnet (`os.environ.get("TIME_ZONE", "Europe/Berlin")`), der Test besteht per Konstruktion. Den Rückfall prüft er nicht einmal: `load_dotenv` setzt `TIME_ZONE` vorher aus `.env`. | `erhebungen/tests/test_forschenden_views.py::StichprobenAnlegenTests::test_liest_den_eingegebenen_zeitraum_als_ortszeit` prüft die Zusage aus dem Docstring über HTTP mit festen UTC-Literalen. Mit `USE_TZ = False` schlüge der Vergleich mit den aware-Datumswerten fehl. Der Rückfallwert selbst ist eine Konfigurationszeile; der Prozess lädt `.env` vor dem Rückfall, also lässt er sich nicht hermetisch testen. |
+| `test_zeitzone_kommt_aus_der_umgebung_und_faellt_auf_ortszeit_zurueck` | streichen | Startbefund bestätigt: Die Erwartung wird wie in `settings.py` berechnet (`os.environ.get("TIME_ZONE", "Europe/Berlin")`), der Test besteht per Konstruktion. Den Rückfall prüft er nicht einmal: `load_dotenv` setzt `TIME_ZONE` vorher aus `.env`. | `erhebungen/tests/test_forschenden_views.py::StichprobenAnlegenTests::test_liest_den_eingegebenen_zeitraum_als_ortszeit` prüft die Folge aus dem Docstring über HTTP mit festen UTC-Literalen: Die Eingabe gilt als Ortszeit, nicht als UTC. Die Zone setzt er selbst (`override_settings(TIME_ZONE="Europe/Berlin")`), den Wert aus `settings.py` prüft er also nicht. Mit `USE_TZ = False` schlüge der Vergleich mit den aware-Datumswerten fehl. Der Rückfallwert selbst ist eine Konfigurationszeile; der Prozess lädt `.env` vor dem Rückfall, also lässt er sich nicht hermetisch testen. |
 
 ### Gemeinsame Test-Helfer
 
@@ -207,4 +207,4 @@ Keine Schichtdoppelung: `vignetten/tests/test_views.py::VignetteDetailViewTests:
 ## Folge-Issues
 
 - #374 `--radius-sm` wird in `vignette-form.css` benutzt, aber nirgends deklariert. Die vorgeschlagene Lint-Regel „jede benutzte Custom Property ist deklariert“ setzt die Behebung voraus.
-- #375 `training/detail.html` umgeht das Design-System mit Inline-Styles: undefinierte Farb-Tokens (`--color-grey-…`, `--color-primary-600`), Pixelabstände, Hover per `onmouseover`. Die Lint-Regeln lesen nur `static/css/`.
+- #375 `training/templates/training/detail.html` umgeht das Design-System mit Inline-Styles: undefinierte Farb-Tokens (`--color-grey-…`, `--color-primary-600`), feste `rem`-Abstände statt des Rasters, Hover per `onmouseover`. Die Lint-Regeln lesen nur `static/css/`.
