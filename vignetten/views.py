@@ -69,7 +69,7 @@ def _lebenszyklus_aktion_ausfuehren(
     try:
         aktion(vignette)
     except ValidationError as error:
-        messages.error(request, error.message)
+        messages.error(request, "; ".join(error.messages))
     return redirect("vignetten:detail", pk=vignette.pk)
 
 
@@ -227,7 +227,7 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
         try:
             entwurf = finale.bearbeiten()
         except ValidationError as error:
-            messages.error(request, error.message)
+            messages.error(request, "; ".join(error.messages))
             return redirect("vignetten:detail", pk=finale.pk)
     return redirect("vignetten:detail", pk=entwurf.pk)
 

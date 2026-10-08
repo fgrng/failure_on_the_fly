@@ -1,8 +1,11 @@
 """Views für den privaten Fragebogen-Item-Editor."""
 
+from collections.abc import Callable
 from typing import TypedDict
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -61,6 +64,23 @@ def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
         .exclude(zustand=FragebogenItem.Zustand.ARCHIVIERT)
         .exists()
     )
+
+
+def _lebenszyklus_aktion_ausfuehren(
+    request: HttpRequest,
+    pk: int,
+    zustand: FragebogenItem.Zustand,
+    aktion: Callable[[FragebogenItem], None],
+) -> HttpResponse:
+    # Führt eine zustandsgebundene Aktion aus und zeigt Modellfehler an.
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item: FragebogenItem = _sichtbares_item(request, pk, zustand=zustand)
+    try:
+        aktion(item)
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+    return redirect("fragebogen_items:detail", pk=item.pk)
 
 
 @login_required
@@ -169,26 +189,18 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
 @_forschende_oder_administratorin_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen sichtbaren Entwurf über die Modell-Naht."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(
-        request,
-        pk,
-        zustand=FragebogenItem.Zustand.ENTWURF,
+    return _lebenszyklus_aktion_ausfuehren(
+        request, pk, FragebogenItem.Zustand.ENTWURF, FragebogenItem.finalisieren
     )
-    item.finalisieren()
-    return redirect("fragebogen_items:detail", pk=item.pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine sichtbare finale Fassung über die Modell-Naht."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.FINAL)
-    item.archivieren()
-    return redirect("fragebogen_items:detail", pk=item.pk)
+    return _lebenszyklus_aktion_ausfuehren(
+        request, pk, FragebogenItem.Zustand.FINAL, FragebogenItem.archivieren
+    )
 
 
 @login_required

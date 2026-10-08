@@ -574,7 +574,8 @@ Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
 stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
-löschen. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
+löschen. Lehnt das Item das Finalisieren oder Archivieren ab, etwa weil der
+Wortlaut fehlt, erscheint der Grund als Meldung auf der Detailansicht. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
 Administrator:innen sehen alle Items. Eigentümer:innen lassen sich direkt an der
 Item-Historie hinzufügen oder entfernen. Der Kreis bleibt dabei immer besetzt;
 die eigene Entfernung übergibt die Historie an die verbleibenden Eigentümer:innen

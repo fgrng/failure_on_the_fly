@@ -48,3 +48,20 @@ ADR-0017 sagt „jede App implementiert selbst" und begründet, warum es keine g
 - Die Form ist an drei Stellen implementiert und kann auseinanderlaufen (ADR-0017). Dieses ADR macht die Form explizit, damit eine Abweichung als Abweichung erkennbar ist und nicht als eine von drei gleichberechtigten Auslegungen.
 - Der Simulationskern braucht eine Historie, obwohl er konzeptionell eine einzige Linie ist (ADR-0004) — sonst hätte der Entwurf-Index keine Spalte. Seine Historie ist ein namenloser Singleton ohne Sprachfeld.
 - Vollständigkeit (welche Felder ein Entwurf zum Finalisieren gefüllt haben muss) gehört **nicht** in diese Form. Sie ist je Artefakt verschieden und lebt in dessen `finalisieren()`. Diese ADR regelt nur den Zustandsautomaten und seine zwei Invarianten.
+
+## Nachtrag (2026-10): Fehlerregel A/B/C
+
+Zur Form gehört auch, welchen Fehler ein Lebenszyklus wirft (#255). Vignette,
+Fragebogen-Item, Simulationskern und Erhebung erfüllen dieselbe Regel, jede App
+eigenständig (ADR-0017 bleibt unverändert):
+
+| Klasse | Was | Typ |
+|---|---|---|
+| **A · Programmierfehler** | Code umgeht die Naht (Anlegen außerhalb der Anlege-Naht, Massenupdate) | `RuntimeError` |
+| **B · Unveränderlichkeit** | `save()`/`delete()` auf einer Fassung außerhalb des Entwurfs | `ValidationError` |
+| **C · abgelehnter Übergang** | Lebenszyklus-Regel verletzt, auch der Wettlauf („inzwischen geändert“) und die zweite erste Fassung | `ValidationError` |
+
+A darf als 500er enden: Kein Klick der Nutzer:in erreicht diese Stelle. B und C
+fangen die View-Hüllen und zeigen sie als Meldung auf der Detail- bzw.
+Verwaltungsansicht. Die Hüllen lesen dazu `error.messages` und verbinden sie;
+`error.message` gibt es nur bei einer einzelnen Meldung.
