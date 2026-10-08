@@ -465,7 +465,6 @@ class Vignette(models.Model):
                 getattr(self, modellfeld.attname)
                 != getattr(gespeicherte_fassung, modellfeld.attname)
                 for modellfeld in self._meta.local_fields
-                if modellfeld.name != "zustand"
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)

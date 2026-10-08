@@ -192,7 +192,7 @@ class FragebogenItem(models.Model):
     objects: FragebogenItemManager = FragebogenItemManager()
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Speichert nur Entwürfe oder kontrollierte Zustandsübergänge.
+        """Speichert nur Entwürfe; Zustandswechsel laufen über den Lebenszyklus.
 
         Beispiel: ``item.finalisieren()`` friert einen Entwurf ein; ein
         anschließendes ``item.save()`` kann dessen Inhalt nicht mehr ändern.
@@ -212,7 +212,6 @@ class FragebogenItem(models.Model):
                 getattr(self, modellfeld.attname)
                 != getattr(gespeicherte_fassung, modellfeld.attname)
                 for modellfeld in self._meta.local_fields
-                if modellfeld.name != "zustand"
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)

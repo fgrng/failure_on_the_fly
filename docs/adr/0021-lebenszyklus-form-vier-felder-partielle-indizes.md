@@ -78,8 +78,9 @@ Simulationskern direkt in `finalisieren()`; eine geteilte Funktion gibt es nicht
 (ADR-0017). Die Aktualisierung läuft über ein schlichtes `models.QuerySet`, weil
 die öffentliche `update()`-Route gesperrt bleibt.
 
-- Fachliche Vorbedingungen (Wortlaut, Budget, keine aktive Schwester, laufende
-  Stichprobe …) prüft jedes Modell vor dem Übergang.
+- Fachliche Vorbedingungen prüft jedes Modell, soweit es sie hat, vor dem
+  Übergang (etwa Wortlaut, Budget, laufende Stichprobe; beim Fragebogen-Item
+  keine aktive Schwester, bei der Vignette hält das der partielle Index).
 - Zustandswechsel laufen nicht mehr durch `save()`; `save()` lehnt jeden
   Zustandswechsel ab und hält weiter die Unveränderlichkeit finaler Fassungen
   (Klasse B). Ein internes Flag, das Übergänge an `save()` vorbeilässt, gibt es
