@@ -29,7 +29,7 @@
 
     <div class="area-band trainings-link{% if training.beitritt_gesperrt %} trainings-link--gesperrt{% endif %}" x-data>
         <div class="trainings-link__zeile">
-            <h2>{% if training.beitritt_gesperrt %}🔒 Beitritt gesperrt{% else %}Gruppe beitreten lassen{% endif %}</h2>
+            <h2>{% if training.beitritt_gesperrt %}Beitritt gesperrt{% else %}Gruppe beitreten lassen{% endif %}</h2>
             <input class="trainings-link__feld" type="text" value="{{ trainings_link_url }}" readonly aria-label="Trainings-Link" x-ref="link">
             {% if training.beitritt_gesperrt %}
                 <form method="post" action="{% url 'training:beitritt_oeffnen' training.pk %}">
@@ -46,9 +46,9 @@
         </div>
         <p>
             {% if training.beitritt_gesperrt %}
-                Der Link funktioniert, aber niemand Neues kann beitreten. {{ beigetretene }} Personen sind bereits dabei.
+                Der Link funktioniert, aber niemand Neues kann beitreten. {{ beigetretene }} Person{{ beigetretene|pluralize:"en" }} {{ beigetretene|pluralize:"ist,sind" }} bereits dabei.
             {% else %}
-                {{ beigetretene }} Personen beigetreten. Wer beitritt, wird auf der Trainingsseite darauf hingewiesen, dass der Kreis die Sitzungen einsieht.
+                {{ beigetretene }} Person{{ beigetretene|pluralize:"en" }} beigetreten. Wer beitritt, wird auf der Trainingsseite darauf hingewiesen, dass der Kreis die Sitzungen einsieht.
             {% endif %}
             {% if training.zustand == "entwurf" %}Der Beitritt ist erst nach dem Veröffentlichen möglich.{% endif %}
         </p>

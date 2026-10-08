@@ -107,6 +107,20 @@ class Training(EigentuemerKreis):
         finally:
             del self._wechselt_zustand
 
+    def beitreten(self, konto: "Konto") -> bool:
+        """Tritt dem Training über den Trainings-Link bei.
+
+        Liefert, ob das Konto danach dabei ist. Die Sperre hält nur Neue
+        fern; wer schon eine Bindung hat, bleibt dabei.
+        """
+        if (
+            self.beitritt_gesperrt
+            and not self.trainingsbindung_set.filter(konto=konto).exists()
+        ):
+            return False
+        self.bindung_fuer(konto)
+        return True
+
     def bindung_fuer(self, konto: "Konto") -> "Trainingsbindung":
         """Lädt oder legt die eine Trainingsbindung des Kontos an.
 

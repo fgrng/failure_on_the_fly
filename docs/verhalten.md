@@ -183,7 +183,7 @@ gespielt hat, gilt als beigetreten und behält Zugang und Sitzungen.
 Jedes Training hat einen festen Trainings-Link. Die Kuratierseite zeigt ihn
 ganz oben in einem Band „Gruppe beitreten lassen“ mit den Knöpfen „Kopieren“
 und „Sperren“ und nennt darunter die Zahl der Beigetretenen. Ist der Beitritt
-gesperrt, färbt sich das Band rot, heißt „🔒 Beitritt gesperrt“, und „Wieder
+gesperrt, färbt sich das Band rot, heißt „Beitritt gesperrt“, und „Wieder
 öffnen“ hebt die Sperre auf. Jede Eigentümerin des Kreises darf sperren und
 öffnen.
 

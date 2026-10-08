@@ -486,18 +486,13 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    beigetreten: bool = Trainingsbindung.objects.filter(
-        training=training, konto=request.user
-    ).exists()
-    if not beigetreten:
-        if training.beitritt_gesperrt:
-            return render(
-                request,
-                "training/beitritt_gesperrt.html",
-                {"training": training},
-                status=403,
-            )
-        training.bindung_fuer(request.user)
+    if not training.beitreten(request.user):
+        return render(
+            request,
+            "training/beitritt_gesperrt.html",
+            {"training": training},
+            status=403,
+        )
     return redirect("training:detail", pk=training.pk)
 
 
