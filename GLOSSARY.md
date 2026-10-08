@@ -203,8 +203,12 @@ Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsb
 _Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
-Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem eine Gruppe ihre Abschriften freigibt. Ein Training ist geschlossen: Zugang hat nur, wer ihm über den Weg beigetreten ist, den der Kreis an seine Gruppe gibt, und nur mit Nutzerkonto.
+Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem eine Gruppe ihre Abschriften freigibt. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
 _Avoid_: Übung, Kurs, Übungsmodus
+
+**Trainings-Link**:
+Der stabile Zugangsweg, über den ein Konto einem Training beitritt. Der Kreis verteilt ihn an seine Gruppe und kann den Beitritt sperren und wieder öffnen. Anders als der Teilnahme-Link setzt er ein Nutzerkonto voraus und erzeugt kein Teilnahme-Token.
+_Avoid_: Teilnahme-Link, Einladungslink, Beitrittscode
 
 **Erhebung**:
 Ein von einem Eigentümer-Kreis der Forschenden zusammengestelltes Untersuchungsdesign aus finalen Vignetten, ihrer Reihenfolge und Fragebogen-Items. Zugang über einen Teilnahme-Link.
@@ -220,7 +224,7 @@ _Avoid_: Gruppe, Bedingung, Kohorte, Arm
 
 **Teilnahme-Link**:
 Der stabile Zugangsweg zu genau einer Stichprobe. Er ist für alle Teilnehmenden dieser Stichprobe identisch.
-_Avoid_: Einladungslink, Studienlink
+_Avoid_: Einladungslink, Studienlink, Erhebungslink, Stichprobenlink
 
 **Teilnahme-Token**:
 Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0043).
