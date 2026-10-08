@@ -26,7 +26,7 @@
     .proto-h .proto-punkt:hover { z-index: 21; transform: scale(1.35); box-shadow: 0 0 0 .3rem var(--color-area-participant-tint); }
     .proto-h .proto-punkt::after { padding: .35rem .6rem; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); color: var(--color-text); font-size: .9rem; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
 
-    /* I: Kreis mit Tageszahl, Tooltip mit vollem Datum */
+    /* I: Kreis mit laufender Sitzungsnummer je Vignette, Tooltip mit vollem Datum */
     .proto-i .proto-punkt { width: 1.6rem; height: 1.6rem; margin-right: .25rem; color: #fff; font-size: .75rem; font-weight: 600; line-height: 1.6rem; text-align: center; }
     .proto-i .proto-punkt:hover { background: var(--color-accent-hover); }
     .proto-i .proto-punkt::after { padding: .25rem .5rem; border-radius: 4px; background: var(--phsg-blue-deep); color: #fff; font-size: .875rem; }
@@ -77,7 +77,7 @@
                         {% if not zelle.sitzungen %}
                             <span class="proto-leer">–</span>
                         {% else %}
-                            {% for s in zelle.sitzungen %}<a class="proto-punkt" href="{{ s.url }}" aria-label="Sitzung vom {{ s.datum }}" data-tipp="{% if prototyp.variante == 'H' %}{{ forloop.counter }}. Sitzung · {% endif %}{{ s.datum }}">{% if prototyp.variante == 'I' %}{{ s.datum|slice:':2' }}{% endif %}</a>{% endfor %}
+                            {% for s in zelle.sitzungen %}<a class="proto-punkt" href="{{ s.url }}" aria-label="Sitzung vom {{ s.datum }}" data-tipp="{% if prototyp.variante == 'H' %}{{ forloop.counter }}. Sitzung · {% endif %}{{ s.datum }}">{% if prototyp.variante == 'I' %}{{ forloop.counter }}{% endif %}</a>{% endfor %}
                         {% endif %}
                     </td>
                     {% endfor %}

@@ -21,7 +21,7 @@ VARIANTEN: dict[str, list[tuple[str, str]]] = {
     "kuratieren": [
         ("G", "Punkt 1rem, dunkle Pille mit Datum"),
         ("H", "Punkt wächst beim Zeigen, helle Karte mit Nummer"),
-        ("I", "Kreis mit Tageszahl, Pille mit vollem Datum"),
+        ("I", "Kreis mit Sitzungsnummer, Pille mit Datum"),
     ],
     "abschrift": [
         ("A", "Checkbox-Liste unten"),
