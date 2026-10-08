@@ -668,6 +668,23 @@ class SimulationskernVerwaltungTests(TestCase):
 
         self.assertContains(response, "Enthält ungültige Platzhalter.")
 
+    def test_zeigt_alle_meldungen_einer_ablehnung(self) -> None:
+        """Mehrere vertragswidrige Felder erscheinen verbunden in einer Meldung."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+        entwurf.system_prompt_vorlage = "$unbekannt"
+        entwurf.user_prompt_vorlage = "$unbekannt"
+        entwurf.save()
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:finalisieren", args=[entwurf.pk]), follow=True
+        )
+
+        self.assertContains(
+            response, "Enthält ungültige Platzhalter.; Enthält ungültige Platzhalter."
+        )
+
     def test_ueberschreibt_die_finale_fassung_ohne_verwendungs_markierung(
         self,
     ) -> None:

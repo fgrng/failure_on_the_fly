@@ -1,10 +1,7 @@
 """HTTP-Tests für den Fragebogen-Item-Editor."""
 
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -301,23 +298,6 @@ class FragebogenItemArchivierenViewTests(TestCase):
         self.assertRedirects(
             response, reverse("fragebogen_items:detail", args=[self.item.pk])
         )
-
-    def test_abgelehntes_archivieren_erscheint_mit_allen_meldungen(self) -> None:
-        """Auch eine Ablehnung mit mehreren Meldungen erreicht die Detailansicht."""
-        with patch.object(
-            FragebogenItem,
-            "archivieren",
-            side_effect=ValidationError(["Erste Ablehnung.", "Zweite Ablehnung."]),
-        ):
-            response: HttpResponse = self.client.post(
-                reverse("fragebogen_items:archivieren", args=[self.item.pk]),
-                follow=True,
-            )
-
-        self.assertRedirects(
-            response, reverse("fragebogen_items:detail", args=[self.item.pk])
-        )
-        self.assertContains(response, "Erste Ablehnung.; Zweite Ablehnung.")
 
     def test_archivieren_setzt_den_archivierten_zustand(self) -> None:
         """Archivieren nimmt die finale Fassung aus dem Umlauf."""
