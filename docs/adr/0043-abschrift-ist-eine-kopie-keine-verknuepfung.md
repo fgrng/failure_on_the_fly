@@ -25,3 +25,10 @@ Die Kante zeigt von `training` nach `erhebungen` und nie umgekehrt. `erhebungen`
 - **Fragebogen-Antworten werden nicht kopiert.** Die `ItemAntwort` hängt an der Erhebungsbindung; sie ist Messinstrument der Forschenden und stünde ohne den Wortlaut ihrer Items als bedeutungsloser Wert da. Die Abschrift enthält Transkript, Ausgang und eigene Diagnose — sonst nichts.
 - **Der Hebel der Forschenden ist das Archivieren.** Abgelehnt wird, was nicht abgeschlossen ist oder zu einer archivierten Stichprobe oder Erhebung gehört; die Phase der Stichprobe spielt keine Rolle. Jede Ablehnung liefert dieselbe Meldung ohne Grund, damit der Import kein Orakel über fremde Tokens wird.
 - **Abschriften sind kontoprivat** und gehören nicht in die Trainingsdaten einer Ausbilder:in: Deren Abfragen hängen an der `Trainingsbindung`.
+
+> **Nachgeführt durch ADR-0049 (Einsicht):** Kontoprivat bleibt der
+> Ausgangszustand. Die Teilnehmer:in kann eine Abschrift aber ausdrücklich für
+> ein Training freigeben, dem sie beigetreten ist; dann sieht der Kreis dieses
+> Trainings sie in seiner Fremdeinsicht. Die Freigabe ist widerrufbar. Dass
+> Dritte die Abschrift so mit dem Erhebungsexport abgleichen können, ist
+> bewusst hingenommen.

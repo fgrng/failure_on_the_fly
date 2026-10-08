@@ -33,6 +33,10 @@ Die Sichtbarkeit ist bewusst gestaffelt:
 - **Forschende:r:** immer, als Teil der Datenspur und des Exports.
 - **Ausbilder:in:** im Rahmen der Sitzungseinsicht ihres eigenen Trainings.
 
+> **Nachgeführt durch ADR-0049 (Einsicht):** Die Ausbilder:in sieht die
+> Denkspur nicht. Ihre Fremdeinsicht zeigt, was die Teilnehmer:in sieht;
+> die Denkspur bleibt Probelauf und Forschenden vorbehalten.
+
 ## Consequences
 
 - Die Vignette braucht eine **Arbeitsheft-Bildbeschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Menschen und speist, an der Bildposition zusammen mit dem Arbeitsheft-Text, das Reasoning.

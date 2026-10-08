@@ -31,6 +31,12 @@ Der Eigentümer ist ein Fremdschlüssel auf dem Objekt. Bei der Vignette trägt 
 > Autor:in, Ausbilder:in und Forschende:r bleiben permissionfreie Groups; die
 > Rolle-oder-Administration-Regel lebt als benannte Konto-QuerySet-Methode.
 
+> **Nachgeführt durch ADR-0049 (Einsicht):** „Die Sitzungen der Teilnehmenden
+> ihrer eigenen Trainings" läuft über die Trainingsbindung und das Training,
+> nie über die Vignette; hinzu kommen für das Training freigegebene
+> Abschriften. Die Regel lebt wie hier beschrieben als benannte
+> QuerySet-Methode.
+
 Die Regel selbst lebt als benannte Methode am QuerySet:
 
 ```python

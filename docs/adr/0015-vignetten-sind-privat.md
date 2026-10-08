@@ -11,6 +11,12 @@ status: accepted
 > Vignetten- und Item-Inhalte, und die Administration sieht alle Vignetten-,
 > Item-, Trainings- und Erhebungsbestände.
 
+> **Nachgeführt durch ADR-0049 (Einsicht):** Eine dritte Ausnahme: Die
+> Fremdeinsicht einer für ein Training freigegebenen Abschrift zeigt dem
+> Kreis des Trainings die gespielte Szene fremder Vignetten. Bearbeiten oder
+> einbinden kann er sie nicht; die Privatheit schützt den Bestand, nicht die
+> gespielte Szene.
+
 Eine Autor:in sieht und bearbeitet **ausschließlich ihre eigenen Vignetten**. Es gibt keinen Mechanismus, eine Vignette anderen Autor:innen derselben Instanz zugänglich zu machen — und deshalb auch keinen Status *veröffentlicht* im Versions-Lebenszyklus (siehe ADR-0003). Sichtbarkeit ist kein Attribut, sondern eine Konstante.
 
 Rollen sind damit **additiv**: Wer eine Erhebung oder ein Training zusammenstellen will, muss die enthaltenen Vignetten selbst in der Rolle der Autor:in geschrieben haben. Ausbilder:innen und Forschende greifen auf keine fremden Vignetten zu.

@@ -199,11 +199,11 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, gena
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Abschrift**:
-Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043).
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar.
 _Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
-Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items; Zugang über die Navigation mit Nutzerkonto.
+Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem eine Gruppe ihre Abschriften freigibt. Ein Training ist geschlossen: Zugang hat nur, wer ihm über den Weg beigetreten ist, den der Kreis an seine Gruppe gibt, und nur mit Nutzerkonto.
 _Avoid_: Übung, Kurs, Übungsmodus
 
 **Erhebung**:
@@ -235,8 +235,20 @@ Die Teilnahme an einer Erhebung, deren Teilnehmer:in der Speicherung (Einwilligu
 _Avoid_: anonyme Teilnahme, Teilnahme ohne Daten, Gastteilnahme
 
 **Datenspur**:
-Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur und werden nicht exportiert.
+Die vollständige, exportierbare Aufzeichnung einer Teilnahme an einer Erhebung: Transkripte, Diagnosen, Denkspuren, Fehlversuche, Item-Antworten sowie die tatsächlich verwendete Vignettenfassung, Simulationskern-Fassung und Modell-Konfiguration. Trainingsteilnahmen tragen keine Datenspur; was aus einem Training hinausgeht, ist der Trainingsexport.
 _Avoid_: Logs, Rohdaten, Protokoll
+
+**Selbsteinsicht**:
+Das nachträgliche, rein lesende Ansehen der eigenen persistierten Sitzungen durch die Teilnehmer:in, die sie geführt hat — im Training und in der Abschrift. Sie zeigt nie die Denkspur. Weder der Probelauf (live, ungespeichert) noch der Export ist Einsicht.
+_Avoid_: Sitzungsansicht, Review, Rückblick
+
+**Fremdeinsicht**:
+Das nachträgliche, rein lesende Ansehen fremder persistierter Sitzungen. Sie entsteht allein aus dem Anlass, unter dem die Sitzung gespielt wurde, nie aus der Vignette: Die Ausbilder:innen eines Trainings sehen die abgeschlossenen Sitzungen, die in diesem Training gespielt oder als Abschrift für es freigegeben wurden, namentlich und genau so, wie die Teilnehmer:in sie sieht — also ohne Denkspur. Die Forschenden einer Erhebung dürfen deren Sitzungen pseudonym und samt Denkspur einsehen. Die Autor:in einer Vignette hat aus ihr keine Fremdeinsicht.
+_Avoid_: Trainingsdaten, Sitzungseinsicht, Monitoring
+
+**Trainingsexport**:
+Die Fremdeinsicht eines Trainings als pseudonymes Archiv menschenlesbarer Dateien, eine je abgeschlossener Sitzung, gegliedert nach Teilnehmenden mit bei jedem Export neu gezogenen Kennzeichen. Er enthält keine Kontodaten und keine Denkspur und ist kein Forschungsdatum.
+_Avoid_: Datenspur, Trainingsdaten, Protokoll
 
 ## Evals
 
