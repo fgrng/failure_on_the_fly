@@ -14,7 +14,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.models import Konto
+from konten.eigentuemer_views import eigentuemer_views
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
     rolle_erforderlich,
@@ -372,36 +372,17 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@login_required
-@_ausbilderin_erforderlich
-def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Ausbilder:in in den Eigentümer-Kreis auf."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
+def _kreis_des_trainings(request: HttpRequest, pk: int) -> tuple[Training, str]:
+    """Liefert das sichtbare Training als Kreis und seine Kuratierseite."""
     training: Training = _sichtbares_training(request, pk)
-    konto: Konto = get_object_or_404(
-        training.moegliche_ergaenzungen(), pk=request.POST.get("konto")
-    )
-    training.eigentuemerinnen.add(konto)
-    return redirect("training:kuratieren", pk=training.pk)
+    return training, reverse("training:kuratieren", args=[training.pk])
 
 
-@login_required
-@_ausbilderin_erforderlich
-def eigentuemerin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
-    """Trägt eine Eigentümerin aus dem Kreis des Trainings aus.
-
-    Wer sich selbst austrägt, landet auf der Trainingsliste; scheitert der
-    Austritt an der Invariante, bleibt es bei der Kuratierseite.
-    """
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    training: Training = _sichtbares_training(request, pk)
-    if training.austreten(konto_pk) and konto_pk == request.user.pk:
-        return redirect("training:liste")
-    return redirect("training:kuratieren", pk=training.pk)
+eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+    rolle_erforderlich=_ausbilderin_erforderlich,
+    aufloesen=_kreis_des_trainings,
+    liste="training:liste",
+)
 
 
 @login_required

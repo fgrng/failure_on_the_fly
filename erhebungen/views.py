@@ -25,7 +25,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
-from konten.models import Konto
+from konten.eigentuemer_views import eigentuemer_views
 from konten.navigation import (
     ist_forschende,
     rolle_erforderlich,
@@ -400,38 +400,18 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
+def _kreis_der_erhebung(request: HttpRequest, pk: int) -> tuple[Erhebung, str]:
+    """Liefert die sichtbare Erhebung als Kreis und ihre Detailseite."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    konto: Konto = get_object_or_404(
-        erhebung.moegliche_ergaenzungen(), pk=request.POST.get("konto")
-    )
-    erhebung.eigentuemerinnen.add(konto)
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    return erhebung, reverse("erhebungen:detail", args=[erhebung.pk])
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
-    """Trägt eine Eigentümerin aus dem Kreis der Erhebung aus.
-
-    Wer sich selbst austrägt, landet auf der Erhebungsliste; scheitert der
-    Austritt an der Invariante, bleibt es bei der Detailseite.
-    """
-
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.austreten(konto_pk) and konto_pk == request.user.pk:
-        return redirect("erhebungen:liste")
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+    rolle_erforderlich=_forschende_oder_administratorin_erforderlich,
+    aufloesen=_kreis_der_erhebung,
+    liste="erhebungen:liste",
+)
 
 
 @login_required

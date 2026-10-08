@@ -77,3 +77,18 @@ class ImportgraphTests(SimpleTestCase):
         quellen: list[Path] = _quellen("erhebungen", mit_tests=False)
 
         self.assertEqual(_verstoesse(quellen, "training"), [])
+
+    def test_konten_importiert_keinen_bestand(self) -> None:
+        """Die Bestands-Apps zeigen auf `konten`, nie umgekehrt (ADR-0037).
+
+        Auch die gemeinsamen Eigentümer-Kreis-Views bekommen Rollenprüfung,
+        Objektauflösung und Rückweg von den Apps hereingereicht.
+        """
+        quellen: list[Path] = _quellen("konten", mit_tests=False)
+
+        self.assertEqual(
+            _verstoesse(
+                quellen, "vignetten", "fragebogen_items", "erhebungen", "training"
+            ),
+            [],
+        )

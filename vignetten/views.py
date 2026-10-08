@@ -9,7 +9,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.models import Konto
+from konten.eigentuemer_views import eigentuemer_views
 from konten.navigation import (
     autorin_erforderlich as _autorin_erforderlich,
 )
@@ -132,36 +132,17 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@login_required
-@_autorin_erforderlich
-def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Autor:in in den Eigentümer-Kreis auf."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
+def _kreis_der_vignette(request: HttpRequest, pk: int) -> tuple[Vignettenhistorie, str]:
+    """Liefert den Kreis der Vignettenhistorie und die Detailseite der Fassung."""
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
-    konto: Konto = get_object_or_404(
-        vignette.historie.moegliche_ergaenzungen(), pk=request.POST.get("konto")
-    )
-    vignette.historie.eigentuemerinnen.add(konto)
-    return redirect("vignetten:detail", pk=vignette.pk)
+    return vignette.historie, reverse("vignetten:detail", args=[vignette.pk])
 
 
-@login_required
-@_autorin_erforderlich
-def eigentuemerin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
-    """Trägt eine Eigentümerin aus dem Kreis der Vignettenhistorie aus.
-
-    Wer sich selbst austrägt, landet auf der Vignettenliste; scheitert der
-    Austritt an der Invariante, bleibt es bei der Detailseite.
-    """
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    vignette: Vignette = _sichtbare_vignette_laden(request, pk)
-    if vignette.historie.austreten(konto_pk) and konto_pk == request.user.pk:
-        return redirect("vignetten:liste")
-    return redirect("vignetten:detail", pk=vignette.pk)
+eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+    rolle_erforderlich=_autorin_erforderlich,
+    aufloesen=_kreis_der_vignette,
+    liste="vignetten:liste",
+)
 
 
 @login_required
