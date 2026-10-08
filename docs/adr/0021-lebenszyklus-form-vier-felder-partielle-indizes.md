@@ -65,3 +65,30 @@ A darf als 500er enden: Kein Klick der Nutzer:in erreicht diese Stelle. B und C
 fangen die View-Hüllen und zeigen sie als Meldung auf der Detail- bzw.
 Verwaltungsansicht. Die Hüllen lesen dazu `error.messages` und verbinden sie;
 `error.message` gibt es nur bei einer einzelnen Meldung.
+
+### Übergangsmechanik
+
+Zur Form gehört auch, wie ein Lebenszyklus einen Zustandsübergang prüft und
+schreibt (#365): in **einer bedingten Aktualisierung**, „setze Zustand auf Ziel,
+wo Zustand = erwartet“. Trifft sie keine Zeile, folgt ein `ValidationError` mit
+der Meldung des Übergangs (Klasse C), auch wenn ein zweiter Tab die Fassung
+inzwischen verändert hat. Vignette, Fragebogen-Item und Erhebung tun das je in
+einer eigenen Routine `_zustand_wechseln` bzw. `_status_wechseln`, der
+Simulationskern direkt in `finalisieren()`; eine geteilte Funktion gibt es nicht
+(ADR-0017). Die Aktualisierung läuft über ein schlichtes `models.QuerySet`, weil
+die öffentliche `update()`-Route gesperrt bleibt.
+
+- Fachliche Vorbedingungen (Wortlaut, Budget, keine aktive Schwester, laufende
+  Stichprobe …) prüft jedes Modell vor dem Übergang.
+- Zustandswechsel laufen nicht mehr durch `save()`; `save()` lehnt jeden
+  Zustandswechsel ab und hält weiter die Unveränderlichkeit finaler Fassungen
+  (Klasse B). Ein internes Flag, das Übergänge an `save()` vorbeilässt, gibt es
+  in diesen vier Lebenszyklen nicht mehr.
+- Der Simulationskern schreibt beim Finalisieren die geprüften Vorlagen in
+  derselben Anweisung mit; das Archivieren der bisherigen finalen Fassung davor
+  rollt die Transaktion zurück, wenn der Übergang scheitert.
+- `bearbeiten()` schreibt keinen Zustand, sondern legt einen Entwurf an; die
+  Prüfung der Quelle bleibt dort eine Abfrage vor dem Anlegen.
+- Weil die bedingte Aktualisierung kein `post_save` auslöst, sendet
+  `Vignette.archivieren()` das Signal `vignette_archiviert`; daran entfernt
+  `training` die Vignette aus seinen Trainings.

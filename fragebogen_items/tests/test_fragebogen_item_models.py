@@ -260,6 +260,18 @@ class FragebogenItemLebenszyklusTests(TestCase):
             FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
         )
 
+    def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
+        konto = get_user_model().objects.create_user(username="ada")
+        erster_tab = FragebogenItem.objects.anlegen(konto, wortlaut="Wie geht es dir?")
+        zweiter_tab = FragebogenItem.objects.get(pk=erster_tab.pk)
+        erster_tab.finalisieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur Entwürfe können finalisiert werden."
+        ):
+            zweiter_tab.finalisieren()
+
     def test_finalisieren_bearbeiten_und_archivieren(self) -> None:
         """Finale Fassungen bleiben unveränderlich und versionieren sich linear."""
         konto = get_user_model().objects.create_user(username="ada")

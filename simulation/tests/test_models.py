@@ -197,6 +197,20 @@ def test_finalisieren_lehnt_eine_finale_fassung_ab() -> None:
 
 
 @pytest.mark.django_db
+def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab() -> None:
+    """Ein inzwischen finalisierter Entwurf meldet den abgelehnten Übergang."""
+
+    erster_tab: Simulationskern = Simulationskern.objects.anlegen()
+    zweiter_tab: Simulationskern = Simulationskern.objects.get(pk=erster_tab.pk)
+    erster_tab.finalisieren()
+
+    with pytest.raises(ValidationError, match="Nur Entwürfe können finalisiert"):
+        zweiter_tab.finalisieren()
+    erster_tab.refresh_from_db()
+    assert erster_tab.zustand == Simulationskern.Zustand.FINAL
+
+
+@pytest.mark.django_db
 def test_bearbeiten_lehnt_eine_inzwischen_geaenderte_fassung_ab() -> None:
     """Der Wettlauf um eine überholte Fassung endet als abgelehnter Übergang."""
 

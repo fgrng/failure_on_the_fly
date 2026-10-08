@@ -779,6 +779,17 @@ class VignetteFinalisierenTests(TestCase):
                 with self.assertRaisesMessage(ValidationError, "Entwürfe"):
                     vignette.finalisieren()
 
+    def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
+        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
+        zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
+        erster_tab.finalisieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur Entwürfe können finalisiert werden."
+        ):
+            zweiter_tab.finalisieren()
+
     def test_finalisieren_lehnt_leeren_lernauftrag_ab(self) -> None:
         """Der Lernauftrag braucht sichtbar Text oder ein Bild."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
