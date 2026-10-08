@@ -282,19 +282,20 @@ class Simulationskern(models.Model):
     def finalisieren(self) -> None:
         """Finalisiert einen vertragskonformen Entwurf."""
 
-        if self.zustand != self.Zustand.ENTWURF:
-            raise ValidationError("Nur Entwürfe können finalisiert werden.")
         self.full_clean()
-        self.save()
         finalisiert_am: datetime = timezone.now()
         # Die bisherige finale Fassung weicht vor dem eigenen Zustandswechsel:
         # Der partielle Unique-Index duldet zwei finale Fassungen keine
         # Anweisung lang nebeneinander. Bei der ersten Fassung der Historie
-        # trifft das Archivieren keine Zeile.
+        # trifft das Archivieren keine Zeile; scheitert der Übergang, rollt
+        # die Transaktion es zurück.
         self._schreibqueryset().filter(
             historie=self.historie,
             zustand=self.Zustand.FINAL,
         ).update(zustand=self.Zustand.ARCHIVIERT)
+        # Der geprüfte Inhalt geht mit dem Zustandswechsel in dieselbe
+        # Anweisung; ein save() davor schlüge bei einer inzwischen
+        # finalisierten Fassung mit der Unveränderlichkeit fehl.
         if (
             not self._schreibqueryset()
             .filter(
@@ -304,9 +305,16 @@ class Simulationskern(models.Model):
             .update(
                 zustand=self.Zustand.FINAL,
                 finalisiert_am=finalisiert_am,
+                system_prompt_vorlage=self.system_prompt_vorlage,
+                user_prompt_vorlage=self.user_prompt_vorlage,
+                rahmenhandlung_einleitung=self.rahmenhandlung_einleitung,
+                rahmenhandlung_gespraechseinleitung=(
+                    self.rahmenhandlung_gespraechseinleitung
+                ),
+                rahmenhandlung_debrief=self.rahmenhandlung_debrief,
             )
         ):
-            raise ValidationError("Der Kern-Entwurf wurde inzwischen geändert.")
+            raise ValidationError("Nur Entwürfe können finalisiert werden.")
         self.zustand = self.Zustand.FINAL
         self.finalisiert_am = finalisiert_am
 

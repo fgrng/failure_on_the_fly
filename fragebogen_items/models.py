@@ -192,7 +192,7 @@ class FragebogenItem(models.Model):
     objects: FragebogenItemManager = FragebogenItemManager()
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Speichert nur Entwürfe oder kontrollierte Zustandsübergänge.
+        """Speichert nur Entwürfe; Zustandswechsel laufen über den Lebenszyklus.
 
         Beispiel: ``item.finalisieren()`` friert einen Entwurf ein; ein
         anschließendes ``item.save()`` kann dessen Inhalt nicht mehr ändern.
@@ -204,9 +204,7 @@ class FragebogenItem(models.Model):
                 )
         else:
             gespeicherte_fassung: FragebogenItem = type(self).objects.get(pk=self.pk)
-            if self.zustand != gespeicherte_fassung.zustand and not getattr(
-                self, "_wechselt_zustand", False
-            ):
+            if self.zustand != gespeicherte_fassung.zustand:
                 raise ValidationError(
                     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
                 )
@@ -214,7 +212,6 @@ class FragebogenItem(models.Model):
                 getattr(self, modellfeld.attname)
                 != getattr(gespeicherte_fassung, modellfeld.attname)
                 for modellfeld in self._meta.local_fields
-                if modellfeld.name != "zustand"
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)
@@ -223,14 +220,24 @@ class FragebogenItem(models.Model):
         # Prüft den Zustand der aktuell gespeicherten Fassung.
         return type(self).objects.filter(pk=self.pk, zustand=zustand).exists()
 
-    def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
-        # Speichert einen ausschließlich intern ausgelösten Zustandsübergang.
-        self._wechselt_zustand = True
-        try:
-            self.zustand = zustand
-            self.save(update_fields=update_fields)
-        finally:
-            del self._wechselt_zustand
+    def _zustand_wechseln(
+        self,
+        erwarteter_zustand: str,
+        zielzustand: str,
+        fehlermeldung: str,
+        **aktualisierungen: object,
+    ) -> None:
+        # Prüft und schreibt einen Zustandsübergang in einer bedingten
+        # Aktualisierung; die öffentliche update()-Route bleibt gesperrt.
+        if (
+            not models.QuerySet(model=type(self), using=self._state.db)
+            .filter(pk=self.pk, zustand=erwarteter_zustand)
+            .update(zustand=zielzustand, **aktualisierungen)
+        ):
+            raise ValidationError(fehlermeldung)
+        self.zustand = zielzustand
+        for feld, wert in aktualisierungen.items():
+            setattr(self, feld, wert)
 
     @transaction.atomic
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
@@ -258,23 +265,27 @@ class FragebogenItem(models.Model):
     @transaction.atomic
     def finalisieren(self) -> None:
         """Friert einen Entwurf als finale Fassung ein."""
-        if self.zustand != self.Zustand.ENTWURF:
-            raise ValidationError("Nur Entwürfe können finalisiert werden.")
         if not self.wortlaut:
             raise ValidationError("Zum Finalisieren fehlt der Wortlaut.")
-        self.finalisiert_am = timezone.now()
-        self._zustand_wechseln(self.Zustand.FINAL, ["zustand", "finalisiert_am"])
+        self._zustand_wechseln(
+            self.Zustand.ENTWURF,
+            self.Zustand.FINAL,
+            "Nur Entwürfe können finalisiert werden.",
+            finalisiert_am=timezone.now(),
+        )
 
     @transaction.atomic
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
-        if not self._hat_gespeicherten_zustand(self.Zustand.FINAL):
-            raise ValidationError("Nur finale Fassungen können archiviert werden.")
-        self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
+        self._zustand_wechseln(
+            self.Zustand.FINAL,
+            self.Zustand.ARCHIVIERT,
+            "Nur finale Fassungen können archiviert werden.",
+        )
 
-    def kann_entarchiviert_werden(self) -> bool:
-        """Prüft, ob keine aktive Schwester dieselbe Vorgängerin belegt."""
-        return self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT) and not (
+    def _hat_aktive_schwester(self) -> bool:
+        # Prüft, ob eine nicht archivierte Schwester dieselbe Vorgängerin belegt.
+        return (
             self.vorgaengerin_id is not None
             and type(self)
             .objects.filter(vorgaengerin_id=self.vorgaengerin_id)
@@ -283,18 +294,25 @@ class FragebogenItem(models.Model):
             .exists()
         )
 
+    def kann_entarchiviert_werden(self) -> bool:
+        """Prüft, ob keine aktive Schwester dieselbe Vorgängerin belegt."""
+        return (
+            self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT)
+            and not self._hat_aktive_schwester()
+        )
+
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
-        if not self._hat_gespeicherten_zustand(self.Zustand.ARCHIVIERT):
-            raise ValidationError(
-                "Nur archivierte Fassungen können entarchiviert werden."
-            )
-        if not self.kann_entarchiviert_werden():
+        if self._hat_aktive_schwester():
             raise ValidationError(
                 "Die Vorgängerin hat bereits eine aktive Nachfolgerin."
             )
-        self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
+        self._zustand_wechseln(
+            self.Zustand.ARCHIVIERT,
+            self.Zustand.FINAL,
+            "Nur archivierte Fassungen können entarchiviert werden.",
+        )
 
     class Meta:
         """Datenbankinvarianten der Fragebogen-Item-Fassung."""
