@@ -2,6 +2,7 @@
 
 Plan, je Element eine Zeile:
 - Fremdeinsicht-Tabelle: drei Varianten auf `training:kuratieren`, umschaltbar über `?variant=`.
+  Runde 2 (D/E/F): Layout steht, offen ist nur noch die Zelle.
 - Trainings-Link-Block und Export-Knopf: reisen mit denselben drei Varianten der Kuratierseite.
 - Freigabe einer Abschrift: drei Varianten auf `training:abschrift`, umschaltbar über `?variant=`.
 - Fester Hinweis zur Fremdeinsicht: zwei Varianten auf `training:detail`.
@@ -15,10 +16,11 @@ from django.conf import settings
 from django.http import HttpRequest
 
 VARIANTEN: dict[str, list[tuple[str, str]]] = {
+    # Runde 1 (A/B/C) liegt in f3532dc. Runde 2: Band aus C, Matrix aus A, volle Breite.
     "kuratieren": [
-        ("A", "Matrix mit Zählern, Link oben"),
-        ("B", "Matrix mit Datumslinks, Abschriften als Spalte"),
-        ("C", "Personenliste statt Matrix, Link als Band"),
+        ("D", "Zelle: Zähler mit Aufklappliste"),
+        ("E", "Zelle: letztes Datum, +n aufklappbar"),
+        ("F", "Zelle: ein Punkt je Sitzung"),
     ],
     "abschrift": [
         ("A", "Checkbox-Liste unten"),
@@ -143,7 +145,7 @@ def _zeilen(vignetten: list[str], leer: bool) -> list[dict[str, object]]:
                     "kurz": f"V{v + 1}",
                     "sitzungen": [
                         {
-                            "datum": f"{3 + i * 5:02d}.{9 + (p + v + i) % 2:02d}.2026",
+                            "datum": f"{2 + i * 7 + (p + v) % 3:02d}.09.2026",
                             "url": "#",
                         }
                         for i in range(anzahl)

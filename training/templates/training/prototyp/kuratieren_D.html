@@ -1,0 +1,110 @@
+{# PROTOTYP #362, Runde 2 (D/E/F teilen dieses Template; nur die Zelle unterscheidet sich): Link-Band aus C, Matrix aus A ganz oben, Matrix und Abschriften über die ganze Breite, Zeilen ohne Sitzung nur grau. #}
+{% if slot == "oben" %}
+<style>
+    .proto-zelle { font-size: .875rem; white-space: nowrap; }
+    .proto-zelle a, .proto-zelle summary { color: var(--color-accent); text-decoration: none; cursor: pointer; }
+    .proto-zelle a:hover, .proto-zelle summary:hover { text-decoration: underline; }
+    .proto-zelle summary { list-style: none; display: inline; }
+    .proto-zelle summary::-webkit-details-marker { display: none; }
+    .proto-zelle details { display: inline-block; position: relative; }
+    .proto-zelle ul { position: absolute; z-index: 10; list-style: none; margin: .25rem 0 0; padding: .4rem .6rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,.08); min-width: max-content; }
+    .proto-zelle .mehr { color: var(--color-text-muted); }
+    .proto-punkt { display: inline-block; width: .65rem; height: .65rem; margin-right: .2rem; border-radius: 50%; background: var(--color-area-participant-solid); }
+    .proto-punkt:hover { outline: 2px solid var(--color-focus); }
+    .proto-leer { color: var(--color-border); }
+    .proto-matrix thead th.proto-vignette { font-size: .8rem; font-weight: 600; line-height: 1.25; vertical-align: bottom; white-space: normal; hyphens: auto; overflow-wrap: anywhere; }
+    .proto-matrix thead th.proto-vignette span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .proto-matrix { table-layout: fixed; width: 100%; min-width: calc(16rem + {{ prototyp.vignetten|length }} * 5.5rem); }
+    .proto-matrix .proto-name { position: sticky; left: 0; z-index: 1; width: 16rem; background: var(--color-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proto-matrix tr.proto-ohne > * { color: var(--color-text-muted); font-weight: 400; background: var(--color-surface-muted); }
+</style>
+
+<div class="area-band" style="margin-bottom: var(--space-3); {% if prototyp.gesperrt %}background: var(--color-danger-tint); color: var(--color-danger-emphasis);{% endif %}">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);">
+        <h2 style="margin: 0; font-size: 1.1rem;">{% if prototyp.gesperrt %}🔒 Beitritt gesperrt{% else %}Gruppe beitreten lassen{% endif %}</h2>
+        <code style="flex: 1; min-width: 16rem; padding: .3rem .5rem; background: rgba(255,255,255,.9); color: var(--color-text); border-radius: 4px;">{{ prototyp.link }}</code>
+        {% if prototyp.gesperrt %}
+            <a class="button" href="?variant={{ prototyp.variante }}&{{ prototyp.leer|yesno:'leer=1,' }}">Wieder öffnen</a>
+        {% else %}
+            <button class="button button--secondary" style="background: #fff;" type="button" onclick="navigator.clipboard.writeText('{{ prototyp.link }}')">Kopieren</button>
+            <a class="button button--secondary" style="background: #fff;" href="?variant={{ prototyp.variante }}&gesperrt=1{% if prototyp.leer %}&leer=1{% endif %}">Sperren</a>
+        {% endif %}
+    </div>
+    <p style="margin: var(--space-1) 0 0; font-size: .875rem;">
+        {% if prototyp.gesperrt %}Der Link funktioniert, aber niemand Neues kann beitreten. {{ prototyp.zeilen|length }} Personen sind bereits dabei.{% else %}{{ prototyp.zeilen|length }} Personen beigetreten. Wer beitritt, wird auf der Trainingsseite darauf hingewiesen, dass der Kreis die Sitzungen einsieht.{% endif %}
+    </p>
+</div>
+
+<section class="page-section page-section--gestapelt" aria-labelledby="section-fremdeinsicht">
+    <header class="page-section__head">
+        <b>00</b><span><h2 id="section-fremdeinsicht">Fremdeinsicht</h2><small>Abgeschlossene Sitzungen der Gruppe, namentlich, ohne Denkspur</small></span>
+    </header>
+    <div class="table-toolbar">
+        <span class="table-toolbar__count">{{ prototyp.zeilen|length }} Teilnehmende · {{ prototyp.vignetten|length }} Vignetten</span>
+        <span style="margin-left: auto; display: flex; align-items: center; gap: var(--space-2);">
+            <small style="color: var(--color-text-muted);" title="Kennzeichen statt Namen, je Export neu gezogen. Freitext wird nicht geschwärzt.">pseudonym, nicht anonym ⓘ</small>
+            <a class="button button--secondary" href="#">Trainingsexport (ZIP)</a>
+        </span>
+    </div>
+    {% if prototyp.vignetten %}
+    <div class="table-wrap" style="overflow-x: auto;">
+        <table class="table proto-matrix">
+            <thead>
+                <tr>
+                    <th scope="col" class="proto-name" style="vertical-align: bottom;">Teilnehmer:in</th>
+                    {% for v in prototyp.vignetten %}<th scope="col" class="proto-vignette" title="{{ v.name }}"><span>{{ v.name }}</span></th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for zeile in prototyp.zeilen %}
+                <tr {% if not zeile.anzahl %}class="proto-ohne"{% endif %}>
+                    <th scope="row" class="proto-name" title="{{ zeile.name }}">{{ zeile.name }}</th>
+                    {% for zelle in zeile.zellen %}
+                    <td class="proto-zelle">
+                        {% if not zelle.sitzungen %}
+                            <span class="proto-leer">–</span>
+                        {% elif prototyp.variante == "D" %}
+                            <details><summary>{{ zelle.sitzungen|length }} ▾</summary>
+                                <ul>{% for s in zelle.sitzungen %}<li><a href="{{ s.url }}">Sitzung vom {{ s.datum }}</a></li>{% endfor %}</ul>
+                            </details>
+                        {% elif prototyp.variante == "E" %}
+                            {% with letzte=zelle.sitzungen|last %}<a href="{{ letzte.url }}">{{ letzte.datum|slice:":6" }}</a>{% endwith %}
+                            {% if zelle.sitzungen|length > 1 %}
+                            <details><summary class="mehr">+{{ zelle.sitzungen|length|add:"-1" }} ▾</summary>
+                                <ul>{% for s in zelle.sitzungen %}{% if not forloop.last %}<li><a href="{{ s.url }}">Sitzung vom {{ s.datum }}</a></li>{% endif %}{% endfor %}</ul>
+                            </details>
+                            {% endif %}
+                        {% else %}
+                            {% for s in zelle.sitzungen %}<a class="proto-punkt" href="{{ s.url }}" title="Sitzung vom {{ s.datum }}" aria-label="Sitzung vom {{ s.datum }}"></a>{% endfor %}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p class="message--info">Dieses Training enthält keine Vignetten. Es sammelt nur freigegebene Abschriften seiner {{ prototyp.zeilen|length }} Teilnehmenden.</p>
+    {% endif %}
+
+    <h3 style="margin: var(--space-3) 0 0;">Freigegebene Abschriften</h3>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th scope="col">Teilnehmer:in</th><th scope="col">Erhebung</th><th scope="col">Geholt am</th><th scope="col">Sitzungen</th></tr></thead>
+            <tbody>
+                {% for zeile in prototyp.mit_abschrift %}{% for a in zeile.abschriften %}
+                <tr>
+                    <td style="white-space: nowrap;">{{ zeile.name }}</td>
+                    <td>{{ a.erhebungsname }}</td>
+                    <td style="white-space: nowrap;">{{ a.importiert_am }}</td>
+                    <td class="proto-zelle">{% for s in a.sitzungen %}<a href="#">{{ s }}</a>{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+                </tr>
+                {% endfor %}{% empty %}
+                <tr><td colspan="4" class="table__empty">Niemand hat eine Abschrift freigegeben.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
