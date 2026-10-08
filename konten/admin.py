@@ -1,6 +1,5 @@
 """Django-Admin für Nutzerkonten."""
 
-from collections.abc import Callable
 from typing import Any
 
 from django.contrib import admin
@@ -66,13 +65,3 @@ class KontoAdmin(UserAdmin):
         """Verweigert das Löschen von Konten."""
         # #156 legt die Behandlung von Konto-Löschbegehren noch fest.
         return False
-
-    def get_actions(
-        self, request: HttpRequest
-    ) -> dict[str, tuple[Callable[..., Any], str, str]]:
-        """Blendet das Massenlöschen aus, bis #156 entschieden ist."""
-        actions: dict[str, tuple[Callable[..., Any], str, str]] = super().get_actions(
-            request
-        )
-        actions.pop("delete_selected", None)
-        return actions
