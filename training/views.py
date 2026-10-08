@@ -380,7 +380,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
                 reverse("training:beitreten", args=[training.trainings_link])
             ),
             "beigetretene": training.trainingsbindung_set.count(),
-            "fremdeinsicht": _fremdeinsicht(request, training),
+            "fremdeinsicht": _fremdeinsicht(request.user, training),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
@@ -388,7 +388,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _fremdeinsicht(request: HttpRequest, training: Training) -> dict[str, object]:
+def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
     # Baut die Tabelle der Fremdeinsicht: die Vignetten in Kuratierreihenfolge
     # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
     # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
@@ -401,7 +401,7 @@ def _fremdeinsicht(request: HttpRequest, training: Training) -> dict[str, object
     ]
     sitzungen_nach_zelle: dict[tuple[int, int], list[Sitzung]] = {}
     for sitzung in (
-        _fremd_einsehbare_sitzungen(request.user)
+        _fremd_einsehbare_sitzungen(konto)
         .filter(teilnahme__trainingsbindung__training=training)
         .order_by("erstellt_am", "pk")
     ):
@@ -735,7 +735,7 @@ def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         Sitzung.objects.filter(
             Q(teilnahme__trainingsbindung__konto=request.user)
             | Q(pk__in=_fremd_einsehbare_sitzungen(request.user).values("pk"))
-        ).select_related("vignette", "simulationskern"),
+        ).select_related("vignette", "simulationskern", "teilnahme"),
         pk=pk,
     )
 
@@ -748,4 +748,5 @@ def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         navigation=_sitzungsnavigation(),
         zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
         ist_lesend=True,
+        abgegebene_diagnose=DBSink.fuer_sitzung(sitzung).abgegebene_diagnose,
     )

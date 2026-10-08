@@ -16,6 +16,7 @@ from vignetten.models import Vignette
 
 
 def _konto(username: str, gruppe: str | None = None, **felder: object) -> Konto:
+    # Legt ein Konto an, auf Wunsch mit Rolle.
     konto: Konto = get_user_model().objects.create_user(username=username, **felder)
     if gruppe is not None:
         konto.groups.add(Group.objects.get_or_create(name=gruppe)[0])
@@ -78,6 +79,7 @@ def _gespielte_sitzung(
 
 
 def _ansehen_url(sitzung: Sitzung) -> str:
+    # Adresse der lesenden Sitzungsansicht.
     return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
@@ -126,6 +128,17 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         response: HttpResponse = self.client.get(_ansehen_url(sitzung))
 
         self.assertContains(response, "Ich habe oben und unten zusammengezählt.")
+
+    def test_kreismitglied_liest_die_abgegebene_diagnose(self) -> None:
+        """Die Diagnose der Teilnehmerin steht in der lesenden Ansicht."""
+        sitzung: Sitzung = _gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        self.client.force_login(self.ausbilderin)
+
+        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+
+        self.assertContains(response, "Zähler und Nenner addiert.")
 
     def test_ko_eigentuemerin_liest_eine_abgeschlossene_sitzung(self) -> None:
         """Eigentümerschaft ist gleichrangig, auch für die Einsicht."""
@@ -230,15 +243,17 @@ class SelbsteinsichtTests(FremdeinsichtTestCase):
                 self.assertEqual(response.status_code, 200)
 
     def test_selbsteinsicht_verschweigt_die_denkspur(self) -> None:
-        """Auch die eigene Sitzung zeigt keine Denkspur."""
-        sitzung: Sitzung = _gespielte_sitzung(
-            self.training, self.teilnehmerin, self.vignette
-        )
+        """Auch die eigene Sitzung zeigt in keinem Status eine Denkspur."""
         self.client.force_login(self.teilnehmerin)
+        for status in Sitzung.Status:
+            with self.subTest(status=status):
+                sitzung: Sitzung = _gespielte_sitzung(
+                    self.training, self.teilnehmerin, self.vignette, status
+                )
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+                response: HttpResponse = self.client.get(_ansehen_url(sitzung))
 
-        self.assertNotContains(response, "Geheime Denkspur der Schülerin.")
+                self.assertNotContains(response, "Geheime Denkspur der Schülerin.")
 
 
 class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
@@ -259,6 +274,16 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         """Jede Vignette des Trainings hat ihren Spaltenkopf."""
         self.assertIn('title="Brüche addieren"', self._kuratierseite())
 
+    def test_spalten_folgen_der_kuratierreihenfolge(self) -> None:
+        """Eine später aufgenommene Vignette steht rechts, nicht alphabetisch."""
+        self.training.vignetten.add(_finale_vignette(self.autorin, "Addition"))
+
+        seite: str = self._kuratierseite()
+
+        self.assertLess(
+            seite.index('title="Brüche addieren"'), seite.index('title="Addition"')
+        )
+
     def test_abgeschlossene_sitzung_ist_verlinkt(self) -> None:
         """Eine abgeschlossene Sitzung öffnet die lesende Sitzungsansicht."""
         sitzung: Sitzung = _gespielte_sitzung(
@@ -268,15 +293,18 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         self.assertIn(_ansehen_url(sitzung), self._kuratierseite())
 
     def test_nicht_abgeschlossene_sitzung_ist_nicht_verlinkt(self) -> None:
-        """Laufende Sitzungen gehören nicht zur Fremdeinsicht."""
-        sitzung: Sitzung = _gespielte_sitzung(
-            self.training,
-            self.teilnehmerin,
-            self.vignette,
+        """Laufende, abgebrochene und gescheiterte Sitzungen fehlen."""
+        for status in (
             Sitzung.Status.LAUFEND,
-        )
+            Sitzung.Status.ABGEBROCHEN,
+            Sitzung.Status.GESCHEITERT,
+        ):
+            with self.subTest(status=status):
+                sitzung: Sitzung = _gespielte_sitzung(
+                    self.training, self.teilnehmerin, self.vignette, status
+                )
 
-        self.assertNotIn(_ansehen_url(sitzung), self._kuratierseite())
+                self.assertNotIn(_ansehen_url(sitzung), self._kuratierseite())
 
     def test_sitzung_in_einem_fremden_training_ist_nicht_verlinkt(self) -> None:
         """Dieselbe Person mit derselben Vignette anderswo erscheint nicht."""
@@ -303,6 +331,18 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         seite: str = self._kuratierseite()
 
         self.assertIn(f'aria-label="Sitzung vom {datum}">2</a>', seite)
+
+    def test_nummerierung_beginnt_je_vignette_neu(self) -> None:
+        """Die erste Sitzung zu einer weiteren Vignette trägt wieder die 1."""
+        weitere: Vignette = _finale_vignette(self.autorin, "Addition")
+        self.training.vignetten.add(weitere)
+        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        _gespielte_sitzung(self.training, self.teilnehmerin, weitere)
+
+        seite: str = self._kuratierseite()
+
+        self.assertEqual(seite.count('">1</a>'), 2)
 
     def test_zeilen_sind_nach_namen_sortiert(self) -> None:
         """Die Gruppe steht alphabetisch, nicht in Beitrittsreihenfolge."""

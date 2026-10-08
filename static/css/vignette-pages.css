@@ -148,7 +148,7 @@
     margin-right: .25rem;
     border-radius: 50%;
     background: var(--color-area-participant-solid);
-    color: #fff;
+    color: var(--color-area-participant-on-solid);
     font-size: .75rem;
     font-weight: 600;
     line-height: 1.6rem;
@@ -169,13 +169,13 @@
 .fremdeinsicht__sitzung::after {
     content: attr(data-datum);
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + var(--space-1));
     left: 50%;
     z-index: 20;
     padding: .25rem .5rem;
     border-radius: 4px;
-    background: var(--phsg-blue-deep);
-    color: #fff;
+    background: var(--color-tooltip);
+    color: var(--color-text-on-accent);
     font-size: .875rem;
     font-weight: 400;
     white-space: nowrap;
