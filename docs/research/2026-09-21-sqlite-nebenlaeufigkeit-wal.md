@@ -415,7 +415,7 @@ Bei positiver Entscheidung:
 
 ## Nachtrag 2026-10-08: 150 statt 10 Teilnehmende (#203)
 
-Die Lastannahme aus ADR-0050 sind 150 gleichzeitige Sitzungen; gunicorn läuft nun mit `--worker-class gthread --workers 3 --threads 60`, also höchstens **180** gleichzeitigen Anfragen und damit 180 potenziellen Schreibern. Die Rechnung aus Abschnitt 8 mit denselben Größen (3 Schreibtransaktionen je Gesprächsschritt, ein Schritt alle 25 s, `fsync` 16 ms auf rotierender Platte), der Text oben bleibt unverändert:
+Die Lastannahme aus ADR-0050 sind 150 gleichzeitige Sitzungen; gunicorn läuft nun mit `--worker-class gthread --workers 3 --threads 60`, also höchstens **180** gleichzeitigen Anfragen und damit 180 potenziellen Schreibern. Die Rechnung aus Abschnitt 8 mit denselben Größen (3 Schreibtransaktionen je Gesprächsschritt, ein Schritt alle 25 s, `fsync` 16 ms auf rotierender Platte) ergibt Folgendes; der Text oben bleibt unverändert:
 
 | | 10 Teilnehmende (oben) | 150 Teilnehmende |
 | --- | --- | --- |

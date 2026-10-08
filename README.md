@@ -200,7 +200,7 @@ die man vorher wissen muss:
 Ein Gesprächsschritt wartet synchron auf das Sprachmodell, eine Transkription
 auf ihren Anbieter; jede wartende Anfrage hält einen Thread. Der gunicorn-Dienst
 läuft deshalb mit Thread-Workern, ausgelegt auf 150 gleichzeitige Sitzungen
-(3 Prozesse × 60 Threads im Walkthrough, ADR-0050). Beide Nähte begrenzen sich
+(Aufteilung im Walkthrough, Begründung in ADR-0050). Beide Nähte begrenzen sich
 selbst: ein Gesprächsschritt auf höchstens 90 s über alle Versuche, eine
 Transkription auf höchstens 120 s.
 
