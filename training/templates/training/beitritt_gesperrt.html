@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Beitritt gesperrt{% endblock %}
+
+{% block content %}
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Ausbildung / Training beitreten</p>
+            <h1>🔒 Beitritt gesperrt</h1>
+            <span>{{ training.name }}</span>
+        </div>
+    </header>
+
+    <div class="messages" style="margin-top: var(--space-4);">
+        <div class="message--info">
+            Diesem Training kann gerade niemand Neues beitreten. Bitte wenden Sie sich an Ihre Ausbilder:in.
+        </div>
+    </div>
+</section>
+{% endblock %}

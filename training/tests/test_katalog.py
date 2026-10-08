@@ -1,4 +1,4 @@
-"""HTTP-Tests für den offenen Trainingskatalog."""
+"""HTTP-Tests für den Trainingskatalog."""
 
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
@@ -20,17 +20,18 @@ from vignetten.models import Vignette, Vignettenhistorie
 
 
 class TrainingskatalogTests(TestCase):
-    """Eingeloggte Konten wählen frei aus veröffentlichten Trainings."""
+    """Beigetretene Konten wählen frei aus ihren Trainings."""
 
-    def test_zeigt_veroeffentlichte_trainings_im_katalog_und_in_der_navigation(
+    def test_zeigt_beigetretene_trainings_im_katalog_und_in_der_navigation(
         self,
     ) -> None:
-        """Jedes eingeloggte Konto findet alle veröffentlichten Trainings."""
+        """Ein beigetretenes Konto findet das Training im Katalog."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         training.veroeffentlichen()
         self.client.force_login(studierende)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
 
         response: HttpResponse = self.client.get(reverse("training:katalog"))
 
@@ -93,6 +94,7 @@ class TrainingskatalogTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
 
         detail: HttpResponse = self.client.get(
             reverse("training:detail", args=[training.pk])
@@ -133,6 +135,7 @@ class TrainingskatalogTests(TestCase):
         vignette.archivieren()
         training.veroeffentlichen()
         self.client.force_login(studierende)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
 
         detail: HttpResponse = self.client.get(
             reverse("training:detail", args=[training.pk])
@@ -194,6 +197,7 @@ class TrainingskatalogTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
         wahl_url: str = reverse("training:wahl", args=[training.pk, vignette.pk])
 
         self.client.post(wahl_url)
@@ -266,6 +270,7 @@ class TrainingskatalogTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
         wahl_url: str = reverse("training:wahl", args=[training.pk, vignette.pk])
 
         einwilligung: HttpResponse = self.client.post(wahl_url)
@@ -338,6 +343,7 @@ class TrainingsabbruchTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
         self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
         self.client.post(
             reverse("training:einwilligung", args=[training.pk, vignette.pk]),

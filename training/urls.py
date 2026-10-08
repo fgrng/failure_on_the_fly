@@ -29,6 +29,16 @@ urlpatterns: list[URLPattern] = [
         name="veroeffentlichen",
     ),
     path(
+        "eigene/<int:pk>/beitritt/sperren/",
+        views.beitritt_sperren,
+        name="beitritt_sperren",
+    ),
+    path(
+        "eigene/<int:pk>/beitritt/oeffnen/",
+        views.beitritt_oeffnen,
+        name="beitritt_oeffnen",
+    ),
+    path(
         "eigene/<int:pk>/eigentuemerinnen/hinzufuegen/",
         views.eigentuemerin_hinzufuegen,
         name="eigentuemerin_hinzufuegen",
@@ -49,6 +59,7 @@ urlpatterns: list[URLPattern] = [
         name="vignette_entfernen",
     ),
     path("<int:pk>/", views.detail, name="detail"),
+    path("beitreten/<uuid:trainings_link>/", views.beitreten, name="beitreten"),
     path(
         "<int:training_pk>/vignetten/<int:vignette_pk>/einwilligung/",
         views.einwilligung,

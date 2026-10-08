@@ -171,6 +171,34 @@ vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
 Eigentümer:innen.
 
+## Geschlossenes Training und Beitritt
+
+Ein Training ist geschlossen (ADR-0049). Teilnehmende sehen im
+Trainingskatalog nur Trainings, denen sie beigetreten sind; Trainingsseite,
+Vignettenwahl und Sitzungsstart eines anderen Trainings antworten mit 404, auch
+über die direkte Adresse. Kreis und Administration erreichen ihre Trainings
+wie bisher ohne Beitritt. Wer schon vor dem Trainings-Link in einem Training
+gespielt hat, gilt als beigetreten und behält Zugang und Sitzungen.
+
+Jedes Training hat einen festen Trainings-Link. Die Kuratierseite zeigt ihn
+ganz oben in einem Band „Gruppe beitreten lassen“ mit den Knöpfen „Kopieren“
+und „Sperren“ und nennt darunter die Zahl der Beigetretenen. Ist der Beitritt
+gesperrt, färbt sich das Band rot, heißt „🔒 Beitritt gesperrt“, und „Wieder
+öffnen“ hebt die Sperre auf. Jede Eigentümerin des Kreises darf sperren und
+öffnen.
+
+Wer den Link eingeloggt öffnet, tritt bei und landet auf der Trainingsseite;
+erneutes Öffnen führt ohne Fehler direkt dorthin. Ohne Anmeldung führt der
+Link über den Login zurück zum Beitritt. Bei gesperrtem Beitritt sehen neue
+Konten die Meldung „Beitritt gesperrt“ mit der Bitte, sich an die Ausbilder:in
+zu wenden; Beigetretene kommen weiter ins Training. Der Link eines Entwurfs
+nimmt noch niemanden auf. Ein Training ohne Vignetten lässt sich
+veröffentlichen und beitreten.
+
+Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die
+Ausbilder:innen dieses Trainings sehen Ihre abgeschlossenen Sitzungen
+namentlich.“
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die

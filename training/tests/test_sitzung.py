@@ -66,6 +66,7 @@ class TrainingssitzungTests(TestCase):
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
         self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
         self.start_response: HttpResponse = self.client.post(
             reverse("training:einwilligung", args=[training.pk, vignette.pk]),

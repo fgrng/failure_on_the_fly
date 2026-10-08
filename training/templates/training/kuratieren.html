@@ -27,6 +27,33 @@
         <a class="button button--secondary" href="{% url 'training:liste' %}">Zurück zur Übersicht</a>
     </div>
 
+    <div class="area-band trainings-link{% if training.beitritt_gesperrt %} trainings-link--gesperrt{% endif %}" x-data>
+        <div class="trainings-link__zeile">
+            <h2>{% if training.beitritt_gesperrt %}🔒 Beitritt gesperrt{% else %}Gruppe beitreten lassen{% endif %}</h2>
+            <input class="trainings-link__feld" type="text" value="{{ trainings_link_url }}" readonly aria-label="Trainings-Link" x-ref="link">
+            {% if training.beitritt_gesperrt %}
+                <form method="post" action="{% url 'training:beitritt_oeffnen' training.pk %}">
+                    {% csrf_token %}
+                    <button class="button" type="submit">Wieder öffnen</button>
+                </form>
+            {% else %}
+                <button class="button button--secondary" type="button" @click="navigator.clipboard.writeText($refs.link.value)">Kopieren</button>
+                <form method="post" action="{% url 'training:beitritt_sperren' training.pk %}">
+                    {% csrf_token %}
+                    <button class="button button--secondary" type="submit">Sperren</button>
+                </form>
+            {% endif %}
+        </div>
+        <p>
+            {% if training.beitritt_gesperrt %}
+                Der Link funktioniert, aber niemand Neues kann beitreten. {{ beigetretene }} Personen sind bereits dabei.
+            {% else %}
+                {{ beigetretene }} Personen beigetreten. Wer beitritt, wird auf der Trainingsseite darauf hingewiesen, dass der Kreis die Sitzungen einsieht.
+            {% endif %}
+            {% if training.zustand == "entwurf" %}Der Beitritt ist erst nach dem Veröffentlichen möglich.{% endif %}
+        </p>
+    </div>
+
     <section class="page-section" aria-labelledby="section-configured">
         <header class="page-section__head">
             <b>01</b><span><h2 id="section-configured">Vignetten</h2><small>Aktuell im Training enthalten</small></span>

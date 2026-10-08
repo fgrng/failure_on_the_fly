@@ -1,9 +1,11 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
+from uuid import UUID
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Count, F, QuerySet
 from django.http import (
     HttpRequest,
@@ -79,16 +81,18 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
 
 
-def _veroeffentlichtes_training(pk: int) -> Training:
-    """Lädt ein Training, das im offenen Katalog sichtbar ist."""
-    return get_object_or_404(Training.objects.veroeffentlicht(), pk=pk)
+def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
+    """Lädt ein veröffentlichtes Training, das die Person betreten darf."""
+    return get_object_or_404(
+        Training.objects.veroeffentlicht().zugaenglich_fuer(request.user), pk=pk
+    )
 
 
-def _veroeffentlichtes_training_mit_finaler_vignette(
-    training_pk: int, vignette_pk: int
+def _zugaengliches_training_mit_finaler_vignette(
+    request: HttpRequest, training_pk: int, vignette_pk: int
 ) -> tuple[Training, Vignette]:
-    """Lädt eine finale Vignette aus einem veröffentlichten Training."""
-    training: Training = _veroeffentlichtes_training(training_pk)
+    """Lädt eine finale Vignette aus einem zugänglichen Training."""
+    training: Training = _zugaengliches_training(request, training_pk)
     vignette: Vignette = get_object_or_404(
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
@@ -97,9 +101,11 @@ def _veroeffentlichtes_training_mit_finaler_vignette(
 
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
-    """Zeigt allen eingeloggten Konten veröffentlichte Trainings und ggf. eigene Entwürfe."""
+    """Zeigt beigetretene Trainings und dem Kreis zusätzlich seine eigenen Entwürfe."""
     ist_ausbilderin: bool = _ausbilderin_oder_administratorin(request.user)
-    trainingsabfrage: QuerySet[Training] = Training.objects.veroeffentlicht()
+    trainingsabfrage: QuerySet[Training] = (
+        Training.objects.veroeffentlicht().zugaenglich_fuer(request.user)
+    )
     sichtbare_pks: set[int] = set()
     eigene_trainings_pks: set[int] = set(
         Training.objects.filter(eigentuemerinnen=request.user).values_list(
@@ -305,7 +311,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings inkl. eigener Sitzungen."""
-    training: Training = _veroeffentlichtes_training(pk)
+    training: Training = _zugaengliches_training(request, pk)
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )
@@ -365,6 +371,10 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "training": training,
             "zustand_badge": _zustand_badge(training),
+            "trainings_link_url": request.build_absolute_uri(
+                reverse("training:beitreten", args=[training.trainings_link])
+            ),
+            "beigetretene": training.trainingsbindung_set.count(),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
@@ -444,15 +454,61 @@ def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
+def beitritt_sperren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Sperrt den Beitritt über den Trainings-Link."""
+    return _beitritt_schalten(request, pk, gesperrt=True)
+
+
+@login_required
+@_ausbilderin_erforderlich
+def beitritt_oeffnen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Öffnet einen gesperrten Beitritt wieder."""
+    return _beitritt_schalten(request, pk, gesperrt=False)
+
+
+def _beitritt_schalten(request: HttpRequest, pk: int, gesperrt: bool) -> HttpResponse:
+    """Setzt die Beitrittssperre eines sichtbaren Trainings."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    training.beitritt_gesperrt = gesperrt
+    training.save(update_fields=["beitritt_gesperrt"])
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
+    """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
+
+    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training.
+    """
+    training: Training = get_object_or_404(
+        Training.objects.veroeffentlicht(), trainings_link=trainings_link
+    )
+    beigetreten: bool = Trainingsbindung.objects.filter(
+        training=training, konto=request.user
+    ).exists()
+    if not beigetreten:
+        if training.beitritt_gesperrt:
+            return render(
+                request,
+                "training/beitritt_gesperrt.html",
+                {"training": training},
+                status=403,
+            )
+        training.bindung_fuer(request.user)
+    return redirect("training:detail", pk=training.pk)
+
+
+@login_required
 def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
     """Bestätigt oder startet die Wahl einer Vignette aus einem Training."""
-    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
-        training_pk, vignette_pk
+    training, vignette = _zugaengliches_training_mit_finaler_vignette(
+        request, training_pk, vignette_pk
     )
     if request.method == "POST":
-        bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(
-            request, training
-        )
+        bindung: Trainingsbindung = training.bindung_fuer(request.user)
         if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
             return render(
                 request,
@@ -474,10 +530,10 @@ def einwilligung(
     """Hält die Entscheidung zur externen Audioverarbeitung an der Teilnahme fest."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
-        training_pk, vignette_pk
+    training, vignette = _zugaengliches_training_mit_finaler_vignette(
+        request, training_pk, vignette_pk
     )
-    bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
+    bindung: Trainingsbindung = training.bindung_fuer(request.user)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
         return HttpResponseBadRequest("Die Einwilligung wurde bereits festgehalten.")
     entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
@@ -486,33 +542,6 @@ def einwilligung(
     bindung.teilnahme.audioverarbeitung_eingewilligt = entscheidung == "ja"
     bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
     return _sitzung_starten(request, bindung, vignette)
-
-
-def _trainingsbindung_laden_oder_anlegen(
-    request: HttpRequest, training: Training
-) -> Trainingsbindung:
-    """Lädt oder erzeugt die eine Trainingsbindung der teilnehmenden Person."""
-    with transaction.atomic():
-        bindung: Trainingsbindung | None = (
-            Trainingsbindung.objects.filter(training=training, konto=request.user)
-            .select_related("teilnahme")
-            .first()
-        )
-        if bindung is None:
-            from sitzungen.models import Teilnahme
-
-            try:
-                with transaction.atomic():
-                    bindung = Trainingsbindung.objects.create(
-                        teilnahme=Teilnahme.objects.create(),
-                        training=training,
-                        konto=request.user,
-                    )
-            except IntegrityError:
-                bindung = Trainingsbindung.objects.select_related("teilnahme").get(
-                    training=training, konto=request.user
-                )
-    return bindung
 
 
 def _sitzungsnavigation() -> Sitzungsnavigation:

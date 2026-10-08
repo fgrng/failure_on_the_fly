@@ -43,3 +43,43 @@
     margin: var(--space-3) 0 0;
     color: var(--color-text-muted);
 }
+
+.page-head div > .page-head__hinweis {
+    margin-top: var(--space-1);
+    font-size: .875rem;
+}
+
+/* ---- Training: Trainings-Link-Band ---- */
+.trainings-link {
+    margin-bottom: var(--space-3);
+}
+
+.trainings-link--gesperrt {
+    background: var(--color-danger-tint);
+    color: var(--color-danger-emphasis);
+}
+
+.trainings-link__zeile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.trainings-link__zeile h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.trainings-link__zeile form { margin: 0; }
+
+.trainings-link__feld {
+    flex: 1;
+    min-width: 16rem;
+    color: var(--color-text);
+}
+
+.trainings-link p {
+    margin: var(--space-1) 0 0;
+    font-size: .875rem;
+}
