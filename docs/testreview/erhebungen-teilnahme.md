@@ -2,7 +2,7 @@
 
 Bereich aus #327 (Spec #321). Geprüft sind `erhebungen/tests/test_teilnahme.py`, `test_teilnahme_gestaltung.py`, `test_ablauf.py`, `test_transkription.py` und `test_models.py`. Die View-Tests der Forschenden-Sicht (`test_forschenden_views.py`) gehören zu #326. Hier sind sie nur als Ersatztests genannt.
 
-Für die Zeit gilt #324: Wer `sitzungen.durchlauf.jetzt` oder `erhebungen.models.timezone.now` patcht, bekommt *umschreiben*, umgesetzt in #349. Für Migrationstests gilt #325: Drei Tests in `test_models.py` werden gestrichen.
+Für die Zeit gilt #324: Wer `sitzungen.durchlauf.jetzt` oder `erhebungen.models.timezone.now` patcht, bekommt *umschreiben*, umgesetzt in #349. Ausgenommen sind drei Tests, die zusätzlich eine Schichtdoppelung sind; sie werden gestrichen (siehe Startbefund 2). Für Migrationstests gilt #325: Drei Tests in `test_models.py` werden gestrichen.
 
 Drei Lesarten gelten für das ganze Dokument:
 
@@ -23,7 +23,7 @@ Drei Lesarten gelten für das ganze Dokument:
   - Relationen: `vignettenzugehoerigkeiten`, `itemzugehoerigkeiten`, `stichprobe_set`, `vignetten`.
 - **Invarianten:**
   - Eine neue Erhebung ist ein Entwurf. Zustandswechsel und das Setzen von `modell_konfiguration` laufen nur über die Lebenszyklus-Methoden, auch nicht über `QuerySet.update`.
-  - Finale und archivierte Erhebungen sind eingefroren (`save()` und `update`). Der Eigentümerinnen-Kreis bleibt änderbar.
+  - Finale und archivierte Erhebungen sind eingefroren (`save()` und `update`). Der Eigentümer-Kreis bleibt änderbar.
   - `finalisieren()` pinnt die belegte Modell-Konfiguration für `Verwendung.SCHUELERIN`, nicht die für Lehrperson oder Bewerter. `zurueckziehen()` und erneutes Finalisieren pinnen neu. Archivieren und Entarchivieren lassen den Pin stehen.
   - Zurückziehen geht nur ohne nicht archivierte und ohne datentragende Stichprobe. Archivieren und Entarchivieren gehen nur ohne laufende Stichprobe. Entarchivieren braucht eine Eigentümerin.
   - Physisch gelöscht werden nur Entwürfe, einzeln wie gesammelt. Die Zuordnungen gehen mit.
@@ -44,8 +44,8 @@ Drei Lesarten gelten für das ganze Dokument:
 #### Stichprobe
 
 - **Aufrufe:** `objects.create(erhebung, beginn, ende)`, `archivieren()`, `phase`, `traegt_daten`, `teilnahme_link` (UUID, eindeutig, nicht editierbar).
-- **Invarianten:** `phase` ist `vor`, `laufend` oder `nach`, gemessen an der Systemzeit. Die Grenzen `beginn` und `ende` zählen zu `laufend`. Archiviert wird nur über `archivieren()` und nur ohne Daten.
-- **Fehlerfälle:** `ValidationError` bei bereits archivierter oder datentragender Stichprobe und bei `archiviert` über `save()` oder `update`.
+- **Invarianten:** `phase` ist `vor`, `laufend` oder `nach`, gemessen an der Systemzeit. Die Grenzen `beginn` und `ende` zählen zu `laufend`. Eine gespeicherte Stichprobe wird nur über `archivieren()` archiviert und nur ohne Daten. Beim Anlegen prüft `save()` das Feld nicht, `objects.create(archiviert=True)` geht durch.
+- **Fehlerfälle:** `ValidationError` bei bereits archivierter oder datentragender Stichprobe und bei `archiviert` über `save()` einer gespeicherten Stichprobe oder über `update`.
 - **Konfiguration:** keine.
 
 #### Erhebungsbindung
@@ -64,8 +64,8 @@ Drei Lesarten gelten für das ganze Dokument:
 - **Aufrufe:** Geschrieben werden sie nur vom Ablauf (`erhebungen/ablauf.py`). `Itemblock.antwortzeilen()` liefert die Antwortzeilen in Item-Reihenfolge.
 - **Invarianten:**
   - Je Teilnahme steht jede Position und jede Vignette einmal in der Ziehung.
-  - Je Teilnahme gibt es einen Block je Sitzung und einen Block am Ende. Die Sitzung passt zum Andockpunkt.
-  - Je Block gibt es eine Antwortzeile je Item. Eine Antwort trägt höchstens einen Wert, der Wert passt zum Item-Typ, eine Likert-Stufe liegt auf der Skala. Die Sitzung gehört zur selben Teilnahme und nur zu Items nach der Sitzung. Eine leere Zeile ist eine gültige Nicht-Antwort.
+  - Je Teilnahme gibt es einen Itemblock je Sitzung und einen am Ende. Die Sitzung passt zum Andockpunkt.
+  - Je Itemblock gibt es eine Antwortzeile je Item. Eine Antwort trägt höchstens einen Wert, der Wert passt zum Item-Typ, eine Likert-Stufe liegt auf der Skala. Die Sitzung gehört zur selben Teilnahme und nur zu Items nach der Sitzung. Eine leere Zeile ist eine gültige Nicht-Antwort.
 - **Fehlerfälle:** `ValidationError` aus `ItemAntwort.clean()` (läuft in `save()`), `IntegrityError` aus den Constraints.
 - **Konfiguration:** die Skala aus `LikertSkalenpol`.
 
@@ -76,10 +76,10 @@ Drei Lesarten gelten für das ganze Dokument:
   - Kommandos: `ziehung_festschreiben(bindung)`, `vignette_beginnen(bindung, session) -> Sitzung | None`, `block_vorlegen(bindung, andockpunkt, sitzung=None) -> Itemblock | None`, `block_erledigen(block)`, `bindung_abschliessen(bindung)`.
 - **Invarianten:**
   - Reihenfolge der Fälle: abgeschlossen, laufende Sitzung, offener Sitzungsblock, noch keine Sitzung, nächste Vignette, offener Abschlussblock, Ende.
-  - Ein Block ist nur offen, wenn es Items an seinem Andockpunkt gibt. Ein leer abgeschickter Block ist erledigt.
+  - Ein Itemblock ist nur offen, wenn es Items an seinem Andockpunkt gibt. Ein leer abgeschickter Itemblock ist erledigt.
   - Alle Kommandos sind wiederholbar, ohne zweite Zeilen anzulegen. Sie sperren die Bindungszeile und serialisieren so zwei Tabs.
   - `vignette_beginnen` schreibt die Ziehung fest, startet die Sitzung mit dem gepinnten Kern der Vignette und der Modell-Konfiguration der Erhebung und hält die Vignettenposition fest. Läuft schon eine Sitzung, bleibt es bei ihr. Steht nichts an, entsteht nichts.
-  - Eine flüchtige Teilnahme bekommt Blöcke, aber keine Antwortzeilen.
+  - Eine flüchtige Teilnahme bekommt Itemblöcke, aber keine Antwortzeilen.
 - **Fehlerfälle:** `RuntimeError`, wenn die Erhebung keine Modell-Konfiguration trägt. Über `finalisieren()` ist das nicht erreichbar.
 - **Konfiguration:** keine.
 
@@ -95,7 +95,7 @@ Drei Lesarten gelten für das ganze Dokument:
   - Das einzige Tor ist die Einwilligung in Sprachmodelle. Unentschieden führt zur Einwilligung, abgelehnt zur Abbruchseite. Die Spracherkennung wird nur mit `TRANSKRIPTION_ZERO_RETENTION` gefragt. Jede angebotene Wahl ist Pflicht. Die Texte sind wörtlich verbindlich (#278). Nach „ja“ zu Sprachmodellen ist die Entscheidung endgültig, eine Ablehnung lässt sich überschreiben.
   - Jede Seite folgt `naechster_schritt` und leitet um, wenn der Ablauf woanders steht. `abschluss` schließt die Bindung ab. Eine flüchtige Teilnahme sieht dort statt des Abschrift-Bausteins den Hinweis, dass nichts gespeichert wurde.
   - Eine flüchtige Sitzung, deren Verlauf nicht in der Session des Browsers liegt, wird abgebrochen, bevor der Ablauf weitergeht (ADR-0045).
-  - Der Sitzungsblock erscheint unter Debrief, Abbruch und Scheitern. Ein Block schreibt nur, solange er laut Ablauf offen ist.
+  - Der Sitzungsblock erscheint unter Debrief, Abbruch und Scheitern. Ein Itemblock schreibt nur, solange er laut Ablauf offen ist.
   - Die Seitenleiste zeigt während der Teilnahme nur das Token, nie ein angemeldetes Konto (`erhebungen/navigation.py`).
 - **Fehlerfälle:** 400 bei unvollständiger oder schon festgehaltener Einwilligung, bei unzulässiger Item-Antwort, bei einem POST ohne offenen Block und bei einem Debrief für eine fremde oder schon beendete Sitzung. 403 und 404 wie oben. 405 bei falscher Methode. `PermissionDenied` im Transkriptions-Endpunkt ohne passendes Browser-Token oder außerhalb des Fensters.
 - **Konfiguration:** `TRANSKRIPTION_ZERO_RETENTION`.
@@ -110,13 +110,13 @@ Drei Lesarten gelten für das ganze Dokument:
 ### Session und Seitenleiste (`erhebungen/teilnahme_session.py`, `erhebungen/navigation.py`)
 
 - **Aufrufe:** `token_aus_session`, `token_in_session_speichern`, `tokens_im_browser`; der Kontextprozessor `teilnahme_token(request)`.
-- **Invarianten:** Ein Browser hält je Teilnahme-Link ein Token. Der Session-Schlüssel ist privat. Der Kontextprozessor liefert das Token nur auf den Teilnahmeseiten der Positivliste und greift nicht auf die Datenbank zu.
+- **Invarianten:** Ein Browser hält je Teilnahme-Link ein Token. Schlüssel und Ablage in der Session kapselt `teilnahme_session.py` (`TEILNAHME_TOKENS_SESSION_KEY`). Der Kontextprozessor liefert das Token nur auf den Teilnahmeseiten der Positivliste und greift nicht auf die Datenbank zu.
 - **Fehlerfälle und Konfiguration:** keine.
 
 ## Startbefunde
 
 1. **`SimpleNamespace`-Kontext in den Gestaltungstests: bestätigt.** `test_teilnahme_gestaltung.py` rendert die fünf Teilnahmeseiten und die Teilvorlage mit `render_to_string` und einem nachgebauten Kontext. Der Kontext enthält `teilnahme_token`, das die Views gar nicht übergeben; es kommt aus dem Kontextprozessor. Ein falscher Kontextname in einer View bliebe unbemerkt. Geprüft werden fast nur Klassennamen. Echte Zusagen sind zwei: die `aria-labelledby`-Verknüpfung und das Rendering der Erhebungstexte über `informationstext` samt Escaping. Beide werden über HTTP umgeschrieben, der Rest gestrichen. Dazu kommen zwei kleinere Zusagen, die in bestehende HTTP-Tests wandern: die `id` des htmx-Ziels im Fragment und die Feldgruppe mit `legend` je Item.
-2. **Zeitpatch über die App-Grenze: bestätigt.** Vier Tests in `test_teilnahme.py` patchen `sitzungen.durchlauf.jetzt` mit `side_effect`-Listen. Sie hängen damit am Modulpfad und an Zahl und Reihenfolge der Aufrufe. Zwei davon wiederholen nur Durchlauf-Tests und werden gestrichen, zwei werden mit `time-machine` umgeschrieben (#349). Dazu kommen zwei Modelltests mit `erhebungen.models.timezone.now`, ebenfalls *umschreiben*.
+2. **Zeitpatch über die App-Grenze: bestätigt.** Vier Tests in `test_teilnahme.py` patchen `sitzungen.durchlauf.jetzt` mit `side_effect`-Listen. Sie hängen damit am Modulpfad und an Zahl und Reihenfolge der Aufrufe. Drei davon wiederholen nur Tests einer anderen Schicht (zwei Durchlauf-Tests, einen Training-Test) und werden gestrichen. Einer, der Browserwechsel, wird mit `time-machine` umgeschrieben (#349). Dazu kommen zwei Modelltests mit `erhebungen.models.timezone.now`, ebenfalls *umschreiben*.
 3. **`choice`-Patch für die Token-Kollision: Kopplung bestätigt, Umbau verworfen.** `test_anlegen_wiederholt_token_nach_kollision` patcht `erhebungen.models.choice`. Der Test hängt am Importstil (`from secrets import choice`) und an acht Aufrufen je Token. Über die Schnittstelle lässt sich die Kollision aber nicht herbeiführen: `secrets` ist nicht seedbar, und der Raum hat 30⁸ Tokens. Eine Naht nur für den Test wäre ein hypothetischer Adapter. Der Patch ersetzt die Zufallsquelle, also eine Systemgrenze, die die Coding Standards ausdrücklich zum Mocken freigeben („Time/randomness“). Ändert sich der Importstil, scheitert der Test laut mit `AttributeError` und besteht nicht still. Urteil: *behalten*.
 4. **`MigrationExecutor`-Tests: bestätigt.** Die drei Tests aus #325 werden gestrichen.
 5. **Hilfsfunktionen mit Unterstrich: bestätigt, kein Befund.** `_vignette_anlegen`, `_laufende_sitzung_starten` usw. sind Test-Helfer. Zwei davon greifen aber selbst auf Interna zu: `_vignette_anlegen` ruft `Vignette.objects._erstellen` (siehe „Setup“), und das `setUp` der Transkriptions-Tests schreibt den Session-Schlüssel von Hand.
@@ -143,7 +143,7 @@ Drei Lesarten gelten für das ganze Dokument:
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
-| `test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung` | umschreiben | Implementation-coupled: liest `session["erhebung_teilnahme_tokens"]`, den privaten Schlüssel aus `teilnahme_session.py`. | Weiterleitung und eine Bindung wie bisher. Die Bindung an den Browser belegt ein zweiter Aufruf desselben Links: keine zweite Bindung, wieder die Einwilligung. Ohne Session-Zugriff. |
+| `test_teilnahme_link_legt_bindung_an_setzt_token_und_zeigt_einwilligung` | umschreiben | Implementation-coupled: liest `session["erhebung_teilnahme_tokens"]`, also das Literal des Schlüssels und das Ablageformat aus `teilnahme_session.py`. | Weiterleitung und eine Bindung wie bisher. Die Bindung an den Browser belegt ein zweiter Aufruf desselben Links: keine zweite Bindung, wieder die Einwilligung. Ohne Session-Zugriff. |
 | `test_einwilligung_oeffnet_instruktion_und_bleibt_an_der_teilnahme`, `test_einwilligungsformular_fuehrt_nach_erteilter_einwilligung_in_den_ablauf`, `test_spracherkennung_wird_nur_bei_aktiver_transkription_gefragt`, `test_ohne_transkription_bleibt_die_spracherkennung_unentschieden`, `test_jede_angebotene_option_ist_eine_pflichtwahl`, `test_nach_zustimmung_zu_sprachmodellen_ist_die_entscheidung_endgueltig`, `test_rueckweg_zeigt_leeres_formular_und_ueberschreibt_die_ablehnung`, `test_abbruchseite_setzt_vor_und_nach_der_zustimmung_im_ablauf_fort` | behalten | HTTP, eigene Logik der Einwilligung. Die gespeicherten Entscheidungen sind Teil der Datenspur. | – |
 | `test_formular_zeigt_die_systemtexte_ohne_vorauswahl`, `test_ablehnung_der_sprachmodelle_fuehrt_auf_die_abbruchseite` | behalten | Die Wortlaute stammen aus einer externen Spec (#278, wörtlich verbindlich), nicht aus Doku-Prosa. Das ist ein Kontrakttest im Sinn von #321. | – |
 | `test_nach_ablehnung_fuehren_alle_teilnahmewege_auf_die_abbruchseite` | behalten | Alle Wege durch dasselbe Tor. | – |
@@ -155,11 +155,11 @@ Drei Lesarten gelten für das ganze Dokument:
 |---|---|---|---|
 | `test_audioeinwilligung_aktiviert_spracheingabe_in_gespraech_und_debrief` | behalten | Eigen ist die Verdrahtung: Das Einwilligungsformular der Erhebung schaltet die Aufnahme frei. | – |
 | `test_ohne_audioeinwilligung_steht_ein_stiller_hinweis_statt_des_knopfs` | streichen | Schichtdoppelung: Gespräch und Debrief rendert die geteilte `persistiertes_gespraech`. Dass „nein“ als `False` gespeichert wird, prüft schon die Einwilligung. | `training/tests/test_sitzung.py::TrainingssitzungTests::test_training_ohne_audioeinwilligung_zeigt_nur_tastatureingabe` und `…::test_debrief_ohne_audioeinwilligung_zeigt_nur_tastatureingabe`, dazu `test_spracherkennung_wird_nur_bei_aktiver_transkription_gefragt` |
-| `test_gespraech_zeigt_die_abgesetzte_aktionszeile` | umschreiben | Implementation-coupled: drei Klassen-Strings, im Debrief die Abwesenheit einer Klasse. Eigen ist die Navigation der Erhebung (`_sitzungsnavigation`). | Wie in #330: „Gespräch beenden“ über `config.tests.formular.submit_knoepfe`, der Erklärsatz und ein Formular mit `action` auf `erhebungen:abbrechen`. Im Debrief fehlt der Erklärsatz. |
+| `test_gespraech_zeigt_die_abgesetzte_aktionszeile` | umschreiben | Implementation-coupled: zwei Klassen-Strings, im Debrief die Abwesenheit einer dritten Klasse. Eigen ist die Navigation der Erhebung (`_sitzungsnavigation`). | Wie in #330: „Gespräch beenden“ über `config.tests.formular.submit_knoepfe`, der Erklärsatz und ein Formular mit `action` auf `erhebungen:abbrechen`. Im Debrief fehlt der Erklärsatz. |
 | `test_token_spielt_eine_vignette_mit_ueberholtem_kern` | streichen | Schichtdoppelung: Den Kern-Pin setzt `sitzung_starten` in `sitzungen`, für Training und Erhebung gleich. | `training/tests/test_sitzung.py::TrainingssitzungTests::test_training_spielt_eine_vignette_mit_ueberholtem_kern` |
 | `test_sitzung_rendert_lernauftrag_und_arbeitsheft_als_szenentext` | umschreiben | Schichtdoppelung: Das Profil des geteilten Includes prüft der Vignettentest. | Wie in #330 für die Abschrift: auf einen Einbindungsbeleg kürzen, „Addiere <em>zwei</em> Brüche.“ steht auf der Gesprächsseite. Das Profil prüft `vignetten/tests/test_views.py::VignetteDetailViewTests::test_rendert_lernauftrag_und_arbeitsheft_als_szenentext`. |
 | `test_token_spielt_eine_vignette_bis_zum_abschluss` | umschreiben | Durchstich mit eigenem Beitrag (Start, Wiederholung von `spielen`, Abschluss, Abschrift-Baustein). Der Debrief ist nur mit „Debrief“ belegt. | „Was ist Ihnen aufgefallen?“ statt „Debrief“. Der Rest bleibt. |
-| `test_seitenleiste_zeigt_das_token_auf_jeder_teilnahmeseite` | umschreiben | Der Helfer `_seitenleiste_zeigt_nur_das_token` prüft die Abwesenheit der Klassen `sidebar-account` und `sidebar-login`. Der Test schickt außerdem das Feld `antwort`, das die View nicht liest (siehe „Setup“). | Statt der Klassen: „Ihr Teilnahme-Token“ mit dem Token steht auf der Seite; der Name des angemeldeten Kontos („grace“), „Abmelden“ und „Anmelden“ stehen nicht darauf. |
+| `test_seitenleiste_zeigt_das_token_auf_jeder_teilnahmeseite` | umschreiben | Der Helfer `_seitenleiste_zeigt_nur_das_token` prüft die Abwesenheit der Klassen `sidebar-account` und `sidebar-login`. Der Test schickt außerdem das Feld `antwort`, das die View nicht liest (siehe „Setup“). | Statt der Klassen: „Ihr Teilnahme-Token“ mit dem Token steht auf der Seite; der Name des angemeldeten Kontos („grace“), „Abmelden“ und „Anmelden“ stehen nicht darauf. Die Abschlussseite trägt „Ihr Teilnahme-Token“ selbst (`abschluss.html`); dort belegen nur die Ausschlüsse etwas. |
 | `test_debrief_setzt_direkt_mit_der_naechsten_vignette_fort`, `test_staler_debrief_beendet_die_folgesitzung_nicht`, `test_aktiver_abbruch_setzt_die_sitzung_auf_abgebrochen` | behalten | Eigene Views der Erhebung (`debrief`, `abbrechen`), eigene Weiterleitungen. | – |
 | `test_vorzeitiges_gespraechsende_zeigt_den_debrief` | umschreiben | Eigene View `gespraech_beenden`, aber „Debrief“ als einziger Beleg. | „Was ist Ihnen aufgefallen?“ erwarten und „Ihre nächste Frage“ ausschließen; Status `laufend` wie bisher. |
 | `test_abgegebene_diagnose_ist_im_debrief_gesperrt` | umschreiben | Implementation-coupled: `'name="diagnose" rows="4" required readonly'` hängt an Reihenfolge und Zahl der Attribute. | Mit einem `HTMLParser` wie in `config/tests/formular.py`: Die `textarea` `diagnose` enthält „Bruchfehler“ und trägt `readonly`, der Knopf „Diagnose abgeben“ trägt `disabled`. |
@@ -194,7 +194,7 @@ Drei Lesarten gelten für das ganze Dokument:
 | `test_htmx_interaktion_schickt_den_ganzen_block` | umschreiben | `assertNotContains(block, "hx-params")` prüft die Abwesenheit eines Attributs. Zugesagt ist das Serververhalten: Ein fehlendes oder leeres Feld ist eine leere Antwort. | Ohne die `hx-params`-Zusicherung. Dazu die `id="itemblock-formular"` im Fragment (aus den Gestaltungstests). |
 | `test_likert_block_bietet_die_skalenpole_und_speichert_die_stufe` | umschreiben | HTTP, Literal 6 als Stufe. Nur ergänzen. | Zusätzlich: Der Wortlaut steht im `<legend>` eines `<fieldset>` (aus den Gestaltungstests). |
 | `test_likert_block_weist_eine_stufe_ausserhalb_der_skala_ab`, `test_itemantwort_bleibt_nach_zeitraumende_unangetastet`, `test_abschluss_url_ueberspringt_keine_offene_vignette` | behalten | Fehlerfälle über HTTP. | – |
-| `test_token_endpunkt_sperrt_sitzungsblock_ausserhalb_seines_besuchs` | umschreiben | Ruft `block_vorlegen` aus dem Test heraus und schickt das Feld `antwort`, das die View nicht liest. Der Block entsteht so neben dem Ablauf. | Während die Sitzung läuft, POST auf `itemblock` mit einem Feld `item_<pk>`: 400, und keine Antwortzeile trägt einen Wert. Ohne `block_vorlegen`. |
+| `test_token_endpunkt_sperrt_sitzungsblock_ausserhalb_seines_besuchs` | umschreiben | Ruft `block_vorlegen` aus dem Test heraus und schickt das Feld `antwort`, das die View nicht liest. Der Itemblock entsteht so neben dem Ablauf. | Während die Sitzung läuft, POST auf `itemblock` mit einem Feld `item_<pk>`: 400, und keine Antwortzeile trägt einen Wert. Ohne `block_vorlegen`. |
 | `test_debrief_zeigt_fragebogen_items_unter_dem_verlauf`, `test_htmx_debrief_fuegt_den_sitzungsblock_ins_fortsetzungsfragment_ein`, `test_wiedereinstieg_fuehrt_zum_offenen_sitzungsblock`, `test_offener_sitzungsblock_ueberlebt_den_browserwechsel`, `test_abbruch_zeigt_den_sitzungsblock_statt_der_instruktion` | behalten | Sitzungsblock über HTTP, erhebungseigen. | – |
 | `test_teilnahme_kommt_ueber_gewechselte_browser_zu_ende` | behalten | Durchstich über fünf Browser, beide Blockarten, Debrief und Abbruch. | – |
 | `test_zwei_vignetten_fuehren_ueber_ihre_bloecke_zum_abschluss` | streichen | Doppelung in der Datei: dieselbe Folge (zwei Vignetten, Sitzungsblock, Abschlussblock, Abschluss). Je eine Antwortzeile pro Sitzung prüft der Browserwechsel-Test über `ItemAntwort.objects.get(sitzung=…)`. Die Reihenfolge der Schritte prüft `test_ablauf.py`. | `test_teilnahme_kommt_ueber_gewechselte_browser_zu_ende` und `test_ablauf.py::test_beendete_sitzung_stellt_ihren_block_vor_die_naechste_vignette` |
@@ -234,7 +234,8 @@ Setup: `_bindung_anlegen` legt die Bindung mit `objects.create` und festem Token
 | `setUp` | umschreiben | `Vignette.objects._erstellen` (SLF001-Übergangsliste), `Sitzung.objects.create` und der Session-Schlüssel `erhebung_teilnahme_tokens` von Hand. | Der echte Weg über den Client: Teilnahme-Link, Einwilligung mit Spracherkennung „ja“, `spielen`. Die Sitzung und die Bindung des Browsers entstehen dabei. Die Vignette über den gemeinsamen Helfer. |
 | `test_eingewilligte_teilnahme_transkribiert_ohne_konto`, `test_ohne_einwilligung_verweigert_externe_transkription`, `test_fremde_sitzung_bleibt_dem_token_verschlossen` | behalten | Erhebungseigen: Autorisierung über das Browser-Token. | – |
 | `test_ohne_zero_retention_verweigert_externe_transkription` | streichen | Schichtdoppelung: Das Tor liegt in `transkriptions_endpunkt` und gilt für jeden Prinzipal. | `sitzungen/tests/test_transkription.py::ProbelaufTranskriptionTests::test_zero_retention_bleibt_auch_im_probelauf_das_tor` |
-| *(fehlt)* | ergänzen | `sitzung_fuer_transkription` sperrt außerhalb des Fensters. Kein Test prüft das. | Stichprobe nach dem Start ins Vergangene verschieben (`ende` setzen): `PermissionDenied`, und der Anbieter bleibt unberührt. |
+
+Lücke: `sitzung_fuer_transkription` sperrt außerhalb des Fensters, aber kein Test prüft das. Neuer Test: Stichprobe nach dem Start ins Vergangene verschieben (`ende` setzen), erwartet `PermissionDenied`, und der Anbieter bleibt unberührt.
 
 ### `erhebungen/tests/test_models.py`
 
@@ -279,7 +280,7 @@ Setup: `_bindung_anlegen` legt die Bindung mit `objects.create` und festem Token
 |---|---|---|---|
 | `test_finalisieren_pinnt_die_aktive_modell_konfiguration`, `test_finalisieren_pinnt_die_schuelerin_nicht_lehrperson_oder_bewerter`, `test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration`, `test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt`, `test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt`, `test_archivieren_akzeptiert_nur_finale_erhebungen`, `test_archivieren_und_entarchivieren_bewahren_den_finalen_pin`, `test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar`, `test_archivierte_erhebung_ist_auch_per_bulk_update_eingefroren`, `test_stichprobe_laesst_sich_nicht_per_bulk_update_archivieren` | behalten | Öffentlicher Lebenszyklus, Fehler über die Meldung. Die laufende Stichprobe entsteht über ihre Daten (± 1 Minute), ohne Zeitpatch. | – |
 | `test_eigentuemerlose_erhebung_kann_nicht_entarchiviert_werden` | behalten | Fehlerfall. `eigentuemerinnen.clear()` ist eine Abkürzung im Aufbau; der öffentliche Weg wäre `austreten` der letzten Eigentümerin einer archivierten Erhebung. | – |
-| `test_stichprobe_archivieren_schaltet_nur_ueber_ihre_lebenszyklus_methode` | umschreiben | Der Name verspricht „nur über die Methode“, geprüft ist nur der Erfolgsfall. Den Weg über `save()` prüft kein Test. | Zusätzlich: `archiviert = True` und `save()` auf einer frischen Instanz wirft `ValidationError` „Lebenszyklus-Methode“. Ein zweites `archivieren()` wirft „bereits archiviert“. |
+| `test_stichprobe_archivieren_schaltet_nur_ueber_ihre_lebenszyklus_methode` | umschreiben | Der Name verspricht „nur über die Methode“, geprüft ist nur der Erfolgsfall. Den Weg über `save()` prüft kein Test. | Zusätzlich: `archiviert = True` und `save()` auf einer gespeicherten, neu geladenen Instanz wirft `ValidationError` „Lebenszyklus-Methode“. Ein zweites `archivieren()` wirft „bereits archiviert“. |
 
 #### Erhebungsbindung und Stichprobe
 
