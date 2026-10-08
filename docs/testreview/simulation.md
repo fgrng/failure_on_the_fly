@@ -3,7 +3,7 @@
 Bereich aus #329 (Spec #321). Geprüft sind alle zehn Dateien in `simulation/tests/`. Für Tests auf die Zeit und auf Migrationen gelten die Entscheidungen aus #324 und #325:
 
 - Die vier Migrationstests in `test_modell_konfiguration.py` sind totes Gewicht (ADR-0031) und werden gestrichen.
-- Kein Test hier patcht `timezone.now` oder eine andere Wanduhr. Drei Dateien ersetzen `time.monotonic` und `time.sleep`. Das sind Uhren an der Grenze zum Anbieter, die `time-machine` nicht steuert; #324 betrifft sie nicht.
+- Kein Test hier patcht `timezone.now` oder eine andere Wanduhr. Zwei Dateien ersetzen `time.monotonic`, `test_transkription.py` zusätzlich `time.sleep`. Das sind Uhren an der Grenze zum Anbieter, die `time-machine` nicht steuert; #324 betrifft sie nicht.
 
 ## Schnittstelle
 
@@ -164,8 +164,6 @@ Legt auf einer leeren Instanz den Standardkern an und finalisiert ihn über die 
 | `test_haelt_den_anlagezeitpunkt_fest` | behalten | Patcht keine Uhr (#324 greift nicht). Mit `time-machine` aus #349 ließe sich das Datum exakt prüfen. | – |
 | `test_die_verwendung_hat_keinen_default` | umschreiben | Startbefund geprüft: `inspect.signature` liest die Struktur der Signatur, nicht das Verhalten. Als Typ- oder Lint-Regel ist es aber nicht besser aufgehoben: `ty` prüft nur Aufrufstellen gegen die Signatur und kann einen neu eingeführten Default nicht verbieten; ruff hat keine Regel dafür. Startbefund daher **verworfen**, das Urteil aber nicht „behalten“. | Über die Schnittstelle, wie schon `test_anlegen_laesst_keine_lebenszyklusfelder_ueberschreiben`: `aktive()`, `belegte()` und `aktivieren(konfiguration)` ohne Verwendung werfen je `TypeError`. |
 
-**Startbefund Migrationen: bestätigt.** Alle vier Migrationstests werden gestrichen (#325). Das spart die langsamen `MigrationExecutor`-Läufe mit `transaction=True`.
-
 ### `simulation/tests/test_kern_view.py`
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
@@ -179,7 +177,8 @@ Legt auf einer leeren Instanz den Standardkern an und finalisiert ihn über die 
 | `…::test_verweist_autorinnen_nicht_auf_die_verwaltung` | umschreiben | `assertNotContains("manage.py")` prüft die Abwesenheit eines früheren Hinweises (totes Gewicht). | Nur die Zusicherung auf die URL von `kern_anlegen` behalten. |
 | `ModellKonfigurationAnzeigeTests` (2 Tests) | behalten | Eigene Seite (`kern_verwalten`), Maske als Literal. | – |
 | `SimulationskernRollenTests` | behalten | – | – |
-| `SimulationskernAnlegenTests` (7 Tests) | behalten | `test_legt_einen_entwurf_aus_den_standardvorlagen_an` vergleicht mit `STANDARDKERN_VORLAGEN`. Das ist keine berechnete Erwartung: Der Standardkern ist laut GLOSSARY.md genau dieser Text, und eine Abschrift im Test wäre die schlechtere Quelle. | – |
+| `SimulationskernAnlegenTests` (6 übrige Tests) | behalten | – | – |
+| `SimulationskernAnlegenTests::test_legt_einen_entwurf_aus_den_standardvorlagen_an` | umschreiben | Tautologisch: Die Schleife läuft über `STANDARDKERN_VORLAGEN.items()`. Wäre die Konstante leer oder fehlte ein Feld, bestünde der Test weiter. Die Werte selbst sind keine berechnete Erwartung: Der Standardkern ist laut GLOSSARY.md genau dieser Text, eine Abschrift im Test wäre die schlechtere Quelle. | Die fünf Feldnamen als Literal (`system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief`); je Feld ist der Wert des Entwurfs gleich dem Eintrag in `STANDARDKERN_VORLAGEN`. |
 | `SimulationskernVerwaltungTests::test_traegt_die_entwicklungs_farbfläche` | streichen | Doppelung, dazu ein Klassenstring. | `konten/tests/test_navigation.py::BereichszuordnungTests` führt `simulation:kern_verwalten` und `simulation:kern_bearbeiten` mit `authoring`. |
 | `…::test_zeigt_den_entwurf`, `…::test_verlinkt_den_entwurf_zur_eigenen_bearbeitungsseite`, `…::test_bearbeitungsseite_zeigt_felder_und_platzhaltervertraege`, `…::test_bearbeitungsseite_benennt_die_felder_wie_die_ansicht` | behalten | – | – |
 | `…::test_rahmenhandlung_bietet_hinweis_und_umschalter_im_szenentext` | umschreiben | `assertNotContains("[Linktext](https://…)")` prüft die Abwesenheit eines entfernten Hinweises. | Diese eine Zusicherung streichen, den Rest (Vorschau-Knöpfe, IDs, `aria-describedby`, fünf Vertragshinweise) behalten. |
@@ -237,7 +236,7 @@ Legt auf einer leeren Instanz den Standardkern an und finalisiert ihn über die 
 | `…::test_holt_beim_rendern_keine_modellliste` | umschreiben | Patcht das eigene Modul. | `httpx.Client` patchen; nach dem GET `assert_not_called()`. |
 | `…::test_leert_die_liste_beim_anbieterwechsel` | streichen | Startbefund bestätigt: JS-Ausdruck wörtlich aus dem statischen Template. | Keiner; ohne Browsertest nicht beobachtbar. |
 
-**Startbefund Mocks eigener Module: bestätigt.** Alle Patches auf `simulation.views.modellverzeichnis` gehen an die Grenze `httpx.Client`. Die Datei tut das an vier Stellen schon. Danach prüft kein Test mehr Aufrufe des eigenen Verzeichnisses; Aufruf-Assertions bleiben nur auf `httpx.Client` und betreffen URL, Parameter und Kopfzeilen.
+Alle Patches auf `simulation.views.modellverzeichnis` gehen an die Grenze `httpx.Client`. Die Datei tut das an vier Stellen schon. Danach prüft kein Test mehr Aufrufe des eigenen Verzeichnisses; Aufruf-Assertions bleiben nur auf `httpx.Client` und betreffen URL, Parameter und Kopfzeilen.
 
 ### `simulation/tests/test_modellverzeichnis.py`
 
@@ -287,13 +286,13 @@ Legt auf einer leeren Instanz den Standardkern an und finalisiert ihn über die 
 | `…::test_verbirgt_den_knopf_beim_anbieter_fake` | streichen | Alpine-Ausdruck aus statischem Template. | wie bei der Modell-Konfiguration |
 | `…::test_holt_beim_rendern_keine_modellliste` | umschreiben | Patcht das eigene Modul. | `httpx.Client` patchen, `assert_not_called()`. |
 | `…::test_leert_die_liste_beim_anbieterwechsel` | streichen | JS-Ausdruck aus statischem Template. | Keiner. |
-| `TranskriptionsKonfigurationWirkungTests::test_wirkt_bei_der_naechsten_anfrage` | behalten | Verbindet Seite und Fabrik: gespeichert über HTTP, wirksam beim nächsten `transkriptions_anbieter()`. Keine andere Datei geht diesen Weg. | Beim Umschreiben der Fabrik-Tests das Attribut `modell` ebenso über den Aufruf-Payload prüfen. |
+| `TranskriptionsKonfigurationWirkungTests::test_wirkt_bei_der_naechsten_anfrage` | umschreiben | Verbindet Seite und Fabrik: gespeichert über HTTP, wirksam beim nächsten `transkriptions_anbieter()`. Keine andere Datei geht diesen Weg. Liest aber das Adapterattribut `modell` statt des Aufrufs, wie die Fabrik-Tests oben. | Gleicher Weg; nach dem POST `transkriptions_anbieter().transkribieren(b"audio")` mit gemocktem `OpenAI`: `audio.transcriptions.create` bekommt `model="whisper-large-v3"`. |
 
 ### `simulation/tests/test_commands.py`
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
-| `test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an` | umschreiben | Wortlaut des Prompts („kannst ihn im Gespräch nicht herleiten“, „Arbeitsphase“). Dazu die Abwesenheit früherer Formate (`<fehlermuster_beschreibung>`, `<lernauftrag_text>`, `<arbeitsheft>`), also totes Gewicht. | Die eine Fassung ist final, und ihre fünf Felder sind gleich `STANDARDKERN_VORLAGEN`, wie im View-Test `test_legt_einen_entwurf_aus_den_standardvorlagen_an`. Dass der Standardkern seine Verträge hält, belegt das erfolgreiche `finalisieren()` selbst. |
+| `test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an` | umschreiben | Wortlaut des Prompts („kannst ihn im Gespräch nicht herleiten“, „Arbeitsphase“). Dazu die Abwesenheit früherer Formate (`<fehlermuster_beschreibung>`, `<lernauftrag_text>`, `<arbeitsheft>`), also totes Gewicht. | Die eine Fassung ist final, und ihre fünf Felder, als Literal benannt, sind gleich ihrem Eintrag in `STANDARDKERN_VORLAGEN`, wie im umgeschriebenen View-Test `test_legt_einen_entwurf_aus_den_standardvorlagen_an`. Dass der Standardkern seine Verträge hält, belegt das erfolgreiche `finalisieren()` selbst. |
 | `test_kern_initialisieren_ist_idempotent` | behalten | – | – |
 
 ## Startbefunde
@@ -305,7 +304,7 @@ Legt auf einer leeren Instanz den Standardkern an und finalisiert ihn über die 
 | Transkription: Abfragezahl wie im Code, `INFOMANIAK_ANTWORTFORMAT == "text"` | bestätigt; Literal 61 bzw. Streichen. Weitere Erwartungen aus Modulkonstanten in derselben Datei und in `test_litellm_sprachmodell.py`. |
 | Modelltest auf fehlendes Feld über `_meta` | bestätigt; gestrichen. |
 | `inspect.signature` für den fehlenden Default | als Typ- oder Lint-Regel verworfen (`ty` und ruff können einen Default nicht verbieten); umgeschrieben auf `TypeError` beim Aufruf ohne Verwendung. |
-| Migrationstests der Modell-Konfiguration | bestätigt; alle vier gestrichen (#325). |
+| Migrationstests der Modell-Konfiguration | bestätigt; alle vier gestrichen (#325). Das spart die langsamen `MigrationExecutor`-Läufe mit `transaction=True`. |
 | Importgraph-Wächter doppelt | bestätigt; Zusammenlegen setzt #378 voraus. |
 | Mocks von litellm, OpenAI-SDK, httpx | bestätigt in Ordnung. Die Aufruf-Assertions betreffen nur den Payload nach außen. Ausnahme sind Objektattribute der Transkriptions-Adapter (`client`, `modell`, `sprache`) und die erwarteten URLs aus Modulkonstanten; beides wird umgeschrieben. |
 
