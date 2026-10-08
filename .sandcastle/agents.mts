@@ -318,6 +318,23 @@ export function sandcastleAgents(lineup: Lineup): Agents {
       );
     },
 
+    async removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun> {
+      return agentRun(
+        await sandcastle.run({
+          ...runSettings(branch),
+          name: `Migrationstests #${spec}`,
+          maxIterations: MAX_IMPLEMENT_ITERATIONS,
+          agent: lineup.implementer,
+          promptFile: "./.sandcastle/migration-tests-prompt.md",
+          promptArgs: {
+            SPEC: spec,
+            INTEGRATION_BRANCH: branch,
+            MIGRATIONS: migrations.map((m) => `- ${m}`).join("\n"),
+          },
+        }),
+      );
+    },
+
     async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {
       const text = await sandcastle.run({
         ...runSettings(branch),

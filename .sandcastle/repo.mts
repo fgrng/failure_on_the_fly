@@ -94,6 +94,13 @@ export const gitRepo: Repo = {
     }
   },
 
+  async addedFiles(branch: string): Promise<string[]> {
+    // Drei Punkte: gemessen ab der Merge-Basis, nicht gegen den heutigen Stand von main.
+    return git(["diff", "--name-only", "--diff-filter=A", `${MAIN_REF}...${branch}`])
+      .split("\n")
+      .filter(Boolean);
+  },
+
   async push(branch: string): Promise<void> {
     // Nur sandcastle/standalone beginnt nach einem gemergten PR neu von main;
     // sein Push ist dann kein Fast-Forward. Die Lease schützt Commits auf

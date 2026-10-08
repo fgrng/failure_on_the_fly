@@ -88,6 +88,8 @@ export interface Repo {
   resetBranch(branch: string, head: string): Promise<void>;
   /** Ob `branch` genau auf seinem Stand in origin steht. */
   isPushed(branch: string): Promise<boolean>;
+  /** Die Dateien, die `branch` gegenüber MAIN_REF neu anlegt. */
+  addedFiles(branch: string): Promise<string[]>;
   /** Pusht `branch` nach origin; nur sandcastle/standalone darf dabei Historie ersetzen. */
   push(branch: string): Promise<void>;
 }
@@ -119,6 +121,8 @@ export interface Agents {
   reviewSpec(spec: number, branch: string): Promise<SpecReview>;
   /** Ein Implementer behebt die Befunde auf `branch`. */
   fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
+  /** Ein Implementer streicht die Tests, die `migrations` vor- und zurückmigrieren. */
+  removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun>;
   /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`. */
   writePullRequest(spec: number, branch: string): Promise<PullRequestText>;
 }
@@ -643,9 +647,10 @@ async function completedSpecs(deps: WithLog<IterationDeps>): Promise<number[]> {
   return specs;
 }
 
-// Spec-Review, Behebung der Standards- und Korrektheitsbefunde, PR-Text,
-// dann Push und PR. Endet die Behebung ohne Abschlusssignal, bleibt der PR
-// aus; der nächste Lauf beginnt die Abschlussphase von vorn.
+// Spec-Review, Behebung der Standards- und Korrektheitsbefunde, Streichen
+// der Tests auf die neuen Migrationen der Spec (ADR-0031), PR-Text, dann
+// Push und PR. Endet die Behebung oder das Streichen ohne Abschlusssignal,
+// bleibt der PR aus; der nächste Lauf beginnt die Abschlussphase von vorn.
 async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<void> {
   const { tracker, repo, agents, log } = deps;
   const branch = specBranch(spec);
@@ -661,6 +666,18 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
     }
   }
 
+  const migrations = (await repo.addedFiles(branch)).filter(isMigration);
+  if (migrations.length === 0) {
+    log(`  ${branch}: no new migrations - no migration tests to remove.`);
+  } else {
+    log(`  ${branch}: removing tests of new migrations: ${migrations.join(", ")}`);
+    const removal = await agents.removeMigrationTests(spec, branch, migrations);
+    if (!removal.completed) {
+      log(`  ! ${branch}: migration tests not removed (no completion signal) - no pull request yet.`);
+      return;
+    }
+  }
+
   const text = await agents.writePullRequest(spec, branch);
   await repo.push(branch);
   await tracker.createPullRequest({
@@ -670,6 +687,12 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
     body: specPrBody(text.body, review.spec, spec),
   });
   log(`${branch}: pushed, pull request opened.`);
+}
+
+// Eine Migrationsdatei liegt unter `<app>/migrations/`; das `__init__.py`
+// eines neuen Pakets ist keine Migration.
+function isMigration(file: string): boolean {
+  return /(^|\/)migrations\/[^/]+\.py$/.test(file) && !file.endsWith("/__init__.py");
 }
 
 // Spec-Befunde entscheidet ein Mensch; sie stehen deshalb wörtlich im PR.
