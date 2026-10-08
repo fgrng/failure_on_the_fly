@@ -259,7 +259,7 @@ def _validierte_aktion_ausfuehren(
     try:
         aktion()
     except ValidationError as error:
-        messages.error(request, error.message)
+        messages.error(request, "; ".join(error.messages))
 
 
 @login_required

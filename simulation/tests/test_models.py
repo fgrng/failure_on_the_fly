@@ -96,7 +96,7 @@ def test_finale_fassung_kann_nicht_gesammelt_geloescht_werden() -> None:
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
 
-    with pytest.raises(RuntimeError, match="gelöscht"):
+    with pytest.raises(ValidationError, match="gelöscht"):
         Simulationskern.objects.filter(pk=kern.pk).delete()
 
 
@@ -171,8 +171,50 @@ def test_bearbeiten_lehnt_zweiten_entwurf_ab() -> None:
     finale_fassung.finalisieren()
     finale_fassung.bearbeiten()
 
-    with pytest.raises(ValueError, match="Entwurf existiert bereits"):
+    with pytest.raises(ValidationError, match="Entwurf existiert bereits"):
         finale_fassung.bearbeiten()
+
+
+@pytest.mark.django_db
+def test_anlegen_lehnt_eine_zweite_erste_fassung_ab() -> None:
+    """Die Anlege-Naht nimmt nur in einer leeren Historie eine Fassung an."""
+
+    Simulationskern.objects.anlegen()
+
+    with pytest.raises(ValidationError, match="bereits angelegt"):
+        Simulationskern.objects.anlegen()
+
+
+@pytest.mark.django_db
+def test_finalisieren_lehnt_eine_finale_fassung_ab() -> None:
+    """Nur Entwürfe gehen in den finalen Zustand über."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.finalisieren()
+
+    with pytest.raises(ValidationError, match="Nur Entwürfe"):
+        kern.finalisieren()
+
+
+@pytest.mark.django_db
+def test_bearbeiten_lehnt_eine_inzwischen_geaenderte_fassung_ab() -> None:
+    """Der Wettlauf um eine überholte Fassung endet als abgelehnter Übergang."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+
+    with pytest.raises(ValidationError, match="inzwischen geändert"):
+        kern.bearbeiten()
+
+
+@pytest.mark.django_db
+def test_zustandswechsel_ueber_save_wird_abgelehnt() -> None:
+    """Zustände wechseln nur über die Lebenszyklus-Methoden."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen()
+    kern.zustand = Simulationskern.Zustand.ARCHIVIERT
+
+    with pytest.raises(ValidationError, match="Lebenszyklus-Methoden"):
+        kern.save()
 
 
 @pytest.mark.django_db
@@ -202,7 +244,7 @@ def test_finale_fassung_ist_ausserhalb_des_lebenszyklus_unveraenderlich() -> Non
     kern.finalisieren()
     kern.system_prompt_vorlage = "$fehlermuster_beschreibung"
 
-    with pytest.raises(RuntimeError, match="unveränderlich"):
+    with pytest.raises(ValidationError, match="unveränderlich"):
         kern.save()
 
 
@@ -236,7 +278,7 @@ def test_finale_fassung_kann_nicht_physisch_geloescht_werden() -> None:
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
 
-    with pytest.raises(RuntimeError, match="gelöscht"):
+    with pytest.raises(ValidationError, match="gelöscht"):
         kern.delete()
 
 
@@ -250,7 +292,7 @@ def test_archivierte_fassung_kann_nicht_physisch_geloescht_werden() -> None:
     kern.refresh_from_db()
 
     assert kern.zustand == Simulationskern.Zustand.ARCHIVIERT
-    with pytest.raises(RuntimeError, match="gelöscht"):
+    with pytest.raises(ValidationError, match="gelöscht"):
         kern.delete()
 
 

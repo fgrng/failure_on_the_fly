@@ -1,7 +1,10 @@
 """HTTP-Tests für den Fragebogen-Item-Editor."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -135,6 +138,21 @@ class FragebogenItemFinalisierenViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_abgelehntes_finalisieren_erscheint_als_meldung(self) -> None:
+        """Ein Entwurf ohne Wortlaut bleibt Entwurf, die Ablehnung wird Meldung."""
+        leer: FragebogenItem = FragebogenItem.objects.anlegen(self.ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[leer.pk]), follow=True
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[leer.pk])
+        )
+        self.assertContains(response, "Zum Finalisieren fehlt der Wortlaut.")
+        leer.refresh_from_db()
+        self.assertEqual(leer.zustand, FragebogenItem.Zustand.ENTWURF)
 
 
 class FragebogenItemReversionierenViewTests(TestCase):
@@ -283,6 +301,23 @@ class FragebogenItemArchivierenViewTests(TestCase):
         self.assertRedirects(
             response, reverse("fragebogen_items:detail", args=[self.item.pk])
         )
+
+    def test_abgelehntes_archivieren_erscheint_mit_allen_meldungen(self) -> None:
+        """Auch eine Ablehnung mit mehreren Meldungen erreicht die Detailansicht."""
+        with patch.object(
+            FragebogenItem,
+            "archivieren",
+            side_effect=ValidationError(["Erste Ablehnung.", "Zweite Ablehnung."]),
+        ):
+            response: HttpResponse = self.client.post(
+                reverse("fragebogen_items:archivieren", args=[self.item.pk]),
+                follow=True,
+            )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[self.item.pk])
+        )
+        self.assertContains(response, "Erste Ablehnung.; Zweite Ablehnung.")
 
     def test_archivieren_setzt_den_archivierten_zustand(self) -> None:
         """Archivieren nimmt die finale Fassung aus dem Umlauf."""

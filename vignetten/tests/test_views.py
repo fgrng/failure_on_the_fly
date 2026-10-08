@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -1304,6 +1305,23 @@ class VignetteFinalisierenViewTests(TestCase):
             response,
             reverse("vignetten:vorspulen", args=[self.vignette.pk]),
         )
+
+    def test_ablehnung_mit_mehreren_meldungen_erscheint_vollstaendig(self) -> None:
+        """Die Hülle verbindet alle Meldungen einer Ablehnung."""
+        with patch.object(
+            Vignette,
+            "finalisieren",
+            side_effect=ValidationError(["Erste Ablehnung.", "Zweite Ablehnung."]),
+        ):
+            response: HttpResponse = self.client.post(
+                reverse("vignetten:finalisieren", args=[self.vignette.pk]),
+                follow=True,
+            )
+
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[self.vignette.pk])
+        )
+        self.assertContains(response, "Erste Ablehnung.; Zweite Ablehnung.")
 
     def test_finalisiert_vollstaendigen_eigenen_entwurf(self) -> None:
         """Ein vollständiger Entwurf wird über HTTP zur finalen Fassung."""

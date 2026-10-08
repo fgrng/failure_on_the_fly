@@ -5,10 +5,12 @@ import json
 import re
 from datetime import UTC, datetime, timedelta
 from io import BytesIO, TextIOWrapper
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -1986,6 +1988,24 @@ class ErhebungenArchivierenTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         self.erhebung.finalisieren()
         self.client.force_login(self.ada)
+
+    def test_ablehnung_mit_mehreren_meldungen_erscheint_vollstaendig(self) -> None:
+        """Die Hülle verbindet alle Meldungen einer Ablehnung."""
+
+        with patch.object(
+            Erhebung,
+            "archivieren",
+            side_effect=ValidationError(["Erste Ablehnung.", "Zweite Ablehnung."]),
+        ):
+            response: HttpResponse = self.client.post(
+                reverse("erhebungen:archivieren", args=[self.erhebung.pk]),
+                follow=True,
+            )
+
+        self.assertRedirects(
+            response, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(response, "Erste Ablehnung.; Zweite Ablehnung.")
 
     def test_archiviert_datenfreie_stichprobe_ueber_die_detailseite(self) -> None:
         """Eine datenfreie Stichprobe zeigt die Aktion und wird darüber archiviert."""
