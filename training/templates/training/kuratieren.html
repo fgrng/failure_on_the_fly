@@ -54,9 +54,50 @@
         </p>
     </div>
 
+    <section class="page-section page-section--gestapelt" aria-labelledby="section-fremdeinsicht">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="section-fremdeinsicht">Fremdeinsicht</h2><small>Abgeschlossene Sitzungen der Gruppe, namentlich, ohne Denkspur</small></span>
+        </header>
+        <div class="table-toolbar">
+            <span class="table-toolbar__count">{{ fremdeinsicht.zeilen|length }} Teilnehmende · {{ fremdeinsicht.vignetten|length }} Vignette{{ fremdeinsicht.vignetten|length|pluralize:"n" }}</span>
+        </div>
+        {% if fremdeinsicht.vignetten %}
+            <div class="table-wrap fremdeinsicht">
+                <table class="table fremdeinsicht__matrix" style="--spalten: {{ fremdeinsicht.vignetten|length }}">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="fremdeinsicht__name">Teilnehmer:in</th>
+                            {% for vignette in fremdeinsicht.vignetten %}
+                                <th scope="col" class="fremdeinsicht__vignette" title="{{ vignette.anzeigename }}"><span>{{ vignette.anzeigename }}</span></th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for zeile in fremdeinsicht.zeilen %}
+                            <tr{% if zeile.ohne_sitzung %} class="fremdeinsicht__ohne-sitzung"{% endif %}>
+                                <th scope="row" class="fremdeinsicht__name" title="{{ zeile.name }}">{{ zeile.name }}</th>
+                                {% for sitzungen in zeile.zellen %}
+                                    <td class="fremdeinsicht__zelle">
+                                        {% for sitzung in sitzungen %}<a class="fremdeinsicht__sitzung" href="{{ sitzung.url }}" data-datum="{{ sitzung.datum|date:"d.m.Y" }}" aria-label="Sitzung vom {{ sitzung.datum|date:"d.m.Y" }}">{{ sitzung.nummer }}</a>{% empty %}<span class="fremdeinsicht__leer">–</span>{% endfor %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="{{ fremdeinsicht.vignetten|length|add:1 }}" class="table__empty">Noch niemand ist beigetreten.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="message--info">Dieses Training enthält keine Vignetten. Es gibt darum keine Sitzungen zu zeigen.</p>
+        {% endif %}
+    </section>
+
     <section class="page-section" aria-labelledby="section-configured">
         <header class="page-section__head">
-            <b>01</b><span><h2 id="section-configured">Vignetten</h2><small>Aktuell im Training enthalten</small></span>
+            <b>02</b><span><h2 id="section-configured">Vignetten</h2><small>Aktuell im Training enthalten</small></span>
         </header>
         <div class="table-wrap vignette-index-table">
             <table class="table">
@@ -89,7 +130,7 @@
 
     <section class="page-section" aria-labelledby="section-available">
         <header class="page-section__head">
-            <b>02</b><span><h2 id="section-available">Finale Vignetten aufnehmen</h2><small>Verfügbare Vignetten aus dem eigenen Katalog</small></span>
+            <b>03</b><span><h2 id="section-available">Finale Vignetten aufnehmen</h2><small>Verfügbare Vignetten aus dem eigenen Katalog</small></span>
         </header>
         <div class="table-wrap vignette-index-table">
             <table class="table">
@@ -120,6 +161,6 @@
         </div>
     </section>
 
-    {% include "includes/eigentuemerinnen.html" with dieses_artefakt="dieses Training" das_artefakt="das Training" eigentuemerinnen_abschnitt_nummer="03" eigentuemerin_hinzufuegen_url="training:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="training:eigentuemerin_entfernen" kreis=training objekt_pk=training.pk %}
+    {% include "includes/eigentuemerinnen.html" with dieses_artefakt="dieses Training" das_artefakt="das Training" eigentuemerinnen_abschnitt_nummer="04" eigentuemerin_hinzufuegen_url="training:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="training:eigentuemerin_entfernen" kreis=training objekt_pk=training.pk %}
 </section>
 {% endblock %}

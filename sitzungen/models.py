@@ -43,6 +43,24 @@ class Teilnahme(models.Model):
         return Q(**{f"{pfad}speicherung_eingewilligt": False})
 
 
+class SitzungQuerySet(models.QuerySet["Sitzung"]):
+    """Abfragen über Sitzungen."""
+
+    def fremd_einsehbar(self, trainings: models.QuerySet) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf.
+
+        Einsicht folgt dem Anlass, nie der Vignette (ADR-0049): abgeschlossene
+        Sitzungen, deren Teilnahme an einer Trainingsbindung eines der
+        Trainings hängt. Wer die Trainings sieht, entscheidet der Aufrufer über
+        `Training.objects.sichtbar_fuer`; `sitzungen` kennt das Training nur
+        über den Rückwärtszugriff der Bindung (ADR-0016).
+        """
+        return self.filter(
+            status=Sitzung.Status.ABGESCHLOSSEN,
+            teilnahme__trainingsbindung__training__in=trainings.values("pk"),
+        )
+
+
 class Sitzung(models.Model):
     """Eine persistierte Sitzung einer Vignette."""
 
@@ -81,6 +99,8 @@ class Sitzung(models.Model):
     )
     verbrauchte_zeit: models.FloatField = models.FloatField(default=0.0)
     offene_spanne_seit: models.DateTimeField = models.DateTimeField(null=True)
+
+    objects: models.Manager["Sitzung"] = SitzungQuerySet.as_manager()
 
     @property
     def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:

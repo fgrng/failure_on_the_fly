@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, F, QuerySet
+from django.db.models import Count, F, Q, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -79,6 +79,11 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     """Lädt ein für die eingeloggte Person sichtbares Training."""
 
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
+
+
+def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
+    """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
+    return Sitzung.objects.fremd_einsehbar(Training.objects.sichtbar_fuer(konto))
 
 
 def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
@@ -375,11 +380,60 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
                 reverse("training:beitreten", args=[training.trainings_link])
             ),
             "beigetretene": training.trainingsbindung_set.count(),
+            "fremdeinsicht": _fremdeinsicht(request, training),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
         },
     )
+
+
+def _fremdeinsicht(request: HttpRequest, training: Training) -> dict[str, object]:
+    # Baut die Tabelle der Fremdeinsicht: die Vignetten in Kuratierreihenfolge
+    # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
+    # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
+
+    vignetten: list[Vignette] = [
+        eintrag.vignette
+        for eintrag in Training.vignetten.through.objects.filter(training=training)
+        .select_related("vignette__historie")
+        .order_by("pk")
+    ]
+    sitzungen_nach_zelle: dict[tuple[int, int], list[Sitzung]] = {}
+    for sitzung in (
+        _fremd_einsehbare_sitzungen(request.user)
+        .filter(teilnahme__trainingsbindung__training=training)
+        .order_by("erstellt_am", "pk")
+    ):
+        sitzungen_nach_zelle.setdefault(
+            (sitzung.teilnahme_id, sitzung.vignette_id), []
+        ).append(sitzung)
+
+    zeilen: list[dict[str, object]] = []
+    for bindung in training.trainingsbindung_set.select_related("konto"):
+        zellen: list[list[dict[str, object]]] = [
+            [
+                {
+                    "nummer": nummer,
+                    "datum": sitzung.erstellt_am,
+                    "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
+                }
+                for nummer, sitzung in enumerate(
+                    sitzungen_nach_zelle.get((bindung.teilnahme_id, vignette.pk), []),
+                    start=1,
+                )
+            ]
+            for vignette in vignetten
+        ]
+        zeilen.append(
+            {
+                "name": bindung.konto.get_full_name() or bindung.konto.username,
+                "zellen": zellen,
+                "ohne_sitzung": not any(zellen),
+            }
+        )
+    zeilen.sort(key=lambda zeile: str(zeile["name"]).casefold())
+    return {"vignetten": vignetten, "zeilen": zeilen}
 
 
 @login_required
@@ -671,14 +725,18 @@ def debrief(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt eine vergangene Trainingssitzung schreibgeschützt an."""
+    """Zeigt eine Trainingssitzung schreibgeschützt an.
+
+    Die eigene Sitzung in jedem Status (Selbsteinsicht), eine fremde nur über
+    die Fremdeinsicht; alles andere ist unbekannt.
+    """
 
     sitzung: Sitzung = get_object_or_404(
-        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        Sitzung.objects.filter(
+            Q(teilnahme__trainingsbindung__konto=request.user)
+            | Q(pk__in=_fremd_einsehbare_sitzungen(request.user).values("pk"))
+        ).select_related("vignette", "simulationskern"),
         pk=pk,
-    )
-    get_object_or_404(
-        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
     )
 
     return sitzung_anzeigen(

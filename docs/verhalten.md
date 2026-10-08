@@ -199,6 +199,27 @@ Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die
 Ausbilder:innen dieses Trainings sehen Ihre abgeschlossenen Sitzungen
 namentlich.“
 
+## Fremdeinsicht im Training
+
+Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze
+Breite die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen als
+Zeilen, nach Namen sortiert, und den Vignetten des Trainings in
+Kuratierreihenfolge als Spalten. Wer noch keine abgeschlossene Sitzung hat,
+steht mit gedämpfter Schrift trotzdem in der Tabelle. Jede abgeschlossene
+Sitzung erscheint in ihrer Zelle als runder Kreis mit ihrer laufenden Nummer
+zu dieser Vignette; beim Zeigen oder Fokussieren erscheint sofort ihr Datum.
+Eine leere Zelle trägt einen blassen Strich. Ein Training ohne Vignetten zeigt
+statt der Tabelle einen Hinweis.
+
+Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
+Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
+alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor
+ihrer Aufnahme, und die Administration. Laufende, abgebrochene und
+gescheiterte fremde Sitzungen, Sitzungen derselben Person in einem fremden
+Training und jede Sitzung für ausgetretene Kreismitglieder, fremde Konten oder
+die Autor:in der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für
+die Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
