@@ -29,9 +29,11 @@ MAX_VERSUCHE: int = 3
 # bekommt die verbliebene Restzeit als Timeout. Das ist nicht das
 # Gesprächsbudget der Vignette (ADR-0012), sondern eine Zusage dieser Naht.
 #
-# Nach oben begrenzt der Worker: 90 s lassen dem Deployment-Timeout (180 s,
-# docs/DEPLOYMENT.md) Luft, auch wenn mehrere Versuche in dieselbe Anfrage fallen und der
-# Endpunkt danach noch schreibt. Nach unten begrenzt die Denkspur, die das
+# Nach oben begrenzt das Deployment: Das Uberspace-Frontend schließt eine
+# Verbindung nach drei Minuten ohne Daten, und gunicorns Thread-Worker bricht
+# eine einzelne Anfrage nicht selbst ab (docs/DEPLOYMENT.md, ADR-0050). 90 s
+# lassen dazu Luft, auch wenn mehrere Versuche in dieselbe Anfrage fallen und
+# der Endpunkt danach noch schreibt. Nach unten begrenzt die Denkspur, die das
 # Ausgabeschema vor der Äußerung erzwingt (ADR-0005): Ein Reasoning-Modell
 # liefert legitim erst nach 20-60 s. 90 s ist der schlechte Fall, nicht der
 # Normalfall.

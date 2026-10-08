@@ -199,10 +199,12 @@ die man vorher wissen muss:
   URL kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber
   ungeschützt.
 
-Ein Gesprächsschritt wartet synchron auf das Sprachmodell; der gunicorn-Dienst
-braucht deshalb ein großzügiges Timeout (180 s im Walkthrough). Beide Nähte
-begrenzen sich selbst: ein Gesprächsschritt auf höchstens 90 s über alle
-Versuche, eine Transkription auf höchstens 120 s.
+Ein Gesprächsschritt wartet synchron auf das Sprachmodell, eine Transkription
+auf ihren Anbieter; jede wartende Anfrage hält einen Thread. Der gunicorn-Dienst
+läuft deshalb mit Thread-Workern, ausgelegt auf 150 gleichzeitige Sitzungen
+(Aufteilung im Walkthrough, Begründung in ADR-0050). Beide Nähte begrenzen sich
+selbst: ein Gesprächsschritt auf höchstens 90 s über alle Versuche, eine
+Transkription auf höchstens 120 s.
 
 ## Weitere Dokumentation
 

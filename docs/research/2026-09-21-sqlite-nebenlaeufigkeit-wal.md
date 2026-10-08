@@ -412,3 +412,19 @@ Bei positiver Entscheidung:
 - Django 6.0.7, lokal geprüft: `django/db/backends/sqlite3/base.py:143` (`transaction_modes`), `:161-165` (`timeout` geht an `sqlite3.connect`), `:181-197` (`transaction_mode` und `init_command`), `:321-331` (`BEGIN {mode}`); `django/db/backends/sqlite3/features.py` bzw. `connection.features.has_select_for_update = False`.
 - gunicorn, [Settings](https://gunicorn.org/reference/settings/) — `workers` (Default 1, »2-4 x $(NUM_CORES)«), `worker_class` (Default `sync`, u. a. `gthread`), `threads` (Default 1, »only affects the Gthread worker type«; `sync` mit `threads > 1` wird zu `gthread`), `timeout` (Default 30).
 - Repo, am 2026-09-21 nachgeprüft: `config/settings.py:115-128`; Abfrage der effektiven Pragmas über Djangos Verbindung (`journal_mode=wal`, `synchronous=2`, `busy_timeout=20000`, `wal_autocheckpoint=1000`, `page_size=4096`, `transaction_mode='IMMEDIATE'`, SQLite-Bibliothek 3.45.1); `rg`- und AST-Durchlauf über alle `atomic()`-Blöcke des Produktivcodes; `sitzungen/sink.py:149,169,183,240-262`; `sitzungen/durchlauf.py:63-107`; `sitzungen/views.py:270,345-371,488`; `simulation/__init__.py:74-108`; `simulation/transkription/__init__.py:19,26,132-147`; `erhebungen/ablauf.py:187,200,252,271,282,294`; `erhebungen/views.py:286-387,613-642,672-702,971,1080,1171`; `training/views.py:418,428,485,561`; `README.md:322`.
+
+## Nachtrag 2026-10-08: 150 statt 10 Teilnehmende (#203)
+
+Die Lastannahme aus ADR-0050 sind 150 gleichzeitige Sitzungen; gunicorn läuft nun mit `--worker-class gthread --workers 3 --threads 60`, also höchstens **180** gleichzeitigen Anfragen und damit 180 potenziellen Schreibern. Die Rechnung aus Abschnitt 8 mit denselben Größen (3 Schreibtransaktionen je Gesprächsschritt, ein Schritt alle 25 s, `fsync` 16 ms auf rotierender Platte) ergibt Folgendes; der Text oben bleibt unverändert:
+
+| | 10 Teilnehmende (oben) | 150 Teilnehmende |
+| --- | --- | --- |
+| Erwartete Schreibrate (25-s-Takt) | ~1,2/s | 150 / 25 s × 3 = **~18/s** |
+| Abstand zur Kapazität, rotierende Platte (~60/s) | 50-fach | **~3-fach** |
+| Abstand zur Kapazität, SSD (einige Hundert bis Tausend/s) | 100- bis 1000-fach | **10- bis 100-fach** |
+| Absurde Obergrenze (Dauerfeuer, 2 s je Schritt) | ~15/s | 150 / 2 s × 3 = ~225/s |
+| Längste Sperrwartezeit, rotierende Platte | 23 × 16 ms ≈ 370 ms (bei 24 Threads) | 179 × 16 ms ≈ **2,9 s** |
+
+Der Abstand schrumpft von gut anderthalb Größenordnungen auf einen Faktor 3 im schlechtesten Fall; auf SSD bleiben ein bis zwei Größenordnungen. Die absurde Obergrenze läge auf rotierender Platte über der Kapazität. Dann stauten sich Schreiber, aber jeder wartet höchstens, bis die 179 anderen ihren `fsync` hinter sich haben: ~2,9 s gegen `busy_timeout` 20 s. Das ist Warten, kein `database is locked` (Abschnitt 2). Welcher Datenträger auf dem Uberspace-Host liegt, ist nicht belegt.
+
+Die Bedingungen aus 8.6 gelten unverändert, mit mehr Gewicht: Ein Anbieteraufruf in einem `atomic()` hielte die Sperre jetzt gegen 179 statt 2 Wartende.
