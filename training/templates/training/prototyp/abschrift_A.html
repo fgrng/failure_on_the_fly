@@ -1,0 +1,17 @@
+{# PROTOTYP #362, Abschrift A: Checkbox-Liste aller beigetretenen Trainings am Seitenende, ein Speichern-Knopf. #}
+{% if slot == "ende" %}
+<section class="page-section" aria-labelledby="section-freigabe">
+    <header class="page-section__head">
+        <b>FG</b><span><h2 id="section-freigabe">Freigabe</h2><small>Die ganze Abschrift für Trainings freigeben, denen Sie beigetreten sind</small></span>
+    </header>
+    <form onsubmit="return false;" style="display: grid; gap: var(--space-1); max-width: 48rem;">
+        {% for t in prototyp.trainings %}
+        <label style="display: flex; gap: var(--space-1); align-items: center; font-weight: 400;">
+            <input type="checkbox" style="width: auto;" {% if t.freigegeben %}checked{% endif %}> {{ t.name }}
+        </label>
+        {% endfor %}
+        <p class="message--info" style="margin: var(--space-1) 0;">Die Ausbilder:innen eines angehakten Trainings sehen Ihre Sitzungen namentlich, ohne Denkspur. Sie können eine Freigabe jederzeit zurücknehmen; ein bereits gezogener Trainingsexport bleibt aber außerhalb des Systems bestehen.</p>
+        <div><button class="button" type="submit">Freigaben speichern</button></div>
+    </form>
+</section>
+{% endif %}

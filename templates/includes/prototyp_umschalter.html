@@ -1,0 +1,36 @@
+{# PROTOTYP (#362): Umschaltleiste. Erscheint nur, wenn die View bei DEBUG einen prototyp-Kontext liefert. #}
+{% if prototyp %}
+<div id="prototyp-umschalter" style="position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.9rem; background: #111; color: #fff; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.35); font: 600 0.875rem/1.2 system-ui, sans-serif;">
+    <button type="button" data-schritt="-1" style="all: unset; cursor: pointer; padding: 0 0.4rem;" aria-label="Vorherige Variante">←</button>
+    <span>PROTOTYP {{ prototyp.variante }} ({{ prototyp.name }})</span>
+    <button type="button" data-schritt="1" style="all: unset; cursor: pointer; padding: 0 0.4rem;" aria-label="Nächste Variante">→</button>
+    {% for schluessel, label, an in prototyp.schalter %}
+        <label style="font-weight: 400; display: flex; gap: 0.3rem; align-items: center; margin: 0;"><input type="checkbox" data-schalter="{{ schluessel }}" {% if an %}checked{% endif %} style="width: auto;">{{ label }}</label>
+    {% endfor %}
+</div>
+<script>
+(() => {
+    const keys = [{% for k, _ in prototyp.varianten %}"{{ k }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+    const gehe = (params) => { location.search = params.toString(); };
+    const wechsle = (schritt) => {
+        const params = new URLSearchParams(location.search);
+        const i = keys.indexOf(params.get("variant"));
+        params.set("variant", keys[(i + schritt + keys.length) % keys.length]);
+        gehe(params);
+    };
+    document.querySelectorAll("#prototyp-umschalter [data-schritt]").forEach((b) =>
+        b.addEventListener("click", () => wechsle(Number(b.dataset.schritt))));
+    document.querySelectorAll("#prototyp-umschalter [data-schalter]").forEach((c) =>
+        c.addEventListener("change", () => {
+            const params = new URLSearchParams(location.search);
+            c.checked ? params.set(c.dataset.schalter, "1") : params.delete(c.dataset.schalter);
+            gehe(params);
+        }));
+    document.addEventListener("keydown", (e) => {
+        if (e.target.closest("input, textarea, select, [contenteditable]")) return;
+        if (e.key === "ArrowLeft") wechsle(-1);
+        if (e.key === "ArrowRight") wechsle(1);
+    });
+})();
+</script>
+{% endif %}

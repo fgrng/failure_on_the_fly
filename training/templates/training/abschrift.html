@@ -14,10 +14,12 @@
         <div>
             <p>Meine Abschriften</p>
             <h1>{{ abschrift.erhebungsname }}</h1>
+            {% if prototyp %}{% include prototyp.template with slot="kopf" %}{% endif %}
             <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. Ihre Abschrift — nur Sie lesen sie.</span>
         </div>
         <a class="button button--secondary" href="{% url 'training:abschriften' %}">Zurück zur Liste</a>
     </header>
+    {% if prototyp %}{% include prototyp.template with slot="oben" %}{% endif %}
 
     {% for sitzung in sitzungen %}
         <section class="page-section" aria-labelledby="section-sitzung-{{ forloop.counter }}">
@@ -69,9 +71,12 @@
         <p>Diese Abschrift enthält keine Sitzung.</p>
     {% endfor %}
 
+    {% if prototyp %}{% include prototyp.template with slot="ende" %}{% endif %}
+
     <form method="post" action="{% url 'training:abschrift_loeschen' abschrift.pk %}">
         {% csrf_token %}
         <button class="button button--danger" type="submit">Abschrift löschen</button>
     </form>
 </section>
+{% include "includes/prototyp_umschalter.html" %}
 {% endblock %}

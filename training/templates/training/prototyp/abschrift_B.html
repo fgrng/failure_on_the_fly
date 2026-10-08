@@ -1,0 +1,23 @@
+{# PROTOTYP #362, Abschrift B: Zeile je Training mit Zustand und eigenem Knopf, oben vor den Sitzungen. #}
+{% if slot == "oben" %}
+<section class="page-section" aria-labelledby="section-freigabe">
+    <header class="page-section__head">
+        <b>00</b><span><h2 id="section-freigabe">Wer sieht diese Abschrift?</h2><small>{% if prototyp.freigegeben %}Freigegeben für {{ prototyp.freigegeben|length }} Trainings{% else %}Nur Sie{% endif %}</small></span>
+    </header>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th scope="col">Training</th><th scope="col">Zustand</th><th scope="col">Aktion</th></tr></thead>
+            <tbody>
+                {% for t in prototyp.trainings %}
+                <tr>
+                    <td>{{ t.name }}</td>
+                    <td>{% if t.freigegeben %}<span class="badge badge--final">freigegeben</span>{% else %}<span class="badge badge--draft">privat</span>{% endif %}</td>
+                    <td>{% if t.freigegeben %}<button class="button button--danger" type="button">Widerrufen</button>{% else %}<button class="button button--secondary" type="button">Freigeben</button>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p style="font-size: .875rem; color: var(--color-text-muted);">Freigeben heißt: Die Ausbilder:innen des Trainings lesen die ganze Abschrift. Ein Widerruf wirkt sofort im System; ein bereits gezogener Trainingsexport bleibt außerhalb bestehen.</p>
+</section>
+{% endif %}

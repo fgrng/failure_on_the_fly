@@ -13,10 +13,12 @@
         <div>
             <p>Ausbildung / Training starten</p>
             <h1>{{ training.name }}</h1>
+            {% if prototyp %}{% include prototyp.template with slot="kopf" %}{% endif %}
             <span>Wählen Sie eine Vignette, um das Training zu beginnen.</span>
         </div>
         <a class="button button--secondary" href="{% url 'training:katalog' %}">Zurück zum Katalog</a>
     </header>
+    {% if prototyp %}{% include prototyp.template with slot="oben" %}{% endif %}
 
     <section class="page-section" aria-labelledby="section-vignetten">
         <header class="page-section__head">
@@ -99,4 +101,5 @@
         </div>
     </section>
 </section>
+{% include "includes/prototyp_umschalter.html" %}
 {% endblock %}

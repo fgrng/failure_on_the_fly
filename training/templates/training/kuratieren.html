@@ -27,6 +27,8 @@
         <a class="button button--secondary" href="{% url 'training:liste' %}">Zurück zur Übersicht</a>
     </div>
 
+    {% if prototyp %}{% include prototyp.template with slot="oben" %}{% endif %}
+
     <section class="page-section" aria-labelledby="section-configured">
         <header class="page-section__head">
             <b>01</b><span><h2 id="section-configured">Vignetten</h2><small>Aktuell im Training enthalten</small></span>
@@ -93,6 +95,10 @@
         </div>
     </section>
 
+    {% if prototyp %}{% include prototyp.template with slot="nach_vignetten" %}{% endif %}
+
     {% include "includes/eigentuemerinnen.html" with dieses_artefakt="dieses Training" das_artefakt="das Training" eigentuemerinnen_abschnitt_nummer="03" eigentuemerin_hinzufuegen_url="training:eigentuemerin_hinzufuegen" eigentuemerin_entfernen_url="training:eigentuemerin_entfernen" kreis=training objekt_pk=training.pk %}
+    {% if prototyp %}{% include prototyp.template with slot="ende" %}{% endif %}
 </section>
+{% include "includes/prototyp_umschalter.html" %}
 {% endblock %}

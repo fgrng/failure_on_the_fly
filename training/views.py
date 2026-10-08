@@ -42,6 +42,7 @@ from vignetten.models import Vignette
 
 from .abschriften import abschrift_holen, abschrift_loeschen
 from .models import Abschrift, Training, Trainingsbindung
+from . import prototyp_fremdeinsicht  # PROTOTYP #362
 
 
 _ausbilderin_oder_administratorin = rolle_oder_administration(AUSBILDERIN_GRUPPE)
@@ -256,7 +257,11 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "training/abschrift.html",
-        {"abschrift": abschrift, "sitzungen": _gelesene_sitzungen(abschrift)},
+        {
+            "abschrift": abschrift,
+            "sitzungen": _gelesene_sitzungen(abschrift),
+            **prototyp_fremdeinsicht.kontext(request, "abschrift"),
+        },
     )
 
 
@@ -350,7 +355,11 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "training/detail.html",
-        {"training": training, "vignetten_daten": vignetten_daten},
+        {
+            "training": training,
+            "vignetten_daten": vignetten_daten,
+            **prototyp_fremdeinsicht.kontext(request, "detail"),
+        },
     )
 
 
@@ -368,6 +377,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
+            **prototyp_fremdeinsicht.kontext(request, "kuratieren"),
         },
     )
 

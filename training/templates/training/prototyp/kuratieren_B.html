@@ -1,0 +1,71 @@
+{# PROTOTYP #362, Kuratierseite B: Export bei den Seitenaktionen oben, Fremdeinsicht nach den Vignetten mit Kurzspalten V1..Vn und allen Datumslinks in der Zelle, Abschriften als eigene Spalte, Personen ohne Sitzung unter der Tabelle, Link-Block als eigene Sektion nach dem Kreis. #}
+{% if slot == "oben" %}
+<div style="display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); margin: calc(-1 * var(--space-2)) 0 var(--space-3);">
+    <a class="button button--secondary" href="#">⤓ Trainingsexport herunterladen</a>
+    <small style="color: var(--color-text-muted); max-width: 22rem;">ZIP mit einer Markdown-Datei je abgeschlossener Sitzung. <strong>Pseudonym, nicht anonym:</strong> Freitext wird nicht geschwärzt.</small>
+</div>
+
+{% elif slot == "nach_vignetten" %}
+<section class="page-section" aria-labelledby="section-fremdeinsicht">
+    <header class="page-section__head">
+        <b>02a</b><span><h2 id="section-fremdeinsicht">Fremdeinsicht</h2><small>Was die Gruppe in diesem Training abgeschlossen hat</small></span>
+    </header>
+    {% if prototyp.vignetten %}
+    <ol style="columns: 2; font-size: .875rem; color: var(--color-text-muted); margin: 0 0 var(--space-2); padding-left: 1.5rem;">
+        {% for v in prototyp.vignetten %}<li><strong>{{ v.kurz }}</strong> {{ v.name }}</li>{% endfor %}
+    </ol>
+    {% else %}
+    <p class="message--info">Keine Vignetten im Training; die Tabelle zeigt nur freigegebene Abschriften.</p>
+    {% endif %}
+    <div class="table-wrap" style="overflow-x: auto;">
+        <table class="table" style="font-size: .875rem;">
+            <thead>
+                <tr>
+                    <th scope="col">Teilnehmer:in</th>
+                    {% for v in prototyp.vignetten %}<th scope="col" title="{{ v.name }}" style="text-align: center;">{{ v.kurz }}</th>{% endfor %}
+                    <th scope="col" style="border-left: 3px solid var(--color-area-research-tint);">Freigegebene Abschriften</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for zeile in prototyp.zeilen %}{% if zeile.anzahl or zeile.abschriften %}
+                <tr>
+                    <th scope="row" style="white-space: nowrap;">{{ zeile.name }}</th>
+                    {% for zelle in zeile.zellen %}
+                    <td style="text-align: center; vertical-align: top; {% if not zelle.sitzungen %}background: var(--color-surface-muted);{% endif %}">
+                        {% for s in zelle.sitzungen %}<a href="{{ s.url }}" style="display: block; white-space: nowrap;">{{ s.datum|slice:":5" }}</a>{% endfor %}
+                    </td>
+                    {% endfor %}
+                    <td style="border-left: 3px solid var(--color-area-research-tint); min-width: 14rem;">
+                        {% for a in zeile.abschriften %}
+                            <a href="#" title="{{ a.erhebungsname }}">{{ a.erhebungsname|truncatechars:48 }}</a><br>
+                            <small style="color: var(--color-text-muted);">geholt {{ a.importiert_am }} · {{ a.sitzungen|length }} Sitzungen</small>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endif %}{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if prototyp.ohne_sitzung %}
+    <p style="color: var(--color-text-muted); font-size: .875rem;">
+        <strong>Beigetreten, noch nichts abgeschlossen:</strong>
+        {% for z in prototyp.ohne_sitzung %}{{ z.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+</section>
+
+{% elif slot == "ende" %}
+<section class="page-section" aria-labelledby="section-beitritt">
+    <header class="page-section__head">
+        <b>04</b><span><h2 id="section-beitritt">Beitritt</h2><small>Wer den Link öffnet, tritt dem Training bei; der Kreis sieht dann seine Sitzungen.</small></span>
+    </header>
+    <div style="display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); align-items: center; max-width: 48rem;">
+        <input type="text" readonly value="{{ prototyp.link }}" {% if prototyp.gesperrt %}disabled{% endif %}>
+        <button class="button button--secondary" type="button" {% if prototyp.gesperrt %}disabled{% endif %} onclick="navigator.clipboard.writeText('{{ prototyp.link }}')">Link kopieren</button>
+        <label style="display: flex; gap: var(--space-1); align-items: center; grid-column: 1 / -1;">
+            <input type="checkbox" style="width: auto;" {% if prototyp.gesperrt %}checked{% endif %} onchange="location.search='?variant=B{% if prototyp.leer %}&leer=1{% endif %}'+(this.checked?'&gesperrt=1':'')">
+            Beitritt sperren{% if prototyp.gesperrt %} — <strong style="color: var(--color-danger);">gesperrt: Neue Personen sehen eine Meldung statt des Trainings.</strong>{% endif %}
+        </label>
+    </div>
+</section>
+{% endif %}

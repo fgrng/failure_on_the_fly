@@ -1,0 +1,32 @@
+{# PROTOTYP #362, Abschrift C: Zustand und Freigaben als Chips im Seitenkopf, Freigeben als eigener Schritt (schritt=1) mit Hinweis vor der Bestätigung. #}
+{% if slot == "kopf" %}
+<div style="display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin: var(--space-1) 0;">
+    {% for t in prototyp.freigegeben %}
+        <span class="badge badge--final" style="color: var(--color-text-on-accent);" title="Freigegeben für {{ t.name }}">{{ t.name|truncatechars:36 }} <button type="button" style="all: unset; cursor: pointer; padding-left: .3rem;" aria-label="Freigabe widerrufen" onclick="confirm('Freigabe widerrufen? Ein bereits gezogener Trainingsexport bleibt außerhalb des Systems bestehen.')">×</button></span>
+    {% empty %}
+        <span class="badge badge--draft">privat</span>
+    {% endfor %}
+    {% if not prototyp.schritt %}<a class="button button--secondary" href="?variant=C&schritt=1">Für ein Training freigeben …</a>{% endif %}
+</div>
+{% elif slot == "oben" and prototyp.schritt %}
+<section class="page-section" aria-labelledby="section-freigabe" style="border: 2px solid var(--area-solid); border-radius: var(--radius); padding: var(--space-3);">
+    <header class="page-section__head">
+        <b>1/2</b><span><h2 id="section-freigabe">Abschrift freigeben</h2><small>Immer die ganze Abschrift, unabhängig von den Vignetten des Trainings</small></span>
+    </header>
+    <fieldset style="border: 0; padding: 0; display: grid; gap: var(--space-1);">
+        <legend>Für welches Training?</legend>
+        {% for t in prototyp.trainings %}{% if not t.freigegeben %}
+        <label style="display: flex; gap: var(--space-1); align-items: center; font-weight: 400;"><input type="radio" name="training" style="width: auto;"> {{ t.name }}</label>
+        {% endif %}{% endfor %}
+    </fieldset>
+    <ul style="margin: var(--space-2) 0;">
+        <li>Die Ausbilder:innen dieses Trainings lesen Ihre Sitzungen namentlich, ohne Denkspur.</li>
+        <li>Sie können die Freigabe jederzeit widerrufen.</li>
+        <li>Ein Trainingsexport, den jemand vorher gezogen hat, bleibt außerhalb des Systems bestehen.</li>
+    </ul>
+    <div style="display: flex; gap: var(--space-2);">
+        <button class="button" type="button">Freigeben</button>
+        <a class="button button--secondary" href="?variant=C">Abbrechen</a>
+    </div>
+</section>
+{% endif %}
