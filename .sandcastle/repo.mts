@@ -96,8 +96,10 @@ export const gitRepo: Repo = {
 
   async addedFiles(branch: string): Promise<string[]> {
     // Drei Punkte: gemessen ab der Merge-Basis, nicht gegen den heutigen Stand von main.
-    return git(["diff", "--name-only", "--diff-filter=A", `${MAIN_REF}...${branch}`])
-      .split("\n")
+    // Ohne Umbenennungen bleibt eine Datei, die eine gelöschte ersetzt, neu;
+    // `-z` liefert Pfade mit Umlauten unmaskiert.
+    return git(["diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", `${MAIN_REF}...${branch}`])
+      .split("\0")
       .filter(Boolean);
   },
 
