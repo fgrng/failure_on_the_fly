@@ -13,9 +13,10 @@ PLATZHALTER_TRANSKRIPT: str = "Dies ist ein Platzhalter-Transkript."
 
 # Wie lange eine Aufnahme höchstens unterwegs sein darf — bei beiden Anbietern
 # gleich: als Timeout des synchronen Aufrufs, als Gesamtbudget des Pollings
-# einschließlich jeder einzelnen Anfrage darin. Die 120 s lassen 60 s Luft zum
-# Worker-Timeout des Deployments (180 s, docs/DEPLOYMENT.md), sodass ein hängender Anbieter
-# einen sauberen Fehlerstatus erzeugt statt eines getöteten Workers.
+# einschließlich jeder einzelnen Anfrage darin. Die 120 s lassen 60 s Luft zu
+# den drei Minuten, nach denen das Uberspace-Frontend eine Verbindung ohne Daten
+# schließt (docs/DEPLOYMENT.md, ADR-0050), sodass ein hängender Anbieter einen
+# sauberen Fehlerstatus erzeugt statt einer abgerissenen Verbindung.
 TRANSKRIPTION_BUDGET_SEKUNDEN: float = 120.0
 
 # Eine Anfrage, deren Budget schon aufgebraucht ist, bekommt noch diese Frist,
