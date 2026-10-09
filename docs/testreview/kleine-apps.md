@@ -95,7 +95,7 @@ Die Schnittstelle steht in `docs/testreview/config-static.md` (#332). Für diese
   - Rohes HTML, Bilder, Tabellen, Fences und Backticks erscheinen wörtlich.
   - Nur der Informationstext verlinkt, und nur auf `https:`, `http:` und `mailto:`. Web-Links öffnen in einem neuen Tab mit `rel="noopener noreferrer"` und einem Hinweis für Screenreader. E-Mail-Links öffnen keinen neuen Tab.
   - Eine leere Quelle ergibt einen leeren String.
-- **Fehlerfälle:** Ein unbekannter Profilname wirft im Template einen `KeyError`.
+- **Fehlerfälle:** Ein unbekannter Profilname wirft im Template einen `TemplateSyntaxError`, der den Namen und die bekannten Profile nennt.
 
 ### Lesefeld (`texte/templates/texte/includes/`)
 

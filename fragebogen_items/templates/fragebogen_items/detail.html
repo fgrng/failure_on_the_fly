@@ -31,7 +31,7 @@
                 <button class="button button--danger" type="submit">Entwurf löschen</button>
             </form>
         {% elif item.zustand == item.Zustand.FINAL %}
-            {% if ist_neueste_nichtarchivierte_fassung %}
+            {% if not item.hat_nicht_archivierte_nachfolgerin %}
                 <form method="post" action="{% url 'fragebogen_items:neue_fassung' item.pk %}">
                     {% csrf_token %}
                     <button class="button button--secondary" type="submit">Neue Fassung</button>

@@ -1158,6 +1158,43 @@ def test_stichprobe_laesst_sich_nicht_per_bulk_update_archivieren() -> None:
 
 
 @pytest.mark.django_db
+def test_stichprobe_laesst_sich_nicht_archiviert_anlegen() -> None:
+    """Archivieren läuft auch beim Anlegen nur über die Lebenszyklus-Methode."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+
+    with pytest.raises(ValidationError, match="nicht archiviert angelegt"):
+        Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now(),
+            ende=timezone.now(),
+            archiviert=True,
+        )
+
+    assert not Stichprobe.objects.exists()
+
+
+@pytest.mark.django_db
+def test_stichprobe_laesst_sich_ausdruecklich_nicht_archiviert_anlegen() -> None:
+    """Nur archiviertes Anlegen ist gesperrt, nicht das Feld selbst."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+
+    stichprobe: Stichprobe = Stichprobe.objects.create(
+        erhebung=erhebung,
+        beginn=timezone.now(),
+        ende=timezone.now(),
+        archiviert=False,
+    )
+
+    assert stichprobe.archiviert is False
+
+
+@pytest.mark.django_db
 def test_erhebungsbindung_verbindet_stichprobe_mit_genau_einer_teilnahme() -> None:
     """Eine Erhebungsbindung ist die einzige Erhebungszuordnung einer Teilnahme."""
 

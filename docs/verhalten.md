@@ -157,10 +157,12 @@ das für alle. »Bearbeiten« öffnet nur diesen Text, bei den Szenentexten im
 Markdown-Feld mit Vorschau, mit eigenen Knöpfen »Speichern« und »Abbrechen«.
 Jeder Speichern-Knopf, am Text wie »Änderungen speichern« oder »Vignette
 anlegen«, speichert die ganze Vignette mit allen Feldern und allen geöffneten
-Texten; beim Anlegen legt er sie an. »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein Text mit
-Fehler steht nach dem Speichern offen. Wer die Seite mit ungespeicherten
-Änderungen verlässt, wird vom Browser gewarnt. Die Bildbeschreibung bleibt Teil
-der Bildkarte.
+Texten; beim Anlegen legt er sie an. »Abbrechen« verwirft nur die Änderungen
+an diesem Text. Ein Text mit Fehler steht nach dem Speichern offen. Gibt es
+noch keinen finalen Simulationskern, legt »Vignette anlegen« nichts an: Das
+Formular nennt den Grund, die Eingaben bleiben stehen. Wer die Seite mit
+ungespeicherten Änderungen verlässt, wird vom Browser gewarnt. Die
+Bildbeschreibung bleibt Teil der Bildkarte.
 
 ## Trainings verwalten
 
@@ -733,8 +735,10 @@ datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
 Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung
 über die Detailansicht; auch bei finalen und laufenden Erhebungen bleibt dieser
-Kreis änderbar. Unter einer finalen Erhebung lassen sich
-Stichproben mit Beginn und Ende anlegen; die Detailseite zeigt ihren kopierbaren
+Kreis änderbar. Unter einer finalen Erhebung lassen sich Stichproben mit Beginn
+und Ende anlegen; ein fehlender oder ungültiger Zeitpunkt oder ein Ende vor dem
+Beginn führt zurück auf die Detailseite, die den Grund als Meldung zeigt, und die
+Eingabe bleibt nicht stehen. Die Detailseite zeigt ihren kopierbaren
 Teilnahme-Link, ihre aus dem Zeitraum abgeleitete Phase — geplant, läuft oder
 abgeschlossen — und die Zahl ihrer Teilnahmen. Daneben stehen, nach dem
 aktuellen Stand der Einwilligungen, die Zahl der Teilnahmen, die die Verarbeitung
@@ -796,7 +800,10 @@ Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die
 private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst als
 Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
-stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
+stattdessen einen bearbeitbaren Folgeentwurf. Eine überholte Fassung, die
+bereits eine nicht archivierte Nachfolgerin hat, bietet keine neue Fassung an.
+Ein Versuch führt zum offenen Entwurf der Historie, falls es einen gibt, und
+sonst mit einer Meldung zurück auf ihre Detailansicht. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
 löschen. Lehnt das Item das Finalisieren oder Archivieren ab, etwa weil der
 Wortlaut fehlt, erscheint der Grund als Meldung auf der Detailansicht. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;

@@ -108,6 +108,26 @@ class VignetteAnlegenViewTests(TestCase):
         )
         self.assertContains(detail_response, f"Gepinnter Simulationskern: {kern.pk}")
 
+    def test_ohne_finalen_kern_meldet_das_formular_den_grund(self) -> None:
+        """Ohne finalen Kern bleibt die Eingabe stehen und nichts wird angelegt."""
+        self.client.force_login(_autorin("ada"))
+
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:anlegen"),
+            {
+                "schuelerin_name": "Mia",
+                "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+                "lehrperson_name": "Weber",
+                "lehrperson_geschlecht": Vignette.Geschlecht.MAENNLICH,
+                "budget_typ": Vignette.BudgetTyp.SCHRITTE,
+            },
+        )
+
+        self.assertContains(response, "Es gibt noch keinen finalen Simulationskern.")
+        self.assertContains(response, 'name="schuelerin_name" value="Mia"')
+        self.assertFalse(Vignette.objects.exists())
+        self.assertFalse(Vignettenhistorie.objects.exists())
+
     def test_formular_belegt_akteure_vor_und_bietet_keine_kernwahl(self) -> None:
         """Akteure sind als Komfort vorausgefüllt; der Kern bleibt nicht wählbar."""
         ada: Konto = _autorin("ada")
