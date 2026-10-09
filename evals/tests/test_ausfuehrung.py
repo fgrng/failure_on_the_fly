@@ -260,13 +260,7 @@ def test_schuelerin_und_bewerter_sehen_die_gelenkte_aeusserung() -> None:
 
     _, _, zweite_schuelerin, bewerter = _anfragetexte(vignette)
 
-    assert (
-        "Gelenkte Frage 1" in zweite_schuelerin,
-        "Gelenkte Frage 1" in bewerter,
-    ) == (
-        True,
-        True,
-    )
+    assert all("Gelenkte Frage 1" in text for text in (zweite_schuelerin, bewerter))
 
 
 @pytest.mark.django_db
@@ -284,7 +278,7 @@ def test_referenzdiagnose_erreicht_auch_die_lehrperson_nicht() -> None:
 
 
 @pytest.mark.django_db
-def test_gelenkter_erster_schritt_formuliert_ohne_bisherigen_verlauf() -> None:
+def test_gelenkter_erster_schritt_eroeffnet_das_gespraech() -> None:
     """Auch ganz vorn spricht die Lehrperson zuerst."""
 
     finaler_katalog(k=1, schritte=(gelenkt("Begrüße"),), uebergreifende=())

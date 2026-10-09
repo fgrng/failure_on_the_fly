@@ -1,16 +1,15 @@
 """Die Ausführung eines Evallaufs, die der Hintergrundprozess aufruft (ADR-0047)."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from simulation import (
     Antwortversuch,
     Ausfuehrung,
-    Ausgabeversuch,
     ausgabe_versuchen,
     antwort_versuchen,
     vorlage_rendern,
 )
-from simulation.models import Evalinput
+from simulation.models import Evalinput, ModellKonfiguration
 from simulation.sprachmodell import BEWERTER_SCHEMA, LEHRPERSON_SCHEMA
 
 from .models import Evalgespraech, Evallauf, Kriterium, Urteil, Wechsel
@@ -53,11 +52,13 @@ def _gespraech_fuehren(
     gespraech: Evalgespraech = Evalgespraech.objects.create(
         evallauf=evallauf, evalinput=evalinput, wiederholung=wiederholung
     )
-    verlauf: list[tuple[str, str]] = []
     protokoll: list[tuple[str, str, str]] = []
     for position, schritt in enumerate(evalinput.schritte.all(), 1):
+        verlauf: list[tuple[str, str]] = [
+            (lehrperson, aeusserung) for lehrperson, _, aeusserung in protokoll
+        ]
         lehrperson_aeusserung: str | None = (
-            _lehrperson_fragen(evallauf, schritt.text, verlauf, ausfuehrung)
+            _lehrperson_fragen(evallauf, schritt.text, protokoll, ausfuehrung)
             if schritt.gelenkt
             else schritt.text
         )
@@ -86,7 +87,6 @@ def _gespraech_fuehren(
         if versuch.antwort is None:
             _alle_beurteilen(gespraech, kriterien, False, ANTWORTVERSUCH_GESCHEITERT)
             return
-        verlauf.append((lehrperson_aeusserung, versuch.antwort.aeusserung))
         protokoll.append(
             (
                 lehrperson_aeusserung,
@@ -102,32 +102,21 @@ def _gespraech_fuehren(
 def _lehrperson_fragen(
     evallauf: Evallauf,
     inputstrategie: str,
-    verlauf: Sequence[tuple[str, str]],
+    protokoll: Sequence[tuple[str, str, str]],
     ausfuehrung: Ausfuehrung,
 ) -> str | None:
-    # Lässt die Lehrperson nach der Strategie formulieren; leer, wenn sie
-    # nach allen Versuchen nichts liefert. Wie beim Bewerter ist die gerenderte
-    # Lehrperson-Vorlage der System-Prompt mit `$inputstrategie` und `$verlauf`
-    # (ohne Denkspur), der User-Prompt der Verlauf, die Eingabe die Strategie.
-    # Die Strategie wird eingesetzt, nicht selbst als Vorlage gerendert.
+    # Lässt die Lehrperson nach der Strategie formulieren, mit dem bisherigen
+    # Verlauf ohne Denkspur; leer, wenn sie nach allen Versuchen nichts liefert.
 
-    verlauf_ohne_denkspur: str = _verlauf_ohne_denkspur(verlauf)
-    ausgabe: dict[str, object] | None = ausgabe_versuchen(
-        vorlage_rendern(
-            evallauf.katalog.lehrperson_vorlage,
-            {
-                **evallauf.platzhalter,
-                "inputstrategie": inputstrategie,
-                "verlauf": verlauf_ohne_denkspur,
-            },
-        ),
-        verlauf_ohne_denkspur,
+    ausgabe: dict[str, object] | None = _rolle_fragen(
+        evallauf,
+        evallauf.katalog.lehrperson_vorlage,
         evallauf.lehrperson_konfiguration,
-        [],
-        inputstrategie,
         LEHRPERSON_SCHEMA,
+        ("inputstrategie", inputstrategie),
+        _verlauf_ohne_denkspur(protokoll),
         ausfuehrung,
-    ).ausgabe
+    )
     return None if ausgabe is None else str(ausgabe["aeusserung"])
 
 
@@ -150,28 +139,17 @@ def _beurteilen(
     verlauf_mit_denkspur: str,
     ausfuehrung: Ausfuehrung,
 ) -> None:
-    # Fragt den Bewerter nach einem Kriterium. Die gerenderte Bewerter-Vorlage
-    # ist der System-Prompt und setzt Kriterium und Verlauf über `$kriterium`
-    # und `$verlauf` ein; der User-Prompt trägt noch einmal den Verlauf, die
-    # Eingabe den Kriteriumstext.
+    # Fragt den Bewerter nach einem Kriterium, mit dem Verlauf samt Denkspur.
 
-    ausgabeversuch: Ausgabeversuch = ausgabe_versuchen(
-        vorlage_rendern(
-            evallauf.katalog.bewerter_vorlage,
-            {
-                **evallauf.platzhalter,
-                "kriterium": kriterium.text,
-                "verlauf": verlauf_mit_denkspur,
-            },
-        ),
-        verlauf_mit_denkspur,
+    ausgabe: dict[str, object] | None = _rolle_fragen(
+        evallauf,
+        evallauf.katalog.bewerter_vorlage,
         evallauf.bewerter_konfiguration,
-        [],
-        kriterium.text,
         BEWERTER_SCHEMA,
+        ("kriterium", kriterium.text),
+        verlauf_mit_denkspur,
         ausfuehrung,
     )
-    ausgabe: dict[str, object] | None = ausgabeversuch.ausgabe
     if ausgabe is None:
         Urteil.objects.schreiben(gespraech, kriterium, None, BEWERTER_OHNE_AUSGABE)
     else:
@@ -183,12 +161,42 @@ def _beurteilen(
         )
 
 
-def _verlauf_ohne_denkspur(verlauf: Sequence[tuple[str, str]]) -> str:
+def _rolle_fragen(
+    evallauf: Evallauf,
+    vorlage: str,
+    konfiguration: ModellKonfiguration,
+    schema: Mapping[str, object],
+    eingabe: tuple[str, str],
+    verlauf: str,
+    ausfuehrung: Ausfuehrung,
+) -> dict[str, object] | None:
+    # Belegt Lehrperson und Bewerter gleich: Die gerenderte Vorlage ist der
+    # System-Prompt und setzt die Eingabe unter ihrem Platzhalter
+    # (`$inputstrategie` oder `$kriterium`) und den Verlauf über `$verlauf`
+    # ein; der User-Prompt trägt noch einmal den Verlauf, die Eingabe ihren
+    # Text. Eingesetzte Werte werden nicht selbst als Vorlage gerendert.
+    # Leer, wenn nach allen Versuchen nichts Auswertbares kam.
+
+    platzhalter, text = eingabe
+    return ausgabe_versuchen(
+        vorlage_rendern(
+            vorlage, {**evallauf.platzhalter, platzhalter: text, "verlauf": verlauf}
+        ),
+        verlauf,
+        konfiguration,
+        [],
+        text,
+        schema,
+        ausfuehrung,
+    ).ausgabe
+
+
+def _verlauf_ohne_denkspur(protokoll: Sequence[tuple[str, str, str]]) -> str:
     # Der Verlauf für die Lehrperson, je Wechsel nur die beiden Äußerungen.
 
     return "\n".join(
         f"<lehrperson>{lehrperson}</lehrperson>\n<schuelerin>{aeusserung}</schuelerin>"
-        for lehrperson, aeusserung in verlauf
+        for lehrperson, _, aeusserung in protokoll
     )
 
 

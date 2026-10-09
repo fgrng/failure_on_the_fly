@@ -10,7 +10,9 @@ from simulation.models import (
     Verwendung,
 )
 
-LEHRPERSON_VORLAGE: str = "Sprich mit $schuelerin_name nach $inputstrategie."
+LEHRPERSON_VORLAGE: str = (
+    "Sprich mit $schuelerin_name nach $inputstrategie. Bisher: $verlauf"
+)
 BEWERTER_VORLAGE: str = (
     "Prüfe $kriterium für $schuelerin_name mit $fehlermuster_beschreibung "
     "am Verlauf $verlauf."
@@ -23,6 +25,14 @@ def antworten(anzahl: int) -> list[dict[str, str]]:
     return [
         {"denkspur": f"Denkspur {nummer}", "aeusserung": f"Antwort {nummer}"}
         for nummer in range(1, anzahl + 1)
+    ]
+
+
+def aeusserungen(anzahl: int) -> list[dict[str, str]]:
+    """Liefert so viele nummerierte Äußerungen der simulierten Lehrperson."""
+
+    return [
+        {"aeusserung": f"Gelenkte Frage {nummer}"} for nummer in range(1, anzahl + 1)
     ]
 
 
@@ -60,14 +70,6 @@ def drei_fakes(
     fake_aktivieren(Verwendung.SCHUELERIN, schuelerin)
     fake_aktivieren(Verwendung.LEHRPERSON, lehrperson)
     fake_aktivieren(Verwendung.BEWERTER, bewerter)
-
-
-def aeusserungen(anzahl: int) -> list[dict[str, str]]:
-    """Liefert so viele nummerierte Äußerungen der simulierten Lehrperson."""
-
-    return [
-        {"aeusserung": f"Gelenkte Frage {nummer}"} for nummer in range(1, anzahl + 1)
-    ]
 
 
 def gelenkt(strategie: str) -> tuple[Inputschritt.Art, str]:
