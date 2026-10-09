@@ -312,27 +312,31 @@ und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
 Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
 `skript_fortlesen` sowie die Zahl `verzoegerung`, die jeden Aufruf so viele
 Sekunden warten lässt wie ein langsames Modell (nur als endliche Zahl ab 0; als
-Text, `true`, negativ oder unendlich wartet er nicht). Ohne `skript_fortlesen`
-beginnt das Skript bei jedem Antwortversuch von vorn, mit ihm — nur als `true`,
-nicht als Text — liest es eine zusammenhängende Ausführung wie ein Evallauf über
-alle Aufrufe derselben Konfiguration fort; jede neue Ausführung beginnt wieder
-vorn. Im Editor schlägt neben dem Sprachmodell der Knopf „Modelle und Basis-URL
-laden“ die Modelle des gewählten Anbieters vor: bei `openrouter` die mit
-Structured Output, bei `infomaniak` die Sprachmodelle des Kontos. Die beiden
-unterscheiden sich darin, was der Abruf verlangt: `openrouter` beantwortet seine
-Modellliste öffentlich, ganz ohne Zugangsdaten, `infomaniak` erst gegen das im
-Formular eingetippte Token — weder eine gespeicherte Fassung noch die Basis-URL
-sind dafür nötig. Bei `fake` erscheint der Knopf nicht; dieser Anbieter
-telefoniert nicht nach außen. Bei `infomaniak` füllt derselbe Druck zusätzlich
-die Basis-URL: Aus der Produktabfrage des Kontos entsteht die Endpunktwurzel des
-Sprachmodells. Sie entsteht nur bei genau einem AI-Produkt — ein geratenes wäre
-schlimmer als ein leeres Feld — und überschreibt nie eine schon getippte Angabe.
-Die Liste wird nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie
-nicht kennt, ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei
-überschreibbar. Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste
-führt, kann an dieser Naht trotzdem scheitern, und was sie nicht führt, kann
-laufen. Die prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches
-Modell, bevor es eine Erhebung erreicht. Aktiv ist je Verwendung (Schüler:in,
+Text, `true`, negativ oder unendlich wartet er nicht). Die Wartezeit endet
+spätestens an der übergebenen Anfragefrist. Erreicht die Verzögerung diese
+Frist, zählt der Aufruf als Anbieterfehler und verbraucht seinen Skripteintrag;
+weitere Versuche laufen ausschließlich über den bestehenden Mechanismus mit
+gemeinsamer Frist. Ohne `skript_fortlesen` beginnt das Skript bei jedem
+Antwortversuch von vorn, mit ihm — nur als `true`, nicht als Text — liest es
+eine zusammenhängende Ausführung wie ein Evallauf über alle Aufrufe derselben
+Konfiguration fort; jede neue Ausführung beginnt wieder vorn. Im Editor schlägt
+neben dem Sprachmodell der Knopf „Modelle und Basis-URL laden“ die Modelle des
+gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
+`infomaniak` die Sprachmodelle des Kontos. Die beiden unterscheiden sich darin,
+was der Abruf verlangt: `openrouter` beantwortet seine Modellliste öffentlich,
+ganz ohne Zugangsdaten, `infomaniak` erst gegen das im Formular eingetippte
+Token — weder eine gespeicherte Fassung noch die Basis-URL sind dafür nötig. Bei
+`fake` erscheint der Knopf nicht; dieser Anbieter telefoniert nicht nach außen.
+Bei `infomaniak` füllt derselbe Druck zusätzlich die Basis-URL: Aus der
+Produktabfrage des Kontos entsteht die Endpunktwurzel des Sprachmodells. Sie
+entsteht nur bei genau einem AI-Produkt — ein geratenes wäre schlimmer als ein
+leeres Feld — und überschreibt nie eine schon getippte Angabe. Die Liste wird
+nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie nicht kennt,
+ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
+Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste führt, kann an
+dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
+prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
+bevor es eine Erhebung erreicht. Aktiv ist je Verwendung (Schüler:in,
 Lehrperson, Bewerter) höchstens eine Konfiguration; dieselbe darf mehreren
 Verwendungen dienen, und eine einmal belegte Verwendung bleibt belegt.
 Sitzungen, Probelauf, Training und der Pin der Erhebung lesen allein die
@@ -609,6 +613,12 @@ einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
 Bewerter nach allen Versuchen nichts Auswertbares, bleibt dieses Kriterium *ohne
 Urteil*. Liefert die Lehrperson nach allen Versuchen keine Äußerung, endet das
 Gespräch vor diesem Schritt, und alle seine Kriterien bleiben *ohne Urteil*.
+Fehlversuche von Lehrperson und Bewerter bleiben mit Grund und Rohantwort
+gespeichert, auch wenn eine Wiederholung danach eine gültige Ausgabe liefert.
+Lehrpersonenfehler werden sofort nach dem Versuch festgehalten, Bewerterfehler
+zusammen mit dem Urteil. Ein Prozessabbruch erhält diese Details. Erfolgreiche
+Wiederholungen bleiben erfolgreich; ihre Fehlversuche ändern weder Quote noch
+Bestehen.
 
 Sobald ein Lauf nicht mehr wartet, zeigt die Ansicht zwei Spalten. Links stehen
 je Eval seine Evalinputs (mit der Folge ihrer Schritte, etwa „FFG“) und darunter
@@ -625,7 +635,15 @@ Reihenfolge, je Antwort die Denkspur, Fehlversuche mit Grund und Rohantwort, ein
 endgültig gescheiterter Antwortversuch als solcher, danach jedes Kriterium mit
 seinem Urteil („erfüllt“, „nicht erfüllt“, „ohne Urteil“, „noch nicht
 beurteilt“) und seiner Begründung. So lässt sich jedes Bewerterurteil fachlich
-nachprüfen und, wenn nötig, manuell korrigieren (siehe unten). Ohne Auswahl
+nachprüfen und, wenn nötig, manuell korrigieren (siehe unten). Bei allen drei
+Rollen öffnet „Fehlversuche · N“ die technischen Details, zunächst eingeklappt:
+bei der Lehrpersonenäußerung, der Schüler:innen-Antwort oder dem Bewerterurteil.
+Die Übersicht erhält keine zusätzlichen Fehlermarken. Scheitert die Lehrperson
+endgültig, steht im Verlauf etwa „Lehrperson konnte Schritt 1 nicht
+formulieren.“ mit ihren Fehlversuchen; frühere Schritte bleiben sichtbar, eine
+Schüler:innen-Antwort wird dafür nicht angezeigt. Solange nach einem
+erfolgreichen Lehrpersonenversuch noch kein vollständiger Wechsel gespeichert
+ist, zeigt die Ansicht diesen Teilstand ausdrücklich als solchen. Ohne Auswahl
 zeigt die Ansicht den ersten Evalinput und seine erste ausgeführte Wiederholung.
 Eine Wiederholung ohne Gespräch heißt „nicht ausgeführt“. Unlesbare Werte, ein
 Evalinput außerhalb des festgehaltenen Katalogs oder eine Wiederholung außerhalb

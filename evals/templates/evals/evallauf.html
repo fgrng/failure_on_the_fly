@@ -78,11 +78,20 @@
 
                 {% if auswahl.gespraech %}
                     <ol class="evallauf-verlauf">
-                        {% for wechsel, schritt in auswahl.wechsel %}
+                        {% for zeile in auswahl.schritte %}
+                            {% with wechsel=zeile.wechsel schritt=zeile.schritt %}
                             <li class="evallauf-blase evallauf-blase--lehrperson">
-                                <strong>Simulierte Lehrperson · Schritt {{ wechsel.position }} ({% if schritt.gelenkt %}gelenkt{% else %}fest{% endif %})</strong>
-                                <p>{{ wechsel.lehrperson_aeusserung }}</p>
+                                <strong>Simulierte Lehrperson · Schritt {{ zeile.position }} ({% if schritt.gelenkt %}gelenkt{% else %}fest{% endif %})</strong>
+                                {% if wechsel %}
+                                    <p>{{ wechsel.lehrperson_aeusserung }}</p>
+                                {% elif zeile.lehrperson_gescheitert %}
+                                    <p class="evallauf--offen">Lehrperson konnte Schritt {{ zeile.position }} nicht formulieren.</p>
+                                {% else %}
+                                    <p class="evallauf--offen">Für Schritt {{ zeile.position }} liegt noch kein vollständiger Wechsel vor.</p>
+                                {% endif %}
+                                {% include "evals/includes/fehlversuche.html" with fehlversuche=zeile.lehrperson_fehlversuche only %}
                             </li>
+                            {% if wechsel %}
                             <li class="evallauf-blase evallauf-blase--schuelerin">
                                 <strong>Simulierte Schüler:in</strong>
                                 {% if wechsel.aeusserung is None %}
@@ -91,17 +100,10 @@
                                     <p>{{ wechsel.aeusserung }}</p>
                                     <details open><summary>Denkspur</summary><p>{{ wechsel.denkspur }}</p></details>
                                 {% endif %}
-                                {% if wechsel.fehlversuche %}
-                                    <details>
-                                        <summary>Fehlversuche · {{ wechsel.fehlversuche|length }}</summary>
-                                        <ol>
-                                            {% for fehlversuch in wechsel.fehlversuche %}
-                                                <li>{{ fehlversuch.grund }}{% if fehlversuch.rohantwort %}<pre>{{ fehlversuch.rohantwort }}</pre>{% endif %}</li>
-                                            {% endfor %}
-                                        </ol>
-                                    </details>
-                                {% endif %}
+                                {% include "evals/includes/fehlversuche.html" with fehlversuche=wechsel.fehlversuche only %}
                             </li>
+                            {% endif %}
+                            {% endwith %}
                         {% endfor %}
                     </ol>
 
@@ -117,6 +119,7 @@
                                     {% elif urteil.begruendung %}
                                         <p>{{ urteil.begruendung }}</p>
                                     {% endif %}
+                                    {% include "evals/includes/fehlversuche.html" with fehlversuche=urteil.fehlversuche only %}
                                     {% if urteil.korrigierbar %}
                                         <details class="evallauf-korrektur">
                                             <summary>{% if urteil.korrigiert %}Korrektur ändern{% else %}Urteil korrigieren{% endif %}</summary>

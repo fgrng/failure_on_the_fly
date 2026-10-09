@@ -1,0 +1,10 @@
+{% if fehlversuche %}
+    <details>
+        <summary>Fehlversuche · {{ fehlversuche|length }}</summary>
+        <ol>
+            {% for fehlversuch in fehlversuche %}
+                <li>{{ fehlversuch.grund }}{% if fehlversuch.rohantwort %}<pre>{{ fehlversuch.rohantwort }}</pre>{% endif %}</li>
+            {% endfor %}
+        </ol>
+    </details>
+{% endif %}

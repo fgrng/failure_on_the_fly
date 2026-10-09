@@ -15,6 +15,14 @@ uv run python manage.py entwicklungsdaten_anlegen
 
 Dann die drei Fakes und den Testkatalog. Die Fakes lesen ihr Skript über den Lauf fort und warten je Aufruf drei Sekunden (`verzoegerung`), damit sich der Prozess mitten im Lauf neu starten lässt. Ein Gespräch macht fünf Aufrufe (zwei Antworten der Schüler:in, eine gelenkte Frage, zwei Urteile), ein Lauf mit *k* = 3 also rund 45 Sekunden. Jeder vierte Bewerter-Eintrag ist *nicht erfüllt*, damit die Übersicht beide Ausgänge zeigt.
 
+Die Verzögerung hält die Anfragefrist ein: Erreicht sie die Frist, endet der
+Aufruf mit einem Anbieterfehler und verbraucht seinen Skripteintrag. Drei
+Sekunden liegen darunter. Für eine gezielte Fristprobe kann die Verzögerung
+größer als die gemeinsame Frist von 90 Sekunden gewählt werden; ein Aufruf
+wartet dann höchstens bis zu seiner Anfragefrist. Die Fehlversuche sind auch
+bei Lehrperson und Bewerter im Gespräch aufklappbar, ebenso nach einer später
+erfolgreichen Wiederholung.
+
 ```bash
 uv run python manage.py shell <<'PY'
 from simulation.models import Evalinput, Evalkatalog, Inputschritt, ModellKonfiguration, Verwendung
@@ -71,3 +79,20 @@ Durchgespielt auf dem Stand von #421, der Start in der Oberfläche als POST übe
 | 6: vollständiger Lauf | Lauf 3 „fertig“ nach 46 s, 3 Gespräche, 6 Urteile; Ansicht: „3 von 3 · bestanden“, „2 von 3 · nicht bestanden“, Gesamtergebnis „Nicht bestanden“ |
 
 Nicht geprüft: der Betrieb unter supervisord auf Uberspace selbst; die Dienstdefinition steht in `docs/DEPLOYMENT.md`, Abschnitt 7.
+
+### Ergänzende Browserprüfung der Fehlerdetails (2026-10-09)
+
+Mit Chromium und einer eigenen Wegwerf-Datenbank geprüft: Anmeldung als
+Autor:in, Start per POST in der Oberfläche, Schließen der Seite, Verarbeitung
+durch einen separat gestarteten Einmal-Prozess und Rückkehr zum Ergebnis.
+Lehrperson und Bewerter lieferten in der ersten Wiederholung nach Fehlversuchen
+gültige Ausgaben; in der zweiten scheiterte die Lehrperson in Schritt 2.
+
+Bei 1440 Pixeln stehen die Spalten nebeneinander, bei 390 Pixeln untereinander.
+Die zunächst eingeklappten Fehlversuche lassen sich mit der Tastatur öffnen.
+Auch eine lange Rohantwort mit einem `<script>`-Tag erscheint ausschließlich
+als Text und verursacht keinen horizontalen Überlauf. Der endgültige
+Lehrpersonenfehler nennt Schritt 2 und erhält den vorherigen Wechsel, ohne eine
+gescheiterte Schüler:innen-Antwort vorzutäuschen. Es gab keine JavaScript-Fehler.
+Diese Zusatzprobe prüft die neue Fehleranzeige; die Prozessneustartprobe oben
+bleibt davon getrennt.

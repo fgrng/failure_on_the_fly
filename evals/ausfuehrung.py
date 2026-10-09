@@ -5,7 +5,9 @@ from typing import NamedTuple
 
 from simulation import (
     Antwortversuch,
+    Ausgabeversuch,
     Ausfuehrung,
+    Fehlversuch,
     ausgabe_versuchen,
     antwort_versuchen,
     vorlage_rendern,
@@ -74,11 +76,23 @@ def _gespraech_fuehren(
         verlauf: list[tuple[str, str]] = [
             (zeile.lehrperson, zeile.aeusserung) for zeile in protokoll
         ]
-        lehrperson_aeusserung: str | None = (
-            _lehrperson_fragen(evallauf, schritt.text, protokoll, ausfuehrung)
-            if schritt.gelenkt
-            else schritt.text
-        )
+        lehrperson_aeusserung: str | None = schritt.text
+        if schritt.gelenkt:
+            lehrperson: Ausgabeversuch = _lehrperson_fragen(
+                evallauf, schritt.text, protokoll, ausfuehrung
+            )
+            lehrperson_aeusserung = (
+                str(lehrperson.ausgabe["aeusserung"]) if lehrperson.ausgabe else None
+            )
+            if lehrperson.fehlversuche:
+                gespraech.lehrperson_fehlversuche.append(
+                    {
+                        "position": position,
+                        "fehlversuche": _fehlversuche(lehrperson.fehlversuche),
+                        "gescheitert": lehrperson.ausgabe is None,
+                    }
+                )
+                gespraech.save(update_fields=["lehrperson_fehlversuche"])
         if lehrperson_aeusserung is None:
             _alle_beurteilen(gespraech, kriterien, None, LEHRPERSON_OHNE_AUSGABE)
             return
@@ -96,10 +110,7 @@ def _gespraech_fuehren(
             lehrperson_aeusserung=lehrperson_aeusserung,
             denkspur=versuch.antwort.denkspur if versuch.antwort else "",
             aeusserung=versuch.antwort.aeusserung if versuch.antwort else None,
-            fehlversuche=[
-                {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
-                for fehlversuch in versuch.fehlversuche
-            ],
+            fehlversuche=_fehlversuche(versuch.fehlversuche),
         )
         if versuch.antwort is None:
             _alle_beurteilen(gespraech, kriterien, False, ANTWORTVERSUCH_GESCHEITERT)
@@ -121,11 +132,11 @@ def _lehrperson_fragen(
     inputstrategie: str,
     protokoll: Sequence[_Protokollzeile],
     ausfuehrung: Ausfuehrung,
-) -> str | None:
+) -> Ausgabeversuch:
     # Lässt die Lehrperson nach der Strategie formulieren, mit dem bisherigen
-    # Verlauf ohne Denkspur; leer, wenn sie nach allen Versuchen nichts liefert.
+    # Verlauf ohne Denkspur, einschließlich ihrer Fehlversuche.
 
-    ausgabe: dict[str, object] | None = _rolle_fragen(
+    return _rolle_fragen(
         evallauf,
         evallauf.katalog.lehrperson_vorlage,
         evallauf.lehrperson_konfiguration,
@@ -134,7 +145,6 @@ def _lehrperson_fragen(
         _verlauf_ohne_denkspur(protokoll),
         ausfuehrung,
     )
-    return None if ausgabe is None else str(ausgabe["aeusserung"])
 
 
 def _alle_beurteilen(
@@ -158,7 +168,7 @@ def _beurteilen(
 ) -> None:
     # Fragt den Bewerter nach einem Kriterium, mit dem Verlauf samt Denkspur.
 
-    ausgabe: dict[str, object] | None = _rolle_fragen(
+    versuch: Ausgabeversuch = _rolle_fragen(
         evallauf,
         evallauf.katalog.bewerter_vorlage,
         evallauf.bewerter_konfiguration,
@@ -167,15 +177,14 @@ def _beurteilen(
         verlauf_mit_denkspur,
         ausfuehrung,
     )
-    if ausgabe is None:
-        Urteil.objects.schreiben(gespraech, kriterium, None, BEWERTER_OHNE_AUSGABE)
-    else:
-        Urteil.objects.schreiben(
-            gespraech,
-            kriterium,
-            bool(ausgabe["erfuellt"]),
-            str(ausgabe["begruendung"]),
-        )
+    ausgabe: dict[str, object] | None = versuch.ausgabe
+    Urteil.objects.schreiben(
+        gespraech,
+        kriterium,
+        bool(ausgabe["erfuellt"]) if ausgabe else None,
+        str(ausgabe["begruendung"]) if ausgabe else BEWERTER_OHNE_AUSGABE,
+        fehlversuche=_fehlversuche(versuch.fehlversuche),
+    )
 
 
 def _rolle_fragen(
@@ -186,13 +195,13 @@ def _rolle_fragen(
     eingabe: _Eingabe,
     verlauf: str,
     ausfuehrung: Ausfuehrung,
-) -> dict[str, object] | None:
+) -> Ausgabeversuch:
     # Belegt Lehrperson und Bewerter gleich: Die gerenderte Vorlage ist der
     # System-Prompt und setzt die Eingabe unter ihrem Platzhalter
     # (`$inputstrategie` oder `$kriterium`) und den Verlauf über `$verlauf`
     # ein; der User-Prompt trägt noch einmal den Verlauf, die Eingabe ihren
     # Text. Eingesetzte Werte werden nicht selbst als Vorlage gerendert.
-    # Leer, wenn nach allen Versuchen nichts Auswertbares kam.
+    # Der Ausgabeversuch erhält auch Fehler vor einer gültigen Ausgabe.
 
     return ausgabe_versuchen(
         system_prompt=vorlage_rendern(
@@ -209,7 +218,16 @@ def _rolle_fragen(
         eingabe=eingabe.text,
         ausgabe_schema=schema,
         ausfuehrung=ausfuehrung,
-    ).ausgabe
+    )
+
+
+def _fehlversuche(fehlversuche: Sequence[Fehlversuch]) -> list[dict[str, str]]:
+    # Die Fehler aller Rollen nutzen dieselbe gespeicherte Form.
+
+    return [
+        {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
+        for fehlversuch in fehlversuche
+    ]
 
 
 def _verlauf_ohne_denkspur(protokoll: Sequence[_Protokollzeile]) -> str:

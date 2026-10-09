@@ -92,6 +92,17 @@ class Beurteilung:
 
 
 @dataclass(frozen=True)
+class Gespraechsschritt:
+    """Ein gespeicherter Wechsel oder ein Lehrpersonenversuch ohne fertigen Wechsel."""
+
+    position: int
+    schritt: Inputschritt
+    wechsel: "Wechsel | None"
+    lehrperson_fehlversuche: list[dict[str, str]]
+    lehrperson_gescheitert: bool
+
+
+@dataclass(frozen=True)
 class Gespraechsauswahl:
     """Das gewählte Evalgespräch eines Laufs; ohne Gespräch nicht ausgeführt."""
 
@@ -102,8 +113,7 @@ class Gespraechsauswahl:
     # Die Wiederholungen 1..k und ob es zu ihnen ein Gespräch gibt.
     wiederholungen: list[tuple[int, bool]]
     gespraech: "Evalgespraech | None"
-    # Jeder geschriebene Wechsel mit dem Inputschritt, aus dem er entstand.
-    wechsel: list[tuple["Wechsel", Inputschritt]]
+    schritte: list[Gespraechsschritt]
     beurteilungen: list[Beurteilung]
 
 
@@ -360,13 +370,15 @@ class Evallauf(models.Model):
             if evalinput_pk in kandidaten
             else next(iter(kandidaten.values()))
         )
-        # Ein Gespräch ohne Wechsel und Urteil brach ab, bevor etwas geschah.
+        # Auch ein Lehrpersonenversuch ohne fertigen Wechsel bleibt lesbar.
         gespraeche: dict[int, Evalgespraech] = {
             gespraech.wiederholung: gespraech
             for gespraech in self.gespraeche.filter(
                 evalinput=evalinput
             ).prefetch_related("wechsel", "urteile__korrigiert_von")
-            if gespraech.wechsel.all() or gespraech.urteile.all()
+            if gespraech.wechsel.all()
+            or gespraech.urteile.all()
+            or gespraech.lehrperson_fehlversuche
         }
         if wiederholung not in range(1, self.katalog.k + 1):
             wiederholung = min(gespraeche, default=1)
@@ -377,6 +389,14 @@ class Evallauf(models.Model):
             else {}
         )
         schritte: list[Inputschritt] = list(evalinput.schritte.all())
+        wechsel: dict[int, Wechsel] = {
+            wechsel.position: wechsel
+            for wechsel in (gespraech.wechsel.all() if gespraech else [])
+        }
+        lehrperson: dict[int, dict] = {
+            versuch["position"]: versuch
+            for versuch in (gespraech.lehrperson_fehlversuche if gespraech else [])
+        }
         return Gespraechsauswahl(
             _anzeigename(eval_),
             nummer,
@@ -385,8 +405,14 @@ class Evallauf(models.Model):
             [(zahl, zahl in gespraeche) for zahl in range(1, self.katalog.k + 1)],
             gespraech,
             [
-                (wechsel, schritte[wechsel.position - 1])
-                for wechsel in (gespraech.wechsel.all() if gespraech else [])
+                Gespraechsschritt(
+                    position,
+                    schritte[position - 1],
+                    wechsel.get(position),
+                    lehrperson.get(position, {}).get("fehlversuche", []),
+                    lehrperson.get(position, {}).get("gescheitert", False),
+                )
+                for position in sorted(wechsel.keys() | lehrperson.keys())
             ],
             [
                 Beurteilung(
@@ -425,6 +451,12 @@ class Evalgespraech(models.Model):
         Evalinput, on_delete=models.PROTECT, related_name="+"
     )
     wiederholung: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField()
+    # Je betroffener Schritt: Position, Fehlversuche und ob die Lehrperson
+    # endgültig scheiterte. Ohne fertigen Wechsel kann auch die Schüler:in
+    # noch laufen; deshalb wird das Scheitern ausdrücklich festgehalten.
+    lehrperson_fehlversuche: models.JSONField = models.JSONField(
+        default=list, blank=True
+    )
 
     @property
     def antwortversuch_gescheitert(self) -> bool:
@@ -481,6 +513,8 @@ class UrteilManager(models.Manager["Urteil"]):
         kriterium: Kriterium,
         erfuellt: bool | None,
         begruendung: str,
+        *,
+        fehlversuche: list[dict[str, str]] | None = None,
     ) -> "Urteil":
         """Legt das Urteil zu einem Kriterium an, gleich welcher Art es ist."""
 
@@ -493,6 +527,7 @@ class UrteilManager(models.Manager["Urteil"]):
             gespraech=gespraech,
             erfuellt=erfuellt,
             begruendung=begruendung,
+            fehlversuche=fehlversuche if fehlversuche is not None else [],
             **{feld: kriterium},
         )
 
@@ -522,6 +557,7 @@ class Urteil(models.Model):
     )
     erfuellt: models.BooleanField = models.BooleanField(null=True)
     begruendung: models.TextField = models.TextField(blank=True, default="")
+    fehlversuche: models.JSONField = models.JSONField(default=list, blank=True)
     # Eine manuelle Korrektur kehrt `erfuellt` um, ohne es zu überschreiben;
     # ohne Korrektur sind alle drei Felder leer.
     korrektur_begruendung: models.TextField = models.TextField(blank=True, default="")

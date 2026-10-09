@@ -147,13 +147,15 @@ class FakeSprachmodell:
     ) -> dict[str, object]:
         """Verbraucht genau einen Eintrag des Fake-Skripts.
 
-        Der Fake antwortet nach seiner Verzögerung; `timeout` bleibt hier
-        ohne Wirkung.
+        Die Verzögerung hält die Anfragefrist ein. Auch ein abgelaufener
+        Aufruf verbraucht seinen Eintrag und zählt als Anbieterfehler.
         """
 
-        if self.verzoegerung:
-            time.sleep(self.verzoegerung)
         eintrag: Mapping[str, Any] = self.skript.pop(0)
+        if self.verzoegerung:
+            time.sleep(min(self.verzoegerung, timeout))
+        if self.verzoegerung >= timeout:
+            raise Anbieterfehler("Die Frist des Fake-Aufrufs wurde überschritten.")
         rohantwort: str = str(eintrag.get("rohantwort", ""))
         if (fehler := eintrag.get("fehler")) == "formatbruch":
             raise Formatbruch(rohantwort)
