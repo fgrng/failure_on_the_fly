@@ -363,6 +363,135 @@ Zeichen, kurze Werte ausschließlich als Punkte.
 Im freien Probelauf der Administration steht jede Konfiguration zur Auswahl als
 »Bezeichnung (Sprachmodell)«.
 
+## Evalkatalog
+
+Administrator:innen pflegen unter `/system/evalkatalog/` (Sidebar: System) den
+Evalkatalog, gegen den künftig jeder Evallauf prüft (ADR-0046). Eine Instanz
+startet ohne Katalog; einen Standardkatalog gibt es nicht. Solange die Linie
+leer ist, bietet die Seite „Evalkatalog anlegen“ an. Das legt einen leeren
+Entwurf an und öffnet dessen Editor. Es gibt höchstens einen Entwurf zugleich:
+Mit Entwurf bietet die Seite nur „Entwurf bearbeiten“ und „Entwurf verwerfen“
+an, ein zweites Anlegen wird mit einer Meldung abgelehnt. Das Verwerfen löscht
+den Entwurf, danach lässt sich wieder ein Katalog anlegen.
+
+Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Der
+Baum trägt die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“,
+darunter jedes Eval als eigenen Knoten in seiner Reihenfolge, unter jedem Eval
+seine Evalinputs.
+„Durchlauf und Vorlagen“ trägt *k*, die Zahl der
+Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
+Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
+Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
+und `$verlauf`, in der Bewerter-Vorlage die des Promptvertrags sowie
+`$kriterium` und `$verlauf`. Hervorgehoben und vorn steht der Platzhalter, den
+nur diese Vorlage kennt. Ein Klick fügt ihn an der Schreibmarke ein. Geprüft
+werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernimmt die
+Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
+Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
+Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
+
+Am Knoten „Übergreifende Kriterien“ (im Baum mit der Zahl seiner Kriterien)
+pflegt die Administrator:in die Rubriken, nach denen der Bewerter jedes
+Evalgespräch aller Evals beurteilt, etwa Rollentreue. Kriterien sind reiner Text
+ohne Platzhalter; ein Hinweis am Knoten bittet, sie kern-neutral zu formulieren
+(ADR-0046). Das ist eine Pflegeregel, keine Prüfung. „Kriterium hinzufügen“
+hängt ein leeres Kriterium ans Ende. Je Zeile rücken Hoch und Runter das
+Kriterium um eine Stelle, wie bei den Zuordnungslisten der Erhebung; Hoch ist an
+der ersten, Runter an der letzten Zeile gesperrt. Der Papierkorb löscht es. Die
+Reihenfolge bleibt gespeichert. Jede dieser Gesten übernimmt zugleich die
+getippten Texte aller Kriterien, ebenso „Änderungen speichern“. Ein Katalog darf
+ohne übergreifende Kriterien auskommen. Ein neuer Entwurf aus einer finalen
+Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle schreibenden
+Routen des Knotens erreichen nur Entwürfe.
+
+„Eval hinzufügen“ unter dem Baum hängt ein Eval namens „Neues Eval“ ans Ende und
+öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um (höchstens
+200 Zeichen, ein längerer Name bleibt ungespeichert); ein Eval ohne Namen
+erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch und
+Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
+gesperrt), der Papierkorb löscht es samt Evalkriterien und Evalinputs und führt zurück
+zu „Durchlauf und Vorlagen“. Darunter pflegt sie die Evalkriterien des Evals,
+nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
+bearbeiten, löschen und umordnen genau wie die übergreifenden Kriterien, ebenfalls
+reiner Text ohne Platzhalter. Jede Geste im Editor, auch „Eval hinzufügen“ aus
+einem anderen Knoten heraus, übernimmt zugleich alle getippten Werte des
+Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein
+ungültiger Wert dort, etwa ein negatives *k*, bleibt ungespeichert; der Editor
+nennt ihn, und „Änderungen speichern“ meldet dann keinen Erfolg. Ein neuer
+Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
+gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
+Alle schreibenden Routen der Evals und Evalkriterien erreichen nur Entwürfe.
+
+Am Eval-Knoten legt „Evalinput hinzufügen“ einen weiteren Evalinput an; ein Eval
+darf mehrere haben. Ein neuer Evalinput startet mit drei leeren, festen
+Inputschritten und öffnet seinen Knoten. Im Baum hängt jeder Evalinput unter
+seinem Eval („Evalinput 1“, „Evalinput 2“ …), daneben die Folge seiner Schritte
+als Kürzel, F für fest und G für gelenkt (etwa „FGF“). Der Knoten zeigt den
+Evalinput als Drehbuch: Die Inputschritte stehen untereinander, nach jedem steht
+„Schüler:in antwortet“. Ein Segmentknopf je Schritt wählt zwischen „sagt
+wörtlich“ (fest: der Text ist die Inputäußerung) und „formuliert nach
+Strategie“ (gelenkt: der Text ist die Inputstrategie, auch bedingt formuliert).
+Gelenkte Schritte erscheinen als gestrichelte, kursive Blase. Inputschritte
+sind reiner Text ohne Platzhalter. „Inputschritt hinzufügen“ hängt einen leeren,
+festen Schritt ans Ende; je Schritt rücken Hoch und Runter ihn um eine Stelle (am
+Rand gesperrt), der Papierkorb entfernt ihn. Reihenfolge, Art und Text bleiben
+gespeichert; jede Geste übernimmt zugleich alle getippten Werte. Der Papierkorb
+am Kopf löscht den Evalinput samt seiner Schritte und führt zurück zum Eval.
+Neben dem Drehbuch stehen die Evalkriterien des Evals, nach denen seine
+Gespräche beurteilt werden. Die Länge eines Evalgesprächs ist die Zahl der
+Inputschritte; eine eigene Obergrenze gibt es nicht. Ein neuer Entwurf aus einer
+finalen Fassung übernimmt die Evalinputs samt Inputschritten. Leere Schritte
+weist erst das Finalisieren zurück. Alle schreibenden Routen der Evalinputs und
+Inputschritte erreichen nur Entwürfe.
+
+„Finalisieren“ in der Aktionszeile des Editors übernimmt zuerst alle getippten
+Werte und prüft dann den Entwurf, ohne ein Sprachmodell aufzurufen. Abgelehnt
+wird er, wenn eine Vorlage leer ist, einen ungültigen Platzhalter enthält oder
+einen Platzhalter außerhalb ihres Vertrags (`$kriterium` in der
+Lehrperson-Vorlage, `$inputstrategie` in der Bewerter-Vorlage, unbekannte
+Namen), wenn *k* kleiner als 1 ist, wenn der Katalog kein Eval hat, ein Eval
+kein Evalkriterium oder keinen Evalinput, ein Evalinput keinen Inputschritt,
+oder wenn ein Inputschritt, ein Evalkriterium oder ein übergreifendes Kriterium
+leer ist. Übergreifende Kriterien dürfen fehlen. Der Editor nennt dann jede
+Lücke als eigene Meldung, etwa „Evalinput 2 von Eval „Muster“ hat keinen
+Inputschritt.“ oder „Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres
+Vertrags: $inputstrategie.“; der Entwurf bleibt Entwurf, die getippten Werte
+bleiben gespeichert. Ist der getippte Durchlauf selbst ungültig, etwa ein
+negatives *k*, bleibt der ungültige Wert ungespeichert, gültige Vorlagen werden
+übernommen, der Editor nennt den Fehler, und der Entwurf bleibt Entwurf. Ebenso
+bleibt er Entwurf mit einer Meldung, wenn er beim Finalisieren inzwischen
+geändert wurde. Ein vollständiger Entwurf wird final, und die
+Administrator:in landet auf der Übersicht, die zeigt, seit wann die finale
+Fassung gilt. Ab dann prüft jeder Evallauf gegen sie. Die bisherige finale
+Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt
+immer genau eine finale Fassung. Andere Apps fragen sie über
+`Evalkatalog.objects.finale_fassung()` ab, das ohne finale Fassung `None`
+liefert.
+
+Finale und überholte Fassungen lassen sich vollständig lesen, damit
+nachvollziehbar bleibt, wogegen ein älterer Evallauf geprüft hat. Die Übersicht
+führt mit „Finale Fassung lesen“ zur finalen Fassung und listet unter
+„Überholte Fassungen“ jede überholte, die zuletzt gültige zuerst, mit dem
+Datum, ab dem sie galt. Beide öffnen sich im Editor über dieselben Adressen wie
+ein Entwurf, mit Baum und allen Knoten. Ein Hinweisband nennt den Zustand („final
+seit …“ bzw. „überholt“, mit dem Datum, ab dem sie galt). Alle Felder sind
+gesperrt; Platzhalterknöpfe, Hinzufügen, Hoch, Runter, Löschen, Speichern und
+Finalisieren fehlen, die Aktionszeile führt nur zurück zur Übersicht. Jede
+schreibende Anfrage an eine finale oder überholte Fassung wird abgewiesen.
+
+„Neue Fassung“ (auf der Übersicht und im Hinweisband der finalen Fassung) leitet
+aus der finalen Fassung einen Entwurf ab und öffnet seinen Editor. Der Entwurf
+ist eine Tiefenkopie: *k*, beide Vorlagen, die übergreifenden Kriterien und der
+ganze Baum aus Evals, Evalkriterien, Evalinputs und Inputschritten (mit Art und
+Text) in gleicher Reihenfolge; er verweist auf die finale Fassung als
+Vorgängerin. Änderungen am Entwurf berühren die Vorgängerin nicht. Solange ein
+Entwurf besteht, bieten die Seiten „Neue Fassung“ nicht an, und ein Versuch wird
+mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
+überholten Fassungen und Entwürfen lässt sich keine neue Fassung ableiten.
+
+Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
+Zugriff.
+
 ## Transkriptions-Konfiguration
 
 Die Transkription hängt an einer eigenen Konfiguration, die die Administration

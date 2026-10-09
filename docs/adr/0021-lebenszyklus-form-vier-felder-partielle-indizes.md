@@ -53,7 +53,10 @@ ADR-0017 sagt „jede App implementiert selbst" und begründet, warum es keine g
 
 Zur Form gehört auch, welchen Fehler ein Lebenszyklus wirft (#255). Vignette,
 Fragebogen-Item, Simulationskern und Erhebung erfüllen dieselbe Regel, jede App
-eigenständig (ADR-0017 bleibt unverändert):
+eigenständig (ADR-0017 bleibt unverändert). Simulationskern und Evalkatalog
+teilen sie innerhalb der App `simulation` über `simulation/lebenszyklus.py`
+(ADR-0035); auch die Teile des Evalkatalogs werfen außerhalb des Entwurfs
+Klasse B, ihre Massenupdates Klasse A:
 
 | Klasse | Was | Typ |
 |---|---|---|
@@ -74,8 +77,9 @@ wo Zustand = erwartet“. Trifft sie keine Zeile, folgt ein `ValidationError` mi
 der Meldung des Übergangs (Klasse C), auch wenn ein zweiter Tab die Fassung
 inzwischen verändert hat. Vignette, Fragebogen-Item und Erhebung tun das je in
 einer eigenen Routine `_zustand_wechseln` bzw. `_status_wechseln`, der
-Simulationskern direkt in `finalisieren()`; eine geteilte Funktion gibt es nicht
-(ADR-0017). Die Aktualisierung läuft über ein schlichtes `models.QuerySet`, weil
+Simulationskern und Evalkatalog in `VersionierteFassung.finalisieren()`
+(`simulation/lebenszyklus.py`); über App-Grenzen hinweg gibt es keine geteilte
+Funktion (ADR-0017). Die Aktualisierung läuft über ein schlichtes `models.QuerySet`, weil
 die öffentliche `update()`-Route gesperrt bleibt.
 
 - Fachliche Vorbedingungen prüft jedes Modell, soweit es sie hat, vor dem
@@ -85,8 +89,8 @@ die öffentliche `update()`-Route gesperrt bleibt.
   Zustandswechsel ab und hält weiter die Unveränderlichkeit finaler Fassungen
   (Klasse B). Ein internes Flag, das Übergänge an `save()` vorbeilässt, gibt es
   in diesen vier Lebenszyklen nicht mehr.
-- Der Simulationskern schreibt beim Finalisieren die geprüften Vorlagen in
-  derselben Anweisung mit; das Archivieren der bisherigen finalen Fassung davor
+- Simulationskern und Evalkatalog schreiben beim Finalisieren den geprüften
+  Inhalt (`_kopierwerte()`) in derselben Anweisung mit; das Archivieren der bisherigen finalen Fassung davor
   rollt die Transaktion zurück, wenn der Übergang scheitert.
 - `bearbeiten()` schreibt keinen Zustand, sondern legt einen Entwurf an; die
   Prüfung der Quelle bleibt dort eine Abfrage vor dem Anlegen.

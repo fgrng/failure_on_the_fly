@@ -7,6 +7,7 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,10 +18,12 @@ from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
 from .forms import (
+    EvalkatalogDurchlaufForm,
     ModellKonfigurationForm,
     SimulationskernForm,
     TranskriptionsKonfigurationForm,
 )
+from .lebenszyklus import VersionierteFassung
 from .modellverzeichnis import (
     Modellverzeichnis,
     Modellverzeichnisfehler,
@@ -31,27 +34,30 @@ from .modellverzeichnis import (
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
+    VERTRAG_BEWERTER,
+    VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
+    Eval,
+    Evalinput,
+    Evalkatalog,
+    Evalkriterium,
+    Inputschritt,
+    Katalogteil,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    UebergreifendesKriterium,
     Verwendung,
 )
 from .standardkern import STANDARDKERN_VORLAGEN
 
 
-def _finale_fassung() -> Simulationskern | None:
-    # Liefert die eine finale Fassung, die der Kern trägt, sobald es sie gibt.
+def _archivierte_fassungen[F: VersionierteFassung](modell: type[F]) -> QuerySet[F]:
+    # Liefert die überholten Fassungen einer Linie, die zuletzt überholte zuerst.
 
-    return Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL).first()
-
-
-def _archivierte_fassungen() -> QuerySet[Simulationskern]:
-    # Liefert die überholten Fassungen, die zuletzt überholte zuerst.
-
-    return Simulationskern.objects.filter(
-        zustand=Simulationskern.Zustand.ARCHIVIERT
-    ).order_by("-finalisiert_am", "-pk")
+    return modell.objects.filter(zustand=modell.Zustand.ARCHIVIERT).order_by(
+        "-finalisiert_am", "-pk"
+    )
 
 
 def _kern_kontext() -> dict[str, object]:
@@ -104,7 +110,7 @@ def _lebenszyklus_aktion_ausfuehren(
 @autorin_erforderlich
 def kern(request: HttpRequest) -> HttpResponse:
     """Zeigt die finale Kern-Fassung und die aktive Modell-Konfiguration."""
-    simulationskern: Simulationskern | None = _finale_fassung()
+    simulationskern: Simulationskern | None = Simulationskern.objects.finale_fassung()
     return render(
         request,
         "simulation/kern.html",
@@ -125,8 +131,8 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "entwurf": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ENTWURF
             ).first(),
-            "finale_fassung": _finale_fassung(),
-            "archivierte_fassungen": _archivierte_fassungen(),
+            "finale_fassung": Simulationskern.objects.finale_fassung(),
+            "archivierte_fassungen": _archivierte_fassungen(Simulationskern),
             # Dieselbe Bedingung, die die Anlege-Naht prüft: Nur solange die
             # Historie leer ist, nimmt sie eine erste Fassung an.
             "kern_fehlt": not Simulationskern.objects.exists(),
@@ -209,6 +215,570 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
         Simulationskern.Zustand.ENTWURF,
         Simulationskern.delete,
     )
+
+
+@administratorin_erforderlich
+def evalkatalog(request: HttpRequest) -> HttpResponse:
+    """Zeigt den Stand des Evalkatalogs; ohne Katalog bietet die Seite das Anlegen an."""
+    return render(
+        request,
+        "simulation/evalkatalog.html",
+        {
+            "entwurf": Evalkatalog.objects.filter(
+                zustand=Evalkatalog.Zustand.ENTWURF
+            ).first(),
+            "finale_fassung": Evalkatalog.objects.finale_fassung(),
+            "ueberholte_fassungen": _archivierte_fassungen(Evalkatalog),
+            # Dieselbe Bedingung, die die Anlege-Naht prüft.
+            "katalog_fehlt": not Evalkatalog.objects.exists(),
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_anlegen(request: HttpRequest) -> HttpResponse:
+    """Legt den ersten Evalkatalog als leeren Entwurf an und öffnet den Editor."""
+    try:
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect("simulation:evalkatalog")
+    return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+
+
+@dataclass(frozen=True)
+class _Platzhalterknopf:
+    # Ein Platzhalter unter einer Vorlage; eigen heißt: nur diese Vorlage kennt ihn.
+
+    name: str
+    eigen: bool
+
+
+def _platzhalterknoepfe(
+    vertrag: frozenset[str], gegenstueck: frozenset[str]
+) -> list[_Platzhalterknopf]:
+    # Vorlageneigen ist, was das Gegenstück nicht kennt; es steht vorn, die
+    # übrigen alphabetisch.
+
+    return [
+        _Platzhalterknopf(name, name not in gegenstueck)
+        for name in sorted(vertrag, key=lambda name: (name in gegenstueck, name))
+    ]
+
+
+def _fassung(request: HttpRequest, pk: int) -> Evalkatalog:
+    # Liefert die Katalog-Fassung der Anfrage. Nur ein POST schreibt und
+    # erreicht deshalb nur Entwürfe; lesend öffnen sich auch finale und
+    # überholte Fassungen.
+
+    fassungen: QuerySet[Evalkatalog] = Evalkatalog.objects.all()
+    if request.method == "POST":
+        fassungen = fassungen.filter(zustand=Evalkatalog.Zustand.ENTWURF)
+    return get_object_or_404(fassungen, pk=pk)
+
+
+def _editor_kontext(katalog: Evalkatalog, knoten: str) -> dict[str, object]:
+    # Was jeder Knoten braucht; außerhalb von Entwürfen sind die Felder
+    # gesperrt und die Bearbeitungsknöpfe fehlen.
+
+    return {
+        "katalog": katalog,
+        "knoten": knoten,
+        "gesperrt": katalog.zustand != Evalkatalog.Zustand.ENTWURF,
+        "neue_fassung_moeglich": katalog.zustand == Evalkatalog.Zustand.FINAL
+        and not Evalkatalog.objects.filter(
+            zustand=Evalkatalog.Zustand.ENTWURF
+        ).exists(),
+    }
+
+
+@administratorin_erforderlich
+def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt den Knoten Durchlauf und Vorlagen; speichert nur in Entwürfe."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    form: EvalkatalogDurchlaufForm
+    if request.method == "POST":
+        form = EvalkatalogDurchlaufForm(request.POST, instance=katalog)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Durchlauf und Vorlagen gespeichert.")
+            return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    else:
+        form = EvalkatalogDurchlaufForm(instance=katalog)
+    kontext: dict[str, object] = _editor_kontext(katalog, "durchlauf")
+    if kontext["gesperrt"]:
+        for feld in form.fields.values():
+            feld.disabled = True
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            **kontext,
+            "form": form,
+            "vorlagen": [
+                (
+                    form["lehrperson_vorlage"],
+                    _platzhalterknoepfe(VERTRAG_LEHRPERSON, VERTRAG_BEWERTER),
+                ),
+                (
+                    form["bewerter_vorlage"],
+                    _platzhalterknoepfe(VERTRAG_BEWERTER, VERTRAG_LEHRPERSON),
+                ),
+            ],
+        },
+    )
+
+
+def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> bool:
+    # Jede Geste im Editor sendet das ganze Formular; so gehen getippte Werte
+    # beim Hinzufügen, Löschen oder Umordnen nicht verloren, egal an welchem
+    # Knoten sie stehen. Ein ungültiger Wert des Durchlaufs bleibt
+    # ungespeichert und wird gemeldet; dann ist das Ergebnis False.
+
+    uebernommen: bool = True
+    if "k" in request.POST:
+        form: EvalkatalogDurchlaufForm = EvalkatalogDurchlaufForm(
+            request.POST, instance=katalog
+        )
+        if form.is_valid():
+            form.save()
+        else:
+            # Nur gültige Felder stehen in cleaned_data und sind schon
+            # in die Instanz übernommen.
+            katalog.save(update_fields=list(form.cleaned_data))
+            for feld, meldungen in form.errors.items():
+                for meldung in meldungen:
+                    messages.error(request, f"{form[feld].label}: {meldung}")
+            uebernommen = False
+    schritte: QuerySet[Inputschritt] = Inputschritt.objects.filter(
+        evalinput__eval__katalog=katalog
+    )
+    teile: tuple[tuple[QuerySet[Katalogteil], str, str], ...] = (
+        (katalog.uebergreifende_kriterien.all(), "kriterium", "text"),
+        (katalog.evals.all(), "eval", "name"),
+        (Evalkriterium.objects.filter(eval__katalog=katalog), "evalkriterium", "text"),
+        (schritte, "inputschritt", "text"),
+        (schritte, "inputschritt-art", "art"),
+    )
+    for queryset, praefix, feld in teile:
+        for teil in queryset:
+            wert: str | None = request.POST.get(f"{praefix}-{teil.pk}")
+            if wert is None or wert == getattr(teil, feld):
+                continue
+            # Wie bei „Durchlauf und Vorlagen“ bleibt ein ungültiger Wert
+            # ungespeichert, etwa ein Name über der Feldlänge.
+            try:
+                teil._meta.get_field(feld).clean(wert, teil)
+            except ValidationError:
+                continue
+            setattr(teil, feld, wert)
+            teil.save(update_fields=[feld])
+    return uebernommen
+
+
+@dataclass(frozen=True)
+class _Listenzeile:
+    # Eine Zeile einer Kriterien- oder Schrittliste samt den Zielen ihrer Gesten.
+
+    feld: str
+    text: str
+    hoch: str
+    runter: str
+    loeschen: str
+
+
+def _listenzeilen(
+    teile: QuerySet[Katalogteil], praefix: str, route: str, *args: int
+) -> list[_Listenzeile]:
+    # Baut die Zeilen einer Kriterien- oder Schrittliste; `route` ist der
+    # Namensstamm der Gesten.
+
+    return [
+        _Listenzeile(
+            feld=f"{praefix}-{teil.pk}",
+            text=teil.text,
+            hoch=reverse(f"{route}_verschieben", args=[*args, teil.pk, "hoch"]),
+            runter=reverse(f"{route}_verschieben", args=[*args, teil.pk, "runter"]),
+            loeschen=reverse(f"{route}_loeschen", args=[*args, teil.pk]),
+        )
+        for teil in teile
+    ]
+
+
+@administratorin_erforderlich
+@transaction.atomic
+def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt den Knoten Übergreifende Kriterien; speichert nur in Entwürfe."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    if request.method == "POST":
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Übergreifende Kriterien gespeichert.")
+        return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            **_editor_kontext(katalog, "kriterien"),
+            "zeilen": _listenzeilen(
+                katalog.uebergreifende_kriterien.all(),
+                "kriterium",
+                "simulation:evalkatalog_kriterium",
+                katalog.pk,
+            ),
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_kriterium_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Hängt ein leeres übergreifendes Kriterium ans Ende der Liste."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    _eingaben_uebernehmen(katalog, request)
+    katalog.kriterium_anlegen()
+    return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_kriterium_loeschen(
+    request: HttpRequest, pk: int, kriterium_pk: int
+) -> HttpResponse:
+    """Löscht ein übergreifendes Kriterium des Entwurfs."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    kriterium: UebergreifendesKriterium = get_object_or_404(
+        katalog.uebergreifende_kriterien, pk=kriterium_pk
+    )
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.delete()
+    messages.success(request, "Das Kriterium wurde gelöscht.")
+    return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+
+
+_RICHTUNGEN: dict[str, int] = {"hoch": -1, "runter": 1}
+
+
+def _versatz(richtung: str) -> int:
+    # Hoch ist -1, runter +1; andere Richtungen gibt es nicht.
+
+    if richtung not in _RICHTUNGEN:
+        raise Http404
+    return _RICHTUNGEN[richtung]
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_kriterium_verschieben(
+    request: HttpRequest, pk: int, kriterium_pk: int, richtung: str
+) -> HttpResponse:
+    """Rückt ein übergreifendes Kriterium eine Zeile hoch oder runter."""
+    versatz: int = _versatz(richtung)
+    katalog: Evalkatalog = _fassung(request, pk)
+    kriterium: UebergreifendesKriterium = get_object_or_404(
+        katalog.uebergreifende_kriterien, pk=kriterium_pk
+    )
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.verschieben(versatz)
+    return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+
+
+def _eval_der_fassung(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> tuple[Evalkatalog, Eval]:
+    # Das Eval muss zur genannten Fassung gehören (siehe _fassung).
+
+    katalog: Evalkatalog = _fassung(request, pk)
+    return katalog, get_object_or_404(katalog.evals, pk=eval_pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Hängt ein Eval ans Ende des Katalogs und öffnet seinen Knoten."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_: Eval = katalog.eval_anlegen("Neues Eval")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@transaction.atomic
+def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpResponse:
+    """Zeigt den Knoten eines Evals samt Evalkriterien; speichert nur in Entwürfe."""
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    if request.method == "POST":
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Das Eval wurde gespeichert.")
+        return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+    evals: list[Eval] = list(katalog.evals.all())
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            **_editor_kontext(katalog, "eval"),
+            "eval": eval_,
+            "eval_erstes": eval_ == evals[0],
+            "eval_letztes": eval_ == evals[-1],
+            "zeilen": _listenzeilen(
+                eval_.kriterien.all(),
+                "evalkriterium",
+                "simulation:evalkatalog_evalkriterium",
+                katalog.pk,
+                eval_.pk,
+            ),
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Löscht ein Eval samt seiner Evalkriterien und Evalinputs."""
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.delete()
+    messages.success(request, "Das Eval wurde gelöscht.")
+    return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_verschieben(
+    request: HttpRequest, pk: int, eval_pk: int, richtung: str
+) -> HttpResponse:
+    """Rückt ein Eval im Katalog eine Stelle hoch oder runter."""
+    versatz: int = _versatz(richtung)
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.verschieben(versatz)
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Hängt ein leeres Evalkriterium ans Ende der Liste des Evals."""
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.kriterium_anlegen()
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int
+) -> HttpResponse:
+    """Löscht ein Evalkriterium des Evals."""
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.delete()
+    messages.success(request, "Das Kriterium wurde gelöscht.")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_verschieben(
+    request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int, richtung: str
+) -> HttpResponse:
+    """Rückt ein Evalkriterium eine Zeile hoch oder runter."""
+    versatz: int = _versatz(richtung)
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.verschieben(versatz)
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+def _evalinput_der_fassung(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> tuple[Evalkatalog, Eval, Evalinput]:
+    # Der Evalinput muss zum genannten Eval der Fassung gehören (siehe _fassung).
+
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    return katalog, eval_, get_object_or_404(eval_.inputs, pk=input_pk)
+
+
+def _zum_evalinput(evalinput: Evalinput) -> HttpResponse:
+    # Zurück an den Knoten des Evalinputs.
+
+    return redirect(
+        "simulation:evalkatalog_evalinput",
+        pk=evalinput.eval.katalog_id,
+        eval_pk=evalinput.eval_id,
+        input_pk=evalinput.pk,
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalinput_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Hängt einen Evalinput mit drei leeren Schritten an und öffnet seinen Knoten."""
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput: Evalinput = eval_.input_anlegen()
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@transaction.atomic
+def evalkatalog_evalinput(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Zeigt einen Evalinput als Drehbuch; speichert nur in Entwürfe."""
+    katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
+    if request.method == "POST":
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Der Evalinput wurde gespeichert.")
+        return _zum_evalinput(evalinput)
+    schritte: list[Inputschritt] = list(evalinput.schritte.all())
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            **_editor_kontext(katalog, "evalinput"),
+            "eval": eval_,
+            "evalinput": evalinput,
+            "nummer": list(eval_.inputs.all()).index(evalinput) + 1,
+            "schrittzeilen": zip(
+                schritte,
+                _listenzeilen(
+                    schritte,
+                    "inputschritt",
+                    "simulation:evalkatalog_inputschritt",
+                    katalog.pk,
+                    eval_.pk,
+                    evalinput.pk,
+                ),
+            ),
+            "arten": Inputschritt.Art.choices,
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalinput_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Löscht einen Evalinput samt seiner Inputschritte."""
+    katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput.delete()
+    messages.success(request, "Der Evalinput wurde gelöscht.")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Hängt einen leeren, festen Inputschritt ans Ende des Drehbuchs."""
+    katalog, _, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput.schritt_anlegen()
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int, schritt_pk: int
+) -> HttpResponse:
+    """Entfernt einen Inputschritt aus dem Drehbuch."""
+    katalog, _, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
+    schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
+    _eingaben_uebernehmen(katalog, request)
+    schritt.delete()
+    messages.success(request, "Der Inputschritt wurde entfernt.")
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_verschieben(
+    request: HttpRequest,
+    pk: int,
+    eval_pk: int,
+    input_pk: int,
+    schritt_pk: int,
+    richtung: str,
+) -> HttpResponse:
+    """Rückt einen Inputschritt eine Zeile hoch oder runter."""
+    versatz: int = _versatz(richtung)
+    katalog, _, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
+    schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
+    _eingaben_uebernehmen(katalog, request)
+    schritt.verschieben(versatz)
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert den Entwurf samt getippter Eingaben oder nennt seine Lücken."""
+    katalog: Evalkatalog = _fassung(request, pk)
+    if not _eingaben_uebernehmen(katalog, request):
+        return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    try:
+        katalog.finalisieren()
+    except ValidationError as fehler:
+        for meldung in fehler.messages:
+            messages.error(request, meldung)
+        return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    messages.success(
+        request, "Der Evalkatalog ist final. Jeder Evallauf prüft ab jetzt gegen ihn."
+    )
+    return redirect("simulation:evalkatalog")
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
+    """Leitet aus der finalen Fassung einen Entwurf ab und öffnet seinen Editor."""
+    katalog: Evalkatalog = get_object_or_404(
+        Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.FINAL), pk=pk
+    )
+    try:
+        entwurf: Evalkatalog = katalog.bearbeiten()
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect("simulation:evalkatalog")
+    return redirect("simulation:evalkatalog_editor", pk=entwurf.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Verwirft den Katalog-Entwurf."""
+    _fassung(request, pk).delete()
+    messages.success(request, "Der Evalkatalog-Entwurf wurde verworfen.")
+    return redirect("simulation:evalkatalog")
 
 
 @dataclass(frozen=True)

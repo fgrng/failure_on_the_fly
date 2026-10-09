@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% include "simulation/includes/evalkatalog_titel.html" %}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/zuordnungsliste.css' %}">
+    <link rel="stylesheet" href="{% static 'css/evalkatalog.css' %}">
+    <script src="{% static 'js/ungespeichert.js' %}" defer></script>
+    <script src="{% static 'js/platzhalter.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System / Evalkatalog</p>
+            <h1>{% include "simulation/includes/evalkatalog_titel.html" %}</h1>
+            <span>Links der Katalog, rechts der gewählte Knoten.</span>
+        </div>
+        <span class="badge">{{ katalog.zustandsbezeichnung }}</span>
+    </header>
+
+    {% if gesperrt %}
+        <div class="evalkatalog-band" role="note">
+            {% if katalog.zustand == katalog.Zustand.FINAL %}
+                <p>Diese Fassung ist final seit {{ katalog.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen sie; ändern lässt sie sich nicht.</p>
+                {% if neue_fassung_moeglich %}
+                    {% include "simulation/includes/evalkatalog_neue_fassung.html" with fassung=katalog %}
+                {% endif %}
+            {% else %}
+                <p>Diese Fassung ist überholt. Sie galt ab {{ katalog.finalisiert_am|date:"d.m.Y H:i" }}; Evalläufe aus dieser Zeit haben gegen sie geprüft. Ändern lässt sie sich nicht.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% comment %}
+        Baum und Knoten stehen im Formular, damit die Aktionszeile als dessen
+        letztes Kind über die ganze Breite klebt (vignette-form.css).
+    {% endcomment %}
+    <form id="evalkatalog-formular" method="post"{% if not gesperrt %} data-ungespeichert-warnen{% endif %}>
+        {% csrf_token %}
+        <div class="evalkatalog-editor">
+            <nav class="evalkatalog-baum" aria-label="Katalog">
+                <ul>
+                    <li><a href="{% url 'simulation:evalkatalog_editor' katalog.pk %}"{% if knoten == "durchlauf" %} aria-current="page"{% endif %}>Durchlauf und Vorlagen</a></li>
+                    <li><a href="{% url 'simulation:evalkatalog_kriterien' katalog.pk %}"{% if knoten == "kriterien" %} aria-current="page"{% endif %}>Übergreifende Kriterien ({{ katalog.uebergreifende_kriterien.count }})</a></li>
+                </ul>
+                <h2 class="evalkatalog-baum__titel">Evals</h2>
+                <ul aria-label="Evals">
+                    {% for knoten_eval in katalog.evals.all %}
+                        <li>
+                            <a href="{% url 'simulation:evalkatalog_eval' katalog.pk knoten_eval.pk %}"{% if knoten == "eval" and knoten_eval == eval %} aria-current="page"{% endif %}>{{ knoten_eval.name|default:"Unbenanntes Eval" }}</a>
+                            {% with inputs=knoten_eval.inputs.all %}{% if inputs %}
+                                <ul class="evalkatalog-baum__inputs" aria-label="Evalinputs von {{ knoten_eval.name|default:'Unbenanntes Eval' }}">
+                                    {% for knoten_input in inputs %}
+                                        <li><a href="{% url 'simulation:evalkatalog_evalinput' katalog.pk knoten_eval.pk knoten_input.pk %}"{% if knoten == "evalinput" and knoten_input == evalinput %} aria-current="page"{% endif %}>Evalinput {{ forloop.counter }} <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ knoten_input.kuerzel }}</span></a></li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}{% endwith %}
+                        </li>
+                    {% empty %}
+                        <li class="evalkatalog-baum__leer">Noch keine Evals.</li>
+                    {% endfor %}
+                </ul>
+                {% if not gesperrt %}
+                    <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_eval_anlegen' katalog.pk %}">Eval hinzufügen</button>
+                {% endif %}
+            </nav>
+
+            {% if knoten == "kriterien" %}
+                <section class="evalkatalog-knoten" aria-label="Übergreifende Kriterien">
+                    <h2>Übergreifende Kriterien</h2>
+                    <p class="evalkatalog-hinweis">Nach diesen Kriterien beurteilt der Bewerter jedes Evalgespräch aller Evals. Formulieren Sie sie kern-neutral: Sie prüfen, was jeder Simulationskern verlangt, etwa Rollentreue, keine Stilregeln einer bestimmten Kern-Fassung. Kriterien sind reiner Text ohne Platzhalter.</p>
+                    {% include "simulation/includes/evalkatalog_kriterienliste.html" with bezeichnung="Übergreifende Kriterien" leer="Noch keine übergreifenden Kriterien. Ein Katalog darf ohne sie auskommen." %}
+                    {% if not gesperrt %}
+                        <div>
+                            <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_kriterium_anlegen' katalog.pk %}">Kriterium hinzufügen</button>
+                        </div>
+                    {% endif %}
+                </section>
+            {% elif knoten == "eval" %}
+                <section class="evalkatalog-knoten" aria-label="Eval">
+                    <h2>Eval</h2>
+                    <div class="evalkatalog-evalkopf">
+                        <div class="vignette-field">
+                            <label for="eval-{{ eval.pk }}">Name</label>
+                            <input type="text" id="eval-{{ eval.pk }}" name="eval-{{ eval.pk }}" value="{{ eval.name }}" maxlength="200"{% if gesperrt %} disabled{% endif %}>
+                        </div>
+                        {% if not gesperrt %}
+                        <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für dieses Eval">
+                            <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'hoch' %}"{% if eval_erstes %} disabled{% endif %} aria-label="Eval nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                            <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'runter' %}"{% if eval_letztes %} disabled{% endif %} aria-label="Eval nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                            <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_eval_loeschen' katalog.pk eval.pk %}" aria-label="Eval löschen" title="Eval samt Kriterien und Evalinputs löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h3>Evalkriterien</h3>
+                    <p class="evalkatalog-hinweis">Nach diesen Kriterien beurteilt der Bewerter jedes Evalgespräch dieses Evals. Kriterien sind reiner Text ohne Platzhalter.</p>
+                    {% include "simulation/includes/evalkatalog_kriterienliste.html" with bezeichnung="Evalkriterien" leer="Noch keine Evalkriterien." %}
+                    {% if not gesperrt %}
+                        <div>
+                            <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_evalkriterium_anlegen' katalog.pk eval.pk %}">Evalkriterium hinzufügen</button>
+                        </div>
+                    {% endif %}
+                    <h3>Evalinputs</h3>
+                    <p class="evalkatalog-hinweis">Jeder Evalinput ist ein Drehbuch für die simulierte Lehrperson. Ein neuer startet mit drei leeren Inputschritten.</p>
+                    <ul class="evalkatalog-inputliste" aria-label="Evalinputs">
+                        {% for evalinput in eval.inputs.all %}
+                            <li><a href="{% url 'simulation:evalkatalog_evalinput' katalog.pk eval.pk evalinput.pk %}">Evalinput {{ forloop.counter }}</a> <span class="evalkatalog-kuerzel">{{ evalinput.kuerzel }}</span></li>
+                        {% empty %}
+                            <li class="evalkatalog-hinweis">Noch keine Evalinputs.</li>
+                        {% endfor %}
+                    </ul>
+                    {% if not gesperrt %}
+                        <div>
+                            <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_evalinput_anlegen' katalog.pk eval.pk %}">Evalinput hinzufügen</button>
+                        </div>
+                    {% endif %}
+                </section>
+            {% elif knoten == "evalinput" %}
+                <div class="evalkatalog-drehbuchknoten">
+                    <section class="evalkatalog-knoten" aria-label="Evalinput">
+                        <div class="evalkatalog-evalkopf">
+                            <h2>Evalinput {{ nummer }} <span class="evalkatalog-kopfzusatz">zu {{ eval.name|default:"Unbenanntes Eval" }}</span></h2>
+                            {% if not gesperrt %}
+                                <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für diesen Evalinput">
+                                    <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_evalinput_loeschen' katalog.pk eval.pk evalinput.pk %}" aria-label="Evalinput löschen" title="Evalinput samt Schritten löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                                </span>
+                            {% endif %}
+                        </div>
+                        <p class="evalkatalog-hinweis">Jeder Inputschritt ist eine Äußerung der simulierten Lehrperson, auf die die simulierte Schüler:in antwortet. „Sagt wörtlich“ bringt den Text als Inputäußerung vor; „formuliert nach Strategie“ lässt die Lehrperson nach dieser Inputstrategie selbst formulieren, auch bedingt („Nennt sie die zum Muster passende Lösung, äußere Zweifel …“). Reiner Text ohne Platzhalter.</p>
+                        <ol class="drehbuch" aria-label="Inputschritte">
+                            {% for schritt, zeile in schrittzeilen %}
+                                <li class="drehbuch__schritt">
+                                    <div class="drehbuch__blase{% if schritt.gelenkt %} drehbuch__blase--gelenkt{% endif %}">
+                                        <div class="drehbuch__kopf">
+                                            <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
+                                            <fieldset class="drehbuch__segment">
+                                                <legend class="zuordnung-unsichtbar">Art von Schritt {{ forloop.counter }}</legend>
+                                                {% for wert, beschriftung in arten %}<label><input type="radio" name="inputschritt-art-{{ schritt.pk }}" value="{{ wert }}"{% if schritt.art == wert %} checked{% endif %}{% if gesperrt %} disabled{% endif %}> {{ beschriftung }}</label>{% endfor %}
+                                            </fieldset>
+                                            {% if not gesperrt %}
+                                            <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Schritt {{ forloop.counter }}">
+                                                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.hoch }}"{% if forloop.first %} disabled{% endif %} aria-label="Schritt {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                                                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.runter }}"{% if forloop.last %} disabled{% endif %} aria-label="Schritt {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                                                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{{ zeile.loeschen }}" aria-label="Schritt {{ forloop.counter }} entfernen" title="Entfernen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <label class="zuordnung-unsichtbar" for="{{ zeile.feld }}">Text von Schritt {{ forloop.counter }}</label>
+                                        <textarea class="drehbuch__text" id="{{ zeile.feld }}" name="{{ zeile.feld }}" rows="2"{% if gesperrt %} disabled{% endif %}>{{ zeile.text }}</textarea>
+                                    </div>
+                                    <p class="drehbuch__antwort">Schüler:in antwortet</p>
+                                </li>
+                            {% empty %}
+                                <li class="zuordnungsliste__leer">Noch keine Inputschritte.</li>
+                            {% endfor %}
+                        </ol>
+                        {% if not gesperrt %}
+                            <div>
+                                <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_inputschritt_anlegen' katalog.pk eval.pk evalinput.pk %}">Inputschritt hinzufügen</button>
+                            </div>
+                        {% endif %}
+                    </section>
+                    <aside class="evalkatalog-beurteilung" aria-label="Evalkriterien">
+                        <h3>Beurteilt nach</h3>
+                        <ol>
+                            {% for kriterium in eval.kriterien.all %}
+                                <li>{{ kriterium.text|default:"(leeres Kriterium)" }}</li>
+                            {% empty %}
+                                <li class="evalkatalog-hinweis">Das Eval hat noch keine Evalkriterien.</li>
+                            {% endfor %}
+                        </ol>
+                        <p class="evalkatalog-hinweis">Die Evalkriterien des Evals, dazu die übergreifenden Kriterien.</p>
+                    </aside>
+                </div>
+            {% else %}
+                <section class="evalkatalog-knoten" aria-label="Durchlauf und Vorlagen">
+                    <h2>Durchlauf und Vorlagen</h2>
+                    {{ form.non_field_errors }}
+                    {% include "vignetten/includes/form_field.html" with field=form.k %}
+                    {% for field, knoepfe in vorlagen %}
+                        <div class="evalkatalog-vorlage">
+                            {% include "vignetten/includes/form_field.html" with field=field %}
+                            {% if not gesperrt %}
+                                <div class="evalkatalog-platzhalterleiste" aria-label="Platzhalter für {{ field.label }}">
+                                    {% for knopf in knoepfe %}<button type="button" data-platzhalter="${{ knopf.name }}" data-ziel="{{ field.id_for_label }}" class="evalkatalog-platzhalter{% if knopf.eigen %} evalkatalog-platzhalter--eigen{% endif %}">${{ knopf.name }}</button>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+        </div>
+
+        <div class="vignette-form-actions">
+            {% if gesperrt %}
+                <a href="{% url 'simulation:evalkatalog' %}">Zurück zur Übersicht</a>
+            {% else %}
+                <a href="{% url 'simulation:evalkatalog' %}">Abbrechen</a>
+                <button class="button button--secondary" type="submit">Änderungen speichern</button>
+                <button class="button" type="submit" formaction="{% url 'simulation:evalkatalog_finalisieren' katalog.pk %}" title="Speichert und finalisiert; ab dann prüft jeder Evallauf gegen diese Fassung.">Finalisieren</button>
+            {% endif %}
+        </div>
+    </form>
+</section>
+{% endblock %}
