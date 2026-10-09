@@ -61,7 +61,7 @@ class Fehlversuch:
 
 @dataclass(frozen=True)
 class Ausgabeversuch:
-    """Das flüchtige Ergebnis von höchstens drei Modellaufrufen."""
+    """Wie der Antwortversuch, nur mit dem rohen Objekt eines beliebigen Schemas."""
 
     # Das geparste Objekt des Ausgabeschemas; leer, wenn kein Versuch glückte.
     ausgabe: dict[str, object] | None
@@ -95,18 +95,26 @@ class Ausfuehrung:
     def __init__(self) -> None:
         """Beginnt ohne Fortschritt."""
 
-        self._fakes: dict[int, FakeSprachmodell] = {}
+        self._fakes: dict[
+            tuple[str, int], tuple["ModellKonfiguration", FakeSprachmodell]
+        ] = {}
 
     def fake(self, modell_konfiguration: "ModellKonfiguration") -> FakeSprachmodell:
         """Liefert den fortlesenden Fake dieser Konfiguration in dieser Ausführung."""
 
-        # Ungespeicherte Konfigurationen unterscheidet ihre Identität.
-        schluessel: int = modell_konfiguration.pk or id(modell_konfiguration)
+        # Ungespeicherte Konfigurationen unterscheidet ihre Identität; gehalten
+        # bleiben sie, damit Python dieselbe Identität nicht neu vergibt.
+        schluessel: tuple[str, int] = (
+            ("pk", modell_konfiguration.pk)
+            if modell_konfiguration.pk is not None
+            else ("id", id(modell_konfiguration))
+        )
         if schluessel not in self._fakes:
-            self._fakes[schluessel] = FakeSprachmodell(
-                modell_konfiguration.parameter.get("skript", [])
+            self._fakes[schluessel] = (
+                modell_konfiguration,
+                FakeSprachmodell(modell_konfiguration.parameter.get("skript", [])),
             )
-        return self._fakes[schluessel]
+        return self._fakes[schluessel][1]
 
 
 def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
@@ -212,7 +220,11 @@ def _sprachmodell_aus(
     from simulation.models import Anbieter
 
     if modell_konfiguration.anbieter == Anbieter.FAKE:
-        if ausfuehrung and modell_konfiguration.parameter.get("skript_fortlesen"):
+        # Nur ein echtes `true` schaltet ein; ein getipptes "false" bliebe sonst wahr.
+        if (
+            ausfuehrung is not None
+            and modell_konfiguration.parameter.get("skript_fortlesen") is True
+        ):
             return ausfuehrung.fake(modell_konfiguration)
         return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
     aufrufparameter: dict[str, object] = dict(modell_konfiguration.parameter)

@@ -311,64 +311,65 @@ Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
 Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
 `skript_fortlesen`: Ohne ihn beginnt das Skript bei jedem Antwortversuch von
-vorn, mit ihm liest es eine zusammenhängende Ausführung wie ein Evallauf über
-alle Aufrufe derselben Konfiguration fort; jede neue Ausführung beginnt wieder
-vorn. Im Editor schlägt neben dem Sprachmodell der Knopf „Modelle und Basis-URL
-laden“ die Modelle des gewählten Anbieters vor: bei `openrouter` die mit
-Structured Output, bei `infomaniak` die Sprachmodelle des Kontos. Die beiden
-unterscheiden sich darin, was der Abruf verlangt: `openrouter` beantwortet seine
-Modellliste öffentlich, ganz ohne Zugangsdaten, `infomaniak` erst gegen das im
-Formular eingetippte Token — weder eine gespeicherte Fassung noch die Basis-URL
-sind dafür nötig. Bei `fake` erscheint der Knopf nicht; dieser Anbieter
-telefoniert nicht nach außen. Bei `infomaniak` füllt derselbe Druck zusätzlich
-die Basis-URL: Aus der Produktabfrage des Kontos entsteht die Endpunktwurzel des
-Sprachmodells. Sie entsteht nur bei genau einem AI-Produkt — ein geratenes wäre
-schlimmer als ein leeres Feld — und überschreibt nie eine schon getippte Angabe.
-Die Liste wird nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie
-nicht kennt, ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei
-überschreibbar. Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste
-führt, kann an dieser Naht trotzdem scheitern, und was sie nicht führt, kann
-laufen. Die prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches
-Modell, bevor es eine Erhebung erreicht. Aktiv ist je Verwendung (Schüler:in,
-Lehrperson, Bewerter) höchstens eine Konfiguration; dieselbe darf mehreren
-Verwendungen dienen, und eine einmal belegte Verwendung bleibt belegt.
-Sitzungen, Probelauf, Training und der Pin der Erhebung lesen allein die
-Verwendung Schüler:in; Lehrperson und Bewerter sind den Evals vorbehalten und
-bleiben unbelegt, bis die Administration sie setzt. Die Seite zeigt alle je
-angelegten Konfigurationen als schmale Tabelle, die neueste zuerst: Bezeichnung,
-darunter das Sprachmodell, dazu Anbieter und Anlagedatum. Konfigurationen, die
-vor Einführung des Anlagedatums entstanden, tragen dort den Zeitpunkt ihrer
-frühesten Sitzung — da bestand sie nachweislich schon; nie gebrauchte zeigen
-»—«, statt den Zeitpunkt der Umstellung als Datum auszugeben. Die Kürzel S, L
-und B vor der Bezeichnung nennen die Verwendungen, für die eine Konfiguration
-gerade aktiv ist. Neben der Tabelle steht das Detail der gewählten Zeile: Nr.,
-Anlagezeitpunkt, Bezeichnung, Anbieter, Sprachmodell, Basis-URL, maskiertes
-Token und Parameter. Ohne Wahl zeigt es die Konfiguration der Schüler:in,
-solange keine aktiv ist die neueste. Im Detail steht je Verwendung ein Knopf,
-etwa „Für Bewerter aktivieren (statt …)“ mit der Bezeichnung der bisher aktiven
-Konfiguration; bei einer unbelegten Verwendung entfällt der „statt“-Teil. Ist
-die gewählte Konfiguration für eine Verwendung schon aktiv, steht dort ein
-deaktivierter Knopf „Aktiv für …“. Das Umschalten fragt nicht nach, bewegt nur
-den Zeiger der genannten Verwendung und führt zurück auf dieselbe Konfiguration;
-eine unbekannte Verwendung ergibt 404. Die Seite bietet genau zwei Gesten:
-Anlegen und Aktivieren. Angelegt wird in einem getrennten Editor unter
-`/system/modell-konfiguration/neu/`, erreichbar über „Neue Konfiguration“ im
-Kopf der Liste. Die Bezeichnung steht dort zuerst. „Als Vorlage für eine neue
-Konfiguration“ im Detail öffnet den Editor mit Anbieter, Basis-URL, Sprachmodell
-und Parametern der gewählten Zeile und der Bezeichnung mit dem Zusatz „(Kopie)“;
-eine unbekannte Vorlage ergibt 404. Das Token übernimmt die Vorlage nie, es wird
-jedes Mal neu eingegeben. Die Vorlage bleibt unverändert, angelegt wird immer
-eine neue Zeile. Der Editor prüft die Anbieterbindung wie zuvor am Feld und
-aktiviert nichts: Nach dem Anlegen führt er mit einer Meldung zurück zur Liste,
-die neue Konfiguration im Detail, und alle Verwendungen bleiben, wie sie waren.
-Bearbeiten und Löschen gibt es nicht — eine Konfiguration ist unveränderlich,
-weil jede Erhebung ihre Fassung pinnt. Ein Umschalten der Schüler:in trifft
-laufende Trainings sofort und laufende Erhebungen gar nicht; eine
-Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren
-für jede Verwendung der alten Fassung. Das Token wird eingegeben, aber nie
-zurückgegeben: Das Detail zeigt es nur maskiert mit seinen letzten vier Zeichen,
-kurze Werte ausschließlich als Punkte. Im freien Probelauf der Administration
-steht jede Konfiguration zur Auswahl als »Bezeichnung (Sprachmodell)«.
+vorn, mit ihm — nur als `true`, nicht als Text — liest es eine zusammenhängende
+Ausführung wie ein Evallauf über alle Aufrufe derselben Konfiguration fort; jede
+neue Ausführung beginnt wieder vorn. Im Editor schlägt neben dem Sprachmodell
+der Knopf „Modelle und Basis-URL laden“ die Modelle des gewählten Anbieters vor:
+bei `openrouter` die mit Structured Output, bei `infomaniak` die Sprachmodelle
+des Kontos. Die beiden unterscheiden sich darin, was der Abruf verlangt:
+`openrouter` beantwortet seine Modellliste öffentlich, ganz ohne Zugangsdaten,
+`infomaniak` erst gegen das im Formular eingetippte Token — weder eine
+gespeicherte Fassung noch die Basis-URL sind dafür nötig. Bei `fake` erscheint
+der Knopf nicht; dieser Anbieter telefoniert nicht nach außen. Bei `infomaniak`
+füllt derselbe Druck zusätzlich die Basis-URL: Aus der Produktabfrage des Kontos
+entsteht die Endpunktwurzel des Sprachmodells. Sie entsteht nur bei genau einem
+AI-Produkt — ein geratenes wäre schlimmer als ein leeres Feld — und überschreibt
+nie eine schon getippte Angabe. Die Liste wird nur auf Druck geholt und bleibt
+ein Vorschlag — ein Name, den sie nicht kennt, ist weiterhin eintragbar, und die
+eingesetzte Wurzel ist frei überschreibbar. Über die Tauglichkeit sagt der
+Vorschlag nichts: Was die Liste führt, kann an dieser Naht trotzdem scheitern,
+und was sie nicht führt, kann laufen. Die prüfende Instanz bleibt der Probelauf
+— er entlarvt ein untaugliches Modell, bevor es eine Erhebung erreicht. Aktiv
+ist je Verwendung (Schüler:in, Lehrperson, Bewerter) höchstens eine
+Konfiguration; dieselbe darf mehreren Verwendungen dienen, und eine einmal
+belegte Verwendung bleibt belegt. Sitzungen, Probelauf, Training und der Pin der
+Erhebung lesen allein die Verwendung Schüler:in; Lehrperson und Bewerter sind
+den Evals vorbehalten und bleiben unbelegt, bis die Administration sie setzt.
+Die Seite zeigt alle je angelegten Konfigurationen als schmale Tabelle, die
+neueste zuerst: Bezeichnung, darunter das Sprachmodell, dazu Anbieter und
+Anlagedatum. Konfigurationen, die vor Einführung des Anlagedatums entstanden,
+tragen dort den Zeitpunkt ihrer frühesten Sitzung — da bestand sie nachweislich
+schon; nie gebrauchte zeigen »—«, statt den Zeitpunkt der Umstellung als Datum
+auszugeben. Die Kürzel S, L und B vor der Bezeichnung nennen die Verwendungen,
+für die eine Konfiguration gerade aktiv ist. Neben der Tabelle steht das Detail
+der gewählten Zeile: Nr., Anlagezeitpunkt, Bezeichnung, Anbieter, Sprachmodell,
+Basis-URL, maskiertes Token und Parameter. Ohne Wahl zeigt es die Konfiguration
+der Schüler:in, solange keine aktiv ist die neueste. Im Detail steht je
+Verwendung ein Knopf, etwa „Für Bewerter aktivieren (statt …)“ mit der
+Bezeichnung der bisher aktiven Konfiguration; bei einer unbelegten Verwendung
+entfällt der „statt“-Teil. Ist die gewählte Konfiguration für eine Verwendung
+schon aktiv, steht dort ein deaktivierter Knopf „Aktiv für …“. Das Umschalten
+fragt nicht nach, bewegt nur den Zeiger der genannten Verwendung und führt
+zurück auf dieselbe Konfiguration; eine unbekannte Verwendung ergibt 404. Die
+Seite bietet genau zwei Gesten: Anlegen und Aktivieren. Angelegt wird in einem
+getrennten Editor unter `/system/modell-konfiguration/neu/`, erreichbar über
+„Neue Konfiguration“ im Kopf der Liste. Die Bezeichnung steht dort zuerst. „Als
+Vorlage für eine neue Konfiguration“ im Detail öffnet den Editor mit Anbieter,
+Basis-URL, Sprachmodell und Parametern der gewählten Zeile und der Bezeichnung
+mit dem Zusatz „(Kopie)“; eine unbekannte Vorlage ergibt 404. Das Token
+übernimmt die Vorlage nie, es wird jedes Mal neu eingegeben. Die Vorlage bleibt
+unverändert, angelegt wird immer eine neue Zeile. Der Editor prüft die
+Anbieterbindung wie zuvor am Feld und aktiviert nichts: Nach dem Anlegen führt
+er mit einer Meldung zurück zur Liste, die neue Konfiguration im Detail, und
+alle Verwendungen bleiben, wie sie waren. Bearbeiten und Löschen gibt es nicht —
+eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt.
+Ein Umschalten der Schüler:in trifft laufende Trainings sofort und laufende
+Erhebungen gar nicht; eine Schlüsselrotation ist deshalb kein Feldupdate,
+sondern Anlegen plus Aktivieren für jede Verwendung der alten Fassung. Das Token
+wird eingegeben, aber nie zurückgegeben: Das Detail zeigt es nur maskiert mit
+seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte. Im freien
+Probelauf der Administration steht jede Konfiguration zur Auswahl als
+»Bezeichnung (Sprachmodell)«.
 
 ## Evalkatalog
 

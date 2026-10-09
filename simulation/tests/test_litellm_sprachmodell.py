@@ -301,10 +301,19 @@ def test_litellm_adapter_liefert_das_objekt_des_uebergebenen_schemas(
     assert response_format["json_schema"]["schema"] == ausgabe_schema
 
 
-def test_bewerter_schema_fordert_die_begruendung_vor_dem_urteil_an() -> None:
+def test_bewerter_anfrage_fordert_die_begruendung_vor_dem_urteil_an() -> None:
     """Das Modell wägt erst ab und entscheidet dann."""
 
-    assert list(BEWERTER_SCHEMA["properties"]) == ["begruendung", "erfuellt"]
+    completion: Mock = _completion_mit(
+        '{"begruendung": "Muster gezeigt.", "erfuellt": true}'
+    )
+
+    LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
+        "System", "Kontext", [], "Eingabe", BEWERTER_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+    )
+
+    schema = completion.call_args.kwargs["response_format"]["json_schema"]["schema"]
+    assert list(schema["properties"]) == ["begruendung", "erfuellt"]
 
 
 @pytest.mark.parametrize(

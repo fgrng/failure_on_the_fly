@@ -3,7 +3,6 @@
 import pytest
 
 from simulation import (
-    MAX_VERSUCHE,
     Ausfuehrung,
     Ausgabeversuch,
     antwort_versuchen,
@@ -111,7 +110,9 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     ]
 
 
-def _fake(skript: list[dict[str, object]], **parameter: object) -> ModellKonfiguration:
+def _fake_konfiguration(
+    skript: list[dict[str, object]], **parameter: object
+) -> ModellKonfiguration:
     # Eine ungespeicherte Fake-Konfiguration; weitere Parameter kommen dazu.
 
     return ModellKonfiguration(
@@ -140,7 +141,7 @@ def test_ausgabe_versuchen_liefert_die_ausgabe_der_lehrperson() -> None:
     """Das geparste Objekt trägt genau die Felder des übergebenen Schemas."""
 
     ausgabeversuch = _lehrperson_versuchen(
-        _fake([{"aeusserung": "Wie hast du gerechnet?"}])
+        _fake_konfiguration([{"aeusserung": "Wie hast du gerechnet?"}])
     )
 
     assert ausgabeversuch.ausgabe == {"aeusserung": "Wie hast du gerechnet?"}
@@ -153,7 +154,7 @@ def test_ausgabe_versuchen_liefert_die_ausgabe_des_bewerters() -> None:
     ausgabeversuch = ausgabe_versuchen(
         "Du bewertest.",
         "Kriterium",
-        _fake([{"begruendung": "Muster gezeigt.", "erfuellt": True}]),
+        _fake_konfiguration([{"begruendung": "Muster gezeigt.", "erfuellt": True}]),
         verlauf=[],
         eingabe="Verlauf",
         ausgabe_schema=BEWERTER_SCHEMA,
@@ -182,7 +183,7 @@ def test_ausgabe_versuchen_verwirft_eine_ausgabe_neben_dem_schema(
     ausgabeversuch = ausgabe_versuchen(
         "Du bewertest.",
         "Kriterium",
-        _fake([eintrag] * MAX_VERSUCHE),
+        _fake_konfiguration([eintrag] * 3),
         verlauf=[],
         eingabe="Verlauf",
         ausgabe_schema=BEWERTER_SCHEMA,
@@ -191,26 +192,28 @@ def test_ausgabe_versuchen_verwirft_eine_ausgabe_neben_dem_schema(
     assert ausgabeversuch.ausgabe is None
     assert [fehlversuch.grund for fehlversuch in ausgabeversuch.fehlversuche] == [
         "Formatbruch"
-    ] * MAX_VERSUCHE
+    ] * 3
 
 
 def test_ausgabe_versuchen_wiederholt_hoechstens_max_versuche_mal() -> None:
     """Auch Lehrperson und Bewerter bekommen keine zusätzlichen Versuche."""
 
     ausgabeversuch = _lehrperson_versuchen(
-        _fake(
-            [{"fehler": "content_filter"}] * MAX_VERSUCHE + [{"aeusserung": "Zu spät."}]
+        _fake_konfiguration(
+            [{"fehler": "content_filter"}] * 3 + [{"aeusserung": "Zu spät."}]
         )
     )
 
     assert ausgabeversuch.ausgabe is None
-    assert len(ausgabeversuch.fehlversuche) == MAX_VERSUCHE
+    assert len(ausgabeversuch.fehlversuche) == 3
 
 
 def test_der_fake_beginnt_ohne_opt_in_bei_jedem_aufruf_von_vorn() -> None:
     """Ohne `skript_fortlesen` bleibt das bisherige Neustarten erhalten."""
 
-    konfiguration = _fake([{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}])
+    konfiguration = _fake_konfiguration(
+        [{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}]
+    )
     ausfuehrung = Ausfuehrung()
 
     ausgaben = [
@@ -223,7 +226,7 @@ def test_der_fake_beginnt_ohne_opt_in_bei_jedem_aufruf_von_vorn() -> None:
 def test_der_fake_liest_sein_skript_mit_opt_in_ueber_aufrufe_fort() -> None:
     """Fehlversuche und Antworten verschiedener Aufrufe teilen sich ein Skript."""
 
-    konfiguration = _fake(
+    konfiguration = _fake_konfiguration(
         [
             {"aeusserung": "Erste."},
             {"fehler": "anbieterfehler"},
@@ -243,10 +246,31 @@ def test_der_fake_liest_sein_skript_mit_opt_in_ueber_aufrufe_fort() -> None:
     ]
 
 
+def test_der_fake_beginnt_ohne_ausfuehrung_trotz_opt_in_von_vorn() -> None:
+    """Sitzungen und Probeläufe kennen keine Ausführung und bleiben unverändert."""
+
+    konfiguration = _fake_konfiguration(
+        [
+            {"denkspur": "D1.", "aeusserung": "Erste."},
+            {"denkspur": "D2.", "aeusserung": "Zweite."},
+        ],
+        skript_fortlesen=True,
+    )
+
+    aeusserungen = [
+        antwort_versuchen(
+            {}, Simulationskern(), konfiguration, verlauf=[], eingabe="Und?"
+        ).antwort.aeusserung
+        for _ in range(2)
+    ]
+
+    assert aeusserungen == ["Erste.", "Erste."]
+
+
 def test_der_fortschritt_des_fakes_ist_je_ausfuehrung_isoliert() -> None:
     """Eine neue Ausführung beginnt vorn und lässt die alte unberührt."""
 
-    konfiguration = _fake(
+    konfiguration = _fake_konfiguration(
         [{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}],
         skript_fortlesen=True,
     )
@@ -301,3 +325,19 @@ def test_der_fortschritt_des_fakes_ist_je_konfiguration_isoliert() -> None:
         verlauf += [frage, antwort.aeusserung]
 
     assert verlauf == ["L1.", "S1.", "L2.", "S2."]
+
+
+def test_der_fake_liest_nur_mit_eingeschaltetem_opt_in_fort() -> None:
+    """Ein als Text getipptes „false“ schaltet das Fortlesen nicht ein."""
+
+    konfiguration = _fake_konfiguration(
+        [{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}],
+        skript_fortlesen="false",
+    )
+    ausfuehrung = Ausfuehrung()
+
+    ausgaben = [
+        _lehrperson_versuchen(konfiguration, ausfuehrung).ausgabe for _ in range(2)
+    ]
+
+    assert ausgaben == [{"aeusserung": "Erste."}, {"aeusserung": "Erste."}]

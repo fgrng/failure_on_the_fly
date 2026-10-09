@@ -83,7 +83,7 @@ class ContentFilter(_Modellantwortfehler):
     """Der Anbieter hat die Modellantwort gefiltert."""
 
 
-def ausgabe_pruefen(
+def _ausgabe_pruefen(
     inhalt: object, ausgabe_schema: Mapping[str, Any], rohantwort: str
 ) -> dict[str, object]:
     """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
@@ -152,7 +152,7 @@ class FakeSprachmodell:
         inhalt: dict[str, object] = {
             name: wert for name, wert in eintrag.items() if name != "rohantwort"
         }
-        return ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
+        return _ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
 
 
 class LiteLLMSprachmodell:
@@ -217,4 +217,4 @@ class LiteLLMSprachmodell:
             inhalt: object = json.loads(rohantwort)
         except (AttributeError, IndexError, TypeError, json.JSONDecodeError) as exc:
             raise Formatbruch(rohantwort) from exc
-        return ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
+        return _ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
