@@ -429,9 +429,12 @@ class Stichprobe(models.Model):
     _wird_archiviert: bool
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Hält Archivieren an der Lebenszyklus-Methode."""
+        """Hält Archivieren an der Lebenszyklus-Methode, auch beim Anlegen."""
 
-        if not self._state.adding:
+        if self._state.adding:
+            if self.archiviert:
+                raise ValidationError("Stichproben werden nicht archiviert angelegt.")
+        else:
             gespeicherte_stichprobe: Stichprobe = type(self).objects.get(pk=self.pk)
             if self.archiviert != gespeicherte_stichprobe.archiviert:
                 if not getattr(self, "_wird_archiviert", False):
