@@ -1,5 +1,7 @@
 """HTTP-Tests für den Evalkatalog-Editor im System-Bereich."""
 
+import re
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -151,6 +153,30 @@ class EvalkatalogEditorTests(TestCase):
                 )
         self.assertContains(response, "js/platzhalter.js")
 
+    def test_der_vorlageneigene_platzhalter_steht_vorn(self) -> None:
+        """Vor den übrigen, alphabetisch geordneten Knöpfen steht der eigene."""
+        inhalt: str = self.client.get(self.url).content.decode()
+
+        for ziel, eigener in (
+            ("id_lehrperson_vorlage", "inputstrategie"),
+            ("id_bewerter_vorlage", "kriterium"),
+        ):
+            with self.subTest(ziel=ziel):
+                namen: list[str] = re.findall(
+                    rf'data-platzhalter="\$(\w+)" data-ziel="{ziel}"', inhalt
+                )
+                self.assertEqual(namen, [eigener, *sorted(namen[1:])])
+
+    def test_ungueltige_eingabe_bleibt_im_editor_ohne_zu_speichern(self) -> None:
+        """Ohne gültiges *k* zeigt der Editor den Fehler und behält den alten Wert."""
+        response: HttpResponse = self.client.post(
+            self.url,
+            {"k": "", "lehrperson_vorlage": "neu", "bewerter_vorlage": "neu"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(self.client.get(self.url), 'name="k" value="3"')
+
     def test_aktionszeile_steht_am_formularende_und_klebt(self) -> None:
         """Abbrechen und Speichern stehen im Markup zuletzt; die CSS hebt sie an."""
         response: HttpResponse = self.client.get(self.url)
@@ -176,6 +202,32 @@ class EvalkatalogEditorTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class EvalkatalogFinaleFassungTests(TestCase):
+    """Eine finale Fassung ist kein Entwurf: kein Editor, kein Verwerfen."""
+
+    def setUp(self) -> None:
+        """Finalisiert eine Fassung und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        self.katalog.finalisieren()
+        self.client.force_login(_administratorin("ada"))
+
+    def test_finale_fassung_hat_keinen_editor(self) -> None:
+        """Der Editor erreicht nur Entwürfe."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_finale_fassung_laesst_sich_nicht_verwerfen(self) -> None:
+        """Verwerfen erreicht nur Entwürfe; die finale Fassung bleibt bestehen."""
+        self.client.post(
+            reverse("simulation:evalkatalog_verwerfen", args=[self.katalog.pk])
+        )
+
+        self.assertTrue(Evalkatalog.objects.filter(pk=self.katalog.pk).exists())
+
+
 class EvalkatalogZugriffTests(TestCase):
     """Nur Administrator:innen erreichen die Routen des Evalkatalogs."""
 
@@ -196,6 +248,18 @@ class EvalkatalogZugriffTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 403)
                 self.assertEqual(self.client.post(url).status_code, 403)
         self.assertTrue(Evalkatalog.objects.exists())
+
+    def test_anlegen_und_verwerfen_nehmen_nur_post_an(self) -> None:
+        """Ein GET ändert die Linie nicht."""
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        self.client.force_login(_administratorin("ada"))
+
+        for url in (
+            reverse("simulation:evalkatalog_anlegen"),
+            reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 405)
 
     def test_sidebar_fuehrt_administratorinnen_zum_evalkatalog(self) -> None:
         """Der System-Bereich der Sidebar verlinkt den Evalkatalog."""

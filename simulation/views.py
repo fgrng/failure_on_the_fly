@@ -220,7 +220,7 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
 
 @administratorin_erforderlich
 def evalkatalog(request: HttpRequest) -> HttpResponse:
-    """Zeigt den Stand des Evalkatalogs; ohne Katalog bietet sie das Anlegen an."""
+    """Zeigt den Stand des Evalkatalogs; ohne Katalog bietet die Seite das Anlegen an."""
     return render(
         request,
         "simulation/evalkatalog.html",
@@ -255,12 +255,14 @@ class _Platzhalterknopf:
 
 
 def _platzhalterknoepfe(
-    vertrag: frozenset[str], eigener: str
+    vertrag: frozenset[str], gegenstueck: frozenset[str]
 ) -> list[_Platzhalterknopf]:
-    # Der vorlageneigene Platzhalter steht vorn, die übrigen alphabetisch.
+    # Vorlageneigen ist, was das Gegenstück nicht kennt; es steht vorn, die
+    # übrigen alphabetisch.
 
-    return [_Platzhalterknopf(eigener, True)] + [
-        _Platzhalterknopf(name, False) for name in sorted(vertrag - {eigener})
+    return [
+        _Platzhalterknopf(name, name not in gegenstueck)
+        for name in sorted(vertrag, key=lambda name: (name in gegenstueck, name))
     ]
 
 
@@ -289,11 +291,11 @@ def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
             "vorlagen": [
                 (
                     form["lehrperson_vorlage"],
-                    _platzhalterknoepfe(VERTRAG_LEHRPERSON, "inputstrategie"),
+                    _platzhalterknoepfe(VERTRAG_LEHRPERSON, VERTRAG_BEWERTER),
                 ),
                 (
                     form["bewerter_vorlage"],
-                    _platzhalterknoepfe(VERTRAG_BEWERTER, "kriterium"),
+                    _platzhalterknoepfe(VERTRAG_BEWERTER, VERTRAG_LEHRPERSON),
                 ),
             ],
         },
