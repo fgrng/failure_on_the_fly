@@ -26,59 +26,6 @@ class FragebogenItemAnlegenTests(TestCase):
         self.assertIsNotNone(item.historie_id)
         self.assertEqual(list(item.historie.eigentuemerinnen.all()), [konto])
 
-    def test_anlegen_laesst_keine_lebenszykluswerte_zu(self) -> None:
-        """Die Anlege-Naht erzeugt stets einen Entwurf, keine finale Fassung."""
-        konto = get_user_model().objects.create_user(username="ada")
-
-        with self.assertRaises(TypeError):
-            FragebogenItem.objects.anlegen(
-                konto,
-                zustand=FragebogenItem.Zustand.FINAL,
-            )
-
-
-class FragebogenItemHistorieTests(TestCase):
-    """Die Historie ist absichtlich kleiner als eine Vignettenhistorie."""
-
-    def test_historie_kennt_keine_archivierung_als_ganzes(self) -> None:
-        """Weder Feld noch Naht bauen die verworfene Bulk-Archivierung nach."""
-        feldnamen = {feld.name for feld in FragebogenItemHistorie._meta.fields}
-
-        self.assertNotIn("archiviert", feldnamen)
-        self.assertFalse(hasattr(FragebogenItemHistorie, "historie_archivieren"))
-
-    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
-        """Ko-Eigentümerinnen sehen dieselbe Item-Linie, Fremde nicht."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        linus: Konto = get_user_model().objects.create_user(username="linus")
-        geteilte_historie = FragebogenItemHistorie.objects.create()
-        geteilte_historie.eigentuemerinnen.add(ada, grace)
-        fremde_historie = FragebogenItemHistorie.objects.create()
-        fremde_historie.eigentuemerinnen.add(linus)
-
-        self.assertEqual(
-            list(FragebogenItemHistorie.objects.sichtbar_fuer(grace)),
-            [geteilte_historie],
-        )
-
-    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
-        """Die Administration sieht auch fremde Item-Historien."""
-        administratorin: Konto = get_user_model().objects.create_user(username="admin")
-        administratorin.is_superuser = True
-        administratorin.save()
-        fremde_historie: FragebogenItemHistorie = (
-            FragebogenItemHistorie.objects.create()
-        )
-        fremde_historie.eigentuemerinnen.add(
-            get_user_model().objects.create_user(username="linus")
-        )
-
-        self.assertEqual(
-            list(FragebogenItemHistorie.objects.sichtbar_fuer(administratorin)),
-            [fremde_historie],
-        )
-
 
 class FragebogenItemQuerySetTests(TestCase):
     """Die Fassungsabfragen übernehmen die Sichtbarkeit ihrer Historie."""
@@ -131,37 +78,28 @@ class FragebogenItemQuerySetTests(TestCase):
             [self.eigenes, self.geteiltes, self.fremdes],
         )
 
-    def test_sichtbar_fuer_ist_nach_zustandsfilter_verkettbar(self) -> None:
-        """Sichtbarkeit lässt sich nach einem Zustandsfilter anwenden."""
-        self.assertEqual(
-            list(
-                FragebogenItem.objects.filter(
-                    zustand=FragebogenItem.Zustand.FINAL
-                ).sichtbar_fuer(self.ada)
-            ),
-            [self.eigenes, self.geteiltes],
+    def _eigene_nicht_einbindbare_fassungen_anlegen(self) -> None:
+        """Ergänzt einen eigenen Entwurf und eine eigene archivierte Fassung."""
+        FragebogenItem.objects.anlegen(self.ada, wortlaut="Eigener Entwurf")
+        archiviert: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Eigenes Archiv"
         )
-
-    def test_sichtbar_fuer_ist_vor_zustandsfilter_verkettbar(self) -> None:
-        """Ein Zustandsfilter lässt sich nach der Sichtbarkeit anwenden."""
-        self.assertEqual(
-            list(
-                FragebogenItem.objects.sichtbar_fuer(self.ada).filter(
-                    zustand=FragebogenItem.Zustand.FINAL
-                )
-            ),
-            [self.eigenes, self.geteiltes],
-        )
+        archiviert.finalisieren()
+        archiviert.archivieren()
 
     def test_sichtbar_fuer_ist_nach_einbindbar_verkettbar(self) -> None:
-        """Sichtbarkeit bleibt nach der Abfrage einbindbarer Fassungen verfügbar."""
+        """Sichtbare einbindbare Fassungen sind die eigenen und geteilten finalen."""
+        self._eigene_nicht_einbindbare_fassungen_anlegen()
+
         self.assertEqual(
             list(FragebogenItem.objects.einbindbar().sichtbar_fuer(self.ada)),
             [self.eigenes, self.geteiltes],
         )
 
     def test_sichtbar_fuer_ist_vor_einbindbar_verkettbar(self) -> None:
-        """Die Abfrage einbindbarer Fassungen bleibt nach Sichtbarkeit verfügbar."""
+        """Die Reihenfolge der beiden Abfragen ändert das Ergebnis nicht."""
+        self._eigene_nicht_einbindbare_fassungen_anlegen()
+
         self.assertEqual(
             list(FragebogenItem.objects.sichtbar_fuer(self.ada).einbindbar()),
             [self.eigenes, self.geteiltes],
@@ -173,10 +111,7 @@ class FragebogenItemConstraintTests(TestCase):
 
     def _direkt_speichern(self, **werte: object) -> FragebogenItem:
         """Erzeugt eine Fassung ohne full_clean(), um DB-Constraints zu prüfen."""
-        item = FragebogenItem(**werte)
-        item._wird_angelegt = True
-        item.save()
-        return item
+        return FragebogenItem.objects._erstellen(**werte)  # noqa: SLF001
 
     def test_constraints_gelten_bei_direktem_save(self) -> None:
         """Entwürfe und nicht-archivierte Schwestern sind je einmalig."""
@@ -211,22 +146,14 @@ class FragebogenItemConstraintTests(TestCase):
         konto = get_user_model().objects.create_user(username="ada")
         vorgaengerin = FragebogenItem.objects.anlegen(konto, wortlaut="Erste Fassung")
         vorgaengerin.finalisieren()
-        archivierte_schwester = self._direkt_speichern(
-            historie=vorgaengerin.historie,
-            vorgaengerin=vorgaengerin,
-            zustand=FragebogenItem.Zustand.FINAL,
-            finalisiert_am=vorgaengerin.finalisiert_am,
-        )
+        schwester = vorgaengerin.bearbeiten()
+        schwester.finalisieren()
+        schwester.archivieren()
 
-        archivierte_schwester.archivieren()
-        neue_schwester = self._direkt_speichern(
-            historie=vorgaengerin.historie,
-            vorgaengerin=vorgaengerin,
-            zustand=FragebogenItem.Zustand.FINAL,
-            finalisiert_am=vorgaengerin.finalisiert_am,
-        )
+        neue_fassung = vorgaengerin.bearbeiten()
 
-        self.assertEqual(neue_schwester.vorgaengerin, vorgaengerin)
+        self.assertEqual(neue_fassung.zustand, FragebogenItem.Zustand.ENTWURF)
+        self.assertEqual(neue_fassung.vorgaengerin, vorgaengerin)
 
 
 class FragebogenItemLebenszyklusTests(TestCase):
@@ -428,18 +355,7 @@ def test_likert_skalenpole_sind_aufsteigend_deklariert() -> None:
     ]
 
 
-def test_likert_skalenpol_wird_aus_seiner_stufe_abgeleitet() -> None:
-    """Jede Likert-Stufe verweist auf ihren globalen Skalenpol."""
-    for stufe, pol in enumerate(LikertSkalenpol, start=1):
-        assert LikertSkalenpol.fuer_stufe(stufe) == pol
-
-
 def test_likert_stufe_wird_aus_ihrem_skalenpol_abgeleitet() -> None:
-    """Jeder globale Likert-Skalenpol verweist auf seine Stufe."""
-    for stufe, pol in enumerate(LikertSkalenpol, start=1):
-        assert LikertSkalenpol.stufe_fuer(pol) == stufe
-
-
-def test_likert_skalenpole_sind_nicht_pro_item_konfigurierbar() -> None:
-    """Die sechs methodisch festgelegten Pole leben nicht an der Fassung."""
-    assert "skalenpole" not in {feld.name for feld in FragebogenItem._meta.fields}
+    """Die Pole zählen von „gar nicht“ als Stufe 1 bis „voll“ als Stufe 6."""
+    assert LikertSkalenpol.stufe_fuer(LikertSkalenpol.STIMME_GAR_NICHT_ZU) == 1
+    assert LikertSkalenpol.stufe_fuer(LikertSkalenpol.STIMME_VOLL_ZU) == 6

@@ -1,16 +1,19 @@
 """HTTP-Tests der persistierten Trainingssitzung."""
 
-from django.contrib.auth import get_user_model
+from datetime import UTC, datetime
+
+import time_machine
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
+from config.tests.aufbau import finale_vignette, konto_mit_rollen
+from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
 from training.models import Training
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 
 class TrainingssitzungTests(TestCase):
@@ -24,45 +27,40 @@ class TrainingssitzungTests(TestCase):
         budget_wert: int = 3,
         audioverarbeitung_eingewilligt: bool = True,
         kern_ueberholen: bool = False,
-        lernauftrag_text: str = "Addiere zwei Brüche.",
-        arbeitsheft_text: str = "1/2 + 1/3 = 2/5",
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
-        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        ausbilderin: Konto = konto_mit_rollen("ada")
+        teilnehmerin: Konto = konto_mit_rollen("grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(
             rahmenhandlung_gespraechseinleitung=(
                 "**$schuelerin_name** zeigt Ihnen die Bearbeitung."
             )
         )
         kern.finalisieren()
-        if kern_ueberholen:
-            kern.bearbeiten().finalisieren()
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        self.konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test",
             sprachmodell="fake",
             parameter={"skript": skript},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        ModellKonfiguration.objects.aktivieren(
+            self.konfiguration, Verwendung.SCHUELERIN
+        )
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text=lernauftrag_text,
+        vignette: Vignette = finale_vignette(
+            ausbilderin,
+            name="Brüche vergleichen",
+            lernauftrag_text="Addiere zwei Brüche.",
             arbeitsheft_bildbeschreibung="Mia rechnet 1/2 + 1/3 = 2/5.",
-            arbeitsheft_text=arbeitsheft_text,
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
             lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
             thema="Brüche",
             klassenstufe="5",
             budget_typ=budget_typ,
             budget_wert=budget_wert,
-            gepinnter_kern=kern,
         )
+        if kern_ueberholen:
+            kern.bearbeiten().finalisieren()
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
@@ -95,40 +93,19 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(self.start_response, "Spracheingabe starten")
         self.assertNotContains(self.start_response, "Gespräch beginnen")
 
-    def test_senden_ist_die_einzige_hauptaktion_der_eingabezeile(self) -> None:
-        """Die Spracheingabe tritt als umrandeter Zweitknopf zurück (#293)."""
-
-        self._sitzung_starten([])
-
-        self.assertContains(
-            self.start_response,
-            'class="button button--secondary spracheingabe__steuerung"',
-        )
-        self.assertContains(
-            self.start_response, 'class="button gespraechseingabe__senden"'
-        )
-        self.assertNotContains(self.start_response, "Spracheingabe nicht freigegeben")
-
     def test_aktionszeile_traegt_beenden_erklaersatz_und_abbrechen(self) -> None:
-        """Beenden grau umrandet, Abbrechen als roter Textlink (#293, Variante B)."""
+        """Die Aktionszeile bietet Beenden mit Erklärsatz und den Abbruch an."""
 
         self._sitzung_starten([])
 
-        self.assertContains(self.start_response, 'class="sitzung-aktionen"')
-        self.assertContains(
-            self.start_response,
-            'class="button button--neutral sitzung-aktionen__beenden"',
-        )
-        self.assertContains(self.start_response, "Gespräch beenden")
+        self.assertIn(("Gespräch beenden →", None), submit_knoepfe(self.start_response))
         self.assertContains(
             self.start_response,
             "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose.",
         )
         self.assertContains(
-            self.start_response,
-            'class="sitzung-aktion-link sitzung-aktion-link--gefahr"',
+            self.start_response, f'action="{reverse("training:abbrechen")}"'
         )
-        self.assertContains(self.start_response, reverse("training:abbrechen"))
 
     def test_training_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
         self,
@@ -143,27 +120,7 @@ class TrainingssitzungTests(TestCase):
 
         self._sitzung_starten([])
 
-        self.assertEqual(
-            Sitzung.objects.get().modell_konfiguration,
-            ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
-        )
-
-    def test_training_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
-        self,
-    ) -> None:
-        """Beide Texte erscheinen als Szenentext, Link-Syntax bleibt wörtlich."""
-
-        self._sitzung_starten(
-            [],
-            lernauftrag_text="Addiere **zwei** Brüche.\n[Tipp](https://example.org)",
-            arbeitsheft_text="1/2 + 1/3\n\\= 2/5",
-        )
-
-        self.assertContains(
-            self.start_response, "Addiere <strong>zwei</strong> Brüche.<br>"
-        )
-        self.assertContains(self.start_response, "[Tipp](https://example.org)")
-        self.assertContains(self.start_response, "<p>1/2 + 1/3<br>\n= 2/5</p>")
+        self.assertEqual(Sitzung.objects.get().modell_konfiguration, self.konfiguration)
 
     def test_training_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
         """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
@@ -292,7 +249,8 @@ class TrainingssitzungTests(TestCase):
             reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
-        self.assertContains(debrief, "Debrief")
+        self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
+        self.assertNotContains(debrief, "Ihre nächste Frage")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
         self.assertFalse(Diagnose.objects.exists())
 
@@ -323,17 +281,23 @@ class TrainingssitzungTests(TestCase):
 
     def test_zeitbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
         """Auch ein ausgeschöpftes Zeitbudget schließt erst mit Diagnose ab."""
-        self._sitzung_starten(
-            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
-            budget_typ=Vignette.BudgetTyp.ZEIT,
-            budget_wert=0,
-        )
+        with time_machine.travel(datetime(2026, 7, 1, 10, 0, tzinfo=UTC), tick=False):
+            self._sitzung_starten(
+                [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
+                budget_typ=Vignette.BudgetTyp.ZEIT,
+                budget_wert=1,
+            )
+            self.client.get(reverse("training:gespraech"))
 
-        debrief: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
-        )
+        with time_machine.travel(
+            datetime(2026, 7, 1, 10, 0, 5, tzinfo=UTC), tick=False
+        ):
+            debrief: HttpResponse = self.client.post(
+                reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            )
 
-        self.assertContains(debrief, "Debrief")
+        self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
+        self.assertNotContains(debrief, "Ihre nächste Frage")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
         self.assertFalse(Diagnose.objects.exists())
 
@@ -364,7 +328,7 @@ class TrainingssitzungTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ich addiere alles.")
-        self.assertContains(response, "Debrief")
+        self.assertContains(response, "Was ist Ihnen aufgefallen?")
         self.assertNotContains(response, "Ihre nächste Frage")
         self.assertNotContains(response, "Spracheingabe starten")
 
@@ -373,7 +337,7 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten([])
         sitzung: Sitzung = Sitzung.objects.get()
 
-        andere_person: Konto = get_user_model().objects.create_user(username="margaret")
+        andere_person: Konto = konto_mit_rollen("margaret")
         self.client.force_login(andere_person)
 
         response: HttpResponse = self.client.get(

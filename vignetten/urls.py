@@ -16,7 +16,6 @@ urlpatterns: list[URLPattern] = [
     path("<int:pk>/entarchivieren/", views.entarchivieren, name="entarchivieren"),
     path("<int:pk>/vorspulen/", views.vorspulen, name="vorspulen"),
     path("<int:pk>/neue-fassung/", views.neue_fassung, name="neue_fassung"),
-    path("<int:pk>/reversionieren/", views.reversionieren, name="reversionieren"),
     path(
         "<int:pk>/eigentuemerinnen/hinzufuegen/",
         views.eigentuemerin_hinzufuegen,

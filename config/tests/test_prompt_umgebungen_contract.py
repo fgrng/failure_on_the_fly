@@ -1,33 +1,48 @@
-"""Vertragstest für die Liste der umgebungserzeugenden Prompt-Platzhalter."""
+"""Vertragstest für die Prompt-Platzhalter und die Liste ihrer Umgebungen."""
 
+import pytest
+
+from simulation import vorlage_rendern
 from simulation.models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
+    Simulationskern,
 )
-from vignetten.models import Vignette, prompt_platzhalter, rahmen_platzhalter
+from sitzungen.durchlauf import rahmenhandlung_rendern
+from vignetten.models import Vignette, prompt_platzhalter
 
 
-def test_vignettenwerte_decken_sich_mit_beiden_vertraegen() -> None:
-    """Jeder Vertragsname wird geliefert, und kein Wert ist vertragsfremd."""
+def _vorlage(vertrag: frozenset[str]) -> str:
+    """Benutzt jeden Namen des Vertrags genau einmal."""
 
+    return " ".join(f"${name}" for name in sorted(vertrag))
+
+
+@pytest.mark.django_db
+def test_jeder_vertragsname_hat_einen_wert() -> None:
+    """Ein Kern, der alle Vertragsnamen benutzt, ist gültig und rendert vollständig.
+
+    Fehlt einem Namen der Wert, scheitert erst das Rendern in der Sitzung.
+    """
+
+    kern: Simulationskern = Simulationskern.objects.anlegen(
+        system_prompt_vorlage=_vorlage(VERTRAG_PROMPT),
+        rahmenhandlung_einleitung=_vorlage(VERTRAG_RAHMEN),
+    )
+    kern.full_clean()
     vignette: Vignette = Vignette(
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
         lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
     )
-    vertraege_und_werte: tuple[tuple[str, frozenset[str], dict[str, str]], ...] = (
-        ("Prompt", VERTRAG_PROMPT, prompt_platzhalter(vignette)),
-        ("Rahmenhandlung", VERTRAG_RAHMEN, rahmen_platzhalter(vignette)),
-    )
 
-    for name, vertrag, werte in vertraege_und_werte:
-        vertragsnamen: set[str] = set(vertrag)
-        wertnamen: set[str] = set(werte)
-        assert vertragsnamen == wertnamen, (
-            f"{name}-Vertrag und gelieferte Werte weichen ab: "
-            f"nur im Vertrag: {sorted(vertragsnamen - wertnamen)}; "
-            f"nur in den Werten: {sorted(wertnamen - vertragsnamen)}."
-        )
+    prompt: str = vorlage_rendern(
+        kern.system_prompt_vorlage, prompt_platzhalter(vignette)
+    )
+    rahmen: str = rahmenhandlung_rendern(kern.rahmenhandlung_einleitung, vignette)
+
+    assert "$" not in prompt
+    assert "$" not in rahmen
 
 
 def test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe() -> None:

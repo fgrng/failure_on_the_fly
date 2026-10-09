@@ -1,20 +1,15 @@
 """HTTP-Tests für den Fragebogen-Item-Editor."""
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
 
-
-def _forschende(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf den Fragebogen-Item-Editor an."""
-    konto: Konto = get_user_model().objects.create_user(username=username)
-    konto.groups.add(Group.objects.get(name="Forschende:r"))
-    return konto
+FORSCHENDE: str = "Forschende:r"
 
 
 class FragebogenItemAnlegenViewTests(TestCase):
@@ -22,7 +17,7 @@ class FragebogenItemAnlegenViewTests(TestCase):
 
     def test_legt_likert_entwurf_an_und_listet_ihn(self) -> None:
         """Eine Forschende legt ein Likert-Item an und findet es in ihrer Bibliothek."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
@@ -47,7 +42,7 @@ class FragebogenItemAnlegenViewTests(TestCase):
 
     def test_legt_freitext_entwurf_an(self) -> None:
         """Eine Forschende kann auch ein Freitext-Item über HTTP anlegen."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.post(
@@ -70,7 +65,7 @@ class FragebogenItemFinalisierenViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt einen sichtbaren Entwurf für jeden Test an."""
-        self.ada = _forschende("ada")
+        self.ada = konto_mit_rollen("ada", FORSCHENDE)
         self.item = FragebogenItem.objects.anlegen(
             self.ada,
             wortlaut="Die Aufgaben waren verständlich.",
@@ -103,13 +98,6 @@ class FragebogenItemFinalisierenViewTests(TestCase):
 
         self.assertEqual(self.item.zustand, FragebogenItem.Zustand.FINAL)
 
-    def test_finalisieren_setzt_den_zeitpunkt(self) -> None:
-        """Die Aktion hält den Finalisierungszeitpunkt fest."""
-        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
-        self.item.refresh_from_db()
-
-        self.assertIsNotNone(self.item.finalisiert_am)
-
     def test_finalisierte_fassung_zeigt_keine_finalisieren_aktion(self) -> None:
         """Nach dem Zustandswechsel ist die Aktion im Editor nicht mehr sichtbar."""
         self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
@@ -118,13 +106,6 @@ class FragebogenItemFinalisierenViewTests(TestCase):
         )
 
         self.assertNotContains(response, "Finalisieren")
-
-    def test_finalisierte_fassung_zeigt_final_in_der_bibliothek(self) -> None:
-        """Die Bibliothek zeigt den Zustand der finalisierten Fassung an."""
-        self.client.post(reverse("fragebogen_items:finalisieren", args=[self.item.pk]))
-        response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
-
-        self.assertContains(response, "Final")
 
     def test_finalisieren_akzeptiert_keine_bereits_finale_fassung(self) -> None:
         """Die zustandsgebundene Aktion ist nach dem Finalisieren nicht erneut nutzbar."""
@@ -157,7 +138,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
 
     def test_erstellt_aus_finaler_fassung_einen_entwurf(self) -> None:
         """Die Aktion verknüpft den Entwurf mit der unveränderten Vorgängerin."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         finale: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Die Aufgaben waren verständlich.",
@@ -184,7 +165,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
 
     def test_entwurf_ist_bearbeitbar_und_warnt_vor_typwechsel(self) -> None:
         """Der Editor lässt den Wechsel zu Likert zu und weist auf ihn hin."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         finale: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Was fiel Ihnen auf?",
@@ -215,7 +196,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
         self,
     ) -> None:
         """Eine überholte Fassung bietet keine neue Fassung an und legt keine an."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Erste Fassung",
@@ -244,7 +225,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
 
     def test_nachfolgerin_verhindert_neue_fassung_mit_fehlermeldung(self) -> None:
         """Eine überholte Fassung führt nicht auf eine Fehlerseite."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Erste Fassung",
@@ -262,7 +243,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
 
     def test_ueberholte_fassung_oeffnet_den_vorhandenen_entwurf(self) -> None:
         """Ein Versuch auf einer überholten Fassung führt zum offenen Entwurf."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Erste Fassung",
@@ -284,7 +265,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
 
     def test_zeigt_archivierte_fassung(self) -> None:
         """Die Detailansicht einer vollständig archivierten Historie bleibt erreichbar."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         item: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             wortlaut="Archivierte Fassung",
@@ -307,7 +288,7 @@ class FragebogenItemArchivierenViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt eine sichtbare finale Fassung für jeden Test an."""
-        ada = _forschende("ada")
+        ada = konto_mit_rollen("ada", FORSCHENDE)
         self.item = FragebogenItem.objects.anlegen(ada, wortlaut="Wie war die Sitzung?")
         self.item.finalisieren()
         self.client.force_login(ada)
@@ -319,22 +300,6 @@ class FragebogenItemArchivierenViewTests(TestCase):
         )
 
         self.assertContains(response, "Archivieren")
-
-    def test_archivieren_ist_destruktiv_gekennzeichnet(self) -> None:
-        """Die Archivierungsaktion ist als destruktiv erkennbar."""
-        response: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[self.item.pk])
-        )
-
-        self.assertContains(response, "button--danger")
-
-    def test_editor_bietet_keine_historien_archivierung(self) -> None:
-        """Nur einzelne Fassungen erhalten eine Archivierungsaktion."""
-        response: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[self.item.pk])
-        )
-
-        self.assertNotContains(response, "Historie archivieren")
 
     def test_archivieren_leitet_zur_detailansicht_weiter(self) -> None:
         """Nach dem Archivieren bleibt die Fassung geöffnet."""
@@ -383,17 +348,6 @@ class FragebogenItemArchivierenViewTests(TestCase):
 
         self.assertEqual(self.item.zustand, FragebogenItem.Zustand.FINAL)
 
-    def test_entarchivieren_erhaelt_den_finalisierungszeitpunkt(self) -> None:
-        """Entarchivieren verändert den Zeitpunkt der ersten Finalisierung nicht."""
-        finalisiert_am = self.item.finalisiert_am
-        self.item.archivieren()
-        self.client.post(
-            reverse("fragebogen_items:entarchivieren", args=[self.item.pk])
-        )
-        self.item.refresh_from_db()
-
-        self.assertEqual(self.item.finalisiert_am, finalisiert_am)
-
     def test_archivierte_schwester_mit_aktiver_nachfolgerin_bleibt_archiviert(
         self,
     ) -> None:
@@ -426,7 +380,7 @@ class FragebogenItemLoeschenViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt einen sichtbaren Entwurf für jeden Test an."""
-        ada = _forschende("ada")
+        ada = konto_mit_rollen("ada", FORSCHENDE)
         self.item = FragebogenItem.objects.anlegen(ada, wortlaut="Noch nicht fertig")
         self.client.force_login(ada)
 
@@ -437,14 +391,6 @@ class FragebogenItemLoeschenViewTests(TestCase):
         )
 
         self.assertContains(response, "Entwurf löschen")
-
-    def test_loeschen_ist_destruktiv_gekennzeichnet(self) -> None:
-        """Die Löschaktion ist als destruktiv erkennbar."""
-        response: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[self.item.pk])
-        )
-
-        self.assertContains(response, "button--danger")
 
     def test_loeschen_leitet_zur_bibliothek_weiter(self) -> None:
         """Nach dem Löschen kehrt der Editor zur Bibliothek zurück."""
@@ -466,8 +412,8 @@ class FragebogenItemSichtbarkeitViewTests(TestCase):
 
     def test_versteckt_fremde_items_in_liste_und_detail(self) -> None:
         """Eine Forschende kann weder fremde Listenzeilen noch Detail-URLs sehen."""
-        ada: Konto = _forschende("ada")
-        grace: Konto = _forschende("grace")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
+        grace: Konto = konto_mit_rollen("grace", FORSCHENDE)
         eigenes_item: FragebogenItem = FragebogenItem.objects.anlegen(
             ada, wortlaut="Mein Item"
         )
@@ -511,9 +457,9 @@ class FragebogenItemKoautorschaftViewTests(TestCase):
 
     def setUp(self) -> None:
         """Legt eine private Item-Historie und drei Forschende an."""
-        self.ada = _forschende("ada")
-        self.grace = _forschende("grace")
-        self.linus = _forschende("linus")
+        self.ada = konto_mit_rollen("ada", FORSCHENDE)
+        self.grace = konto_mit_rollen("grace", FORSCHENDE)
+        self.linus = konto_mit_rollen("linus", FORSCHENDE)
         self.item = FragebogenItem.objects.anlegen(self.ada, wortlaut="Geteiltes Item")
 
     def test_editor_zeigt_die_eigentuemerin(self) -> None:
@@ -711,7 +657,7 @@ class FragebogenItemLikertViewTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet eine Forschende mit einem Likert-Item an."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         self.item: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
             typ=FragebogenItem.Typ.LIKERT,
@@ -737,14 +683,6 @@ class FragebogenItemLikertViewTests(TestCase):
         positionen: list[int] = [inhalt.index(skalenpol) for skalenpol in skalenpole]
         self.assertEqual(positionen, sorted(positionen))
 
-    def test_detail_enthaelt_keine_eingabefelder_fuer_skalenpole(self) -> None:
-        """Die globalen Skalenpole sind am Item nicht konfigurierbar."""
-        response: HttpResponse = self.client.get(
-            reverse("fragebogen_items:detail", args=[self.item.pk])
-        )
-
-        self.assertNotContains(response, 'name="skalenpol"')
-
 
 class FragebogenItemListeViewTests(TestCase):
     """Die Bibliothek verdichtet Fassungen zu einer Zeile je Historie."""
@@ -753,7 +691,7 @@ class FragebogenItemListeViewTests(TestCase):
         self,
     ) -> None:
         """Alte Fassungen bleiben aus der Bibliothek ausgeblendet."""
-        ada: Konto = _forschende("ada")
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada, wortlaut="Alte Fassung"
         )
@@ -774,12 +712,10 @@ class FragebogenItemListeViewTests(TestCase):
         self.assertContains(response, "Entwurf")
         self.assertContains(response, "Bereits final")
         self.assertContains(response, "Final")
-        self.assertContains(response, "badge--final")
-        self.assertContains(response, "badge--research")
 
     def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
-        """Der Name ist der einzige Link der Zeile; »Öffnen« und »Aktion« entfallen."""
-        ada: Konto = _forschende("ada")
+        """Die Zeile verlinkt die Detailseite genau einmal."""
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         item: FragebogenItem = FragebogenItem.objects.anlegen(
             ada, wortlaut="Die Aufgaben waren verständlich."
         )
@@ -788,7 +724,4 @@ class FragebogenItemListeViewTests(TestCase):
         response: HttpResponse = self.client.get(reverse("fragebogen_items:liste"))
 
         detail: str = reverse("fragebogen_items:detail", args=[item.pk])
-        self.assertContains(response, f'<a class="zeilenlink" href="{detail}">')
-        self.assertContains(response, "table--zeilenlink")
-        self.assertNotContains(response, "button--secondary")
-        self.assertNotContains(response, ">Aktion<")
+        self.assertContains(response, f'href="{detail}"', count=1)

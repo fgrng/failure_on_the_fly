@@ -1,11 +1,11 @@
 """HTTP-Tests für den Vorschau-Endpunkt der Markdown-Texte."""
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from konten.models import Konto
 
 
@@ -15,9 +15,7 @@ class VorschauTests(TestCase):
     def _konto(self, name: str, *rollen: str) -> Konto:
         # Legt ein angemeldetes Konto mit den genannten Rollen an.
 
-        konto: Konto = get_user_model().objects.create_user(username=name)
-        for rolle in rollen:
-            konto.groups.add(Group.objects.get(name=rolle))
+        konto: Konto = konto_mit_rollen(name, *rollen)
         self.client.force_login(konto)
         return konto
 
@@ -54,6 +52,19 @@ class VorschauTests(TestCase):
         self.assertContains(antwort, "<em>kursiv</em>")
         self.assertContains(antwort, "[Info](https://example.org)")
         self.assertNotContains(antwort, "<a ")
+
+    def test_szenentext_laesst_platzhalter_woertlich_stehen(self) -> None:
+        """Die Vorschau ersetzt keine Platzhalter, Markdown um sie wirkt."""
+
+        self._konto("grace", "Autor:in")
+
+        antwort: HttpResponse = self._vorschau(
+            "szenentext", "Zu **$thema** bei $lehrperson_anrede"
+        )
+
+        self.assertContains(
+            antwort, "Zu <strong>$thema</strong> bei $lehrperson_anrede"
+        )
 
     def test_unbekanntes_profil_wird_abgewiesen(self) -> None:
         """Ohne gültiges Profil gibt es kein Fragment."""

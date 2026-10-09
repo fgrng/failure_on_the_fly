@@ -4,16 +4,19 @@ from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    konto_mit_rollen,
+    vignetten_entwurf,
+)
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
@@ -26,6 +29,7 @@ from sitzungen.views import (
     probelauf_sitzung_fuer_transkription,
     transkriptions_endpunkt,
 )
+from sitzungen.tests.aufnahme import audioaufnahme
 from vignetten.models import Vignette
 
 
@@ -35,16 +39,9 @@ class ProbelaufTranskriptionTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet die Autor:in an und legt ihren spielbaren Entwurf an."""
-        self.autorin: Konto = get_user_model().objects.create_user(username="ada")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(
-                bezeichnung="Test", sprachmodell="fake", parameter={"skript": []}
-            ),
-            Verwendung.SCHUELERIN,
-        )
-        self.entwurf: Vignette = Vignette.objects.anlegen(self.autorin)
+        self.autorin: Konto = konto_mit_rollen("ada")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        self.entwurf: Vignette = vignetten_entwurf(self.autorin)
         # Die Rahmenhandlung braucht beide Akteure für ihre Grammatikformen.
         self.entwurf.schuelerin_name = "Mia"
         self.entwurf.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
@@ -52,10 +49,6 @@ class ProbelaufTranskriptionTests(TestCase):
         self.entwurf.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
         self.entwurf.save()
         self.client.force_login(self.autorin)
-
-    def _aufnahme(self) -> SimpleUploadedFile:
-        # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
-        return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
 
     def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
         # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
@@ -78,7 +71,7 @@ class ProbelaufTranskriptionTests(TestCase):
     ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
-            "/sitzungen/transkription/", {"audio": aufnahme or self._aufnahme()}
+            "/sitzungen/transkription/", {"audio": aufnahme or audioaufnahme()}
         )
         request.user = self.autorin
         request.session = self.client.session
@@ -154,6 +147,7 @@ class ProbelaufTranskriptionTests(TestCase):
         self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
         self.assertEqual(anbieter.skript, ["Text"])
 
+    @override_settings(TRANSKRIPTION_MAX_AUFNAHME_BYTES=8)
     def test_lehnt_aufnahme_ueber_der_grenze_mit_eigenem_status_ab(self) -> None:
         """Eine Aufnahme jenseits der Grenze erreicht den Anbieter nicht."""
         self._probelauf_starten()
@@ -161,20 +155,21 @@ class ProbelaufTranskriptionTests(TestCase):
 
         response: HttpResponse = self._anfragen(
             anbieter,
-            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES + 1),
+            self._aufnahme_mit_groesse(9),
         )
 
         self.assertEqual(response.status_code, 413)
         self.assertJSONEqual(response.content, {"status": "aufnahme_zu_gross"})
         self.assertEqual(anbieter.skript, ["Text"])
 
+    @override_settings(TRANSKRIPTION_MAX_AUFNAHME_BYTES=8)
     def test_nimmt_aufnahme_genau_auf_der_grenze_an(self) -> None:
         """Die Grenze schließt die letzte erlaubte Größe ein."""
         self._probelauf_starten()
 
         response: HttpResponse = self._anfragen(
             FakeTranskription(["Wie hast du gerechnet?"]),
-            self._aufnahme_mit_groesse(settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES),
+            self._aufnahme_mit_groesse(8),
         )
 
         self.assertEqual(response.status_code, 200)

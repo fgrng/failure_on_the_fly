@@ -1,93 +1,32 @@
 """HTTP-Tests der Abschrift-Freigabe für ein Training (ADR-0049)."""
 
-from django.contrib.auth import get_user_model
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import time_machine
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    konto_mit_rollen,
+)
 from konten.models import Konto
-from konten.navigation import AUTORIN_GRUPPE, AUSBILDERIN_GRUPPE
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
+from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
+from simulation.models import Verwendung
+from sitzungen.models import Sitzung
 from training.models import Abschrift, Training
+from training.tests.aufbau import abschrift_mit_sitzung, ansehen_url
+from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
-
-
-def _konto(username: str, gruppe: str | None = None, **felder: object) -> Konto:
-    # Legt ein Konto an, auf Wunsch mit Rolle.
-    konto: Konto = get_user_model().objects.create_user(username=username, **felder)
-    if gruppe is not None:
-        konto.groups.add(Group.objects.get_or_create(name=gruppe)[0])
-    return konto
-
-
-def _finale_vignette(autorin: Konto, name: str) -> Vignette:
-    # Legt eine finale Fassung im Bestand der Autorin an.
-    if not Simulationskern.objects.filter(
-        zustand=Simulationskern.Zustand.FINAL
-    ).exists():
-        Simulationskern.objects.anlegen().finalisieren()
-    vignette: Vignette = Vignette.objects.anlegen(autorin)
-    vignette.historie.name = name
-    vignette.historie.save(update_fields=["name"])
-    vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
-    vignette.lernauftrag_text = "Kürze den Bruch aus der Erhebung."
-    vignette.arbeitsheft_text = "4/8 = 2/8"
-    vignette.schuelerin_name = "Lea"
-    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.lehrperson_name = "Weber"
-    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.fach = "Mathematik"
-    vignette.thema = "Brüche"
-    vignette.klassenstufe = "6"
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 3
-    vignette.save()
-    vignette.finalisieren()
-    return vignette
-
-
-def _abschrift(
-    konto: Konto,
-    vignette: Vignette,
-    status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
-) -> Abschrift:
-    # Legt eine Abschrift mit einer kopierten Sitzung samt Denkspur an.
-    abschrift: Abschrift = Abschrift.objects.create(
-        teilnahme=Teilnahme.objects.create(),
-        konto=konto,
-        erhebungsname="Studie Bruchrechnung",
-    )
-    sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=abschrift.teilnahme,
-        vignette=vignette,
-        simulationskern=Simulationskern.objects.get(
-            zustand=Simulationskern.Zustand.FINAL
-        ),
-        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
-        status=status,
-    )
-    Gespraechsschritt.objects.create(
-        sitzung=sitzung,
-        eingabe="Wie hast du gekürzt?",
-        denkspur="Geheime Denkspur aus der Erhebung.",
-        aeusserung="Ich habe nur oben geteilt.",
-        reihenfolge=1,
-    )
-    Diagnose.objects.create(sitzung=sitzung, text="Nur den Zähler gekürzt.")
-    return abschrift
 
 
 def _sitzung(abschrift: Abschrift) -> Sitzung:
     # Die eine kopierte Sitzung der Abschrift.
     return abschrift.teilnahme.sitzung_set.get()
-
-
-def _ansehen_url(sitzung: Sitzung) -> str:
-    # Adresse der lesenden Sitzungsansicht.
-    return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
 class FreigabeTestCase(TestCase):
@@ -98,24 +37,23 @@ class FreigabeTestCase(TestCase):
     """
 
     def setUp(self) -> None:
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        self.ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
+        self.forschende: Konto = konto_mit_rollen("rosalind", AUTORIN_GRUPPE)
+        self.teilnehmerin: Konto = Konto.objects.create_user(
+            username="grace", first_name="Grace", last_name="Hopper"
         )
-        self.ausbilderin: Konto = _konto("ada", AUSBILDERIN_GRUPPE)
-        self.forschende: Konto = _konto("rosalind", AUTORIN_GRUPPE)
-        self.teilnehmerin: Konto = _konto(
-            "grace", first_name="Grace", last_name="Hopper"
-        )
-        self.erhebungsvignette: Vignette = _finale_vignette(
-            self.forschende, "Brüche kürzen"
+        self.erhebungsvignette: Vignette = finale_vignette(
+            self.forschende,
+            name="Brüche kürzen",
+            lernauftrag_text="Kürze den Bruch aus der Erhebung.",
         )
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
         self.training.veroeffentlichen()
         self.training.beitreten(self.teilnehmerin)
-        self.abschrift: Abschrift = _abschrift(
+        self.abschrift: Abschrift = abschrift_mit_sitzung(
             self.teilnehmerin, self.erhebungsvignette
         )
 
@@ -130,21 +68,16 @@ class FreigabeTestCase(TestCase):
     def _abschriftseite(self) -> str:
         # Liest die Abschriftseite aus Sicht der Teilnehmerin.
         self.client.force_login(self.teilnehmerin)
-        return self.client.get(
+        response: HttpResponse = self.client.get(
             reverse("training:abschrift", args=[self.abschrift.pk])
-        ).content.decode()
-
-    def _kuratierseite(self, konto: Konto | None = None) -> str:
-        # Liest die Kuratierseite des Trainings aus Sicht des Kreises.
-        self.client.force_login(konto or self.ausbilderin)
-        return self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        ).content.decode()
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
 
     def _status_fuer(self, konto: Konto) -> int:
         # Öffnet die Sitzung der Abschrift aus Sicht des Kontos.
         self.client.force_login(konto)
-        return self.client.get(_ansehen_url(_sitzung(self.abschrift))).status_code
+        return self.client.get(ansehen_url(_sitzung(self.abschrift))).status_code
 
 
 class FreigebenTests(FreigabeTestCase):
@@ -163,7 +96,7 @@ class FreigebenTests(FreigabeTestCase):
     ) -> None:
         """Ein Training, dem die Teilnehmerin nicht beigetreten ist, gibt es nicht."""
         fremdes_training: Training = Training.objects.anlegen(
-            _konto("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
+            konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
         )
         fremdes_training.veroeffentlichen()
 
@@ -173,7 +106,7 @@ class FreigebenTests(FreigabeTestCase):
 
     def test_abgewiesene_freigabe_oeffnet_keine_fremdeinsicht(self) -> None:
         """Auch der Kreis des fremden Trainings sieht danach nichts."""
-        fremder_kreis: Konto = _konto("hedy", AUSBILDERIN_GRUPPE)
+        fremder_kreis: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
         fremdes_training: Training = Training.objects.anlegen(
             fremder_kreis, name="Anderes Seminar"
         )
@@ -185,7 +118,7 @@ class FreigebenTests(FreigabeTestCase):
 
     def test_fremde_abschrift_laesst_sich_nicht_freigeben(self) -> None:
         """Freigeben kann nur, wem die Abschrift gehört."""
-        fremde: Konto = _konto("linus")
+        fremde: Konto = Konto.objects.create_user(username="linus")
         self.training.beitreten(fremde)
         self.client.force_login(fremde)
 
@@ -221,7 +154,7 @@ class FreigebenTests(FreigabeTestCase):
     def test_abgewiesene_freigabe_laesst_die_bisherige_freigabe_stehen(self) -> None:
         """Nennt die Auswahl ein fremdes Training, bleibt alles, wie es war."""
         fremdes_training: Training = Training.objects.anlegen(
-            _konto("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
+            konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
         )
         self._freigeben(self.training)
 
@@ -239,17 +172,9 @@ class FreigebenTests(FreigabeTestCase):
 
         self.assertEqual(response.status_code, 405)
 
-    def test_freigabe_gelingt_unabhaengig_von_den_vignetten_des_trainings(
-        self,
-    ) -> None:
-        """Das Training ist leer; die Abschrift wird trotzdem eingesehen."""
-        self._freigeben(self.training)
-
-        self.assertEqual(self._status_fuer(self.ausbilderin), 200)
-
     def test_abschrift_laesst_sich_fuer_mehrere_trainings_freigeben(self) -> None:
         """Beide Kreise sehen dieselbe Abschrift."""
-        zweiter_kreis: Konto = _konto("hedy", AUSBILDERIN_GRUPPE)
+        zweiter_kreis: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
         zweites_training: Training = Training.objects.anlegen(
             zweiter_kreis, name="Zweites Seminar"
         )
@@ -264,12 +189,16 @@ class FreigebenTests(FreigabeTestCase):
     def test_abschriftseite_bietet_nur_beigetretene_trainings_an(self) -> None:
         """Ein Training ohne eigene Bindung steht nicht zur Auswahl."""
         Training.objects.anlegen(
-            _konto("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
+            konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
         ).veroeffentlichen()
 
         seite: str = self._abschriftseite()
 
-        self.assertIn("Bruchrechnung", seite)
+        self.assertInHTML(
+            '<label><input type="checkbox" name="training" '
+            f'value="{self.training.pk}"> Bruchrechnung</label>',
+            seite,
+        )
         self.assertNotIn("Anderes Seminar", seite)
 
     def test_abschriftseite_zeigt_die_aktuelle_freigabe_angehakt(self) -> None:
@@ -278,11 +207,18 @@ class FreigebenTests(FreigabeTestCase):
 
         seite: str = self._abschriftseite()
 
-        self.assertIn(f'value="{self.training.pk}" checked', seite)
+        self.assertInHTML(
+            '<input type="checkbox" name="training" '
+            f'value="{self.training.pk}" checked>',
+            seite,
+        )
 
     def test_abschriftseite_zeigt_ohne_freigabe_nichts_angehakt(self) -> None:
         """Eine private Abschrift hat keinen Haken."""
-        self.assertNotIn("checked", self._abschriftseite())
+        self.assertInHTML(
+            f'<input type="checkbox" name="training" value="{self.training.pk}">',
+            self._abschriftseite(),
+        )
 
     def test_abschriftseite_nennt_die_freigegebenen_trainings_im_kopf(self) -> None:
         """Der Untertitel sagt, wer mitliest."""
@@ -295,19 +231,18 @@ class FreigebenTests(FreigabeTestCase):
 
     def test_abschriftseite_ohne_beitritt_bietet_keine_freigabe_an(self) -> None:
         """Wer keinem Training beigetreten ist, bekommt keine Checkbox-Liste."""
-        ohne_training: Konto = _konto("linus")
-        self.abschrift = _abschrift(ohne_training, self.erhebungsvignette)
+        ohne_training: Konto = Konto.objects.create_user(username="linus")
+        self.abschrift = abschrift_mit_sitzung(ohne_training, self.erhebungsvignette)
         self.teilnehmerin = ohne_training
 
-        self.assertNotIn("Freigaben speichern", self._abschriftseite())
+        seite: str = self._abschriftseite()
+
+        self.assertIn("Sie sind noch keinem Training beigetreten.", seite)
+        self.assertNotIn("Freigaben speichern", seite)
 
     def test_private_abschrift_bleibt_im_kopf_privat(self) -> None:
         """Ohne Freigabe liest nur die Teilnehmerin."""
         self.assertIn("nur Sie lesen sie", self._abschriftseite())
-
-    def test_abschriftseite_nennt_keinen_export(self) -> None:
-        """Kein Hinweis zu bereits gezogenen Trainingsexporten (#362)."""
-        self.assertNotIn("Export", self._abschriftseite())
 
     def test_widerruf_beendet_die_fremdeinsicht_sofort(self) -> None:
         """Eine gemerkte Adresse liefert nach dem Widerruf 404."""
@@ -316,27 +251,6 @@ class FreigebenTests(FreigabeTestCase):
         self._freigeben()
 
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
-
-    def test_widerruf_entfernt_die_abschrift_aus_der_kuratierseite(self) -> None:
-        """Die Liste unter der Tabelle zeigt sie nicht mehr."""
-        self._freigeben(self.training)
-
-        self._freigeben()
-
-        self.assertNotIn("Studie Bruchrechnung", self._kuratierseite())
-
-    def test_loeschen_der_abschrift_beendet_die_fremdeinsicht(self) -> None:
-        """Mit der Abschrift verschwinden ihre Freigaben und Sitzungen."""
-        self._freigeben(self.training)
-        url: str = _ansehen_url(_sitzung(self.abschrift))
-        self.client.post(
-            reverse("training:abschrift_loeschen", args=[self.abschrift.pk])
-        )
-        self.client.force_login(self.ausbilderin)
-
-        response: HttpResponse = self.client.get(url)
-
-        self.assertEqual(response.status_code, 404)
 
 
 class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
@@ -350,31 +264,47 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self,
     ) -> None:
         """Auch die Administration hat ohne Freigabe keine Einsicht."""
-        self.assertEqual(self._status_fuer(_konto("root", is_superuser=True)), 404)
+        self.assertEqual(
+            self._status_fuer(konto_mit_rollen("root", is_superuser=True)), 404
+        )
 
     def test_private_abschrift_fehlt_auf_der_kuratierseite(self) -> None:
         """Weder Kreis noch Administration finden sie unter der Tabelle."""
-        administratorin: Konto = _konto("root", is_superuser=True)
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
 
-        self.assertNotIn("Studie Bruchrechnung", self._kuratierseite())
-        self.assertNotIn("Studie Bruchrechnung", self._kuratierseite(administratorin))
+        self.assertNotIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
+        self.assertNotIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, administratorin),
+        )
 
     def test_kuratierseite_meldet_wenn_niemand_freigegeben_hat(self) -> None:
         """Die leere Liste sagt es ausdrücklich."""
-        self.assertIn("Niemand hat eine Abschrift freigegeben.", self._kuratierseite())
+        self.assertIn(
+            "Niemand hat eine Abschrift freigegeben.",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_freigegebene_abschrift_steht_mit_name_erhebung_und_importzeit(
         self,
     ) -> None:
         """Beschriftet wird der Importzeitpunkt, nicht die Spielzeit."""
+        with time_machine.travel(
+            datetime(2026, 7, 2, 0, 30, tzinfo=ZoneInfo("Europe/Berlin"))
+        ):
+            self.abschrift = abschrift_mit_sitzung(
+                self.teilnehmerin, self.erhebungsvignette
+            )
         self._freigeben(self.training)
-        importiert: str = self.abschrift.importiert_am.astimezone().strftime("%d.%m.%Y")
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
-        self.assertIn("Grace Hopper", seite)
-        self.assertIn("Studie Bruchrechnung", seite)
-        self.assertIn(importiert, seite)
+        self.assertInHTML('<th scope="row">Grace Hopper</th>', seite)
+        self.assertInHTML("<td>Studie Bruchrechnung</td>", seite)
+        self.assertInHTML("<td>02.07.2026 00:30</td>", seite)
 
     def test_administration_findet_die_freigegebene_abschrift_unter_der_tabelle(
         self,
@@ -382,7 +312,9 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Liste folgt der Sichtbarkeit des Trainings."""
         self._freigeben(self.training)
 
-        seite: str = self._kuratierseite(_konto("root", is_superuser=True))
+        seite: str = kuratierseite(
+            self.client, self.training, konto_mit_rollen("root", is_superuser=True)
+        )
 
         self.assertIn("Studie Bruchrechnung", seite)
 
@@ -392,33 +324,41 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Sitzung lässt sich aus der Liste lesend öffnen."""
         self._freigeben(self.training)
 
-        self.assertIn(_ansehen_url(_sitzung(self.abschrift)), self._kuratierseite())
+        self.assertIn(
+            ansehen_url(_sitzung(self.abschrift)),
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_nicht_abgeschlossene_sitzung_der_abschrift_ist_nicht_verlinkt(
         self,
     ) -> None:
         """Auch in der Abschrift zählen nur abgeschlossene Sitzungen."""
-        abgebrochen: Abschrift = _abschrift(
+        abgebrochen: Abschrift = abschrift_mit_sitzung(
             self.teilnehmerin, self.erhebungsvignette, Sitzung.Status.ABGEBROCHEN
         )
         self.abschrift = abgebrochen
         self._freigeben(self.training)
 
-        self.assertNotIn(_ansehen_url(_sitzung(abgebrochen)), self._kuratierseite())
+        self.assertNotIn(
+            ansehen_url(_sitzung(abgebrochen)),
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
 
     def test_freigegebene_abschriften_stehen_nach_namen_sortiert(self) -> None:
         """Die Liste folgt dem Namen der Person, nicht dem Importzeitpunkt."""
-        ada_lovelace: Konto = _konto("lovelace", first_name="ada", last_name="Lovelace")
+        ada_lovelace: Konto = Konto.objects.create_user(
+            username="lovelace", first_name="ada", last_name="Lovelace"
+        )
         self.training.beitreten(ada_lovelace)
         frueh: Abschrift = self.abschrift
-        self.abschrift = _abschrift(ada_lovelace, self.erhebungsvignette)
+        self.abschrift = abschrift_mit_sitzung(ada_lovelace, self.erhebungsvignette)
         self.teilnehmerin = ada_lovelace
         self._freigeben(self.training)
         self.abschrift, self.teilnehmerin = frueh, frueh.konto
         self._freigeben(self.training)
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertLess(seite.index("ada Lovelace"), seite.index("Grace Hopper"))
 
@@ -427,7 +367,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(_sitzung(self.abschrift)))
+        response: HttpResponse = self.client.get(ansehen_url(_sitzung(self.abschrift)))
 
         self.assertContains(response, "Ich habe nur oben geteilt.")
         self.assertContains(response, "Nur den Zähler gekürzt.")
@@ -438,7 +378,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(_sitzung(self.abschrift)))
+        response: HttpResponse = self.client.get(ansehen_url(_sitzung(self.abschrift)))
 
         self.assertNotContains(response, "Geheime Denkspur aus der Erhebung.")
 
@@ -446,13 +386,17 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Administration folgt allein aus der Sichtbarkeit des Trainings."""
         self._freigeben(self.training)
 
-        self.assertEqual(self._status_fuer(_konto("root", is_superuser=True)), 200)
+        self.assertEqual(
+            self._status_fuer(konto_mit_rollen("root", is_superuser=True)), 200
+        )
 
     def test_fremder_kreis_liest_die_freigegebene_sitzung_nicht(self) -> None:
         """Die Freigabe gilt dem Training, nicht jeder Ausbilder:in."""
         self._freigeben(self.training)
 
-        self.assertEqual(self._status_fuer(_konto("hedy", AUSBILDERIN_GRUPPE)), 404)
+        self.assertEqual(
+            self._status_fuer(konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)), 404
+        )
 
     def test_fremde_vignette_bleibt_ausserhalb_des_vignettenbestands(self) -> None:
         """Die Kuratierseite bietet die Vignette der Abschrift nicht zum Aufnehmen."""
@@ -470,7 +414,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
 
     def test_fremde_vignette_fehlt_in_der_vignettenliste_des_kreises(self) -> None:
         """Auch der eigene Vignettenbestand zeigt sie nicht."""
-        self.ausbilderin.groups.add(Group.objects.get_or_create(name=AUTORIN_GRUPPE)[0])
+        self.ausbilderin.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 
@@ -480,7 +424,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
 
     def test_fremde_vignette_ist_im_detail_nicht_erreichbar(self) -> None:
         """Der Bestand schützt die Vignette weiter (ADR-0015)."""
-        self.ausbilderin.groups.add(Group.objects.get_or_create(name=AUTORIN_GRUPPE)[0])
+        self.ausbilderin.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 

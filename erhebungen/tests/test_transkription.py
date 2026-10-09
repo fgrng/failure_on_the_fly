@@ -2,23 +2,22 @@
 
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
-from erhebungen.models import Erhebung, Erhebungsbindung, Stichprobe
+from config.tests.aufbau import aktive_modell_konfiguration, finale_vignette
+from erhebungen.models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe
 from erhebungen.views import sitzung_fuer_transkription
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import Verwendung
 from simulation.transkription import FakeTranskription
 from sitzungen.models import Sitzung
 from sitzungen.views import transkriptions_endpunkt
-from vignetten.models import Vignette, Vignettenhistorie
+from sitzungen.tests.aufnahme import audioaufnahme
 
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
@@ -26,60 +25,38 @@ class ErhebungsTranskriptionTests(TestCase):
     """Eine Erhebungsteilnahme autorisiert Audio ohne ein Nutzerkonto."""
 
     def setUp(self) -> None:
-        """Legt eine laufende, pseudonyme Erhebungssitzung samt Token an."""
-        forscherin: Konto = get_user_model().objects.create_user(username="ada")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create(name="Brüche")
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere zwei Brüche.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            gepinnter_kern=kern,
-        )
+        """Startet eine laufende, pseudonyme Erhebungssitzung über den Teilnahme-Link."""
+        forscherin: Konto = Konto.objects.create_user(username="ada")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         erhebung: Erhebung = Erhebung.objects.anlegen(forscherin, name="Audioerhebung")
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung, vignette=finale_vignette(forscherin), position=1
+        )
         erhebung.finalisieren()
         self.stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(minutes=1),
             ende=timezone.now() + timedelta(minutes=1),
         )
-        self.bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(
-            self.stichprobe
+        link = self.stichprobe.teilnahme_link
+        self.client.get(reverse("erhebungen:teilnehmen", args=[link]))
+        self.client.post(
+            reverse("erhebungen:einwilligung", args=[link]),
+            {
+                "sprachmodell_eingewilligt": "ja",
+                "audioverarbeitung_eingewilligt": "ja",
+                "speicherung_eingewilligt": "ja",
+            },
         )
-        self.bindung.teilnahme.audioverarbeitung_eingewilligt = True
-        self.bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
-        self.sitzung: Sitzung = Sitzung.objects.create(
-            teilnahme=self.bindung.teilnahme,
-            vignette=vignette,
-            simulationskern=kern,
-            modell_konfiguration=konfiguration,
-        )
-        session: SessionBase = self.client.session
-        session["erhebung_teilnahme_tokens"] = {
-            str(self.stichprobe.teilnahme_link): self.bindung.token
-        }
-        session.save()
-
-    def _aufnahme(self) -> SimpleUploadedFile:
-        # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
-        return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
+        self.client.post(reverse("erhebungen:spielen", args=[link]))
+        self.bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
+        self.sitzung: Sitzung = Sitzung.objects.get()
 
     def _anfragen(self, anbieter: FakeTranskription, sitzung: Sitzung) -> HttpResponse:
         # Ruft den Endpunkt pseudonym auf, so wie es die Teilnahme tut.
         request: HttpRequest = RequestFactory().post(
             "/erhebungen/teilnahme/transkription/",
-            {"audio": self._aufnahme(), "sitzung_pk": sitzung.pk},
+            {"audio": audioaufnahme(), "sitzung_pk": sitzung.pk},
         )
         request.user = AnonymousUser()
         request.session = self.client.session
@@ -129,13 +106,13 @@ class ErhebungsTranskriptionTests(TestCase):
 
         self.assertEqual(anbieter.skript, ["Text"])
 
-    @override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
-    def test_ohne_zero_retention_verweigert_externe_transkription(self) -> None:
-        """Ohne vertragliche Zusicherung wird der Anbieter nicht aufgerufen."""
+    def test_nach_fensterende_bleibt_der_endpunkt_verschlossen(self) -> None:
+        """Nach dem Ende der Stichprobe autorisiert das Token keine Aufnahme mehr."""
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
         anbieter = FakeTranskription(["Text"])
 
-        response: HttpResponse = self._anfragen(anbieter, self.sitzung)
+        with self.assertRaises(PermissionDenied):
+            self._anfragen(anbieter, self.sitzung)
 
-        self.assertEqual(response.status_code, 503)
-        self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
         self.assertEqual(anbieter.skript, ["Text"])

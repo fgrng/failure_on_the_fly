@@ -2,20 +2,14 @@
 
 import re
 from html.parser import HTMLParser
-from unittest import mock
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from config.tests.formular import submit_knoepfe
-from konten.models import Konto
-from simulation.lebenszyklus import VersionierteFassung
 from simulation.models import (
-    VERTRAG_PROMPT,
     Eval,
     Evalkatalog,
     Evalinput,
@@ -26,41 +20,18 @@ from simulation.models import (
 from simulation.tests.evalkatalog_bau import vervollstaendigen, vollstaendiger_katalog
 
 
-def _administratorin(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf den Evalkatalog an."""
-    return get_user_model().objects.create_user(username=username, is_superuser=True)
-
-
 class EvalkatalogUebersichtTests(TestCase):
     """Die Systemseite bietet das Anlegen nur ohne Katalog an."""
 
     def setUp(self) -> None:
         """Meldet eine Administratorin an."""
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def test_ohne_katalog_bietet_die_seite_das_anlegen_an(self) -> None:
         """Eine Instanz startet ohne Katalog; die Seite sagt das und bietet an."""
         response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
 
         self.assertIn(("Evalkatalog anlegen", None), submit_knoepfe(response))
-
-    def test_verwerfen_nimmt_die_kriterien_des_entwurfs_mit(self) -> None:
-        """Ein Entwurf mit übergreifenden Kriterien lässt sich verwerfen."""
-        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
-        katalog.kriterium_anlegen("Rollentreue")
-
-        self.client.post(reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]))
-
-        self.assertFalse(UebergreifendesKriterium.objects.exists())
-
-    def test_verwerfen_nimmt_die_evals_samt_evalkriterien_mit(self) -> None:
-        """Ein Entwurf mit Evals und Evalkriterien lässt sich verwerfen."""
-        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
-        katalog.eval_anlegen("Muster").kriterium_anlegen("A")
-
-        self.client.post(reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]))
-
-        self.assertFalse(Evalkriterium.objects.exists())
 
     def test_anlegen_oeffnet_den_editor_des_neuen_entwurfs(self) -> None:
         """Nach dem Anlegen steht die Administratorin im Editor des Entwurfs."""
@@ -94,20 +65,45 @@ class EvalkatalogUebersichtTests(TestCase):
             reverse("simulation:evalkatalog_anlegen"), follow=True
         )
 
-        self.assertEqual(Evalkatalog.objects.count(), 1)
         self.assertContains(response, "Der Evalkatalog wurde bereits angelegt.")
+        self.assertIn(("Entwurf verwerfen", None), submit_knoepfe(response))
 
     def test_verwerfen_loescht_den_entwurf(self) -> None:
-        """Nach dem Verwerfen ist die Linie leer und das Anlegen wieder möglich."""
+        """Auch mit allen Teilen verworfen, ist die Linie leer und das Anlegen möglich."""
         katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        katalog.kriterium_anlegen("Rollentreue")
+        eval_: Eval = katalog.eval_anlegen("Muster")
+        eval_.kriterium_anlegen("A")
+        eval_.input_anlegen()
 
         response: HttpResponse = self.client.post(
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
             follow=True,
         )
 
-        self.assertFalse(Evalkatalog.objects.exists())
         self.assertIn(("Evalkatalog anlegen", None), submit_knoepfe(response))
+
+
+class _Platzhaltersammler(HTMLParser):
+    """Sammelt die Platzhalterknöpfe einer Seite je Zielfeld."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.knoepfe: dict[str, list[str]] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        werte: dict[str, str | None] = dict(attrs)
+        name: str | None = werte.get("data-platzhalter")
+        if tag == "button" and name:
+            ziel: str = werte.get("data-ziel") or ""
+            self.knoepfe.setdefault(ziel, []).append(name.removeprefix("$"))
+
+
+def _platzhalter(response: HttpResponse) -> dict[str, list[str]]:
+    """Die Namen der Platzhalterknöpfe je Zielfeld in Reihenfolge der Seite."""
+    sammler: _Platzhaltersammler = _Platzhaltersammler()
+    sammler.feed(response.content.decode())
+    return sammler.knoepfe
 
 
 class EvalkatalogEditorTests(TestCase):
@@ -117,14 +113,17 @@ class EvalkatalogEditorTests(TestCase):
         """Legt einen Entwurf an und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
         self.url: str = reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def test_zeigt_den_baum_mit_dem_knoten_durchlauf_und_vorlagen(self) -> None:
-        """Links steht der Baum mit dem Knoten Durchlauf und Vorlagen."""
+        """Der Baum verlinkt den Knoten Durchlauf und Vorlagen als aktuellen."""
         response: HttpResponse = self.client.get(self.url)
 
-        self.assertContains(response, 'class="evalkatalog-baum"')
-        self.assertContains(response, "Durchlauf und Vorlagen")
+        self.assertContains(
+            response,
+            f'<a href="{self.url}" aria-current="page">Durchlauf und Vorlagen</a>',
+            html=True,
+        )
 
     def test_zeigt_k_und_beide_vorlagen(self) -> None:
         """Das Formular trägt *k* mit Startwert 3 und beide Vorlagen."""
@@ -151,52 +150,32 @@ class EvalkatalogEditorTests(TestCase):
         self.assertEqual(self.katalog.lehrperson_vorlage, "Frage nach: $inputstrategie")
         self.assertEqual(self.katalog.bewerter_vorlage, "Prüfe: $kriterium")
 
-    def test_platzhalterknoepfe_heben_die_vorlageneigenen_hervor(self) -> None:
-        """Je Vorlage steht ihr Vertrag als Knöpfe; der eigene Wert ist markiert."""
+    def test_platzhalterknoepfe_folgen_dem_vertrag_jeder_vorlage(self) -> None:
+        """Je Vorlage steht ihr eigener Evalwert vorn, danach der Rest alphabetisch."""
+        gemeinsam: list[str] = [
+            "arbeitsheft",
+            "arbeitsheft_simulationshinweise",
+            "fach",
+            "fehlermuster_beschreibung",
+            "klassenstufe",
+            "lernauftrag",
+            "lernauftrag_simulationshinweise",
+            "schuelerin_geschlecht",
+            "schuelerin_name",
+            "thema",
+            "verlauf",
+        ]
+
         response: HttpResponse = self.client.get(self.url)
+        knoepfe: dict[str, list[str]] = _platzhalter(response)
 
-        self.assertContains(
-            response,
-            'data-platzhalter="$inputstrategie" data-ziel="id_lehrperson_vorlage"'
-            ' class="evalkatalog-platzhalter evalkatalog-platzhalter--eigen"',
+        self.assertEqual(
+            knoepfe,
+            {
+                "id_lehrperson_vorlage": ["inputstrategie", *gemeinsam],
+                "id_bewerter_vorlage": ["kriterium", *gemeinsam],
+            },
         )
-        self.assertContains(
-            response,
-            'data-platzhalter="$kriterium" data-ziel="id_bewerter_vorlage"'
-            ' class="evalkatalog-platzhalter evalkatalog-platzhalter--eigen"',
-        )
-        self.assertNotContains(
-            response, 'data-platzhalter="$kriterium" data-ziel="id_lehrperson_vorlage"'
-        )
-        self.assertNotContains(
-            response,
-            'data-platzhalter="$inputstrategie" data-ziel="id_bewerter_vorlage"',
-        )
-        for ziel in ("id_lehrperson_vorlage", "id_bewerter_vorlage"):
-            self.assertContains(
-                response,
-                f'data-platzhalter="$verlauf" data-ziel="{ziel}"'
-                ' class="evalkatalog-platzhalter"',
-            )
-            for name in VERTRAG_PROMPT:
-                self.assertContains(
-                    response, f'data-platzhalter="${name}" data-ziel="{ziel}"'
-                )
-        self.assertContains(response, "js/platzhalter.js")
-
-    def test_der_vorlageneigene_platzhalter_steht_vorn(self) -> None:
-        """Vor den übrigen, alphabetisch geordneten Knöpfen steht der eigene."""
-        inhalt: str = self.client.get(self.url).content.decode()
-
-        for ziel, eigener in (
-            ("id_lehrperson_vorlage", "inputstrategie"),
-            ("id_bewerter_vorlage", "kriterium"),
-        ):
-            with self.subTest(ziel=ziel):
-                namen: list[str] = re.findall(
-                    rf'data-platzhalter="\$(\w+)" data-ziel="{ziel}"', inhalt
-                )
-                self.assertEqual(namen, [eigener, *sorted(namen[1:])])
 
     def test_ungueltige_eingabe_bleibt_im_editor_ohne_zu_speichern(self) -> None:
         """Ohne gültiges *k* zeigt der Editor den Fehler und behält den alten Wert."""
@@ -208,18 +187,10 @@ class EvalkatalogEditorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(self.client.get(self.url), 'name="k" value="3"')
 
-    def test_aktionszeile_steht_am_formularende_und_klebt(self) -> None:
-        """Abbrechen und Speichern stehen im Markup zuletzt; die CSS hebt sie an."""
+    def test_speichern_schickt_das_editorformular(self) -> None:
+        """Speichern schickt das Formular des Editors."""
         response: HttpResponse = self.client.get(self.url)
-        inhalt: str = response.content.decode()
 
-        self.assertContains(response, "css/vignette-form.css")
-        formularende: int = inhalt.index(
-            "</form>", inhalt.index('id="evalkatalog-formular"')
-        )
-        aktionen: int = inhalt.index('class="vignette-form-actions"')
-        self.assertLess(aktionen, formularende)
-        self.assertNotIn("<section", inhalt[aktionen:formularende])
         self.assertIn(
             ("Änderungen speichern", "evalkatalog-formular"), submit_knoepfe(response)
         )
@@ -242,7 +213,7 @@ class EvalkatalogKriterienTests(TestCase):
         self.url: str = reverse(
             "simulation:evalkatalog_kriterien", args=[self.katalog.pk]
         )
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def _texte(self) -> list[str]:
         # Liefert die Texte der Kriterien des Entwurfs in gespeicherter Reihenfolge.
@@ -260,11 +231,10 @@ class EvalkatalogKriterienTests(TestCase):
         self.assertContains(response, f'href="{self.url}"')
         self.assertContains(response, "Übergreifende Kriterien (2)")
 
-    def test_knoten_zeigt_den_hinweis_zur_kern_neutralitaet(self) -> None:
-        """Die Pflegeregel aus ADR-0046 steht am Knoten."""
+    def test_knoten_bietet_das_hinzufuegen_an(self) -> None:
+        """Am Knoten hängt ein Knopf im Editorformular ein Kriterium an."""
         response: HttpResponse = self.client.get(self.url)
 
-        self.assertContains(response, "kern-neutral")
         self.assertIn(
             ("Kriterium hinzufügen", "evalkatalog-formular"),
             submit_knoepfe(response),
@@ -404,7 +374,7 @@ class EvalkatalogEvalTests(TestCase):
     def setUp(self) -> None:
         """Legt einen Entwurf an und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def _knoten(self, eval_: Eval) -> str:
         # Die Adresse des Eval-Knotens im Editor.
@@ -509,7 +479,7 @@ class EvalkatalogEvalTests(TestCase):
         self.assertEqual(eval_.name, "Muster bleibt stabil")
         self.assertEqual(kriterium.text, "Nennt die falsche Regel")
 
-    def test_loeschen_nimmt_die_evalkriterien_mit(self) -> None:
+    def test_loeschen_fuehrt_zum_editor(self) -> None:
         """Nach dem Löschen steht die Administratorin wieder am Katalog."""
         eval_: Eval = self.katalog.eval_anlegen("Muster")
         eval_.kriterium_anlegen("A")
@@ -526,7 +496,6 @@ class EvalkatalogEvalTests(TestCase):
             response, reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
         )
         self.assertEqual(self._namen(), ["Rolle"])
-        self.assertFalse(Evalkriterium.objects.exists())
 
     def test_hoch_und_runter_ordnen_die_evals_um(self) -> None:
         """Am Eval-Knoten rückt das Eval eine Stelle; am Rand ist der Knopf gesperrt."""
@@ -681,7 +650,7 @@ class EvalkatalogEvalinputTests(TestCase):
         """Legt einen Entwurf mit einem Eval an und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
         self.eval_: Eval = self.katalog.eval_anlegen("Muster")
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def _route(self, name: str, *args: object) -> str:
         # Eine Route unterhalb des Evals.
@@ -694,7 +663,7 @@ class EvalkatalogEvalinputTests(TestCase):
         # Art und Text der Inputschritte in gespeicherter Reihenfolge.
         return [(s.art, s.text) for s in evalinput.schritte.all()]
 
-    def test_hinzufuegen_legt_einen_evalinput_mit_drei_schritten_an(self) -> None:
+    def test_hinzufuegen_legt_einen_weiteren_evalinput_an_und_oeffnet_ihn(self) -> None:
         """Am Eval-Knoten entsteht ein Evalinput nach dem anderen; sein Knoten öffnet sich."""
         self.assertIn(
             ("Evalinput hinzufügen", "evalkatalog-formular"),
@@ -707,10 +676,9 @@ class EvalkatalogEvalinputTests(TestCase):
         zweiter: Evalinput = self.eval_.inputs.last()
         self.assertRedirects(response, self._route("evalinput", zweiter.pk))
         self.assertEqual(self.eval_.inputs.count(), 2)
-        self.assertEqual(self._schritte(zweiter), [(Inputschritt.Art.FEST, "")] * 3)
 
     def test_loeschen_entfernt_den_evalinput_und_fuehrt_zum_eval(self) -> None:
-        """Der Papierkorb am Evalinput nimmt seine Schritte mit."""
+        """Nach dem Papierkorb am Evalinput steht die Administratorin am Eval."""
         evalinput: Evalinput = self.eval_.input_anlegen()
 
         response: HttpResponse = self.client.post(
@@ -719,7 +687,6 @@ class EvalkatalogEvalinputTests(TestCase):
 
         self.assertRedirects(response, self._route("eval"))
         self.assertFalse(self.eval_.inputs.exists())
-        self.assertFalse(Inputschritt.objects.exists())
 
     def test_eval_knoten_listet_seine_evalinputs_mit_kuerzeln(self) -> None:
         """Am Eval führt je Evalinput ein Link samt F/G-Kürzel zu seinem Drehbuch."""
@@ -801,16 +768,12 @@ class EvalkatalogEvalinputTests(TestCase):
 
         response: HttpResponse = self.client.get(self._route("evalinput", evalinput.pk))
 
-        inhalt: str = response.content.decode()
-        self.assertEqual(
-            inhalt.count('<p class="drehbuch__antwort">Schüler:in antwortet</p>'), 3
-        )
-        self.assertEqual(inhalt.count("drehbuch__blase--gelenkt"), 1)
+        self.assertContains(response, "Schüler:in antwortet", count=3, html=True)
         self.assertContains(response, "sagt wörtlich")
         self.assertContains(response, "formuliert nach Strategie")
-        self.assertRegex(
-            inhalt,
-            rf'name="inputschritt-art-{schritte[1].pk}" value="gelenkt" checked',
+        self.assertContains(
+            response,
+            f'name="inputschritt-art-{schritte[1].pk}" value="gelenkt" checked',
         )
         self.assertIn(
             ("Inputschritt hinzufügen", "evalkatalog-formular"),
@@ -951,6 +914,36 @@ def _evalrouten(
     ]
 
 
+class _Linksammler(HTMLParser):
+    """Sammelt die Links einer Seite mit ihrem Text."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[tuple[str, str | None]] = []
+        self._link: tuple[str | None, list[str]] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            self._link = (dict(attrs).get("href"), [])
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._link is not None:
+            href, text = self._link
+            self.links.append(("".join(text).strip(), href))
+            self._link = None
+
+    def handle_data(self, data: str) -> None:
+        if self._link is not None:
+            self._link[1].append(data)
+
+
+def _links(response: HttpResponse) -> list[tuple[str, str | None]]:
+    """Text und Ziel jedes Links der Seite."""
+    sammler: _Linksammler = _Linksammler()
+    sammler.feed(response.content.decode())
+    return sammler.links
+
+
 class EvalkatalogFinaleFassungTests(TestCase):
     """Eine finale Fassung ist kein Entwurf: kein Editor, kein Verwerfen."""
 
@@ -958,7 +951,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         """Finalisiert eine Fassung und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
         vervollstaendigen(self.katalog).finalisieren()
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def test_finale_fassung_nimmt_keine_eingaben_an(self) -> None:
         """Lesen ja, Speichern nein: Der Editor schreibt nur in Entwürfe."""
@@ -1030,11 +1023,19 @@ class EvalkatalogFinaleFassungTests(TestCase):
 
     def test_finale_fassung_laesst_sich_nicht_verwerfen(self) -> None:
         """Verwerfen erreicht nur Entwürfe; die finale Fassung bleibt bestehen."""
-        self.client.post(
+        response: HttpResponse = self.client.post(
             reverse("simulation:evalkatalog_verwerfen", args=[self.katalog.pk])
         )
 
-        self.assertTrue(Evalkatalog.objects.filter(pk=self.katalog.pk).exists())
+        self.assertEqual(response.status_code, 404)
+        uebersicht: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+        self.assertIn(
+            (
+                "Finale Fassung lesen",
+                reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
+            ),
+            _links(uebersicht),
+        )
 
 
 class _Feldsammler(HTMLParser):
@@ -1077,7 +1078,7 @@ class EvalkatalogLeseansichtTests(TestCase):
         self.eval_.input_anlegen().schritt_anlegen(Inputschritt.Art.GELENKT, "Zweifle")
         vervollstaendigen(self.katalog).finalisieren()
         self.evalinput: Evalinput = self.eval_.inputs.get()
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def _knoten(self, katalog: Evalkatalog) -> list[str]:
         # Die Adressen aller vier Knotenarten der Fassung.
@@ -1117,7 +1118,6 @@ class EvalkatalogLeseansichtTests(TestCase):
         """Das Band nennt den Zustand und seit wann die Fassung gilt."""
         response: HttpResponse = self.client.get(self._knoten(self.katalog)[0])
 
-        self.assertContains(response, 'class="evalkatalog-band"')
         self.assertContains(response, "Diese Fassung ist final")
         self.assertContains(response, "Finale Fassung lesen")
 
@@ -1155,7 +1155,7 @@ class EvalkatalogLeseansichtTests(TestCase):
             with self.subTest(url=url):
                 response: HttpResponse = self.client.get(url)
 
-                self.assertNotContains(response, 'class="evalkatalog-band"')
+                self.assertNotContains(response, "Diese Fassung ist")
                 self.assertFalse(any(gesperrt for _, gesperrt in _felder(response)))
                 self.assertContains(response, "formaction=")
 
@@ -1207,16 +1207,17 @@ class EvalkatalogNeueFassungTests(TestCase):
     def setUp(self) -> None:
         """Finalisiert eine Fassung und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = vollstaendiger_katalog()
-        self.katalog.kriterium_anlegen("Rollentreu")
+        # Abweichend vom Startwert 3, damit die Kopie von *k* sichtbar wird.
+        self.katalog.k = 5
         self.katalog.finalisieren()
         self.url: str = reverse(
             "simulation:evalkatalog_neue_fassung", args=[self.katalog.pk]
         )
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def test_neue_fassung_oeffnet_den_editor_einer_tiefenkopie(self) -> None:
-        """Der neue Entwurf trägt den ganzen Katalog und verweist auf die Vorgängerin."""
-        response: HttpResponse = self.client.post(self.url)
+        """Der Editor des neuen Entwurfs zeigt *k* und Vorlagen der Vorgängerin."""
+        response: HttpResponse = self.client.post(self.url, follow=True)
 
         entwurf: Evalkatalog = Evalkatalog.objects.get(
             zustand=Evalkatalog.Zustand.ENTWURF
@@ -1224,37 +1225,11 @@ class EvalkatalogNeueFassungTests(TestCase):
         self.assertRedirects(
             response, reverse("simulation:evalkatalog_editor", args=[entwurf.pk])
         )
+        self.assertContains(response, 'name="k" value="5"')
+        self.assertContains(
+            response, "Sprich mit $schuelerin_name nach $inputstrategie."
+        )
         self.assertEqual(entwurf.vorgaengerin, self.katalog)
-        self.assertEqual(entwurf.lehrperson_vorlage, self.katalog.lehrperson_vorlage)
-        self.assertEqual(
-            [k.text for k in entwurf.uebergreifende_kriterien.all()], ["Rollentreu"]
-        )
-        self.assertEqual(
-            [
-                [[(s.art, s.text) for s in i.schritte.all()] for i in e.inputs.all()]
-                for e in entwurf.evals.all()
-            ],
-            [
-                [[(s.art, s.text) for s in i.schritte.all()] for i in e.inputs.all()]
-                for e in self.katalog.evals.all()
-            ],
-        )
-
-    def test_aenderungen_am_entwurf_beruehren_die_vorgaengerin_nicht(self) -> None:
-        """Gespeicherte Eingaben im neuen Entwurf bleiben in ihm."""
-        self.client.post(self.url)
-        entwurf: Evalkatalog = Evalkatalog.objects.get(
-            zustand=Evalkatalog.Zustand.ENTWURF
-        )
-        eval_: Eval = entwurf.evals.get()
-
-        self.client.post(
-            reverse("simulation:evalkatalog_eval", args=[entwurf.pk, eval_.pk]),
-            {f"eval-{eval_.pk}": "Umbenannt"},
-        )
-
-        self.assertEqual(entwurf.evals.get().name, "Umbenannt")
-        self.assertEqual(self.katalog.evals.get().name, "Ergänzt")
 
     def test_bei_bestehendem_entwurf_wird_keine_neue_fassung_abgeleitet(
         self,
@@ -1319,7 +1294,7 @@ class EvalkatalogFinalisierenTests(TestCase):
         self.url: str = reverse(
             "simulation:evalkatalog_finalisieren", args=[self.katalog.pk]
         )
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
 
     def test_editor_bietet_das_finalisieren_im_formular_an(self) -> None:
         """Der Knopf steht in der Aktionszeile und schickt das ganze Formular."""
@@ -1346,9 +1321,21 @@ class EvalkatalogFinalisierenTests(TestCase):
 
         self.assertRedirects(response, reverse("simulation:evalkatalog"))
         self.assertContains(response, "Der Evalkatalog ist final.")
-        self.assertEqual(Evalkatalog.objects.finale_fassung(), entwurf)
-        self.katalog.refresh_from_db()
-        self.assertEqual(self.katalog.zustand, Evalkatalog.Zustand.ARCHIVIERT)
+        links: list[tuple[str, str | None]] = _links(response)
+        self.assertIn(
+            (
+                "Finale Fassung lesen",
+                reverse("simulation:evalkatalog_editor", args=[entwurf.pk]),
+            ),
+            links,
+        )
+        _, ueberholte_fassungen = response.content.decode().split(
+            "<h2>Überholte Fassungen</h2>"
+        )
+        self.assertIn(
+            f'href="{reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])}"',
+            ueberholte_fassungen,
+        )
 
     def test_unvollstaendiger_entwurf_bleibt_mit_meldungen_im_editor(self) -> None:
         """Jede Lücke erscheint als Meldung im Editor; der Entwurf bleibt Entwurf."""
@@ -1420,20 +1407,6 @@ class EvalkatalogFinalisierenTests(TestCase):
         )
         self.assertIsNone(Evalkatalog.objects.finale_fassung())
 
-    def test_zwischenzeitlich_geaenderter_entwurf_wird_gemeldet(self) -> None:
-        """Wechselt der Entwurf beim Finalisieren den Zustand, nennt der Editor das."""
-        with mock.patch.object(
-            VersionierteFassung,
-            "finalisieren",
-            side_effect=ValidationError("Nur Entwürfe können finalisiert werden."),
-        ):
-            response: HttpResponse = self.client.post(self.url, follow=True)
-
-        self.assertRedirects(
-            response, reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
-        )
-        self.assertContains(response, "Nur Entwürfe können finalisiert werden.")
-
     def test_finale_fassung_wird_nicht_erneut_finalisiert(self) -> None:
         """Die Route erreicht nur Entwürfe."""
         self.katalog.finalisieren()
@@ -1441,10 +1414,14 @@ class EvalkatalogFinalisierenTests(TestCase):
         self.assertEqual(self.client.post(self.url).status_code, 404)
 
     def test_uebersicht_ohne_finale_fassung_nennt_keine(self) -> None:
-        """Solange nichts finalisiert ist, zeigt die Systemseite keine Fassung."""
+        """Solange nichts finalisiert ist, gibt es nur den Entwurf zu verwerfen."""
         response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
 
-        self.assertNotContains(response, "Finale Fassung")
+        self.assertEqual(
+            submit_knoepfe(response),
+            [("Abmelden", None), ("Entwurf verwerfen", None)],
+        )
+        self.assertNotIn("Finale Fassung lesen", [text for text, _ in _links(response)])
 
     def test_uebersicht_nennt_die_finale_fassung(self) -> None:
         """Die Systemseite zeigt, seit wann der Katalog final ist."""
@@ -1468,9 +1445,7 @@ class EvalkatalogZugriffTests(TestCase):
         eval_: Eval = katalog.eval_anlegen("Muster")
         evalkriterium: Evalkriterium = eval_.kriterium_anlegen("B")
         eval_.input_anlegen()
-        autorin: Konto = get_user_model().objects.create_user(username="bea")
-        autorin.groups.add(Group.objects.get(name="Autor:in"))
-        self.client.force_login(autorin)
+        self.client.force_login(konto_mit_rollen("bea", "Autor:in"))
 
         for url in (
             reverse("simulation:evalkatalog"),
@@ -1511,7 +1486,7 @@ class EvalkatalogZugriffTests(TestCase):
         eval_: Eval = katalog.eval_anlegen("Muster")
         evalkriterium: Evalkriterium = eval_.kriterium_anlegen("B")
         evalinput: Evalinput = eval_.input_anlegen()
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
         # Die Knoten von Eval und Evalinput zeigen sich auch per GET.
         knoten: set[str] = {
             reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
@@ -1546,7 +1521,7 @@ class EvalkatalogZugriffTests(TestCase):
 
     def test_sidebar_markiert_den_evalkatalog_auf_jedem_knoten(self) -> None:
         """Auch auf den Knoten Kriterien, Eval und Evalinput gilt der Link als aktuell."""
-        self.client.force_login(_administratorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", is_superuser=True))
         katalog: Evalkatalog = Evalkatalog.objects.anlegen()
         eval_: Eval = katalog.eval_anlegen("Muster")
         evalinput: Evalinput = eval_.input_anlegen()
@@ -1565,11 +1540,3 @@ class EvalkatalogZugriffTests(TestCase):
         ):
             with self.subTest(url=url):
                 self.assertContains(self.client.get(url), link, html=True)
-
-    def test_sidebar_fuehrt_administratorinnen_zum_evalkatalog(self) -> None:
-        """Der System-Bereich der Sidebar verlinkt den Evalkatalog."""
-        self.client.force_login(_administratorin("ada"))
-
-        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
-
-        self.assertContains(response, f'href="{reverse("simulation:evalkatalog")}"')

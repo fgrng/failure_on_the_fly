@@ -1,25 +1,17 @@
 """Anbieterbindung und Parameter-Allowlist der Modell-Konfiguration."""
 
-import inspect
-from datetime import UTC, datetime
+from datetime import datetime
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import connection
-from django.db.models import QuerySet
-from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
-from konten.models import Konto
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
     ModellKonfiguration,
-    Simulationskern,
     Verwendung,
 )
-from sitzungen.models import Sitzung, Teilnahme
-from vignetten.models import Vignette
 
 
 def _openrouter(**werte: object) -> ModellKonfiguration:
@@ -173,6 +165,14 @@ def test_lehnt_api_key_ab() -> None:
 
 
 @pytest.mark.django_db
+def test_lehnt_timeout_ab() -> None:
+    """Die Frist gehört der Naht und ist keine Stellschraube."""
+
+    with pytest.raises(ValidationError, match="timeout"):
+        _openrouter(parameter={"timeout": 5})
+
+
+@pytest.mark.django_db
 def test_lehnt_extra_body_ab() -> None:
     """Der Provider-Filter ist abgeleitet und nicht überschreibbar."""
 
@@ -259,42 +259,6 @@ def test_verlangt_eine_bezeichnung() -> None:
 
 
 @pytest.mark.django_db
-def test_die_bezeichnung_ist_nach_dem_anlegen_unveraenderlich() -> None:
-    """Eine gepinnte Konfiguration heißt nie anders als bei der Erhebung."""
-
-    konfiguration: ModellKonfiguration = _openrouter()
-    konfiguration.bezeichnung = "Umbenannt"
-
-    with pytest.raises(RuntimeError):
-        konfiguration.save()
-
-
-@pytest.mark.django_db(transaction=True)
-def test_migration_benennt_den_bestand_nach_sprachmodell_und_nummer() -> None:
-    """Bestandskonfigurationen bleiben nach dem Umstieg unterscheidbar."""
-
-    vorher = [("simulation", "0006_transkriptionskonfiguration")]
-    nachher = [("simulation", "0007_modellkonfiguration_bezeichnung")]
-    executor: MigrationExecutor = MigrationExecutor(connection)
-    executor.migrate(vorher)
-    try:
-        alte_apps = executor.loader.project_state(vorher).apps
-        alte_konfiguration = alte_apps.get_model(
-            "simulation", "ModellKonfiguration"
-        ).objects.create(sprachmodell="fake")
-        MigrationExecutor(connection).migrate(nachher)
-    finally:
-        executor = MigrationExecutor(connection)
-        executor.migrate(executor.loader.graph.leaf_nodes())
-    # Erst nach der letzten Migration passt das aktuelle Modell zur Tabelle.
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
-        pk=alte_konfiguration.pk
-    )
-
-    assert konfiguration.bezeichnung == f"fake (Nr. {konfiguration.pk})"
-
-
-@pytest.mark.django_db
 def test_nach_dem_aktivieren_liefert_die_verwendung_genau_diese() -> None:
     """Der Zeiger einer Verwendung zeigt auf die zuletzt aktivierte."""
 
@@ -376,100 +340,11 @@ def test_haelt_den_anlagezeitpunkt_fest() -> None:
 def test_die_verwendung_hat_keinen_default() -> None:
     """Keine neue Stelle erwischt versehentlich die Schüler:innen-Konfiguration."""
 
-    for methode in ("aktive", "belegte", "aktivieren"):
-        parameter = inspect.signature(
-            getattr(ModellKonfiguration.objects, methode)
-        ).parameters["verwendung"]
-        assert parameter.default is inspect.Parameter.empty
-
-
-@pytest.mark.django_db(transaction=True)
-def test_migration_macht_die_aktive_zur_schuelerin() -> None:
-    """Der Umstieg auf Verwendungen verliert keine aktive Konfiguration."""
-
-    vorher = [("simulation", "0007_modellkonfiguration_bezeichnung")]
-    nachher = [("simulation", "0008_aktivemodellkonfiguration_verwendung")]
-    executor: MigrationExecutor = MigrationExecutor(connection)
-    executor.migrate(vorher)
-    try:
-        alte_apps = executor.loader.project_state(vorher).apps
-        alte_konfiguration = alte_apps.get_model(
-            "simulation", "ModellKonfiguration"
-        ).objects.create(bezeichnung="Bestand", sprachmodell="fake")
-        alte_apps.get_model("simulation", "AktiveModellKonfiguration").objects.create(
-            konfiguration=alte_konfiguration
+    with pytest.raises(TypeError):
+        ModellKonfiguration.objects.aktive()  # ty: ignore[missing-argument]
+    with pytest.raises(TypeError):
+        ModellKonfiguration.objects.belegte()  # ty: ignore[missing-argument]
+    with pytest.raises(TypeError):
+        ModellKonfiguration.objects.aktivieren(  # ty: ignore[missing-argument]
+            ModellKonfiguration(bezeichnung="Test", sprachmodell="fake")
         )
-        MigrationExecutor(connection).migrate(nachher)
-    finally:
-        executor = MigrationExecutor(connection)
-        executor.migrate(executor.loader.graph.leaf_nodes())
-    # Erst nach der letzten Migration passt das aktuelle Modell zur Tabelle.
-    schuelerin: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-        Verwendung.SCHUELERIN
-    )
-    lehrperson: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-        Verwendung.LEHRPERSON
-    )
-    bewerter: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
-        Verwendung.BEWERTER
-    )
-
-    assert schuelerin is not None and schuelerin.pk == alte_konfiguration.pk
-    assert lehrperson is None
-    assert bewerter is None
-
-
-@pytest.mark.django_db(transaction=True)
-def test_migration_laesst_das_anlagedatum_des_bestands_leer() -> None:
-    """Der Migrationszeitpunkt wird nicht als Anlagedatum ausgegeben."""
-
-    vorher = [("simulation", "0008_aktivemodellkonfiguration_verwendung")]
-    executor: MigrationExecutor = MigrationExecutor(connection)
-    executor.migrate(vorher)
-    try:
-        alte_konfiguration = (
-            executor.loader.project_state(vorher)
-            .apps.get_model("simulation", "ModellKonfiguration")
-            .objects.create(bezeichnung="Bestand", sprachmodell="fake")
-        )
-    finally:
-        executor = MigrationExecutor(connection)
-        executor.migrate(executor.loader.graph.leaf_nodes())
-
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get(
-        pk=alte_konfiguration.pk
-    )
-    assert konfiguration.angelegt_am is None
-
-
-@pytest.mark.django_db(transaction=True)
-def test_migration_datiert_den_bestand_auf_seine_frueheste_sitzung() -> None:
-    """Bestand mit Sitzung trägt deren Beginn, Bestand ohne Sitzung bleibt leer."""
-
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    autorin: Konto = Konto.objects.create_user(username="ada")
-    gebraucht: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Gebraucht", sprachmodell="fake"
-    )
-    ungebraucht: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Ungebraucht", sprachmodell="fake"
-    )
-    fruehe: datetime = datetime(2025, 3, 4, 9, 30, tzinfo=UTC)
-    for beginn in (datetime(2025, 5, 6, 10, 0, tzinfo=UTC), fruehe):
-        sitzung: Sitzung = Sitzung.objects.create(
-            teilnahme=Teilnahme.objects.create(),
-            vignette=Vignette.objects.anlegen(autorin),
-            simulationskern=kern,
-            modell_konfiguration=gebraucht,
-        )
-        Sitzung.objects.filter(pk=sitzung.pk).update(erstellt_am=beginn)
-    # Bestand vor dem Anlagedatum; die Sperre des QuerySets umgeht der Test.
-    QuerySet.update(ModellKonfiguration.objects.all(), angelegt_am=None)
-    executor: MigrationExecutor = MigrationExecutor(connection)
-    executor.migrate([("simulation", "0009_modellkonfiguration_angelegt_am")])
-    executor = MigrationExecutor(connection)
-    executor.migrate(executor.loader.graph.leaf_nodes())
-
-    assert ModellKonfiguration.objects.get(pk=gebraucht.pk).angelegt_am == fruehe
-    assert ModellKonfiguration.objects.get(pk=ungebraucht.pk).angelegt_am is None

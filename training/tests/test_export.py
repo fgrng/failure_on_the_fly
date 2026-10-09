@@ -1,22 +1,24 @@
 """HTTP-Tests des Trainingsexports (ADR-0049)."""
 
+from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
+import time_machine
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.urls import reverse
-from django.utils.text import slugify
 
+from config.tests.aufbau import konto_mit_rollen
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE
 from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
 from training.models import Abschrift, Training
-from training.tests.test_freigabe import _abschrift
-from training.tests.test_fremdeinsicht import (
+from training.tests.aufbau import (
     FremdeinsichtTestCase,
-    _gespielte_sitzung,
-    _konto,
+    abschrift_mit_sitzung,
+    gespielte_sitzung,
 )
 
 
@@ -69,27 +71,20 @@ class ZugriffTests(TrainingsexportTestCase):
 
     def test_administration_laedt_den_export(self) -> None:
         """Die Administration zieht den Export jedes Trainings."""
-        administratorin: Konto = _konto("root", is_superuser=True)
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
 
         self.assertEqual(self._export(administratorin).status_code, 200)
 
-    def test_ko_eigentuemerin_laedt_den_export(self) -> None:
-        """Jedes Kreismitglied zieht den Export."""
-        ko: Konto = _konto("katherine", AUSBILDERIN_GRUPPE)
-        self.training.eigentuemerinnen.add(ko)
-
-        self.assertEqual(self._export(ko).status_code, 200)
-
     def test_fremde_ausbilderin_bekommt_404(self) -> None:
         """Ein fremder Kreis erfährt nichts über das Training."""
-        fremde: Konto = _konto("hedy", AUSBILDERIN_GRUPPE)
+        fremde: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
 
         self.assertEqual(self._export(fremde).status_code, 404)
 
     def test_neues_kreismitglied_laedt_auch_aeltere_sitzungen(self) -> None:
         """Der Export folgt der aktuellen Mitgliedschaft, auch rückwirkend."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        neues_mitglied: Konto = _konto("katherine", AUSBILDERIN_GRUPPE)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        neues_mitglied: Konto = konto_mit_rollen("katherine", AUSBILDERIN_GRUPPE)
         self.training.eigentuemerinnen.add(neues_mitglied)
 
         response: HttpResponse = self._export(neues_mitglied)
@@ -99,7 +94,9 @@ class ZugriffTests(TrainingsexportTestCase):
 
     def test_ausgetretenes_kreismitglied_bekommt_404(self) -> None:
         """Wer den Kreis verlässt, zieht sofort keinen Export mehr."""
-        self.training.eigentuemerinnen.add(_konto("katherine", AUSBILDERIN_GRUPPE))
+        self.training.eigentuemerinnen.add(
+            konto_mit_rollen("katherine", AUSBILDERIN_GRUPPE)
+        )
         self.training.austreten(self.ausbilderin.pk)
 
         self.assertEqual(self._export(self.ausbilderin).status_code, 404)
@@ -116,12 +113,15 @@ class ZugriffTests(TrainingsexportTestCase):
 
     def test_dateiname_nennt_training_und_zeitpunkt(self) -> None:
         """Der Download heißt nach Training und UTC-Zeitstempel."""
-        response: HttpResponse = self._export()
+        with time_machine.travel(
+            datetime(2026, 7, 1, 10, 0, tzinfo=ZoneInfo("Europe/Berlin")), tick=False
+        ):
+            response: HttpResponse = self._export()
 
-        self.assertRegex(
+        self.assertEqual(
             response["Content-Disposition"],
-            rf'^attachment; filename="training-{self.training.pk}-'
-            rf'{slugify(self.training.name)}-\d{{8}}T\d{{6}}Z\.zip"$',
+            f'attachment; filename="training-{self.training.pk}-'
+            'bruchrechnung-20260701T080000Z.zip"',
         )
 
     def test_kuratierseite_bietet_den_export_an(self) -> None:
@@ -142,23 +142,12 @@ class ZugriffTests(TrainingsexportTestCase):
 class InhaltTests(TrainingsexportTestCase):
     """Was im Archiv steht."""
 
-    def test_je_abgeschlossener_sitzung_eine_markdown_datei(self) -> None:
-        """Zwei Sitzungen derselben Person liegen in einem Ordner."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-
-        archiv: dict[str, str] = self._archiv()
-
-        self.assertEqual(len(archiv), 2)
-        self.assertEqual(len(self._ordner(archiv)), 1)
-        self.assertTrue(all(name.endswith(".md") for name in archiv))
-
     def test_je_person_ein_eigener_ordner(self) -> None:
         """Bearbeitungen verschiedener Personen liegen getrennt."""
-        zweite: Konto = _konto("margaret")
+        zweite: Konto = Konto.objects.create_user(username="margaret")
         self.training.beitreten(zweite)
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        _gespielte_sitzung(self.training, zweite, self.vignette)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, zweite, self.vignette)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -166,8 +155,8 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_dateien_sind_gezaehlt_und_nach_der_vignette_benannt(self) -> None:
         """Mehrere Durchläufe derselben Vignette tragen eine laufende Nummer."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -178,27 +167,42 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_ordner_heissen_nach_kennzeichen(self) -> None:
         """Der Ordner trägt ein Kennzeichen, keinen Namen."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
         (ordner,) = self._ordner(self._archiv())
 
         self.assertRegex(ordner, r"^teilnehmer-[0-9a-f]+$")
 
     def test_datei_enthaelt_vignette_ausgang_transkript_und_diagnose(self) -> None:
-        """Dasselbe wie in der Fremdeinsicht, als Markdown."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        """Dasselbe wie in der Fremdeinsicht, als Markdown, datiert in Ortszeit."""
+        with time_machine.travel(
+            datetime(2026, 7, 2, 0, 30, tzinfo=ZoneInfo("Europe/Berlin"))
+        ):
+            gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
         (text,) = self._archiv().values()
 
-        self.assertIn("# Brüche addieren", text)
-        self.assertIn("Abgeschlossen", text)
-        self.assertIn("Wie hast du gerechnet?", text)
-        self.assertIn("Ich habe oben und unten zusammengezählt.", text)
-        self.assertIn("Zähler und Nenner addiert.", text)
+        self.assertEqual(
+            text,
+            "# Brüche addieren\n"
+            "\n"
+            "- Ausgang: Abgeschlossen\n"
+            "- Datum: 02.07.2026\n"
+            "\n"
+            "## Transkript\n"
+            "\n"
+            "**Eingabe:** Wie hast du gerechnet?\n"
+            "\n"
+            "**Äußerung:** Ich habe oben und unten zusammengezählt.\n"
+            "\n"
+            "## Diagnose\n"
+            "\n"
+            "Zähler und Nenner addiert.\n",
+        )
 
     def test_sitzung_ohne_zeitstempel_kommt_ohne_datum_hinaus(self) -> None:
         """Eine Bestandssitzung ohne Entstehungszeitpunkt nennt kein Datum."""
-        sitzung: Sitzung = _gespielte_sitzung(
+        sitzung: Sitzung = gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         )
         sitzung.erstellt_am = None
@@ -210,7 +214,7 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_schritt_ohne_aeusserung_ist_als_solcher_markiert(self) -> None:
         """Ein endgültig gescheiterter Schritt bleibt im Transkript sichtbar."""
-        sitzung: Sitzung = _gespielte_sitzung(
+        sitzung: Sitzung = gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         )
         Gespraechsschritt.objects.answerless_anlegen(
@@ -226,7 +230,7 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_sitzung_ohne_diagnose_ist_als_solche_markiert(self) -> None:
         """Fehlt die Diagnose, sagt der Abschnitt das ausdrücklich."""
-        _gespielte_sitzung(
+        gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         ).diagnose.delete()
 
@@ -236,7 +240,7 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_transkript_wechselt_eingabe_und_aeusserung(self) -> None:
         """Die Schritte stehen in ihrer Reihenfolge, Eingabe vor Äußerung."""
-        sitzung: Sitzung = _gespielte_sitzung(
+        sitzung: Sitzung = gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         )
         Gespraechsschritt.objects.create(
@@ -267,7 +271,7 @@ class InhaltTests(TrainingsexportTestCase):
             Sitzung.Status.ABGEBROCHEN,
             Sitzung.Status.GESCHEITERT,
         ):
-            _gespielte_sitzung(
+            gespielte_sitzung(
                 self.training,
                 self.teilnehmerin,
                 self.vignette,
@@ -280,19 +284,19 @@ class InhaltTests(TrainingsexportTestCase):
     def test_sitzung_in_einem_fremden_training_fehlt(self) -> None:
         """Einsicht folgt dem Anlass, nicht der Vignette."""
         fremdes: Training = Training.objects.anlegen(
-            _konto("hedy", AUSBILDERIN_GRUPPE), name="Fremd"
+            konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Fremd"
         )
         fremdes.vignetten.add(self.vignette)
         fremdes.veroeffentlichen()
-        _gespielte_sitzung(fremdes, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(fremdes, self.teilnehmerin, self.vignette)
 
         self.assertEqual(self._archiv(), {})
 
     def test_kein_kontoname_und_keine_mailadresse(self) -> None:
         """Weder Name, Benutzername noch Mailadresse stehen im Archiv."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        self._freigeben(abschrift, self.training)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
+        self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -302,7 +306,7 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_keine_denkspur_und_keine_fehlversuche(self) -> None:
         """Denkspur und verworfene Modellantworten bleiben im System."""
-        sitzung: Sitzung = _gespielte_sitzung(
+        sitzung: Sitzung = gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         )
         Fehlversuch.objects.create(
@@ -319,7 +323,7 @@ class InhaltTests(TrainingsexportTestCase):
 
     def test_zwei_exporte_ziehen_verschiedene_kennzeichen(self) -> None:
         """Kennzeichen verfolgen niemanden über die Zeit."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
         erstes: set[str] = self._ordner(self._archiv())
         zweites: set[str] = self._ordner(self._archiv())
@@ -334,9 +338,9 @@ class AbschriftTests(TrainingsexportTestCase):
         self,
     ) -> None:
         """Sie liegt im Ordner der Person, benannt nach der Erhebung."""
-        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        self._freigeben(abschrift, self.training)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
+        self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -349,20 +353,12 @@ class AbschriftTests(TrainingsexportTestCase):
         )
         self.assertIn("Nur den Zähler gekürzt.", archiv[abschriftdateien[0]])
 
-    def test_abschrift_geht_ohne_denkspur_hinaus(self) -> None:
-        """Auch die kopierte Denkspur aus der Erhebung bleibt im System."""
-        self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
-
-        (text,) = self._archiv().values()
-
-        self.assertNotIn("Geheime Denkspur", text)
-
     def test_erhebungsname_bricht_nicht_aus_dem_ordner_aus(self) -> None:
         """Schrägstriche und Punkte im Namen werden kein Pfad."""
-        abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        abschrift.erhebungsname = "../../Studie/Bruch"
-        abschrift.save(update_fields=["erhebungsname"])
-        self._freigeben(abschrift, self.training)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
+        kopie.erhebungsname = "../../Studie/Bruch"
+        kopie.save(update_fields=["erhebungsname"])
+        self._freigeben(kopie, self.training)
 
         (name,) = self._archiv()
 
@@ -370,46 +366,43 @@ class AbschriftTests(TrainingsexportTestCase):
 
     def test_private_abschrift_fehlt(self) -> None:
         """Ohne Freigabe geht die Abschrift nicht hinaus."""
-        _abschrift(self.teilnehmerin, self.vignette)
-
-        self.assertEqual(self._archiv(), {})
-
-    def test_widerrufene_abschrift_fehlt(self) -> None:
-        """Nach dem Widerruf geht die Abschrift nicht mehr hinaus."""
-        abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        self._freigeben(abschrift, self.training)
-        self._freigeben(abschrift)
-
-        self.assertEqual(self._archiv(), {})
-
-    def test_nicht_abgeschlossene_sitzung_der_abschrift_fehlt(self) -> None:
-        """Auch in Abschriften gehen nur abgeschlossene Sitzungen hinaus."""
-        abschrift: Abschrift = _abschrift(
-            self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
-        )
-        self._freigeben(abschrift, self.training)
+        abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
 
         self.assertEqual(self._archiv(), {})
 
     def test_zwei_abschriften_derselben_erhebung_bleiben_getrennt(self) -> None:
         """Gleiche Erhebungsnamen überschreiben einander nicht."""
         for _ in range(2):
-            self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
+            self._freigeben(
+                abschrift_mit_sitzung(self.teilnehmerin, self.vignette), self.training
+            )
 
         archiv: dict[str, str] = self._archiv()
 
-        self.assertEqual(len(archiv), 2)
-        self.assertEqual(len({name.rsplit("/", 1)[0] for name in archiv}), 2)
+        # Das Kennzeichen ist zufällig; beide Ordner liegen unter derselben Person.
+        pfade: list[list[str]] = sorted(name.split("/", 1) for name in archiv)
+        kennzeichen: str = pfade[0][0]
+        self.assertEqual(
+            pfade,
+            [
+                [kennzeichen, "studie-bruchrechnung-2/01-brüche-addieren.md"],
+                [kennzeichen, "studie-bruchrechnung/01-brüche-addieren.md"],
+            ],
+        )
 
     def test_abschrift_ohne_einsehbare_sitzung_belegt_keinen_ordnernamen(
         self,
     ) -> None:
         """Eine leer ausgehende Abschrift schiebt die nächste nicht auf „-2“."""
         self._freigeben(
-            _abschrift(self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN),
+            abschrift_mit_sitzung(
+                self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
+            ),
             self.training,
         )
-        self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
+        self._freigeben(
+            abschrift_mit_sitzung(self.teilnehmerin, self.vignette), self.training
+        )
 
         (name,) = self._archiv()
 

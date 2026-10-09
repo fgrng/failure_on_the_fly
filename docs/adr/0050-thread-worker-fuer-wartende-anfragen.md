@@ -69,3 +69,19 @@ während andere frei sind. Zahlen und Quellen stehen in
 - **SQLite trägt die Nebenläufigkeit**, mit kleinerem Abstand als bei zehn
   Teilnehmenden: Nachtrag vom 2026-10-08 in
   `docs/research/2026-09-21-sqlite-nebenlaeufigkeit-wal.md`.
+
+## Nachtrag: Fake-Sprachmodell ohne geteilte Liste
+
+Seit #379 hält `FakeSprachmodell` keine Liste `letzte_anfragen` mehr. Tests
+zeichnen ihre Anfragen über `config.tests.sprachmodell.anfragen_aufzeichnen`
+je Test in eine eigene Liste auf; kein Sprachmodell-Adapter teilt damit noch
+Zustand zwischen Threads.
+
+## Nachtrag: Evalkatalog-Knoten rendern ohne Schreibsperre
+
+Mehr Threads halten auch die globale Schreibsperre von SQLite öfter (#249).
+Seit #409 lesen und rendern die Knoten „Übergreifende Kriterien“, Eval und
+Evalinput auf GET außerhalb einer Schreibtransaktion, auch bei finalen und
+überholten Fassungen. Auf POST liegen Entwurfs- und Zuordnungsprüfung sowie die
+gesamte Eingabenübernahme in einer gemeinsamen atomaren Transaktion; die Seite
+rendert erst nach der Weiterleitung.

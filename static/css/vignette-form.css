@@ -130,7 +130,7 @@
     list-style: none;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
 }
 .vignette-vorschlaege button {
     width: 100%;
@@ -139,7 +139,7 @@
     text-align: left;
     background: transparent;
     border: 0;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
 }
 .vignette-vorschlaege button:hover, .vignette-vorschlaege button:focus { background: var(--color-surface-muted); }
 
