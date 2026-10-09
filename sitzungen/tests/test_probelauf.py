@@ -10,9 +10,9 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from unittest.mock import patch
 
+from config.tests.sprachmodell import anfragen_aufzeichnen
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -421,13 +421,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.entwurf.save()
 
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie hast du gerechnet?"},
+            )
 
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_text>Rechne zuerst.\n</lernauftrag_text>\n"
             "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Zahlenreihe"
@@ -457,13 +458,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.entwurf.save()
 
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie hast du gerechnet?"},
+            )
 
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_text>Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
             "</lernauftrag_text>",
@@ -506,13 +508,14 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertNotContains(response_gespraech, "Geheimer Hinweis zum Arbeitsheft")
 
         # 3. Prompt-Erzeugung beim Gesprächsschritt prüfen
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Wie hast du gerechnet?"},
+            )
 
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_simulationshinweise>\n"
             "Geheimer Hinweis zum Lernauftrag\n"
@@ -608,10 +611,11 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
         self.assertContains(erste_antwort, "Mia addiert Zähler und Nenner.")
 
-        zweite_antwort: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Und warum?", "eingabemodus": "transkribiert"},
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            zweite_antwort: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_gespraech"),
+                {"eingabe": "Und warum?", "eingabemodus": "transkribiert"},
+            )
 
         self.assertContains(
             zweite_antwort, "Ich rechne eins plus eins und zwei plus drei."
@@ -637,9 +641,7 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 },
             ],
         )
-        zweite_nachrichten: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][
-            0
-        ]
+        zweite_nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
         self.assertIn(
             {
                 "role": "assistant",
@@ -808,12 +810,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
+            )
 
         self.assertEqual(
-            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
+            aufgezeichnet[-1][-3:],
             [
                 {"role": "user", "content": "Wie rechnest du?"},
                 {"role": "assistant", "content": "Ich addiere einfach alles."},
@@ -837,12 +840,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
         )
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
+            )
 
         self.assertEqual(
-            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
+            aufgezeichnet[-1][-3:],
             [
                 {"role": "user", "content": "Erster Schritt"},
                 {"role": "assistant", "content": ""},

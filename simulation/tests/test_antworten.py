@@ -2,9 +2,10 @@
 
 import pytest
 
+from config.tests.sprachmodell import anfragen_aufzeichnen
 from simulation import MAX_VERSUCHE, antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
-from simulation.sprachmodell import AUSGABE_SCHEMA, FakeSprachmodell
+from simulation.sprachmodell import AUSGABE_SCHEMA
 from vignetten.models import Vignette
 
 
@@ -113,36 +114,36 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
 def test_antwort_versuchen_gibt_dem_fake_nur_sichtbaren_verlauf() -> None:
     """Die Denkspur erreicht keinen späteren Modellaufruf."""
 
-    FakeSprachmodell.letzte_anfragen.clear()
-    vorheriger_versuch = antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {
-                        "denkspur": "Die geheime Denkspur.",
-                        "aeusserung": "Sichtbare Äußerung",
-                    }
-                ]
-            },
-        ),
-        verlauf=[],
-        eingabe="Wie hast du gerechnet?",
-    )
-    antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={"skript": [{"denkspur": "x", "aeusserung": "2/5."}]},
-        ),
-        verlauf=[("Wie hast du gerechnet?", vorheriger_versuch.antwort.aeusserung)],
-        eingabe="Wie hast du gerechnet?",
-    )
+    with anfragen_aufzeichnen() as anfragen:
+        vorheriger_versuch = antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                sprachmodell="fake",
+                parameter={
+                    "skript": [
+                        {
+                            "denkspur": "Die geheime Denkspur.",
+                            "aeusserung": "Sichtbare Äußerung",
+                        }
+                    ]
+                },
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+        antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                sprachmodell="fake",
+                parameter={"skript": [{"denkspur": "x", "aeusserung": "2/5."}]},
+            ),
+            verlauf=[("Wie hast du gerechnet?", vorheriger_versuch.antwort.aeusserung)],
+            eingabe="Wie hast du gerechnet?",
+        )
 
-    nachrichten = FakeSprachmodell.letzte_anfragen[1][0]
+    nachrichten = anfragen[-1]
     assert {"role": "assistant", "content": "Sichtbare Äußerung"} in nachrichten
     assert all(
         "Die geheime Denkspur." not in nachricht["content"] for nachricht in nachrichten

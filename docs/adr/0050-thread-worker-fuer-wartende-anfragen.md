@@ -69,3 +69,10 @@ während andere frei sind. Zahlen und Quellen stehen in
 - **SQLite trägt die Nebenläufigkeit**, mit kleinerem Abstand als bei zehn
   Teilnehmenden: Nachtrag vom 2026-10-08 in
   `docs/research/2026-09-21-sqlite-nebenlaeufigkeit-wal.md`.
+
+## Nachtrag: Fake-Sprachmodell ohne geteilte Liste
+
+Seit #379 hält `FakeSprachmodell` keine Liste `letzte_anfragen` mehr. Tests
+zeichnen ihre Anfragen über `config.tests.sprachmodell.anfragen_aufzeichnen`
+je Test in eine eigene Liste auf; kein Sprachmodell-Adapter teilt damit noch
+Zustand zwischen Threads.

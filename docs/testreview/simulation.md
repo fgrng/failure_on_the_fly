@@ -35,7 +35,7 @@ Bereich aus #329 (Spec #321). Geprüft sind alle zehn Dateien in `simulation/tes
   - Strukturierte Ausgabe mit `strict: True`. Nur genau die beiden Felder gelten als Antwort; eine native Reasoning-Spur des Anbieters wird nicht durchgereicht.
   - `timeout` überschreibt einen gleichnamigen Parameter.
 - **Fehlerfälle:** `ContentFilter` (Ausnahme von LiteLLM oder `finish_reason`), `Formatbruch` (Hülle fehlt, kein JSON, falsche Felder), `Anbieterfehler` (jede andere Ausnahme). Alle tragen `rohantwort`.
-- **Fake:** verbraucht je Aufruf einen Skripteintrag und spielt `fehler: formatbruch | anbieterfehler | content_filter` ab. Er zeichnet jeden Aufruf in der klassenweiten Liste `letzte_anfragen` auf; das ist ein Testhaken im Produktionscode (#379).
+- **Fake:** verbraucht je Aufruf einen Skripteintrag und spielt `fehler: formatbruch | anbieterfehler | content_filter` ab. Er zeichnet keine Aufrufe auf; Tests lesen die Nachrichten über `config.tests.sprachmodell.anfragen_aufzeichnen` (#379).
 
 ### Transkription (`simulation/transkription/`)
 
