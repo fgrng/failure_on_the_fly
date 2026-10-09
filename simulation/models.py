@@ -1016,6 +1016,17 @@ class AktiveModellKonfiguration(models.Model):
     )
 
 
+def evals_verfuegbar() -> bool:
+    """Ob Evals angeboten werden: finaler Evalkatalog und alle drei Verwendungen belegt.
+
+    Sonst gibt es keine Evals-Elemente, auch keinen erklärenden Hinweis (ADR-0046).
+    """
+
+    return Evalkatalog.objects.finale_fassung() is not None and set(
+        ModellKonfiguration.objects.aktive_je_verwendung()
+    ) == set(Verwendung.values)
+
+
 class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
     """Zugang zur einzigen Transkriptions-Konfiguration."""
 

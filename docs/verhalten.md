@@ -502,6 +502,67 @@ mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 
+## Evalläufe
+
+Evals gibt es nur, wenn ein finaler Evalkatalog existiert und alle drei
+Verwendungen (Schüler:in, Lehrperson, Bewerter) belegt sind. Sonst fehlen
+Verlinkung, Ansicht und Start ganz, ohne erklärenden Hinweis; beide Routen
+ergeben 404.
+
+Die Detailansicht einer Vignette nennt dann den Zustand ihres Evallaufs („noch
+keiner“, „Wartet“, „Läuft“, „Fertig“, „Abgebrochen“) und verlinkt mit „Evals
+ansehen“ die Ansicht unter `/evals/vignette/<Fassung>/`. Sie steht Mitgliedern
+des Eigentümer-Kreises und der Administration offen; fremde Fassungen ergeben
+404, Konten ohne Autor:innen-Rolle 403. Die Ansicht zeigt Zustand, Auslöse-,
+Start- und Endzeitpunkt und *k*. „Evallauf starten“ (POST) gibt es an Entwürfen
+und finalen Fassungen, solange kein Lauf wartet oder läuft; archivierte
+Fassungen sind nicht startbar. Während ein Lauf wartet oder läuft, steht statt
+des Knopfs der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu
+laden“; aktualisiert wird nur durch Neuladen. Eine abgewiesene Startprüfung
+führt mit Meldung zurück auf die Ansicht und lässt den bisherigen Lauf
+unberührt.
+
+Je Fassung gibt es höchstens einen Evallauf. Ein neuer Start ersetzt einen
+fertigen oder abgebrochenen Vorgänger samt seinen Gesprächen im selben Zug; ein
+wartender oder laufender wird auch bei gleichzeitigen Starts weder verdoppelt
+noch ersetzt. Der Start hält den gepinnten Kern, die finale Katalogfassung, die
+drei aktiven Konfigurationen und die Prompt-Werte der Fassung fest: Wird der
+Entwurf danach gespeichert oder vorgespult, spielt der Lauf trotzdem den Stand
+beim Start. Die Referenzdiagnose gehört nicht zu diesen Werten und erreicht
+keinen Modellaufruf. Finalisieren behält den Lauf an derselben Fassung; das
+Löschen eines Entwurfs entfernt ihn.
+
+Ausgeführt wird ein Lauf vom Hintergrundprozess
+`python manage.py evallaeufe_abarbeiten --einmal`. Er nimmt höchstens den
+ältesten wartenden Lauf, setzt ihn auf „Läuft“ und am Ende auf „Fertig“, jeweils
+mit Zeitpunkt; ein Fehler mitten im Lauf hinterlässt ihn „Abgebrochen“, das bis
+dahin Geschriebene bleibt. Ohne `--einmal` verweigert der Command den Dienst;
+der dauerhafte Betrieb folgt. Für jedes Eval, jeden Evalinput und jede
+Wiederholung 1 bis *k* entsteht ein Evalgespräch, für jeden festen Inputschritt
+ein Wechsel: Die Inputäußerung ist die Äußerung der Lehrperson, die Schüler:in
+antwortet über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
+Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
+Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
+Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
+User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Jedes Gespräch, jeder
+Wechsel und jedes Urteil wird sofort geschrieben; kein Modellaufruf hält eine
+Schreibtransaktion offen.
+
+Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
+einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
+*nicht erfüllt* mit der Begründung „Antwortversuch gescheitert“. Liefert der
+Bewerter nach allen Versuchen nichts Auswertbares, bleibt dieses Kriterium *ohne
+Urteil*. Gelenkte Inputschritte werden noch nicht ausgeführt: Das Gespräch endet
+vor dem ersten gelenkten Schritt, und alle seine Kriterien bleiben *ohne
+Urteil*, statt dass der Schritt still entfiele.
+
+Die Ansicht zeigt je Eval eine Tabelle aus Evalinputs (mit der Folge ihrer
+Schritte, etwa „FFG“) und Kriterien, die übergreifenden eingeschlossen. Jede
+Zelle nennt Quote und Bestehen zusammen, etwa „2 von 3 · nicht bestanden“;
+bestanden ist eine Zelle nur, wenn alle *k* Urteile erfüllt sind. Urteile ohne
+Urteil stehen gezählt dahinter. Evalläufe erzeugen weder Teilnahme noch Sitzung
+und erscheinen weder in der Datenspur noch im Trainingsexport.
+
 ## Transkriptions-Konfiguration
 
 Die Transkription hängt an einer eigenen Konfiguration, die die Administration

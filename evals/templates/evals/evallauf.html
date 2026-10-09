@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Evallauf{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page area--authoring">
+    <header class="page-head">
+        <div>
+            <p>Entwicklung / Vignetten / Evallauf</p>
+            <h1>{{ vignette.anzeigename }}</h1>
+            <span>Fassung {{ vignette.pk }} · {{ vignette.get_zustand_display }}</span>
+        </div>
+        <a class="button button--secondary" href="{% url 'vignetten:detail' vignette.pk %}">Zur Vignette</a>
+    </header>
+
+    <section class="page-section" aria-labelledby="evallauf-zustand">
+        <header class="page-section__head">
+            <b>01</b><span><h2 id="evallauf-zustand">Zustand</h2><small>Der jüngste Evallauf dieser Fassung</small></span>
+        </header>
+        {% if lauf %}
+            <dl class="field-grid field-grid--three">
+                <div><dt>Zustand</dt><dd>{{ lauf.get_zustand_display }}</dd></div>
+                <div><dt>Ausgelöst</dt><dd>{{ lauf.ausgeloest_am|date:"d.m.Y H:i" }}</dd></div>
+                <div><dt>Gestartet</dt><dd>{{ lauf.gestartet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
+                <div><dt>Beendet</dt><dd>{{ lauf.beendet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
+                <div><dt>Wiederholungen je Evalinput</dt><dd>{{ lauf.katalog.k }}</dd></div>
+            </dl>
+        {% else %}
+            <p>Für diese Fassung gibt es noch keinen Evallauf.</p>
+        {% endif %}
+        <div class="vignette-detail-actions">
+            {% if startbar %}
+                <form method="post" action="{% url 'evals:starten' vignette.pk %}">
+                    {% csrf_token %}
+                    <button class="button" type="submit">Evallauf starten</button>
+                </form>
+            {% elif lauf.ist_offen %}
+                <small class="system-page-hint">Der Evallauf wird im Hintergrund ausgeführt; die Seite darf geschlossen werden.</small>
+                <a class="button button--secondary" href="{% url 'evals:evallauf' vignette.pk %}">Stand neu laden</a>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if lauf and lauf.zustand != "wartet" %}
+        {% for ergebnis in uebersicht %}
+            <section class="page-section" aria-label="Eval {{ ergebnis.name }}">
+                <header class="page-section__head">
+                    <b>{{ forloop.counter|add:1|stringformat:"02d" }}</b><span><h2>{{ ergebnis.name }}</h2><small>Je Evalinput und Kriterium: Quote und Bestehen</small></span>
+                </header>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Evalinput</th>
+                                {% for kriterium in ergebnis.kriterien %}<th>{{ kriterium }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for zeile in ergebnis.zeilen %}
+                                <tr>
+                                    <th>Evalinput {{ zeile.nummer }} <small>{{ zeile.kuerzel }}</small></th>
+                                    {% for zelle in zeile.zellen %}
+                                        <td>
+                                            {{ zelle.erfuellt }} von {{ zelle.k }} ·
+                                            {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}
+                                            {% if zelle.ohne_urteil %}<small>({{ zelle.ohne_urteil }} ohne Urteil)</small>{% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% endfor %}
+    {% endif %}
+</section>
+{% endblock %}

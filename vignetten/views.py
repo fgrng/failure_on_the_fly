@@ -14,6 +14,8 @@ from konten.navigation import (
     autorin_erforderlich as _autorin_erforderlich,
 )
 
+from simulation.models import evals_verfuegbar
+
 from .forms import VignetteForm
 from .models import Vignette, Vignettenhistorie, zufaellige_akteure
 
@@ -132,6 +134,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "vignette": vignette,
             "zustand_badge": _zustand_badge(vignette),
+            "evals_verfuegbar": evals_verfuegbar(),
         },
     )
 

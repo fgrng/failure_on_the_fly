@@ -58,6 +58,10 @@
             </form>
         {% endif %}
     </div>
+    {# Der Evallauf kommt über den Reverse-Accessor, ohne Import von evals. #}
+    {% if evals_verfuegbar %}
+        <p class="vignette-detail-kern">Evallauf: {{ vignette.evallauf.get_zustand_display|default:"noch keiner" }} · <a href="{% url 'evals:evallauf' vignette.pk %}">Evals ansehen</a></p>
+    {% endif %}
 
     <section class="page-section" aria-labelledby="detail-context">
         <header class="page-section__head">

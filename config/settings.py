@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "config",
     "erhebungen",
+    "evals",
     "fragebogen_items",
     "konten",
     "seeds",
