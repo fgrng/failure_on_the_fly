@@ -196,6 +196,39 @@ class FreigebenTests(FreigabeTestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_freigabe_mit_unlesbarer_auswahl_wird_abgewiesen(self) -> None:
+        """Eine Auswahl, die keine Trainingsnummer ist, gibt es nicht."""
+        self.client.force_login(self.teilnehmerin)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:abschrift_freigaben", args=[self.abschrift.pk]),
+            {"training": ["abc"]},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_freigabe_mit_hochgestellter_ziffer_wird_abgewiesen(self) -> None:
+        """Eine Unicode-Ziffer ist keine Trainingsnummer."""
+        self.client.force_login(self.teilnehmerin)
+
+        response: HttpResponse = self.client.post(
+            reverse("training:abschrift_freigaben", args=[self.abschrift.pk]),
+            {"training": ["²"]},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_abgewiesene_freigabe_laesst_die_bisherige_freigabe_stehen(self) -> None:
+        """Nennt die Auswahl ein fremdes Training, bleibt alles, wie es war."""
+        fremdes_training: Training = Training.objects.anlegen(
+            _konto("hedy", AUSBILDERIN_GRUPPE), name="Anderes Seminar"
+        )
+        self._freigeben(self.training)
+
+        self._freigeben(fremdes_training)
+
+        self.assertEqual(self._status_fuer(self.ausbilderin), 200)
+
     def test_freigeben_verlangt_post(self) -> None:
         """Ein GET ändert keine Freigabe."""
         self.client.force_login(self.teilnehmerin)
@@ -259,6 +292,14 @@ class FreigebenTests(FreigabeTestCase):
 
         self.assertIn("Freigegeben für Bruchrechnung.", seite)
         self.assertNotIn("nur Sie lesen sie", seite)
+
+    def test_abschriftseite_ohne_beitritt_bietet_keine_freigabe_an(self) -> None:
+        """Wer keinem Training beigetreten ist, bekommt keine Checkbox-Liste."""
+        ohne_training: Konto = _konto("linus")
+        self.abschrift = _abschrift(ohne_training, self.erhebungsvignette)
+        self.teilnehmerin = ohne_training
+
+        self.assertNotIn("Freigaben speichern", self._abschriftseite())
 
     def test_private_abschrift_bleibt_im_kopf_privat(self) -> None:
         """Ohne Freigabe liest nur die Teilnehmerin."""
@@ -335,6 +376,16 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self.assertIn("Studie Bruchrechnung", seite)
         self.assertIn(importiert, seite)
 
+    def test_administration_findet_die_freigegebene_abschrift_unter_der_tabelle(
+        self,
+    ) -> None:
+        """Die Liste folgt der Sichtbarkeit des Trainings."""
+        self._freigeben(self.training)
+
+        seite: str = self._kuratierseite(_konto("root", is_superuser=True))
+
+        self.assertIn("Studie Bruchrechnung", seite)
+
     def test_freigegebene_abschrift_verlinkt_ihre_abgeschlossene_sitzung(
         self,
     ) -> None:
@@ -355,6 +406,21 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
 
         self.assertNotIn(_ansehen_url(_sitzung(abgebrochen)), self._kuratierseite())
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
+
+    def test_freigegebene_abschriften_stehen_nach_namen_sortiert(self) -> None:
+        """Die Liste folgt dem Namen der Person, nicht dem Importzeitpunkt."""
+        ada_lovelace: Konto = _konto("lovelace", first_name="ada", last_name="Lovelace")
+        self.training.beitreten(ada_lovelace)
+        frueh: Abschrift = self.abschrift
+        self.abschrift = _abschrift(ada_lovelace, self.erhebungsvignette)
+        self.teilnehmerin = ada_lovelace
+        self._freigeben(self.training)
+        self.abschrift, self.teilnehmerin = frueh, frueh.konto
+        self._freigeben(self.training)
+
+        seite: str = self._kuratierseite()
+
+        self.assertLess(seite.index("ada Lovelace"), seite.index("Grace Hopper"))
 
     def test_kreis_liest_die_freigegebene_sitzung_samt_fremder_szene(self) -> None:
         """Transkript, Diagnose und Szene der fremden Vignette sind lesbar."""

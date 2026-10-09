@@ -27,6 +27,7 @@ ABLEHNUNG: str = "Zu diesem Teilnahme-Token lässt sich keine Abschrift holen."
 """Die eine Meldung jeder Ablehnung: Der Import ist kein Orakel über Tokens."""
 
 FREIGABE_ABGEWIESEN: str = "Freigeben lässt sich nur für beigetretene Trainings."
+"""Die Ablehnung einer Freigabe für ein Training ohne eigene Trainingsbindung."""
 
 
 @transaction.atomic
@@ -70,9 +71,9 @@ def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
     wie es war.
     """
 
-    gewaehlt: QuerySet[Training] = Training.objects.filter(
-        trainingsbindung__konto=abschrift.konto, pk__in=trainings
-    )
+    gewaehlt: QuerySet[Training] = Training.objects.beigetreten_von(
+        abschrift.konto
+    ).filter(pk__in=trainings)
     if gewaehlt.count() != len(set(trainings)):
         raise ValidationError(FREIGABE_ABGEWIESEN)
     abschrift.freigegeben_fuer.set(gewaehlt)

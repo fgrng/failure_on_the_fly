@@ -231,6 +231,13 @@ def _eigene_abschrift(request: HttpRequest, pk: int) -> Abschrift:
     )
 
 
+_GESPIELTE_FOLGE: tuple[object, ...] = (
+    F("vignettenposition__position").asc(nulls_last=True),
+    "pk",
+)
+"""Sortiert Sitzungen einer Abschrift in gespielter Folge, ohne Position hinten."""
+
+
 def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     # Bereitet die kopierten Sitzungen zum Lesen auf. Die gespielte Folge steht
     # in der Vignettenposition; eine Sitzung ohne Position — die der Import
@@ -241,7 +248,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     gespielte_folge: QuerySet[Sitzung] = (
         Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
         .select_related("vignette__historie", "diagnose")
-        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+        .order_by(*_GESPIELTE_FOLGE)
     )
     return [
         {
@@ -274,8 +281,8 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
             "sitzungen": _gelesene_sitzungen(abschrift),
             "freigegeben": [training.name for training in freigegeben],
             "freigegebene_pks": {training.pk for training in freigegeben},
-            "beigetretene_trainings": Training.objects.filter(
-                trainingsbindung__konto=request.user
+            "beigetretene_trainings": Training.objects.beigetreten_von(
+                request.user
             ).order_by("name"),
         },
     )
@@ -291,11 +298,12 @@ def abschrift_freigaben(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     abschrift: Abschrift = _eigene_abschrift(request, pk)
-    auswahl: list[str] = request.POST.getlist("training")
-    if not all(wert.isdigit() for wert in auswahl):
+    try:
+        auswahl: list[int] = [int(wert) for wert in request.POST.getlist("training")]
+    except ValueError:
         raise Http404
     try:
-        abschrift_freigeben(abschrift, [int(wert) for wert in auswahl])
+        abschrift_freigeben(abschrift, auswahl)
     except ValidationError:
         raise Http404
     return redirect("training:abschrift", pk=abschrift.pk)
@@ -486,7 +494,7 @@ def _freigegebene_abschriften(
         _fremd_einsehbare_sitzungen(konto)
         .filter(teilnahme__abschrift__freigegeben_fuer=training)
         .select_related("vignette__historie")
-        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+        .order_by(*_GESPIELTE_FOLGE)
     ):
         sitzungen_nach_teilnahme.setdefault(sitzung.teilnahme_id, []).append(sitzung)
 
