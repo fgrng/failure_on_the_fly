@@ -411,12 +411,6 @@ def test_likert_skalenpole_sind_aufsteigend_deklariert() -> None:
     ]
 
 
-def test_likert_skalenpol_wird_aus_seiner_stufe_abgeleitet() -> None:
-    """Jede Likert-Stufe verweist auf ihren globalen Skalenpol."""
-    for stufe, pol in enumerate(LikertSkalenpol, start=1):
-        assert LikertSkalenpol.fuer_stufe(stufe) == pol
-
-
 def test_likert_stufe_wird_aus_ihrem_skalenpol_abgeleitet() -> None:
     """Jeder globale Likert-Skalenpol verweist auf seine Stufe."""
     for stufe, pol in enumerate(LikertSkalenpol, start=1):

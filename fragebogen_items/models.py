@@ -34,13 +34,6 @@ class LikertSkalenpol(models.TextChoices):
         return list(range(1, len(cls) + 1))
 
     @classmethod
-    def fuer_stufe(cls, stufe: int) -> "LikertSkalenpol":
-        """Liefert den globalen Skalenpol einer Stufe der Skala."""
-        if stufe not in cls.stufen():
-            raise ValueError(cls.stufenbereich_meldung())
-        return list(cls)[stufe - 1]
-
-    @classmethod
     def stufenbereich_meldung(cls) -> str:
         """Benennt den zulässigen Stufenbereich für Fehlermeldungen."""
         stufen: list[int] = cls.stufen()
