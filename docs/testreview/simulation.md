@@ -12,7 +12,6 @@ Bereich aus #329 (Spec #321). Geprüft sind alle zehn Dateien in `simulation/tes
 - **Aufrufe:**
   - `antwort_versuchen(vignette, kern, modell_konfiguration, verlauf, eingabe) -> Antwortversuch`. Einziger Aufrufer ist `sitzungen.durchlauf`.
   - `vorlage_rendern(vorlage, platzhalter)` setzt die benutzten Platzhalter einer Vorlage ein. Aufrufer sind `antwort_versuchen` und `sitzungen.durchlauf`.
-  - `render(vorlage, mapping)` ist öffentlich, hat aber nur `vorlage_rendern` als Aufrufer (#380).
 - **Invarianten:**
   - Schreibfrei (ADR-0016): `antwort_versuchen` berührt die Datenbank nicht.
   - Höchstens drei Modellaufrufe je Schritt. Jeder verworfene Aufruf wird ein `Fehlversuch` mit Grund (`Formatbruch`, `Anbieterfehler`, `Content-Filter`) und Rohantwort.

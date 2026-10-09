@@ -69,25 +69,12 @@ class Antwortversuch:
     fehlversuche: list[Fehlversuch]
 
 
-def render(vorlage_text: str, mapping: Mapping[str, str]) -> str:
-    """Füllt eine Vorlage mit genau ihren vereinbarten Platzhaltern."""
-
-    vorlage: Template = Template(vorlage_text)
-    ueberzaehlige_platzhalter: set[str] = set(mapping) - set(vorlage.get_identifiers())
-    if ueberzaehlige_platzhalter:
-        raise ValueError(
-            f"Überzählige Platzhalter: {', '.join(sorted(ueberzaehlige_platzhalter))}."
-        )
-    return vorlage.substitute(mapping)
-
-
 def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
-    """Übergibt dem strikten Renderer nur die in der Vorlage benutzten Platzhalter."""
+    """Setzt die in der Vorlage benutzten Platzhalter ein; übrige Werte bleiben unbenutzt."""
 
     vorlage: Template = Template(vorlage_text)
-    return render(
-        vorlage_text,
-        {name: platzhalter[name] for name in vorlage.get_identifiers()},
+    return vorlage.substitute(
+        {name: platzhalter[name] for name in vorlage.get_identifiers()}
     )
 
 
