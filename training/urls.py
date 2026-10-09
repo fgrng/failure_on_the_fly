@@ -34,6 +34,11 @@ urlpatterns: list[URLPattern] = [
         name="veroeffentlichen",
     ),
     path(
+        "eigene/<int:pk>/export/",
+        views.trainingsexport,
+        name="trainingsexport",
+    ),
+    path(
         "eigene/<int:pk>/beitritt/sperren/",
         views.beitritt_sperren,
         name="beitritt_sperren",

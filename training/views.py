@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, F, Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.http import (
     Http404,
     HttpRequest,
@@ -16,6 +16,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 
 from konten.models import Konto
 from konten.navigation import (
@@ -43,7 +45,13 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
+from .abschriften import (
+    GESPIELTE_FOLGE,
+    abschrift_freigeben,
+    abschrift_holen,
+    abschrift_loeschen,
+)
+from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
 
 
@@ -231,13 +239,6 @@ def _eigene_abschrift(request: HttpRequest, pk: int) -> Abschrift:
     )
 
 
-_GESPIELTE_FOLGE: tuple[object, ...] = (
-    F("vignettenposition__position").asc(nulls_last=True),
-    "pk",
-)
-"""Sortiert Sitzungen einer Abschrift in gespielter Folge, ohne Position hinten."""
-
-
 def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     # Bereitet die kopierten Sitzungen zum Lesen auf. Die gespielte Folge steht
     # in der Vignettenposition; eine Sitzung ohne Position — die der Import
@@ -248,7 +249,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     gespielte_folge: QuerySet[Sitzung] = (
         Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
         .select_related("vignette__historie", "diagnose")
-        .order_by(*_GESPIELTE_FOLGE)
+        .order_by(*GESPIELTE_FOLGE)
     )
     return [
         {
@@ -494,7 +495,7 @@ def _freigegebene_abschriften(
         _fremd_einsehbare_sitzungen(konto)
         .filter(teilnahme__abschrift__freigegeben_fuer=training)
         .select_related("vignette__historie")
-        .order_by(*_GESPIELTE_FOLGE)
+        .order_by(*GESPIELTE_FOLGE)
     ):
         sitzungen_nach_teilnahme.setdefault(sitzung.teilnahme_id, []).append(sitzung)
 
@@ -517,6 +518,24 @@ def _freigegebene_abschriften(
     ]
     abschriften.sort(key=lambda abschrift: str(abschrift["name"]).casefold())
     return abschriften
+
+
+@login_required
+@_ausbilderin_erforderlich
+def trainingsexport(request: HttpRequest, pk: int) -> HttpResponse:
+    """Lädt den Trainingsexport eines sichtbaren Trainings herunter."""
+    training: Training = _sichtbares_training(request, pk)
+    zeitstempel: str = (
+        timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
+    )
+    dateiname: str = (
+        f"training-{training.pk}-{slugify(training.name)}-{zeitstempel}.zip"
+    )
+    response: HttpResponse = HttpResponse(
+        trainingsexport_zip(training), content_type="application/zip"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
+    return response
 
 
 @login_required

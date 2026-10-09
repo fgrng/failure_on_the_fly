@@ -89,6 +89,23 @@
     overflow-x: auto;
 }
 
+.fremdeinsicht__toolbar .table-toolbar__count {
+    margin-left: 0;
+}
+
+.fremdeinsicht__export {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.fremdeinsicht__exporthinweis {
+    color: var(--color-text-muted);
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
 .fremdeinsicht__matrix {
     table-layout: fixed;
     width: 100%;

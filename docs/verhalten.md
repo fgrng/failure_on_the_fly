@@ -233,6 +233,25 @@ sich nicht. Eine nicht freigegebene Abschrift erscheint in keiner
 Fremdeinsicht, auch nicht für die Administration; nach dem Widerruf oder dem
 Löschen der Abschrift antwortet auch eine gemerkte Adresse mit 404.
 
+## Trainingsexport
+
+In der Werkzeugleiste über der Tabelle steht rechts der Knopf „Trainingsexport
+(ZIP)“, davor der gedämpfte Hinweis „pseudonym, nicht anonym“; sein Tooltip
+sagt, dass Kennzeichen je Export neu gezogen werden und Freitext nicht
+geschwärzt wird. Der Download heißt
+`training-<id>-<name>-<UTC-Zeitstempel>.zip` und enthält genau die Sitzungen
+der Fremdeinsicht (ADR-0049): je Person einen Ordner mit einem zufälligen
+Kennzeichen wie `teilnehmer-3f9a01c2`, darin eine Markdown-Datei je
+abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
+Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
+Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im
+Ordner der Person; private und widerrufene fehlen, ebenso laufende,
+abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten,
+keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und keinen
+Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen dürfen der
+Kreis und die Administration, alle anderen bekommen 404. Der Trainingsexport
+ist keine Datenspur und unterliegt nicht dem Exportkontrakt aus ADR-0029.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
