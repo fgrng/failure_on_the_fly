@@ -63,6 +63,6 @@ if __name__ == "__main__":
             return [b"Prototype: /vignetten/296/"]
         return app(environ, start_response)
 
-    print("#296: http://127.0.0.1:8296/vignetten/296/?variant=A", flush=True)
+    print("#296: http://127.0.0.1:8296/vignetten/296/?variant=C", flush=True)
     with make_server("127.0.0.1", 8296, only_preview) as server:
         server.serve_forever()

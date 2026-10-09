@@ -5,8 +5,8 @@ const evals = [
   {name:'Fehlermuster trägt', criteria:['Muster konsequent', 'Rollentreue'], inputs:['Direkte Nachfrage', 'Gelenkter Widerspruch']},
   {name:'Muster bleibt stabil', criteria:['Keine Selbstkorrektur', 'Rollentreue'], inputs:['Hinweis auf Gegenprobe', 'Neue Gleichung']}
 ];
-let variant = new URLSearchParams(location.search).get('variant') || 'A';
-if (!variants[variant]) variant = 'A';
+let variant = new URLSearchParams(location.search).get('variant') || 'C';
+if (!variants[variant]) variant = 'C';
 let scenario = 'failed', stale = false, chosen = [0,0], repeat = 0;
 const $ = selector => document.querySelector(selector);
 const available = () => ['failed','passed','incomplete','aborted','running'].includes(scenario);

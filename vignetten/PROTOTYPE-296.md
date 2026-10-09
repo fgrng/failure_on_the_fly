@@ -25,8 +25,16 @@ unverändertem Zweispaltenlayout:
 - C: Abgeschlossene Läufe als Fußzeile unter den Ergebnissen. Noch nicht
   gestartete, wartende und laufende Läufe stehen oben.
 
-Diese Statusvarianten sind noch nicht entschieden. Die ursprünglichen drei
-Layoutvarianten liegen im Vorgängercommit `a92c84a`.
+Gewählt ist Variante C: Der Status eines abgeschlossenen Evallaufs steht als
+Fußnote unter den Ergebnissen. „Erneut prüfen“ steht dort als sekundäre Aktion;
+die Angaben zum Lauf bleiben eingeklappt. Ohne Lauf sowie bei wartenden und
+laufenden Läufen steht der Status oben. Die Autor:in hat diese Variante nach
+Korrektur der Spaltenansicht bestätigt. C ist die Standardansicht des Prototyps.
+
+Damit sind Zweispaltenansicht, Wegfall des Vignettenkontexts und Platzierung des
+Laufstatus entschieden. Die tatsächliche Aktualisierung laufender Läufe (Polling
+oder manuelles Neu laden) bleibt für die Umsetzung zu klären. Die ursprünglichen
+drei Layoutvarianten liegen im Vorgängercommit `a92c84a`.
 
 ## Start und Bedienung
 
@@ -34,7 +42,7 @@ Layoutvarianten liegen im Vorgängercommit `a92c84a`.
 uv run python -m vignetten.prototype_296
 ```
 
-Adresse: <http://127.0.0.1:8296/vignetten/296/?variant=A>
+Adresse: <http://127.0.0.1:8296/vignetten/296/?variant=C>
 
 Die schwebende Leiste und Pfeiltasten wechseln `?variant=A|B|C`. Alle Varianten
 haben dieselben Beispieldaten. Die Auswahl links zeigt das Gespräch rechts, mit
