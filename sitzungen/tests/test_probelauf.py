@@ -427,8 +427,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 {"eingabe": "Wie hast du gerechnet?"},
             )
 
-        anfragen: list[dict[str, str]] = aufgezeichnet[-1]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_text>Rechne zuerst.\n</lernauftrag_text>\n"
             "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Zahlenreihe"
@@ -464,8 +464,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 {"eingabe": "Wie hast du gerechnet?"},
             )
 
-        anfragen: list[dict[str, str]] = aufgezeichnet[-1]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_text>Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
             "</lernauftrag_text>",
@@ -514,8 +514,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
                 {"eingabe": "Wie hast du gerechnet?"},
             )
 
-        anfragen: list[dict[str, str]] = aufgezeichnet[-1]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
+        nachrichten: list[dict[str, str]] = aufgezeichnet[-1]
+        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in nachrichten)
         self.assertIn(
             "<lernauftrag_simulationshinweise>\n"
             "Geheimer Hinweis zum Lernauftrag\n"

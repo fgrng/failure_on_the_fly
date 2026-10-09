@@ -61,9 +61,7 @@ während andere frei sind. Zahlen und Quellen stehen in
   Konstanten auf Modulebene werden nur gelesen, die geteilten
   `MarkdownIt`-Parser halten ihren Zustand je Aufruf. Einzig
   `FakeSprachmodell.letzte_anfragen` ist eine geteilte Liste; sie dient den
-  Tests, `append` ist atomar, und produktiv antwortet kein Fake. (Nachtrag:
-  Die Liste ist mit #379 entfallen; Tests zeichnen über
-  `config.tests.sprachmodell.anfragen_aufzeichnen` auf.)
+  Tests, `append` ist atomar, und produktiv antwortet kein Fake.
 - **Bis zu 180 Anbieteraufrufe gleichzeitig.** OpenRouter setzt für bezahlte
   Modelle keine Plattformgrenze; für Infomaniak ist die Grenze der KI-Routen
   nicht belegt. Vor einem Einsatz mit fünf Seminargruppen über Infomaniak ist
@@ -71,3 +69,10 @@ während andere frei sind. Zahlen und Quellen stehen in
 - **SQLite trägt die Nebenläufigkeit**, mit kleinerem Abstand als bei zehn
   Teilnehmenden: Nachtrag vom 2026-10-08 in
   `docs/research/2026-09-21-sqlite-nebenlaeufigkeit-wal.md`.
+
+## Nachtrag: Fake-Sprachmodell ohne geteilte Liste
+
+Seit #379 hält `FakeSprachmodell` keine Liste `letzte_anfragen` mehr. Tests
+zeichnen ihre Anfragen über `config.tests.sprachmodell.anfragen_aufzeichnen`
+je Test in eine eigene Liste auf; kein Sprachmodell-Adapter teilt damit noch
+Zustand zwischen Threads.

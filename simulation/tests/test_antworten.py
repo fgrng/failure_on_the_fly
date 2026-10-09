@@ -2,9 +2,9 @@
 
 import pytest
 
+from config.tests.sprachmodell import anfragen_aufzeichnen
 from simulation import MAX_VERSUCHE, antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
-from config.tests.sprachmodell import anfragen_aufzeichnen
 from simulation.sprachmodell import AUSGABE_SCHEMA
 from vignetten.models import Vignette
 
