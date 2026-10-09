@@ -75,7 +75,17 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 
    Die Anwendung ist dann unter http://127.0.0.1:8000/ erreichbar.
 
-Die Testsuite läuft mit `uv run pytest`.
+Außerhalb von Sandcastle ist vor jedem Commit der Abschluss aus Tests, Formatierung und Lint Pflicht; der pre-commit-Hook führt nur ruff und den Migrationscheck aus, keine Tests:
+
+```
+uv run pytest
+uv run ruff format .
+uv run ruff check .
+```
+
+Ruff prüft einen engen Regelsatz (`[tool.ruff.lint]` in `pyproject.toml`),
+darunter Typ-Hinweise, Docstrings öffentlicher Objekte und die Regeln gegen
+Zugriffe auf private Attribute und Importe privater Namen.
 
 Der Seed aktiviert das Fake-Sprachmodell, damit sich Diagnosegespräche ohne
 Zugangsdaten durchklicken lassen. Für echte Antworten wird unter

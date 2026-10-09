@@ -2,6 +2,10 @@ When changing public-facing behavior, update docs/verhalten.md (behaviour per ar
 
 Checks: the pre-commit hook (`.githooks/pre-commit`) runs ruff and the missing-migrations check on every commit; type checking is `uv run ty check` (advisory, no mypy).
 
+## Abschlusslauf
+
+Außerhalb von Sandcastle vor jedem Commit: `uv run pytest`, `uv run ruff format .`, `uv run ruff check .`.
+
 ## Agent skills
 
 - **Domain docs**: terminology in GLOSSARY.md, decisions in docs/adr/ (single-context). See docs/agents/domain.md.
