@@ -763,7 +763,9 @@ MIKRO_STELLSCHRAUBEN: frozenset[str] = frozenset(
         "verbosity",
     }
 )
-FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset({"skript", "skript_fortlesen"})
+FAKE_STELLSCHRAUBEN: frozenset[str] = frozenset(
+    {"skript", "skript_fortlesen", "verzoegerung"}
+)
 # Die Maske verrät die Länge des Tokens nicht: immer acht Punkte.
 TOKEN_MASKE: str = "•" * 8
 # Erst ab dieser Länge geben vier sichtbare Zeichen nicht das halbe Token preis.

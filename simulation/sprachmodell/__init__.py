@@ -1,6 +1,7 @@
 """Naht zum Sprachmodell und ihr deterministischer Testadapter."""
 
 import json
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any, Callable, Protocol
 
@@ -122,10 +123,18 @@ class Sprachmodell(Protocol):
 class FakeSprachmodell:
     """Spielt konfigurierte Antworten und maschinelle Fehler deterministisch ab."""
 
-    def __init__(self, skript: Sequence[Mapping[str, Any]]) -> None:
-        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden."""
+    def __init__(
+        self, skript: Sequence[Mapping[str, Any]], verzoegerung: float = 0.0
+    ) -> None:
+        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden.
+
+        `verzoegerung` lässt jeden Aufruf so viele Sekunden warten, wie ein
+        langsames Modell, etwa um einen Prozessneustart mitten im Evallauf
+        durchzuspielen.
+        """
 
         self.skript: list[Mapping[str, Any]] = list(skript)
+        self.verzoegerung: float = verzoegerung
 
     def antworten(
         self,
@@ -138,9 +147,12 @@ class FakeSprachmodell:
     ) -> dict[str, object]:
         """Verbraucht genau einen Eintrag des Fake-Skripts.
 
-        Der Fake antwortet sofort; `timeout` bleibt hier ohne Wirkung.
+        Der Fake antwortet nach seiner Verzögerung; `timeout` bleibt hier
+        ohne Wirkung.
         """
 
+        if self.verzoegerung:
+            time.sleep(self.verzoegerung)
         eintrag: Mapping[str, Any] = self.skript.pop(0)
         rohantwort: str = str(eintrag.get("rohantwort", ""))
         if (fehler := eintrag.get("fehler")) == "formatbruch":

@@ -1,5 +1,7 @@
 """Antwortversuche gegen den deterministischen Sprachmodell-Fake."""
 
+from unittest import mock
+
 import pytest
 
 from simulation import (
@@ -341,3 +343,34 @@ def test_der_fake_liest_nur_mit_eingeschaltetem_opt_in_fort() -> None:
     ]
 
     assert ausgaben == [{"aeusserung": "Erste."}, {"aeusserung": "Erste."}]
+
+
+@pytest.mark.parametrize(
+    ("verzoegerung", "wartezeiten"),
+    [
+        (2.5, [2.5, 2.5]),
+        ("2", []),
+        (True, []),
+        (-1, []),
+        (float("nan"), []),
+        (float("inf"), []),
+    ],
+)
+def test_der_fake_wartet_nur_mit_einer_zahl_als_verzoegerung(
+    verzoegerung: object, wartezeiten: list[float]
+) -> None:
+    """Die Verzögerung spielt ein langsames Modell; nur endliche Zahlen ab 0 zählen."""
+
+    konfiguration = _fake_konfiguration(
+        [{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}],
+        skript_fortlesen=True,
+        verzoegerung=verzoegerung,
+    )
+    ausfuehrung = Ausfuehrung()
+    gewartet: list[float] = []
+
+    with mock.patch("time.sleep", gewartet.append):
+        for _ in range(2):
+            _lehrperson_versuchen(konfiguration, ausfuehrung)
+
+    assert gewartet == wartezeiten

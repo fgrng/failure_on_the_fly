@@ -1,5 +1,6 @@
 """Modelle und Abläufe der Simulation."""
 
+import math
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -112,7 +113,7 @@ class Ausfuehrung:
         if schluessel not in self._fakes:
             self._fakes[schluessel] = (
                 modell_konfiguration,
-                FakeSprachmodell(modell_konfiguration.parameter.get("skript", [])),
+                _fake_aus(modell_konfiguration),
             )
         return self._fakes[schluessel][1]
 
@@ -212,6 +213,23 @@ def _restzeit(frist: float) -> float:
     return max(frist - time.monotonic(), SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN)
 
 
+def _fake_aus(modell_konfiguration: "ModellKonfiguration") -> FakeSprachmodell:
+    """Bildet den Fake aus Skript und Verzögerung der Konfiguration."""
+
+    verzoegerung: object = modell_konfiguration.parameter.get("verzoegerung", 0)
+    # Nur eine echte, endliche Zahl ab 0 wartet; ein getipptes "2", true, -1
+    # oder inf bleibt sofort, statt `time.sleep` scheitern zu lassen.
+    if (
+        isinstance(verzoegerung, bool)
+        or not isinstance(verzoegerung, int | float)
+        or not 0 <= verzoegerung < math.inf
+    ):
+        verzoegerung = 0
+    return FakeSprachmodell(
+        modell_konfiguration.parameter.get("skript", []), float(verzoegerung)
+    )
+
+
 def _sprachmodell_aus(
     modell_konfiguration: "ModellKonfiguration", ausfuehrung: Ausfuehrung | None
 ) -> Sprachmodell:
@@ -226,7 +244,7 @@ def _sprachmodell_aus(
             and modell_konfiguration.parameter.get("skript_fortlesen") is True
         ):
             return ausfuehrung.fake(modell_konfiguration)
-        return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
+        return _fake_aus(modell_konfiguration)
     aufrufparameter: dict[str, object] = dict(modell_konfiguration.parameter)
     aufrufparameter["api_key"] = modell_konfiguration.anbieter_token
     if modell_konfiguration.anbieter_basis_url:
