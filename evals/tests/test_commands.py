@@ -1,12 +1,15 @@
 """Der Hintergrundprozess im Einmal-Modus über `call_command`."""
 
+import fcntl
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 import time_machine
 from django.core.management import CommandError, call_command
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
+from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf
 from evals.tests.aufbau import antworten, drei_fakes, finaler_katalog, urteile
 from konten.models import Konto
@@ -78,6 +81,63 @@ def test_abbruch_mitten_im_lauf_laesst_die_fertigen_gespraeche_stehen() -> None:
     lauf.refresh_from_db()
     assert lauf.zustand == Evallauf.Zustand.ABGEBROCHEN
     assert lauf.uebersicht()[0].zeilen[0].zellen[0].erfuellt == 1
+
+
+def _verwaist(lauf: Evallauf) -> None:
+    # Ein Lauf, dessen Prozess nach dem ersten Gespräch starb: Er steht auf
+    # „Läuft“, das Geschriebene bleibt.
+
+    evallauf_ausfuehren(lauf)
+    Evallauf.objects.filter(pk=lauf.pk).update(zustand=Evallauf.Zustand.LAEUFT)
+
+
+@pytest.mark.django_db
+def test_start_bricht_verwaiste_laeufe_ab_und_arbeitet_wartende_ab() -> None:
+    """Der Verwaiste wird abgebrochen, ohne Fortsetzung; der Wartende läuft danach."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    ada: Konto = konto_mit_rollen("ada", "Autor:in")
+    verwaist: Evallauf = _ausgeloest(ada, "Verwaist", _AUSGELOEST)
+    _verwaist(verwaist)
+    wartend: Evallauf = _ausgeloest(ada, "Wartend", _AUSGELOEST.replace(minute=5))
+
+    with time_machine.travel(_ABGEARBEITET, tick=False):
+        call_command("evallaeufe_abarbeiten", "--einmal")
+
+    verwaist.refresh_from_db()
+    wartend.refresh_from_db()
+    assert (
+        verwaist.zustand,
+        verwaist.beendet_am,
+        verwaist.gespraeche.count(),
+        wartend.zustand,
+    ) == (Evallauf.Zustand.ABGEBROCHEN, _ABGEARBEITET, 1, Evallauf.Zustand.FERTIG)
+
+
+@pytest.mark.django_db
+def test_zweiter_prozess_laesst_aktiven_lauf_und_warteschlange_unberuehrt(
+    eigene_sperrdatei: Path,
+) -> None:
+    """Solange ein Prozess die Sperre hält, bereinigt und nimmt ein zweiter nichts."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    ada: Konto = konto_mit_rollen("ada", "Autor:in")
+    aktiv: Evallauf = _ausgeloest(ada, "Aktiv", _AUSGELOEST)
+    _verwaist(aktiv)
+    wartend: Evallauf = _ausgeloest(ada, "Wartend", _AUSGELOEST.replace(minute=5))
+
+    with eigene_sperrdatei.open("a") as sperre:
+        fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        call_command("evallaeufe_abarbeiten", "--einmal")
+
+    aktiv.refresh_from_db()
+    wartend.refresh_from_db()
+    assert (aktiv.zustand, wartend.zustand) == (
+        Evallauf.Zustand.LAEUFT,
+        Evallauf.Zustand.WARTET,
+    )
 
 
 def test_ohne_einmal_modus_verweigert_der_command() -> None:

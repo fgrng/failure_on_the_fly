@@ -343,3 +343,71 @@ def test_evallauf_erzeugt_weder_teilnahme_noch_sitzung() -> None:
     _ausgefuehrter_lauf(vignette)
 
     assert (Teilnahme.objects.count(), Sitzung.objects.count()) == (0, 0)
+
+
+@pytest.mark.django_db
+def test_zelle_trennt_fehlende_urteile_von_ausstehenden_wiederholungen() -> None:
+    """Ein abgebrochener Teilstand zählt Ohne-Urteil und Ausstehendes getrennt."""
+
+    finaler_katalog(k=3, uebergreifende=())
+    # Das Skript reicht für zwei Gespräche; das dritte bricht ab.
+    drei_fakes(
+        schuelerin=antworten(4),
+        bewerter=[{"fehler": "formatbruch"}] * 3 + urteile(False),
+    )
+    lauf: Evallauf = Evallauf.objects.ausloesen(
+        finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+    )
+    # Das leere Skript des Fakes steht hier für einen Prozessabbruch.
+    with pytest.raises(IndexError):
+        evallauf_ausfuehren(lauf)
+
+    zelle: Zelle = lauf.uebersicht()[0].zeilen[0].zellen[0]
+
+    assert (
+        zelle.erfuellt,
+        zelle.nicht_erfuellt,
+        zelle.ohne_urteil,
+        zelle.ausstehend,
+    ) == (0, 1, 1, 1)
+
+
+@pytest.mark.django_db
+def test_versagender_bewerter_macht_den_lauf_unvollstaendig_und_nicht_bestanden() -> (
+    None
+):
+    """Ein fertiger Lauf mit fehlendem Urteil besteht nicht."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=[{"fehler": "formatbruch"}] * 3)
+    lauf: Evallauf = _ausgefuehrter_lauf(
+        finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+    )
+    lauf.zustand = Evallauf.Zustand.FERTIG
+
+    assert (lauf.unvollstaendig, lauf.bestanden) == (True, False)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("zustand", "bestanden"),
+    [
+        (Evallauf.Zustand.WARTET, False),
+        (Evallauf.Zustand.LAEUFT, False),
+        (Evallauf.Zustand.ABGEBROCHEN, False),
+        (Evallauf.Zustand.FERTIG, True),
+    ],
+)
+def test_nur_ein_fertiger_lauf_besteht_insgesamt(
+    zustand: Evallauf.Zustand, bestanden: bool
+) -> None:
+    """Auch wenn jedes geschriebene Urteil erfüllt ist, besteht kein Teilstand."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True))
+    lauf: Evallauf = _ausgefuehrter_lauf(
+        finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+    )
+    lauf.zustand = zustand
+
+    assert (lauf.unvollstaendig, lauf.bestanden) == (False, bestanden)

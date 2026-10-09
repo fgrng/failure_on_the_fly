@@ -35,6 +35,7 @@ class Zelle:
 
     kriterium: str
     erfuellt: int
+    nicht_erfuellt: int
     ohne_urteil: int
     k: int
 
@@ -43,6 +44,12 @@ class Zelle:
         """Bestanden nur, wenn jede der k Wiederholungen erfüllt ist (pass^k)."""
 
         return self.erfuellt == self.k
+
+    @property
+    def ausstehend(self) -> int:
+        """Wiederholungen ohne geschriebenes Urteil, etwa nach einem Abbruch."""
+
+        return self.k - self.erfuellt - self.nicht_erfuellt - self.ohne_urteil
 
 
 @dataclass(frozen=True)
@@ -159,14 +166,38 @@ class Evallauf(models.Model):
 
         return self.zustand in (self.Zustand.WARTET, self.Zustand.LAEUFT)
 
+    @property
+    def unvollstaendig(self) -> bool:
+        """Ob mindestens ein Kriterium ohne Urteil blieb; ein Neustart lohnt."""
+
+        return Urteil.objects.filter(
+            gespraech__evallauf=self, erfuellt__isnull=True
+        ).exists()
+
+    @property
+    def bestanden(self) -> bool:
+        """Insgesamt bestanden nur als fertiger Lauf, in dem jede Zelle besteht.
+
+        Ein wartender, laufender oder abgebrochener Teilstand besteht nie,
+        auch wenn jedes bisher geschriebene Urteil erfüllt ist.
+        """
+
+        return self.zustand == self.Zustand.FERTIG and all(
+            zelle.bestanden
+            for ergebnis in self.uebersicht()
+            for zeile in ergebnis.zeilen
+            for zelle in zeile.zellen
+        )
+
     def uebersicht(self) -> list[Evalergebnis]:
         """Je Eval die Quoten aller Evalinputs und Kriterien, in Katalogreihenfolge.
 
         Beispiel: Bei k = 3 und den Urteilen erfüllt, nicht erfüllt, erfüllt
-        steht in der Zelle ``Zelle(kriterium, erfuellt=2, ohne_urteil=0, k=3)``,
-        und sie besteht nicht.
+        steht in der Zelle ``Zelle(kriterium, erfuellt=2, nicht_erfuellt=1,
+        ohne_urteil=0, k=3)``, und sie besteht nicht.
         """
 
+        # Je Zelle die Zahl der Urteile erfüllt, nicht erfüllt, ohne Urteil.
         zaehler: dict[tuple[int, type[Kriterium], int], list[int]] = {}
         for urteil in Urteil.objects.filter(gespraech__evallauf=self).select_related(
             "gespraech"
@@ -175,11 +206,8 @@ class Evallauf(models.Model):
                 urteil.gespraech.evalinput_id,
                 *urteil.kriterium_schluessel,
             )
-            stand: list[int] = zaehler.setdefault(schluessel, [0, 0])
-            if urteil.erfuellt is True:
-                stand[0] += 1
-            elif urteil.erfuellt is None:
-                stand[1] += 1
+            stand: list[int] = zaehler.setdefault(schluessel, [0, 0, 0])
+            stand[{True: 0, False: 1, None: 2}[urteil.erfuellt]] += 1
         ergebnisse: list[Evalergebnis] = []
         for eval_, kriterien in self.evals_mit_kriterien():
             zeilen: list[Inputzeile] = []
@@ -187,11 +215,15 @@ class Evallauf(models.Model):
             for nummer, evalinput in enumerate(eval_.inputs.all(), 1):
                 zellen: list[Zelle] = []
                 for kriterium in kriterien:
-                    erfuellt, ohne_urteil = zaehler.get(
-                        (evalinput.pk, type(kriterium), kriterium.pk), [0, 0]
-                    )
                     zellen.append(
-                        Zelle(kriterium.text, erfuellt, ohne_urteil, self.katalog.k)
+                        Zelle(
+                            kriterium.text,
+                            *zaehler.get(
+                                (evalinput.pk, type(kriterium), kriterium.pk),
+                                [0, 0, 0],
+                            ),
+                            self.katalog.k,
+                        )
                     )
                 zeilen.append(Inputzeile(nummer, evalinput.kuerzel, zellen))
             ergebnisse.append(

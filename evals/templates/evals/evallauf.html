@@ -29,7 +29,14 @@
                 <div><dt>Gestartet</dt><dd>{{ lauf.gestartet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
                 <div><dt>Beendet</dt><dd>{{ lauf.beendet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
                 <div><dt>Wiederholungen je Evalinput</dt><dd>{{ lauf.katalog.k }}</dd></div>
+                <div><dt>Gesamtergebnis</dt><dd>{% if lauf.zustand == "fertig" %}{% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}{% else %}—{% endif %}</dd></div>
             </dl>
+            {% if lauf.unvollstaendig %}
+                <p class="system-page-hint">Unvollständig: Mindestens ein Kriterium blieb ohne Urteil, weil Lehrperson oder Bewerter nichts Auswertbares lieferten. Ein neuer Evallauf lohnt.</p>
+            {% endif %}
+            {% if lauf.zustand == "abgebrochen" %}
+                <p class="system-page-hint">Der Evallauf wurde abgebrochen. Was bis dahin fertig war, bleibt lesbar; nicht ausgeführte Wiederholungen werden nicht fortgesetzt, ein neuer Evallauf beginnt von vorn.</p>
+            {% endif %}
         {% else %}
             <p>Für diese Fassung gibt es noch keinen Evallauf.</p>
         {% endif %}
@@ -69,6 +76,7 @@
                                             {{ zelle.erfuellt }} von {{ zelle.k }} ·
                                             {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}
                                             {% if zelle.ohne_urteil %}<small>({{ zelle.ohne_urteil }} ohne Urteil)</small>{% endif %}
+                                            {% if zelle.ausstehend %}<small>({{ zelle.ausstehend }} noch nicht ausgeführt)</small>{% endif %}
                                         </td>
                                     {% endfor %}
                                 </tr>

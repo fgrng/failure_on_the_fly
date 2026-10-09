@@ -536,25 +536,33 @@ Ausgeführt wird ein Lauf vom Hintergrundprozess
 `python manage.py evallaeufe_abarbeiten --einmal`. Er nimmt höchstens den
 ältesten wartenden Lauf, setzt ihn auf „Läuft“ und am Ende auf „Fertig“, jeweils
 mit Zeitpunkt; ein Fehler mitten im Lauf hinterlässt ihn „Abgebrochen“, das bis
-dahin Geschriebene bleibt. Ohne `--einmal` verweigert der Command den Dienst;
-der dauerhafte Betrieb folgt. Für jedes Eval, jeden Evalinput und jede
-Wiederholung 1 bis *k* entsteht ein Evalgespräch, für jeden Inputschritt ein
-Wechsel in der Reihenfolge des Evalinputs; feste und gelenkte Schritte dürfen
-sich mischen. Bei einem festen Schritt ist die Inputäußerung wörtlich die
-Äußerung der Lehrperson. Bei einem gelenkten formuliert die simulierte
-Lehrperson sie mit der festgehaltenen Lehrpersonen-Konfiguration: Ihr
-System-Prompt ist die gerenderte Lehrperson-Vorlage des festgehaltenen Katalogs
-mit `$inputstrategie` (Text des Schritts) und `$verlauf` (bisheriger Verlauf
-ohne Denkspur), der User-Prompt dieser Verlauf, die Eingabe die Inputstrategie.
-Die Schüler:in antwortet in beiden Fällen über denselben Antwortversuch wie in
-der Sitzung, ohne Denkspur im Kontext. Danach beurteilt der Bewerter das
-Gespräch nach jedem Evalkriterium des Evals und jedem übergreifenden Kriterium.
-Sein System-Prompt ist die gerenderte Bewerter-Vorlage mit `$kriterium` und
-`$verlauf` (Verlauf samt Denkspur), der User-Prompt der Verlauf, die Eingabe der
-Kriteriumstext. Inputstrategie und Kriterium werden als reiner Text eingesetzt
-und nicht selbst als Vorlage ausgewertet; Anweisungen stehen allein in den
-Vorlagen des Katalogs. Jedes Gespräch, jeder Wechsel und jedes Urteil wird
-sofort geschrieben; kein Modellaufruf hält eine Schreibtransaktion offen.
+dahin Geschriebene bleibt. Instanzweit arbeitet nur ein Hintergrundprozess: Er
+hält dafür eine Sperrdatei (`EVALLAEUFE_SPERRE`, standardmäßig `evallaeufe.lock`
+im Projektverzeichnis), die das Betriebssystem freigibt, wenn der Prozess endet
+oder stirbt. Findet ein zweiter Aufruf sie gesperrt, meldet er das und rührt
+nichts an, auch keinen laufenden Lauf. Wer die Sperre erhält, setzt zuerst jeden
+Lauf, der noch „Läuft“ sagt, auf „Abgebrochen“ (Endzeitpunkt ist die
+Bereinigung); wartende bleiben wartend. Abgebrochene Läufe werden weder
+fortgesetzt noch um Wiederholungen ergänzt; ein neuer Start beginnt von vorn.
+Ohne `--einmal` verweigert der Command den Dienst; der dauerhafte Betrieb folgt.
+Für jedes Eval, jeden Evalinput und jede Wiederholung 1 bis *k* entsteht ein
+Evalgespräch, für jeden Inputschritt ein Wechsel in der Reihenfolge des
+Evalinputs; feste und gelenkte Schritte dürfen sich mischen. Bei einem festen
+Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei einem
+gelenkten formuliert die simulierte Lehrperson sie mit der festgehaltenen
+Lehrpersonen-Konfiguration: Ihr System-Prompt ist die gerenderte
+Lehrperson-Vorlage des festgehaltenen Katalogs mit `$inputstrategie` (Text des
+Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), der User-Prompt
+dieser Verlauf, die Eingabe die Inputstrategie. Die Schüler:in antwortet in
+beiden Fällen über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
+Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
+Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
+Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
+User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Inputstrategie und
+Kriterium werden als reiner Text eingesetzt und nicht selbst als Vorlage
+ausgewertet; Anweisungen stehen allein in den Vorlagen des Katalogs. Jedes
+Gespräch, jeder Wechsel und jedes Urteil wird sofort geschrieben; kein
+Modellaufruf hält eine Schreibtransaktion offen.
 
 Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
 einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
@@ -566,9 +574,19 @@ Gespräch vor diesem Schritt, und alle seine Kriterien bleiben *ohne Urteil*.
 Die Ansicht zeigt je Eval eine Tabelle aus Evalinputs (mit der Folge ihrer
 Schritte, etwa „FFG“) und Kriterien, die übergreifenden eingeschlossen. Jede
 Zelle nennt Quote und Bestehen zusammen, etwa „2 von 3 · nicht bestanden“;
-bestanden ist eine Zelle nur, wenn alle *k* Urteile erfüllt sind. Urteile ohne
-Urteil stehen gezählt dahinter. Evalläufe erzeugen weder Teilnahme noch Sitzung
-und erscheinen weder in der Datenspur noch im Trainingsexport.
+bestanden ist eine Zelle nur, wenn alle *k* Urteile erfüllt sind. Dahinter
+stehen getrennt gezählt Kriterien ohne Urteil („1 ohne Urteil“) und
+Wiederholungen, die noch nicht oder wegen eines Abbruchs nie ausgeführt wurden
+(„1 noch nicht ausgeführt“). Ohne Urteil zählt weder als erfüllt noch als nicht
+erfüllt. Blieb mindestens ein Kriterium ohne Urteil, heißt der Lauf
+*unvollständig*, und die Ansicht empfiehlt einen neuen Lauf. Das
+„Gesamtergebnis“ lautet nur an einem fertigen Lauf „Bestanden“ oder „Nicht
+bestanden“, bestanden nur, wenn jede Zelle besteht; ein wartender, laufender
+oder abgebrochener Teilstand zeigt „—“, auch wenn jedes bisher geschriebene
+Urteil erfüllt ist. Ein abgebrochener Lauf zeigt seine fertigen Gespräche und
+Urteile weiter, mit dem Hinweis, dass ein neuer Lauf von vorn beginnt. Evalläufe
+erzeugen weder Teilnahme noch Sitzung und erscheinen weder in der Datenspur noch
+im Trainingsexport.
 
 ## Transkriptions-Konfiguration
 

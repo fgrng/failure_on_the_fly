@@ -12,6 +12,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from config.tests.formular import submit_knoepfe
+from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf
 from evals.tests.aufbau import (
     aeusserungen,
@@ -23,7 +24,7 @@ from evals.tests.aufbau import (
     urteile,
 )
 from konten.models import Konto
-from simulation.models import Verwendung
+from simulation.models import Inputschritt, Verwendung
 from vignetten.models import Vignette
 
 _STARTEN: str = "Evallauf starten"
@@ -334,3 +335,116 @@ def test_start_nur_per_post(ada: Konto) -> None:
 
     assert antwort.status_code == 405
     assert not Evallauf.objects.exists()
+
+
+def _abgearbeitete_ansicht(ada: Konto) -> str:
+    # Startet über einer finalen Fassung, arbeitet ab und liest die Ansicht.
+
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+    return _client(ada).get(_ansicht(vignette)).content.decode()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("schritte", "fakes"),
+    [
+        (
+            ("Eins", "Zwei"),
+            {"schuelerin": antworten(2), "bewerter": [{"fehler": "formatbruch"}] * 3},
+        ),
+        (
+            ("Eins", gelenkt("Frag nach")),
+            {"schuelerin": antworten(1), "lehrperson": [{"fehler": "formatbruch"}] * 3},
+        ),
+    ],
+    ids=["bewerter", "lehrperson"],
+)
+def test_fertiger_lauf_mit_fehlendem_urteil_ist_unvollstaendig_und_nicht_bestanden(
+    ada: Konto,
+    schritte: tuple[str | tuple[Inputschritt.Art, str], ...],
+    fakes: dict[str, list[dict[str, object]]],
+) -> None:
+    """Fehlende Urteile stehen gezählt in der Zelle und schließen das Bestehen aus."""
+
+    finaler_katalog(k=1, schritte=schritte, uebergreifende=())
+    drei_fakes(**fakes)
+
+    seite: str = _abgearbeitete_ansicht(ada)
+
+    assert "Fertig" in seite
+    assert "1 ohne Urteil" in seite
+    assert "Unvollständig" in seite
+    assert "<dd>Nicht bestanden</dd>" in seite
+
+
+@pytest.mark.django_db
+def test_fertiger_lauf_mit_allen_urteilen_erfuellt_besteht_insgesamt(
+    ada: Konto,
+) -> None:
+    """Nur ein vollständiger fertiger Lauf erscheint als bestanden."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True))
+
+    seite: str = _abgearbeitete_ansicht(ada)
+
+    assert "<dd>Bestanden</dd>" in seite
+    assert "Unvollständig" not in seite
+
+
+@pytest.mark.django_db
+def test_abgebrochener_lauf_zeigt_das_fertige_und_das_ausstehende(ada: Konto) -> None:
+    """Erfüllte Urteile machen einen Teilstand nicht bestanden; Ausstehendes zählt."""
+
+    finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
+    # Das Skript reicht nur für das erste Gespräch; das zweite bricht ab.
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+
+    seite: str = _abgearbeitete_ansicht(ada)
+
+    assert "Abgebrochen" in seite
+    assert "1 von 2" in seite
+    assert "1 noch nicht ausgeführt" in seite
+    assert "<dd>Bestanden</dd>" not in seite
+    assert "Unvollständig" not in seite
+
+
+@pytest.mark.django_db
+def test_gescheiterte_schuelerin_ist_nicht_erfuellt_statt_unvollstaendig(
+    ada: Konto,
+) -> None:
+    """Ein endgültig gescheiterter Antwortversuch ist ein Befund, kein fehlendes Urteil."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=[{"fehler": "anbieterfehler"}] * 3)
+
+    seite: str = _abgearbeitete_ansicht(ada)
+
+    assert "0 von 1" in seite
+    assert "<dd>Nicht bestanden</dd>" in seite
+    assert "Unvollständig" not in seite
+
+
+@pytest.mark.django_db
+def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
+    ada: Konto,
+) -> None:
+    """Der Hintergrundprozess räumt beim Start auf; das Geschriebene bleibt lesbar."""
+
+    finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    lauf: Evallauf = Evallauf.objects.get(vignette=vignette)
+    # Der Prozess stirbt nach dem ersten Gespräch und lässt „Läuft“ stehen.
+    with pytest.raises(IndexError):
+        evallauf_ausfuehren(lauf)
+    Evallauf.objects.filter(pk=lauf.pk).update(zustand=Evallauf.Zustand.LAEUFT)
+
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
+    assert "Abgebrochen" in seite
+    assert "1 von 2" in seite and "1 noch nicht ausgeführt" in seite
