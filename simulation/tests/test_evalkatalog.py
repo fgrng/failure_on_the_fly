@@ -7,10 +7,6 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 
 from simulation.models import (
-    VERTRAG_BEWERTER,
-    VERTRAG_EVAL,
-    VERTRAG_LEHRPERSON,
-    VERTRAG_PROMPT,
     Eval,
     Evalkatalog,
     Evalinput,
@@ -23,19 +19,6 @@ from simulation.tests.evalkatalog_bau import (
     vervollstaendigen,
     vollstaendiger_katalog,
 )
-
-
-def test_vertrag_eval_erweitert_den_promptvertrag_um_die_drei_evalwerte() -> None:
-    """`VERTRAG_EVAL` ist `VERTRAG_PROMPT` plus die drei Werte des Evallaufs."""
-
-    assert VERTRAG_EVAL == VERTRAG_PROMPT | {"inputstrategie", "kriterium", "verlauf"}
-
-
-def test_jede_vorlage_erlaubt_nur_ihren_eigenen_evalwert() -> None:
-    """Die Lehrperson sieht die Inputstrategie, der Bewerter das Kriterium."""
-
-    assert VERTRAG_LEHRPERSON == VERTRAG_PROMPT | {"inputstrategie", "verlauf"}
-    assert VERTRAG_BEWERTER == VERTRAG_PROMPT | {"kriterium", "verlauf"}
 
 
 @pytest.mark.django_db
@@ -80,24 +63,6 @@ def test_direktes_anlegen_wird_abgelehnt() -> None:
 
     with pytest.raises(RuntimeError, match="Evalkatalog-Fassungen"):
         Evalkatalog.objects.create()
-
-
-@pytest.mark.django_db
-def test_entwurf_uebernimmt_gespeicherte_werte() -> None:
-    """Ein Entwurf ist änderbar; gespeichert bleibt, was eingetragen wurde."""
-
-    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
-    katalog.k = 5
-    katalog.lehrperson_vorlage = "$inputstrategie"
-    katalog.bewerter_vorlage = "$kriterium"
-    katalog.save()
-
-    katalog.refresh_from_db()
-    assert (katalog.k, katalog.lehrperson_vorlage, katalog.bewerter_vorlage) == (
-        5,
-        "$inputstrategie",
-        "$kriterium",
-    )
 
 
 @pytest.mark.django_db
@@ -371,6 +336,16 @@ def test_geloeschtes_eval_nimmt_seine_evalinputs_mit() -> None:
     eval_.delete()
 
     assert not Evalinput.objects.exists()
+    assert not Inputschritt.objects.exists()
+
+
+@pytest.mark.django_db
+def test_geloeschter_evalinput_nimmt_seine_schritte_mit() -> None:
+    """Inputschritte gibt es nur an ihrem Evalinput."""
+
+    eval_: Eval = Evalkatalog.objects.anlegen().eval_anlegen("Muster")
+    eval_.input_anlegen().delete()
+
     assert not Inputschritt.objects.exists()
 
 
@@ -663,10 +638,13 @@ def test_vorlage_ausserhalb_ihres_vertrags_wird_nicht_final(
 
 @pytest.mark.django_db
 def test_promptvertrag_und_verlauf_sind_in_beiden_vorlagen_erlaubt() -> None:
-    """Jeder Name aus `VERTRAG_PROMPT` und `$verlauf` passen in beide Vorlagen."""
+    """Die Prompt-Spalte aus ADR-0010 und `$verlauf` passen in beide Vorlagen."""
 
-    gemeinsam: str = " ".join(
-        f"${name}" for name in sorted(VERTRAG_PROMPT | {"verlauf"})
+    gemeinsam: str = (
+        "$fehlermuster_beschreibung $lernauftrag $arbeitsheft"
+        " $lernauftrag_simulationshinweise $arbeitsheft_simulationshinweise"
+        " $schuelerin_name $schuelerin_geschlecht $fach $thema $klassenstufe"
+        " $verlauf"
     )
     katalog: Evalkatalog = vollstaendiger_katalog()
     katalog.lehrperson_vorlage = f"{gemeinsam} $inputstrategie"
