@@ -265,6 +265,9 @@ class Vignette(models.Model):
         max_length=11, choices=Zustand, default=Zustand.ENTWURF
     )
     finalisiert_am: models.DateTimeField = models.DateTimeField(null=True, blank=True)
+    # Jedes Speichern eines Entwurfs setzt ihn neu, auch mit update_fields;
+    # Zustandswechsel wie das Finalisieren lassen ihn stehen.
+    geaendert_am: models.DateTimeField = models.DateTimeField(default=timezone.now)
     historie: models.ForeignKey = models.ForeignKey(
         Vignettenhistorie, on_delete=models.PROTECT
     )
@@ -472,6 +475,11 @@ class Vignette(models.Model):
                 for modellfeld in self._meta.local_fields
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
+        # Der Zustand ist hier der gespeicherte; nur Entwürfe ändern sich.
+        if self.zustand == self.Zustand.ENTWURF:
+            self.geaendert_am = timezone.now()
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "geaendert_am"}
         super().save(*args, **kwargs)
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:

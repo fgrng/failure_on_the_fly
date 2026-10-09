@@ -12,6 +12,7 @@
         {% else %}
             <span>{{ lauf.get_zustand_display }}</span>
         {% endif %}
+        {% if lauf.veraltet %} <span class="evallauf--offen">· Veraltet</span>{% endif %}
         {% if lauf.beendet_am %}<small>{{ lauf.beendet_am|date:"d.m.Y H:i" }} · {{ lauf.katalog.k }} Wiederholungen je Evalinput</small>{% endif %}
     </p>
     {% if startbar %}
@@ -28,6 +29,9 @@
 {% elif lauf.zustand == "abgebrochen" %}
     <p class="evallauf-zeile__hinweis">Der Evallauf wurde abgebrochen. Was bis dahin fertig war, bleibt lesbar; nicht ausgeführte Wiederholungen werden nicht fortgesetzt, ein neuer Evallauf beginnt von vorn.</p>
 {% endif %}
+{% if lauf.veraltet %}
+    <p class="evallauf-zeile__hinweis">Veraltet: Der Evallauf prüft den Stand beim Auslösen ({{ lauf.ausgeloest_am|date:"d.m.Y H:i" }}). Seit dem Start: {{ lauf.veraltungsgruende|join:", " }}. Ein neuer Evallauf prüft den aktuellen Stand.</p>
+{% endif %}
 {% if lauf.unvollstaendig %}
     <p class="evallauf-zeile__hinweis">Unvollständig: Mindestens ein Kriterium blieb ohne Urteil, weil Lehrperson oder Bewerter nichts Auswertbares lieferten. Ein neuer Evallauf lohnt.</p>
 {% endif %}
@@ -38,6 +42,7 @@
             <div><dt>Ausgelöst</dt><dd>{{ lauf.ausgeloest_am|date:"d.m.Y H:i" }}</dd></div>
             <div><dt>Gestartet</dt><dd>{{ lauf.gestartet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
             <div><dt>Beendet</dt><dd>{{ lauf.beendet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
+            <div><dt>Geprüfter Stand der Vignette</dt><dd>{{ lauf.vignette_geaendert_am|date:"d.m.Y H:i" }}</dd></div>
             <div><dt>Wiederholungen je Evalinput</dt><dd>{{ lauf.katalog.k }}</dd></div>
             <div><dt>Simulationskern</dt><dd>{{ lauf.kern_id }}</dd></div>
             <div><dt>Evalkatalog</dt><dd>Fassung {{ lauf.katalog_id }}</dd></div>

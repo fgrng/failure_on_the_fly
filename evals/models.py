@@ -5,6 +5,7 @@ Quote und Bestehen sind abgeleitet und werden nie gespeichert.
 
 from collections import Counter
 from dataclasses import dataclass
+from functools import cached_property
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
@@ -150,6 +151,7 @@ class EvallaufManager(models.Manager["Evallauf"]):
                 Verwendung.BEWERTER
             ),
             platzhalter=prompt_platzhalter(vignette),
+            vignette_geaendert_am=vignette.geaendert_am,
         )
 
 
@@ -185,6 +187,9 @@ class Evallauf(models.Model):
     # Die Prompt-Platzhalter der Fassung beim Auslösen: Ein Entwurf, der
     # während Wartezeit oder Ausführung gespeichert wird, ändert den Lauf nicht.
     platzhalter: models.JSONField = models.JSONField()
+    # Der Änderungszeitstempel der Fassung beim Auslösen, gegen den `veraltet`
+    # vergleicht, nicht der spätere Arbeitsbeginn des Hintergrundprozesses.
+    vignette_geaendert_am: models.DateTimeField = models.DateTimeField()
     zustand: models.CharField = models.CharField(
         max_length=11, choices=Zustand, default=Zustand.WARTET
     )
@@ -199,6 +204,53 @@ class Evallauf(models.Model):
         """Ob der Lauf wartet oder läuft; dann gibt es keinen zweiten Start."""
 
         return self.zustand in (self.Zustand.WARTET, self.Zustand.LAEUFT)
+
+    @cached_property
+    def veraltungsgruende(self) -> list[str]:
+        """Was sich seit dem Auslösen geändert hat, das den Lauf bestimmte.
+
+        Eine neue finale Kern-Fassung zählt erst, wenn die Fassung auf sie
+        vorspult; das Finalisieren der Fassung zählt nicht.
+        """
+
+        aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
+        festgehalten: dict[str, int] = {
+            Verwendung.SCHUELERIN: self.schuelerin_konfiguration_id,
+            Verwendung.LEHRPERSON: self.lehrperson_konfiguration_id,
+            Verwendung.BEWERTER: self.bewerter_konfiguration_id,
+        }
+        finaler_katalog: Evalkatalog | None = Evalkatalog.objects.finale_fassung()
+        return [
+            grund
+            for grund, geaendert in [
+                (
+                    "Vignette bearbeitet",
+                    self.vignette.geaendert_am != self.vignette_geaendert_am,
+                ),
+                (
+                    "Simulationskern gewechselt",
+                    self.vignette.gepinnter_kern_id != self.kern_id,
+                ),
+                *(
+                    (
+                        f"Konfiguration {Verwendung(verwendung).label} gewechselt",
+                        aktive.get(verwendung) != konfiguration_id,
+                    )
+                    for verwendung, konfiguration_id in festgehalten.items()
+                ),
+                (
+                    "Evalkatalog gewechselt",
+                    finaler_katalog is None or finaler_katalog.pk != self.katalog_id,
+                ),
+            ]
+            if geaendert
+        ]
+
+    @property
+    def veraltet(self) -> bool:
+        """Ob das Ergebnis eine Vignette oder Einstellung beschreibt, die es so nicht mehr gibt."""
+
+        return bool(self.veraltungsgruende)
 
     @property
     def unvollstaendig(self) -> bool:

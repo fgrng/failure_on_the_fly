@@ -512,16 +512,17 @@ Verlinkung, Ansicht und Start ganz, ohne erklärenden Hinweis; beide Routen
 ergeben 404.
 
 Die Detailansicht einer Vignette nennt dann den Zustand ihres Evallaufs („noch
-keiner“, „Wartet“, „Läuft“, „Fertig“, „Abgebrochen“) und verlinkt mit „Evals
-ansehen“ die Ansicht unter `/evals/vignette/<Fassung>/`. Sie steht Mitgliedern
-des Eigentümer-Kreises und der Administration offen; fremde Fassungen ergeben
-404, Konten ohne Autor:innen-Rolle 403. Vignettentitel und Fassung im Seitenkopf
-geben den Kontext. Ohne Lauf und solange ein Lauf wartet oder läuft, stehen
-Zustand und Aktion oben: „Evallauf starten“ (POST) gibt es an Entwürfen und
-finalen Fassungen, solange kein Lauf wartet oder läuft; archivierte Fassungen
-sind nicht startbar. Während ein Lauf wartet oder läuft, steht statt des Knopfs
-der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“, das
-die gewählte Auswahl behält; aktualisiert wird nur durch Neuladen, ohne
+keiner“, „Wartet“, „Läuft“, „Fertig“, „Abgebrochen“, dazu gegebenenfalls
+„veraltet“) und verlinkt mit „Evals ansehen“ die Ansicht unter
+`/evals/vignette/<Fassung>/`. Sie steht Mitgliedern des Eigentümer-Kreises und
+der Administration offen; fremde Fassungen ergeben 404, Konten ohne
+Autor:innen-Rolle 403. Vignettentitel und Fassung im Seitenkopf geben den
+Kontext. Ohne Lauf und solange ein Lauf wartet oder läuft, stehen Zustand und
+Aktion oben: „Evallauf starten“ (POST) gibt es an Entwürfen und finalen
+Fassungen, solange kein Lauf wartet oder läuft; archivierte Fassungen sind nicht
+startbar. Während ein Lauf wartet oder läuft, steht statt des Knopfs der
+Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“, das die
+gewählte Auswahl behält; aktualisiert wird nur durch Neuladen, ohne
 automatisches Polling. Ein fertiger oder abgebrochener Lauf steht dagegen als
 dezente Fußzeile unter den Ergebnissen: Zustand samt Gesamtergebnis, „Erneut
 prüfen“ als sekundäre Aktion und eingeklappt die „Angaben zum Lauf“ (Auslöse-,
@@ -538,6 +539,28 @@ Entwurf danach gespeichert oder vorgespult, spielt der Lauf trotzdem den Stand
 beim Start. Die Referenzdiagnose gehört nicht zu diesen Werten und erreicht
 keinen Modellaufruf. Finalisieren behält den Lauf an derselben Fassung; das
 Löschen eines Entwurfs entfernt ihn.
+
+Ein Lauf ist *veraltet*, sobald sich seit seinem Auslösen etwas geändert hat,
+das ihn bestimmte: Der Entwurf wurde gespeichert (jedes Speichern zählt, auch
+ohne inhaltliche Änderung, und auch das Vorspulen), der gepinnte Kern ist ein
+anderer, eine der drei Verwendungen zeigt auf eine andere Konfiguration, oder
+eine andere Katalogfassung ist final. Verglichen wird mit dem Stand beim
+Auslösen, nicht mit dem Arbeitsbeginn des Hintergrundprozesses; eine Änderung,
+während der Lauf wartet oder läuft, macht ihn also ebenso veraltet. Eine neue
+finale Kern-Fassung allein ändert nichts, solange die Fassung nicht vorspult;
+Finalisieren ändert ebenfalls nichts. Die Ansicht ergänzt jeden Zustand um
+„Veraltet“, nennt darunter die Gründe („Seit dem Start: Vignette bearbeitet,
+Konfiguration Bewerter gewechselt.“) und den Auslösezeitpunkt; die „Angaben zum
+Lauf“ nennen zusätzlich den geprüften Stand der Vignette. Die Ergebnisse bleiben
+lesbar; ein neuer Lauf prüft den aktuellen Stand.
+
+An einem Entwurf steht unmittelbar bei „Finalisieren“ ein Hinweis auf den
+Evallauf: „Vor dem Finalisieren: Noch kein Evallauf.“ oder Zustand samt
+Gesamtergebnis (nur fertig: „Bestanden“/„Nicht bestanden“), „Veraltet“ mit
+Gründen und „Unvollständig“; darunter je Eval und Evalinput die Quote jedes
+Kriteriums samt „ohne Urteil“ und „noch nicht ausgeführt“. Der Hinweis sperrt
+nichts: Finalisieren ist in jedem Zustand des Laufs möglich, allein die
+Vollständigkeitsregeln der Vignette gelten. Ohne verfügbare Evals fehlt er ganz.
 
 Ausgeführt wird ein Lauf vom Hintergrundprozess
 `python manage.py evallaeufe_abarbeiten`, der im Betrieb als eigener

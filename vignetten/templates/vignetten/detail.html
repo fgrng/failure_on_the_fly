@@ -27,8 +27,11 @@
             </form>
             <form method="post" action="{% url 'vignetten:finalisieren' vignette.pk %}">
                 {% csrf_token %}
-                <button class="button" type="submit">Finalisieren</button>
+                <button class="button" type="submit"{% if evals_verfuegbar %} aria-describedby="finalisieren-evalhinweis"{% endif %}>Finalisieren</button>
             </form>
+            {% if evals_verfuegbar %}
+                {% include "vignetten/includes/finalisieren_evalhinweis.html" with lauf=evallauf %}
+            {% endif %}
             <form method="post" action="{% url 'vignetten:vorspulen' vignette.pk %}">
                 {% csrf_token %}
                 <button class="button button--secondary" type="submit">Auf aktuellen Kern vorspulen</button>
@@ -58,9 +61,8 @@
             </form>
         {% endif %}
     </div>
-    {# Der Evallauf kommt über den Reverse-Accessor, ohne Import von evals. #}
     {% if evals_verfuegbar %}
-        <p class="vignette-detail-kern">Evallauf: {{ vignette.evallauf.get_zustand_display|default:"noch keiner" }} · <a href="{% url 'evals:evallauf' vignette.pk %}">Evals ansehen</a></p>
+        <p class="vignette-detail-kern">Evallauf: {{ evallauf.get_zustand_display|default:"noch keiner" }}{% if evallauf.veraltet %} · veraltet{% endif %} · <a href="{% url 'evals:evallauf' vignette.pk %}">Evals ansehen</a></p>
     {% endif %}
 
     <section class="page-section" aria-labelledby="detail-context">

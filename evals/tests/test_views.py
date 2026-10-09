@@ -11,7 +11,7 @@ from config.tests.aufbau import (
     konto_mit_rollen,
     vignetten_entwurf,
 )
-from config.tests.formular import submit_knoepfe
+from config.tests.formular import submit_knoepfe, text_ohne_tags
 from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf
 from evals.tests.aufbau import (
@@ -802,3 +802,162 @@ def test_laufendes_gespraech_ohne_urteile_ist_noch_nicht_beurteilt(
 
     assert "Antwort 1" in seite
     assert "Muster gezeigt · noch nicht beurteilt" in seite
+
+
+# Veraltet und der Hinweis beim Finalisieren.
+
+
+def _detail(ada: Konto, vignette: Vignette) -> str:
+    # Die gerenderte Vignettenansicht der Fassung.
+
+    return text_ohne_tags(
+        _client(ada).get(reverse("vignetten:detail", args=[vignette.pk]))
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_wartender_lauf_nach_bearbeiten_heisst_veraltet_mit_grund(ada: Konto) -> None:
+    """Auch ein noch offener Lauf zeigt, dass der Entwurf seitdem bearbeitet wurde."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+    _starten(_client(ada), vignette)
+    vignette.thema = "Neues Thema"
+    vignette.save()
+
+    seite: str = text_ohne_tags(_client(ada).get(_ansicht(vignette)))
+
+    assert "Evallauf Wartet · Veraltet" in seite
+    assert "Seit dem Start: Vignette bearbeitet." in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_fertiger_lauf_nach_konfigurationswechsel_heisst_veraltet(ada: Konto) -> None:
+    """Das Gesamtergebnis bleibt lesbar und ist als veraltet markiert."""
+
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+    fake_aktivieren(Verwendung.BEWERTER)
+
+    seite: str = text_ohne_tags(_client(ada).get(_ansicht(vignette)))
+
+    assert "Fertig · Nicht bestanden · Veraltet" in seite
+    assert "Seit dem Start: Konfiguration Bewerter gewechselt." in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_unveraenderter_lauf_heisst_nicht_veraltet_und_nennt_seinen_stand(
+    ada: Konto,
+) -> None:
+    """Die Angaben zum Lauf nennen den geprüften Stand der Vignette."""
+
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = text_ohne_tags(_client(ada).get(_ansicht(vignette)))
+
+    assert "Veraltet" not in seite
+    assert "Geprüfter Stand der Vignette" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_finalisieren_hinweis_ohne_lauf(ada: Konto) -> None:
+    """Ohne Lauf nennt der Hinweis das und lässt das Finalisieren stehen."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+
+    antwort: HttpResponse = _client(ada).get(
+        reverse("vignetten:detail", args=[vignette.pk])
+    )
+
+    assert "Vor dem Finalisieren: Noch kein Evallauf." in text_ohne_tags(antwort)
+    assert "Finalisieren" in _knoepfe(antwort)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_finalisieren_hinweis_nennt_ergebnis_und_quoten(ada: Konto) -> None:
+    """Ein fertiger Lauf erscheint mit Gesamtergebnis und den Quoten je Kriterium."""
+
+    entwurf: Vignette = finale_vignette(ada).bearbeiten()
+    _starten(_client(ada), entwurf)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = _detail(ada, entwurf)
+
+    assert "Vor dem Finalisieren: Evallauf Fertig · Nicht bestanden." in seite
+    assert "Muster · Evalinput 1: Muster gezeigt 2 von 3, Rollentreue 3 von 3" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_finalisieren_hinweis_nennt_veraltet(ada: Konto) -> None:
+    """Ein nach dem Start bearbeiteter Entwurf zeigt den veralteten Lauf."""
+
+    entwurf: Vignette = finale_vignette(ada).bearbeiten()
+    _starten(_client(ada), entwurf)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+    entwurf.thema = "Neues Thema"
+    entwurf.save()
+
+    seite: str = _detail(ada, entwurf)
+
+    assert "· Veraltet (Vignette bearbeitet)." in seite
+
+
+@pytest.mark.django_db
+def test_finalisieren_hinweis_nennt_teil_und_fehlerzustaende(ada: Konto) -> None:
+    """Abbruch, fehlende Urteile und nicht Ausgeführtes bleiben erkennbar."""
+
+    finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
+    # Das zweite Gespräch bricht ab; das erste bleibt ohne Urteil.
+    drei_fakes(schuelerin=antworten(1), bewerter=[{"fehler": "formatbruch"}] * 3)
+    entwurf: Vignette = finale_vignette(ada).bearbeiten()
+    _starten(_client(ada), entwurf)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = _detail(ada, entwurf)
+
+    assert "Vor dem Finalisieren: Evallauf Abgebrochen · Unvollständig." in seite
+    assert "Muster gezeigt 0 von 2 (1 ohne Urteil, 1 noch nicht ausgeführt)" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("ausgang", ["wartet", "veraltet", "fertig"])
+@pytest.mark.usefixtures("evals_bereit")
+def test_finalisieren_bleibt_in_jedem_laufzustand_erlaubt(
+    ada: Konto, ausgang: str
+) -> None:
+    """Der Hinweis sperrt nicht: Der Entwurf wird über die Route final."""
+
+    entwurf: Vignette = finale_vignette(ada).bearbeiten()
+    _starten(_client(ada), entwurf)
+    if ausgang != "wartet":
+        call_command("evallaeufe_abarbeiten", "--einmal")
+    if ausgang == "veraltet":
+        entwurf.save()
+
+    _client(ada).post(reverse("vignetten:finalisieren", args=[entwurf.pk]))
+
+    lauf: Evallauf = Evallauf.objects.get(vignette=entwurf)
+    assert lauf.vignette.zustand == Vignette.Zustand.FINAL
+    assert lauf.veraltet == (ausgang == "veraltet")
+
+
+@pytest.mark.django_db
+def test_ohne_verwendung_fehlt_der_finalisieren_hinweis(ada: Konto) -> None:
+    """Ohne alle drei Verwendungen gibt es weder Evals noch Hinweis."""
+
+    finaler_katalog()
+    fake_aktivieren(Verwendung.SCHUELERIN)
+    fake_aktivieren(Verwendung.LEHRPERSON)
+
+    seite: str = _detail(ada, vignetten_entwurf(ada))
+
+    assert "Vor dem Finalisieren" not in seite
+    assert "Evallauf" not in seite
