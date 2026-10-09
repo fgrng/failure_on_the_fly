@@ -407,14 +407,17 @@ def _listenzeilen(
 
 
 @administratorin_erforderlich
-@transaction.atomic
 def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt den Knoten Übergreifende Kriterien; speichert nur in Entwürfe."""
-    katalog: Evalkatalog = _fassung(request, pk)
     if request.method == "POST":
-        if _eingaben_uebernehmen(katalog, request):
-            messages.success(request, "Übergreifende Kriterien gespeichert.")
+        with transaction.atomic():
+            katalog: Evalkatalog = _fassung(request, pk)
+            if _eingaben_uebernehmen(katalog, request):
+                messages.success(request, "Übergreifende Kriterien gespeichert.")
         return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+    # Gerendert wird außerhalb der Transaktion: Unter IMMEDIATE hielte jeder
+    # atomic()-Block die Schreibsperre, auch ein lesender (ADR-0051).
+    katalog = _fassung(request, pk)
     return render(
         request,
         "simulation/evalkatalog_editor.html",
@@ -507,14 +510,16 @@ def evalkatalog_eval_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @administratorin_erforderlich
-@transaction.atomic
 def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpResponse:
     """Zeigt den Knoten eines Evals samt Evalkriterien; speichert nur in Entwürfe."""
-    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     if request.method == "POST":
-        if _eingaben_uebernehmen(katalog, request):
-            messages.success(request, "Das Eval wurde gespeichert.")
+        with transaction.atomic():
+            katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
+            if _eingaben_uebernehmen(katalog, request):
+                messages.success(request, "Das Eval wurde gespeichert.")
         return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+    # Rendern außerhalb der Transaktion, siehe evalkatalog_kriterien.
+    katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     evals: list[Eval] = list(katalog.evals.all())
     return render(
         request,
@@ -640,16 +645,20 @@ def evalkatalog_evalinput_anlegen(
 
 
 @administratorin_erforderlich
-@transaction.atomic
 def evalkatalog_evalinput(
     request: HttpRequest, pk: int, eval_pk: int, input_pk: int
 ) -> HttpResponse:
     """Zeigt einen Evalinput als Drehbuch; speichert nur in Entwürfe."""
-    katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
     if request.method == "POST":
-        if _eingaben_uebernehmen(katalog, request):
-            messages.success(request, "Der Evalinput wurde gespeichert.")
+        with transaction.atomic():
+            katalog, _, evalinput = _evalinput_der_fassung(
+                request, pk, eval_pk, input_pk
+            )
+            if _eingaben_uebernehmen(katalog, request):
+                messages.success(request, "Der Evalinput wurde gespeichert.")
         return _zum_evalinput(evalinput)
+    # Rendern außerhalb der Transaktion, siehe evalkatalog_kriterien.
+    katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
     schritte: list[Inputschritt] = list(evalinput.schritte.all())
     return render(
         request,

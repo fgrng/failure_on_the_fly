@@ -485,6 +485,13 @@ Entwurf besteht, bieten die Seiten „Neue Fassung“ nicht an, und ein Versuch 
 mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
 überholten Fassungen und Entwürfen lässt sich keine neue Fassung ableiten.
 
+Die Knoten „Übergreifende Kriterien“, Eval und Evalinput lesen und rendern auf
+GET außerhalb einer Schreibtransaktion, bei Entwürfen wie bei finalen und
+überholten Fassungen; das Anzeigen hält die Schreibsperre der Datenbank nicht
+(wie bei der Erhebung, ADR-0051). „Änderungen speichern“ an diesen Knoten
+übernimmt alle getippten Werte in einer Transaktion: Bricht die Übernahme
+unerwartet ab, bleibt keiner der Werte gespeichert.
+
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 

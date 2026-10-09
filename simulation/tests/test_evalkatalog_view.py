@@ -8,7 +8,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
-from django.test import TestCase
+from django.db import connection
+from django.shortcuts import render as django_render
+from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 
 from config.tests.formular import submit_knoepfe
@@ -23,7 +25,11 @@ from simulation.models import (
     Inputschritt,
     UebergreifendesKriterium,
 )
-from simulation.tests.evalkatalog_bau import vervollstaendigen, vollstaendiger_katalog
+from simulation.tests.evalkatalog_bau import (
+    FUELLTEXT,
+    vervollstaendigen,
+    vollstaendiger_katalog,
+)
 
 
 def _administratorin(username: str) -> Konto:
@@ -1573,3 +1579,80 @@ class EvalkatalogZugriffTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
 
         self.assertContains(response, f'href="{reverse("simulation:evalkatalog")}"')
+
+
+class EvalkatalogTransaktionsgrenzeTests(TransactionTestCase):
+    """Die Knoten rendern außerhalb der Schreibsperre (ADR-0051).
+
+    Ohne umgebende `TestCase`-Transaktion; sie würde `in_atomic_block` beim
+    Rendern verdecken.
+    """
+
+    def setUp(self) -> None:
+        """Finalisiert eine Fassung und meldet eine Administratorin an."""
+        self.finale: Evalkatalog = vollstaendiger_katalog()
+        self.finale.finalisieren()
+        self.client.force_login(_administratorin("ada"))
+
+    def _knoten(self, katalog: Evalkatalog) -> list[str]:
+        # Die Adressen der drei Knoten mit Formularübernahme auf POST.
+        eval_: Eval = katalog.evals.get()
+        return [
+            reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
+            reverse(
+                "simulation:evalkatalog_evalinput",
+                args=[katalog.pk, eval_.pk, eval_.inputs.get().pk],
+            ),
+        ]
+
+    def _rendern_in_transaktion(self, url: str) -> bool:
+        # Rendert den Knoten und meldet, ob dabei eine Transaktion offen stand.
+        beim_rendern: list[bool] = []
+
+        def render(*args: object, **kwargs: object) -> HttpResponse:
+            beim_rendern.append(connection.in_atomic_block)
+            return django_render(*args, **kwargs)
+
+        with mock.patch("simulation.views.render", side_effect=render):
+            response: HttpResponse = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return any(beim_rendern)
+
+    def test_get_rendert_den_entwurf_ausserhalb_einer_transaktion(self) -> None:
+        """Kein Knoten des Entwurfs hält beim Rendern die Schreibsperre."""
+        entwurf: Evalkatalog = self.finale.bearbeiten()
+
+        for url in self._knoten(entwurf):
+            with self.subTest(url=url):
+                self.assertFalse(self._rendern_in_transaktion(url))
+
+    def test_get_rendert_die_finale_fassung_ausserhalb_einer_transaktion(
+        self,
+    ) -> None:
+        """Auch das Lesen einer finalen Fassung nimmt keine Schreibsperre."""
+        for url in self._knoten(self.finale):
+            with self.subTest(url=url):
+                self.assertFalse(self._rendern_in_transaktion(url))
+
+    def test_post_uebernimmt_alle_eingaben_oder_keine(self) -> None:
+        """Bricht die Übernahme mittendrin ab, bleibt nichts gespeichert."""
+        entwurf: Evalkatalog = self.finale.bearbeiten()
+        kriterium: UebergreifendesKriterium = entwurf.kriterium_anlegen("Alt")
+        eval_: Eval = entwurf.evals.get()
+
+        for url in self._knoten(entwurf):
+            with (
+                self.subTest(url=url),
+                mock.patch(
+                    "simulation.views.messages.success", side_effect=RuntimeError
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    url,
+                    {f"kriterium-{kriterium.pk}": "Neu", f"eval-{eval_.pk}": "Neu"},
+                )
+            kriterium.refresh_from_db()
+            eval_.refresh_from_db()
+            self.assertEqual((kriterium.text, eval_.name), ("Alt", FUELLTEXT))
