@@ -7,11 +7,13 @@ from collections import Counter
 from dataclasses import dataclass
 from functools import cached_property
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from konten.models import Konto
 from simulation.models import (
     Eval,
     Evalinput,
@@ -271,13 +273,13 @@ class Evallauf(models.Model):
         ohne_urteil=0, k=3)``, und sie besteht nicht.
         """
 
-        # Je Evalinput, Kriterium und Ausgang (erfüllt, nicht erfüllt, ohne
-        # Urteil) die Zahl der Urteile.
+        # Je Evalinput, Kriterium und wirksamem Ausgang (erfüllt, nicht
+        # erfüllt, ohne Urteil) die Zahl der Urteile.
         zaehler: Counter[tuple[int, type[Kriterium], int, bool | None]] = Counter(
             (
                 urteil.gespraech.evalinput_id,
                 *urteil.kriterium_schluessel,
-                urteil.erfuellt,
+                urteil.wirksam,
             )
             for urteil in Urteil.objects.filter(
                 gespraech__evallauf=self
@@ -405,6 +407,12 @@ class Evalgespraech(models.Model):
     )
     wiederholung: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField()
 
+    @property
+    def antwortversuch_gescheitert(self) -> bool:
+        """Ob die Schüler:in endgültig scheiterte; die Urteile setzte dann kein Bewerter."""
+
+        return any(wechsel.aeusserung is None for wechsel in self.wechsel.all())
+
     class Meta:
         """Jede Wiederholung eines Evalinputs gibt es je Lauf einmal."""
 
@@ -495,6 +503,17 @@ class Urteil(models.Model):
     )
     erfuellt: models.BooleanField = models.BooleanField(null=True)
     begruendung: models.TextField = models.TextField(blank=True, default="")
+    # Eine manuelle Korrektur kehrt `erfuellt` um, ohne es zu überschreiben;
+    # ohne Korrektur sind alle drei Felder leer.
+    korrektur_begruendung: models.TextField = models.TextField(blank=True, default="")
+    korrigiert_von: models.ForeignKey = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    korrigiert_am: models.DateTimeField = models.DateTimeField(null=True, blank=True)
 
     objects: UrteilManager = UrteilManager()
 
@@ -523,7 +542,76 @@ class Urteil(models.Model):
                 fields=["gespraech", "uebergreifendes_kriterium"],
                 name="evals_urteil_je_uebergreifendem_kriterium",
             ),
+            models.CheckConstraint(
+                condition=Q(korrigiert_am__isnull=True, korrektur_begruendung="")
+                | (
+                    Q(korrigiert_am__isnull=False, erfuellt__isnull=False)
+                    & ~Q(korrektur_begruendung="")
+                ),
+                name="evals_urteil_korrektur_vollstaendig",
+            ),
         ]
+
+    @property
+    def korrigiert(self) -> bool:
+        """Ob eine manuelle Korrektur das Bewerterurteil umkehrt."""
+
+        return self.korrigiert_am is not None
+
+    @property
+    def wirksam(self) -> bool | None:
+        """Das Urteil, das Quote und Bestehen bestimmt: korrigiert oder vom Bewerter."""
+
+        return not self.erfuellt if self.korrigiert else self.erfuellt
+
+    def korrigieren(self, begruendung: str, konto: Konto) -> None:
+        """Kehrt das Bewerterurteil mit eigener Begründung um oder ändert die Korrektur.
+
+        Eine frühere Korrektur wird ohne Historie ersetzt.
+        """
+
+        self._korrigierbar_pruefen()
+        begruendung = begruendung.strip()
+        if not begruendung:
+            raise ValidationError("Eine Korrektur braucht eine Begründung.")
+        self.korrektur_begruendung = begruendung
+        self.korrigiert_von = konto
+        self.korrigiert_am = timezone.now()
+        self.save(
+            update_fields=["korrektur_begruendung", "korrigiert_von", "korrigiert_am"]
+        )
+
+    def korrektur_zuruecknehmen(self) -> None:
+        """Lässt wieder das ursprüngliche Bewerterurteil gelten."""
+
+        self._korrigierbar_pruefen()
+        self.korrektur_begruendung = ""
+        self.korrigiert_von = None
+        self.korrigiert_am = None
+        self.save(
+            update_fields=["korrektur_begruendung", "korrigiert_von", "korrigiert_am"]
+        )
+
+    @property
+    def korrigierbar(self) -> bool:
+        """Ob sich das Urteil manuell korrigieren lässt; siehe `_korrigierbar_pruefen`."""
+
+        try:
+            self._korrigierbar_pruefen()
+        except ValidationError:
+            return False
+        return True
+
+    def _korrigierbar_pruefen(self) -> None:
+        # Korrigierbar sind fachliche Bewerterurteile abgeschlossener Läufe;
+        # kein fehlendes und keines, das ein gescheiterter Antwortversuch setzte.
+
+        if self.gespraech.evallauf.ist_offen:
+            raise ValidationError(
+                "Nur abgeschlossene Evalläufe lassen sich korrigieren."
+            )
+        if self.erfuellt is None or self.gespraech.antwortversuch_gescheitert:
+            raise ValidationError("Nur Bewerterurteile lassen sich korrigieren.")
 
     @property
     def kriterium_schluessel(self) -> tuple[type[Kriterium], int]:

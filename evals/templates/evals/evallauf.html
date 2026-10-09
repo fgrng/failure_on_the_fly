@@ -110,8 +110,32 @@
                         {% for beurteilung in einsicht.beurteilungen %}
                             <li class="evallauf-blase">
                                 {% with urteil=beurteilung.urteil %}
-                                    <strong class="{% if urteil.erfuellt %}evallauf--erfuellt{% elif urteil.erfuellt is False %}evallauf--nicht-erfuellt{% else %}evallauf--offen{% endif %}">{{ beurteilung.kriterium }} · {% if not urteil %}noch nicht beurteilt{% elif urteil.erfuellt %}erfüllt{% elif urteil.erfuellt is False %}nicht erfüllt{% else %}ohne Urteil{% endif %}</strong>
-                                    {% if urteil.begruendung %}<p>{{ urteil.begruendung }}</p>{% endif %}
+                                    <strong class="{% if urteil.wirksam %}evallauf--erfuellt{% elif urteil.wirksam is False %}evallauf--nicht-erfuellt{% else %}evallauf--offen{% endif %}">{{ beurteilung.kriterium }} · {% if not urteil %}noch nicht beurteilt{% elif urteil.wirksam %}erfüllt{% elif urteil.wirksam is False %}nicht erfüllt{% else %}ohne Urteil{% endif %}{% if urteil.korrigiert %} · manuell korrigiert{% endif %}</strong>
+                                    {% if urteil.korrigiert %}
+                                        <p>Korrektur von {{ urteil.korrigiert_von.username|default:"einem gelöschten Konto" }}, {{ urteil.korrigiert_am|date:"d.m.Y H:i" }}: {{ urteil.korrektur_begruendung }}</p>
+                                        <p class="evalkatalog-hinweis">Bewerter: {% if urteil.erfuellt %}erfüllt{% else %}nicht erfüllt{% endif %}{% if urteil.begruendung %} · {{ urteil.begruendung }}{% endif %}</p>
+                                    {% elif urteil.begruendung %}
+                                        <p>{{ urteil.begruendung }}</p>
+                                    {% endif %}
+                                    {% if urteil.korrigierbar %}
+                                        <details class="evallauf-korrektur">
+                                            <summary>{% if urteil.korrigiert %}Korrektur ändern{% else %}Urteil korrigieren{% endif %}</summary>
+                                            <form method="post" action="{% url 'evals:urteil_korrigieren' vignette.pk urteil.pk %}">
+                                                {% csrf_token %}
+                                                <div class="vignette-field">
+                                                    <label for="korrektur-{{ urteil.pk }}">Eigene Begründung</label>
+                                                    <textarea id="korrektur-{{ urteil.pk }}" name="begruendung" rows="3" required>{{ urteil.korrektur_begruendung }}</textarea>
+                                                </div>
+                                                <button class="button button--secondary" type="submit">{% if urteil.korrigiert %}Korrektur ändern{% elif urteil.erfuellt %}Als nicht erfüllt werten{% else %}Als erfüllt werten{% endif %}</button>
+                                            </form>
+                                            {% if urteil.korrigiert %}
+                                                <form method="post" action="{% url 'evals:korrektur_zuruecknehmen' vignette.pk urteil.pk %}">
+                                                    {% csrf_token %}
+                                                    <button class="button button--secondary" type="submit">Korrektur zurücknehmen</button>
+                                                </form>
+                                            {% endif %}
+                                        </details>
+                                    {% endif %}
                                 {% endwith %}
                                 <small>{% if beurteilung.uebergreifend %}Übergreifendes Kriterium{% else %}Evalkriterium{% endif %}</small>
                             </li>

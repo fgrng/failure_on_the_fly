@@ -625,22 +625,46 @@ Reihenfolge, je Antwort die Denkspur, Fehlversuche mit Grund und Rohantwort, ein
 endgültig gescheiterter Antwortversuch als solcher, danach jedes Kriterium mit
 seinem Urteil („erfüllt“, „nicht erfüllt“, „ohne Urteil“, „noch nicht
 beurteilt“) und seiner Begründung. So lässt sich jedes Bewerterurteil fachlich
-nachprüfen; ändern lässt es sich hier nicht. Ohne Auswahl zeigt die Ansicht den
-ersten Evalinput und seine erste ausgeführte Wiederholung. Eine Wiederholung
-ohne Gespräch heißt „nicht ausgeführt“. Unlesbare Werte, ein Evalinput außerhalb
-des festgehaltenen Katalogs oder eine Wiederholung außerhalb 1 bis *k* weichen
-dieser Vorgabe; gesucht wird stets nur unter den Gesprächen des aktuellen Laufs
-der Fassung, sodass eine alte Adresse nach „Erneut prüfen“ den aktuellen Stand
-zeigt. Auf schmalem Hauptbereich stehen die Spalten untereinander. Blieb
-mindestens ein Kriterium ohne Urteil, heißt der Lauf *unvollständig*, und die
-Ansicht empfiehlt einen neuen Lauf. Ein Gesamtergebnis nennt nur ein fertiger
-Lauf („Fertig · Bestanden“ oder „Fertig · Nicht bestanden“), bestanden nur, wenn
-jedes Kriterium jedes Evalinputs besteht; ein wartender, laufender oder
-abgebrochener Teilstand nennt nur seinen Zustand, auch wenn jedes bisher
-geschriebene Urteil erfüllt ist. Ein abgebrochener Lauf zeigt seine fertigen
-Gespräche und Urteile weiter, mit dem Hinweis, dass ein neuer Lauf von vorn
-beginnt. Evalläufe erzeugen weder Teilnahme noch Sitzung und erscheinen weder in
-der Datenspur noch im Trainingsexport.
+nachprüfen und, wenn nötig, manuell korrigieren (siehe unten). Ohne Auswahl
+zeigt die Ansicht den ersten Evalinput und seine erste ausgeführte Wiederholung.
+Eine Wiederholung ohne Gespräch heißt „nicht ausgeführt“. Unlesbare Werte, ein
+Evalinput außerhalb des festgehaltenen Katalogs oder eine Wiederholung außerhalb
+1 bis *k* weichen dieser Vorgabe; gesucht wird stets nur unter den Gesprächen
+des aktuellen Laufs der Fassung, sodass eine alte Adresse nach „Erneut prüfen“
+den aktuellen Stand zeigt. Auf schmalem Hauptbereich stehen die Spalten
+untereinander. Blieb mindestens ein Kriterium ohne Urteil, heißt der Lauf
+*unvollständig*, und die Ansicht empfiehlt einen neuen Lauf. Ein Gesamtergebnis
+nennt nur ein fertiger Lauf („Fertig · Bestanden“ oder „Fertig · Nicht
+bestanden“), bestanden nur, wenn jedes Kriterium jedes Evalinputs besteht; ein
+wartender, laufender oder abgebrochener Teilstand nennt nur seinen Zustand, auch
+wenn jedes bisher geschriebene Urteil erfüllt ist. Ein abgebrochener Lauf zeigt
+seine fertigen Gespräche und Urteile weiter, mit dem Hinweis, dass ein neuer
+Lauf von vorn beginnt. Evalläufe erzeugen weder Teilnahme noch Sitzung und
+erscheinen weder in der Datenspur noch im Trainingsexport.
+
+Ein fachlich falsches Bewerterurteil lässt sich im gewählten Gespräch manuell
+korrigieren, von Mitgliedern des Eigentümer-Kreises und der Administration,
+sobald der Lauf fertig oder abgebrochen ist. Unter dem Urteil öffnet „Urteil
+korrigieren“ ein Formular mit einer Pflicht-Begründung; „Als erfüllt werten“
+bzw. „Als nicht erfüllt werten“ kehrt das Bewerterurteil um. Das Urteil heißt
+dann etwa „Muster gezeigt · erfüllt · manuell korrigiert“, darunter stehen
+Korrektur samt Konto, Zeitpunkt und Begründung und das ursprüngliche
+Bewerterurteil mit seiner Begründung; überschrieben wird es nie. „Korrektur
+ändern“ ersetzt Begründung, Konto und Zeitpunkt ohne Historie früherer
+Fassungen, „Korrektur zurücknehmen“ lässt wieder das Bewerterurteil gelten. Das
+wirksame Urteil bestimmt überall Quote und Bestehen: in den Quoten links, im
+Gesamtergebnis und im Hinweis beim Finalisieren; aus „2 von 3 · nicht bestanden“
+wird so „3 von 3 · bestanden“ und mit der Rücknahme wieder umgekehrt. Nicht
+korrigierbar sind Kriterien ohne Urteil, nicht ausgeführte Wiederholungen und
+die automatisch nicht erfüllten Urteile eines endgültig gescheiterten
+Antwortversuchs; ein wartender oder laufender Lauf ist schreibgeschützt. Ein
+abgebrochener Lauf bleibt auch mit korrigierten Urteilen abgebrochen und nennt
+kein Gesamtergebnis. Korrigieren und Zurücknehmen laufen per POST mit
+CSRF-Schutz und prüfen Fassung, Laufzustand und Zuordnung des Urteils frisch;
+ein Urteil, das nicht zum aktuellen Lauf der Fassung gehört (etwa aus einem
+alten Browserstand nach „Erneut prüfen“), wird mit Meldung abgewiesen. Eine
+Korrektur ändert weder die Fassung noch „veraltet“. Ein neuer Lauf ersetzt den
+alten samt Korrekturen; auf neue Urteile wird nichts übertragen.
 
 ## Transkriptions-Konfiguration
 
