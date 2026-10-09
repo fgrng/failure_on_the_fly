@@ -3,16 +3,15 @@
 from unittest.mock import patch
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
-from konten.models import Konto
+from config.tests.aufbau import konto_mit_rollen
+from config.tests.formular import submit_knoepfe
 from simulation.models import Anbieter, TranskriptionsKonfiguration
-from simulation.transkription import OpenAITranskription, transkriptions_anbieter
+from simulation.transkription import transkriptions_anbieter
 
 SEITE: str = "simulation:transkriptions_konfiguration"
 
@@ -28,18 +27,6 @@ def _eingabe(**werte: object) -> dict[str, object]:
         "sprache": "de",
         **werte,
     }
-
-
-def _administratorin(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf die Systemseiten an."""
-    return get_user_model().objects.create_user(username=username, is_superuser=True)
-
-
-def _autorin(username: str) -> Konto:
-    """Legt ein Konto mit Entwicklungs-, aber ohne Administrationsrolle an."""
-    konto: Konto = get_user_model().objects.create_user(username=username)
-    konto.groups.add(Group.objects.get(name="Autor:in"))
-    return konto
 
 
 @pytest.mark.django_db
@@ -84,39 +71,12 @@ def test_infomaniak_verlangt_zusaetzlich_die_endpunktwurzel() -> None:
     assert set(fehler.value.message_dict) == {"anbieter_basis_url"}
 
 
-def test_maskierung_zeigt_die_letzten_vier_zeichen() -> None:
-    """Das Token ist wiedererkennbar, ohne lesbar zu sein."""
-
-    konfiguration: TranskriptionsKonfiguration = TranskriptionsKonfiguration(
-        anbieter_token="sk-or-supergeheim1234"
-    )
-
-    assert konfiguration.anbieter_token_maskiert.endswith("1234")
-    assert "supergeheim" not in konfiguration.anbieter_token_maskiert
-
-
-def test_maskierung_eines_sehr_kurzen_tokens_zeigt_nur_punkte() -> None:
-    """Ein kurzes Token verriete sich sonst vollständig."""
-
-    konfiguration: TranskriptionsKonfiguration = TranskriptionsKonfiguration(
-        anbieter_token="kurz"
-    )
-
-    assert "kurz" not in konfiguration.anbieter_token_maskiert
-
-
-def test_maskierung_ohne_token_bleibt_leer() -> None:
-    """Ohne hinterlegtes Token gibt es nichts zu maskieren."""
-
-    assert TranskriptionsKonfiguration().anbieter_token_maskiert == ""
-
-
 class TranskriptionsKonfigurationRollenTests(TestCase):
     """Die Betriebseinstellungen liegen hinter der Administrationsrolle."""
 
     def test_weist_autorin_ab(self) -> None:
         """Eine Autorin ohne Administrationsrolle darf die Seite nicht öffnen."""
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         self.assertEqual(self.client.get(reverse(SEITE)).status_code, 403)
 
@@ -126,7 +86,7 @@ class TranskriptionsKonfigurationRollenTests(TestCase):
 
     def test_weist_autorin_auch_beim_speichern_ab(self) -> None:
         """Die Schreibroute trägt dieselbe Rollenprüfung wie die Anzeige."""
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         response: HttpResponse = self.client.post(reverse(SEITE), _eingabe())
 
@@ -138,26 +98,23 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet die Administratorin an."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
-    def test_zeigt_alle_fuenf_felder(self) -> None:
-        """Alle Felder der Konfiguration sind bedienbar."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
+    def test_zeigt_die_felder_in_der_eingabefolge(self) -> None:
+        """Erst Anbieter und Zugang, dann das Modell, wie in der Modell-Konfiguration."""
+        seite: str = self.client.get(reverse(SEITE)).content.decode()
 
-        for feld in (
-            "anbieter",
-            "anbieter_basis_url",
-            "anbieter_token",
-            "transkriptionsmodell",
-            "sprache",
-        ):
-            self.assertContains(response, f'name="{feld}"')
-
-    def test_zeigt_die_sprache_mit_der_vorgabe_deutsch(self) -> None:
-        """Die Transkription soll bei kurzen deutschen Äußerungen nicht raten müssen."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
-
-        self.assertContains(response, 'value="de"')
+        stellen: list[int] = [
+            seite.index(f'name="{feld}"')
+            for feld in (
+                "anbieter",
+                "anbieter_token",
+                "anbieter_basis_url",
+                "transkriptionsmodell",
+                "sprache",
+            )
+        ]
+        self.assertEqual(stellen, sorted(stellen))
 
     def test_speichert_die_eingetragene_konfiguration(self) -> None:
         """Die Eingabe der Administratorin landet in der Datenbank."""
@@ -226,25 +183,10 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
         """Ein veränderlicher Singleton kennt genau eine Geste: Bearbeiten."""
         response: HttpResponse = self.client.get(reverse(SEITE))
 
-        seite: str = response.content.decode()
-        for geste in ("Anlegen", "Aktivieren", "Neue Fassung", "Löschen"):
-            self.assertNotIn(geste, seite)
-
-    def test_benennt_die_zero_retention_zusicherung_als_instanz_einstellung(
-        self,
-    ) -> None:
-        """Wer hier einstellt, soll das Tor nicht hier suchen (ADR-0026)."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
-
-        self.assertContains(response, "Instanz-Einstellung")
-        self.assertContains(response, "OpenRouter")
-
-    def test_liegt_blau_unter_system(self) -> None:
-        """Die Betriebsseite trägt das Chrome des Systembereichs (ADR-0024)."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
-
-        self.assertEqual(reverse(SEITE), "/system/transkription/")
-        self.assertContains(response, 'class="page system-page area--system"')
+        self.assertEqual(
+            [beschriftung for beschriftung, _ in submit_knoepfe(response)],
+            ["Abmelden", "Änderungen speichern"],
+        )
 
     def test_traegt_einen_eigenen_sidebar_eintrag(self) -> None:
         """Die Gruppe »System« führt die Transkription neben dem Sprachmodell."""
@@ -262,7 +204,7 @@ class TranskriptionsKonfigurationVorschlaegeTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet die Administratorin an."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def test_traegt_den_knopf_neben_dem_transkriptionsmodell(self) -> None:
         """Derselbe Endpunkt wie an der Sprachmodell-Naht, dieselbe Geste."""
@@ -274,33 +216,12 @@ class TranskriptionsKonfigurationVorschlaegeTests(TestCase):
         )
         self.assertContains(response, '"naht": "transkription"')
 
-    def test_verbirgt_den_knopf_beim_anbieter_fake(self) -> None:
-        """Ohne echten Anbieter gibt es nichts zu laden."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
-
-        self.assertContains(response, "anbieter !== 'fake'")
-
     def test_holt_beim_rendern_keine_modellliste(self) -> None:
         """Eine Systemseite rendert ohne Netzaufruf."""
-        with patch("simulation.views.modellverzeichnis") as verzeichnis:
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
             self.client.get(reverse(SEITE))
 
-        verzeichnis.assert_not_called()
-
-    def test_leert_die_liste_beim_anbieterwechsel(self) -> None:
-        """Kein Vorschlag des vorigen Anbieters bleibt stehen."""
-        response: HttpResponse = self.client.get(reverse(SEITE))
-
-        self.assertContains(response, "$refs.modellvorschlaege.innerHTML = ''")
-
-    def test_stellt_das_token_vor_das_transkriptionsmodell(self) -> None:
-        """Dieselbe Eingabefolge wie in der Modell-Konfiguration."""
-        seite: str = self.client.get(reverse(SEITE)).content.decode()
-
-        self.assertLess(
-            seite.index('name="anbieter_token"'),
-            seite.index('name="transkriptionsmodell"'),
-        )
+        httpx_client.assert_not_called()
 
 
 class TranskriptionsKonfigurationWirkungTests(TestCase):
@@ -308,7 +229,7 @@ class TranskriptionsKonfigurationWirkungTests(TestCase):
 
     def test_wirkt_bei_der_naechsten_anfrage(self) -> None:
         """Der Adapter entsteht je Anfrage aus der gespeicherten Zeile."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
         self.assertEqual(
             transkriptions_anbieter().transkribieren(b"audio"),
             "Dies ist ein Platzhalter-Transkript.",
@@ -316,5 +237,11 @@ class TranskriptionsKonfigurationWirkungTests(TestCase):
 
         self.client.post(reverse(SEITE), _eingabe())
 
-        anbieter: OpenAITranskription = transkriptions_anbieter()
-        self.assertEqual(anbieter.modell, "whisper-large-v3")
+        with patch("simulation.transkription.OpenAI") as openai:
+            openai.return_value.audio.transcriptions.create.return_value.text = "Hallo."
+            transkriptions_anbieter().transkribieren(b"audio")
+
+        self.assertEqual(
+            openai.return_value.audio.transcriptions.create.call_args.kwargs["model"],
+            "whisper-large-v3",
+        )

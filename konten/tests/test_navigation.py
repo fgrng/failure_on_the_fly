@@ -228,11 +228,14 @@ class BereichszuordnungTests(TestCase):
         for url, bereich in (
             (reverse("vignetten:liste"), "authoring"),
             (reverse("vignetten:detail", args=[vignette.pk]), "authoring"),
+            (reverse("simulation:kern"), "authoring"),
             (reverse("simulation:kern_verwalten"), "authoring"),
             (
                 reverse("simulation:kern_bearbeiten", args=[kern_entwurf.pk]),
                 "authoring",
             ),
+            (reverse("simulation:modell_konfiguration"), "system"),
+            (reverse("simulation:transkriptions_konfiguration"), "system"),
             (reverse("training:katalog"), "participant"),
             (reverse("training:liste"), "participant"),
             (reverse("training:anlegen"), "participant"),

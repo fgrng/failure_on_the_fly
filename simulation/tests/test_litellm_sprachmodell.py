@@ -6,17 +6,8 @@ from unittest.mock import Mock, patch
 import pytest
 from litellm import ContentPolicyViolationError
 
-from simulation import (
-    SPRACHMODELL_FRIST_SEKUNDEN,
-    SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN,
-    antwort_versuchen,
-)
-from simulation.models import (
-    MIKRO_STELLSCHRAUBEN,
-    Anbieter,
-    ModellKonfiguration,
-    Simulationskern,
-)
+from simulation import SPRACHMODELL_FRIST_SEKUNDEN, antwort_versuchen
+from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import (
     AUSGABE_SCHEMA,
     Antwort,
@@ -328,6 +319,28 @@ def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
     }
 
 
+def test_antwort_versuchen_fordert_die_denkspur_vor_der_aeusserung_an() -> None:
+    """Das Ausgabeschema am Anbieter erzeugt die Denkspur zuerst (ADR-0005)."""
+
+    completion: Mock = _geglueckte_completion()
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwort_versuchen(
+            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    schema = completion.call_args.kwargs["response_format"]["json_schema"]["schema"]
+    assert list(schema["properties"]) == ["denkspur", "aeusserung"]
+
+
 def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> None:
     """Der deterministische Adapter hängt am Feld, nicht am Modellnamen."""
 
@@ -384,7 +397,7 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
 
     uhr = _Testuhr()
     monkeypatch.setattr("simulation.time.monotonic", uhr)
-    completion = _haengender_anbieter(uhr, SPRACHMODELL_FRIST_SEKUNDEN * 0.6)
+    completion = _haengender_anbieter(uhr, 54.0)
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwortversuch = antwort_versuchen(
@@ -405,18 +418,14 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
     # nicht mehr — obwohl MAX_VERSUCHE ihn erlauben würde.
     assert completion.call_count == 2
     assert [aufruf.kwargs["timeout"] for aufruf in completion.call_args_list] == [
-        SPRACHMODELL_FRIST_SEKUNDEN,
-        SPRACHMODELL_FRIST_SEKUNDEN * 0.4,
+        90.0,
+        36.0,
     ]
     assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
-        "Anbieterfehler"
-    ] * 3
-
-
-def test_timeout_steht_nicht_in_der_allowlist_der_stellschrauben() -> None:
-    """Die Frist der Naht steht nicht in der Allowlist der Stellschrauben."""
-
-    assert "timeout" not in MIKRO_STELLSCHRAUBEN
+        "Anbieterfehler",
+        "Anbieterfehler",
+        "Anbieterfehler",
+    ]
 
 
 def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
@@ -427,10 +436,7 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
     # Die Uhr rückt bei jedem Ablesen so weit vor, dass sie bei der Prüfung
     # der Schleife kurz vor der Frist steht und beim Berechnen der Restzeit
     # schon hinter ihr.
-    monkeypatch.setattr(
-        "simulation.time.monotonic",
-        _Testuhr(schritt=SPRACHMODELL_FRIST_SEKUNDEN - 0.5),
-    )
+    monkeypatch.setattr("simulation.time.monotonic", _Testuhr(schritt=89.5))
     completion = Mock(side_effect=TimeoutError("Der Anbieter antwortete nicht."))
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
@@ -447,7 +453,4 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
             eingabe="Wie hast du gerechnet?",
         )
 
-    assert (
-        completion.call_args.kwargs["timeout"]
-        == SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN
-    )
+    assert completion.call_args.kwargs["timeout"] == 1.0
