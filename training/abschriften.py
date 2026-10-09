@@ -8,6 +8,7 @@ Erhebungsbindung.
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import QuerySet
 
 from erhebungen.models import Erhebung, Erhebungsbindung
 from konten.models import Konto
@@ -20,10 +21,13 @@ from sitzungen.models import (
     Vignettenposition,
 )
 
-from .models import Abschrift
+from .models import Abschrift, Training
 
 ABLEHNUNG: str = "Zu diesem Teilnahme-Token lässt sich keine Abschrift holen."
 """Die eine Meldung jeder Ablehnung: Der Import ist kein Orakel über Tokens."""
+
+FREIGABE_ABGEWIESEN: str = "Freigeben lässt sich nur für beigetretene Trainings."
+"""Die Ablehnung einer Freigabe für ein Training ohne eigene Trainingsbindung."""
 
 
 @transaction.atomic
@@ -56,6 +60,23 @@ def abschrift_loeschen(abschrift: Abschrift) -> None:
     """
 
     abschrift.delete()
+
+
+def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
+    """Gibt die ganze Abschrift genau für diese Trainings frei (ADR-0049).
+
+    Freigeben lässt sie sich nur für Trainings, denen ihr Konto beigetreten
+    ist; die Vignetten des Trainings spielen keine Rolle. Was nicht genannt
+    ist, ist widerrufen. Nennt die Auswahl ein anderes Training, bleibt alles,
+    wie es war.
+    """
+
+    gewaehlt: QuerySet[Training] = Training.objects.beigetreten_von(
+        abschrift.konto
+    ).filter(pk__in=trainings)
+    if gewaehlt.count() != len(set(trainings)):
+        raise ValidationError(FREIGABE_ABGEWIESEN)
+    abschrift.freigegeben_fuer.set(gewaehlt)
 
 
 def teilnahme_einer_abschrift_raeumen(teilnahme: Teilnahme) -> None:

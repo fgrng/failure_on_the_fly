@@ -1,13 +1,19 @@
 """Datenmodelle für kuratierte Trainings."""
 
+from typing import TYPE_CHECKING
+from uuid import uuid4
+
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models.signals import m2m_changed, post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
 from sitzungen.bindungen import Bindung
 from vignetten.models import vignette_archiviert
+
+if TYPE_CHECKING:
+    from konten.models import Konto
 
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
@@ -29,6 +35,23 @@ class TrainingQuerySet(
     def veroeffentlicht(self) -> models.QuerySet["Training"]:
         """Liefert die für Teilnehmende sichtbaren Trainings."""
         return self.filter(zustand=Training.Zustand.VEROEFFENTLICHT)
+
+    def beigetreten_von(self, konto: "Konto") -> models.QuerySet["Training"]:
+        """Liefert die Trainings, an denen das Konto eine Trainingsbindung hat."""
+        return self.filter(trainingsbindung__konto=konto)
+
+    def zugaenglich_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
+        """Liefert die Trainings, die das Konto betreten darf (ADR-0049).
+
+        Teilnehmende erreichen ein Training nur über ihre Trainingsbindung;
+        Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
+        """
+        return self.filter(
+            models.Q(
+                pk__in=Trainingsbindung.objects.filter(konto=konto).values("training")
+            )
+            | models.Q(pk__in=Training.objects.sichtbar_fuer(konto).values("pk"))
+        )
 
 
 class Training(EigentuemerKreis):
@@ -53,6 +76,12 @@ class Training(EigentuemerKreis):
         default=Zustand.ENTWURF,
     )
     vignetten: models.ManyToManyField = models.ManyToManyField("vignetten.Vignette")
+    trainings_link: models.UUIDField = models.UUIDField(
+        default=uuid4,
+        unique=True,
+        editable=False,
+    )
+    beitritt_gesperrt: models.BooleanField = models.BooleanField(default=False)
 
     objects: models.Manager["Training"] = TrainingQuerySet.as_manager()
 
@@ -82,6 +111,48 @@ class Training(EigentuemerKreis):
             self.save(update_fields=["zustand"])
         finally:
             del self._wechselt_zustand
+
+    def beitreten(self, konto: "Konto") -> bool:
+        """Tritt dem Training über den Trainings-Link bei.
+
+        Liefert, ob das Konto danach dabei ist. Die Sperre hält nur Neue
+        fern; wer schon eine Bindung hat, bleibt dabei.
+        """
+        if (
+            self.beitritt_gesperrt
+            and not self.trainingsbindung_set.filter(konto=konto).exists()
+        ):
+            return False
+        self.bindung_fuer(konto)
+        return True
+
+    def bindung_fuer(self, konto: "Konto") -> "Trainingsbindung":
+        """Lädt oder legt die eine Trainingsbindung des Kontos an.
+
+        Beitritt und Sitzungsstart teilen sich diesen Weg; ein paralleler
+        zweiter Aufruf scheitert an der Eindeutigkeit und lädt die erste.
+        """
+        from sitzungen.models import Teilnahme
+
+        with transaction.atomic():
+            bindung: Trainingsbindung | None = (
+                Trainingsbindung.objects.filter(training=self, konto=konto)
+                .select_related("teilnahme")
+                .first()
+            )
+            if bindung is not None:
+                return bindung
+            try:
+                with transaction.atomic():
+                    return Trainingsbindung.objects.create(
+                        teilnahme=Teilnahme.objects.create(),
+                        training=self,
+                        konto=konto,
+                    )
+            except IntegrityError:
+                return Trainingsbindung.objects.select_related("teilnahme").get(
+                    training=self, konto=konto
+                )
 
 
 class Trainingsbindung(Bindung):
@@ -125,6 +196,9 @@ class Abschrift(Bindung):
     )
     erhebungsname: models.CharField = models.CharField(max_length=255)
     importiert_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    freigegeben_fuer: models.ManyToManyField = models.ManyToManyField(
+        Training, related_name="freigegebene_abschriften", blank=True
+    )
 
 
 def _pruefe_finale_vignetten(

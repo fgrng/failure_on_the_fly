@@ -25,7 +25,6 @@
                     {% if zeige_ausbildung_kuratieren %}
                         <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "katalog" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "kuratieren" %} aria-current="page"{% endif %}>Trainings ansehen</a>
                         <a href="{% url 'training:anlegen' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "anlegen" %} aria-current="page"{% endif %}>Neues Training anlegen</a>
-                        <span>Trainingsdaten <small>geplant</small></span>
                     {% endif %}
                     {% if zeige_teilnahme %}
                         <a href="{% url 'training:katalog' %}"{% if request.resolver_match.namespace == "training" and request.resolver_match.url_name == "detail" or request.resolver_match.namespace == "training" and request.resolver_match.url_name == "wahl" %} aria-current="page"{% endif %}>Training starten</a>

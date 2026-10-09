@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import F, Q
 
 
 class Teilnahme(models.Model):
@@ -43,6 +43,33 @@ class Teilnahme(models.Model):
         return Q(**{f"{pfad}speicherung_eingewilligt": False})
 
 
+class SitzungQuerySet(models.QuerySet["Sitzung"]):
+    """Abfragen über Sitzungen."""
+
+    def fremd_einsehbar(self, trainings: models.QuerySet) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf.
+
+        Einsicht folgt dem Anlass, nie der Vignette (ADR-0049): abgeschlossene
+        Sitzungen, deren Teilnahme an einer Trainingsbindung eines der
+        Trainings hängt oder an einer Abschrift, die für eines von ihnen
+        freigegeben ist. Wer die Trainings sieht, entscheidet der Aufrufer über
+        `Training.objects.sichtbar_fuer`; `sitzungen` kennt das Training nur
+        über den Rückwärtszugriff der Bindungen (ADR-0016).
+        """
+        trainings_pks: models.QuerySet = trainings.values("pk")
+        return self.filter(
+            Q(teilnahme__trainingsbindung__training__in=trainings_pks)
+            | Q(teilnahme__abschrift__freigegeben_fuer__in=trainings_pks),
+            status=Sitzung.Status.ABGESCHLOSSEN,
+        ).distinct()
+
+    def in_gespielter_folge(self) -> "SitzungQuerySet":
+        """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
+        return self.order_by(
+            F("vignettenposition__position").asc(nulls_last=True), "pk"
+        )
+
+
 class Sitzung(models.Model):
     """Eine persistierte Sitzung einer Vignette."""
 
@@ -81,6 +108,8 @@ class Sitzung(models.Model):
     )
     verbrauchte_zeit: models.FloatField = models.FloatField(default=0.0)
     offene_spanne_seit: models.DateTimeField = models.DateTimeField(null=True)
+
+    objects: models.Manager["Sitzung"] = SitzungQuerySet.as_manager()
 
     @property
     def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:

@@ -192,7 +192,7 @@ class TrainingKuratierenTests(TestCase):
         )
 
         self.assertContains(detail, "Brüche")
-        self.assertNotContains(detail, "Fremd")
+        self.assertNotContains(detail, fremde_finale.anzeigename)
         self.assertNotContains(detail, "Nichtfinale Vignette")
         hinzufuegen: HttpResponse = self.client.post(
             reverse("training:vignette_hinzufuegen", args=[training.pk, finale.pk])

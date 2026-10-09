@@ -43,3 +43,171 @@
     margin: var(--space-3) 0 0;
     color: var(--color-text-muted);
 }
+
+.page-head div > .page-head__hinweis {
+    margin-top: var(--space-1);
+    font-size: .875rem;
+}
+
+/* ---- Training: Trainings-Link-Band ---- */
+.trainings-link {
+    margin-bottom: var(--space-3);
+}
+
+.trainings-link--gesperrt {
+    background: var(--color-danger-tint);
+    color: var(--color-danger-emphasis);
+}
+
+.trainings-link__zeile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.trainings-link__zeile h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.trainings-link__zeile form { margin: 0; }
+
+.trainings-link__feld {
+    flex: 1;
+    min-width: 16rem;
+    color: var(--color-text);
+}
+
+.trainings-link p {
+    margin: var(--space-1) 0 0;
+    font-size: .875rem;
+}
+
+/* ---- Training: Fremdeinsicht ---- */
+.fremdeinsicht {
+    overflow-x: auto;
+}
+
+.fremdeinsicht__toolbar .table-toolbar__count {
+    margin-left: 0;
+}
+
+.fremdeinsicht__export {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.fremdeinsicht__exporthinweis {
+    color: var(--color-text-muted);
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
+.fremdeinsicht__matrix {
+    table-layout: fixed;
+    width: 100%;
+    min-width: calc(16rem + var(--spalten) * 5.5rem);
+}
+
+.fremdeinsicht__matrix .fremdeinsicht__name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 16rem;
+    background: var(--color-surface);
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fremdeinsicht__matrix thead th {
+    vertical-align: bottom;
+}
+
+.fremdeinsicht__vignette {
+    font-size: .8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: normal;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+}
+
+.fremdeinsicht__vignette span {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.fremdeinsicht__ohne-sitzung > * {
+    color: var(--color-text-muted);
+}
+
+.fremdeinsicht__zelle {
+    white-space: nowrap;
+}
+
+.fremdeinsicht__leer {
+    color: var(--color-border);
+}
+
+/* Der Datums-Tooltip erscheint sofort; `title` käme erst verzögert. */
+.fremdeinsicht__sitzung {
+    position: relative;
+    display: inline-block;
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-right: .25rem;
+    border-radius: 50%;
+    background: var(--color-area-participant-solid);
+    color: var(--color-area-participant-on-solid);
+    font-size: .75rem;
+    font-weight: 600;
+    line-height: 1.6rem;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+}
+
+.fremdeinsicht__sitzung:hover {
+    background: var(--color-accent-hover);
+}
+
+.fremdeinsicht__sitzung:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+.fremdeinsicht__sitzung::after {
+    content: attr(data-datum);
+    position: absolute;
+    bottom: calc(100% + var(--space-1));
+    left: 50%;
+    z-index: 20;
+    padding: .25rem .5rem;
+    border-radius: 4px;
+    background: var(--color-tooltip);
+    color: var(--color-text-on-accent);
+    font-size: .875rem;
+    font-weight: 400;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%);
+}
+
+.fremdeinsicht__sitzung:is(:hover, :focus-visible)::after {
+    opacity: 1;
+}
+
+/* ---- Training: freigegebene Abschriften unter der Fremdeinsicht ---- */
+.freigegebene-abschriften__sitzungen {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}

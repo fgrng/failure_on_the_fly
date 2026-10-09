@@ -174,7 +174,7 @@ class SidebarNavigationTests(TestCase):
 
         self.assertIn("Trainings ansehen", sidebar)
         self.assertIn("Neues Training anlegen", sidebar)
-        self.assertIn("Trainingsdaten <small>geplant</small>", sidebar)
+        self.assertNotIn("Trainingsdaten", sidebar)
         self.assertNotIn("Training starten", sidebar)
         self.assertNotIn("Meine Trainings", sidebar)
 

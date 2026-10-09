@@ -23,8 +23,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from django.utils.text import slugify
 
+from config.downloads import zip_download
 from konten.eigentuemer_views import eigentuemer_views
 from konten.navigation import (
     ist_forschende,
@@ -420,17 +420,7 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    zeitstempel: str = (
-        timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
-    )
-    dateiname: str = (
-        f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
-    )
-    response: HttpResponse = HttpResponse(
-        datenspur_zip(erhebung), content_type="application/zip"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
-    return response
+    return zip_download("erhebung", erhebung.pk, erhebung.name, datenspur_zip(erhebung))
 
 
 @login_required

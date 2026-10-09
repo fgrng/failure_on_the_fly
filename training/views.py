@@ -1,11 +1,14 @@
 """Views für Trainingskatalog und Ausbilder-UI."""
 
+from uuid import UUID
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError, transaction
-from django.db.models import Count, F, QuerySet
+from django.db import transaction
+from django.db.models import Count, Q, QuerySet
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
@@ -14,7 +17,9 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from config.downloads import zip_download
 from konten.eigentuemer_views import eigentuemer_views
+from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
     rolle_erforderlich,
@@ -40,7 +45,8 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_holen, abschrift_loeschen
+from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
+from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
 
 
@@ -79,16 +85,23 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
     return get_object_or_404(Training.objects.sichtbar_fuer(request.user), pk=pk)
 
 
-def _veroeffentlichtes_training(pk: int) -> Training:
-    """Lädt ein Training, das im offenen Katalog sichtbar ist."""
-    return get_object_or_404(Training.objects.veroeffentlicht(), pk=pk)
+def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
+    """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
+    return Sitzung.objects.fremd_einsehbar(Training.objects.sichtbar_fuer(konto))
 
 
-def _veroeffentlichtes_training_mit_finaler_vignette(
-    training_pk: int, vignette_pk: int
+def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
+    """Lädt ein veröffentlichtes Training, das die Person betreten darf."""
+    return get_object_or_404(
+        Training.objects.veroeffentlicht().zugaenglich_fuer(request.user), pk=pk
+    )
+
+
+def _zugaengliches_training_mit_finaler_vignette(
+    request: HttpRequest, training_pk: int, vignette_pk: int
 ) -> tuple[Training, Vignette]:
-    """Lädt eine finale Vignette aus einem veröffentlichten Training."""
-    training: Training = _veroeffentlichtes_training(training_pk)
+    """Lädt eine finale Vignette aus einem zugänglichen Training."""
+    training: Training = _zugaengliches_training(request, training_pk)
     vignette: Vignette = get_object_or_404(
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
@@ -97,9 +110,11 @@ def _veroeffentlichtes_training_mit_finaler_vignette(
 
 @login_required
 def katalog(request: HttpRequest) -> HttpResponse:
-    """Zeigt allen eingeloggten Konten veröffentlichte Trainings und ggf. eigene Entwürfe."""
+    """Zeigt beigetretene Trainings und dem Kreis zusätzlich seine eigenen Entwürfe."""
     ist_ausbilderin: bool = _ausbilderin_oder_administratorin(request.user)
-    trainingsabfrage: QuerySet[Training] = Training.objects.veroeffentlicht()
+    trainingsabfrage: QuerySet[Training] = (
+        Training.objects.veroeffentlicht().zugaenglich_fuer(request.user)
+    )
     sichtbare_pks: set[int] = set()
     eigene_trainings_pks: set[int] = set(
         Training.objects.filter(eigentuemerinnen=request.user).values_list(
@@ -229,7 +244,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     gespielte_folge: QuerySet[Sitzung] = (
         Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
         .select_related("vignette__historie", "diagnose")
-        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+        .in_gespielter_folge()
     )
     return [
         {
@@ -253,11 +268,41 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
+    freigegeben: list[Training] = list(abschrift.freigegeben_fuer.order_by("name"))
     return render(
         request,
         "training/abschrift.html",
-        {"abschrift": abschrift, "sitzungen": _gelesene_sitzungen(abschrift)},
+        {
+            "abschrift": abschrift,
+            "sitzungen": _gelesene_sitzungen(abschrift),
+            "freigegeben": [training.name for training in freigegeben],
+            "freigegebene_pks": {training.pk for training in freigegeben},
+            "beigetretene_trainings": Training.objects.beigetreten_von(
+                request.user
+            ).order_by("name"),
+        },
     )
+
+
+@login_required
+def abschrift_freigaben(request: HttpRequest, pk: int) -> HttpResponse:
+    """Speichert, für welche beigetretenen Trainings die Abschrift freigegeben ist.
+
+    Ein Training ohne eigene Bindung ist für das Konto unbekannt.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    abschrift: Abschrift = _eigene_abschrift(request, pk)
+    try:
+        auswahl: list[int] = [int(wert) for wert in request.POST.getlist("training")]
+    except ValueError:
+        raise Http404
+    try:
+        abschrift_freigeben(abschrift, auswahl)
+    except ValidationError:
+        raise Http404
+    return redirect("training:abschrift", pk=abschrift.pk)
 
 
 @login_required
@@ -304,8 +349,8 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings inkl. eigener Sitzungen."""
-    training: Training = _veroeffentlichtes_training(pk)
+    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen."""
+    training: Training = _zugaengliches_training(request, pk)
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )
@@ -365,10 +410,118 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "training": training,
             "zustand_badge": _zustand_badge(training),
+            "trainings_link_url": request.build_absolute_uri(
+                reverse("training:beitreten", args=[training.trainings_link])
+            ),
+            "beigetretene": training.trainingsbindung_set.count(),
+            "fremdeinsicht": _fremdeinsicht(request.user, training),
+            "freigegebene_abschriften": _freigegebene_abschriften(
+                request.user, training
+            ),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
         },
+    )
+
+
+def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
+    # Baut die Tabelle der Fremdeinsicht: die Vignetten in Kuratierreihenfolge
+    # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
+    # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
+
+    vignetten: list[Vignette] = [
+        eintrag.vignette
+        for eintrag in Training.vignetten.through.objects.filter(training=training)
+        .select_related("vignette__historie")
+        .order_by("pk")
+    ]
+    sitzungen_nach_zelle: dict[tuple[int, int], list[Sitzung]] = {}
+    for sitzung in (
+        _fremd_einsehbare_sitzungen(konto)
+        .filter(teilnahme__trainingsbindung__training=training)
+        .order_by("erstellt_am", "pk")
+    ):
+        sitzungen_nach_zelle.setdefault(
+            (sitzung.teilnahme_id, sitzung.vignette_id), []
+        ).append(sitzung)
+
+    zeilen: list[dict[str, object]] = []
+    for bindung in training.trainingsbindung_set.select_related("konto"):
+        zellen: list[list[dict[str, object]]] = [
+            [
+                {
+                    "nummer": nummer,
+                    "datum": sitzung.erstellt_am,
+                    "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
+                }
+                for nummer, sitzung in enumerate(
+                    sitzungen_nach_zelle.get((bindung.teilnahme_id, vignette.pk), []),
+                    start=1,
+                )
+            ]
+            for vignette in vignetten
+        ]
+        zeilen.append(
+            {
+                "name": _kontoname(bindung.konto),
+                "zellen": zellen,
+                "ohne_sitzung": not any(zellen),
+            }
+        )
+    zeilen.sort(key=lambda zeile: str(zeile["name"]).casefold())
+    return {"vignetten": vignetten, "zeilen": zeilen}
+
+
+def _kontoname(konto: Konto) -> str:
+    """Der Name, unter dem die Fremdeinsicht eine Person zeigt."""
+    return konto.get_full_name() or konto.username
+
+
+def _freigegebene_abschriften(
+    konto: Konto, training: Training
+) -> list[dict[str, object]]:
+    # Listet die für das Training freigegebenen Abschriften nach Namen, mit
+    # Erhebungsname, Importzeitpunkt und ihren einsehbaren Sitzungen. Die
+    # Sitzungen kommen aus derselben Regel wie die Tabelle.
+
+    sitzungen_nach_teilnahme: dict[int, list[Sitzung]] = {}
+    for sitzung in (
+        _fremd_einsehbare_sitzungen(konto)
+        .filter(teilnahme__abschrift__freigegeben_fuer=training)
+        .select_related("vignette__historie")
+        .in_gespielter_folge()
+    ):
+        sitzungen_nach_teilnahme.setdefault(sitzung.teilnahme_id, []).append(sitzung)
+
+    abschriften: list[dict[str, object]] = [
+        {
+            "name": _kontoname(abschrift.konto),
+            "erhebungsname": abschrift.erhebungsname,
+            "importiert_am": abschrift.importiert_am,
+            "sitzungen": [
+                {
+                    "name": sitzung.vignette.anzeigename,
+                    "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
+                }
+                for sitzung in sitzungen_nach_teilnahme.get(abschrift.teilnahme_id, [])
+            ],
+        }
+        for abschrift in training.freigegebene_abschriften.select_related(
+            "konto"
+        ).order_by("importiert_am", "pk")
+    ]
+    abschriften.sort(key=lambda abschrift: str(abschrift["name"]).casefold())
+    return abschriften
+
+
+@login_required
+@_ausbilderin_erforderlich
+def trainingsexport(request: HttpRequest, pk: int) -> HttpResponse:
+    """Lädt den Trainingsexport eines sichtbaren Trainings herunter."""
+    training: Training = _sichtbares_training(request, pk)
+    return zip_download(
+        "training", training.pk, training.name, trainingsexport_zip(training)
     )
 
 
@@ -425,15 +578,62 @@ def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
+def beitritt_sperren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Sperrt den Beitritt über den Trainings-Link."""
+    return _beitritt_schalten(request, pk, gesperrt=True)
+
+
+@login_required
+@_ausbilderin_erforderlich
+def beitritt_oeffnen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Öffnet einen gesperrten Beitritt wieder."""
+    return _beitritt_schalten(request, pk, gesperrt=False)
+
+
+def _beitritt_schalten(request: HttpRequest, pk: int, gesperrt: bool) -> HttpResponse:
+    """Setzt die Beitrittssperre eines sichtbaren Trainings."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    training.beitritt_gesperrt = gesperrt
+    training.save(update_fields=["beitritt_gesperrt"])
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
+    """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
+
+    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training,
+    ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
+    """
+    training: Training = get_object_or_404(
+        Training.objects.veroeffentlicht(), trainings_link=trainings_link
+    )
+    if (
+        not training.beitreten(request.user)
+        and not Training.objects.sichtbar_fuer(request.user)
+        .filter(pk=training.pk)
+        .exists()
+    ):
+        return render(
+            request,
+            "training/beitritt_gesperrt.html",
+            {"training": training},
+            status=403,
+        )
+    return redirect("training:detail", pk=training.pk)
+
+
+@login_required
 def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
     """Bestätigt oder startet die Wahl einer Vignette aus einem Training."""
-    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
-        training_pk, vignette_pk
+    training, vignette = _zugaengliches_training_mit_finaler_vignette(
+        request, training_pk, vignette_pk
     )
     if request.method == "POST":
-        bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(
-            request, training
-        )
+        bindung: Trainingsbindung = training.bindung_fuer(request.user)
         if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
             return render(
                 request,
@@ -455,10 +655,10 @@ def einwilligung(
     """Hält die Entscheidung zur externen Audioverarbeitung an der Teilnahme fest."""
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    training, vignette = _veroeffentlichtes_training_mit_finaler_vignette(
-        training_pk, vignette_pk
+    training, vignette = _zugaengliches_training_mit_finaler_vignette(
+        request, training_pk, vignette_pk
     )
-    bindung: Trainingsbindung = _trainingsbindung_laden_oder_anlegen(request, training)
+    bindung: Trainingsbindung = training.bindung_fuer(request.user)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
         return HttpResponseBadRequest("Die Einwilligung wurde bereits festgehalten.")
     entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
@@ -467,33 +667,6 @@ def einwilligung(
     bindung.teilnahme.audioverarbeitung_eingewilligt = entscheidung == "ja"
     bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
     return _sitzung_starten(request, bindung, vignette)
-
-
-def _trainingsbindung_laden_oder_anlegen(
-    request: HttpRequest, training: Training
-) -> Trainingsbindung:
-    """Lädt oder erzeugt die eine Trainingsbindung der teilnehmenden Person."""
-    with transaction.atomic():
-        bindung: Trainingsbindung | None = (
-            Trainingsbindung.objects.filter(training=training, konto=request.user)
-            .select_related("teilnahme")
-            .first()
-        )
-        if bindung is None:
-            from sitzungen.models import Teilnahme
-
-            try:
-                with transaction.atomic():
-                    bindung = Trainingsbindung.objects.create(
-                        teilnahme=Teilnahme.objects.create(),
-                        training=training,
-                        konto=request.user,
-                    )
-            except IntegrityError:
-                bindung = Trainingsbindung.objects.select_related("teilnahme").get(
-                    training=training, konto=request.user
-                )
-    return bindung
 
 
 def _sitzungsnavigation() -> Sitzungsnavigation:
@@ -628,14 +801,18 @@ def debrief(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt eine vergangene Trainingssitzung schreibgeschützt an."""
+    """Zeigt eine Trainingssitzung schreibgeschützt an.
+
+    Die eigene Sitzung in jedem Status (Selbsteinsicht), eine fremde nur über
+    die Fremdeinsicht; alles andere ist unbekannt.
+    """
 
     sitzung: Sitzung = get_object_or_404(
-        Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
+        Sitzung.objects.filter(
+            Q(teilnahme__trainingsbindung__konto=request.user)
+            | Q(pk__in=_fremd_einsehbare_sitzungen(request.user).values("pk"))
+        ).select_related("vignette", "simulationskern", "teilnahme"),
         pk=pk,
-    )
-    get_object_or_404(
-        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
     )
 
     return sitzung_anzeigen(
@@ -647,4 +824,5 @@ def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         navigation=_sitzungsnavigation(),
         zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
         ist_lesend=True,
+        abgegebene_diagnose=DBSink.fuer_sitzung(sitzung).abgegebene_diagnose,
     )
