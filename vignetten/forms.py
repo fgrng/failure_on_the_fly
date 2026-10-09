@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from django.forms import ClearableFileInput, Form, ModelForm
+from django.forms import ClearableFileInput, ModelForm
 
 from .models import FELDBESCHRIFTUNGEN, Vignette
 
@@ -129,7 +129,3 @@ class VignetteForm(ModelForm):
                 "entfernen": entfernen,
             }
         return karten
-
-
-class FinalisierenForm(Form):
-    """Trägt die nicht feldgebundenen Fehler der Finalisieren-Aktion."""
