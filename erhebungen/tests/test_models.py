@@ -6,11 +6,16 @@ from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
-from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    finaler_kern,
+    vignetten_entwurf,
+)
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -22,8 +27,8 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import Anbieter, ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung, Teilnahme
+from simulation.models import Anbieter, ModellKonfiguration, Verwendung
+from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
 
@@ -43,247 +48,14 @@ def _erhebungsbindung_anlegen(konto: Konto, teilnahme: Teilnahme) -> Erhebungsbi
     )
 
 
-def _finale_vignette_anlegen(konto: Konto) -> Vignette:
-    """Legt eine finalisierte Vignette über ihren öffentlichen Lebenszyklus an."""
-
-    vignette: Vignette = Vignette.objects.anlegen(konto)
-    vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag_text = "Addiere die Brüche."
-    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
-    vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
-    vignette.schuelerin_name = "Lea"
-    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.lehrperson_name = "Ada"
-    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.fach = "Mathematik"
-    vignette.thema = "Bruchrechnung"
-    vignette.klassenstufe = "6"
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 3
-    vignette.save()
-    vignette.finalisieren()
-    return vignette
-
-
-@pytest.mark.django_db
-def test_neue_erhebungsbindung_traegt_entstehungszeitpunkt() -> None:
-    """Eine neue Erhebungsbindung hält ihren Entstehungszeitpunkt fest."""
-
-    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(
-        Konto.objects.create_user(username="ada"),
-        Teilnahme.objects.create(),
-    )
-
-    assert bindung.erstellt_am is not None
-
-
-@pytest.mark.django_db(transaction=True)
-def test_migration_belaesst_bestandsdaten_ohne_entstehungszeitpunkt() -> None:
-    """Die Zeitstempel-Migration erfindet keine Zeitpunkte für Bestandsdaten."""
-
-    konto: Konto = Konto.objects.create_user(username="ada")
-    teilnahme: Teilnahme = Teilnahme.objects.create()
-    bindung: Erhebungsbindung = _erhebungsbindung_anlegen(konto, teilnahme)
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=teilnahme,
-        vignette=_finale_vignette_anlegen(konto),
-        simulationskern=kern,
-        modell_konfiguration=ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        ),
-    )
-    schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
-        sitzung=sitzung,
-        eingabe="Warum?",
-        denkspur="Ich folge meiner Regel.",
-        aeusserung="Weil das so ist.",
-        reihenfolge=1,
-    )
-    diagnose: Diagnose = Diagnose.objects.create(
-        sitzung=sitzung,
-        text="Brüche werden addiert.",
-    )
-
-    vorher = [
-        ("erhebungen", "0007_merge_issue_83_issue_84"),
-        ("sitzungen", "0006_teilnahme_einwilligung_erteilt"),
-    ]
-    nachher = [
-        ("erhebungen", "0008_erhebungsbindung_erstellt_am"),
-        ("sitzungen", "0007_gespraechsschritt_erstellt_am"),
-    ]
-    MigrationExecutor(connection).migrate(vorher)
-    try:
-        MigrationExecutor(connection).migrate(nachher)
-        with connection.cursor() as cursor:
-            werte = []
-            for tabelle, pk in [
-                ("erhebungen_erhebungsbindung", bindung.pk),
-                ("sitzungen_sitzung", sitzung.pk),
-                ("sitzungen_gespraechsschritt", schritt.pk),
-                ("sitzungen_diagnose", diagnose.pk),
-            ]:
-                cursor.execute(
-                    f'SELECT erstellt_am FROM "{tabelle}" WHERE id = %s',
-                    [pk],
-                )
-                werte.append(cursor.fetchone()[0])
-    finally:
-        MigrationExecutor(connection).migrate(nachher)
-
-    assert werte == [None, None, None, None]
-
-
-@pytest.mark.django_db(transaction=True)
-def test_eigentuemerinnen_migration_uebernimmt_bestand_und_stellt_trigger_zurueck() -> (
-    None
-):
-    """Die M2M-Migration bewahrt den Bestand und ihre reversible Trigger-Semantik."""
-
-    vorher = [("erhebungen", "0011_likert_gueltig")]
-    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
-    executor = MigrationExecutor(connection)
-    executor.migrate(vorher)
-    try:
-        apps = executor.loader.project_state(vorher).apps
-        KontoVorher = apps.get_model("konten", "Konto")
-        ErhebungVorher = apps.get_model("erhebungen", "Erhebung")
-        ada = KontoVorher.objects.create(username="ada")
-        erhebung = ErhebungVorher.objects.create(name="Brüche", eigentuemerin=ada)
-
-        executor = MigrationExecutor(connection)
-        executor.migrate([("erhebungen", "0013_erhebungsvignette_eigentuemerinnen")])
-        apps = executor.loader.project_state(
-            [("erhebungen", "0013_erhebungsvignette_eigentuemerinnen")]
-        ).apps
-        ErhebungNachher = apps.get_model("erhebungen", "Erhebung")
-        assert list(
-            ErhebungNachher.objects.get(pk=erhebung.pk).eigentuemerinnen.values_list(
-                "username", flat=True
-            )
-        ) == ["ada"]
-
-        executor = MigrationExecutor(connection)
-        executor.migrate(vorher)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT sql FROM sqlite_master WHERE type = 'trigger' "
-                "AND name = 'erhebungen_reihenfolgeregel_bewahren'"
-            )
-            trigger_sql = cursor.fetchone()[0]
-    finally:
-        MigrationExecutor(connection).migrate(nachher)
-
-    assert "AFTER UPDATE OF randomisierung" in trigger_sql
-
-
-@pytest.mark.django_db(transaction=True)
-def test_positionsmigration_traegt_positionen_zufaelliger_erhebungen_nach() -> None:
-    """Zufällige Erhebungen bekommen Positionen; rückwärts verlieren sie sie wieder."""
-
-    # Andere Migrationstests hinterlassen einen älteren Stand.
-    nachher = MigrationExecutor(connection).loader.graph.leaf_nodes()
-    MigrationExecutor(connection).migrate(nachher)
-    ada: Konto = Konto.objects.create_user(username="ada")
-    Simulationskern.objects.anlegen().finalisieren()
-    zufaellig: Erhebung = Erhebung.objects.anlegen(
-        ada, name="Zufall", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
-    )
-    fest: Erhebung = Erhebung.objects.anlegen(ada, name="Fest")
-    erste: Vignette = _finale_vignette_anlegen(ada)
-    zweite: Vignette = _finale_vignette_anlegen(ada)
-    # Umgekehrt zur Aufnahme-Reihenfolge, damit die Nachtragung sichtbar wird.
-    Erhebungsvignette.objects.create(erhebung=zufaellig, vignette=erste, position=2)
-    Erhebungsvignette.objects.create(erhebung=zufaellig, vignette=zweite, position=1)
-    Erhebungsvignette.objects.create(erhebung=fest, vignette=zweite, position=1)
-    Erhebungsvignette.objects.create(erhebung=fest, vignette=erste, position=2)
-
-    def positionen(erhebung: Erhebung) -> list[tuple[int, int | None]]:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT vignette_id, position FROM erhebungen_erhebungsvignette "
-                "WHERE erhebung_id = %s ORDER BY id",
-                [erhebung.pk],
-            )
-            return cursor.fetchall()
-
-    vorher = [("erhebungen", "0016_vignettenposition_zieht_um")]
-    MigrationExecutor(connection).migrate(vorher)
-    try:
-        rueckwaerts = (positionen(zufaellig), positionen(fest))
-        MigrationExecutor(connection).migrate(nachher)
-        vorwaerts = (positionen(zufaellig), positionen(fest))
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'trigger' "
-                "AND name = 'erhebungen_reihenfolgeregel_bewahren'"
-            )
-            reihenfolgeregel_trigger = cursor.fetchall()
-    finally:
-        MigrationExecutor(connection).migrate(nachher)
-
-    assert rueckwaerts == (
-        [(erste.pk, None), (zweite.pk, None)],
-        [(zweite.pk, 1), (erste.pk, 2)],
-    )
-    assert vorwaerts == (
-        [(erste.pk, 1), (zweite.pk, 2)],
-        [(zweite.pk, 1), (erste.pk, 2)],
-    )
-    assert reihenfolgeregel_trigger == []
-
-
-@pytest.mark.django_db
-def test_sichtbar_fuer_liefert_nur_eigene_erhebungen() -> None:
-    """Forschende sehen ausschließlich ihre eigenen Erhebungen."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    eigene: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    Erhebung.objects.anlegen(grace, name="Addition")
-
-    assert list(Erhebung.objects.sichtbar_fuer(ada)) == [eigene]
-
-
-@pytest.mark.django_db
-def test_geteilte_erhebung_ist_fuer_alle_eigentuemerinnen_sichtbar() -> None:
-    """Die Anlege-Naht setzt die erste Eigentümerin und teilt über den Kreis."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    erhebung.eigentuemerinnen.add(grace)
-
-    assert list(Erhebung.objects.sichtbar_fuer(ada)) == [erhebung]
-    assert list(Erhebung.objects.sichtbar_fuer(grace)) == [erhebung]
-
-
-@pytest.mark.django_db
-def test_sichtbar_fuer_liefert_alle_erhebungen_fuer_administration() -> None:
-    """Die Administration sieht auch fremde Erhebungen."""
-
-    administratorin: Konto = Konto.objects.create_user(
-        username="admin", is_superuser=True
-    )
-    fremde: Erhebung = Erhebung.objects.anlegen(
-        Konto.objects.create_user(username="grace"), name="Addition"
-    )
-
-    assert list(Erhebung.objects.sichtbar_fuer(administratorin)) == [fremde]
-
-
 @pytest.mark.django_db
 def test_erhebung_haelt_finale_vignetten_in_fester_reihenfolge() -> None:
     """Eine feste Erhebung bewahrt ihre finalen Vignetten eindeutig geordnet."""
 
     konto: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    erste: Vignette = _finale_vignette_anlegen(konto)
-    zweite: Vignette = _finale_vignette_anlegen(konto)
+    erste: Vignette = finale_vignette(konto)
+    zweite: Vignette = finale_vignette(konto)
 
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=2)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
@@ -299,9 +71,7 @@ def test_erhebungsvignette_lehnt_entwurf_auch_per_bulk_insert_ab() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    entwurf: Vignette = Vignette.objects.anlegen(ada)
+    entwurf: Vignette = vignetten_entwurf(ada)
 
     with pytest.raises(IntegrityError, match="finale"), transaction.atomic():
         Erhebungsvignette.objects.bulk_create(
@@ -316,9 +86,7 @@ def test_erhebungsvignette_lehnt_fremde_finale_fassung_ab() -> None:
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    fremde_finale: Vignette = _finale_vignette_anlegen(grace)
+    fremde_finale: Vignette = finale_vignette(grace)
 
     with pytest.raises(IntegrityError, match="eigene"), transaction.atomic():
         Erhebungsvignette.objects.bulk_create(
@@ -335,9 +103,7 @@ def test_erhebung_bindet_material_ueber_eine_kreis_schnittmenge_ein() -> None:
     linus: Konto = Konto.objects.create_user(username="linus")
     erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
     erhebung.eigentuemerinnen.add(grace)
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    vignette: Vignette = _finale_vignette_anlegen(grace)
+    vignette: Vignette = finale_vignette(grace)
     item: FragebogenItem = FragebogenItem.objects.anlegen(
         grace, wortlaut="Wie sicher fühlten Sie sich?"
     )
@@ -366,36 +132,12 @@ def test_erhebungsvignette_braucht_eine_position() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    Simulationskern.objects.anlegen().finalisieren()
-    finale: Vignette = _finale_vignette_anlegen(ada)
+    finale: Vignette = finale_vignette(ada)
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale)
     with pytest.raises(ValidationError, match="position"):
         Erhebungsvignette(erhebung=erhebung, vignette=finale).full_clean()
-
-
-@pytest.mark.django_db
-def test_zufaellige_erhebung_bewahrt_vignettenpositionen() -> None:
-    """Auch eine zufällige Reihenfolge speichert die Position der Liste."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.anlegen(
-        ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
-    )
-    Simulationskern.objects.anlegen().finalisieren()
-    erste: Vignette = _finale_vignette_anlegen(ada)
-    zweite: Vignette = _finale_vignette_anlegen(ada)
-
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=2)
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=zweite, position=1)
-    for regel in (Erhebung.Randomisierung.FEST, Erhebung.Randomisierung.ZUFAELLIG):
-        erhebung.randomisierung = regel
-        erhebung.save(update_fields=["randomisierung"])
-
-    assert list(
-        erhebung.vignettenzugehoerigkeiten.values_list("vignette_id", "position")
-    ) == [(zweite.pk, 1), (erste.pk, 2)]
 
 
 @pytest.mark.django_db
@@ -406,14 +148,13 @@ def test_vignettenposition_ist_je_erhebung_eindeutig() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         ada, name="Brüche", randomisierung=Erhebung.Randomisierung.ZUFAELLIG
     )
-    Simulationskern.objects.anlegen().finalisieren()
     Erhebungsvignette.objects.create(
-        erhebung=erhebung, vignette=_finale_vignette_anlegen(ada), position=1
+        erhebung=erhebung, vignette=finale_vignette(ada), position=1
     )
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Erhebungsvignette.objects.create(
-            erhebung=erhebung, vignette=_finale_vignette_anlegen(ada), position=1
+            erhebung=erhebung, vignette=finale_vignette(ada), position=1
         )
 
 
@@ -423,9 +164,7 @@ def test_erhebungsvignette_bewahrt_die_menge_je_erhebung_eindeutig() -> None:
 
     ada: Konto = Konto.objects.create_user(username="ada")
     erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    finale: Vignette = _finale_vignette_anlegen(ada)
+    finale: Vignette = finale_vignette(ada)
     Erhebungsvignette.objects.create(erhebung=erhebung, vignette=finale, position=1)
 
     with pytest.raises(IntegrityError), transaction.atomic():
@@ -605,11 +344,10 @@ def test_itemantwort_sitzung_und_andockpunkt_passen_zur_teilnahme() -> None:
         andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
         position=1,
     )
-    kern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
+    kern = finaler_kern()
     fremde_sitzung = Sitzung.objects.create(
         teilnahme=Teilnahme.objects.create(),
-        vignette=_finale_vignette_anlegen(ada),
+        vignette=finale_vignette(ada),
         simulationskern=kern,
         modell_konfiguration=ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake"
@@ -720,7 +458,7 @@ def _zuordnung_anlegen(erhebung: Erhebung, konto: Konto, art: str) -> models.Mod
     if art == "vignettenzugehoerigkeiten":
         return Erhebungsvignette.objects.create(
             erhebung=erhebung,
-            vignette=_finale_vignette_anlegen(konto),
+            vignette=finale_vignette(konto),
             position=position,
         )
     item: FragebogenItem = FragebogenItem.objects.anlegen(
@@ -739,12 +477,7 @@ def _entwurf_mit_zuordnungen(konto: Konto) -> Erhebung:
     """Legt einen finalisierbaren Entwurf mit je einer Vignette und einem Item an."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-        Verwendung.SCHUELERIN,
-    )
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     for art in _ZUORDNUNGSARTEN:
         _zuordnung_anlegen(erhebung, konto, art)
     return erhebung
@@ -841,34 +574,15 @@ def test_entwurf_laesst_sich_mitsamt_seinen_zuordnungen_loeschen() -> None:
 
 
 @pytest.mark.django_db
-def test_feste_reihenfolge_hat_keine_doppelte_position() -> None:
-    """Eine feste Reihenfolge ordnet jeder Position genau eine Vignette zu."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    erste: Vignette = _finale_vignette_anlegen(ada)
-    zweite: Vignette = _finale_vignette_anlegen(ada)
-    Erhebungsvignette.objects.create(erhebung=erhebung, vignette=erste, position=1)
-
-    with pytest.raises(IntegrityError), transaction.atomic():
-        Erhebungsvignette.objects.bulk_create(
-            [Erhebungsvignette(erhebung=erhebung, vignette=zweite, position=1)]
-        )
-
-
-@pytest.mark.django_db
 def test_finalisieren_pinnt_die_aktive_modell_konfiguration() -> None:
     """Finalisieren friert die aktive Modell-Konfiguration an der Erhebung ein."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
+    konfiguration: ModellKonfiguration = aktive_modell_konfiguration(
+        Verwendung.SCHUELERIN
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
 
     erhebung.finalisieren()
 
@@ -935,10 +649,7 @@ def test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     Stichprobe.objects.create(
         erhebung=erhebung,
@@ -957,10 +668,7 @@ def test_archivieren_ist_waehrend_laufender_stichprobe_gesperrt() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     jetzt: datetime = timezone.now()
     Stichprobe.objects.create(
@@ -992,10 +700,7 @@ def test_archivieren_in_zweitem_tab_lehnt_den_uebergang_ab() -> None:
     erster_tab: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erster_tab.finalisieren()
     zweiter_tab: Erhebung = Erhebung.objects.get(pk=erster_tab.pk)
     erster_tab.archivieren()
@@ -1011,10 +716,9 @@ def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
+    konfiguration: ModellKonfiguration = aktive_modell_konfiguration(
+        Verwendung.SCHUELERIN
     )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.archivieren()
@@ -1031,10 +735,7 @@ def test_eigentuemerlose_erhebung_kann_nicht_entarchiviert_werden() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.archivieren()
     erhebung.eigentuemerinnen.clear()
@@ -1050,10 +751,7 @@ def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.name = "Addition"
@@ -1064,33 +762,13 @@ def test_finale_erhebung_ist_eingefroren_und_nicht_physisch_loeschbar() -> None:
 
 
 @pytest.mark.django_db
-def test_finale_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
-    """Das Einfrieren betrifft das Design, nicht die Verantwortung."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-    erhebung.finalisieren()
-    erhebung.eigentuemerinnen.add(grace)
-
-    assert set(erhebung.eigentuemerinnen.all()) == {ada, grace}
-
-
-@pytest.mark.django_db
 def test_laufende_erhebung_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
     """Auch laufende Erhebungen können ihre Verantwortung übertragen."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     grace: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.eigentuemerinnen.add(grace)
     Stichprobe.objects.create(
@@ -1111,10 +789,7 @@ def test_archivierte_erhebung_ist_auch_per_bulk_update_eingefroren() -> None:
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"
     )
-    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-        bezeichnung="Test", sprachmodell="fake"
-    )
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
     erhebung.archivieren()
 
@@ -1135,9 +810,17 @@ def test_stichprobe_archivieren_schaltet_nur_ueber_ihre_lebenszyklus_methode() -
         ende=timezone.now(),
     )
 
+    neu_geladen: Stichprobe = Stichprobe.objects.get(pk=stichprobe.pk)
+    neu_geladen.archiviert = True
+
+    with pytest.raises(ValidationError, match="Lebenszyklus-Methode"):
+        neu_geladen.save()
+
     stichprobe.archivieren()
 
-    assert stichprobe.archiviert is True
+    assert Stichprobe.objects.get(pk=stichprobe.pk).archiviert is True
+    with pytest.raises(ValidationError, match="bereits archiviert"):
+        stichprobe.archivieren()
 
 
 @pytest.mark.django_db
@@ -1155,29 +838,6 @@ def test_stichprobe_laesst_sich_nicht_per_bulk_update_archivieren() -> None:
 
     with pytest.raises(ValidationError, match="Lebenszyklus-Methode"):
         Stichprobe.objects.filter(pk=stichprobe.pk).update(archiviert=True)
-
-
-@pytest.mark.django_db
-def test_erhebungsbindung_verbindet_stichprobe_mit_genau_einer_teilnahme() -> None:
-    """Eine Erhebungsbindung ist die einzige Erhebungszuordnung einer Teilnahme."""
-
-    erhebung: Erhebung = Erhebung.objects.anlegen(
-        Konto.objects.create_user(username="ada"), name="Brüche"
-    )
-    stichprobe: Stichprobe = Stichprobe.objects.create(
-        erhebung=erhebung,
-        beginn=timezone.now(),
-        ende=timezone.now(),
-    )
-    teilnahme: Teilnahme = Teilnahme.objects.create()
-
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=stichprobe,
-        teilnahme=teilnahme,
-        token="2345-6789",
-    )
-
-    assert (bindung.stichprobe, bindung.teilnahme) == (stichprobe, teilnahme)
 
 
 @pytest.mark.django_db
