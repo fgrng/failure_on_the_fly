@@ -31,7 +31,8 @@ from sitzungen.sink import ScratchSink, probelauf_laeuft
 from vignetten.models import Vignette
 
 
-_T: datetime = datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC)
+# Zeitpunkt, zu dem das Gespräch angezeigt wird; ab hier zählen die Züge.
+_GESPRAECHSBEGINN: datetime = datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC)
 
 _ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
     {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
@@ -534,10 +535,10 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         # 4 s Autorinnenzug, danach rechnet das Modell 100 s.
-        with time_machine.travel(_T, tick=False) as uhr:
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             uhr.shift(4)
-            with modellaufrufe_dauern(uhr.shift, 100):
+            with modellaufrufe_dauern(uhr, 100):
                 response: HttpResponse = self.client.post(
                     reverse("sitzungen:probelauf_gespraech"),
                     {"eingabe": "Wie rechnest du?"},
@@ -555,10 +556,10 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         # 4 s Autorinnenzug, danach kostet jeder Fehlversuch 100 s.
-        with time_machine.travel(_T, tick=False) as uhr:
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             uhr.shift(4)
-            with modellaufrufe_dauern(uhr.shift, 100):
+            with modellaufrufe_dauern(uhr, 100):
                 response: HttpResponse = self.client.post(
                     reverse("sitzungen:probelauf_gespraech"),
                     {"eingabe": "Wie rechnest du?"},
@@ -584,7 +585,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with time_machine.travel(_T, tick=False) as uhr:
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
             uhr.shift(5)
             response: HttpResponse = self.client.post(

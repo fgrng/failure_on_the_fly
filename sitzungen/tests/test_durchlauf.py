@@ -393,11 +393,12 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
     vignette.budget_wert = 7
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
+    beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
     for sink in (ScratchSink(SessionStore()), datenbank):
-        time_machine.move_to(datetime(2026, 9, 22, 10, 0, tzinfo=UTC), tick=False)
+        time_machine.move_to(beginn, tick=False)
         sitzung_starten(sink, vignette, konfiguration)
-        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beginnen(beginn)
         time_machine.shift(7)
         sitzung_beenden(sink)
         assert _leeren_schritt_anhaengen(sink)
@@ -415,10 +416,11 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
     vignette.budget_wert = 10
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
+    beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     sink: DBSink = DBSink(Teilnahme.objects.create())
-    time_machine.move_to(datetime(2026, 9, 22, 10, 0, tzinfo=UTC), tick=False)
+    time_machine.move_to(beginn, tick=False)
     sitzung_starten(sink, vignette, konfiguration)
-    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+    sink.zug_beginnen(beginn)
     time_machine.shift(3)
     sitzung_abbrechen(sink)
 
