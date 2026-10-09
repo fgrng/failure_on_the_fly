@@ -7,6 +7,11 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    finaler_kern,
+)
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -18,7 +23,7 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.models import (
     Diagnose,
     Fehlversuch,
@@ -32,59 +37,13 @@ from training.models import Abschrift
 from vignetten.models import Vignette
 
 
-def _finaler_kern() -> Simulationskern:
-    """Liefert den finalen Simulationskern und legt ihn beim ersten Aufruf an."""
-
-    vorhandener: Simulationskern | None = Simulationskern.objects.filter(
-        zustand=Simulationskern.Zustand.FINAL
-    ).first()
-    if vorhandener is not None:
-        return vorhandener
-    kern: Simulationskern = Simulationskern.objects.anlegen()
-    kern.finalisieren()
-    return kern
-
-
-def _finale_vignette_anlegen(konto: Konto, name: str = "") -> Vignette:
-    """Legt eine für die Erhebung einbindbare Vignetten-Fassung an.
-
-    Ein übergebener Name geht an die Historie: So lassen sich mehrere Fassungen
-    im gerenderten Text auseinanderhalten.
-    """
-
-    _finaler_kern()  # Vignette.objects.anlegen pinnt den aktuellen finalen Kern.
-    vignette: Vignette = Vignette.objects.anlegen(konto)
-    if name:
-        vignette.historie.name = name
-        vignette.historie.save(update_fields=["name"])
-    vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag_text = "Addiere **die** Brüche.\n[Tipp](https://example.org)"
-    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
-    vignette.arbeitsheft_text = "1/2 + 1/3\n\\= 2/5"
-    vignette.schuelerin_name = "Lea"
-    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.lehrperson_name = "Ada"
-    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.fach = "Mathematik"
-    vignette.thema = "Bruchrechnung"
-    vignette.klassenstufe = "6"
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 3
-    vignette.save()
-    vignette.finalisieren()
-    return vignette
-
-
 def _erhebung_anlegen(konto: Konto, name: str = "Brüche") -> Erhebung:
     """Legt eine Erhebung mit einer eingebundenen Vignette und aktivem Modell an."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name=name)
-    ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-        Verwendung.SCHUELERIN,
-    )
+    aktive_modell_konfiguration()
     Erhebungsvignette.objects.create(
-        erhebung=erhebung, vignette=_finale_vignette_anlegen(konto), position=1
+        erhebung=erhebung, vignette=finale_vignette(konto), position=1
     )
     return erhebung
 
@@ -120,7 +79,7 @@ def _gespielte_teilnahme(
     sitzung: Sitzung = Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
         vignette=vignette,
-        simulationskern=_finaler_kern(),
+        simulationskern=finaler_kern(),
         modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGESCHLOSSEN,
     )
@@ -503,8 +462,8 @@ def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
     Vignettenposition.objects.filter(teilnahme=bindung.teilnahme).update(position=2)
     zuerst: Sitzung = Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
-        vignette=_finale_vignette_anlegen(forschende, name="Zuerst gespielt"),
-        simulationskern=_finaler_kern(),
+        vignette=finale_vignette(forschende, name="Zuerst gespielt"),
+        simulationskern=finaler_kern(),
         modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
@@ -560,8 +519,8 @@ def test_ansicht_zeigt_auch_eine_sitzung_ohne_vignettenposition(
     bindung: Erhebungsbindung = _gespielte_teilnahme(_erhebung_anlegen(forschende))
     Sitzung.objects.create(
         teilnahme=bindung.teilnahme,
-        vignette=_finale_vignette_anlegen(forschende, name="Ohne Position"),
-        simulationskern=_finaler_kern(),
+        vignette=finale_vignette(forschende, name="Ohne Position"),
+        simulationskern=finaler_kern(),
         modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         status=Sitzung.Status.ABGEBROCHEN,
     )
