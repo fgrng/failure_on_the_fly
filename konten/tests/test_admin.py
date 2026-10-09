@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from konten.models import Konto
 
 
@@ -137,14 +138,8 @@ class KontoAdminTests(TestCase):
 
     def test_masken_zeigen_nur_rollenfelder(self) -> None:
         """Konten tragen Rollen und Administration, aber keine Einzelrechte."""
-        administratorin: Konto = Konto.objects.create_user(
-            username="administratorin",
-            password="sicheres-passwort",
-            is_superuser=True,
-        )
-        konto: Konto = Konto.objects.create_user(
-            username="ada", password="sicheres-passwort"
-        )
+        administratorin: Konto = konto_mit_rollen("administratorin", is_superuser=True)
+        konto: Konto = konto_mit_rollen("ada")
         self.client.force_login(administratorin)
 
         detail = self.client.get(reverse("admin:konten_konto_change", args=(konto.pk,)))
@@ -159,14 +154,8 @@ class KontoAdminTests(TestCase):
 
     def test_konten_sind_nicht_loeschbar(self) -> None:
         """Bis #156 löscht weder die Löschseite noch die Sammelaktion ein Konto."""
-        administratorin: Konto = Konto.objects.create_user(
-            username="administratorin",
-            password="sicheres-passwort",
-            is_superuser=True,
-        )
-        konto: Konto = Konto.objects.create_user(
-            username="ada", password="sicheres-passwort"
-        )
+        administratorin: Konto = konto_mit_rollen("administratorin", is_superuser=True)
+        konto: Konto = konto_mit_rollen("ada")
         self.client.force_login(administratorin)
 
         loeschen: HttpResponse = self.client.get(

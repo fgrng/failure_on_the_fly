@@ -2,13 +2,13 @@
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from konten.navigation import (
     AUTORIN_GRUPPE,
     administratorin_erforderlich,
@@ -90,12 +90,8 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
     rollen: list[str], is_superuser: bool, erwartet: dict[str, bool]
 ) -> None:
     """Die Navigation kennt Gruppenrollen und den Admin-Override zentral."""
-    konto: Konto = get_user_model().objects.create_user(
-        username="ada", is_superuser=is_superuser
-    )
-    konto.groups.add(*Group.objects.filter(name__in=rollen))
     request: HttpRequest = RequestFactory().get("/")
-    request.user = konto
+    request.user = konto_mit_rollen("ada", *rollen, is_superuser=is_superuser)
 
     assert navigation(request) == erwartet
 
@@ -111,12 +107,8 @@ def test_administratorin_erforderlich_schuetzt_views_mit_der_administrationsroll
     """Nur die Administratorin passiert den Decorator, auch ohne Anmeldung nicht."""
     request: HttpRequest = RequestFactory().get("/")
     if is_superuser or ist_autorin:
-        konto: Konto = get_user_model().objects.create_user(
-            username="ada", is_superuser=is_superuser
-        )
-        if ist_autorin:
-            konto.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
-        request.user = konto
+        rollen: list[str] = [AUTORIN_GRUPPE] if ist_autorin else []
+        request.user = konto_mit_rollen("ada", *rollen, is_superuser=is_superuser)
     else:
         request.user = AnonymousUser()
 
@@ -133,10 +125,9 @@ class SidebarNavigationTests(TestCase):
     def _sidebar_fuer(self, *rollen: str, is_superuser: bool = False) -> str:
         # Eigener Kontoname je Aufruf, damit ein Test mehrere Rollen nacheinander
         # durch dieselbe Sidebar schicken kann.
-        konto: Konto = get_user_model().objects.create_user(
-            username=f"ada{Konto.objects.count()}", is_superuser=is_superuser
+        konto: Konto = konto_mit_rollen(
+            f"ada{Konto.objects.count()}", *rollen, is_superuser=is_superuser
         )
-        konto.groups.add(*Group.objects.filter(name__in=rollen))
         self.client.force_login(konto)
         return self.client.get(reverse("training:katalog")).content.decode()
 
