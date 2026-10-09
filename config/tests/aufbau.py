@@ -10,18 +10,20 @@ from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from vignetten.models import Vignette
 
 
-def konto(username: str, *rollen: str) -> Konto:
-    """Legt ein Konto mit den übergebenen Fachrollen an."""
+def konto_mit_rollen(username: str, *rollen: str) -> Konto:
+    """Legt ein Konto mit den übergebenen Fachrollen an.
+
+    Die Rollen-Gruppen legt die Migration an; ein unbekannter Name scheitert
+    deshalb, statt eine wirkungslose Gruppe zu erzeugen.
+    """
 
     angelegt: Konto = Konto.objects.create_user(username=username)
     for rolle in rollen:
-        angelegt.groups.add(Group.objects.get_or_create(name=rolle)[0])
+        angelegt.groups.add(Group.objects.get(name=rolle))
     return angelegt
 
 
-def aktive_modell_konfiguration(
-    verwendung: Verwendung = Verwendung.SCHUELERIN,
-) -> ModellKonfiguration:
+def aktive_modell_konfiguration(verwendung: Verwendung) -> ModellKonfiguration:
     """Legt eine Konfiguration des Fake-Anbieters an und aktiviert sie."""
 
     return ModellKonfiguration.objects.aktivieren(
@@ -53,7 +55,8 @@ def vignetten_entwurf(konto: Konto) -> Vignette:
 def finale_vignette(konto: Konto, *, name: str = "", **felder: object) -> Vignette:
     """Legt eine finale Vignetten-Fassung mit vollständigen Pflichtfeldern an.
 
-    Übergebene Felder ersetzen die Vorgaben. Ein Name geht an die Historie: So
+    Übergebene Felder ersetzen die Vorgaben; ein unbekanntes Feld scheitert,
+    statt still ignoriert zu werden. Ein Name geht an die Historie: So
     lassen sich mehrere Fassungen im gerenderten Text auseinanderhalten.
     """
 
@@ -77,6 +80,8 @@ def finale_vignette(konto: Konto, *, name: str = "", **felder: object) -> Vignet
         "budget_wert": 3,
     } | felder
     for feld, wert in werte.items():
+        if not hasattr(vignette, feld):
+            raise TypeError(f"Vignette hat kein Feld {feld!r}.")
         setattr(vignette, feld, wert)
     vignette.save()
     vignette.finalisieren()

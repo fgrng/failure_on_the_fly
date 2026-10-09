@@ -41,7 +41,7 @@ def _erhebung_anlegen(konto: Konto, name: str = "Brüche") -> Erhebung:
     """Legt eine Erhebung mit einer eingebundenen Vignette und aktivem Modell an."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(konto, name=name)
-    aktive_modell_konfiguration()
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     Erhebungsvignette.objects.create(
         erhebung=erhebung, vignette=finale_vignette(konto), position=1
     )
