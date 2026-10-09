@@ -292,7 +292,8 @@ an, ein zweites Anlegen wird mit einer Meldung abgelehnt. Das Verwerfen löscht
 den Entwurf, danach lässt sich wieder ein Katalog anlegen.
 
 Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Bisher
-gibt es nur den Knoten „Durchlauf und Vorlagen“: *k*, die Zahl der
+gibt es die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“.
+„Durchlauf und Vorlagen“ trägt *k*, die Zahl der
 Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
 Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
 Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
@@ -303,6 +304,20 @@ werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernim
 Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
 Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
 Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
+
+Am Knoten „Übergreifende Kriterien“ (im Baum mit der Zahl seiner Kriterien)
+pflegt die Administrator:in die Rubriken, nach denen der Bewerter jedes
+Evalgespräch aller Evals beurteilt, etwa Rollentreue. Kriterien sind reiner Text
+ohne Platzhalter; ein Hinweis am Knoten bittet, sie kern-neutral zu formulieren
+(ADR-0046). Das ist eine Pflegeregel, keine Prüfung. „Kriterium hinzufügen“
+hängt ein leeres Kriterium ans Ende. Je Zeile rücken Hoch und Runter das
+Kriterium um eine Stelle, wie bei den Zuordnungslisten der Erhebung; Hoch ist an
+der ersten, Runter an der letzten Zeile gesperrt. Der Papierkorb löscht es. Die
+Reihenfolge bleibt gespeichert. Jede dieser Gesten übernimmt zugleich die
+getippten Texte aller Kriterien, ebenso „Änderungen speichern“. Ein Katalog darf
+ohne übergreifende Kriterien auskommen. Ein neuer Entwurf aus einer finalen
+Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle Routen des Knotens
+erreichen nur Entwürfe.
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 

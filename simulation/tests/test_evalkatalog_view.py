@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
-from simulation.models import VERTRAG_PROMPT, Evalkatalog
+from simulation.models import VERTRAG_PROMPT, Evalkatalog, UebergreifendesKriterium
 
 
 def _administratorin(username: str) -> Konto:
@@ -89,7 +89,7 @@ class EvalkatalogEditorTests(TestCase):
         self.client.force_login(_administratorin("ada"))
 
     def test_zeigt_den_baum_mit_dem_knoten_durchlauf_und_vorlagen(self) -> None:
-        """Links steht der Baum, vorerst mit einem Knoten."""
+        """Links steht der Baum mit dem Knoten Durchlauf und Vorlagen."""
         response: HttpResponse = self.client.get(self.url)
 
         self.assertContains(response, 'class="evalkatalog-baum"')
@@ -202,6 +202,137 @@ class EvalkatalogEditorTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class EvalkatalogKriterienTests(TestCase):
+    """Der Knoten Übergreifende Kriterien pflegt die Rubriken aller Evals."""
+
+    def setUp(self) -> None:
+        """Legt einen Entwurf an und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        self.url: str = reverse(
+            "simulation:evalkatalog_kriterien", args=[self.katalog.pk]
+        )
+        self.client.force_login(_administratorin("ada"))
+
+    def _texte(self) -> list[str]:
+        return [k.text for k in self.katalog.uebergreifende_kriterien.all()]
+
+    def test_baum_zeigt_den_knoten_mit_der_zahl_seiner_kriterien(self) -> None:
+        """Der Baum nennt die Kriterien samt Zahl, auch im anderen Knoten."""
+        self.katalog.kriterium_anlegen("A")
+        self.katalog.kriterium_anlegen("B")
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+
+        self.assertContains(response, f'href="{self.url}"')
+        self.assertContains(response, "Übergreifende Kriterien (2)")
+
+    def test_knoten_zeigt_den_hinweis_zur_kern_neutralitaet(self) -> None:
+        """Die Pflegeregel aus ADR-0046 steht am Knoten."""
+        response: HttpResponse = self.client.get(self.url)
+
+        self.assertContains(response, "kern-neutral")
+        self.assertIn(
+            ("Kriterium hinzufügen", "evalkatalog-formular"),
+            submit_knoepfe(response),
+        )
+
+    def test_hinzufuegen_haengt_ein_leeres_kriterium_an(self) -> None:
+        """Ein neues Kriterium steht leer am Ende; die Texte bleiben erhalten."""
+        kriterium = self.katalog.kriterium_anlegen("alt")
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:evalkatalog_kriterium_anlegen", args=[self.katalog.pk]),
+            {f"kriterium-{kriterium.pk}": "Rollentreue"},
+        )
+
+        self.assertRedirects(response, self.url)
+        self.assertEqual(self._texte(), ["Rollentreue", ""])
+
+    def test_speichern_uebernimmt_die_texte(self) -> None:
+        """Speichern schreibt jedes Kriterium; fremde Schlüssel bleiben folgenlos."""
+        erstes = self.katalog.kriterium_anlegen("A")
+        zweites = self.katalog.kriterium_anlegen("B")
+
+        response: HttpResponse = self.client.post(
+            self.url,
+            {
+                f"kriterium-{erstes.pk}": "Rollentreue",
+                f"kriterium-{zweites.pk}": "Kein Verraten der Regel",
+                "kriterium-999": "fremd",
+            },
+        )
+
+        self.assertRedirects(response, self.url)
+        self.assertEqual(self._texte(), ["Rollentreue", "Kein Verraten der Regel"])
+
+    def test_loeschen_entfernt_das_kriterium(self) -> None:
+        """Nach dem Löschen bleibt die übrige Liste in ihrer Reihenfolge."""
+        self.katalog.kriterium_anlegen("A")
+        zweites = self.katalog.kriterium_anlegen("B")
+        self.katalog.kriterium_anlegen("C")
+
+        self.client.post(
+            reverse(
+                "simulation:evalkatalog_kriterium_loeschen",
+                args=[self.katalog.pk, zweites.pk],
+            )
+        )
+
+        self.assertEqual(self._texte(), ["A", "C"])
+
+    def test_hoch_und_runter_ordnen_um(self) -> None:
+        """Die Reihenfolge bleibt nach dem Umordnen gespeichert."""
+        erstes = self.katalog.kriterium_anlegen("A")
+        self.katalog.kriterium_anlegen("B")
+        drittes = self.katalog.kriterium_anlegen("C")
+
+        for kriterium, richtung in ((drittes, "hoch"), (erstes, "runter")):
+            self.client.post(
+                reverse(
+                    "simulation:evalkatalog_kriterium_verschieben",
+                    args=[self.katalog.pk, kriterium.pk, richtung],
+                )
+            )
+
+        self.assertEqual(self._texte(), ["C", "A", "B"])
+
+    def test_hoch_an_der_ersten_runter_an_der_letzten_zeile_deaktiviert(self) -> None:
+        """Am Rand der Liste ist der jeweilige Knopf gesperrt."""
+        erstes = self.katalog.kriterium_anlegen("A")
+        letztes = self.katalog.kriterium_anlegen("B")
+        inhalt: str = self.client.get(self.url).content.decode()
+
+        def knopf(kriterium: UebergreifendesKriterium, richtung: str) -> str:
+            ziel: str = reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[self.katalog.pk, kriterium.pk, richtung],
+            )
+            return re.search(rf'<button[^>]*formaction="{ziel}"[^>]*>', inhalt)[0]
+
+        self.assertIn("disabled", knopf(erstes, "hoch"))
+        self.assertNotIn("disabled", knopf(erstes, "runter"))
+        self.assertNotIn("disabled", knopf(letztes, "hoch"))
+        self.assertIn("disabled", knopf(letztes, "runter"))
+
+    def test_kriterium_eines_anderen_katalogs_ist_nicht_erreichbar(self) -> None:
+        """Die Route verlangt, dass das Kriterium zum genannten Entwurf gehört."""
+        self.katalog.kriterium_anlegen("A")
+        self.katalog.finalisieren()
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+        fremd = self.katalog.uebergreifende_kriterien.get()
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "simulation:evalkatalog_kriterium_loeschen",
+                args=[entwurf.pk, fremd.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class EvalkatalogFinaleFassungTests(TestCase):
     """Eine finale Fassung ist kein Entwurf: kein Editor, kein Verwerfen."""
 
@@ -219,6 +350,30 @@ class EvalkatalogFinaleFassungTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_kriterienrouten_erreichen_nur_entwuerfe(self) -> None:
+        """An einer finalen Fassung ändert keine Kriterienroute etwas."""
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+        kriterium = entwurf.kriterium_anlegen("A")
+        entwurf.finalisieren()
+
+        for url in (
+            reverse("simulation:evalkatalog_kriterien", args=[entwurf.pk]),
+            reverse("simulation:evalkatalog_kriterium_anlegen", args=[entwurf.pk]),
+            reverse(
+                "simulation:evalkatalog_kriterium_loeschen",
+                args=[entwurf.pk, kriterium.pk],
+            ),
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[entwurf.pk, kriterium.pk, "hoch"],
+            ),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
+        self.assertEqual(
+            [k.text for k in entwurf.uebergreifende_kriterien.all()], ["A"]
+        )
+
     def test_finale_fassung_laesst_sich_nicht_verwerfen(self) -> None:
         """Verwerfen erreicht nur Entwürfe; die finale Fassung bleibt bestehen."""
         self.client.post(
@@ -234,6 +389,7 @@ class EvalkatalogZugriffTests(TestCase):
     def test_autorinnen_erhalten_auf_keiner_route_zugriff(self) -> None:
         """Auch die Entwicklungsrolle bekommt 403, lesend wie schreibend."""
         katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        kriterium = katalog.kriterium_anlegen("A")
         autorin: Konto = get_user_model().objects.create_user(username="bea")
         autorin.groups.add(Group.objects.get(name="Autor:in"))
         self.client.force_login(autorin)
@@ -243,20 +399,41 @@ class EvalkatalogZugriffTests(TestCase):
             reverse("simulation:evalkatalog_anlegen"),
             reverse("simulation:evalkatalog_editor", args=[katalog.pk]),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
+            reverse(
+                "simulation:evalkatalog_kriterium_loeschen",
+                args=[katalog.pk, kriterium.pk],
+            ),
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[katalog.pk, kriterium.pk, "hoch"],
+            ),
         ):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 403)
                 self.assertEqual(self.client.post(url).status_code, 403)
         self.assertTrue(Evalkatalog.objects.exists())
+        self.assertTrue(katalog.uebergreifende_kriterien.filter(text="A").exists())
 
-    def test_anlegen_und_verwerfen_nehmen_nur_post_an(self) -> None:
-        """Ein GET ändert die Linie nicht."""
+    def test_aenderungsrouten_nehmen_nur_post_an(self) -> None:
+        """Ein GET ändert weder die Linie noch die Kriterien."""
         katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        kriterium = katalog.kriterium_anlegen("A")
         self.client.force_login(_administratorin("ada"))
 
         for url in (
             reverse("simulation:evalkatalog_anlegen"),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
+            reverse(
+                "simulation:evalkatalog_kriterium_loeschen",
+                args=[katalog.pk, kriterium.pk],
+            ),
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[katalog.pk, kriterium.pk, "runter"],
+            ),
         ):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 405)

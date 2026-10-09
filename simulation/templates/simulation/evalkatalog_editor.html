@@ -6,6 +6,7 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
     <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/zuordnungsliste.css' %}">
     <link rel="stylesheet" href="{% static 'css/evalkatalog.css' %}">
     <script src="{% static 'js/ungespeichert.js' %}" defer></script>
     <script src="{% static 'js/platzhalter.js' %}" defer></script>
@@ -31,23 +32,50 @@
         <div class="evalkatalog-editor">
             <nav class="evalkatalog-baum" aria-label="Katalog">
                 <ul>
-                    <li><a href="{% url 'simulation:evalkatalog_editor' katalog.pk %}" aria-current="page">Durchlauf und Vorlagen</a></li>
+                    <li><a href="{% url 'simulation:evalkatalog_editor' katalog.pk %}"{% if knoten == "durchlauf" %} aria-current="page"{% endif %}>Durchlauf und Vorlagen</a></li>
+                    <li><a href="{% url 'simulation:evalkatalog_kriterien' katalog.pk %}"{% if knoten == "kriterien" %} aria-current="page"{% endif %}>Übergreifende Kriterien ({{ katalog.uebergreifende_kriterien.count }})</a></li>
                 </ul>
             </nav>
 
-            <section class="evalkatalog-knoten" aria-label="Durchlauf und Vorlagen">
-                <h2>Durchlauf und Vorlagen</h2>
-                {{ form.non_field_errors }}
-                {% include "vignetten/includes/form_field.html" with field=form.k %}
-                {% for field, knoepfe in vorlagen %}
-                    <div class="evalkatalog-vorlage">
-                        {% include "vignetten/includes/form_field.html" with field=field %}
-                        <div class="evalkatalog-platzhalterleiste" aria-label="Platzhalter für {{ field.label }}">
-                            {% for knopf in knoepfe %}<button type="button" data-platzhalter="${{ knopf.name }}" data-ziel="{{ field.id_for_label }}" class="evalkatalog-platzhalter{% if knopf.eigen %} evalkatalog-platzhalter--eigen{% endif %}">${{ knopf.name }}</button>{% endfor %}
-                        </div>
+            {% if knoten == "kriterien" %}
+                <section class="evalkatalog-knoten" aria-label="Übergreifende Kriterien">
+                    <h2>Übergreifende Kriterien</h2>
+                    <p class="evalkatalog-hinweis">Nach diesen Kriterien beurteilt der Bewerter jedes Evalgespräch aller Evals. Formulieren Sie sie kern-neutral: Sie prüfen, was jeder Simulationskern verlangt, etwa Rollentreue, keine Stilregeln einer bestimmten Kern-Fassung. Kriterien sind reiner Text ohne Platzhalter.</p>
+                    <ol class="zuordnungsliste__liste" aria-label="Übergreifende Kriterien">
+                        {% for kriterium in kriterien %}
+                            <li class="zuordnungsliste__zeile">
+                                <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
+                                <label class="zuordnung-unsichtbar" for="kriterium-{{ kriterium.pk }}">Kriterium {{ forloop.counter }}</label>
+                                <textarea class="zuordnungsliste__text" id="kriterium-{{ kriterium.pk }}" name="kriterium-{{ kriterium.pk }}" rows="2">{{ kriterium.text }}</textarea>
+                                <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Kriterium {{ forloop.counter }}">
+                                    <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_kriterium_verschieben' katalog.pk kriterium.pk 'hoch' %}"{% if forloop.first %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                                    <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_kriterium_verschieben' katalog.pk kriterium.pk 'runter' %}"{% if forloop.last %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                                    <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_kriterium_loeschen' katalog.pk kriterium.pk %}" aria-label="Kriterium {{ forloop.counter }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                                </span>
+                            </li>
+                        {% empty %}
+                            <li class="zuordnungsliste__leer">Noch keine übergreifenden Kriterien. Ein Katalog darf ohne sie auskommen.</li>
+                        {% endfor %}
+                    </ol>
+                    <div>
+                        <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_kriterium_anlegen' katalog.pk %}">Kriterium hinzufügen</button>
                     </div>
-                {% endfor %}
-            </section>
+                </section>
+            {% else %}
+                <section class="evalkatalog-knoten" aria-label="Durchlauf und Vorlagen">
+                    <h2>Durchlauf und Vorlagen</h2>
+                    {{ form.non_field_errors }}
+                    {% include "vignetten/includes/form_field.html" with field=form.k %}
+                    {% for field, knoepfe in vorlagen %}
+                        <div class="evalkatalog-vorlage">
+                            {% include "vignetten/includes/form_field.html" with field=field %}
+                            <div class="evalkatalog-platzhalterleiste" aria-label="Platzhalter für {{ field.label }}">
+                                {% for knopf in knoepfe %}<button type="button" data-platzhalter="${{ knopf.name }}" data-ziel="{{ field.id_for_label }}" class="evalkatalog-platzhalter{% if knopf.eigen %} evalkatalog-platzhalter--eigen{% endif %}">${{ knopf.name }}</button>{% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </section>
+            {% endif %}
         </div>
 
         <div class="vignette-form-actions">

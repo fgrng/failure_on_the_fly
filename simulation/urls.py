@@ -38,6 +38,26 @@ urlpatterns: list[URLPattern] = [
         name="evalkatalog_editor",
     ),
     path(
+        "evalkatalog/<int:pk>/kriterien/",
+        views.evalkatalog_kriterien,
+        name="evalkatalog_kriterien",
+    ),
+    path(
+        "evalkatalog/<int:pk>/kriterien/anlegen/",
+        views.evalkatalog_kriterium_anlegen,
+        name="evalkatalog_kriterium_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/kriterien/<int:kriterium_pk>/loeschen/",
+        views.evalkatalog_kriterium_loeschen,
+        name="evalkatalog_kriterium_loeschen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/kriterien/<int:kriterium_pk>/<str:richtung>/",
+        views.evalkatalog_kriterium_verschieben,
+        name="evalkatalog_kriterium_verschieben",
+    ),
+    path(
         "evalkatalog/<int:pk>/verwerfen/",
         views.evalkatalog_verwerfen,
         name="evalkatalog_verwerfen",

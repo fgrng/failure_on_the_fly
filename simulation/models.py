@@ -262,12 +262,110 @@ class Evalkatalog(VersionierteFassung):
             "bewerter_vorlage": self.bewerter_vorlage,
         }
 
+    @transaction.atomic
+    def bearbeiten(self) -> "Evalkatalog":
+        """Erzeugt einen neuen Entwurf samt Kopie der übergreifenden Kriterien."""
+
+        entwurf: Evalkatalog = super().bearbeiten()
+        for kriterium in self.uebergreifende_kriterien.all():
+            UebergreifendesKriterium(
+                katalog=entwurf, position=kriterium.position, text=kriterium.text
+            ).save()
+        return entwurf
+
+    def kriterium_anlegen(self, text: str = "") -> "UebergreifendesKriterium":
+        """Hängt ein übergreifendes Kriterium ans Ende der Liste."""
+
+        letzte: int = (
+            self.uebergreifende_kriterien.aggregate(models.Max("position"))[
+                "position__max"
+            ]
+            or 0
+        )
+        kriterium: UebergreifendesKriterium = UebergreifendesKriterium(
+            katalog=self, position=letzte + 1, text=text
+        )
+        kriterium.save()
+        return kriterium
+
     class Meta:
         """Sichert die Lebenszyklus-Invarianten der Katalog-Fassungen."""
 
         constraints: list[models.BaseConstraint] = lebenszyklus_constraints(
             "simulation_evalkatalog"
         )
+
+
+class UebergreifendesKriterium(models.Model):
+    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt.
+
+    Reiner Text ohne Platzhalter; kern-neutral zu formulieren ist eine
+    Pflegeregel, keine Mechanik (ADR-0046).
+    """
+
+    katalog: models.ForeignKey = models.ForeignKey(
+        Evalkatalog,
+        on_delete=models.CASCADE,
+        related_name="uebergreifende_kriterien",
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+
+    class Meta:
+        """Ordnet die Kriterien nach ihrer gespeicherten Position."""
+
+        ordering: list[str] = ["position"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["katalog", "position"],
+                name="simulation_uebergreifendes_kriterium_position_eindeutig",
+            ),
+        ]
+
+    def _nur_am_entwurf(self) -> None:
+        # Kriterien teilen die Schreibsperre ihrer Fassung.
+
+        if not Evalkatalog.objects.filter(
+            pk=self.katalog_id, zustand=Evalkatalog.Zustand.ENTWURF
+        ).exists():
+            raise RuntimeError("Kriterien ändern sich nur an einem Entwurf.")
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Speichert nur an einem Entwurf."""
+
+        self._nur_am_entwurf()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Löscht nur an einem Entwurf."""
+
+        self._nur_am_entwurf()
+        return super().delete(*args, **kwargs)
+
+    @transaction.atomic
+    def verschieben(self, schritt: int) -> None:
+        """Tauscht den Platz mit der Nachbarin davor (-1) oder dahinter (+1).
+
+        Am Rand der Liste bleibt alles, wie es ist.
+        """
+
+        geschwister: models.QuerySet[UebergreifendesKriterium] = (
+            UebergreifendesKriterium.objects.filter(katalog_id=self.katalog_id)
+        )
+        nachbarin: UebergreifendesKriterium | None = (
+            geschwister.filter(position__lt=self.position).last()
+            if schritt < 0
+            else geschwister.filter(position__gt=self.position).first()
+        )
+        if nachbarin is None:
+            return
+        eigene: int = self.position
+        # Die Zwischenposition 0 hält den eindeutigen Platz während des Tauschs frei.
+        self.position = 0
+        self.save(update_fields=["position"])
+        nachbarin.position, self.position = eigene, nachbarin.position
+        nachbarin.save(update_fields=["position"])
+        self.save(update_fields=["position"])
 
 
 class Anbieter(models.TextChoices):

@@ -9,6 +9,7 @@ from simulation.models import (
     VERTRAG_LEHRPERSON,
     VERTRAG_PROMPT,
     Evalkatalog,
+    UebergreifendesKriterium,
 )
 
 
@@ -95,3 +96,69 @@ def test_linie_hat_hoechstens_einen_entwurf() -> None:
         models.QuerySet(model=Evalkatalog).bulk_create(
             [Evalkatalog(historie=katalog.historie)]
         )
+
+
+@pytest.mark.django_db
+def test_kriterien_stehen_in_der_reihenfolge_des_anlegens() -> None:
+    """Ein neues übergreifendes Kriterium reiht sich am Ende ein."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    katalog.kriterium_anlegen("Rollentreue")
+    katalog.kriterium_anlegen("Kein Verraten der Regel")
+
+    assert [k.text for k in katalog.uebergreifende_kriterien.all()] == [
+        "Rollentreue",
+        "Kein Verraten der Regel",
+    ]
+
+
+@pytest.mark.django_db
+def test_verschieben_tauscht_mit_der_nachbarin_und_bleibt_gespeichert() -> None:
+    """Hoch und Runter tauschen die Plätze; am Rand bleibt alles, wie es ist."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    erstes: UebergreifendesKriterium = katalog.kriterium_anlegen("A")
+    katalog.kriterium_anlegen("B")
+    drittes: UebergreifendesKriterium = katalog.kriterium_anlegen("C")
+
+    drittes.verschieben(-1)
+    erstes.verschieben(-1)
+
+    assert [k.text for k in katalog.uebergreifende_kriterien.all()] == ["A", "C", "B"]
+
+
+@pytest.mark.django_db
+def test_kriterien_einer_finalen_fassung_sind_unveraenderlich() -> None:
+    """Nur am Entwurf lassen sich Kriterien ändern, anlegen oder löschen."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    kriterium: UebergreifendesKriterium = katalog.kriterium_anlegen("Rollentreue")
+    katalog.finalisieren()
+
+    kriterium.text = "geändert"
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        kriterium.save()
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        kriterium.delete()
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        katalog.kriterium_anlegen("neu")
+
+
+@pytest.mark.django_db
+def test_neuer_entwurf_uebernimmt_die_kriterien_ohne_die_vorgaengerin_zu_beruehren() -> (
+    None
+):
+    """Die Tiefenkopie trägt die Kriterien in gleicher Reihenfolge weiter."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    katalog.kriterium_anlegen("A")
+    katalog.kriterium_anlegen("B")
+    katalog.finalisieren()
+
+    entwurf: Evalkatalog = katalog.bearbeiten()
+    kopie: UebergreifendesKriterium = entwurf.uebergreifende_kriterien.first()
+    kopie.text = "A2"
+    kopie.save()
+
+    assert [k.text for k in entwurf.uebergreifende_kriterien.all()] == ["A2", "B"]
+    assert [k.text for k in katalog.uebergreifende_kriterien.all()] == ["A", "B"]
