@@ -28,10 +28,7 @@
             {% if katalog.zustand == "final" %}
                 <p>Diese Fassung ist final seit {{ katalog.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen sie; ändern lässt sie sich nicht.</p>
                 {% if neue_fassung_moeglich %}
-                    <form method="post" action="{% url 'simulation:evalkatalog_neue_fassung' katalog.pk %}">
-                        {% csrf_token %}
-                        <button class="button" type="submit" title="Legt einen Entwurf mit dem ganzen Katalog dieser Fassung an.">Neue Fassung</button>
-                    </form>
+                    {% include "simulation/includes/evalkatalog_neue_fassung.html" with fassung=katalog %}
                 {% endif %}
             {% else %}
                 <p>Diese Fassung ist überholt. Sie galt ab {{ katalog.finalisiert_am|date:"d.m.Y H:i" }}; Evalläufe aus dieser Zeit haben gegen sie geprüft. Ändern lässt sie sich nicht.</p>

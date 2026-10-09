@@ -1114,6 +1114,14 @@ class EvalkatalogLeseansichtTests(TestCase):
                 )
                 self.assertTrue(all(gesperrt for _, gesperrt in _felder(response)))
 
+    def test_ueberholte_fassung_heisst_im_zustand_ueberholt(self) -> None:
+        """Der Zustand im Kopf nennt die Fassung überholt, nicht archiviert."""
+        self.katalog.bearbeiten().finalisieren()
+
+        response: HttpResponse = self.client.get(self._knoten(self.katalog)[0])
+
+        self.assertContains(response, '<span class="badge">Überholt</span>', html=True)
+
     def test_entwurf_bleibt_bearbeitbar(self) -> None:
         """Im Entwurf sind die Felder offen und ohne Hinweisband."""
         entwurf: Evalkatalog = self.katalog.bearbeiten()

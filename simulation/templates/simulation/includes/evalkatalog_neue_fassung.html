@@ -1,0 +1,7 @@
+{% comment %}
+    Leitet aus der finalen Fassung `fassung` einen neuen Entwurf ab.
+{% endcomment %}
+<form method="post" action="{% url 'simulation:evalkatalog_neue_fassung' fassung.pk %}">
+    {% csrf_token %}
+    <button class="button" type="submit" title="Legt einen Entwurf mit dem ganzen Katalog der finalen Fassung an.">Neue Fassung</button>
+</form>
