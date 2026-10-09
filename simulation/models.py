@@ -39,6 +39,15 @@ PROMPT_PLATZHALTER_MIT_UMGEBUNG: frozenset[str] = frozenset(
         "arbeitsheft_simulationshinweise",
     }
 )
+# Die Werte, die der Evallauf selbst berechnet, ergänzen den Promptvertrag;
+# jede Vorlage des Evalkatalogs erhält nur ihren eigenen (ADR-0010).
+VERTRAG_EVAL: frozenset[str] = VERTRAG_PROMPT | {
+    "inputstrategie",
+    "kriterium",
+    "verlauf",
+}
+VERTRAG_LEHRPERSON: frozenset[str] = VERTRAG_PROMPT | {"inputstrategie", "verlauf"}
+VERTRAG_BEWERTER: frozenset[str] = VERTRAG_PROMPT | {"kriterium", "verlauf"}
 VERTRAG_RAHMEN: frozenset[str] = frozenset(
     {
         "schuelerin_name",
@@ -177,6 +186,87 @@ class Simulationskern(VersionierteFassung):
 
         constraints: list[models.BaseConstraint] = lebenszyklus_constraints(
             "simulation"
+        )
+
+
+class EvalkatalogHistorie(models.Model):
+    """Die einzige, namenlose Historie der Evalkatalog-Fassungen."""
+
+    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        primary_key=True,
+        default=1,
+        editable=False,
+    )
+
+    class Meta:
+        """Hält die Katalog-Historie als einzige Zeile."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.CheckConstraint(
+                condition=Q(id=1),
+                name="simulation_evalkatalog_historie_ist_singleton",
+            ),
+        ]
+
+
+class EvalkatalogManager(FassungManager):
+    """Schreibnaht für neue Fassungen des Evalkatalogs."""
+
+    @transaction.atomic
+    def anlegen(self) -> "Evalkatalog":
+        """Legt die erste Katalog-Fassung als leeren Entwurf an.
+
+        Einen Standardkatalog gibt es nicht: Der erste Katalog entsteht in der
+        Oberfläche (ADR-0046).
+        """
+
+        historie, _ = EvalkatalogHistorie.objects.get_or_create(pk=1)
+        if self.filter(historie=historie).exists():
+            raise ValueError("Der Evalkatalog wurde bereits angelegt.")
+        return self._erstellen(historie=historie)
+
+
+class Evalkatalog(VersionierteFassung):
+    """Eine versionierte Fassung der Evals, Kriterien und Vorlagen (ADR-0046)."""
+
+    _bezeichnung: str = "Evalkatalog"
+
+    historie: models.ForeignKey = models.ForeignKey(
+        EvalkatalogHistorie,
+        on_delete=models.PROTECT,
+    )
+    k: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "k",
+        default=3,
+        help_text="Wie oft jeder Evalinput durchgespielt wird.",
+    )
+    lehrperson_vorlage: models.TextField = models.TextField(
+        "Lehrperson-Vorlage",
+        blank=True,
+        default="",
+    )
+    bewerter_vorlage: models.TextField = models.TextField(
+        "Bewerter-Vorlage",
+        blank=True,
+        default="",
+    )
+
+    objects: EvalkatalogManager = EvalkatalogManager()
+
+    def _kopierwerte(self) -> dict[str, object]:
+        # Ein neuer Katalog-Entwurf übernimmt Durchlauf und Vorlagen.
+
+        return {
+            "k": self.k,
+            "lehrperson_vorlage": self.lehrperson_vorlage,
+            "bewerter_vorlage": self.bewerter_vorlage,
+        }
+
+    class Meta:
+        """Sichert die Lebenszyklus-Invarianten der Katalog-Fassungen."""
+
+        constraints: list[models.BaseConstraint] = lebenszyklus_constraints(
+            "simulation_evalkatalog"
         )
 
 

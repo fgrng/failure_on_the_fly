@@ -1,4 +1,4 @@
-"""URLs für die Systemansicht des Simulationskerns."""
+"""URLs für die Systemansichten von Simulationskern, Evalkatalog und Konfigurationen."""
 
 from django.urls import path
 from django.urls.resolvers import URLPattern
@@ -26,6 +26,22 @@ urlpatterns: list[URLPattern] = [
     path("kern/<int:pk>/neue-fassung/", views.neue_fassung, name="neue_fassung"),
     path("kern/<int:pk>/finalisieren/", views.finalisieren, name="finalisieren"),
     path("kern/<int:pk>/verwerfen/", views.verwerfen, name="verwerfen"),
+    path("evalkatalog/", views.evalkatalog, name="evalkatalog"),
+    path(
+        "evalkatalog/anlegen/",
+        views.evalkatalog_anlegen,
+        name="evalkatalog_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/",
+        views.evalkatalog_editor,
+        name="evalkatalog_editor",
+    ),
+    path(
+        "evalkatalog/<int:pk>/verwerfen/",
+        views.evalkatalog_verwerfen,
+        name="evalkatalog_verwerfen",
+    ),
     path(
         "modell-konfiguration/",
         views.modell_konfiguration,

@@ -17,6 +17,7 @@ from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
 from .forms import (
+    EvalkatalogDurchlaufForm,
     ModellKonfigurationForm,
     SimulationskernForm,
     TranskriptionsKonfigurationForm,
@@ -31,7 +32,10 @@ from .modellverzeichnis import (
 from .models import (
     PROMPT_PLATZHALTER_MIT_UMGEBUNG,
     VERTRAG_PROMPT,
+    VERTRAG_BEWERTER,
+    VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
+    Evalkatalog,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
@@ -212,6 +216,100 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
         Simulationskern.Zustand.ENTWURF,
         Simulationskern.delete,
     )
+
+
+@administratorin_erforderlich
+def evalkatalog(request: HttpRequest) -> HttpResponse:
+    """Zeigt den Stand des Evalkatalogs; ohne Katalog bietet sie das Anlegen an."""
+    return render(
+        request,
+        "simulation/evalkatalog.html",
+        {
+            "entwurf": Evalkatalog.objects.filter(
+                zustand=Evalkatalog.Zustand.ENTWURF
+            ).first(),
+            # Dieselbe Bedingung, die die Anlege-Naht prüft.
+            "katalog_fehlt": not Evalkatalog.objects.exists(),
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_anlegen(request: HttpRequest) -> HttpResponse:
+    """Legt den ersten Evalkatalog als leeren Entwurf an und öffnet den Editor."""
+    try:
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("simulation:evalkatalog")
+    return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+
+
+@dataclass(frozen=True)
+class _Platzhalterknopf:
+    # Ein Platzhalter unter einer Vorlage; eigen heißt: nur diese Vorlage kennt ihn.
+
+    name: str
+    eigen: bool
+
+
+def _platzhalterknoepfe(
+    vertrag: frozenset[str], eigener: str
+) -> list[_Platzhalterknopf]:
+    # Der vorlageneigene Platzhalter steht vorn, die übrigen alphabetisch.
+
+    return [_Platzhalterknopf(eigener, True)] + [
+        _Platzhalterknopf(name, False) for name in sorted(vertrag - {eigener})
+    ]
+
+
+@administratorin_erforderlich
+def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
+    """Bearbeitet den Knoten Durchlauf und Vorlagen eines Katalog-Entwurfs."""
+    katalog: Evalkatalog = get_object_or_404(
+        Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.ENTWURF),
+        pk=pk,
+    )
+    form: EvalkatalogDurchlaufForm
+    if request.method == "POST":
+        form = EvalkatalogDurchlaufForm(request.POST, instance=katalog)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Durchlauf und Vorlagen gespeichert.")
+            return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    else:
+        form = EvalkatalogDurchlaufForm(instance=katalog)
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            "katalog": katalog,
+            "form": form,
+            "vorlagen": [
+                (
+                    form["lehrperson_vorlage"],
+                    _platzhalterknoepfe(VERTRAG_LEHRPERSON, "inputstrategie"),
+                ),
+                (
+                    form["bewerter_vorlage"],
+                    _platzhalterknoepfe(VERTRAG_BEWERTER, "kriterium"),
+                ),
+            ],
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Verwirft den Katalog-Entwurf."""
+    get_object_or_404(
+        Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.ENTWURF),
+        pk=pk,
+    ).delete()
+    messages.success(request, "Der Evalkatalog-Entwurf wurde verworfen.")
+    return redirect("simulation:evalkatalog")
 
 
 @dataclass(frozen=True)

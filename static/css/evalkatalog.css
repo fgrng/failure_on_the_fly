@@ -1,0 +1,68 @@
+/* Evalkatalog-Editor: links der Katalog als Baum, rechts der gewählte Knoten
+   (Prototyp #295, Variante C). */
+
+.evalkatalog-editor {
+    display: grid;
+    grid-template-columns: minmax(180px, .3fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+    margin-top: var(--space-3);
+}
+
+.evalkatalog-baum {
+    padding-right: var(--space-3);
+    border-right: 1px solid var(--color-border);
+}
+
+.evalkatalog-baum ul { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+
+.evalkatalog-baum a {
+    display: block;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.evalkatalog-baum a[aria-current="page"] {
+    background: var(--area-tint);
+    font-weight: 700;
+}
+
+.evalkatalog-knoten { display: grid; gap: var(--space-3); }
+.evalkatalog-knoten h2 { margin: 0; }
+
+.evalkatalog-vorlage textarea { min-height: 14rem; }
+
+.evalkatalog-platzhalterleiste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
+}
+
+.evalkatalog-platzhalter {
+    padding: 2px var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.evalkatalog-platzhalter:hover { border-color: var(--area-solid); color: var(--color-text); }
+
+/* Den Platzhalter, den nur diese Vorlage kennt, hebt der Bereichston hervor. */
+.evalkatalog-platzhalter--eigen {
+    border-color: var(--area-solid);
+    background: var(--area-tint);
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+@media (max-width: 760px) {
+    .evalkatalog-editor { grid-template-columns: 1fr; }
+    .evalkatalog-baum { padding: 0 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
+}

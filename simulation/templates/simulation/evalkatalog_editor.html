@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Evalkatalog-Entwurf bearbeiten{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/evalkatalog.css' %}">
+    <script src="{% static 'js/ungespeichert.js' %}" defer></script>
+    <script src="{% static 'js/platzhalter.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System / Evalkatalog</p>
+            <h1>Evalkatalog-Entwurf bearbeiten</h1>
+            <span>Links der Katalog, rechts der gewählte Knoten.</span>
+        </div>
+        <span class="badge">{{ katalog.get_zustand_display }}</span>
+    </header>
+
+    {% comment %}
+        Baum und Knoten stehen im Formular, damit die Aktionszeile als dessen
+        letztes Kind über die ganze Breite klebt (vignette-form.css).
+    {% endcomment %}
+    <form id="evalkatalog-formular" method="post" data-ungespeichert-warnen>
+        {% csrf_token %}
+        <div class="evalkatalog-editor">
+            <nav class="evalkatalog-baum" aria-label="Katalog">
+                <ul>
+                    <li><a href="{% url 'simulation:evalkatalog_editor' katalog.pk %}" aria-current="page">Durchlauf und Vorlagen</a></li>
+                </ul>
+            </nav>
+
+            <section class="evalkatalog-knoten" aria-label="Durchlauf und Vorlagen">
+                <h2>Durchlauf und Vorlagen</h2>
+                {{ form.non_field_errors }}
+                {% include "vignetten/includes/form_field.html" with field=form.k %}
+                {% for field, knoepfe in vorlagen %}
+                    <div class="evalkatalog-vorlage">
+                        {% include "vignetten/includes/form_field.html" with field=field %}
+                        <div class="evalkatalog-platzhalterleiste" aria-label="Platzhalter für {{ field.label }}">
+                            {% for knopf in knoepfe %}<button type="button" data-platzhalter="${{ knopf.name }}" data-ziel="{{ field.id_for_label }}" class="evalkatalog-platzhalter{% if knopf.eigen %} evalkatalog-platzhalter--eigen{% endif %}">${{ knopf.name }}</button>{% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </section>
+        </div>
+
+        <div class="vignette-form-actions">
+            <a href="{% url 'simulation:evalkatalog' %}">Abbrechen</a>
+            <button class="button" type="submit">Änderungen speichern</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

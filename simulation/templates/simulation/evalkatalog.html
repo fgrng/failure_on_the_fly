@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Evalkatalog{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System / Evalkatalog</p>
+            <h1>Evalkatalog</h1>
+            <span>Evals, Kriterien und Vorlagen, gegen die jeder Evallauf prüft.</span>
+        </div>
+    </header>
+
+    {% if entwurf %}
+        <h2>Entwurf</h2>
+        <div class="page-actions">
+            <a class="button" href="{% url 'simulation:evalkatalog_editor' entwurf.pk %}">Entwurf bearbeiten</a>
+            <form method="post" action="{% url 'simulation:evalkatalog_verwerfen' entwurf.pk %}">
+                {% csrf_token %}
+                <button class="button button--secondary" type="submit">Entwurf verwerfen</button>
+            </form>
+        </div>
+    {% elif katalog_fehlt %}
+        <h2>Noch kein Evalkatalog</h2>
+        <p class="system-page-empty">Die Instanz hat noch keine Evals. Legen Sie den ersten Katalog als leeren Entwurf an.</p>
+        <div class="page-actions">
+            <form method="post" action="{% url 'simulation:evalkatalog_anlegen' %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Evalkatalog anlegen</button>
+            </form>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

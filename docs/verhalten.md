@@ -280,6 +280,32 @@ Zeichen, kurze Werte ausschließlich als Punkte.
 Im freien Probelauf der Administration steht jede Konfiguration zur Auswahl als
 »Bezeichnung (Sprachmodell)«.
 
+## Evalkatalog
+
+Administrator:innen pflegen unter `/system/evalkatalog/` (Sidebar: System) den
+Evalkatalog, gegen den künftig jeder Evallauf prüft (ADR-0046). Eine Instanz
+startet ohne Katalog; einen Standardkatalog gibt es nicht. Solange die Linie
+leer ist, bietet die Seite „Evalkatalog anlegen“ an. Das legt einen leeren
+Entwurf an und öffnet dessen Editor. Es gibt höchstens einen Entwurf zugleich:
+Mit Entwurf bietet die Seite nur „Entwurf bearbeiten“ und „Entwurf verwerfen“
+an, ein zweites Anlegen wird mit einer Meldung abgelehnt. Das Verwerfen löscht
+den Entwurf, danach lässt sich wieder ein Katalog anlegen.
+
+Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Bisher
+gibt es nur den Knoten „Durchlauf und Vorlagen“: *k*, die Zahl der
+Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
+Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
+Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
+und `$verlauf`, in der Bewerter-Vorlage die des Promptvertrags sowie
+`$kriterium` und `$verlauf`. Hervorgehoben und vorn steht der Platzhalter, den
+nur diese Vorlage kennt. Ein Klick fügt ihn an der Schreibmarke ein. Geprüft
+werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernimmt die
+Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
+Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
+Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
+Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
+Zugriff.
+
 ## Transkriptions-Konfiguration
 
 Die Transkription hängt an einer eigenen Konfiguration, die die Administration
