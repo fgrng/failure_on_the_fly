@@ -83,7 +83,6 @@ class Bindung(models.Model):
         eigene Art steht nie in der Abfrage, die Zeile weist sich also auch
         beim wiederholten Speichern nicht selbst ab.
         """
-
         for fremde_art in self._fremde_bindungsarten():
             if fremde_art.objects.filter(teilnahme_id=self.teilnahme_id).exists():
                 raise ValidationError(UNVERTRAEGLICHE_BINDUNG)

@@ -139,7 +139,7 @@ class FragebogenItemManager(models.Manager.from_queryset(FragebogenItemQuerySet)
     def _erstellen(self, **werte: object) -> "FragebogenItem":
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
         item: FragebogenItem = self.model(**werte)
-        item._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
+        item._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht: Manager markiert das neue Item
         item.save(using=self.db)
         return item
 

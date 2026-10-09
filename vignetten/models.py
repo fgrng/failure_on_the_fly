@@ -216,7 +216,7 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         werte.setdefault("schuelerin_geschlecht", Vignette.Geschlecht.WEIBLICH)
         werte.setdefault("lehrperson_geschlecht", Vignette.Geschlecht.WEIBLICH)
         vignette: Vignette = self.model(**werte)
-        vignette._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
+        vignette._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht: Manager markiert die neue Fassung
         vignette.save(using=self.db)
         return vignette
 

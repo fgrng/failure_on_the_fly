@@ -60,7 +60,7 @@ class FassungManager(models.Manager.from_queryset(FassungQuerySet)):
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
 
         fassung: VersionierteFassung = self.model(**werte)
-        fassung._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
+        fassung._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht: Manager markiert die neue Fassung
         fassung.save(using=self.db)
         return fassung
 
