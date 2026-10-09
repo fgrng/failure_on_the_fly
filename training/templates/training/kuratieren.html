@@ -93,6 +93,42 @@
         {% else %}
             <p class="message--info">Dieses Training enthält keine Vignetten. Es gibt darum keine Sitzungen zu zeigen.</p>
         {% endif %}
+
+        <h3 id="freigegebene-abschriften">Freigegebene Abschriften</h3>
+        <div class="table-wrap">
+            <table class="table" aria-labelledby="freigegebene-abschriften">
+                <thead>
+                    <tr>
+                        <th scope="col">Teilnehmer:in</th>
+                        <th scope="col">Erhebung</th>
+                        <th scope="col">Geholt am</th>
+                        <th scope="col">Sitzungen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for abschrift in freigegebene_abschriften %}
+                        <tr>
+                            <th scope="row">{{ abschrift.name }}</th>
+                            <td>{{ abschrift.erhebungsname }}</td>
+                            <td>{{ abschrift.importiert_am|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <ul class="freigegebene-abschriften__sitzungen">
+                                    {% for sitzung in abschrift.sitzungen %}
+                                        <li><a href="{{ sitzung.url }}">{{ sitzung.name }}</a></li>
+                                    {% empty %}
+                                        <li><span class="fremdeinsicht__leer">–</span></li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="table__empty">Niemand hat eine Abschrift freigegeben.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <section class="page-section" aria-labelledby="section-configured">

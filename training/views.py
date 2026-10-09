@@ -8,6 +8,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, F, Q, QuerySet
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
@@ -42,7 +43,7 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_holen, abschrift_loeschen
+from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
 from .models import Abschrift, Training, Trainingsbindung
 
 
@@ -264,11 +265,40 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
+    freigegeben: list[Training] = list(abschrift.freigegeben_fuer.order_by("name"))
     return render(
         request,
         "training/abschrift.html",
-        {"abschrift": abschrift, "sitzungen": _gelesene_sitzungen(abschrift)},
+        {
+            "abschrift": abschrift,
+            "sitzungen": _gelesene_sitzungen(abschrift),
+            "freigegeben": [training.name for training in freigegeben],
+            "freigegebene_pks": {training.pk for training in freigegeben},
+            "beigetretene_trainings": Training.objects.filter(
+                trainingsbindung__konto=request.user
+            ).order_by("name"),
+        },
     )
+
+
+@login_required
+def abschrift_freigaben(request: HttpRequest, pk: int) -> HttpResponse:
+    """Speichert, für welche beigetretenen Trainings die Abschrift freigegeben ist.
+
+    Ein Training ohne eigene Bindung ist für das Konto unbekannt.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    abschrift: Abschrift = _eigene_abschrift(request, pk)
+    auswahl: list[str] = request.POST.getlist("training")
+    if not all(wert.isdigit() for wert in auswahl):
+        raise Http404
+    try:
+        abschrift_freigeben(abschrift, [int(wert) for wert in auswahl])
+    except ValidationError:
+        raise Http404
+    return redirect("training:abschrift", pk=abschrift.pk)
 
 
 @login_required
@@ -381,6 +411,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
             ),
             "beigetretene": training.trainingsbindung_set.count(),
             "fremdeinsicht": _fremdeinsicht(request.user, training),
+            "freigegebene_abschriften": _freigegebene_abschriften(
+                request.user, training
+            ),
             "verfuegbare_vignetten": _eigene_finalen_vignetten(request).exclude(
                 pk__in=training.vignetten.values("pk")
             ),
@@ -427,13 +460,55 @@ def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
         ]
         zeilen.append(
             {
-                "name": bindung.konto.get_full_name() or bindung.konto.username,
+                "name": _kontoname(bindung.konto),
                 "zellen": zellen,
                 "ohne_sitzung": not any(zellen),
             }
         )
     zeilen.sort(key=lambda zeile: str(zeile["name"]).casefold())
     return {"vignetten": vignetten, "zeilen": zeilen}
+
+
+def _kontoname(konto: Konto) -> str:
+    """Der Name, unter dem die Fremdeinsicht eine Person zeigt."""
+    return konto.get_full_name() or konto.username
+
+
+def _freigegebene_abschriften(
+    konto: Konto, training: Training
+) -> list[dict[str, object]]:
+    # Listet die für das Training freigegebenen Abschriften nach Namen, mit
+    # Erhebungsname, Importzeitpunkt und ihren einsehbaren Sitzungen. Die
+    # Sitzungen kommen aus derselben Regel wie die Tabelle.
+
+    sitzungen_nach_teilnahme: dict[int, list[Sitzung]] = {}
+    for sitzung in (
+        _fremd_einsehbare_sitzungen(konto)
+        .filter(teilnahme__abschrift__freigegeben_fuer=training)
+        .select_related("vignette__historie")
+        .order_by(F("vignettenposition__position").asc(nulls_last=True), "pk")
+    ):
+        sitzungen_nach_teilnahme.setdefault(sitzung.teilnahme_id, []).append(sitzung)
+
+    abschriften: list[dict[str, object]] = [
+        {
+            "name": _kontoname(abschrift.konto),
+            "erhebungsname": abschrift.erhebungsname,
+            "importiert_am": abschrift.importiert_am,
+            "sitzungen": [
+                {
+                    "name": sitzung.vignette.anzeigename,
+                    "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
+                }
+                for sitzung in sitzungen_nach_teilnahme.get(abschrift.teilnahme_id, [])
+            ],
+        }
+        for abschrift in training.freigegebene_abschriften.select_related(
+            "konto"
+        ).order_by("importiert_am", "pk")
+    ]
+    abschriften.sort(key=lambda abschrift: str(abschrift["name"]).casefold())
+    return abschriften
 
 
 @login_required

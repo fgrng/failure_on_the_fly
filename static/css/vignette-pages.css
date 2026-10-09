@@ -187,3 +187,10 @@
 .fremdeinsicht__sitzung:is(:hover, :focus-visible)::after {
     opacity: 1;
 }
+
+/* ---- Training: freigegebene Abschriften unter der Fremdeinsicht ---- */
+.freigegebene-abschriften__sitzungen {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}

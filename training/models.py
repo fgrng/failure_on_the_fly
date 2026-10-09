@@ -191,6 +191,9 @@ class Abschrift(Bindung):
     )
     erhebungsname: models.CharField = models.CharField(max_length=255)
     importiert_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    freigegeben_fuer: models.ManyToManyField = models.ManyToManyField(
+        Training, related_name="freigegebene_abschriften", blank=True
+    )
 
 
 def _pruefe_finale_vignetten(

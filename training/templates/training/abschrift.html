@@ -14,7 +14,7 @@
         <div>
             <p>Meine Abschriften</p>
             <h1>{{ abschrift.erhebungsname }}</h1>
-            <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. Ihre Abschrift — nur Sie lesen sie.</span>
+            <span>Geholt am {{ abschrift.importiert_am|date:"d.m.Y H:i" }}. {% if freigegeben %}Freigegeben für {{ freigegeben|join:", " }}.{% else %}Ihre Abschrift — nur Sie lesen sie.{% endif %}</span>
         </div>
         <a class="button button--secondary" href="{% url 'training:abschriften' %}">Zurück zur Liste</a>
     </header>
@@ -68,6 +68,29 @@
     {% empty %}
         <p>Diese Abschrift enthält keine Sitzung.</p>
     {% endfor %}
+
+    <section class="page-section" aria-labelledby="section-freigabe">
+        <header class="page-section__head">
+            <b>{{ sitzungen|length|add:1|stringformat:"02d" }}</b><span>
+                <h2 id="section-freigabe">Freigabe</h2>
+                <small>Die Ausbilder:innen eines freigegebenen Trainings lesen die ganze Abschrift.</small>
+            </span>
+        </header>
+        {% if beigetretene_trainings %}
+            <form method="post" action="{% url 'training:abschrift_freigaben' abschrift.pk %}">
+                {% csrf_token %}
+                <fieldset class="page-fieldset">
+                    <legend>Freigeben für</legend>
+                    {% for training in beigetretene_trainings %}
+                        <div><label><input type="checkbox" name="training" value="{{ training.pk }}"{% if training.pk in freigegebene_pks %} checked{% endif %}> {{ training.name }}</label></div>
+                    {% endfor %}
+                </fieldset>
+                <button class="button button--secondary" type="submit">Freigaben speichern</button>
+            </form>
+        {% else %}
+            <p class="message--info">Sie sind noch keinem Training beigetreten. Freigeben lässt sich eine Abschrift nur für ein Training, dem Sie beigetreten sind.</p>
+        {% endif %}
+    </section>
 
     <form method="post" action="{% url 'training:abschrift_loeschen' abschrift.pk %}">
         {% csrf_token %}
