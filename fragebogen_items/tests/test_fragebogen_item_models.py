@@ -260,6 +260,45 @@ class FragebogenItemLebenszyklusTests(TestCase):
             FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
         )
 
+    def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
+        konto = get_user_model().objects.create_user(username="ada")
+        erster_tab = FragebogenItem.objects.anlegen(konto, wortlaut="Wie geht es dir?")
+        zweiter_tab = FragebogenItem.objects.get(pk=erster_tab.pk)
+        erster_tab.finalisieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur Entwürfe können finalisiert werden."
+        ):
+            zweiter_tab.finalisieren()
+
+    def test_archivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen archivierte Fassung meldet den abgelehnten Übergang."""
+        konto = get_user_model().objects.create_user(username="ada")
+        erster_tab = FragebogenItem.objects.anlegen(konto, wortlaut="Wie geht es dir?")
+        erster_tab.finalisieren()
+        zweiter_tab = FragebogenItem.objects.get(pk=erster_tab.pk)
+        erster_tab.archivieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur finale Fassungen können archiviert werden."
+        ):
+            zweiter_tab.archivieren()
+
+    def test_entarchivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen entarchivierte Fassung meldet den abgelehnten Übergang."""
+        konto = get_user_model().objects.create_user(username="ada")
+        erster_tab = FragebogenItem.objects.anlegen(konto, wortlaut="Wie geht es dir?")
+        erster_tab.finalisieren()
+        erster_tab.archivieren()
+        zweiter_tab = FragebogenItem.objects.get(pk=erster_tab.pk)
+        erster_tab.entarchivieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur archivierte Fassungen können entarchiviert werden."
+        ):
+            zweiter_tab.entarchivieren()
+
     def test_finalisieren_bearbeiten_und_archivieren(self) -> None:
         """Finale Fassungen bleiben unveränderlich und versionieren sich linear."""
         konto = get_user_model().objects.create_user(username="ada")

@@ -48,3 +48,52 @@ ADR-0017 sagt „jede App implementiert selbst" und begründet, warum es keine g
 - Die Form ist an drei Stellen implementiert und kann auseinanderlaufen (ADR-0017). Dieses ADR macht die Form explizit, damit eine Abweichung als Abweichung erkennbar ist und nicht als eine von drei gleichberechtigten Auslegungen.
 - Der Simulationskern braucht eine Historie, obwohl er konzeptionell eine einzige Linie ist (ADR-0004) — sonst hätte der Entwurf-Index keine Spalte. Seine Historie ist ein namenloser Singleton ohne Sprachfeld.
 - Vollständigkeit (welche Felder ein Entwurf zum Finalisieren gefüllt haben muss) gehört **nicht** in diese Form. Sie ist je Artefakt verschieden und lebt in dessen `finalisieren()`. Diese ADR regelt nur den Zustandsautomaten und seine zwei Invarianten.
+
+## Nachtrag (2026-10): Fehlerregel A/B/C
+
+Zur Form gehört auch, welchen Fehler ein Lebenszyklus wirft (#255). Vignette,
+Fragebogen-Item, Simulationskern und Erhebung erfüllen dieselbe Regel, jede App
+eigenständig (ADR-0017 bleibt unverändert). Simulationskern und Evalkatalog
+teilen sie innerhalb der App `simulation` über `simulation/lebenszyklus.py`
+(ADR-0035); auch die Teile des Evalkatalogs werfen außerhalb des Entwurfs
+Klasse B, ihre Massenupdates Klasse A:
+
+| Klasse | Was | Typ |
+|---|---|---|
+| **A · Programmierfehler** | Code umgeht die Naht (Anlegen außerhalb der Anlege-Naht, Massenupdate) | `RuntimeError` |
+| **B · Unveränderlichkeit** | `save()`/`delete()` auf einer Fassung außerhalb des Entwurfs | `ValidationError` |
+| **C · abgelehnter Übergang** | Lebenszyklus-Regel verletzt, auch der Wettlauf („inzwischen geändert“) und die zweite erste Fassung | `ValidationError` |
+
+A darf als 500er enden: Kein Klick der Nutzer:in erreicht diese Stelle. B und C
+fangen die View-Hüllen und zeigen sie als Meldung auf der Detail- bzw.
+Verwaltungsansicht. Die Hüllen lesen dazu `error.messages` und verbinden sie;
+`error.message` gibt es nur bei einer einzelnen Meldung.
+
+### Übergangsmechanik
+
+Zur Form gehört auch, wie ein Lebenszyklus einen Zustandsübergang prüft und
+schreibt (#365): in **einer bedingten Aktualisierung**, „setze Zustand auf Ziel,
+wo Zustand = erwartet“. Trifft sie keine Zeile, folgt ein `ValidationError` mit
+der Meldung des Übergangs (Klasse C), auch wenn ein zweiter Tab die Fassung
+inzwischen verändert hat. Vignette, Fragebogen-Item und Erhebung tun das je in
+einer eigenen Routine `_zustand_wechseln` bzw. `_status_wechseln`, der
+Simulationskern und Evalkatalog in `VersionierteFassung.finalisieren()`
+(`simulation/lebenszyklus.py`); über App-Grenzen hinweg gibt es keine geteilte
+Funktion (ADR-0017). Die Aktualisierung läuft über ein schlichtes `models.QuerySet`, weil
+die öffentliche `update()`-Route gesperrt bleibt.
+
+- Fachliche Vorbedingungen prüft jedes Modell, soweit es sie hat, vor dem
+  Übergang (etwa Wortlaut, Budget, laufende Stichprobe; beim Fragebogen-Item
+  keine aktive Schwester, bei der Vignette hält das der partielle Index).
+- Zustandswechsel laufen nicht mehr durch `save()`; `save()` lehnt jeden
+  Zustandswechsel ab und hält weiter die Unveränderlichkeit finaler Fassungen
+  (Klasse B). Ein internes Flag, das Übergänge an `save()` vorbeilässt, gibt es
+  in diesen vier Lebenszyklen nicht mehr.
+- Simulationskern und Evalkatalog schreiben beim Finalisieren den geprüften
+  Inhalt (`_kopierwerte()`) in derselben Anweisung mit; das Archivieren der bisherigen finalen Fassung davor
+  rollt die Transaktion zurück, wenn der Übergang scheitert.
+- `bearbeiten()` schreibt keinen Zustand, sondern legt einen Entwurf an; die
+  Prüfung der Quelle bleibt dort eine Abfrage vor dem Anlegen.
+- Weil die bedingte Aktualisierung kein `post_save` auslöst, sendet
+  `Vignette.archivieren()` das Signal `vignette_archiviert`; daran entfernt
+  `training` die Vignette aus seinen Trainings.

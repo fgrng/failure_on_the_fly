@@ -1,4 +1,4 @@
-"""Formulare der Simulation: Kern-Entwurf, Modell- und Transkriptions-Konfiguration."""
+"""Formulare der Simulation: Kern- und Evalkatalog-Entwurf, Modell- und Transkriptions-Konfiguration."""
 
 from django.forms import ModelForm, PasswordInput
 
@@ -8,6 +8,7 @@ from .models import (
     VERTRAG_PROMPT,
     VERTRAG_RAHMEN,
     Anbieter,
+    Evalkatalog,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
@@ -70,6 +71,16 @@ class SimulationskernForm(ModelForm):
         for feldname, bezeichnung in felder.items():
             self.fields[feldname].label = bezeichnung
             self.fields[feldname].help_text = hinweis
+
+
+class EvalkatalogDurchlaufForm(ModelForm):
+    """Der Knoten Durchlauf und Vorlagen eines Evalkatalog-Entwurfs."""
+
+    class Meta:
+        """Beschränkt das Formular auf *k* und die beiden Vorlagen."""
+
+        model: type[Evalkatalog] = Evalkatalog
+        fields: list[str] = ["k", "lehrperson_vorlage", "bewerter_vorlage"]
 
 
 def _stellschrauben_hinweis() -> str:

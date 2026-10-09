@@ -1,5 +1,7 @@
 When changing public-facing behavior, update docs/verhalten.md (behaviour per area); check README.md only for setup and deployment changes.
 
+Checks: the pre-commit hook (`.githooks/pre-commit`) runs ruff and the missing-migrations check on every commit; type checking is `uv run ty check` (advisory, no mypy).
+
 ## Abschlusslauf
 
 Außerhalb von Sandcastle vor jedem Commit: `uv run pytest`, `uv run ruff format .`, `uv run ruff check .`.

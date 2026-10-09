@@ -49,19 +49,61 @@ test("ein gerade geschlossenes Ticket, das die Suche noch als offen führt, wird
 });
 
 test("ein fertiges Ticket wird reviewt, gemergt und geschlossen", async () => {
-  const { tracker, agents, run } = setup();
+  const { tracker, repo, agents, run } = setup();
   tracker.addTicket(ticket(7));
 
   await run();
 
   assert.deepEqual(
-    { reviewed: agents.reviewed, merged: agents.mergedWith, open: tracker.isOpen(7) },
     {
-      reviewed: ["7"],
-      merged: [{ into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] }],
-      open: false,
+      reviewed: agents.reviewed,
+      landed: await repo.contains("sandcastle/standalone", "sandcastle/issue-7"),
+      open: tracker.isOpen(7),
     },
+    { reviewed: ["7"], landed: true, open: false },
   );
+});
+
+test("ein einzelner Branch, der per Fast-Forward passt, landet ohne Merger", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addTicket(ticket(7));
+
+  await run();
+
+  assert.deepEqual(
+    {
+      merged: agents.mergedWith,
+      landed: await repo.contains("sandcastle/standalone", "sandcastle/issue-7"),
+      open: tracker.isOpen(7),
+    },
+    { merged: [], landed: true, open: false },
+  );
+});
+
+test("ist der Integrations-Branch weitergelaufen, mergt der Merger auch einen einzelnen Branch", async () => {
+  const { tracker, agents, repo, run } = setup();
+  tracker.addTicket(ticket(7));
+  await repo.createBranch("sandcastle/standalone", "origin/main");
+  await repo.createBranch("sandcastle/issue-7", "sandcastle/standalone");
+  repo.commit("sandcastle/standalone");
+
+  await run();
+
+  assert.deepEqual(agents.mergedWith, [
+    { into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] },
+  ]);
+});
+
+test("hat ein Worktree den Integrations-Branch ausgecheckt, mergt der Merger statt eines Fast-Forwards", async () => {
+  const { tracker, agents, repo, run } = setup();
+  tracker.addTicket(ticket(7));
+  repo.checkedOutElsewhere.add("sandcastle/standalone");
+
+  await run();
+
+  assert.deepEqual(agents.mergedWith, [
+    { into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] },
+  ]);
 });
 
 test("ohne Abschlusssignal gibt es kein Review und keinen Merge, das Ticket bleibt offen", async () => {
@@ -123,7 +165,7 @@ test("ohne Abschlusssignal des Mergers steht der Integrations-Branch wieder auf 
 });
 
 test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits gemergt", async () => {
-  const { tracker, repo, agents, run, update } = setup();
+  const { tracker, repo, agents, run } = setup();
   tracker.addTicket(ticket(7));
   await repo.createBranch("sandcastle/standalone", "origin/main");
   await repo.createBranch("sandcastle/issue-7", "sandcastle/standalone");
@@ -132,9 +174,7 @@ test("ein fertiger Branch aus einer früheren Iteration wird ohne neue Commits g
 
   await run();
 
-  assert.deepEqual(agents.mergedWith, [
-    { into: "sandcastle/standalone", branches: ["sandcastle/issue-7"] },
-  ]);
+  assert.equal(await repo.contains("sandcastle/standalone", "sandcastle/issue-7"), true);
 });
 
 test("ein Branch ohne Arbeit wird weder reviewt noch gemergt", async () => {
@@ -193,14 +233,12 @@ test("ein Ticket einer Spec zweigt von spec/<n> ab, das von main entsteht, und w
   assert.deepEqual(
     {
       startedFrom: agents.startedFrom,
-      merged: agents.mergedWith,
       specHasMain: await repo.contains("spec/30", "origin/main"),
       specHasTicket: await repo.contains("spec/30", "sandcastle/issue-31"),
       mainHasTicket: await repo.contains("origin/main", "sandcastle/issue-31"),
     },
     {
       startedFrom: [{ id: "31", base: "spec/30" }],
-      merged: [{ into: "spec/30", branches: ["sandcastle/issue-31"] }],
       specHasMain: true,
       specHasTicket: true,
       mainHasTicket: false,
@@ -208,7 +246,7 @@ test("ein Ticket einer Spec zweigt von spec/<n> ab, das von main entsteht, und w
   );
 });
 
-test("je Integrations-Branch läuft ein eigener Merger", async () => {
+test("je Integrations-Branch mit mehreren Branches läuft ein eigener Merger", async () => {
   const { tracker, agents, run } = setup();
   tracker.addSpec(30);
   tracker.addSpec(40);
@@ -222,9 +260,7 @@ test("je Integrations-Branch läuft ein eigener Merger", async () => {
   assert.deepEqual(
     new Map(agents.mergedWith.map((m) => [m.into, m.branches.toSorted()])),
     new Map([
-      ["sandcastle/standalone", ["sandcastle/issue-7"]],
       ["spec/30", ["sandcastle/issue-31", "sandcastle/issue-32"]],
-      ["spec/40", ["sandcastle/issue-41"]],
     ]),
   );
 });
@@ -977,5 +1013,58 @@ test("ein gemergter oder fehlender Spec-PR sperrt kein Ticket", async () => {
       comments: tracker.comments,
     },
     { planned: [[31, 41]], comments: [] },
+  );
+});
+
+test("ohne neue Migrationsdateien läuft kein Agent für Migrationstests", async () => {
+  const { tracker, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", { commits: 1, completed: true, files: ["vignetten/models.py"] });
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, prs: tracker.pullRequests.length },
+    { steps: ["review #30", "pr-text #30"], prs: 1 },
+  );
+});
+
+test("neue Migrationsdateien der Spec gehen nach der Behebung und vor dem PR-Text an den Agent für Migrationstests", async () => {
+  const { tracker, repo, agents, run } = setup();
+  repo.commitOnOrigin("main", "", ["vignetten/migrations/0001_initial.py"]);
+  await repo.fetch();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", {
+    commits: 1,
+    completed: true,
+    files: ["vignetten/migrations/0002_anlass.py", "vignetten/models.py", "konten/migrations/__init__.py"],
+  });
+  agents.specReviews.set(30, { standards: ["Docstring fehlt"], correctness: [], spec: [] });
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, migrations: agents.migrationTestsRemovedFor },
+    {
+      steps: ["review #30", "fix #30", "migration-tests #30", "pr-text #30"],
+      migrations: [{ spec: 30, migrations: ["vignetten/migrations/0002_anlass.py"] }],
+    },
+  );
+});
+
+test("endet der Agent für Migrationstests ohne Abschlusssignal, gibt es weder Push noch PR", async () => {
+  const { tracker, repo, agents, run } = setup();
+  tracker.addSpec(30);
+  tracker.addTicket(ticket(31), { parent: 30 });
+  agents.implementers.set("31", { commits: 1, completed: true, files: ["vignetten/migrations/0002_anlass.py"] });
+  agents.migrationTestsStuck.add(30);
+
+  await run();
+
+  assert.deepEqual(
+    { steps: agents.specSteps, pushed: await repo.isPushed("spec/30"), prs: tracker.pullRequests },
+    { steps: ["review #30", "migration-tests #30"], pushed: false, prs: [] },
   );
 });

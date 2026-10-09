@@ -986,6 +986,25 @@ def test_archivieren_akzeptiert_nur_finale_erhebungen() -> None:
 
 
 @pytest.mark.django_db
+def test_archivieren_in_zweitem_tab_lehnt_den_uebergang_ab() -> None:
+    """Eine inzwischen archivierte Erhebung meldet den abgelehnten Übergang."""
+
+    erster_tab: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test", sprachmodell="fake"
+    )
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+    erster_tab.finalisieren()
+    zweiter_tab: Erhebung = Erhebung.objects.get(pk=erster_tab.pk)
+    erster_tab.archivieren()
+
+    with pytest.raises(ValidationError, match="Nur finale Erhebungen"):
+        zweiter_tab.archivieren()
+
+
+@pytest.mark.django_db
 def test_archivieren_und_entarchivieren_bewahren_den_finalen_pin() -> None:
     """Eine archivierte Erhebung kann mit ihrem unveränderten Design zurückkehren."""
 

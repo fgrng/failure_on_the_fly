@@ -1,5 +1,6 @@
 #!/bin/sh
-# Prüft Formatierung und Lint mit Ruff, bevor ein Commit entsteht.
+# Prüft Formatierung und Lint mit Ruff und fehlende Migrationen, bevor ein
+# Commit entsteht.
 # Aktivierung: git config core.hooksPath .githooks
 # pytest läuft bewusst nicht hier, sondern in der CI, damit ein Commit
 # nur Sekunden kostet.
@@ -7,3 +8,4 @@ set -e
 
 uv run ruff format --check
 uv run ruff check
+uv run python manage.py makemigrations --check --dry-run

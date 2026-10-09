@@ -145,6 +145,7 @@ export class FakeRepo implements Repo {
   private refs = new Map<string, Set<string>>();
   private remote = new Map<string, Set<string>>();
   private messages = new Map<string, string>();
+  private files = new Map<string, string[]>();
   private nextSha = 1;
   /** Solange gesetzt, scheitert jeder Push. */
   pushFails = false;
@@ -152,6 +153,8 @@ export class FakeRepo implements Repo {
   readonly conflicting = new Set<string>();
   /** Der Branch, den der Checkout des Hosts gerade ausgecheckt hat. */
   checkedOut = "main";
+  /** Branches, die ein Worktree ausgecheckt hat, etwa der eines Mergers. */
+  readonly checkedOutElsewhere = new Set<string>();
 
   constructor(...branches: string[]) {
     for (const branch of branches) {
@@ -192,6 +195,13 @@ export class FakeRepo implements Repo {
     return "clean";
   }
 
+  async fastForward(branch: string, to: string): Promise<boolean> {
+    if (this.checkedOutElsewhere.has(branch)) return false;
+    if (!(await this.contains(to, branch))) return false;
+    this.refs.set(branch, new Set(this.commits(to)));
+    return true;
+  }
+
   async push(branch: string): Promise<void> {
     if (this.pushFails) throw new Error(`FakeRepo: Push von ${branch} abgewiesen`);
     this.remote.set(branch, new Set(this.commits(branch)));
@@ -210,9 +220,11 @@ export class FakeRepo implements Repo {
     return remote !== undefined && remote.size === local.size && [...local].every((sha) => remote.has(sha));
   }
 
-  commit(branch: string, message = ""): string {
+  /** Ein Commit auf `branch`, der `files` neu anlegt. */
+  commit(branch: string, message = "", files: string[] = []): string {
     const sha = `c${this.nextSha++}`;
     this.messages.set(sha, message);
+    this.files.set(sha, files);
     this.commits(branch).add(sha);
     return sha;
   }
@@ -222,9 +234,10 @@ export class FakeRepo implements Repo {
   }
 
   /** Ein Commit landet auf GitHub, etwa von einem anderen Rechner. */
-  commitOnOrigin(branch: string, message = ""): string {
+  commitOnOrigin(branch: string, message = "", files: string[] = []): string {
     const sha = `c${this.nextSha++}`;
     this.messages.set(sha, message);
+    this.files.set(sha, files);
     this.remoteCommits(branch).add(sha);
     return sha;
   }
@@ -248,6 +261,12 @@ export class FakeRepo implements Repo {
     this.refs.set(branch, new Set(head ? head.split(",") : []));
   }
 
+  // Die Dateien aus den Commits von `branch`, die origin/main fehlen.
+  async addedFiles(branch: string): Promise<string[]> {
+    const main = this.commits("origin/main");
+    return [...this.commits(branch)].filter((sha) => !main.has(sha)).flatMap((sha) => this.files.get(sha) ?? []);
+  }
+
   // Wie gitRepo: ein unbekannter Ref ist nirgends enthalten.
   async contains(branch: string, ref: string): Promise<boolean> {
     if (!this.refs.has(ref)) return false;
@@ -268,8 +287,11 @@ export class FakeRepo implements Repo {
   }
 }
 
-/** Was der Implementer für ein Ticket tut: neue Commits und Abschlusssignal. */
-export type ImplementerScript = { commits: number; completed: boolean };
+/**
+ * Was der Implementer für ein Ticket tut: neue Commits, Abschlusssignal und
+ * die Dateien, die sein erster Commit neu anlegt.
+ */
+export type ImplementerScript = { commits: number; completed: boolean; files?: string[] };
 
 export class FakeAgents implements Agents {
   /** Die Ticketliste jedes Planner-Aufrufs. */
@@ -302,6 +324,10 @@ export class FakeAgents implements Agents {
   readonly specReviews = new Map<number, SpecReview>();
   /** Specs, deren Fix-Implementer ohne Abschlusssignal endet. */
   readonly unfixable = new Set<number>();
+  /** Die Migrationen, die jeder Agent für Migrationstests bekam. */
+  readonly migrationTestsRemovedFor: { spec: number; migrations: string[] }[] = [];
+  /** Specs, deren Agent für Migrationstests ohne Abschlusssignal endet. */
+  readonly migrationTestsStuck = new Set<number>();
 
   constructor(private repo: FakeRepo) {}
 
@@ -328,8 +354,8 @@ export class FakeAgents implements Agents {
     return work({
       implement: async (): Promise<AgentRun> => {
         this.implemented.push(issue.id);
-        const commits = Array.from({ length: script.commits }, () =>
-          this.repo.commit(issue.branch),
+        const commits = Array.from({ length: script.commits }, (_, i) =>
+          this.repo.commit(issue.branch, "", i === 0 ? script.files : []),
         );
         return { commits, completed: script.completed };
       },
@@ -361,6 +387,12 @@ export class FakeAgents implements Agents {
     this.specSteps.push(`fix #${spec}`);
     this.fixedWith.push({ spec, findings });
     return { commits: [this.repo.commit(branch)], completed: !this.unfixable.has(spec) };
+  }
+
+  async removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun> {
+    this.specSteps.push(`migration-tests #${spec}`);
+    this.migrationTestsRemovedFor.push({ spec, migrations });
+    return { commits: [this.repo.commit(branch)], completed: !this.migrationTestsStuck.has(spec) };
   }
 
   async writePullRequest(spec: number, branch: string): Promise<PullRequestText> {

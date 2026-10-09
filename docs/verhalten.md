@@ -171,6 +171,89 @@ vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
 Eigentümer:innen.
 
+## Geschlossenes Training und Beitritt
+
+Ein Training ist geschlossen (ADR-0049). Teilnehmende sehen im
+Trainingskatalog nur Trainings, denen sie beigetreten sind; Trainingsseite,
+Vignettenwahl und Sitzungsstart eines anderen Trainings antworten mit 404, auch
+über die direkte Adresse. Kreis und Administration erreichen ihre Trainings
+wie bisher ohne Beitritt. Wer schon vor dem Trainings-Link in einem Training
+gespielt hat, gilt als beigetreten und behält Zugang und Sitzungen.
+
+Jedes Training hat einen festen Trainings-Link. Die Kuratierseite zeigt ihn
+ganz oben in einem Band „Gruppe beitreten lassen“ mit den Knöpfen „Kopieren“
+und „Sperren“ und nennt darunter die Zahl der Beigetretenen. Ist der Beitritt
+gesperrt, färbt sich das Band rot, heißt „Beitritt gesperrt“, und „Wieder
+öffnen“ hebt die Sperre auf. Jede Eigentümerin des Kreises darf sperren und
+öffnen.
+
+Wer den Link eingeloggt öffnet, tritt bei und landet auf der Trainingsseite;
+erneutes Öffnen führt ohne Fehler direkt dorthin. Ohne Anmeldung führt der
+Link über den Login zurück zum Beitritt. Bei gesperrtem Beitritt sehen neue
+Konten die Meldung „Beitritt gesperrt“ mit der Bitte, sich an die Ausbilder:in
+zu wenden; Beigetretene kommen weiter ins Training, ebenso der Eigentümer-Kreis
+und die Administration, ohne dadurch beizutreten. Der Link eines Entwurfs
+nimmt noch niemanden auf. Ein Training ohne Vignetten lässt sich
+veröffentlichen und beitreten.
+
+Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die
+Ausbilder:innen dieses Trainings sehen Ihre abgeschlossenen Sitzungen
+namentlich.“
+
+## Fremdeinsicht im Training
+
+Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze
+Breite die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen als
+Zeilen, nach Namen sortiert, und den Vignetten des Trainings in
+Kuratierreihenfolge als Spalten. Wer noch keine abgeschlossene Sitzung hat,
+steht mit gedämpfter Schrift trotzdem in der Tabelle. Jede abgeschlossene
+Sitzung erscheint in ihrer Zelle als runder Kreis mit ihrer laufenden Nummer
+zu dieser Vignette; beim Zeigen oder Fokussieren erscheint sofort ihr Datum.
+Eine leere Zelle trägt einen blassen Strich. Ein Training ohne Vignetten zeigt
+statt der Tabelle einen Hinweis.
+
+Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
+Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
+alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor
+ihrer Aufnahme, und die Administration. Laufende, abgebrochene und
+gescheiterte fremde Sitzungen, Sitzungen derselben Person in einem fremden
+Training und jede Sitzung für ausgetretene Kreismitglieder, fremde Konten oder
+die Autor:in der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für
+die Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
+
+Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
+Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie
+zeigt jede Abschrift, die eine Beigetretene für dieses Training freigegeben
+hat, beschriftet mit Erhebungsname und Importzeitpunkt, und verlinkt ihre
+abgeschlossenen Sitzungen untereinander. Ohne Freigaben steht dort „Niemand hat
+eine Abschrift freigegeben.“ Eine solche Sitzung öffnet sich lesend wie eine
+Trainingssitzung, ohne Denkspur und samt der gespielten Szene ihrer Vignette,
+auch wenn die Vignette dem Kreis nicht gehört (dritte Ausnahme in ADR-0015).
+Im Vignettenbestand des Kreises erscheint sie nicht, und aufnehmen lässt sie
+sich nicht. Eine nicht freigegebene Abschrift erscheint in keiner
+Fremdeinsicht, auch nicht für die Administration; nach dem Widerruf oder dem
+Löschen der Abschrift antwortet auch eine gemerkte Adresse mit 404.
+
+## Trainingsexport
+
+In der Werkzeugleiste über der Tabelle steht rechts der Knopf „Trainingsexport
+(ZIP)“, davor der gedämpfte Hinweis „pseudonym, nicht anonym“; sein Tooltip
+sagt, dass Kennzeichen je Export neu gezogen werden und Freitext nicht
+geschwärzt wird. Der Download heißt
+`training-<id>-<name>-<UTC-Zeitstempel>.zip` und enthält genau die Sitzungen
+der Fremdeinsicht (ADR-0049): je Person einen Ordner mit einem zufälligen
+Kennzeichen wie `teilnehmer-3f9a01c2`, darin eine Markdown-Datei je
+abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
+Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
+Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im
+Ordner der Person; private und widerrufene fehlen, ebenso laufende,
+abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten,
+keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und keinen
+Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen dürfen der
+Kreis und die Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
+unterliegt nicht dem Exportkontrakt aus ADR-0029.
+
 ## Simulationskern
 
 Autor:innen und Administrator:innen können die finale Kern-Fassung und die
@@ -279,6 +362,135 @@ aber nie zurückgegeben: Das Detail zeigt es nur maskiert mit seinen letzten vie
 Zeichen, kurze Werte ausschließlich als Punkte.
 Im freien Probelauf der Administration steht jede Konfiguration zur Auswahl als
 »Bezeichnung (Sprachmodell)«.
+
+## Evalkatalog
+
+Administrator:innen pflegen unter `/system/evalkatalog/` (Sidebar: System) den
+Evalkatalog, gegen den künftig jeder Evallauf prüft (ADR-0046). Eine Instanz
+startet ohne Katalog; einen Standardkatalog gibt es nicht. Solange die Linie
+leer ist, bietet die Seite „Evalkatalog anlegen“ an. Das legt einen leeren
+Entwurf an und öffnet dessen Editor. Es gibt höchstens einen Entwurf zugleich:
+Mit Entwurf bietet die Seite nur „Entwurf bearbeiten“ und „Entwurf verwerfen“
+an, ein zweites Anlegen wird mit einer Meldung abgelehnt. Das Verwerfen löscht
+den Entwurf, danach lässt sich wieder ein Katalog anlegen.
+
+Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Der
+Baum trägt die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“,
+darunter jedes Eval als eigenen Knoten in seiner Reihenfolge, unter jedem Eval
+seine Evalinputs.
+„Durchlauf und Vorlagen“ trägt *k*, die Zahl der
+Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
+Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
+Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
+und `$verlauf`, in der Bewerter-Vorlage die des Promptvertrags sowie
+`$kriterium` und `$verlauf`. Hervorgehoben und vorn steht der Platzhalter, den
+nur diese Vorlage kennt. Ein Klick fügt ihn an der Schreibmarke ein. Geprüft
+werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernimmt die
+Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
+Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
+Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
+
+Am Knoten „Übergreifende Kriterien“ (im Baum mit der Zahl seiner Kriterien)
+pflegt die Administrator:in die Rubriken, nach denen der Bewerter jedes
+Evalgespräch aller Evals beurteilt, etwa Rollentreue. Kriterien sind reiner Text
+ohne Platzhalter; ein Hinweis am Knoten bittet, sie kern-neutral zu formulieren
+(ADR-0046). Das ist eine Pflegeregel, keine Prüfung. „Kriterium hinzufügen“
+hängt ein leeres Kriterium ans Ende. Je Zeile rücken Hoch und Runter das
+Kriterium um eine Stelle, wie bei den Zuordnungslisten der Erhebung; Hoch ist an
+der ersten, Runter an der letzten Zeile gesperrt. Der Papierkorb löscht es. Die
+Reihenfolge bleibt gespeichert. Jede dieser Gesten übernimmt zugleich die
+getippten Texte aller Kriterien, ebenso „Änderungen speichern“. Ein Katalog darf
+ohne übergreifende Kriterien auskommen. Ein neuer Entwurf aus einer finalen
+Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle schreibenden
+Routen des Knotens erreichen nur Entwürfe.
+
+„Eval hinzufügen“ unter dem Baum hängt ein Eval namens „Neues Eval“ ans Ende und
+öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um (höchstens
+200 Zeichen, ein längerer Name bleibt ungespeichert); ein Eval ohne Namen
+erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch und
+Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
+gesperrt), der Papierkorb löscht es samt Evalkriterien und Evalinputs und führt zurück
+zu „Durchlauf und Vorlagen“. Darunter pflegt sie die Evalkriterien des Evals,
+nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
+bearbeiten, löschen und umordnen genau wie die übergreifenden Kriterien, ebenfalls
+reiner Text ohne Platzhalter. Jede Geste im Editor, auch „Eval hinzufügen“ aus
+einem anderen Knoten heraus, übernimmt zugleich alle getippten Werte des
+Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein
+ungültiger Wert dort, etwa ein negatives *k*, bleibt ungespeichert; der Editor
+nennt ihn, und „Änderungen speichern“ meldet dann keinen Erfolg. Ein neuer
+Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
+gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
+Alle schreibenden Routen der Evals und Evalkriterien erreichen nur Entwürfe.
+
+Am Eval-Knoten legt „Evalinput hinzufügen“ einen weiteren Evalinput an; ein Eval
+darf mehrere haben. Ein neuer Evalinput startet mit drei leeren, festen
+Inputschritten und öffnet seinen Knoten. Im Baum hängt jeder Evalinput unter
+seinem Eval („Evalinput 1“, „Evalinput 2“ …), daneben die Folge seiner Schritte
+als Kürzel, F für fest und G für gelenkt (etwa „FGF“). Der Knoten zeigt den
+Evalinput als Drehbuch: Die Inputschritte stehen untereinander, nach jedem steht
+„Schüler:in antwortet“. Ein Segmentknopf je Schritt wählt zwischen „sagt
+wörtlich“ (fest: der Text ist die Inputäußerung) und „formuliert nach
+Strategie“ (gelenkt: der Text ist die Inputstrategie, auch bedingt formuliert).
+Gelenkte Schritte erscheinen als gestrichelte, kursive Blase. Inputschritte
+sind reiner Text ohne Platzhalter. „Inputschritt hinzufügen“ hängt einen leeren,
+festen Schritt ans Ende; je Schritt rücken Hoch und Runter ihn um eine Stelle (am
+Rand gesperrt), der Papierkorb entfernt ihn. Reihenfolge, Art und Text bleiben
+gespeichert; jede Geste übernimmt zugleich alle getippten Werte. Der Papierkorb
+am Kopf löscht den Evalinput samt seiner Schritte und führt zurück zum Eval.
+Neben dem Drehbuch stehen die Evalkriterien des Evals, nach denen seine
+Gespräche beurteilt werden. Die Länge eines Evalgesprächs ist die Zahl der
+Inputschritte; eine eigene Obergrenze gibt es nicht. Ein neuer Entwurf aus einer
+finalen Fassung übernimmt die Evalinputs samt Inputschritten. Leere Schritte
+weist erst das Finalisieren zurück. Alle schreibenden Routen der Evalinputs und
+Inputschritte erreichen nur Entwürfe.
+
+„Finalisieren“ in der Aktionszeile des Editors übernimmt zuerst alle getippten
+Werte und prüft dann den Entwurf, ohne ein Sprachmodell aufzurufen. Abgelehnt
+wird er, wenn eine Vorlage leer ist, einen ungültigen Platzhalter enthält oder
+einen Platzhalter außerhalb ihres Vertrags (`$kriterium` in der
+Lehrperson-Vorlage, `$inputstrategie` in der Bewerter-Vorlage, unbekannte
+Namen), wenn *k* kleiner als 1 ist, wenn der Katalog kein Eval hat, ein Eval
+kein Evalkriterium oder keinen Evalinput, ein Evalinput keinen Inputschritt,
+oder wenn ein Inputschritt, ein Evalkriterium oder ein übergreifendes Kriterium
+leer ist. Übergreifende Kriterien dürfen fehlen. Der Editor nennt dann jede
+Lücke als eigene Meldung, etwa „Evalinput 2 von Eval „Muster“ hat keinen
+Inputschritt.“ oder „Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres
+Vertrags: $inputstrategie.“; der Entwurf bleibt Entwurf, die getippten Werte
+bleiben gespeichert. Ist der getippte Durchlauf selbst ungültig, etwa ein
+negatives *k*, bleibt der ungültige Wert ungespeichert, gültige Vorlagen werden
+übernommen, der Editor nennt den Fehler, und der Entwurf bleibt Entwurf. Ebenso
+bleibt er Entwurf mit einer Meldung, wenn er beim Finalisieren inzwischen
+geändert wurde. Ein vollständiger Entwurf wird final, und die
+Administrator:in landet auf der Übersicht, die zeigt, seit wann die finale
+Fassung gilt. Ab dann prüft jeder Evallauf gegen sie. Die bisherige finale
+Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt
+immer genau eine finale Fassung. Andere Apps fragen sie über
+`Evalkatalog.objects.finale_fassung()` ab, das ohne finale Fassung `None`
+liefert.
+
+Finale und überholte Fassungen lassen sich vollständig lesen, damit
+nachvollziehbar bleibt, wogegen ein älterer Evallauf geprüft hat. Die Übersicht
+führt mit „Finale Fassung lesen“ zur finalen Fassung und listet unter
+„Überholte Fassungen“ jede überholte, die zuletzt gültige zuerst, mit dem
+Datum, ab dem sie galt. Beide öffnen sich im Editor über dieselben Adressen wie
+ein Entwurf, mit Baum und allen Knoten. Ein Hinweisband nennt den Zustand („final
+seit …“ bzw. „überholt“, mit dem Datum, ab dem sie galt). Alle Felder sind
+gesperrt; Platzhalterknöpfe, Hinzufügen, Hoch, Runter, Löschen, Speichern und
+Finalisieren fehlen, die Aktionszeile führt nur zurück zur Übersicht. Jede
+schreibende Anfrage an eine finale oder überholte Fassung wird abgewiesen.
+
+„Neue Fassung“ (auf der Übersicht und im Hinweisband der finalen Fassung) leitet
+aus der finalen Fassung einen Entwurf ab und öffnet seinen Editor. Der Entwurf
+ist eine Tiefenkopie: *k*, beide Vorlagen, die übergreifenden Kriterien und der
+ganze Baum aus Evals, Evalkriterien, Evalinputs und Inputschritten (mit Art und
+Text) in gleicher Reihenfolge; er verweist auf die finale Fassung als
+Vorgängerin. Änderungen am Entwurf berühren die Vorgängerin nicht. Solange ein
+Entwurf besteht, bieten die Seiten „Neue Fassung“ nicht an, und ein Versuch wird
+mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
+überholten Fassungen und Entwürfen lässt sich keine neue Fassung ableiten.
+
+Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
+Zugriff.
 
 ## Transkriptions-Konfiguration
 
@@ -468,8 +680,20 @@ Lernauftrag und Arbeitsheft, das Transkript des Diagnosegesprächs, den Ausgang
 der Sitzung und die eigene Diagnose. Die Denkspur der simulierten Schüler:in erscheint auch hier nicht; es
 gibt weder Eingabefeld noch Sitzungsnavigation. Abschriften sind kontoprivat —
 eine fremde ist nicht erreichbar. Aus der Ansicht heraus lässt sich die Abschrift
-löschen; dabei verschwinden ihre Teilnahme und die kopierten Sitzungen, während
-die Daten der Erhebung unberührt bleiben.
+löschen; dabei verschwinden ihre Teilnahme, die kopierten Sitzungen und alle
+Freigaben, während die Daten der Erhebung unberührt bleiben.
+
+Vor dem Löschknopf steht die Sektion „Freigabe“: eine Checkbox-Liste aller
+Trainings, denen das Konto beigetreten ist, angehakt heißt freigegeben, und der
+Knopf „Freigaben speichern“. Freigegeben wird immer die ganze Abschrift, für
+beliebig viele Trainings und unabhängig davon, ob ihre Vignetten zum Training
+gehören (ADR-0049). Ein abgewählter Haken widerruft die Freigabe sofort. Ein
+Training ohne eigene Trainingsbindung wird mit 404 abgewiesen. Der Seitenkopf
+nennt die Trainings, für die die Abschrift freigegeben ist; ohne Freigabe heißt
+es dort „Ihre Abschrift — nur Sie lesen sie.“ Einen Hinweis auf bereits
+gezogene Trainingsexporte oder zur Wiedererkennung durch Forschende gibt es
+bewusst nicht. Wer noch keinem Training beigetreten ist, liest statt der Liste
+einen Hinweis.
 
 ## Erhebungen verwalten
 
@@ -574,7 +798,8 @@ Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
 stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
-löschen. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
+löschen. Lehnt das Item das Finalisieren oder Archivieren ab, etwa weil der
+Wortlaut fehlt, erscheint der Grund als Meldung auf der Detailansicht. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;
 Administrator:innen sehen alle Items. Eigentümer:innen lassen sich direkt an der
 Item-Historie hinzufügen oder entfernen. Der Kreis bleibt dabei immer besetzt;
 die eigene Entfernung übergibt die Historie an die verbleibenden Eigentümer:innen

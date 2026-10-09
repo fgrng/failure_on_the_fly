@@ -82,12 +82,19 @@ export interface Repo {
    * einem Konflikt bleibt `branch` unverändert.
    */
   mergeMain(branch: string): Promise<"clean" | "conflict">;
+  /**
+   * Setzt `branch` auf `to`, wenn das ein Fast-Forward ist und kein Worktree
+   * `branch` ausgecheckt hat; sonst bleibt er, wie er war.
+   */
+  fastForward(branch: string, to: string): Promise<boolean>;
   /** Der Commit, auf dem `branch` steht; auch für Remote-Refs wie MAIN_REF. */
   head(branch: string): Promise<string>;
   /** Setzt `branch` auf `head` zurück, ohne den Checkout des Hosts zu berühren. */
   resetBranch(branch: string, head: string): Promise<void>;
   /** Ob `branch` genau auf seinem Stand in origin steht. */
   isPushed(branch: string): Promise<boolean>;
+  /** Die Dateien, die `branch` gegenüber MAIN_REF neu anlegt. */
+  addedFiles(branch: string): Promise<string[]>;
   /** Pusht `branch` nach origin; nur sandcastle/standalone darf dabei Historie ersetzen. */
   push(branch: string): Promise<void>;
 }
@@ -119,6 +126,8 @@ export interface Agents {
   reviewSpec(spec: number, branch: string): Promise<SpecReview>;
   /** Ein Implementer behebt die Befunde auf `branch`. */
   fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
+  /** Ein Implementer streicht die Tests, die `migrations` vor- und zurückmigrieren. */
+  removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun>;
   /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`. */
   writePullRequest(spec: number, branch: string): Promise<PullRequestText>;
 }
@@ -309,7 +318,7 @@ async function activeIntegrationBranches(deps: WithLog<UpdateDeps>): Promise<str
 async function planImplementAndMerge(
   deps: WithLog<IterationDeps>,
 ): Promise<{ planned: number; landed: Assignment[] }> {
-  const { agents, log } = deps;
+  const { agents, repo, log } = deps;
   const issues = await agents.plan(await frontier(deps));
   if (issues.length === 0) {
     log("No issues to work on.");
@@ -333,8 +342,12 @@ async function planImplementAndMerge(
   const byIntegrationBranch = Map.groupBy(readyIssues, (i) => i.integrationBranch);
   for (const [into, group] of byIntegrationBranch) {
     // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
+    // Ein einzelner Branch, der per Fast-Forward passt, braucht keinen: Sein
+    // Stand ist genau der, den das Review getestet hat.
     const branches = group.map((i) => i.branch);
-    if (!(await mergeOrReset(deps, into, branches))) {
+    if (branches.length === 1 && (await repo.fastForward(into, branches[0]!))) {
+      log(`  ${into}: fast-forwarded to ${branches[0]}, no merger.`);
+    } else if (!(await mergeOrReset(deps, into, branches))) {
       log(`  ! ${into}: merger did not finish, branch reset - no ticket closed.`);
       continue;
     }
@@ -643,9 +656,10 @@ async function completedSpecs(deps: WithLog<IterationDeps>): Promise<number[]> {
   return specs;
 }
 
-// Spec-Review, Behebung der Standards- und Korrektheitsbefunde, PR-Text,
-// dann Push und PR. Endet die Behebung ohne Abschlusssignal, bleibt der PR
-// aus; der nächste Lauf beginnt die Abschlussphase von vorn.
+// Spec-Review, Behebung der Standards- und Korrektheitsbefunde, Streichen
+// der Tests auf die neuen Migrationen der Spec (ADR-0031), PR-Text, dann
+// Push und PR. Endet die Behebung oder das Streichen ohne Abschlusssignal,
+// bleibt der PR aus; der nächste Lauf beginnt die Abschlussphase von vorn.
 async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<void> {
   const { tracker, repo, agents, log } = deps;
   const branch = specBranch(spec);
@@ -661,6 +675,18 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
     }
   }
 
+  const migrations = (await repo.addedFiles(branch)).filter(isMigration);
+  if (migrations.length === 0) {
+    log(`  ${branch}: no new migrations - no migration tests to remove.`);
+  } else {
+    log(`  ${branch}: removing tests of new migrations: ${migrations.join(", ")}`);
+    const removal = await agents.removeMigrationTests(spec, branch, migrations);
+    if (!removal.completed) {
+      log(`  ! ${branch}: migration tests not removed (no completion signal) - no pull request yet.`);
+      return;
+    }
+  }
+
   const text = await agents.writePullRequest(spec, branch);
   await repo.push(branch);
   await tracker.createPullRequest({
@@ -670,6 +696,12 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
     body: specPrBody(text.body, review.spec, spec),
   });
   log(`${branch}: pushed, pull request opened.`);
+}
+
+// Eine Migrationsdatei liegt unter `<app>/migrations/`; das `__init__.py`
+// eines neuen Pakets ist keine Migration.
+function isMigration(file: string): boolean {
+  return /(^|\/)migrations\/[^/]+\.py$/.test(file) && !file.endsWith("/__init__.py");
 }
 
 // Spec-Befunde entscheidet ein Mensch; sie stehen deshalb wörtlich im PR.

@@ -23,9 +23,9 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from django.utils.text import slugify
 
-from konten.models import Konto
+from config.downloads import zip_download
+from konten.eigentuemer_views import eigentuemer_views
 from konten.navigation import (
     ist_forschende,
     rolle_erforderlich,
@@ -259,7 +259,7 @@ def _validierte_aktion_ausfuehren(
     try:
         aktion()
     except ValidationError as error:
-        messages.error(request, error.message)
+        messages.error(request, "; ".join(error.messages))
 
 
 @login_required
@@ -400,38 +400,18 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Nimmt eine weitere Forschende in den Eigentümer-Kreis auf."""
+def _kreis_der_erhebung(request: HttpRequest, pk: int) -> tuple[Erhebung, str]:
+    """Liefert die sichtbare Erhebung als Kreis und ihre Detailseite."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    konto: Konto = get_object_or_404(
-        erhebung.moegliche_ergaenzungen(), pk=request.POST.get("konto")
-    )
-    erhebung.eigentuemerinnen.add(konto)
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    return erhebung, reverse("erhebungen:detail", args=[erhebung.pk])
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
-    """Trägt eine Eigentümerin aus dem Kreis der Erhebung aus.
-
-    Wer sich selbst austrägt, landet auf der Erhebungsliste; scheitert der
-    Austritt an der Invariante, bleibt es bei der Detailseite.
-    """
-
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.austreten(konto_pk) and konto_pk == request.user.pk:
-        return redirect("erhebungen:liste")
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+    rolle_erforderlich=_forschende_oder_administratorin_erforderlich,
+    aufloesen=_kreis_der_erhebung,
+    liste="erhebungen:liste",
+)
 
 
 @login_required
@@ -440,17 +420,7 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Datenexport einer sichtbaren Erhebung synchron herunter."""
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    zeitstempel: str = (
-        timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
-    )
-    dateiname: str = (
-        f"erhebung-{erhebung.pk}-{slugify(erhebung.name)}-{zeitstempel}.zip"
-    )
-    response: HttpResponse = HttpResponse(
-        datenspur_zip(erhebung), content_type="application/zip"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
-    return response
+    return zip_download("erhebung", erhebung.pk, erhebung.name, datenspur_zip(erhebung))
 
 
 @login_required

@@ -1,16 +1,19 @@
 """Datenmodell des Simulationskerns."""
 
 from dataclasses import dataclass
-from datetime import datetime
 from string import Template
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils import timezone
+
+from simulation.lebenszyklus import (
+    FassungManager,
+    VersionierteFassung,
+    lebenszyklus_constraints,
+)
 
 _UNVERAENDERLICH_FEHLERMELDUNG: str = "ModellKonfigurationen sind append-only."
-_KERN_UNVERAENDERLICH_FEHLERMELDUNG: str = "Finale Kern-Fassungen sind unveränderlich."
 
 
 VERTRAG_PROMPT: frozenset[str] = frozenset(
@@ -36,6 +39,15 @@ PROMPT_PLATZHALTER_MIT_UMGEBUNG: frozenset[str] = frozenset(
         "arbeitsheft_simulationshinweise",
     }
 )
+# Die Werte, die der Evallauf selbst berechnet, ergänzen den Promptvertrag;
+# jede Vorlage des Evalkatalogs erhält nur ihren eigenen (ADR-0010).
+VERTRAG_EVAL: frozenset[str] = VERTRAG_PROMPT | {
+    "inputstrategie",
+    "kriterium",
+    "verlauf",
+}
+VERTRAG_LEHRPERSON: frozenset[str] = VERTRAG_PROMPT | {"inputstrategie", "verlauf"}
+VERTRAG_BEWERTER: frozenset[str] = VERTRAG_PROMPT | {"kriterium", "verlauf"}
 VERTRAG_RAHMEN: frozenset[str] = frozenset(
     {
         "schuelerin_name",
@@ -74,42 +86,7 @@ class KernHistorie(models.Model):
         ]
 
 
-class SimulationskernQuerySet(models.QuerySet["Simulationskern"]):
-    """Öffentliche Abfragen ohne direkte Schreibroute für Kern-Fassungen."""
-
-    def update(self, **kwargs: object) -> int:
-        """Hält Zustands- und Inhaltsänderungen an den Lebenszyklus-Methoden."""
-
-        raise RuntimeError("Kern-Fassungen ändern sich nur über Lebenszyklus-Methoden.")
-
-    def delete(self) -> tuple[int, dict[str, int]]:
-        """Löscht gesammelt ausschließlich Entwürfe."""
-
-        if self.exclude(zustand=Simulationskern.Zustand.ENTWURF).exists():
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete()
-
-    def bulk_create(
-        self,
-        objs: list["Simulationskern"],
-        **kwargs: object,
-    ) -> list["Simulationskern"]:
-        """Verhindert das Umgehen der Anlege-Naht per Masseneinfügen."""
-
-        raise RuntimeError("Kern-Fassungen werden über die Anlege-Naht erzeugt.")
-
-    def bulk_update(
-        self,
-        objs: list["Simulationskern"],
-        fields: list[str],
-        **kwargs: object,
-    ) -> int:
-        """Verhindert das Umgehen der Lebenszyklus-Methoden per Massenupdate."""
-
-        raise RuntimeError("Kern-Fassungen ändern sich nur über Lebenszyklus-Methoden.")
-
-
-class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySet)):
+class SimulationskernManager(FassungManager):
     """Schreibnaht für neue Fassungen des Simulationskerns."""
 
     @transaction.atomic
@@ -126,7 +103,7 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
 
         historie, _ = KernHistorie.objects.get_or_create(pk=1)
         if self.filter(historie=historie).exists():
-            raise ValueError("Der Simulationskern wurde bereits angelegt.")
+            raise ValidationError("Der Simulationskern wurde bereits angelegt.")
         return self._erstellen(
             historie=historie,
             system_prompt_vorlage=system_prompt_vorlage,
@@ -136,49 +113,14 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
             rahmenhandlung_debrief=rahmenhandlung_debrief,
         )
 
-    def create(self, **kwargs: object) -> "Simulationskern":
-        """Verhindert das Umgehen der Anlege-Naht."""
 
-        raise RuntimeError("Kern-Fassungen werden über die Anlege-Naht erzeugt.")
-
-    def _erstellen(self, **werte: object) -> "Simulationskern":
-        # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
-
-        kern: Simulationskern = self.model(**werte)
-        kern._wird_angelegt = True
-        kern.save(using=self.db)
-        return kern
-
-
-class Simulationskern(models.Model):
+class Simulationskern(VersionierteFassung):
     """Eine versionierte Fassung der zentralen Simulationsvorgaben."""
 
-    _wird_angelegt: bool
+    _bezeichnung: str = "Kern"
 
-    class Zustand(models.TextChoices):
-        """Mögliche Zustände einer Simulationskern-Fassung."""
-
-        ENTWURF = "entwurf", "Entwurf"
-        FINAL = "final", "Final"
-        ARCHIVIERT = "archiviert", "Archiviert"
-
-    zustand: models.CharField = models.CharField(
-        max_length=11,
-        choices=Zustand,
-        default=Zustand.ENTWURF,
-    )
-    finalisiert_am: models.DateTimeField = models.DateTimeField(
-        null=True,
-        blank=True,
-    )
     historie: models.ForeignKey = models.ForeignKey(
         KernHistorie,
-        on_delete=models.PROTECT,
-    )
-    vorgaengerin: models.ForeignKey = models.ForeignKey(
-        "self",
-        null=True,
-        blank=True,
         on_delete=models.PROTECT,
     )
     system_prompt_vorlage: models.TextField = models.TextField(
@@ -204,111 +146,18 @@ class Simulationskern(models.Model):
 
     objects: SimulationskernManager = SimulationskernManager()
 
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Verhindert Änderungen außerhalb der Lebenszyklus-Methoden."""
+    def _kopierwerte(self) -> dict[str, object]:
+        # Ein neuer Kern-Entwurf übernimmt alle Vorlagen der finalen Fassung.
 
-        if self._state.adding:
-            if not getattr(self, "_wird_angelegt", False):
-                raise RuntimeError(
-                    "Kern-Fassungen werden über die Anlege-Naht erzeugt."
-                )
-        else:
-            vorherige_fassung: Simulationskern = type(self).objects.get(pk=self.pk)
-            if vorherige_fassung.zustand != self.Zustand.ENTWURF:
-                raise RuntimeError(_KERN_UNVERAENDERLICH_FEHLERMELDUNG)
-            if (
-                self.zustand != vorherige_fassung.zustand
-                or self.finalisiert_am != vorherige_fassung.finalisiert_am
-            ):
-                raise RuntimeError(
-                    "Zustandswechsel laufen über die Lebenszyklus-Methoden."
-                )
-        super().save(*args, **kwargs)
-
-    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
-        """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
-
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.ENTWURF,
-            )
-            .exists()
-        ):
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
-        return super().delete(*args, **kwargs)
-
-    def _schreibqueryset(self) -> models.QuerySet["Simulationskern"]:
-        # Liefert die interne Schreibroute der Lebenszyklus-Methoden.
-
-        return models.QuerySet(model=type(self), using=self._state.db)
-
-    @transaction.atomic
-    def bearbeiten(self) -> "Simulationskern":
-        """Erzeugt aus einer finalen Fassung einen neuen Entwurf."""
-
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.FINAL,
-            )
-            .exists()
-        ):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
-        if (
-            type(self)
-            .objects.filter(
-                historie=self.historie,
-                zustand=self.Zustand.ENTWURF,
-            )
-            .exists()
-        ):
-            raise ValueError("Ein Kern-Entwurf existiert bereits.")
-        return type(self).objects._erstellen(
-            historie=self.historie,
-            vorgaengerin=self,
-            system_prompt_vorlage=self.system_prompt_vorlage,
-            user_prompt_vorlage=self.user_prompt_vorlage,
-            rahmenhandlung_einleitung=self.rahmenhandlung_einleitung,
-            rahmenhandlung_gespraechseinleitung=(
+        return {
+            "system_prompt_vorlage": self.system_prompt_vorlage,
+            "user_prompt_vorlage": self.user_prompt_vorlage,
+            "rahmenhandlung_einleitung": self.rahmenhandlung_einleitung,
+            "rahmenhandlung_gespraechseinleitung": (
                 self.rahmenhandlung_gespraechseinleitung
             ),
-            rahmenhandlung_debrief=self.rahmenhandlung_debrief,
-        )
-
-    @transaction.atomic
-    def finalisieren(self) -> None:
-        """Finalisiert einen vertragskonformen Entwurf."""
-
-        if self.zustand != self.Zustand.ENTWURF:
-            raise ValueError("Nur Entwürfe können finalisiert werden.")
-        self.full_clean()
-        self.save()
-        finalisiert_am: datetime = timezone.now()
-        # Die bisherige finale Fassung weicht vor dem eigenen Zustandswechsel:
-        # Der partielle Unique-Index duldet zwei finale Fassungen keine
-        # Anweisung lang nebeneinander. Bei der ersten Fassung der Historie
-        # trifft das Archivieren keine Zeile.
-        self._schreibqueryset().filter(
-            historie=self.historie,
-            zustand=self.Zustand.FINAL,
-        ).update(zustand=self.Zustand.ARCHIVIERT)
-        if (
-            not self._schreibqueryset()
-            .filter(
-                pk=self.pk,
-                zustand=self.Zustand.ENTWURF,
-            )
-            .update(
-                zustand=self.Zustand.FINAL,
-                finalisiert_am=finalisiert_am,
-            )
-        ):
-            raise ValueError("Der Kern-Entwurf wurde inzwischen geändert.")
-        self.zustand = self.Zustand.FINAL
-        self.finalisiert_am = finalisiert_am
+            "rahmenhandlung_debrief": self.rahmenhandlung_debrief,
+        }
 
     def clean(self) -> None:
         """Lehnt Vorlagen mit Platzhaltern außerhalb ihres Vertrags ab."""
@@ -335,30 +184,557 @@ class Simulationskern(models.Model):
     class Meta:
         """Sichert die Lebenszyklus-Invarianten der Kern-Fassungen."""
 
+        constraints: list[models.BaseConstraint] = lebenszyklus_constraints(
+            "simulation"
+        )
+
+
+class EvalkatalogHistorie(models.Model):
+    """Die einzige, namenlose Historie der Evalkatalog-Fassungen."""
+
+    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        primary_key=True,
+        default=1,
+        editable=False,
+    )
+
+    class Meta:
+        """Hält die Katalog-Historie als einzige Zeile."""
+
         constraints: list[models.BaseConstraint] = [
-            models.UniqueConstraint(
-                fields=["historie"],
-                condition=Q(zustand="entwurf"),
-                name="simulation_ein_entwurf_pro_historie",
-            ),
-            models.UniqueConstraint(
-                fields=["historie"],
-                condition=Q(zustand="final"),
-                name="simulation_eine_finale_fassung_pro_historie",
-            ),
-            models.UniqueConstraint(
-                fields=["vorgaengerin"],
-                condition=~Q(zustand="archiviert"),
-                name="simulation_keine_nichtarchivierten_schwestern",
-            ),
             models.CheckConstraint(
-                condition=(
-                    Q(zustand="entwurf", finalisiert_am__isnull=True)
-                    | (~Q(zustand="entwurf") & Q(finalisiert_am__isnull=False))
-                ),
-                name="simulation_finalisiert_am_passt_zu_zustand",
+                condition=Q(id=1),
+                name="simulation_evalkatalog_historie_ist_singleton",
             ),
         ]
+
+
+class EvalkatalogManager(FassungManager):
+    """Schreibnaht für neue Fassungen des Evalkatalogs."""
+
+    @transaction.atomic
+    def anlegen(self) -> "Evalkatalog":
+        """Legt die erste Katalog-Fassung als leeren Entwurf an.
+
+        Einen Standardkatalog gibt es nicht: Der erste Katalog entsteht in der
+        Oberfläche (ADR-0046).
+        """
+
+        historie, _ = EvalkatalogHistorie.objects.get_or_create(pk=1)
+        if self.filter(historie=historie).exists():
+            raise ValidationError("Der Evalkatalog wurde bereits angelegt.")
+        return self._erstellen(historie=historie)
+
+
+def _vorlagenmangel(
+    bezeichnung: str, vorlage: str, vertrag: frozenset[str]
+) -> str | None:
+    # Prüft eine Vorlage wie beim Kern ohne Modellaufruf: nichtleer, gültig und
+    # nur mit Platzhaltern ihres Vertrags. Liefert die Meldung oder None.
+
+    if not vorlage.strip():
+        return f"Die {bezeichnung} ist leer."
+    template: Template = Template(vorlage)
+    if not template.is_valid():
+        return f"Die {bezeichnung} enthält einen ungültigen Platzhalter."
+    fremde: list[str] = sorted(set(template.get_identifiers()) - vertrag)
+    if fremde:
+        return (
+            f"Die {bezeichnung} enthält Platzhalter außerhalb ihres Vertrags: "
+            + ", ".join(f"${name}" for name in fremde)
+            + "."
+        )
+    return None
+
+
+class Evalkatalog(VersionierteFassung):
+    """Eine versionierte Fassung der Evals, Kriterien und Vorlagen (ADR-0046)."""
+
+    _bezeichnung: str = "Evalkatalog"
+
+    historie: models.ForeignKey = models.ForeignKey(
+        EvalkatalogHistorie,
+        on_delete=models.PROTECT,
+    )
+    k: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "k",
+        default=3,
+        help_text="Wie oft jeder Evalinput durchgespielt wird.",
+    )
+    lehrperson_vorlage: models.TextField = models.TextField(
+        "Lehrperson-Vorlage",
+        blank=True,
+        default="",
+    )
+    bewerter_vorlage: models.TextField = models.TextField(
+        "Bewerter-Vorlage",
+        blank=True,
+        default="",
+    )
+
+    objects: EvalkatalogManager = EvalkatalogManager()
+
+    def _kopierwerte(self) -> dict[str, object]:
+        # Ein neuer Katalog-Entwurf übernimmt Durchlauf und Vorlagen.
+
+        return {
+            "k": self.k,
+            "lehrperson_vorlage": self.lehrperson_vorlage,
+            "bewerter_vorlage": self.bewerter_vorlage,
+        }
+
+    @transaction.atomic
+    def bearbeiten(self) -> "Evalkatalog":
+        """Erzeugt einen neuen Entwurf samt Kopie der Kriterien und des Eval-Baums."""
+
+        entwurf: Evalkatalog = super().bearbeiten()
+        for kriterium in self.uebergreifende_kriterien.all():
+            UebergreifendesKriterium(
+                katalog=entwurf, position=kriterium.position, text=kriterium.text
+            ).save()
+        for eval_ in self.evals.all():
+            kopie: Eval = Eval(
+                katalog=entwurf, position=eval_.position, name=eval_.name
+            )
+            kopie.save()
+            for evalkriterium in eval_.kriterien.all():
+                Evalkriterium(
+                    eval=kopie, position=evalkriterium.position, text=evalkriterium.text
+                ).save()
+            for evalinput in eval_.inputs.all():
+                input_kopie: Evalinput = Evalinput(
+                    eval=kopie, position=evalinput.position
+                )
+                input_kopie.save()
+                for schritt in evalinput.schritte.all():
+                    Inputschritt(
+                        evalinput=input_kopie,
+                        position=schritt.position,
+                        art=schritt.art,
+                        text=schritt.text,
+                    ).save()
+        return entwurf
+
+    def maengel(self) -> list[str]:
+        """Was dem Entwurf zum Finalisieren fehlt, je Lücke eine Meldung.
+
+        Ein Entwurf darf unvollständig gespeichert werden; geprüft wird erst
+        beim Finalisieren. Übergreifende Kriterien dürfen fehlen.
+
+        Beispiel: Ein frisch angelegter Katalog liefert ``["Die
+        Lehrperson-Vorlage ist leer.", "Die Bewerter-Vorlage ist leer.", "Der
+        Evalkatalog hat kein Eval."]``, ein vollständiger ``[]``.
+        """
+
+        meldungen: list[str] = [
+            meldung
+            for meldung in (
+                _vorlagenmangel(
+                    "Lehrperson-Vorlage", self.lehrperson_vorlage, VERTRAG_LEHRPERSON
+                ),
+                _vorlagenmangel(
+                    "Bewerter-Vorlage", self.bewerter_vorlage, VERTRAG_BEWERTER
+                ),
+            )
+            if meldung is not None
+        ]
+        if self.k < 1:
+            meldungen.append("k muss mindestens 1 sein.")
+        for nummer, kriterium in enumerate(self.uebergreifende_kriterien.all(), 1):
+            if not kriterium.text.strip():
+                meldungen.append(f"Übergreifendes Kriterium {nummer} ist leer.")
+        evals: models.QuerySet[Eval] = self.evals.prefetch_related(
+            "kriterien", "inputs__schritte"
+        )
+        if not evals:
+            meldungen.append("Der Evalkatalog hat kein Eval.")
+        for eval_ in evals:
+            name: str = f"Eval „{eval_.name or 'Unbenanntes Eval'}“"
+            kriterien: list[Evalkriterium] = list(eval_.kriterien.all())
+            inputs: list[Evalinput] = list(eval_.inputs.all())
+            if not kriterien:
+                meldungen.append(f"{name} hat kein Evalkriterium.")
+            if not inputs:
+                meldungen.append(f"{name} hat keinen Evalinput.")
+            for nummer, kriterium in enumerate(kriterien, 1):
+                if not kriterium.text.strip():
+                    meldungen.append(f"Evalkriterium {nummer} von {name} ist leer.")
+            for nummer, evalinput in enumerate(inputs, 1):
+                schritte: list[Inputschritt] = list(evalinput.schritte.all())
+                if not schritte:
+                    meldungen.append(
+                        f"Evalinput {nummer} von {name} hat keinen Inputschritt."
+                    )
+                for schrittnummer, schritt in enumerate(schritte, 1):
+                    if not schritt.text.strip():
+                        meldungen.append(
+                            f"Inputschritt {schrittnummer} in Evalinput {nummer} "
+                            f"von {name} ist leer."
+                        )
+        return meldungen
+
+    @property
+    def zustandsbezeichnung(self) -> str:
+        """Der Zustand, wie der Editor ihn nennt: archiviert heißt hier überholt."""
+
+        if self.zustand == self.Zustand.ARCHIVIERT:
+            return "Überholt"
+        return self.get_zustand_display()
+
+    @transaction.atomic
+    def finalisieren(self) -> None:
+        """Finalisiert einen vollständigen Entwurf; sonst nennt der Fehler alle Lücken."""
+
+        maengel: list[str] = self.maengel()
+        if maengel:
+            raise ValidationError(maengel)
+        super().finalisieren()
+
+    def kriterium_anlegen(self, text: str = "") -> "UebergreifendesKriterium":
+        """Hängt ein übergreifendes Kriterium ans Ende der Liste."""
+
+        return UebergreifendesKriterium.anhaengen(self, text=text)
+
+    def eval_anlegen(self, name: str = "") -> "Eval":
+        """Hängt ein Eval ans Ende des Katalogs."""
+
+        return Eval.anhaengen(self, name=name)
+
+    class Meta:
+        """Sichert die Lebenszyklus-Invarianten der Katalog-Fassungen."""
+
+        constraints: list[models.BaseConstraint] = lebenszyklus_constraints(
+            "simulation_evalkatalog"
+        )
+
+
+_NUR_AM_ENTWURF: str = "Der Evalkatalog ändert sich nur an einem Entwurf."
+
+
+def _nur_an_entwuerfen(katalog_ids: set[int]) -> None:
+    # Teile des Katalogs teilen die Schreibsperre ihrer Fassung: Jede
+    # betroffene Fassung muss ein Entwurf sein.
+
+    entwuerfe: int = Evalkatalog.objects.filter(
+        pk__in=katalog_ids, zustand=Evalkatalog.Zustand.ENTWURF
+    ).count()
+    if entwuerfe != len(katalog_ids):
+        raise ValidationError(_NUR_AM_ENTWURF)
+
+
+class KatalogteilQuerySet(models.QuerySet["Katalogteil"]):
+    """Hält auch gesammelte Schreibzugriffe an der Schreibsperre der Fassung."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Massenänderungen an Teilen des Katalogs."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def bulk_create(
+        self, objs: list["Katalogteil"], **kwargs: object
+    ) -> list["Katalogteil"]:
+        """Verhindert das Umgehen der Schreibsperre per Masseneinfügen."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def bulk_update(
+        self,
+        objs: list["Katalogteil"],
+        fields: list[str],
+        **kwargs: object,
+    ) -> int:
+        """Verhindert das Umgehen der Schreibsperre per Massenupdate."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Löscht gesammelt nur Teile von Entwürfen."""
+
+        _nur_an_entwuerfen(set(self.values_list(self.model._katalog_pfad, flat=True)))
+        return super().delete()
+
+
+class Katalogteil(models.Model):
+    """Ein geordneter Teil einer Evalkatalog-Fassung, änderbar nur am Entwurf.
+
+    Vertrag der Unterklassen: `_eltern` nennt den Fremdschlüssel, unter dem die
+    Geschwister hängen, `_katalog_pfad` den Lookup bis zur Fassung. Hängt ein
+    Teil nicht direkt am Katalog, beginnt sein Pfad mit `<_eltern>__`, etwa
+    `eval__katalog_id`.
+    """
+
+    _eltern: str
+    _katalog_pfad: str
+
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+
+    objects: models.Manager = models.Manager.from_queryset(KatalogteilQuerySet)()
+
+    class Meta:
+        """Ordnet die Teile nach ihrer gespeicherten Position."""
+
+        abstract: bool = True
+        ordering: list[str] = ["position"]
+
+    @classmethod
+    def anhaengen(cls, eltern: models.Model, **werte: object) -> "Katalogteil":
+        """Legt einen Teil hinter dem letzten seiner Geschwister an."""
+
+        letzte: int = (
+            cls.objects.filter(**{cls._eltern: eltern}).aggregate(
+                models.Max("position")
+            )["position__max"]
+            or 0
+        )
+        teil: Katalogteil = cls(**{cls._eltern: eltern}, position=letzte + 1, **werte)
+        teil.save()
+        return teil
+
+    def _geschwister(self) -> models.QuerySet["Katalogteil"]:
+        # Alle Teile unter demselben Elternteil, dieser eingeschlossen.
+
+        return type(self).objects.filter(
+            **{f"{self._eltern}_id": getattr(self, f"{self._eltern}_id")}
+        )
+
+    def _katalog_id(self) -> int | None:
+        # Die Fassung, an der der Teil hängt; tiefere Teile fragen ihr Elternteil
+        # in der Datenbank, damit auch ein umgehängter Teil die neue Fassung trifft.
+
+        eltern_id: int | None = getattr(self, f"{self._eltern}_id")
+        if "__" not in self._katalog_pfad:
+            return eltern_id
+        eltern: type[models.Model] = self._meta.get_field(self._eltern).related_model
+        return (
+            eltern.objects.filter(pk=eltern_id)
+            .values_list(self._katalog_pfad.split("__", 1)[1], flat=True)
+            .first()
+        )
+
+    def _nur_am_entwurf(self) -> None:
+        # Prüft die Fassung des Teils und beim Umhängen auch die bisherige.
+
+        bisherige: models.QuerySet = (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list(self._katalog_pfad, flat=True)
+        )
+        _nur_an_entwuerfen({self._katalog_id(), *bisherige})
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Speichert nur an einem Entwurf."""
+
+        self._nur_am_entwurf()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Löscht nur an einem Entwurf."""
+
+        self._nur_am_entwurf()
+        return super().delete(*args, **kwargs)
+
+    @transaction.atomic
+    def verschieben(self, versatz: int) -> None:
+        """Tauscht den Platz mit dem Nachbarn davor (-1) oder dahinter (+1).
+
+        Am Rand der Liste bleibt alles, wie es ist.
+        """
+
+        geschwister: models.QuerySet[Katalogteil] = self._geschwister()
+        nachbar: Katalogteil | None = (
+            geschwister.filter(position__lt=self.position).last()
+            if versatz < 0
+            else geschwister.filter(position__gt=self.position).first()
+        )
+        if nachbar is None:
+            return
+        eigene: int = self.position
+        # Die Zwischenposition 0 hält den eindeutigen Platz während des Tauschs frei.
+        self.position = 0
+        self.save(update_fields=["position"])
+        nachbar.position, self.position = eigene, nachbar.position
+        nachbar.save(update_fields=["position"])
+        self.save(update_fields=["position"])
+
+
+class UebergreifendesKriterium(Katalogteil):
+    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt.
+
+    Reiner Text ohne Platzhalter; kern-neutral zu formulieren ist eine
+    Pflegeregel, keine Mechanik (ADR-0046).
+    """
+
+    _eltern: str = "katalog"
+    _katalog_pfad: str = "katalog_id"
+
+    katalog: models.ForeignKey = models.ForeignKey(
+        Evalkatalog,
+        on_delete=models.CASCADE,
+        related_name="uebergreifende_kriterien",
+    )
+    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Katalog eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["katalog", "position"],
+                name="simulation_uebergreifendes_kriterium_position_eindeutig",
+            ),
+        ]
+
+
+class Eval(Katalogteil):
+    """Ein Prüffall des Katalogs mit eigenen Evalkriterien (ADR-0046)."""
+
+    _eltern: str = "katalog"
+    _katalog_pfad: str = "katalog_id"
+
+    katalog: models.ForeignKey = models.ForeignKey(
+        Evalkatalog,
+        on_delete=models.CASCADE,
+        related_name="evals",
+    )
+    name: models.CharField = models.CharField(
+        "Name", max_length=200, blank=True, default=""
+    )
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Katalog eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["katalog", "position"],
+                name="simulation_eval_position_eindeutig",
+            ),
+        ]
+
+    def kriterium_anlegen(self, text: str = "") -> "Evalkriterium":
+        """Hängt ein Evalkriterium ans Ende der Liste des Evals."""
+
+        return Evalkriterium.anhaengen(self, text=text)
+
+    @transaction.atomic
+    def input_anlegen(self) -> "Evalinput":
+        """Hängt einen Evalinput mit drei leeren, festen Inputschritten ans Ende."""
+
+        evalinput: Evalinput = Evalinput.anhaengen(self)
+        for _ in range(3):
+            evalinput.schritt_anlegen()
+        return evalinput
+
+
+class Evalkriterium(Katalogteil):
+    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch seines Evals beurteilt.
+
+    Reiner Text ohne Platzhalter.
+    """
+
+    _eltern: str = "eval"
+    _katalog_pfad: str = "eval__katalog_id"
+
+    eval: models.ForeignKey = models.ForeignKey(
+        Eval,
+        on_delete=models.CASCADE,
+        related_name="kriterien",
+    )
+    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Eval eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["eval", "position"],
+                name="simulation_evalkriterium_position_eindeutig",
+            ),
+        ]
+
+
+class Evalinput(Katalogteil):
+    """Wie die simulierte Lehrperson in einem Evalgespräch spricht (ADR-0046).
+
+    Eine geordnete Folge von Inputschritten; ihre Zahl ist die Länge jedes
+    Evalgesprächs dieses Evalinputs.
+    """
+
+    _eltern: str = "eval"
+    _katalog_pfad: str = "eval__katalog_id"
+
+    eval: models.ForeignKey = models.ForeignKey(
+        Eval,
+        on_delete=models.CASCADE,
+        related_name="inputs",
+    )
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Eval eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["eval", "position"],
+                name="simulation_evalinput_position_eindeutig",
+            ),
+        ]
+
+    @property
+    def kuerzel(self) -> str:
+        """Die Folge der Schritte als F (fest) und G (gelenkt), etwa „FFG“."""
+
+        return "".join(
+            "G" if schritt.gelenkt else "F" for schritt in self.schritte.all()
+        )
+
+    def schritt_anlegen(
+        self, art: "Inputschritt.Art | None" = None, text: str = ""
+    ) -> "Inputschritt":
+        """Hängt einen Inputschritt ans Ende des Drehbuchs; ohne Art einen festen."""
+
+        return Inputschritt.anhaengen(self, art=art or Inputschritt.Art.FEST, text=text)
+
+
+class Inputschritt(Katalogteil):
+    """Ein Schritt eines Evalinputs: wörtlich (fest) oder nach Strategie (gelenkt).
+
+    Bei *fest* ist der Text die Inputäußerung, bei *gelenkt* die
+    Inputstrategie. Reiner Text ohne Platzhalter.
+    """
+
+    class Art(models.TextChoices):
+        """Ob die Lehrperson den Text wörtlich sagt oder danach formuliert."""
+
+        FEST = "fest", "sagt wörtlich"
+        GELENKT = "gelenkt", "formuliert nach Strategie"
+
+    _eltern: str = "evalinput"
+    _katalog_pfad: str = "evalinput__eval__katalog_id"
+
+    evalinput: models.ForeignKey = models.ForeignKey(
+        Evalinput,
+        on_delete=models.CASCADE,
+        related_name="schritte",
+    )
+    art: models.CharField = models.CharField(
+        "Art", max_length=10, choices=Art.choices, default=Art.FEST
+    )
+    text: models.TextField = models.TextField("Text", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Evalinput eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["evalinput", "position"],
+                name="simulation_inputschritt_position_eindeutig",
+            ),
+        ]
+
+    @property
+    def gelenkt(self) -> bool:
+        """Ob die Lehrperson nach der Inputstrategie selbst formuliert."""
+
+        return self.art == self.Art.GELENKT
 
 
 class Anbieter(models.TextChoices):

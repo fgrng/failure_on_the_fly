@@ -1,16 +1,20 @@
 """Views für den privaten Fragebogen-Item-Editor."""
 
+from collections.abc import Callable
 from typing import TypedDict
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from konten.navigation import (
     ist_forschende,
     rolle_erforderlich,
 )
-from konten.models import Konto
+from konten.eigentuemer_views import eigentuemer_views
 
 from .forms import FragebogenItemForm
 from .models import FragebogenItem, FragebogenItemHistorie, LikertSkalenpol
@@ -61,6 +65,23 @@ def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
         .exclude(zustand=FragebogenItem.Zustand.ARCHIVIERT)
         .exists()
     )
+
+
+def _lebenszyklus_aktion_ausfuehren(
+    request: HttpRequest,
+    pk: int,
+    zustand: FragebogenItem.Zustand,
+    aktion: Callable[[FragebogenItem], None],
+) -> HttpResponse:
+    # Führt eine zustandsgebundene Aktion aus und zeigt Modellfehler an.
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    item: FragebogenItem = _sichtbares_item(request, pk, zustand=zustand)
+    try:
+        aktion(item)
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+    return redirect("fragebogen_items:detail", pk=item.pk)
 
 
 @login_required
@@ -169,40 +190,33 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
 @_forschende_oder_administratorin_erforderlich
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert einen sichtbaren Entwurf über die Modell-Naht."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(
-        request,
-        pk,
-        zustand=FragebogenItem.Zustand.ENTWURF,
+    return _lebenszyklus_aktion_ausfuehren(
+        request, pk, FragebogenItem.Zustand.ENTWURF, FragebogenItem.finalisieren
     )
-    item.finalisieren()
-    return redirect("fragebogen_items:detail", pk=item.pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
 def archivieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Archiviert eine sichtbare finale Fassung über die Modell-Naht."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.FINAL)
-    item.archivieren()
-    return redirect("fragebogen_items:detail", pk=item.pk)
-
-
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_hinzufuegen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Teilt eine sichtbare Item-Historie mit einer weiteren Forschenden."""
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item: FragebogenItem = _sichtbares_item(request, pk)
-    konto: Konto = get_object_or_404(
-        item.historie.moegliche_ergaenzungen(), pk=request.POST.get("konto")
+    return _lebenszyklus_aktion_ausfuehren(
+        request, pk, FragebogenItem.Zustand.FINAL, FragebogenItem.archivieren
     )
-    item.historie.eigentuemerinnen.add(konto)
-    return redirect("fragebogen_items:detail", pk=item.pk)
+
+
+def _kreis_des_items(
+    request: HttpRequest, pk: int
+) -> tuple[FragebogenItemHistorie, str]:
+    # Liefert den Kreis der Item-Historie und die Detailseite der Fassung.
+    item: FragebogenItem = _sichtbares_item(request, pk)
+    return item.historie, reverse("fragebogen_items:detail", args=[item.pk])
+
+
+eigentuemerin_hinzufuegen, eigentuemerin_entfernen = eigentuemer_views(
+    rolle_erforderlich=_forschende_oder_administratorin_erforderlich,
+    aufloesen=_kreis_des_items,
+    liste="fragebogen_items:liste",
+)
 
 
 @login_required
@@ -227,21 +241,3 @@ def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
     item = _sichtbares_item(request, pk, zustand=FragebogenItem.Zustand.ENTWURF)
     item.delete()
     return redirect("fragebogen_items:liste")
-
-
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def eigentuemerin_entfernen(
-    request: HttpRequest, pk: int, konto_pk: int
-) -> HttpResponse:
-    """Trägt eine Eigentümerin aus dem Kreis der Item-Historie aus.
-
-    Wer sich selbst austrägt, landet in der Item-Bibliothek; scheitert der
-    Austritt an der Invariante, bleibt es bei der Detailseite.
-    """
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    item: FragebogenItem = _sichtbares_item(request, pk)
-    if item.historie.austreten(konto_pk) and konto_pk == request.user.pk:
-        return redirect("fragebogen_items:liste")
-    return redirect("fragebogen_items:detail", pk=item.pk)

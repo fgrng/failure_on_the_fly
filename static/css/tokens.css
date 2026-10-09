@@ -88,6 +88,7 @@
     /* ---- Semantisch: Status- und Rückmeldungsfarben ---- */
     --color-success: var(--phsg-green-dark);
     --color-info: var(--phsg-blue-dark);
+    --color-tooltip: var(--phsg-blue-deep); /* dunkle Pille sofortiger Tooltips */
 
     /* ---- Typografie ---- */
     --font-heading: "Platypi", Georgia, serif;

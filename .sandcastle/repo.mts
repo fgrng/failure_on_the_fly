@@ -70,6 +70,15 @@ export const gitRepo: Repo = {
     return "clean";
   },
 
+  async fastForward(branch: string, to: string): Promise<boolean> {
+    if (!(await gitRepo.contains(to, branch))) return false;
+    // Den Branch eines Worktrees verschiebt nur, wer dort arbeitet.
+    if (checkedOutBranches().has(branch)) return false;
+    // Der alte Stand als dritter Wert: Ist `branch` inzwischen weiter, scheitert update-ref.
+    git(["update-ref", `refs/heads/${branch}`, await gitRepo.head(to), await gitRepo.head(branch)]);
+    return true;
+  },
+
   async head(branch: string): Promise<string> {
     // Lokaler Branch oder Remote-Ref wie origin/main.
     return git(["rev-parse", "--verify", `${branch}^{commit}`]).trim();
@@ -92,6 +101,15 @@ export const gitRepo: Repo = {
     } catch {
       return false;
     }
+  },
+
+  async addedFiles(branch: string): Promise<string[]> {
+    // Drei Punkte: gemessen ab der Merge-Basis, nicht gegen den heutigen Stand von main.
+    // Ohne Umbenennungen bleibt eine Datei, die eine gelöschte ersetzt, neu;
+    // `-z` liefert Pfade mit Umlauten unmaskiert.
+    return git(["diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", `${MAIN_REF}...${branch}`])
+      .split("\0")
+      .filter(Boolean);
   },
 
   async push(branch: string): Promise<void> {

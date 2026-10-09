@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Evalkatalog{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/system-page.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page system-page area--system">
+    <header class="page-head">
+        <div>
+            <p>System / Evalkatalog</p>
+            <h1>Evalkatalog</h1>
+            <span>Evals, Kriterien und Vorlagen, gegen die jeder Evallauf prüft.</span>
+        </div>
+    </header>
+
+    {% if finale_fassung %}
+        <h2>Finale Fassung</h2>
+        <p>Final seit {{ finale_fassung.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen diese Fassung.</p>
+        <div class="page-actions">
+            <a class="button button--secondary" href="{% url 'simulation:evalkatalog_editor' finale_fassung.pk %}">Finale Fassung lesen</a>
+            {% if not entwurf %}
+                {% include "simulation/includes/evalkatalog_neue_fassung.html" with fassung=finale_fassung %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if entwurf %}
+        <h2>Entwurf</h2>
+        <div class="page-actions">
+            <a class="button" href="{% url 'simulation:evalkatalog_editor' entwurf.pk %}">Entwurf bearbeiten</a>
+            <form method="post" action="{% url 'simulation:evalkatalog_verwerfen' entwurf.pk %}">
+                {% csrf_token %}
+                <button class="button button--secondary" type="submit">Entwurf verwerfen</button>
+            </form>
+        </div>
+    {% elif katalog_fehlt %}
+        <h2>Noch kein Evalkatalog</h2>
+        <p class="system-page-empty">Die Instanz hat noch keine Evals. Legen Sie den ersten Katalog als leeren Entwurf an.</p>
+        <div class="page-actions">
+            <form method="post" action="{% url 'simulation:evalkatalog_anlegen' %}">
+                {% csrf_token %}
+                <button class="button" type="submit">Evalkatalog anlegen</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if ueberholte_fassungen %}
+        <h2>Überholte Fassungen</h2>
+        <ul>
+            {% for fassung in ueberholte_fassungen %}
+                <li><a href="{% url 'simulation:evalkatalog_editor' fassung.pk %}">Fassung vom {{ fassung.finalisiert_am|date:"d.m.Y H:i" }}</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
+{% endblock %}

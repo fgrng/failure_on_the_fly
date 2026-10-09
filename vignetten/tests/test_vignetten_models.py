@@ -779,6 +779,42 @@ class VignetteFinalisierenTests(TestCase):
                 with self.assertRaisesMessage(ValidationError, "Entwürfe"):
                     vignette.finalisieren()
 
+    def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
+        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
+        zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
+        erster_tab.finalisieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur Entwürfe können finalisiert werden."
+        ):
+            zweiter_tab.finalisieren()
+
+    def test_archivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen archivierte Fassung meldet den abgelehnten Übergang."""
+        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
+        erster_tab.finalisieren()
+        zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
+        erster_tab.archivieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur finale Fassungen können archiviert werden."
+        ):
+            zweiter_tab.archivieren()
+
+    def test_entarchivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
+        """Eine inzwischen entarchivierte Fassung meldet den abgelehnten Übergang."""
+        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
+        erster_tab.finalisieren()
+        erster_tab.archivieren()
+        zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
+        erster_tab.entarchivieren()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Nur archivierte Fassungen können entarchiviert werden."
+        ):
+            zweiter_tab.entarchivieren()
+
     def test_finalisieren_lehnt_leeren_lernauftrag_ab(self) -> None:
         """Der Lernauftrag braucht sichtbar Text oder ein Bild."""
         vignette: Vignette = self._vollstaendigen_entwurf_anlegen()

@@ -26,9 +26,11 @@ Browser ──HTTPS──> Uberspace-Frontend (nginx + Apache, Let's-Encrypt-Zer
 
 Konsequenzen, die den Rest der Anleitung erklären:
 
-- **Ein Prozess, mehrere Worker.** gunicorn läuft als supervisord-Dienst mit drei
-  Workern. Ein Gesprächsschritt wartet synchron auf das Sprachmodell; deshalb das
-  großzügige Worker-Timeout.
+- **Ein Dienst, drei Prozesse mit je 60 Threads.** gunicorn läuft als
+  supervisord-Dienst mit dem Thread-Worker. Ein Gesprächsschritt wartet synchron
+  auf das Sprachmodell, eine Transkription auf ihren Anbieter; jede wartende
+  Anfrage hält einen Thread. Ausgelegt ist das für 150 gleichzeitige Sitzungen
+  (ADR-0050).
 - **SQLite, kein MySQL.** Die Datenbank ist eine Datei im Home. Sie läuft im
   WAL-Modus mit wartendem Writer (siehe `config/settings.py`), damit mehrere
   gleichzeitige Teilnahmen parallel schreiben können. Das automatische
@@ -205,7 +207,7 @@ mkdir -p ~/etc/services.d
 cat > ~/etc/services.d/failure-on-the-fly.ini <<'EOF'
 [program:failure-on-the-fly]
 directory=%(ENV_HOME)s/failure_on_the_fly
-command=%(ENV_HOME)s/failure_on_the_fly/.venv/bin/gunicorn --error-logfile - --bind 0.0.0.0:8000 --workers 3 --timeout 180 config.wsgi:application
+command=%(ENV_HOME)s/failure_on_the_fly/.venv/bin/gunicorn --error-logfile - --bind 0.0.0.0:8000 --worker-class gthread --workers 3 --threads 60 --worker-connections 60 --timeout 180 config.wsgi:application
 startsecs=30
 autostart=yes
 autorestart=yes
@@ -217,14 +219,30 @@ Zu den Werten:
 - **`--bind 0.0.0.0:8000`** — das Uberspace-Frontend erreicht nur Dienste auf
   `0.0.0.0` oder `::`; `127.0.0.1` funktioniert ausdrücklich nicht. Der Port ist
   frei wählbar zwischen 1024 und 65535, muss aber zum Backend in Schritt 8 passen.
-- **`--workers 3`** — drei gleichzeitige Anfragen. Da ein Gesprächsschritt
-  synchron auf das Sprachmodell wartet, belegt jede laufende Antwort einen Worker.
-  Für eine Erhebung mit vielen parallelen Teilnahmen darf der Wert höher liegen;
-  jeder Worker kostet Arbeitsspeicher.
-- **`--timeout 180`** — Notbremse, nicht Normalfall. Beide Nähte begrenzen sich
-  selbst: Ein Gesprächsschritt wartet über alle Versuche zusammen höchstens 90 s,
-  eine Transkription höchstens 120 s. Das Worker-Timeout muss darüber liegen,
-  sonst tötet gunicorn eine Anfrage, die noch legitim wartet.
+- **`--worker-class gthread`** — jede Anfrage läuft in einem Thread. Ein
+  Gesprächsschritt (bis 90 s) oder eine Transkription (bis 120 s) hält nur
+  diesen Thread, nicht den ganzen Prozess.
+- **`--workers 3`** — drei Prozesse. Der Arbeitsspeicher hängt am Prozess: Ein
+  Worker belegt rund 230 MB, die Threads darin fast nichts. Drei Prozesse
+  belegen gut 700 MB der 1,5 GB, die ein Uberspace erlaubt; der Rest bleibt für
+  den Evallauf-Prozess, Backup, SSH und Audio-Uploads. Ein vierter Prozess
+  kostet ein Drittel dieser Reserve.
+- **`--threads 60`** — 3 × 60 = 180 gleichzeitige Anfragen: 150 wartende
+  Sitzungen aus fünf Seminargruppen und Luft für Seitenaufrufe und Lehrende.
+  Mehr gleichzeitige Sitzungen brauchen mehr Threads, nicht mehr Prozesse;
+  Uberspace erlaubt 1024 Prozesse und Threads zusammen.
+- **`--worker-connections 60`** — gleich der Threadzahl. Sonst nimmt ein voll
+  belegter Prozess weitere Verbindungen an und staut sie hinter seinen
+  Threads, während ein anderer Prozess freie hat. Wer `--threads` ändert,
+  ändert diesen Wert mit.
+- **`--timeout 180`** — Notbremse für einen hängenden Prozess, nicht für eine
+  einzelne Anfrage: Beim Thread-Worker meldet sich der Prozess weiter, solange
+  seine Threads warten. Die Haltezeit einer Anfrage begrenzen die beiden Nähte
+  selbst — ein Gesprächsschritt wartet über alle Versuche zusammen höchstens
+  90 s, eine Transkription höchstens 120 s — und von außen das
+  Uberspace-Frontend, das eine Verbindung nach drei Minuten ohne Daten
+  schließt. Der Wert bleibt über 120 s, damit ein Prozess, der gerade nur
+  wartende Threads führt, nie als hängend gilt.
 - **`--error-logfile -`** — gunicorn schreibt seine Fehler nach stderr, wo
   supervisord sie einsammelt.
 
@@ -498,8 +516,8 @@ Häufige Stolpersteine:
 | Bilder erscheinen nicht | `MEDIA_ROOT` zeigt nicht ins Docroot | `.env` prüfen, `/media`-Backend setzen |
 | `uberspace web backend list` sagt `no service` | Dienst läuft nicht oder falscher Port | `supervisorctl status`, Port in `.ini` und Backend abgleichen |
 | `wrong interface (::1)` | gunicorn lauscht auf localhost | `--bind 0.0.0.0:8000` |
-| Gesprächsschritt bricht nach ~180 s ab | Worker-Timeout erreicht | Anbieter/Modell prüfen; das Timeout ist die Notbremse, nicht die Ursache |
-| 502 nur unter Last | Alle Worker warten auf das Sprachmodell | `--workers` erhöhen, Dienst neu starten |
+| Gesprächsschritt bricht nach ~180 s ab | Das Frontend schließt Verbindungen nach drei Minuten ohne Daten | Anbieter/Modell prüfen; beide Nähte begrenzen sich auf 90 s bzw. 120 s, ein längeres Warten ist ein Fehler im Code |
+| 502 oder lange Ladezeiten nur unter Last | Alle Threads warten auf einen Anbieter | `--threads` und `--worker-connections` gemeinsam erhöhen, nicht `--workers`; Dienst neu starten. Häufen sich zugleich Anbieterfehler, greift eher ein Rate-Limit des Anbieters (`docs/research/2026-10-08-worker-belegung-uberspace-anbieter.md`) |
 | Dienst startet nach `supervisorctl update` nicht | `SECRET_KEY` fehlt in der `.env` | `.env` prüfen; Django bricht ohne Schlüssel beim Import ab |
 
 ## 14. Was beim Produktivbetrieb zu bedenken ist
