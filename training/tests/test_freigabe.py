@@ -19,18 +19,13 @@ from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import Verwendung
 from sitzungen.models import Sitzung
 from training.models import Abschrift, Training
-from training.tests.aufbau import abschrift
+from training.tests.aufbau import abschrift_mit_sitzung, ansehen_url
 from vignetten.models import Vignette
 
 
 def _sitzung(abschrift: Abschrift) -> Sitzung:
     # Die eine kopierte Sitzung der Abschrift.
     return abschrift.teilnahme.sitzung_set.get()
-
-
-def _ansehen_url(sitzung: Sitzung) -> str:
-    # Adresse der lesenden Sitzungsansicht.
-    return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
 class FreigabeTestCase(TestCase):
@@ -57,7 +52,9 @@ class FreigabeTestCase(TestCase):
         )
         self.training.veroeffentlichen()
         self.training.beitreten(self.teilnehmerin)
-        self.abschrift: Abschrift = abschrift(self.teilnehmerin, self.erhebungsvignette)
+        self.abschrift: Abschrift = abschrift_mit_sitzung(
+            self.teilnehmerin, self.erhebungsvignette
+        )
 
     def _freigeben(self, *trainings: Training) -> HttpResponse:
         # Speichert die Freigaben der Abschrift aus Sicht der Teilnehmerin.
@@ -88,7 +85,7 @@ class FreigabeTestCase(TestCase):
     def _status_fuer(self, konto: Konto) -> int:
         # Öffnet die Sitzung der Abschrift aus Sicht des Kontos.
         self.client.force_login(konto)
-        return self.client.get(_ansehen_url(_sitzung(self.abschrift))).status_code
+        return self.client.get(ansehen_url(_sitzung(self.abschrift))).status_code
 
 
 class FreigebenTests(FreigabeTestCase):
@@ -243,7 +240,7 @@ class FreigebenTests(FreigabeTestCase):
     def test_abschriftseite_ohne_beitritt_bietet_keine_freigabe_an(self) -> None:
         """Wer keinem Training beigetreten ist, bekommt keine Checkbox-Liste."""
         ohne_training: Konto = Konto.objects.create_user(username="linus")
-        self.abschrift = abschrift(ohne_training, self.erhebungsvignette)
+        self.abschrift = abschrift_mit_sitzung(ohne_training, self.erhebungsvignette)
         self.teilnehmerin = ohne_training
 
         seite: str = self._abschriftseite()
@@ -297,7 +294,9 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         with time_machine.travel(
             datetime(2026, 7, 2, 0, 30, tzinfo=ZoneInfo("Europe/Berlin"))
         ):
-            self.abschrift = abschrift(self.teilnehmerin, self.erhebungsvignette)
+            self.abschrift = abschrift_mit_sitzung(
+                self.teilnehmerin, self.erhebungsvignette
+            )
         self._freigeben(self.training)
 
         seite: str = self._kuratierseite()
@@ -322,19 +321,19 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Sitzung lässt sich aus der Liste lesend öffnen."""
         self._freigeben(self.training)
 
-        self.assertIn(_ansehen_url(_sitzung(self.abschrift)), self._kuratierseite())
+        self.assertIn(ansehen_url(_sitzung(self.abschrift)), self._kuratierseite())
 
     def test_nicht_abgeschlossene_sitzung_der_abschrift_ist_nicht_verlinkt(
         self,
     ) -> None:
         """Auch in der Abschrift zählen nur abgeschlossene Sitzungen."""
-        abgebrochen: Abschrift = abschrift(
+        abgebrochen: Abschrift = abschrift_mit_sitzung(
             self.teilnehmerin, self.erhebungsvignette, Sitzung.Status.ABGEBROCHEN
         )
         self.abschrift = abgebrochen
         self._freigeben(self.training)
 
-        self.assertNotIn(_ansehen_url(_sitzung(abgebrochen)), self._kuratierseite())
+        self.assertNotIn(ansehen_url(_sitzung(abgebrochen)), self._kuratierseite())
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
 
     def test_freigegebene_abschriften_stehen_nach_namen_sortiert(self) -> None:
@@ -344,7 +343,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         )
         self.training.beitreten(ada_lovelace)
         frueh: Abschrift = self.abschrift
-        self.abschrift = abschrift(ada_lovelace, self.erhebungsvignette)
+        self.abschrift = abschrift_mit_sitzung(ada_lovelace, self.erhebungsvignette)
         self.teilnehmerin = ada_lovelace
         self._freigeben(self.training)
         self.abschrift, self.teilnehmerin = frueh, frueh.konto
@@ -359,7 +358,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(_sitzung(self.abschrift)))
+        response: HttpResponse = self.client.get(ansehen_url(_sitzung(self.abschrift)))
 
         self.assertContains(response, "Ich habe nur oben geteilt.")
         self.assertContains(response, "Nur den Zähler gekürzt.")
@@ -370,7 +369,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(_sitzung(self.abschrift)))
+        response: HttpResponse = self.client.get(ansehen_url(_sitzung(self.abschrift)))
 
         self.assertNotContains(response, "Geheime Denkspur aus der Erhebung.")
 

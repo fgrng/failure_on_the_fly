@@ -12,13 +12,12 @@ from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE
 from sitzungen.models import Sitzung
 from training.models import Training
-from training.tests.aufbau import FremdeinsichtTestCase, gespielte_sitzung
+from training.tests.aufbau import (
+    FremdeinsichtTestCase,
+    ansehen_url,
+    gespielte_sitzung,
+)
 from vignetten.models import Vignette
-
-
-def _ansehen_url(sitzung: Sitzung) -> str:
-    # Adresse der lesenden Sitzungsansicht.
-    return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
 class SitzungAnsehenTests(FremdeinsichtTestCase):
@@ -32,7 +31,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
             self.training, self.teilnehmerin, self.vignette, status
         )
         self.client.force_login(konto)
-        return self.client.get(_ansehen_url(sitzung)).status_code
+        return self.client.get(ansehen_url(sitzung)).status_code
 
     def test_kreismitglied_liest_eine_abgeschlossene_sitzung(self) -> None:
         """Die Eigentümerin sieht Transkript und Diagnose ihrer Gruppe."""
@@ -41,7 +40,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         )
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         self.assertContains(response, "Ich habe oben und unten zusammengezählt.")
 
@@ -52,7 +51,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         )
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         self.assertContains(response, "Zähler und Nenner addiert.")
 
@@ -65,7 +64,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         self.training.eigentuemerinnen.add(neues_mitglied)
         self.client.force_login(neues_mitglied)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         self.assertEqual(response.status_code, 200)
 
@@ -112,7 +111,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         )
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         self.assertNotContains(response, "Geheime Denkspur der Schülerin.")
 
@@ -123,7 +122,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         )
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         for bedienelement in (
             reverse("training:abbrechen"),
@@ -148,7 +147,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         )
         self.client.force_login(self.ausbilderin)
 
-        response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+        response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         self.assertEqual(response.status_code, 404)
 
@@ -165,7 +164,7 @@ class SelbsteinsichtTests(FremdeinsichtTestCase):
                     self.training, self.teilnehmerin, self.vignette, status
                 )
 
-                response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+                response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
                 self.assertEqual(response.status_code, 200)
 
@@ -178,7 +177,7 @@ class SelbsteinsichtTests(FremdeinsichtTestCase):
                     self.training, self.teilnehmerin, self.vignette, status
                 )
 
-                response: HttpResponse = self.client.get(_ansehen_url(sitzung))
+                response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
                 self.assertNotContains(response, "Geheime Denkspur der Schülerin.")
 
@@ -219,7 +218,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             self.training, self.teilnehmerin, self.vignette
         )
 
-        self.assertIn(_ansehen_url(sitzung), self._kuratierseite())
+        self.assertIn(ansehen_url(sitzung), self._kuratierseite())
 
     def test_nicht_abgeschlossene_sitzung_ist_nicht_verlinkt(self) -> None:
         """Laufende, abgebrochene und gescheiterte Sitzungen fehlen."""
@@ -233,7 +232,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
                     self.training, self.teilnehmerin, self.vignette, status
                 )
 
-                self.assertNotIn(_ansehen_url(sitzung), self._kuratierseite())
+                self.assertNotIn(ansehen_url(sitzung), self._kuratierseite())
 
     def test_sitzungen_sind_je_vignette_nummeriert_und_datiert(self) -> None:
         """Mehrere Durchläufe stehen einzeln, mit Nummer und Datum."""

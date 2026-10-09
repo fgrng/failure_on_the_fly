@@ -7,6 +7,7 @@ aus den gemeinsamen Helfern.
 """
 
 from django.test import TestCase
+from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
@@ -22,6 +23,40 @@ from training.models import Abschrift, Training
 from vignetten.models import Vignette
 
 
+def ansehen_url(sitzung: Sitzung) -> str:
+    """Adresse der lesenden Sitzungsansicht."""
+
+    return reverse("training:sitzung_ansehen", args=[sitzung.pk])
+
+
+def _sitzung_mit_verlauf(
+    teilnahme: Teilnahme,
+    vignette: Vignette,
+    status: Sitzung.Status,
+    eingabe: str,
+    denkspur: str,
+    aeusserung: str,
+    diagnose: str,
+) -> Sitzung:
+    # Eine Sitzung mit einem Gesprächsschritt und einer Diagnose.
+    sitzung: Sitzung = Sitzung.objects.create(
+        teilnahme=teilnahme,
+        vignette=vignette,
+        simulationskern=finaler_kern(),
+        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
+        status=status,
+    )
+    Gespraechsschritt.objects.create(
+        sitzung=sitzung,
+        eingabe=eingabe,
+        denkspur=denkspur,
+        aeusserung=aeusserung,
+        reihenfolge=1,
+    )
+    Diagnose.objects.create(sitzung=sitzung, text=diagnose)
+    return sitzung
+
+
 def gespielte_sitzung(
     training: Training,
     konto: Konto,
@@ -29,53 +64,46 @@ def gespielte_sitzung(
     status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
     aeusserung: str = "Ich habe oben und unten zusammengezählt.",
 ) -> Sitzung:
-    """Legt eine gespielte Sitzung unter der Trainingsbindung des Kontos an."""
+    """Legt eine gespielte Sitzung unter der Trainingsbindung des Kontos an.
 
-    sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=training.bindung_fuer(konto).teilnahme,
-        vignette=vignette,
-        simulationskern=finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
-        status=status,
-    )
-    Gespraechsschritt.objects.create(
-        sitzung=sitzung,
+    Setzt eine aktive Modell-Konfiguration für die Schülerin voraus.
+    """
+
+    return _sitzung_mit_verlauf(
+        training.bindung_fuer(konto).teilnahme,
+        vignette,
+        status,
         eingabe="Wie hast du gerechnet?",
         denkspur="Geheime Denkspur der Schülerin.",
         aeusserung=aeusserung,
-        reihenfolge=1,
+        diagnose="Zähler und Nenner addiert.",
     )
-    Diagnose.objects.create(sitzung=sitzung, text="Zähler und Nenner addiert.")
-    return sitzung
 
 
-def abschrift(
+def abschrift_mit_sitzung(
     konto: Konto,
     vignette: Vignette,
     status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
 ) -> Abschrift:
-    """Legt eine Abschrift mit einer kopierten Sitzung samt Denkspur an."""
+    """Legt eine Abschrift mit einer kopierten Sitzung samt Denkspur an.
+
+    Setzt eine aktive Modell-Konfiguration für die Schülerin voraus.
+    """
 
     angelegt: Abschrift = Abschrift.objects.create(
         teilnahme=Teilnahme.objects.create(),
         konto=konto,
         erhebungsname="Studie Bruchrechnung",
     )
-    sitzung: Sitzung = Sitzung.objects.create(
-        teilnahme=angelegt.teilnahme,
-        vignette=vignette,
-        simulationskern=finaler_kern(),
-        modell_konfiguration=ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
-        status=status,
-    )
-    Gespraechsschritt.objects.create(
-        sitzung=sitzung,
+    _sitzung_mit_verlauf(
+        angelegt.teilnahme,
+        vignette,
+        status,
         eingabe="Wie hast du gekürzt?",
         denkspur="Geheime Denkspur aus der Erhebung.",
         aeusserung="Ich habe nur oben geteilt.",
-        reihenfolge=1,
+        diagnose="Nur den Zähler gekürzt.",
     )
-    Diagnose.objects.create(sitzung=sitzung, text="Nur den Zähler gekürzt.")
     return angelegt
 
 

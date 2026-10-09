@@ -17,7 +17,7 @@ from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
 from training.models import Abschrift, Training
 from training.tests.aufbau import (
     FremdeinsichtTestCase,
-    abschrift,
+    abschrift_mit_sitzung,
     gespielte_sitzung,
 )
 
@@ -295,7 +295,7 @@ class InhaltTests(TrainingsexportTestCase):
     def test_kein_kontoname_und_keine_mailadresse(self) -> None:
         """Weder Name, Benutzername noch Mailadresse stehen im Archiv."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        kopie: Abschrift = abschrift(self.teilnehmerin, self.vignette)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
         self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
@@ -339,7 +339,7 @@ class AbschriftTests(TrainingsexportTestCase):
     ) -> None:
         """Sie liegt im Ordner der Person, benannt nach der Erhebung."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        kopie: Abschrift = abschrift(self.teilnehmerin, self.vignette)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
         self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
@@ -355,7 +355,7 @@ class AbschriftTests(TrainingsexportTestCase):
 
     def test_erhebungsname_bricht_nicht_aus_dem_ordner_aus(self) -> None:
         """Schrägstriche und Punkte im Namen werden kein Pfad."""
-        kopie: Abschrift = abschrift(self.teilnehmerin, self.vignette)
+        kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
         kopie.erhebungsname = "../../Studie/Bruch"
         kopie.save(update_fields=["erhebungsname"])
         self._freigeben(kopie, self.training)
@@ -366,14 +366,16 @@ class AbschriftTests(TrainingsexportTestCase):
 
     def test_private_abschrift_fehlt(self) -> None:
         """Ohne Freigabe geht die Abschrift nicht hinaus."""
-        abschrift(self.teilnehmerin, self.vignette)
+        abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
 
         self.assertEqual(self._archiv(), {})
 
     def test_zwei_abschriften_derselben_erhebung_bleiben_getrennt(self) -> None:
         """Gleiche Erhebungsnamen überschreiben einander nicht."""
         for _ in range(2):
-            self._freigeben(abschrift(self.teilnehmerin, self.vignette), self.training)
+            self._freigeben(
+                abschrift_mit_sitzung(self.teilnehmerin, self.vignette), self.training
+            )
 
         archiv: dict[str, str] = self._archiv()
 
@@ -390,10 +392,14 @@ class AbschriftTests(TrainingsexportTestCase):
     ) -> None:
         """Eine leer ausgehende Abschrift schiebt die nächste nicht auf „-2“."""
         self._freigeben(
-            abschrift(self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN),
+            abschrift_mit_sitzung(
+                self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
+            ),
             self.training,
         )
-        self._freigeben(abschrift(self.teilnehmerin, self.vignette), self.training)
+        self._freigeben(
+            abschrift_mit_sitzung(self.teilnehmerin, self.vignette), self.training
+        )
 
         (name,) = self._archiv()
 
