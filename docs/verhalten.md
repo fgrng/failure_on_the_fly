@@ -157,7 +157,9 @@ das für alle. »Bearbeiten« öffnet nur diesen Text, bei den Szenentexten im
 Markdown-Feld mit Vorschau, mit eigenen Knöpfen »Speichern« und »Abbrechen«.
 Jeder Speichern-Knopf, am Text wie »Änderungen speichern« oder »Vignette
 anlegen«, speichert die ganze Vignette mit allen Feldern und allen geöffneten
-Texten; beim Anlegen legt er sie an. »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein Text mit
+Texten; beim Anlegen legt er sie an. Gibt es noch keinen finalen
+Simulationskern, legt »Vignette anlegen« nichts an: Das Formular nennt den
+Grund, die Eingaben bleiben stehen. »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein Text mit
 Fehler steht nach dem Speichern offen. Wer die Seite mit ungespeicherten
 Änderungen verlässt, wird vom Browser gewarnt. Die Bildbeschreibung bleibt Teil
 der Bildkarte.
