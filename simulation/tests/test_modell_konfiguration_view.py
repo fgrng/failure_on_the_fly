@@ -304,9 +304,14 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
             reverse("simulation:modell_konfiguration")
         )
 
-        for beschriftung, _ in submit_knoepfe(response):
-            if beschriftung != "Abmelden":
-                self.assertRegex(beschriftung, r"^Für .+ aktivieren")
+        gesten: list[str] = [
+            beschriftung
+            for beschriftung, _ in submit_knoepfe(response)
+            if beschriftung != "Abmelden"
+        ]
+        self.assertTrue(gesten)
+        for beschriftung in gesten:
+            self.assertRegex(beschriftung, r"^Für .+ aktivieren")
 
     def test_zeigt_das_token_nur_maskiert(self) -> None:
         """Der Klartext des Tokens erscheint nirgends im Antwortkörper."""
@@ -726,6 +731,16 @@ class ModellvorschlaegeEndpunktTests(TestCase):
         """Meldet eine Administratorin an."""
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
+    def _openrouter_vorschlaege_holen(self, **werte: object) -> HttpResponse:
+        """Ruft die Vorschläge ab, während OpenRouter seine Liste liefert."""
+        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
+            httpx_client.return_value.get.return_value.json.return_value = (
+                OPENROUTER_LISTE
+            )
+            return self.client.post(
+                reverse("simulation:modellvorschlaege"), _abrufdaten(**werte)
+            )
+
     def test_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
         """Der Abruf hängt an derselben Rolle wie die Seite (ADR-0033)."""
         self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
@@ -746,28 +761,14 @@ class ModellvorschlaegeEndpunktTests(TestCase):
 
     def test_liefert_die_vorschlaege_des_verzeichnisses(self) -> None:
         """Die Liste des Anbieters erscheint mit Anzeige und fertigem Wert."""
-        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
-            httpx_client.return_value.get.return_value.json.return_value = (
-                OPENROUTER_LISTE
-            )
-
-            response: HttpResponse = self.client.post(
-                reverse("simulation:modellvorschlaege"), _abrufdaten()
-            )
+        response: HttpResponse = self._openrouter_vorschlaege_holen()
 
         self.assertContains(response, "Anthropic: Claude Opus")
         self.assertContains(response, "openrouter/anthropic/claude-opus-4.8")
 
     def test_gibt_das_getippte_token_nicht_zurueck(self) -> None:
         """Das Token bleibt im Formular; die Antwort trägt es nicht."""
-        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
-            httpx_client.return_value.get.return_value.json.return_value = (
-                OPENROUTER_LISTE
-            )
-
-            response: HttpResponse = self.client.post(
-                reverse("simulation:modellvorschlaege"), _abrufdaten()
-            )
+        response: HttpResponse = self._openrouter_vorschlaege_holen()
 
         self.assertNotContains(response, TOKEN)
 
@@ -786,29 +787,16 @@ class ModellvorschlaegeEndpunktTests(TestCase):
 
     def test_setzt_den_vorschlag_in_das_feld_des_formulars(self) -> None:
         """Die Naht nennt das Feld, das das Formular für das Sprachmodell rendert."""
-        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
-            httpx_client.return_value.get.return_value.json.return_value = (
-                OPENROUTER_LISTE
-            )
-
-            response: HttpResponse = self.client.post(
-                reverse("simulation:modellvorschlaege"), _abrufdaten()
-            )
+        response: HttpResponse = self._openrouter_vorschlaege_holen()
 
         self.assertContains(response, "id_sprachmodell")
         self.assertNotContains(response, "id_transkriptionsmodell")
 
     def test_setzt_den_vorschlag_der_transkription_in_ihr_eigenes_feld(self) -> None:
         """Die Naht nennt das Feld, das das Formular für die Transkription rendert."""
-        with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
-            httpx_client.return_value.get.return_value.json.return_value = (
-                OPENROUTER_LISTE
-            )
-
-            response: HttpResponse = self.client.post(
-                reverse("simulation:modellvorschlaege"),
-                _abrufdaten(naht=Naht.TRANSKRIPTION),
-            )
+        response: HttpResponse = self._openrouter_vorschlaege_holen(
+            naht=Naht.TRANSKRIPTION
+        )
 
         self.assertContains(response, "id_transkriptionsmodell")
         self.assertNotContains(response, "id_sprachmodell")
