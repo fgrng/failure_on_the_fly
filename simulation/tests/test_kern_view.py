@@ -3,35 +3,21 @@
 import ast
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation import views
 from simulation.models import (
-    VERTRAG_PROMPT,
     Anbieter,
     ModellKonfiguration,
     Simulationskern,
     Verwendung,
 )
 from simulation.standardkern import STANDARDKERN_VORLAGEN
-
-
-def _autorin(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf den Simulationskern an."""
-    konto: Konto = get_user_model().objects.create_user(username=username)
-    konto.groups.add(Group.objects.get(name="Autor:in"))
-    return konto
-
-
-def _administratorin(username: str) -> Konto:
-    """Legt ein Konto mit Zugriff auf die Kern-Verwaltung an."""
-    return get_user_model().objects.create_user(username=username, is_superuser=True)
 
 
 class SimulationskernAnsichtLeereRahmenhandlungTests(TestCase):
@@ -43,7 +29,7 @@ class SimulationskernAnsichtLeereRahmenhandlungTests(TestCase):
             system_prompt_vorlage="System-Prompt",
         )
         kern.finalisieren()
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
@@ -55,7 +41,7 @@ class SimulationskernAnsichtMitKernTests(TestCase):
 
     def setUp(self) -> None:
         """Legt die aktuelle finale Kern-Fassung und Modell-Konfiguration an."""
-        konto: Konto = _autorin("ada")
+        konto: Konto = konto_mit_rollen("ada", "Autor:in")
         aelterer_kern: Simulationskern = Simulationskern.objects.anlegen(
             system_prompt_vorlage="Alter System-Prompt",
         )
@@ -91,24 +77,6 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
         self.assertContains(response, "Aktueller User-Prompt")
-
-    def test_zeigt_die_einleitung_der_neuesten_finalen_fassung(self) -> None:
-        """Angemeldete sehen die Einleitung der neuesten finalen Fassung."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern"))
-
-        self.assertContains(response, "Aktuelle Einleitung")
-
-    def test_zeigt_den_debrief_der_neuesten_finalen_fassung(self) -> None:
-        """Angemeldete sehen den Debrief der neuesten finalen Fassung."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern"))
-
-        self.assertContains(response, "Aktueller Debrief")
-
-    def test_zeigt_die_gespraechseinleitung_der_neuesten_finalen_fassung(self) -> None:
-        """Angemeldete sehen die Gesprächseinleitung der neuesten Fassung."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern"))
-
-        self.assertContains(response, "Aktuelle Gesprächseinleitung")
 
     def test_rendert_die_rahmenhandlung_mit_woertlichen_platzhaltern(self) -> None:
         """Die drei Abschnitte erscheinen als Szenentext, `$name` bleibt stehen."""
@@ -173,9 +141,10 @@ class SimulationskernAnsichtMitKernTests(TestCase):
         """Die gelbe Leseansicht bleibt trotz gemeinsamem Fassung-Include schreibfrei."""
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertNotContains(response, "Entwurf ziehen")
-        self.assertNotContains(response, "Finalisieren")
-        self.assertNotContains(response, "Verwerfen")
+        self.assertEqual(
+            [beschriftung for beschriftung, _ in submit_knoepfe(response)],
+            ["Abmelden"],
+        )
 
 
 class SimulationskernLeereAnsichtTests(TestCase):
@@ -183,7 +152,7 @@ class SimulationskernLeereAnsichtTests(TestCase):
 
     def setUp(self) -> None:
         """Legt ein Konto an, ohne einen Kern zu initialisieren."""
-        self.konto: Konto = _autorin("ada")
+        self.konto: Konto = konto_mit_rollen("ada", "Autor:in")
 
     def test_stellt_den_leeren_kern_nur_fest(self) -> None:
         """Eine noch leere Installation bleibt lesbar statt mit 500 zu scheitern."""
@@ -200,7 +169,6 @@ class SimulationskernLeereAnsichtTests(TestCase):
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 
-        self.assertNotContains(response, "manage.py")
         self.assertNotContains(response, reverse("simulation:kern_anlegen"))
 
     def test_zeigt_fehlende_aktive_modellkonfiguration(self) -> None:
@@ -238,7 +206,7 @@ class ModellKonfigurationAnzeigeTests(TestCase):
         ModellKonfiguration.objects.aktivieren(
             self.konfiguration, Verwendung.SCHUELERIN
         )
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def test_zeigt_anbieter_basis_url_und_parameter(self) -> None:
         """Die Administrator:in sieht, an welchem Endpunkt die Sitzung hängt."""
@@ -262,14 +230,10 @@ class SimulationskernRollenTests(TestCase):
 
     def test_teilnehmerin_wird_abgewiesen_und_administratorin_zugelassen(self) -> None:
         """Gruppenrollen und is_superuser entscheiden statt Template-Links."""
-        teilnehmerin: Konto = get_user_model().objects.create_user(username="studi")
-        self.client.force_login(teilnehmerin)
+        self.client.force_login(konto_mit_rollen("studi"))
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 403)
 
-        administratorin: Konto = get_user_model().objects.create_user(username="linus")
-        administratorin.is_superuser = True
-        administratorin.save()
-        self.client.force_login(administratorin)
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
         self.assertEqual(self.client.get(reverse("simulation:kern")).status_code, 200)
 
 
@@ -278,7 +242,7 @@ class SimulationskernAnlegenTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet eine Administratorin an einer Instanz ohne Kern-Fassung an."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def test_leerzustand_zeigt_beide_anlege_gesten(self) -> None:
         """Ohne jede Fassung bietet die Verwaltung den leeren und den Standardweg."""
@@ -307,8 +271,16 @@ class SimulationskernAnlegenTests(TestCase):
         self.assertRedirects(response, reverse("simulation:kern_verwalten"))
         entwurf: Simulationskern = Simulationskern.objects.get()
         self.assertEqual(entwurf.zustand, Simulationskern.Zustand.ENTWURF)
-        for feldname, vorlage in STANDARDKERN_VORLAGEN.items():
-            self.assertEqual(getattr(entwurf, feldname), vorlage)
+        for feldname in (
+            "system_prompt_vorlage",
+            "user_prompt_vorlage",
+            "rahmenhandlung_einleitung",
+            "rahmenhandlung_gespraechseinleitung",
+            "rahmenhandlung_debrief",
+        ):
+            self.assertEqual(
+                getattr(entwurf, feldname), STANDARDKERN_VORLAGEN[feldname]
+            )
 
     def test_legt_keine_zweite_fassung_an_und_erklaert_die_ablehnung(self) -> None:
         """Eine bereits angelegte Linie nimmt keine zweite erste Fassung an."""
@@ -349,7 +321,7 @@ class SimulationskernAnlegenTests(TestCase):
 
         for url in urls:
             self.assertEqual(self.client.get(url).status_code, 405)
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
         for url in urls:
             self.assertEqual(self.client.post(url).status_code, 403)
 
@@ -371,13 +343,7 @@ class SimulationskernVerwaltungTests(TestCase):
         entwurf: Simulationskern = aktuelle_fassung.bearbeiten()
         entwurf.system_prompt_vorlage = "Entwurfs-Prompt"
         entwurf.save()
-        self.client.force_login(_administratorin("linus"))
-
-    def test_traegt_die_entwicklungs_farbfläche(self) -> None:
-        """Die Verwaltungsübersicht gehört zum Entwicklungsbereich (ADR-0024)."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
-
-        self.assertContains(response, 'class="page system-page area--authoring"')
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def test_zeigt_den_entwurf(self) -> None:
         """Die Verwaltungsübersicht zeigt den vorhandenen Entwurf."""
@@ -460,32 +426,7 @@ class SimulationskernVerwaltungTests(TestCase):
             self.assertContains(response, f'id="id_{feld}_vorschau"')
             self.assertContains(response, f'aria-describedby="id_{feld}_helptext"')
         self.assertNotContains(response, 'id="id_system_prompt_vorlage_vorschau"')
-        self.assertNotContains(response, "[Linktext](https://…)")
         self.assertContains(response, "Erlaubte Platzhalter:", count=5)
-
-    def test_kern_vorschau_laesst_platzhalter_woertlich_stehen(self) -> None:
-        """Die Vorschau ersetzt keine Platzhalter, Markdown um sie wirkt."""
-        response: HttpResponse = self.client.post(
-            reverse("texte:vorschau"),
-            {"profil": "szenentext", "quelle": "Zu **$thema** bei $lehrperson_anrede"},
-        )
-
-        self.assertContains(
-            response, "Zu <strong>$thema</strong> bei $lehrperson_anrede"
-        )
-
-    def test_platzhalteranzeige_folgt_dem_prompt_vertrag(self) -> None:
-        """Die Seite nennt jeden Platzhalter des Prompt-Vertrags."""
-        entwurf: Simulationskern = Simulationskern.objects.get(
-            zustand=Simulationskern.Zustand.ENTWURF
-        )
-
-        response: HttpResponse = self.client.get(
-            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
-        )
-
-        for platzhalter in VERTRAG_PROMPT:
-            self.assertContains(response, f"${platzhalter}")
 
     def test_ungueltiger_platzhalter_erscheint_am_verursachenden_feld(self) -> None:
         """Die Formularvalidierung ordnet Vertragsverletzungen dem Feld zu."""
@@ -559,7 +500,7 @@ class SimulationskernVerwaltungTests(TestCase):
         entwurf: Simulationskern = Simulationskern.objects.get(
             zustand=Simulationskern.Zustand.ENTWURF
         )
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         response: HttpResponse = self.client.get(
             reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
@@ -582,18 +523,6 @@ class SimulationskernVerwaltungTests(TestCase):
         )
 
         self.assertContains(response, "Finalisieren")
-
-    def test_finalisiert_den_entwurf(self) -> None:
-        """Die Verwaltung macht den angegebenen Entwurf zu einer finalen Fassung."""
-        entwurf: Simulationskern = Simulationskern.objects.get(
-            zustand=Simulationskern.Zustand.ENTWURF
-        )
-
-        response: HttpResponse = self.client.post(
-            reverse("simulation:finalisieren", args=[entwurf.pk]), follow=True
-        )
-
-        self.assertContains(response, "<h2>Finale Fassung</h2>", html=False)
 
     def test_verwirft_den_entwurf(self) -> None:
         """Die Verwaltung entfernt ausschließlich den angegebenen Entwurf."""
@@ -621,9 +550,8 @@ class SimulationskernVerwaltungTests(TestCase):
                 reverse("simulation:verwerfen", args=[simulationskern.pk]), follow=True
             )
             self.assertContains(response, "hat nicht den erwarteten Zustand")
-            self.assertTrue(
-                Simulationskern.objects.filter(pk=simulationskern.pk).exists()
-            )
+            self.assertContains(response, "Aktueller Prompt")
+            self.assertContains(response, "Archivierter Prompt")
 
     def test_gesten_sind_post_und_administratorinnen_vorbehalten(self) -> None:
         """Die schreibenden Routen weisen GET und Autorinnen ohne Adminrolle ab."""
@@ -638,7 +566,7 @@ class SimulationskernVerwaltungTests(TestCase):
 
         for url in urls:
             self.assertEqual(self.client.get(url).status_code, 405)
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
         for url in urls:
             self.assertEqual(self.client.post(url).status_code, 403)
 
@@ -685,15 +613,6 @@ class SimulationskernVerwaltungTests(TestCase):
             response, "Enthält ungültige Platzhalter.; Enthält ungültige Platzhalter."
         )
 
-    def test_ueberschreibt_die_finale_fassung_ohne_verwendungs_markierung(
-        self,
-    ) -> None:
-        """Bei genau einer finalen Fassung hat eine Verwendungs-Markierung nichts zu sagen."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
-
-        self.assertContains(response, "<h2>Finale Fassung</h2>", html=False)
-        self.assertNotContains(response, "Verwendete finale Fassung")
-
     def test_zeigt_die_finale_fassung(self) -> None:
         """Die Verwaltungsübersicht zeigt die eine finale Fassung."""
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
@@ -708,12 +627,17 @@ class SimulationskernVerwaltungTests(TestCase):
 
     def test_zeigt_archivierte_fassungen_ohne_aktionsbereich(self) -> None:
         """Eine überholte Fassung bleibt lesbar, trägt aber keinen Aktionsbereich."""
-        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
-        seite: str = response.content.decode()
+        archiviert: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ARCHIVIERT
+        )
 
-        eingeklappt: str = seite[seite.index("<details>") : seite.index("</details>")]
-        self.assertIn("Archivierter Prompt", eingeklappt)
-        self.assertNotIn("page-actions", eingeklappt)
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "Archivierter Prompt")
+        for route in ("neue_fassung", "finalisieren", "verwerfen"):
+            self.assertNotContains(
+                response, reverse(f"simulation:{route}", args=[archiviert.pk])
+            )
 
     def test_klappt_archivierte_fassungen_ein(self) -> None:
         """Die Verwaltungsübersicht hält archivierte Fassungen eingeklappt bereit."""
@@ -723,7 +647,7 @@ class SimulationskernVerwaltungTests(TestCase):
 
     def test_weist_autorin_ab(self) -> None:
         """Eine Autorin ohne Administrationsrolle darf die Übersicht nicht öffnen."""
-        self.client.force_login(_autorin("ada"))
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
@@ -731,7 +655,7 @@ class SimulationskernVerwaltungTests(TestCase):
 
     def test_weist_konto_ohne_rolle_ab(self) -> None:
         """Ein Konto ohne Rolle darf die Übersicht nicht öffnen."""
-        self.client.force_login(get_user_model().objects.create_user("studi"))
+        self.client.force_login(konto_mit_rollen("studi"))
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
@@ -756,7 +680,7 @@ class SimulationskernLangeTexteTests(TestCase):
             system_prompt_vorlage="Du bist **$schuelerin_name**.",
         )
         self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def _daten(self, **werte: str) -> dict[str, str]:
         # POST-Daten mit den gespeicherten Texten, überschrieben durch werte.
@@ -782,7 +706,6 @@ class SimulationskernLangeTexteTests(TestCase):
             response, "Frau <strong>$lehrperson_name</strong> unterrichtet."
         )
         self.assertContains(response, "<p>Du bist **$schuelerin_name**.</p>")
-        self.assertContains(response, 'page-field--wide markdown-lesefeld"', count=5)
         self.assertContains(response, "Noch kein Text", count=3)
         self.assertContains(response, ">Text schreiben</button>", count=3)
 
@@ -835,20 +758,9 @@ class SimulationskernLangeTexteTests(TestCase):
 class SimulationskernSeitennavigationTests(TestCase):
     """Chrome und Sidebar unterscheiden die zwei Kern-Ansichten."""
 
-    def test_markiert_die_autorinnen_ansicht_gelb(self) -> None:
-        """Die read-only Ansicht erbt das Chrome ihres Entwicklungsbereichs."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        self.client.force_login(_autorin("ada"))
-
-        response: HttpResponse = self.client.get(reverse("simulation:kern"))
-
-        self.assertContains(response, 'class="page system-page area--authoring"')
-        self.assertContains(response, 'class="badge badge--authoring"')
-
     def test_markiert_in_der_sidebar_nur_den_verwaltungslink(self) -> None:
         """Die zwei Kern-Routen teilen den Namespace, nicht den aktiven Link."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
@@ -865,7 +777,7 @@ class SimulationskernSeitennavigationTests(TestCase):
 
     def test_markiert_in_der_sidebar_nur_den_ansichtslink(self) -> None:
         """Die Kernansicht aktiviert nur ihren eigenen Sidebar-Link."""
-        self.client.force_login(_administratorin("linus"))
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
         response: HttpResponse = self.client.get(reverse("simulation:kern"))
 

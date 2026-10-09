@@ -55,6 +55,19 @@ class VorschauTests(TestCase):
         self.assertContains(antwort, "[Info](https://example.org)")
         self.assertNotContains(antwort, "<a ")
 
+    def test_szenentext_laesst_platzhalter_woertlich_stehen(self) -> None:
+        """Die Vorschau ersetzt keine Platzhalter, Markdown um sie wirkt."""
+
+        self._konto("grace", "Autor:in")
+
+        antwort: HttpResponse = self._vorschau(
+            "szenentext", "Zu **$thema** bei $lehrperson_anrede"
+        )
+
+        self.assertContains(
+            antwort, "Zu <strong>$thema</strong> bei $lehrperson_anrede"
+        )
+
     def test_unbekanntes_profil_wird_abgewiesen(self) -> None:
         """Ohne gültiges Profil gibt es kein Fragment."""
 

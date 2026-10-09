@@ -4,6 +4,7 @@ import pytest
 from django.core.management import call_command
 
 from simulation.models import Simulationskern
+from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
 @pytest.mark.django_db
@@ -14,16 +15,14 @@ def test_kern_initialisieren_legt_eine_finale_platzhalter_fassung_an() -> None:
 
     kern: Simulationskern = Simulationskern.objects.get()
     assert kern.zustand == Simulationskern.Zustand.FINAL
-    assert "kannst ihn im Gespräch nicht herleiten" in kern.system_prompt_vorlage
-    assert "$fehlermuster_beschreibung" in kern.system_prompt_vorlage
-    assert "<fehlermuster_beschreibung>" not in kern.system_prompt_vorlage
-    assert "$arbeitsheft" in kern.user_prompt_vorlage
-    assert "$lernauftrag_simulationshinweise" in kern.user_prompt_vorlage
-    assert "$arbeitsheft_simulationshinweise" in kern.user_prompt_vorlage
-    assert "<lernauftrag_text>" not in kern.user_prompt_vorlage
-    assert "<arbeitsheft>" not in kern.user_prompt_vorlage
-    assert "Arbeitsphase" in kern.rahmenhandlung_einleitung
-    assert "$schuelerin_name" in kern.rahmenhandlung_gespraechseinleitung
+    for feldname in (
+        "system_prompt_vorlage",
+        "user_prompt_vorlage",
+        "rahmenhandlung_einleitung",
+        "rahmenhandlung_gespraechseinleitung",
+        "rahmenhandlung_debrief",
+    ):
+        assert getattr(kern, feldname) == STANDARDKERN_VORLAGEN[feldname]
 
 
 @pytest.mark.django_db
