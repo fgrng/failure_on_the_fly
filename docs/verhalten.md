@@ -358,6 +358,27 @@ Inputschritte; eine eigene Obergrenze gibt es nicht. Ein neuer Entwurf aus einer
 finalen Fassung übernimmt die Evalinputs samt Inputschritten. Leere Schritte
 weist erst das Finalisieren zurück. Alle Routen der Evalinputs und Inputschritte
 erreichen nur Entwürfe.
+
+„Finalisieren“ in der Aktionszeile des Editors übernimmt zuerst alle getippten
+Werte und prüft dann den Entwurf, ohne ein Sprachmodell aufzurufen. Abgelehnt
+wird er, wenn eine Vorlage leer ist, einen ungültigen Platzhalter enthält oder
+einen Platzhalter außerhalb ihres Vertrags (`$kriterium` in der
+Lehrperson-Vorlage, `$inputstrategie` in der Bewerter-Vorlage, unbekannte
+Namen), wenn *k* kleiner als 1 ist, wenn der Katalog kein Eval hat, ein Eval
+kein Evalkriterium oder keinen Evalinput, ein Evalinput keinen Inputschritt,
+oder wenn ein Inputschritt, ein Evalkriterium oder ein übergreifendes Kriterium
+leer ist. Übergreifende Kriterien dürfen fehlen. Der Editor nennt dann jede
+Lücke als eigene Meldung, etwa „Evalinput 2 von Eval „Muster“ hat keinen
+Inputschritt.“ oder „Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres
+Vertrags: $inputstrategie.“; der Entwurf bleibt Entwurf, die getippten Werte
+bleiben gespeichert. Ein vollständiger Entwurf wird final, und die
+Administrator:in landet auf der Übersicht, die zeigt, seit wann die finale
+Fassung gilt. Ab dann prüft jeder Evallauf gegen sie. Die bisherige finale
+Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt
+immer genau eine finale Fassung. Andere Apps fragen sie über
+`Evalkatalog.objects.finale_fassung()` ab, das ohne finale Fassung `None`
+liefert.
+
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 

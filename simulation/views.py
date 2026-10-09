@@ -235,6 +235,7 @@ def evalkatalog(request: HttpRequest) -> HttpResponse:
             "entwurf": Evalkatalog.objects.filter(
                 zustand=Evalkatalog.Zustand.ENTWURF
             ).first(),
+            "finale_fassung": Evalkatalog.objects.finale_fassung(),
             # Dieselbe Bedingung, die die Anlege-Naht prüft.
             "katalog_fehlt": not Evalkatalog.objects.exists(),
         },
@@ -711,6 +712,25 @@ def evalkatalog_inputschritt_verschieben(
     _eingaben_uebernehmen(katalog, request)
     schritt.verschieben(weite)
     return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Finalisiert den Entwurf samt getippter Eingaben oder nennt seine Lücken."""
+    katalog: Evalkatalog = _katalog_entwurf(pk)
+    _eingaben_uebernehmen(katalog, request)
+    try:
+        katalog.finalisieren()
+    except ValidationError as fehler:
+        for meldung in fehler.messages:
+            messages.error(request, meldung)
+        return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    messages.success(
+        request, "Der Evalkatalog ist final. Jeder Evallauf prüft ab jetzt gegen ihn."
+    )
+    return redirect("simulation:evalkatalog")
 
 
 @administratorin_erforderlich

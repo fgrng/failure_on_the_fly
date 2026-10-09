@@ -225,6 +225,30 @@ class EvalkatalogManager(FassungManager):
             raise ValueError("Der Evalkatalog wurde bereits angelegt.")
         return self._erstellen(historie=historie)
 
+    def finale_fassung(self) -> "Evalkatalog | None":
+        """Die Fassung, gegen die jeder Evallauf prüft, oder None ohne sie."""
+
+        return self.filter(zustand=Evalkatalog.Zustand.FINAL).first()
+
+
+def _vorlagenmangel(bezeichnung: str, vorlage: str, vertrag: frozenset[str]) -> str:
+    # Prüft eine Vorlage wie beim Kern ohne Modellaufruf: nichtleer, gültig und
+    # nur mit Platzhaltern ihres Vertrags. Liefert die Meldung oder "".
+
+    if not vorlage.strip():
+        return f"Die {bezeichnung} ist leer."
+    template: Template = Template(vorlage)
+    if not template.is_valid():
+        return f"Die {bezeichnung} enthält einen ungültigen Platzhalter."
+    fremde: list[str] = sorted(set(template.get_identifiers()) - vertrag)
+    if fremde:
+        return (
+            f"Die {bezeichnung} enthält Platzhalter außerhalb ihres Vertrags: "
+            + ", ".join(f"${name}" for name in fremde)
+            + "."
+        )
+    return ""
+
 
 class Evalkatalog(VersionierteFassung):
     """Eine versionierte Fassung der Evals, Kriterien und Vorlagen (ADR-0046)."""
@@ -293,6 +317,65 @@ class Evalkatalog(VersionierteFassung):
                         text=schritt.text,
                     ).save()
         return entwurf
+
+    def maengel(self) -> list[str]:
+        """Was dem Entwurf zum Finalisieren fehlt, je Lücke eine Meldung.
+
+        Ein Entwurf darf unvollständig gespeichert werden; geprüft wird erst
+        beim Finalisieren. Übergreifende Kriterien dürfen fehlen.
+        """
+
+        meldungen: list[str] = [
+            _vorlagenmangel(
+                "Lehrperson-Vorlage", self.lehrperson_vorlage, VERTRAG_LEHRPERSON
+            ),
+            _vorlagenmangel(
+                "Bewerter-Vorlage", self.bewerter_vorlage, VERTRAG_BEWERTER
+            ),
+        ]
+        if self.k < 1:
+            meldungen.append("k muss mindestens 1 sein.")
+        for nummer, kriterium in enumerate(self.uebergreifende_kriterien.all(), 1):
+            if not kriterium.text.strip():
+                meldungen.append(f"Übergreifendes Kriterium {nummer} ist leer.")
+        evals: models.QuerySet[Eval] = self.evals.prefetch_related(
+            "kriterien", "inputs__schritte"
+        )
+        if not evals:
+            meldungen.append("Der Evalkatalog hat kein Eval.")
+        for eval_ in evals:
+            name: str = f"Eval „{eval_.name or 'Unbenanntes Eval'}“"
+            kriterien: list[Evalkriterium] = list(eval_.kriterien.all())
+            inputs: list[Evalinput] = list(eval_.inputs.all())
+            if not kriterien:
+                meldungen.append(f"{name} hat kein Evalkriterium.")
+            if not inputs:
+                meldungen.append(f"{name} hat keinen Evalinput.")
+            for nummer, kriterium in enumerate(kriterien, 1):
+                if not kriterium.text.strip():
+                    meldungen.append(f"Evalkriterium {nummer} von {name} ist leer.")
+            for nummer, evalinput in enumerate(inputs, 1):
+                schritte: list[Inputschritt] = list(evalinput.schritte.all())
+                if not schritte:
+                    meldungen.append(
+                        f"Evalinput {nummer} von {name} hat keinen Inputschritt."
+                    )
+                for schrittnummer, schritt in enumerate(schritte, 1):
+                    if not schritt.text.strip():
+                        meldungen.append(
+                            f"Inputschritt {schrittnummer} in Evalinput {nummer} "
+                            f"von {name} ist leer."
+                        )
+        return [meldung for meldung in meldungen if meldung]
+
+    @transaction.atomic
+    def finalisieren(self) -> None:
+        """Finalisiert einen vollständigen Entwurf; sonst nennt der Fehler alle Lücken."""
+
+        maengel: list[str] = self.maengel()
+        if maengel:
+            raise ValidationError(maengel)
+        super().finalisieren()
 
     def kriterium_anlegen(self, text: str = "") -> "UebergreifendesKriterium":
         """Hängt ein übergreifendes Kriterium ans Ende der Liste."""

@@ -1,6 +1,9 @@
 """Lebenszyklus und Vertrag des Evalkatalogs (ADR-0046, ADR-0035, ADR-0010)."""
 
+from collections.abc import Callable
+
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 
 from simulation.models import (
@@ -14,6 +17,11 @@ from simulation.models import (
     Evalkriterium,
     Inputschritt,
     UebergreifendesKriterium,
+)
+from simulation.tests.evalkatalog_bau import (
+    FUELLTEXT,
+    vervollstaendigen,
+    vollstaendiger_katalog,
 )
 
 
@@ -137,7 +145,7 @@ def test_kriterien_einer_finalen_fassung_sind_unveraenderlich() -> None:
 
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     kriterium: UebergreifendesKriterium = katalog.kriterium_anlegen("Rollentreue")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     kriterium.text = "geändert"
     with pytest.raises(RuntimeError, match="Entwurf"):
@@ -157,7 +165,7 @@ def test_neuer_entwurf_uebernimmt_die_kriterien_ohne_die_vorgaengerin_zu_beruehr
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     katalog.kriterium_anlegen("A")
     katalog.kriterium_anlegen("B")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     entwurf: Evalkatalog = katalog.bearbeiten()
     kopie: UebergreifendesKriterium = entwurf.uebergreifende_kriterien.first()
@@ -174,7 +182,7 @@ def test_kriterien_einer_finalen_fassung_widerstehen_massenaenderungen() -> None
 
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     katalog.kriterium_anlegen("Rollentreue")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     with pytest.raises(RuntimeError, match="Entwurf"):
         UebergreifendesKriterium.objects.filter(katalog=katalog).update(text="x")
@@ -188,7 +196,7 @@ def test_kriterium_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf() -
 
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     kriterium: UebergreifendesKriterium = katalog.kriterium_anlegen("Rollentreue")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
     kriterium.katalog = katalog.bearbeiten()
     kriterium.position = 99
 
@@ -249,7 +257,7 @@ def test_evals_und_evalkriterien_einer_finalen_fassung_sind_unveraenderlich() ->
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     eval_: Eval = katalog.eval_anlegen("Muster")
     kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     eval_.name = "geändert"
     kriterium.text = "geändert"
@@ -277,7 +285,7 @@ def test_evalkriterium_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf
 
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
     kriterium: Evalkriterium = katalog.eval_anlegen("Muster").kriterium_anlegen("A")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
     kriterium.eval = katalog.bearbeiten().evals.get()
     kriterium.position = 99
 
@@ -294,7 +302,7 @@ def test_neuer_entwurf_uebernimmt_evals_und_evalkriterien() -> None:
     erstes.kriterium_anlegen("A")
     erstes.kriterium_anlegen("B")
     katalog.eval_anlegen("Rolle").kriterium_anlegen("C")
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     entwurf: Evalkatalog = katalog.bearbeiten()
     kopie: Evalkriterium = entwurf.evals.first().kriterien.first()
@@ -370,7 +378,7 @@ def test_evalinputs_und_inputschritte_einer_finalen_fassung_sind_unveraenderlich
     eval_: Eval = katalog.eval_anlegen("Muster")
     evalinput: Evalinput = eval_.input_anlegen()
     schritt: Inputschritt = evalinput.schritte.first()
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     schritt.text = "geändert"
     for versuch in (
@@ -399,7 +407,7 @@ def test_inputschritt_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf(
     schritt: Inputschritt = (
         katalog.eval_anlegen("Muster").input_anlegen().schritte.first()
     )
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
     schritt.evalinput = katalog.bearbeiten().evals.get().inputs.get()
     schritt.position = 99
 
@@ -415,7 +423,7 @@ def test_neuer_entwurf_uebernimmt_evalinputs_samt_inputschritten() -> None:
     eval_: Eval = katalog.eval_anlegen("Muster")
     eval_.input_anlegen().schritt_anlegen(Inputschritt.Art.GELENKT, "Zweifle")
     eval_.input_anlegen().schritte.first().delete()
-    katalog.finalisieren()
+    vervollstaendigen(katalog).finalisieren()
 
     entwurf: Evalkatalog = katalog.bearbeiten()
     kopie: Inputschritt = entwurf.evals.get().inputs.first().schritte.last()
@@ -429,7 +437,8 @@ def test_neuer_entwurf_uebernimmt_evalinputs_samt_inputschritten() -> None:
             for i in fassung.evals.get().inputs.all()
         ]
 
-    fest: tuple[str, str] = (Inputschritt.Art.FEST, "")
+    # Leere Schritte füllt das Vervollständigen vor dem Finalisieren.
+    fest: tuple[str, str] = (Inputschritt.Art.FEST, FUELLTEXT)
     assert inputs(entwurf) == [
         [fest, fest, fest, (Inputschritt.Art.GELENKT, "Zweifle laut")],
         [fest, fest],
@@ -437,4 +446,202 @@ def test_neuer_entwurf_uebernimmt_evalinputs_samt_inputschritten() -> None:
     assert inputs(katalog) == [
         [fest, fest, fest, (Inputschritt.Art.GELENKT, "Zweifle")],
         [fest, fest],
+    ]
+
+
+@pytest.mark.django_db
+def test_vollstaendiger_entwurf_wird_final_und_ueberholt_die_vorgaengerin() -> None:
+    """Finalisieren lässt genau eine finale Fassung; die bisherige ist überholt."""
+
+    erste: Evalkatalog = vollstaendiger_katalog()
+    erste.finalisieren()
+    zweite: Evalkatalog = erste.bearbeiten()
+
+    zweite.finalisieren()
+
+    erste.refresh_from_db()
+    assert erste.zustand == Evalkatalog.Zustand.ARCHIVIERT
+    assert zweite.zustand == Evalkatalog.Zustand.FINAL
+    assert Evalkatalog.objects.finale_fassung() == zweite
+
+
+@pytest.mark.django_db
+def test_finale_fassung_fehlt_ohne_finalisierten_katalog() -> None:
+    """Ohne finale Fassung meldet die Abfrage für andere Apps „keine“."""
+
+    assert Evalkatalog.objects.finale_fassung() is None
+    vollstaendiger_katalog()
+
+    assert Evalkatalog.objects.finale_fassung() is None
+
+
+@pytest.mark.django_db
+def test_uebergreifende_kriterien_duerfen_fehlen() -> None:
+    """Ein Katalog ohne übergreifende Kriterien ist vollständig."""
+
+    katalog: Evalkatalog = vollstaendiger_katalog()
+
+    katalog.finalisieren()
+
+    assert not katalog.uebergreifende_kriterien.exists()
+    assert katalog.zustand == Evalkatalog.Zustand.FINAL
+
+
+# Jede Lücke nimmt einem vollständigen Katalog genau eine Voraussetzung.
+
+
+def _ohne_eval(katalog: Evalkatalog) -> None:
+    katalog.evals.get().delete()
+
+
+def _eval_ohne_evalinput(katalog: Evalkatalog) -> None:
+    katalog.evals.get().inputs.get().delete()
+
+
+def _eval_ohne_evalkriterium(katalog: Evalkatalog) -> None:
+    katalog.evals.get().kriterien.get().delete()
+
+
+def _evalinput_ohne_inputschritt(katalog: Evalkatalog) -> None:
+    for schritt in katalog.evals.get().inputs.get().schritte.all():
+        schritt.delete()
+
+
+def _leerer_inputschritt(katalog: Evalkatalog) -> None:
+    schritt: Inputschritt = katalog.evals.get().inputs.get().schritte.last()
+    schritt.text = "   "
+    schritt.save()
+
+
+def _leeres_evalkriterium(katalog: Evalkatalog) -> None:
+    katalog.evals.get().kriterium_anlegen("")
+
+
+def _leeres_uebergreifendes_kriterium(katalog: Evalkatalog) -> None:
+    katalog.kriterium_anlegen("Rollentreue")
+    katalog.kriterium_anlegen("")
+
+
+def _feld_setzen(feld: str, wert: object) -> Callable[[Evalkatalog], None]:
+    # Eine Lücke, die ein Feld der Fassung auf einen untauglichen Wert setzt.
+
+    def setzen(katalog: Evalkatalog) -> None:
+        setattr(katalog, feld, wert)
+        katalog.save()
+
+    return setzen
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("luecke", "meldung"),
+    [
+        (_ohne_eval, "Der Evalkatalog hat kein Eval."),
+        (_eval_ohne_evalinput, "Eval „Ergänzt“ hat keinen Evalinput."),
+        (_eval_ohne_evalkriterium, "Eval „Ergänzt“ hat kein Evalkriterium."),
+        (
+            _evalinput_ohne_inputschritt,
+            "Evalinput 1 von Eval „Ergänzt“ hat keinen Inputschritt.",
+        ),
+        (
+            _leerer_inputschritt,
+            "Inputschritt 3 in Evalinput 1 von Eval „Ergänzt“ ist leer.",
+        ),
+        (_leeres_evalkriterium, "Evalkriterium 2 von Eval „Ergänzt“ ist leer."),
+        (_leeres_uebergreifendes_kriterium, "Übergreifendes Kriterium 2 ist leer."),
+        (_feld_setzen("k", 0), "k muss mindestens 1 sein."),
+        (_feld_setzen("lehrperson_vorlage", ""), "Die Lehrperson-Vorlage ist leer."),
+        (_feld_setzen("bewerter_vorlage", " \n"), "Die Bewerter-Vorlage ist leer."),
+    ],
+)
+def test_unvollstaendiger_entwurf_wird_nicht_final(
+    luecke: Callable[[Evalkatalog], None], meldung: str
+) -> None:
+    """Jede Strukturregel lehnt einzeln ab, und die Meldung nennt die Lücke."""
+
+    katalog: Evalkatalog = vollstaendiger_katalog()
+    luecke(katalog)
+
+    with pytest.raises(ValidationError) as abgelehnt:
+        katalog.finalisieren()
+
+    assert abgelehnt.value.messages == [meldung]
+    katalog.refresh_from_db()
+    assert katalog.zustand == Evalkatalog.Zustand.ENTWURF
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("feld", "vorlage", "meldung"),
+    [
+        (
+            "lehrperson_vorlage",
+            "Prüfe $kriterium.",
+            "Die Lehrperson-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
+            "$kriterium.",
+        ),
+        (
+            "bewerter_vorlage",
+            "Lenke nach $inputstrategie.",
+            "Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
+            "$inputstrategie.",
+        ),
+        (
+            "bewerter_vorlage",
+            "$kriterium für $unbekannt und ${lehrperson_name}",
+            "Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
+            "$lehrperson_name, $unbekannt.",
+        ),
+        (
+            "lehrperson_vorlage",
+            "Kostet 5 $ pro Lauf.",
+            "Die Lehrperson-Vorlage enthält einen ungültigen Platzhalter.",
+        ),
+    ],
+)
+def test_vorlage_ausserhalb_ihres_vertrags_wird_nicht_final(
+    feld: str, vorlage: str, meldung: str
+) -> None:
+    """Teilmengen-Test plus Gültigkeit je Vorlage, ohne Modellaufruf."""
+
+    katalog: Evalkatalog = vollstaendiger_katalog()
+    setattr(katalog, feld, vorlage)
+    katalog.save()
+
+    with pytest.raises(ValidationError) as abgelehnt:
+        katalog.finalisieren()
+
+    assert abgelehnt.value.messages == [meldung]
+
+
+@pytest.mark.django_db
+def test_promptvertrag_und_verlauf_sind_in_beiden_vorlagen_erlaubt() -> None:
+    """Jeder Name aus `VERTRAG_PROMPT` und `$verlauf` passen in beide Vorlagen."""
+
+    gemeinsam: str = " ".join(
+        f"${name}" for name in sorted(VERTRAG_PROMPT | {"verlauf"})
+    )
+    katalog: Evalkatalog = vollstaendiger_katalog()
+    katalog.lehrperson_vorlage = f"{gemeinsam} $inputstrategie"
+    katalog.bewerter_vorlage = f"{gemeinsam} $kriterium"
+    katalog.save()
+
+    katalog.finalisieren()
+
+    assert katalog.zustand == Evalkatalog.Zustand.FINAL
+
+
+@pytest.mark.django_db
+def test_meldungen_nennen_alle_luecken_auf_einmal() -> None:
+    """Wer finalisiert, erfährt alle Lücken, nicht nur die erste."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+
+    with pytest.raises(ValidationError) as abgelehnt:
+        katalog.finalisieren()
+
+    assert abgelehnt.value.messages == [
+        "Die Lehrperson-Vorlage ist leer.",
+        "Die Bewerter-Vorlage ist leer.",
+        "Der Evalkatalog hat kein Eval.",
     ]

@@ -17,6 +17,11 @@
         </div>
     </header>
 
+    {% if finale_fassung %}
+        <h2>Finale Fassung</h2>
+        <p>Final seit {{ finale_fassung.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen diese Fassung.</p>
+    {% endif %}
+
     {% if entwurf %}
         <h2>Entwurf</h2>
         <div class="page-actions">

@@ -123,6 +123,11 @@ urlpatterns: list[URLPattern] = [
         name="evalkatalog_inputschritt_verschieben",
     ),
     path(
+        "evalkatalog/<int:pk>/finalisieren/",
+        views.evalkatalog_finalisieren,
+        name="evalkatalog_finalisieren",
+    ),
+    path(
         "evalkatalog/<int:pk>/verwerfen/",
         views.evalkatalog_verwerfen,
         name="evalkatalog_verwerfen",

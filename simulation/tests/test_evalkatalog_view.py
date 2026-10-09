@@ -19,6 +19,7 @@ from simulation.models import (
     Inputschritt,
     UebergreifendesKriterium,
 )
+from simulation.tests.evalkatalog_bau import vervollstaendigen, vollstaendiger_katalog
 
 
 def _administratorin(username: str) -> Konto:
@@ -375,7 +376,7 @@ class EvalkatalogKriterienTests(TestCase):
     def test_kriterium_eines_anderen_katalogs_ist_nicht_erreichbar(self) -> None:
         """Die Route verlangt, dass das Kriterium zum genannten Entwurf gehört."""
         self.katalog.kriterium_anlegen("A")
-        self.katalog.finalisieren()
+        vervollstaendigen(self.katalog).finalisieren()
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         fremd = self.katalog.uebergreifende_kriterien.get()
 
@@ -579,7 +580,7 @@ class EvalkatalogEvalTests(TestCase):
         """Eval und Kriterium müssen zum genannten Entwurf und Eval gehören."""
         eval_: Eval = self.katalog.eval_anlegen("Muster")
         kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
-        self.katalog.finalisieren()
+        vervollstaendigen(self.katalog).finalisieren()
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         eigenes: Eval = entwurf.evals.get()
 
@@ -930,7 +931,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
     def setUp(self) -> None:
         """Finalisiert eine Fassung und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
-        self.katalog.finalisieren()
+        vervollstaendigen(self.katalog).finalisieren()
         self.client.force_login(_administratorin("ada"))
 
     def test_finale_fassung_hat_keinen_editor(self) -> None:
@@ -945,7 +946,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         """An einer finalen Fassung ändert keine Kriterienroute etwas."""
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         kriterium = entwurf.kriterium_anlegen("A")
-        entwurf.finalisieren()
+        vervollstaendigen(entwurf).finalisieren()
 
         for url in (
             reverse("simulation:evalkatalog_kriterien", args=[entwurf.pk]),
@@ -971,7 +972,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         eval_: Eval = entwurf.eval_anlegen("Muster")
         kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
         eval_.input_anlegen()
-        entwurf.finalisieren()
+        vervollstaendigen(entwurf).finalisieren()
 
         for url in _evalrouten(entwurf, eval_, kriterium):
             with self.subTest(url=url):
@@ -981,7 +982,8 @@ class EvalkatalogFinaleFassungTests(TestCase):
                 (e.name, [k.text for k in e.kriterien.all()])
                 for e in entwurf.evals.all()
             ],
-            [("Muster", ["A"])],
+            # Das erste Eval stammt aus der vervollständigten Vorgängerin.
+            [("Ergänzt", ["Ergänzt"]), ("Muster", ["A"])],
         )
 
     def test_evalrouten_erreichen_keine_ueberholte_fassung(self) -> None:
@@ -990,7 +992,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         eval_: Eval = entwurf.eval_anlegen("Muster")
         kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
         eval_.input_anlegen()
-        entwurf.finalisieren()
+        vervollstaendigen(entwurf).finalisieren()
         entwurf.bearbeiten().finalisieren()
 
         for url in _evalrouten(entwurf, eval_, kriterium):
@@ -1004,6 +1006,117 @@ class EvalkatalogFinaleFassungTests(TestCase):
         )
 
         self.assertTrue(Evalkatalog.objects.filter(pk=self.katalog.pk).exists())
+
+
+class EvalkatalogFinalisierenTests(TestCase):
+    """Der Editor finalisiert einen vollständigen Entwurf oder nennt die Lücken."""
+
+    def setUp(self) -> None:
+        """Legt einen vollständigen Entwurf an und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = vollstaendiger_katalog()
+        self.url: str = reverse(
+            "simulation:evalkatalog_finalisieren", args=[self.katalog.pk]
+        )
+        self.client.force_login(_administratorin("ada"))
+
+    def test_editor_bietet_das_finalisieren_im_formular_an(self) -> None:
+        """Der Knopf steht in der Aktionszeile und schickt das ganze Formular."""
+        response: HttpResponse = self.client.get(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+
+        self.assertIn(
+            ("Finalisieren", "evalkatalog-formular"), submit_knoepfe(response)
+        )
+        self.assertContains(response, f'formaction="{self.url}"')
+
+    def test_vollstaendiger_entwurf_wird_final_und_ueberholt_die_vorgaengerin(
+        self,
+    ) -> None:
+        """Nach dem Finalisieren gibt es genau eine finale Fassung."""
+        vervollstaendigen(self.katalog).finalisieren()
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+
+        response: HttpResponse = self.client.post(
+            reverse("simulation:evalkatalog_finalisieren", args=[entwurf.pk]),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("simulation:evalkatalog"))
+        self.assertContains(response, "Der Evalkatalog ist final.")
+        self.assertEqual(Evalkatalog.objects.finale_fassung(), entwurf)
+        self.katalog.refresh_from_db()
+        self.assertEqual(self.katalog.zustand, Evalkatalog.Zustand.ARCHIVIERT)
+
+    def test_unvollstaendiger_entwurf_bleibt_mit_meldungen_im_editor(self) -> None:
+        """Jede Lücke erscheint als Meldung im Editor; der Entwurf bleibt Entwurf."""
+        eval_: Eval = self.katalog.evals.get()
+        eval_.kriterium_anlegen("")
+        eval_.inputs.get().delete()
+
+        response: HttpResponse = self.client.post(self.url, follow=True)
+
+        self.assertRedirects(
+            response, reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+        self.assertContains(response, "Eval „Ergänzt“ hat keinen Evalinput.")
+        self.assertContains(response, "Evalkriterium 2 von Eval „Ergänzt“ ist leer.")
+        self.katalog.refresh_from_db()
+        self.assertEqual(self.katalog.zustand, Evalkatalog.Zustand.ENTWURF)
+
+    def test_finalisieren_uebernimmt_zuerst_die_getippten_eingaben(self) -> None:
+        """Was im Formular steht, gilt: auch ein frisch getippter Schritttext."""
+        schritt: Inputschritt = Inputschritt.objects.get(
+            evalinput__eval__katalog=self.katalog, position=1
+        )
+        schritt.text = ""
+        schritt.save()
+
+        self.client.post(self.url, {f"inputschritt-{schritt.pk}": "Erkläre es mir."})
+
+        self.katalog.refresh_from_db()
+        self.assertEqual(self.katalog.zustand, Evalkatalog.Zustand.FINAL)
+        schritt.refresh_from_db()
+        self.assertEqual(schritt.text, "Erkläre es mir.")
+
+    def test_unerlaubter_platzhalter_wird_abgelehnt(self) -> None:
+        """Die Meldung nennt den Platzhalter außerhalb des Vertrags."""
+        response: HttpResponse = self.client.post(
+            self.url,
+            {
+                "k": "3",
+                "lehrperson_vorlage": "Prüfe $kriterium.",
+                "bewerter_vorlage": "Prüfe $kriterium.",
+            },
+            follow=True,
+        )
+
+        self.assertContains(
+            response,
+            "Die Lehrperson-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
+            "$kriterium.",
+        )
+        self.katalog.refresh_from_db()
+        self.assertEqual(self.katalog.zustand, Evalkatalog.Zustand.ENTWURF)
+        # Die getippte Vorlage bleibt gespeichert, damit sie sich korrigieren lässt.
+        self.assertEqual(self.katalog.lehrperson_vorlage, "Prüfe $kriterium.")
+
+    def test_finale_fassung_wird_nicht_erneut_finalisiert(self) -> None:
+        """Die Route erreicht nur Entwürfe."""
+        self.katalog.finalisieren()
+
+        self.assertEqual(self.client.post(self.url).status_code, 404)
+
+    def test_uebersicht_nennt_die_finale_fassung(self) -> None:
+        """Die Systemseite zeigt, seit wann der Katalog final ist."""
+        self.katalog.finalisieren()
+
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertContains(response, "Finale Fassung")
+        self.assertNotIn(
+            "Evalkatalog anlegen", [text for text, _ in submit_knoepfe(response)]
+        )
 
 
 class EvalkatalogZugriffTests(TestCase):
@@ -1025,6 +1138,7 @@ class EvalkatalogZugriffTests(TestCase):
             reverse("simulation:evalkatalog_anlegen"),
             reverse("simulation:evalkatalog_editor", args=[katalog.pk]),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_finalisieren", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
             reverse(
@@ -1070,6 +1184,7 @@ class EvalkatalogZugriffTests(TestCase):
         for url in (
             reverse("simulation:evalkatalog_anlegen"),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_finalisieren", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
             reverse(
                 "simulation:evalkatalog_kriterium_loeschen",
