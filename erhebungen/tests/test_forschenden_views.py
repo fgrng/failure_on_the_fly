@@ -6,8 +6,10 @@ import re
 from datetime import UTC, datetime, timedelta
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
 import pytest
+import time_machine
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import connection
@@ -54,10 +56,8 @@ from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
 
-def _zeitstempel(wert: datetime) -> str:
-    """Schreibt einen Zeitstempel so, wie der Export ihn erwartet."""
-
-    return timezone.localtime(wert, timezone.UTC).isoformat(timespec="seconds")
+# Ein Zeitpunkt in Sommerzeit: Der Export schreibt ihn zwei Stunden früher in UTC.
+_SOMMERZEIT: datetime = datetime(2026, 7, 1, 10, 0, tzinfo=ZoneInfo("Europe/Berlin"))
 
 
 def _laufende_bindung(erhebung: Erhebung, token: str) -> Erhebungsbindung:
@@ -2332,7 +2332,8 @@ class ErhebungsExportTests(TestCase):
         zweiter_kern: Simulationskern = erster_kern.bearbeiten()
         zweiter_kern.system_prompt_vorlage = "Verwendeter System-Prompt\nZeile zwei"
         zweiter_kern.save()
-        zweiter_kern.finalisieren()
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            zweiter_kern.finalisieren()
         erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
         erste_vignette = erste_vignette.bearbeiten()
         erste_vignette.lernauftrag_text = (
@@ -2490,9 +2491,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "id": str(zweiter_kern.pk),
                     "historie_id": str(zweiter_kern.historie_id),
-                    "finalisiert_am": zweiter_kern.finalisiert_am.isoformat(
-                        timespec="seconds"
-                    ),
+                    "finalisiert_am": "2026-07-01T08:00:00+00:00",
                     "system_prompt_vorlage": "Verwendeter System-Prompt\nZeile zwei",
                     "user_prompt_vorlage": "User $lernauftrag",
                     "rahmenhandlung_einleitung": "Einleitung\nmehrzeilig",
@@ -3061,27 +3060,28 @@ class ErhebungsExportTests(TestCase):
             _laufende_bindung(erhebung, f"2345-678{nummer}") for nummer in range(1, 3)
         ]
         bloecke: list[Itemblock] = []
-        for bindung in bindungen:
-            sitzung: Sitzung = Sitzung.objects.create(
-                teilnahme=bindung.teilnahme,
-                vignette=vignette,
-                simulationskern=kern,
-                modell_konfiguration=konfiguration,
-            )
-            bloecke.append(
-                Itemblock.objects.create(
-                    erhebungsbindung=bindung,
-                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                    sitzung=sitzung,
-                    erledigt_am=timezone.now(),
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            for bindung in bindungen:
+                sitzung: Sitzung = Sitzung.objects.create(
+                    teilnahme=bindung.teilnahme,
+                    vignette=vignette,
+                    simulationskern=kern,
+                    modell_konfiguration=konfiguration,
                 )
-            )
-            bloecke.append(
-                Itemblock.objects.create(
-                    erhebungsbindung=bindung,
-                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                bloecke.append(
+                    Itemblock.objects.create(
+                        erhebungsbindung=bindung,
+                        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                        sitzung=sitzung,
+                        erledigt_am=_SOMMERZEIT + timedelta(minutes=5),
+                    )
                 )
-            )
+                bloecke.append(
+                    Itemblock.objects.create(
+                        erhebungsbindung=bindung,
+                        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                    )
+                )
         fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
         fremde_erhebung.finalisieren()
         Itemblock.objects.create(
@@ -3110,9 +3110,9 @@ class ErhebungsExportTests(TestCase):
                     "teilnahme_token": block.erhebungsbindung.token,
                     "andockpunkt": block.andockpunkt,
                     "sitzung_id": (str(block.sitzung_id) if block.sitzung_id else "NA"),
-                    "vorgelegt_am": _zeitstempel(block.vorgelegt_am),
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
                     "erledigt_am": (
-                        _zeitstempel(block.erledigt_am) if block.erledigt_am else "NA"
+                        "2026-07-01T08:05:00+00:00" if block.sitzung_id else "NA"
                     ),
                 }
                 for block in bloecke
@@ -3312,9 +3312,10 @@ class ErhebungsExportTests(TestCase):
         detail_ohne_stichprobe: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[entwurf.pk])
         )
-        export: HttpResponse = self.client.get(
-            reverse("erhebungen:export", args=[entwurf.pk])
-        )
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            export: HttpResponse = self.client.get(
+                reverse("erhebungen:export", args=[entwurf.pk])
+            )
         fremder_export: HttpResponse = self.client.get(
             reverse("erhebungen:export", args=[fremde_erhebung.pk])
         )
@@ -3323,9 +3324,10 @@ class ErhebungsExportTests(TestCase):
             detail_ohne_stichprobe, reverse("erhebungen:export", args=[entwurf.pk])
         )
         self.assertEqual(fremder_export.status_code, 404)
-        self.assertRegex(
+        self.assertEqual(
             export["Content-Disposition"],
-            r'^attachment; filename="erhebung-\d+-leerer-entwurf-\d{8}T\d{6}Z.zip"$',
+            f'attachment; filename="erhebung-{entwurf.pk}-leerer-entwurf-'
+            '20260701T080000Z.zip"',
         )
         # Die Kopfzeile steht auch ohne Datenzeile; die Erhebung selbst und die
         # global festgelegte Likert-Kodierung hängen nicht am Datenbestand.

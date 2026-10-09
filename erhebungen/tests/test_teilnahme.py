@@ -1,10 +1,10 @@
 """HTTP-Tests für den pseudonymen Erhebungszugang."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from html.parser import HTMLParser
-from unittest.mock import patch
 
+import time_machine
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -1365,21 +1365,16 @@ class ErhebungsteilnahmeTests(TestCase):
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
         self._verbrauchte_trainingssitzung_anlegen(vignette, sekunden=999.0)
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
             self.client.get(gespraech_url)
+            uhr.shift(1)
             antwort: HttpResponse = self.client.post(
                 gespraech_url, {"eingabe": "Wie rechnest du?"}
             )
 
-        self.assertNotContains(antwort, 'id="sitzung-debrief"')
         self.assertContains(antwort, "Ich addiere.")
+        self.assertContains(antwort, "Ihre nächste Frage")
+        self.assertNotContains(antwort, "Was ist Ihnen aufgefallen?")
 
     def test_zeitbudget_ueberlebt_den_browserwechsel(self) -> None:
         """Die andere Browser-Session führt den Zeitverbrauch derselben Sitzung fort."""
@@ -1394,25 +1389,19 @@ class ErhebungsteilnahmeTests(TestCase):
 
         # Ein Zug von 1 s im ersten Browser, einer von 6 s im zweiten: Der zweite
         # erbt den Stand des ersten und bucht auf zusammen 7 s weiter.
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 11, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 20, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 26, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
             self.client.get(gespraech_url)
+            uhr.shift(1)
             self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+            uhr.shift(69)
             anderer_browser: Client = Client()
             anderer_browser.get(gespraech_url)
+            uhr.shift(6)
             debrief: HttpResponse = anderer_browser.post(
                 gespraech_url, {"eingabe": "Und warum?"}
             )
 
-        self.assertContains(debrief, "Debrief")
+        self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
         self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 7)
 
     def test_schrittbudget_laesst_die_uhr_der_sitzung_stehen(self) -> None:
@@ -1428,15 +1417,9 @@ class ErhebungsteilnahmeTests(TestCase):
 
         # Zwischen Anzeige und Absenden liegen 40 s. Bei einem Zeitbudget waeren
         # sie gebucht; hier laeuft keine Uhr, die sie buchen koennte.
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 50, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 50, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
             self.client.get(gespraech_url)
+            uhr.shift(40)
             self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
 
         self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 0.0)
@@ -1454,15 +1437,9 @@ class ErhebungsteilnahmeTests(TestCase):
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 0, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 6, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 6, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
             self.client.get(gespraech_url)
+            uhr.shift(6)
             debrief: HttpResponse = self.client.post(
                 gespraech_url, {"eingabe": "Wie rechnest du?"}
             )
@@ -1471,7 +1448,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(schritt.eingabe, "Wie rechnest du?")
         self.assertEqual(schritt.aeusserung, "Ich addiere.")
         self.assertContains(debrief, "Ich addiere.")
-        self.assertContains(debrief, "Debrief")
+        self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
+        self.assertNotContains(debrief, "Ihre nächste Frage")
 
     def test_aktiver_abbruch_setzt_die_sitzung_auf_abgebrochen(self) -> None:
         """Die Teilnahme kann eine laufende Sitzung ohne Diagnose abbrechen."""

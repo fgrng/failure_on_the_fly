@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 from django.contrib.sessions.backends.db import SessionStore
+from time_machine import TimeMachineFixture
 
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -383,7 +384,7 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_allen_senken_neu_an() -> N
 
 @pytest.mark.django_db
 def test_sitzung_beenden_beendet_die_offene_spanne(
-    monkeypatch: pytest.MonkeyPatch,
+    time_machine: TimeMachineFixture,
 ) -> None:
     """Das Beenden delegiert das Buchen an den Sink."""
 
@@ -392,14 +393,13 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
     vignette.budget_wert = 7
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    monkeypatch.setattr(
-        "sitzungen.durchlauf.jetzt",
-        lambda: datetime(2026, 9, 22, 10, 0, 7, tzinfo=UTC),
-    )
+    beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
     for sink in (ScratchSink(SessionStore()), datenbank):
+        time_machine.move_to(beginn, tick=False)
         sitzung_starten(sink, vignette, konfiguration)
-        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beginnen(beginn)
+        time_machine.shift(7)
         sitzung_beenden(sink)
         assert _leeren_schritt_anhaengen(sink)
     assert _verbrauchte_zeit(datenbank) == 7.0
@@ -407,7 +407,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
 
 @pytest.mark.django_db
 def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebrochen(
-    monkeypatch: pytest.MonkeyPatch,
+    time_machine: TimeMachineFixture,
 ) -> None:
     """Das Abbrechen hält die Uhr an und markiert die Sitzung als abgebrochen."""
 
@@ -416,13 +416,12 @@ def test_sitzung_abbrechen_beendet_die_offene_spanne_und_setzt_status_abgebroche
     vignette.budget_wert = 10
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
+    beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     sink: DBSink = DBSink(Teilnahme.objects.create())
-    monkeypatch.setattr(
-        "sitzungen.durchlauf.jetzt",
-        lambda: datetime(2026, 9, 22, 10, 0, 3, tzinfo=UTC),
-    )
+    time_machine.move_to(beginn, tick=False)
     sitzung_starten(sink, vignette, konfiguration)
-    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+    sink.zug_beginnen(beginn)
+    time_machine.shift(3)
     sitzung_abbrechen(sink)
 
     assert _verbrauchte_zeit(sink) == 3.0

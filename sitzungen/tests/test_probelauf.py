@@ -2,11 +2,11 @@
 
 from datetime import UTC, datetime
 
+import time_machine
 from django.contrib.sessions.backends.base import SessionBase
 from django.http import HttpResponse
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-from unittest.mock import patch
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
@@ -15,7 +15,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from config.tests.formular import submit_knoepfe
-from config.tests.sprachmodell import anfragen_aufzeichnen
+from config.tests.sprachmodell import anfragen_aufzeichnen, modellaufrufe_dauern
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.durchlauf import Ausgang, gespraechsschritt_ausfuehren
@@ -30,6 +30,9 @@ from sitzungen.models import (
 from sitzungen.sink import ScratchSink, probelauf_laeuft
 from vignetten.models import Vignette
 
+
+# Zeitpunkt, zu dem das Gespräch angezeigt wird; ab hier zählen die Züge.
+_GESPRAECHSBEGINN: datetime = datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC)
 
 _ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
     {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
@@ -531,19 +534,15 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-            ],
-        ):
+        # 4 s Autorinnenzug, danach rechnet das Modell 100 s.
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
-            response: HttpResponse = self.client.post(
-                reverse("sitzungen:probelauf_gespraech"),
-                {"eingabe": "Wie rechnest du?"},
-            )
+            uhr.shift(4)
+            with modellaufrufe_dauern(uhr, 100):
+                response: HttpResponse = self.client.post(
+                    reverse("sitzungen:probelauf_gespraech"),
+                    {"eingabe": "Wie rechnest du?"},
+                )
 
         self.assertContains(response, "Ich addiere einfach alles.")
         self.assertNotContains(response, "Budget")
@@ -556,25 +555,17 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         geglueckt: ModellKonfiguration = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-            ],
-        ):
+        # 4 s Autorinnenzug, danach kostet jeder Fehlversuch 100 s.
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
-            response: HttpResponse = self.client.post(
-                reverse("sitzungen:probelauf_gespraech"),
-                {"eingabe": "Wie rechnest du?"},
-            )
+            uhr.shift(4)
+            with modellaufrufe_dauern(uhr, 100):
+                response: HttpResponse = self.client.post(
+                    reverse("sitzungen:probelauf_gespraech"),
+                    {"eingabe": "Wie rechnest du?"},
+                )
 
-        session: SessionBase = self.client.session
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            return_value=datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-        ):
+            session: SessionBase = self.client.session
             ausgang: Ausgang = gespraechsschritt_ausfuehren(
                 ScratchSink(session),
                 self.entwurf,
@@ -594,14 +585,9 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 15, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
+            uhr.shift(5)
             response: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_gespraech"),
                 {"eingabe": "Wie rechnest du?"},

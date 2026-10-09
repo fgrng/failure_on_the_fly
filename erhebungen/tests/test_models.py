@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
+from time_machine import TimeMachineFixture
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
@@ -896,12 +897,14 @@ def test_anlegen_wiederholt_token_nach_kollision() -> None:
     [
         (datetime(2026, 7, 16, 8, 59), Stichprobe.Phase.VOR),
         (datetime(2026, 7, 16, 9), Stichprobe.Phase.LAUFEND),
+        (datetime(2026, 7, 16, 17), Stichprobe.Phase.LAUFEND),
         (datetime(2026, 7, 16, 17, 1), Stichprobe.Phase.NACH),
     ],
 )
 def test_phase_leitet_sich_aus_zeitraum_und_systemzeit_ab(
     zeitpunkt: datetime,
     erwartete_phase: str,
+    time_machine: TimeMachineFixture,
 ) -> None:
     """Eine Stichprobe ist vor, während oder nach ihrem Erhebungszeitraum."""
 
@@ -914,8 +917,6 @@ def test_phase_leitet_sich_aus_zeitraum_und_systemzeit_ab(
         ende=timezone.make_aware(datetime(2026, 7, 16, 17)),
     )
 
-    with patch(
-        "erhebungen.models.timezone.now",
-        return_value=timezone.make_aware(zeitpunkt),
-    ):
-        assert stichprobe.phase == erwartete_phase
+    time_machine.move_to(timezone.make_aware(zeitpunkt), tick=False)
+
+    assert stichprobe.phase == erwartete_phase
