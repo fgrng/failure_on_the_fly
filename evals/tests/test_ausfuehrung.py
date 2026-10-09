@@ -72,32 +72,65 @@ def test_je_wiederholung_ein_gespraech_mit_einem_wechsel_je_inputschritt() -> No
     ] == [(1, ["Eins", "Zwei", "Drei"]), (2, ["Eins", "Zwei", "Drei"])]
 
 
-@pytest.mark.django_db
-def test_schuelerin_sieht_keine_denkspur_bewerter_schon_niemand_die_referenzdiagnose() -> (
-    None
-):
-    """Die Kontextgrenzen der beiden Rollen, an den Anbieter-Anfragen geprüft."""
+def _anfragetexte(vignette: Vignette) -> list[str]:
+    # Führt einen Lauf aus; je Anbieter-Anfrage alle Nachrichten als ein Text.
+
+    with anfragen_aufzeichnen() as anfragen:
+        _ausgefuehrter_lauf(vignette)
+    return [
+        " ".join(nachricht["content"] for nachricht in anfrage) for anfrage in anfragen
+    ]
+
+
+@pytest.fixture
+def zwei_schritte_ein_kriterium() -> None:
+    """Ein Gespräch aus zwei festen Schritten, beurteilt nach einem Kriterium."""
 
     finaler_katalog(k=1, uebergreifende=())
     drei_fakes(schuelerin=antworten(2), bewerter=urteile(True))
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_schuelerin_sieht_ihre_fruehere_antwort_ohne_denkspur() -> None:
+    """Der zweite Antwortversuch kennt die Äußerung, nicht die Denkspur."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, zweite_schuelerin, _ = _anfragetexte(vignette)
+
+    assert ("Antwort 1" in zweite_schuelerin, "Denkspur 1" in zweite_schuelerin) == (
+        True,
+        False,
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_bewerter_sieht_verlauf_samt_denkspur_und_kriterium() -> None:
+    """Der Bewerter beurteilt das ganze Gespräch nach dem Kriteriumstext."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    *_, bewerter = _anfragetexte(vignette)
+
+    assert all(
+        text in bewerter for text in ("Denkspur 1", "Denkspur 2", "Muster gezeigt")
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_referenzdiagnose_erreicht_keinen_modellaufruf() -> None:
+    """Weder Schüler:in noch Bewerter sehen die Referenzdiagnose."""
+
     vignette: Vignette = finale_vignette(
         konto_mit_rollen("ada", "Autor:in"), referenzdiagnose="GEHEIME DIAGNOSE"
     )
 
-    with anfragen_aufzeichnen() as anfragen:
-        _ausgefuehrter_lauf(vignette)
+    texte: list[str] = _anfragetexte(vignette)
 
-    schuelerin, zweite_schuelerin, bewerter = (
-        " ".join(nachricht["content"] for nachricht in anfrage) for anfrage in anfragen
-    )
-    assert "Antwort 1" in zweite_schuelerin
-    assert "Denkspur 1" not in zweite_schuelerin
-    assert "Denkspur 1" in bewerter and "Denkspur 2" in bewerter
-    assert "Muster gezeigt" in bewerter
-    assert all(
-        "GEHEIME DIAGNOSE" not in text
-        for text in (schuelerin, zweite_schuelerin, bewerter)
-    )
+    assert all("GEHEIME DIAGNOSE" not in text for text in texte)
 
 
 @pytest.mark.django_db
@@ -155,6 +188,20 @@ def test_gelenkter_schritt_wird_nicht_stillschweigend_ausgelassen() -> None:
     gespraech = lauf.gespraeche.get()
     assert gespraech.wechsel.count() == 1
     assert {urteil.erfuellt for urteil in gespraech.urteile.all()} == {None}
+
+
+@pytest.mark.django_db
+def test_gelenkter_erster_schritt_laesst_alle_kriterien_ohne_urteil() -> None:
+    """Auch ganz vorn entfällt ein gelenkter Schritt nicht still."""
+
+    finaler_katalog(k=1, schritte=(), gelenkt=("Frag nach",))
+    drei_fakes()
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    lauf: Evallauf = _ausgefuehrter_lauf(vignette)
+
+    zellen: list[Zelle] = lauf.uebersicht()[0].zeilen[0].zellen
+    assert [(z.erfuellt, z.ohne_urteil) for z in zellen] == [(0, 1), (0, 1)]
 
 
 @pytest.mark.django_db

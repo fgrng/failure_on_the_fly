@@ -41,9 +41,11 @@ class Command(BaseCommand):
             pk=lauf.pk, zustand=Evallauf.Zustand.WARTET
         ).update(zustand=Evallauf.Zustand.LAEUFT, gestartet_am=timezone.now()):
             return
-        ende: str = Evallauf.Zustand.FERTIG
+        ende: Evallauf.Zustand = Evallauf.Zustand.FERTIG
         try:
             evallauf_ausfuehren(lauf)
+        # Anbieterfehler fängt die Simulation selbst ab; was hier ankommt, ist
+        # unerwartet und soll den Lauf abgebrochen hinterlassen (ADR-0047).
         except Exception:
             logger.exception("Evallauf %s abgebrochen.", lauf.pk)
             ende = Evallauf.Zustand.ABGEBROCHEN

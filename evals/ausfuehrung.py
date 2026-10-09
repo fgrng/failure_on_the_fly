@@ -10,19 +10,16 @@ from simulation import (
     antwort_versuchen,
     vorlage_rendern,
 )
-from simulation.models import Evalinput, Evalkriterium, UebergreifendesKriterium
+from simulation.models import Evalinput
 from simulation.sprachmodell import BEWERTER_SCHEMA
 
-from .models import Evalgespraech, Evallauf, Urteil, Wechsel
+from .models import Evalgespraech, Evallauf, Kriterium, Urteil, Wechsel
 
 ANTWORTVERSUCH_GESCHEITERT: str = "Antwortversuch gescheitert"
 BEWERTER_OHNE_AUSGABE: str = "Der Bewerter lieferte keine auswertbare Ausgabe."
 GELENKT_NOCH_NICHT: str = (
     "Gelenkte Inputschritte werden noch nicht ausgeführt; das Gespräch endet davor."
 )
-
-# Ein Kriterium als Feld des Urteils, das es bezeichnet.
-type Urteilsziel = dict[str, Evalkriterium | UebergreifendesKriterium]
 
 
 def evallauf_ausfuehren(evallauf: Evallauf) -> None:
@@ -35,18 +32,11 @@ def evallauf_ausfuehren(evallauf: Evallauf) -> None:
     """
 
     ausfuehrung: Ausfuehrung = Ausfuehrung()
-    katalog = evallauf.katalog
-    uebergreifende: list[UebergreifendesKriterium] = list(
-        katalog.uebergreifende_kriterien.all()
-    )
-    for eval_ in katalog.evals.prefetch_related("kriterien", "inputs__schritte"):
-        ziele: list[Urteilsziel] = [
-            {"evalkriterium": kriterium} for kriterium in eval_.kriterien.all()
-        ] + [{"uebergreifendes_kriterium": kriterium} for kriterium in uebergreifende]
+    for eval_, kriterien in evallauf.evals_mit_kriterien():
         for evalinput in eval_.inputs.all():
-            for wiederholung in range(1, katalog.k + 1):
+            for wiederholung in range(1, evallauf.katalog.k + 1):
                 _gespraech_fuehren(
-                    evallauf, evalinput, wiederholung, ziele, ausfuehrung
+                    evallauf, evalinput, wiederholung, kriterien, ausfuehrung
                 )
 
 
@@ -54,7 +44,7 @@ def _gespraech_fuehren(
     evallauf: Evallauf,
     evalinput: Evalinput,
     wiederholung: int,
-    ziele: Sequence[Urteilsziel],
+    kriterien: Sequence[Kriterium],
     ausfuehrung: Ausfuehrung,
 ) -> None:
     # Spielt eine Wiederholung Schritt für Schritt und lässt sie beurteilen.
@@ -66,7 +56,7 @@ def _gespraech_fuehren(
     protokoll: list[tuple[str, str, str]] = []
     for position, schritt in enumerate(evalinput.schritte.all(), 1):
         if schritt.gelenkt:
-            _alle_beurteilen(gespraech, ziele, None, GELENKT_NOCH_NICHT)
+            _alle_beurteilen(gespraech, kriterien, None, GELENKT_NOCH_NICHT)
             return
         versuch: Antwortversuch = antwort_versuchen(
             evallauf.platzhalter,
@@ -88,68 +78,67 @@ def _gespraech_fuehren(
             ],
         )
         if versuch.antwort is None:
-            _alle_beurteilen(gespraech, ziele, False, ANTWORTVERSUCH_GESCHEITERT)
+            _alle_beurteilen(gespraech, kriterien, False, ANTWORTVERSUCH_GESCHEITERT)
             return
         verlauf.append((schritt.text, versuch.antwort.aeusserung))
         protokoll.append(
             (schritt.text, versuch.antwort.denkspur, versuch.antwort.aeusserung)
         )
     verlauf_mit_denkspur: str = _verlauf_mit_denkspur(protokoll)
-    for ziel in ziele:
-        _beurteilen(evallauf, gespraech, ziel, verlauf_mit_denkspur, ausfuehrung)
+    for kriterium in kriterien:
+        _beurteilen(evallauf, gespraech, kriterium, verlauf_mit_denkspur, ausfuehrung)
 
 
 def _alle_beurteilen(
     gespraech: Evalgespraech,
-    ziele: Sequence[Urteilsziel],
+    kriterien: Sequence[Kriterium],
     erfuellt: bool | None,
     begruendung: str,
 ) -> None:
     # Schreibt jedem Kriterium dasselbe Urteil, ohne den Bewerter zu fragen.
 
-    for ziel in ziele:
-        Urteil.objects.create(
-            gespraech=gespraech, erfuellt=erfuellt, begruendung=begruendung, **ziel
-        )
+    for kriterium in kriterien:
+        Urteil.objects.schreiben(gespraech, kriterium, erfuellt, begruendung)
 
 
 def _beurteilen(
     evallauf: Evallauf,
     gespraech: Evalgespraech,
-    ziel: Urteilsziel,
+    kriterium: Kriterium,
     verlauf_mit_denkspur: str,
     ausfuehrung: Ausfuehrung,
 ) -> None:
-    # Fragt den Bewerter nach einem Kriterium. Die Anweisung steht allein in
-    # der Bewerter-Vorlage; der User-Prompt trägt den Verlauf, die Eingabe das
-    # Kriterium, beides als Daten.
+    # Fragt den Bewerter nach einem Kriterium. Die gerenderte Bewerter-Vorlage
+    # ist der System-Prompt und setzt Kriterium und Verlauf über `$kriterium`
+    # und `$verlauf` ein; der User-Prompt trägt noch einmal den Verlauf, die
+    # Eingabe den Kriteriumstext.
 
-    kriterium: str = next(iter(ziel.values())).text
     ausgabeversuch: Ausgabeversuch = ausgabe_versuchen(
         vorlage_rendern(
             evallauf.katalog.bewerter_vorlage,
             {
                 **evallauf.platzhalter,
-                "kriterium": kriterium,
+                "kriterium": kriterium.text,
                 "verlauf": verlauf_mit_denkspur,
             },
         ),
         verlauf_mit_denkspur,
         evallauf.bewerter_konfiguration,
         [],
-        kriterium,
+        kriterium.text,
         BEWERTER_SCHEMA,
         ausfuehrung,
     )
     ausgabe: dict[str, object] | None = ausgabeversuch.ausgabe
-    Urteil.objects.create(
-        gespraech=gespraech,
-        erfuellt=None if ausgabe is None else bool(ausgabe["erfuellt"]),
-        begruendung=(
-            BEWERTER_OHNE_AUSGABE if ausgabe is None else str(ausgabe["begruendung"])
-        ),
-        **ziel,
-    )
+    if ausgabe is None:
+        Urteil.objects.schreiben(gespraech, kriterium, None, BEWERTER_OHNE_AUSGABE)
+    else:
+        Urteil.objects.schreiben(
+            gespraech,
+            kriterium,
+            bool(ausgabe["erfuellt"]),
+            str(ausgabe["begruendung"]),
+        )
 
 
 def _verlauf_mit_denkspur(protokoll: Sequence[tuple[str, str, str]]) -> str:

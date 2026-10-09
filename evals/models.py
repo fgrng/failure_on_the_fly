@@ -25,6 +25,9 @@ from vignetten.models import Vignette, prompt_platzhalter
 
 _LAEUFT_SCHON: str = "Für diese Fassung wartet oder läuft bereits ein Evallauf."
 
+# Was ein Urteil beurteilt: ein Evalkriterium oder ein übergreifendes Kriterium.
+type Kriterium = Evalkriterium | UebergreifendesKriterium
+
 
 @dataclass(frozen=True)
 class Zelle:
@@ -164,11 +167,11 @@ class Evallauf(models.Model):
         und sie besteht nicht.
         """
 
-        zaehler: dict[tuple[int, str, int], list[int]] = {}
+        zaehler: dict[tuple[int, type[Kriterium], int], list[int]] = {}
         for urteil in Urteil.objects.filter(gespraech__evallauf=self).select_related(
             "gespraech"
         ):
-            schluessel: tuple[int, str, int] = (
+            schluessel: tuple[int, type[Kriterium], int] = (
                 urteil.gespraech.evalinput_id,
                 *urteil.kriterium_schluessel,
             )
@@ -177,37 +180,44 @@ class Evallauf(models.Model):
                 stand[0] += 1
             elif urteil.erfuellt is None:
                 stand[1] += 1
-        uebergreifende: list[UebergreifendesKriterium] = list(
-            self.katalog.uebergreifende_kriterien.all()
-        )
         ergebnisse: list[Evalergebnis] = []
-        eval_: Eval
-        for eval_ in self.katalog.evals.prefetch_related(
-            "kriterien", "inputs__schritte"
-        ):
-            kriterien: list[tuple[str, int, str]] = [
-                ("eval", kriterium.pk, kriterium.text)
-                for kriterium in eval_.kriterien.all()
-            ] + [
-                ("uebergreifend", kriterium.pk, kriterium.text)
-                for kriterium in uebergreifende
-            ]
+        for eval_, kriterien in self.evals_mit_kriterien():
             zeilen: list[Inputzeile] = []
             evalinput: Evalinput
             for nummer, evalinput in enumerate(eval_.inputs.all(), 1):
                 zellen: list[Zelle] = []
-                for art, pk, text in kriterien:
-                    erfuellt, ohne_urteil = zaehler.get((evalinput.pk, art, pk), [0, 0])
-                    zellen.append(Zelle(text, erfuellt, ohne_urteil, self.katalog.k))
+                for kriterium in kriterien:
+                    erfuellt, ohne_urteil = zaehler.get(
+                        (evalinput.pk, type(kriterium), kriterium.pk), [0, 0]
+                    )
+                    zellen.append(
+                        Zelle(kriterium.text, erfuellt, ohne_urteil, self.katalog.k)
+                    )
                 zeilen.append(Inputzeile(nummer, evalinput.kuerzel, zellen))
             ergebnisse.append(
                 Evalergebnis(
                     eval_.name or "Unbenanntes Eval",
-                    [text for _, _, text in kriterien],
+                    [kriterium.text for kriterium in kriterien],
                     zeilen,
                 )
             )
         return ergebnisse
+
+    def evals_mit_kriterien(self) -> list[tuple[Eval, list[Kriterium]]]:
+        """Je Eval des festgehaltenen Katalogs seine Kriterien, die übergreifenden zuletzt.
+
+        Evalinputs und Schritte der Evals sind vorab geladen.
+        """
+
+        uebergreifende: list[UebergreifendesKriterium] = list(
+            self.katalog.uebergreifende_kriterien.all()
+        )
+        return [
+            (eval_, [*eval_.kriterien.all(), *uebergreifende])
+            for eval_ in self.katalog.evals.prefetch_related(
+                "kriterien", "inputs__schritte"
+            )
+        ]
 
 
 class Evalgespraech(models.Model):
@@ -261,6 +271,31 @@ class Wechsel(models.Model):
         ]
 
 
+class UrteilManager(models.Manager["Urteil"]):
+    """Schreibnaht für Urteile."""
+
+    def schreiben(
+        self,
+        gespraech: Evalgespraech,
+        kriterium: Kriterium,
+        erfuellt: bool | None,
+        begruendung: str,
+    ) -> "Urteil":
+        """Legt das Urteil zu einem Kriterium an, gleich welcher Art es ist."""
+
+        feld: str = (
+            "evalkriterium"
+            if isinstance(kriterium, Evalkriterium)
+            else "uebergreifendes_kriterium"
+        )
+        return self.create(
+            gespraech=gespraech,
+            erfuellt=erfuellt,
+            begruendung=begruendung,
+            **{feld: kriterium},
+        )
+
+
 class Urteil(models.Model):
     """Das Ergebnis genau eines Kriteriums an einem Evalgespräch.
 
@@ -286,6 +321,8 @@ class Urteil(models.Model):
     )
     erfuellt: models.BooleanField = models.BooleanField(null=True)
     begruendung: models.TextField = models.TextField(blank=True, default="")
+
+    objects: UrteilManager = UrteilManager()
 
     class Meta:
         """Genau ein Kriterium je Urteil, je Gespräch und Kriterium ein Urteil."""
@@ -315,9 +352,9 @@ class Urteil(models.Model):
         ]
 
     @property
-    def kriterium_schluessel(self) -> tuple[str, int]:
+    def kriterium_schluessel(self) -> tuple[type[Kriterium], int]:
         """Art und Primärschlüssel des beurteilten Kriteriums."""
 
         if self.evalkriterium_id is not None:
-            return ("eval", self.evalkriterium_id)
-        return ("uebergreifend", self.uebergreifendes_kriterium_id)
+            return (Evalkriterium, self.evalkriterium_id)
+        return (UebergreifendesKriterium, self.uebergreifendes_kriterium_id)

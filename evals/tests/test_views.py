@@ -36,14 +36,20 @@ def _client(konto: Konto) -> Client:
 
 
 def _knoepfe(antwort: HttpResponse) -> list[str]:
+    # Die Beschriftungen aller Absendeknöpfe der Seite.
+
     return [beschriftung for beschriftung, _ in submit_knoepfe(antwort)]
 
 
 def _ansicht(vignette: Vignette) -> str:
+    # Die URL der Evallauf-Ansicht einer Fassung.
+
     return reverse("evals:evallauf", args=[vignette.pk])
 
 
 def _starten(client: Client, vignette: Vignette) -> HttpResponse:
+    # Startet per POST und folgt der Weiterleitung auf die Ansicht.
+
     return client.post(reverse("evals:starten", args=[vignette.pk]), follow=True)
 
 
@@ -90,6 +96,32 @@ def test_start_stellt_einen_wartenden_lauf_ohne_zweite_startaktion_ein(
     assert Evallauf.objects.get(vignette=vignette).zustand == Evallauf.Zustand.WARTET
     assert "Wartet" in antwort.content.decode()
     assert _STARTEN not in _knoepfe(antwort)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_wartender_lauf_bietet_neuladen_statt_start(ada: Konto) -> None:
+    """Aktualisiert wird durch Neuladen; die Seite darf geschlossen werden."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+
+    seite: str = _starten(_client(ada), vignette).content.decode()
+
+    assert "Stand neu laden" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_konto_ohne_autorinnenrolle_erhaelt_keinen_zugriff(ada: Konto) -> None:
+    """Ansicht und Start ergeben 403 für Konten ohne Autor:innen-Rolle."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+    client: Client = _client(konto_mit_rollen("tom"))
+
+    assert (
+        client.get(_ansicht(vignette)).status_code,
+        client.post(reverse("evals:starten", args=[vignette.pk])).status_code,
+    ) == (403, 403)
 
 
 @pytest.mark.django_db
