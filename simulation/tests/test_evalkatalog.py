@@ -8,7 +8,9 @@ from simulation.models import (
     VERTRAG_EVAL,
     VERTRAG_LEHRPERSON,
     VERTRAG_PROMPT,
+    Eval,
     Evalkatalog,
+    Evalkriterium,
     UebergreifendesKriterium,
 )
 
@@ -190,3 +192,118 @@ def test_kriterium_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf() -
 
     with pytest.raises(RuntimeError, match="Entwurf"):
         kriterium.save()
+
+
+@pytest.mark.django_db
+def test_evals_stehen_in_der_reihenfolge_des_anlegens_und_lassen_sich_umordnen() -> (
+    None
+):
+    """Ein neues Eval reiht sich am Ende ein; Hoch und Runter tauschen Plätze."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    katalog.eval_anlegen("A")
+    katalog.eval_anlegen("B")
+    drittes: Eval = katalog.eval_anlegen("C")
+
+    drittes.verschieben(-1)
+
+    assert [e.name for e in katalog.evals.all()] == ["A", "C", "B"]
+
+
+@pytest.mark.django_db
+def test_evalkriterien_haengen_am_eval_und_lassen_sich_umordnen() -> None:
+    """Jedes Eval ordnet seine eigenen Kriterien, unabhängig von den anderen."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    eval_: Eval = katalog.eval_anlegen("Muster")
+    anderes: Eval = katalog.eval_anlegen("Andere")
+    erstes: Evalkriterium = eval_.kriterium_anlegen("A")
+    eval_.kriterium_anlegen("B")
+    anderes.kriterium_anlegen("X")
+
+    erstes.verschieben(1)
+
+    assert [k.text for k in eval_.kriterien.all()] == ["B", "A"]
+    assert [k.text for k in anderes.kriterien.all()] == ["X"]
+
+
+@pytest.mark.django_db
+def test_geloeschtes_eval_nimmt_seine_kriterien_mit() -> None:
+    """Evalkriterien gibt es nur an ihrem Eval."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    eval_: Eval = katalog.eval_anlegen("Muster")
+    eval_.kriterium_anlegen("A")
+
+    eval_.delete()
+
+    assert not Evalkriterium.objects.exists()
+
+
+@pytest.mark.django_db
+def test_evals_und_evalkriterien_einer_finalen_fassung_sind_unveraenderlich() -> None:
+    """Evals und ihre Kriterien teilen die Schreibsperre der Fassung."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    eval_: Eval = katalog.eval_anlegen("Muster")
+    kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
+    katalog.finalisieren()
+
+    eval_.name = "geändert"
+    kriterium.text = "geändert"
+    for versuch in (
+        eval_.save,
+        eval_.delete,
+        kriterium.save,
+        kriterium.delete,
+        lambda: katalog.eval_anlegen("neu"),
+        lambda: eval_.kriterium_anlegen("neu"),
+        lambda: Eval.objects.filter(katalog=katalog).update(name="x"),
+        lambda: Eval.objects.filter(katalog=katalog).delete(),
+        lambda: Evalkriterium.objects.filter(eval=eval_).update(text="x"),
+        lambda: Evalkriterium.objects.filter(eval=eval_).delete(),
+    ):
+        with pytest.raises(RuntimeError, match="Entwurf"):
+            versuch()
+
+
+@pytest.mark.django_db
+def test_evalkriterium_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf() -> (
+    None
+):
+    """Auch über das Eval hinweg nimmt das Umhängen der Fassung nichts weg."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    kriterium: Evalkriterium = katalog.eval_anlegen("Muster").kriterium_anlegen("A")
+    katalog.finalisieren()
+    kriterium.eval = katalog.bearbeiten().evals.get()
+    kriterium.position = 99
+
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        kriterium.save()
+
+
+@pytest.mark.django_db
+def test_neuer_entwurf_uebernimmt_evals_und_evalkriterien() -> None:
+    """Die Tiefenkopie trägt Evals samt Kriterien in gleicher Reihenfolge weiter."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    erstes: Eval = katalog.eval_anlegen("Muster")
+    erstes.kriterium_anlegen("A")
+    erstes.kriterium_anlegen("B")
+    katalog.eval_anlegen("Rolle").kriterium_anlegen("C")
+    katalog.finalisieren()
+
+    entwurf: Evalkatalog = katalog.bearbeiten()
+    kopie: Evalkriterium = entwurf.evals.first().kriterien.first()
+    kopie.text = "A2"
+    kopie.save()
+
+    def baum(fassung: Evalkatalog) -> list[tuple[str, list[str]]]:
+        # Liefert die Evals einer Fassung samt Kriterientexten in Reihenfolge.
+        return [
+            (e.name, [k.text for k in e.kriterien.all()]) for e in fassung.evals.all()
+        ]
+
+    assert baum(entwurf) == [("Muster", ["A2", "B"]), ("Rolle", ["C"])]
+    assert baum(katalog) == [("Muster", ["A", "B"]), ("Rolle", ["C"])]

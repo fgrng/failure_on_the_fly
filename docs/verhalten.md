@@ -291,8 +291,9 @@ Mit Entwurf bietet die Seite nur „Entwurf bearbeiten“ und „Entwurf verwerf
 an, ein zweites Anlegen wird mit einer Meldung abgelehnt. Das Verwerfen löscht
 den Entwurf, danach lässt sich wieder ein Katalog anlegen.
 
-Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Bisher
-gibt es die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“.
+Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Der
+Baum trägt die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“,
+darunter jedes Eval als eigenen Knoten in seiner Reihenfolge.
 „Durchlauf und Vorlagen“ trägt *k*, die Zahl der
 Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
 Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
@@ -318,6 +319,21 @@ getippten Texte aller Kriterien, ebenso „Änderungen speichern“. Ein Katalog
 ohne übergreifende Kriterien auskommen. Ein neuer Entwurf aus einer finalen
 Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle Routen des Knotens
 erreichen nur Entwürfe.
+
+„Eval hinzufügen“ unter dem Baum hängt ein Eval namens „Neues Eval“ ans Ende und
+öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um; ein Eval
+ohne Namen erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch
+und Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
+gesperrt), der Papierkorb löscht es samt seiner Evalkriterien und führt zurück
+zu „Durchlauf und Vorlagen“. Darunter pflegt sie die Evalkriterien des Evals,
+nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
+bearbeiten, löschen und umordnen genau wie die übergreifenden Kriterien, ebenfalls
+reiner Text ohne Platzhalter. Jede Geste im Editor, auch „Eval hinzufügen“ aus
+einem anderen Knoten heraus, übernimmt zugleich alle getippten Werte des
+Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein neuer
+Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
+gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
+Alle Routen der Evals und Evalkriterien erreichen nur Entwürfe.
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 

@@ -264,29 +264,33 @@ class Evalkatalog(VersionierteFassung):
 
     @transaction.atomic
     def bearbeiten(self) -> "Evalkatalog":
-        """Erzeugt einen neuen Entwurf samt Kopie der übergreifenden Kriterien."""
+        """Erzeugt einen neuen Entwurf samt Kopie der Kriterien und Evals."""
 
         entwurf: Evalkatalog = super().bearbeiten()
         for kriterium in self.uebergreifende_kriterien.all():
             UebergreifendesKriterium(
                 katalog=entwurf, position=kriterium.position, text=kriterium.text
             ).save()
+        for eval_ in self.evals.all():
+            kopie: Eval = Eval(
+                katalog=entwurf, position=eval_.position, name=eval_.name
+            )
+            kopie.save()
+            for evalkriterium in eval_.kriterien.all():
+                Evalkriterium(
+                    eval=kopie, position=evalkriterium.position, text=evalkriterium.text
+                ).save()
         return entwurf
 
     def kriterium_anlegen(self, text: str = "") -> "UebergreifendesKriterium":
         """Hängt ein übergreifendes Kriterium ans Ende der Liste."""
 
-        letzte: int = (
-            self.uebergreifende_kriterien.aggregate(models.Max("position"))[
-                "position__max"
-            ]
-            or 0
-        )
-        kriterium: UebergreifendesKriterium = UebergreifendesKriterium(
-            katalog=self, position=letzte + 1, text=text
-        )
-        kriterium.save()
-        return kriterium
+        return UebergreifendesKriterium.anhaengen(self, text=text)
+
+    def eval_anlegen(self, name: str = "") -> "Eval":
+        """Hängt ein Eval ans Ende des Katalogs."""
+
+        return Eval.anhaengen(self, name=name)
 
     class Meta:
         """Sichert die Lebenszyklus-Invarianten der Katalog-Fassungen."""
@@ -296,12 +300,12 @@ class Evalkatalog(VersionierteFassung):
         )
 
 
-_NUR_AM_ENTWURF: str = "Kriterien ändern sich nur an einem Entwurf."
+_NUR_AM_ENTWURF: str = "Der Evalkatalog ändert sich nur an einem Entwurf."
 
 
 def _nur_an_entwuerfen(katalog_ids: set[int]) -> None:
-    # Kriterien teilen die Schreibsperre ihrer Fassung: Jede betroffene
-    # Fassung muss ein Entwurf sein.
+    # Teile des Katalogs teilen die Schreibsperre ihrer Fassung: Jede
+    # betroffene Fassung muss ein Entwurf sein.
 
     entwuerfe: int = Evalkatalog.objects.filter(
         pk__in=katalog_ids, zustand=Evalkatalog.Zustand.ENTWURF
@@ -310,24 +314,24 @@ def _nur_an_entwuerfen(katalog_ids: set[int]) -> None:
         raise RuntimeError(_NUR_AM_ENTWURF)
 
 
-class UebergreifendesKriteriumQuerySet(models.QuerySet["UebergreifendesKriterium"]):
+class KatalogteilQuerySet(models.QuerySet["Katalogteil"]):
     """Hält auch gesammelte Schreibzugriffe an der Schreibsperre der Fassung."""
 
     def update(self, **kwargs: object) -> int:
-        """Verhindert Massenänderungen an Kriterien."""
+        """Verhindert Massenänderungen an Teilen des Katalogs."""
 
         raise RuntimeError(_NUR_AM_ENTWURF)
 
     def bulk_create(
-        self, objs: list["UebergreifendesKriterium"], **kwargs: object
-    ) -> list["UebergreifendesKriterium"]:
+        self, objs: list["Katalogteil"], **kwargs: object
+    ) -> list["Katalogteil"]:
         """Verhindert das Umgehen der Schreibsperre per Masseneinfügen."""
 
         raise RuntimeError(_NUR_AM_ENTWURF)
 
     def bulk_update(
         self,
-        objs: list["UebergreifendesKriterium"],
+        objs: list["Katalogteil"],
         fields: list[str],
         **kwargs: object,
     ) -> int:
@@ -336,49 +340,68 @@ class UebergreifendesKriteriumQuerySet(models.QuerySet["UebergreifendesKriterium
         raise RuntimeError(_NUR_AM_ENTWURF)
 
     def delete(self) -> tuple[int, dict[str, int]]:
-        """Löscht gesammelt nur Kriterien von Entwürfen."""
+        """Löscht gesammelt nur Teile von Entwürfen."""
 
-        _nur_an_entwuerfen(set(self.values_list("katalog_id", flat=True)))
+        _nur_an_entwuerfen(set(self.values_list(self.model._katalog_pfad, flat=True)))
         return super().delete()
 
 
-class UebergreifendesKriterium(models.Model):
-    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt.
+class Katalogteil(models.Model):
+    """Ein geordneter Teil einer Evalkatalog-Fassung, änderbar nur am Entwurf.
 
-    Reiner Text ohne Platzhalter; kern-neutral zu formulieren ist eine
-    Pflegeregel, keine Mechanik (ADR-0046).
+    Vertrag der Unterklassen: `_eltern` nennt den Fremdschlüssel, unter dem die
+    Geschwister hängen, `_katalog_pfad` den Lookup bis zur Fassung. Wer nicht
+    direkt am Katalog hängt, überschreibt `_katalog_id`.
     """
 
-    katalog: models.ForeignKey = models.ForeignKey(
-        Evalkatalog,
-        on_delete=models.CASCADE,
-        related_name="uebergreifende_kriterien",
-    )
-    position: models.PositiveIntegerField = models.PositiveIntegerField()
-    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+    _eltern: str
+    _katalog_pfad: str
 
-    objects: models.Manager = models.Manager.from_queryset(
-        UebergreifendesKriteriumQuerySet
-    )()
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+
+    objects: models.Manager = models.Manager.from_queryset(KatalogteilQuerySet)()
 
     class Meta:
-        """Ordnet die Kriterien nach ihrer gespeicherten Position."""
+        """Ordnet die Teile nach ihrer gespeicherten Position."""
 
+        abstract: bool = True
         ordering: list[str] = ["position"]
-        constraints: list[models.BaseConstraint] = [
-            models.UniqueConstraint(
-                fields=["katalog", "position"],
-                name="simulation_uebergreifendes_kriterium_position_eindeutig",
-            ),
-        ]
+
+    @classmethod
+    def anhaengen(cls, eltern: models.Model, **werte: object) -> "Katalogteil":
+        """Legt einen Teil hinter dem letzten seiner Geschwister an."""
+
+        letzte: int = (
+            cls.objects.filter(**{cls._eltern: eltern}).aggregate(
+                models.Max("position")
+            )["position__max"]
+            or 0
+        )
+        teil: Katalogteil = cls(**{cls._eltern: eltern}, position=letzte + 1, **werte)
+        teil.save()
+        return teil
+
+    def _geschwister(self) -> models.QuerySet["Katalogteil"]:
+        # Alle Teile unter demselben Elternteil, dieser eingeschlossen.
+
+        return type(self).objects.filter(
+            **{f"{self._eltern}_id": getattr(self, f"{self._eltern}_id")}
+        )
+
+    def _katalog_id(self) -> int | None:
+        # Die Fassung, an der der Teil hängt; Teile direkt am Katalog.
+
+        return getattr(self, f"{self._eltern}_id")
 
     def _nur_am_entwurf(self) -> None:
-        # Prüft die Fassung des Kriteriums und beim Umhängen auch die bisherige.
+        # Prüft die Fassung des Teils und beim Umhängen auch die bisherige.
 
-        bisherige: models.QuerySet = UebergreifendesKriterium.objects.filter(
-            pk=self.pk
-        ).values_list("katalog_id", flat=True)
-        _nur_an_entwuerfen({self.katalog_id, *bisherige})
+        bisherige: models.QuerySet = (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list(self._katalog_pfad, flat=True)
+        )
+        _nur_an_entwuerfen({self._katalog_id(), *bisherige})
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Speichert nur an einem Entwurf."""
@@ -394,28 +417,121 @@ class UebergreifendesKriterium(models.Model):
 
     @transaction.atomic
     def verschieben(self, schritt: int) -> None:
-        """Tauscht den Platz mit der Nachbarin davor (-1) oder dahinter (+1).
+        """Tauscht den Platz mit dem Nachbarn davor (-1) oder dahinter (+1).
 
         Am Rand der Liste bleibt alles, wie es ist.
         """
 
-        geschwister: models.QuerySet[UebergreifendesKriterium] = (
-            UebergreifendesKriterium.objects.filter(katalog_id=self.katalog_id)
-        )
-        nachbarin: UebergreifendesKriterium | None = (
+        geschwister: models.QuerySet[Katalogteil] = self._geschwister()
+        nachbar: Katalogteil | None = (
             geschwister.filter(position__lt=self.position).last()
             if schritt < 0
             else geschwister.filter(position__gt=self.position).first()
         )
-        if nachbarin is None:
+        if nachbar is None:
             return
         eigene: int = self.position
         # Die Zwischenposition 0 hält den eindeutigen Platz während des Tauschs frei.
         self.position = 0
         self.save(update_fields=["position"])
-        nachbarin.position, self.position = eigene, nachbarin.position
-        nachbarin.save(update_fields=["position"])
+        nachbar.position, self.position = eigene, nachbar.position
+        nachbar.save(update_fields=["position"])
         self.save(update_fields=["position"])
+
+
+class UebergreifendesKriterium(Katalogteil):
+    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt.
+
+    Reiner Text ohne Platzhalter; kern-neutral zu formulieren ist eine
+    Pflegeregel, keine Mechanik (ADR-0046).
+    """
+
+    _eltern: str = "katalog"
+    _katalog_pfad: str = "katalog_id"
+
+    katalog: models.ForeignKey = models.ForeignKey(
+        Evalkatalog,
+        on_delete=models.CASCADE,
+        related_name="uebergreifende_kriterien",
+    )
+    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Katalog eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["katalog", "position"],
+                name="simulation_uebergreifendes_kriterium_position_eindeutig",
+            ),
+        ]
+
+
+class Eval(Katalogteil):
+    """Ein Prüffall des Katalogs mit eigenen Evalkriterien (ADR-0046)."""
+
+    _eltern: str = "katalog"
+    _katalog_pfad: str = "katalog_id"
+
+    katalog: models.ForeignKey = models.ForeignKey(
+        Evalkatalog,
+        on_delete=models.CASCADE,
+        related_name="evals",
+    )
+    name: models.CharField = models.CharField(
+        "Name", max_length=200, blank=True, default=""
+    )
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Katalog eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["katalog", "position"],
+                name="simulation_eval_position_eindeutig",
+            ),
+        ]
+
+    def kriterium_anlegen(self, text: str = "") -> "Evalkriterium":
+        """Hängt ein Evalkriterium ans Ende der Liste des Evals."""
+
+        return Evalkriterium.anhaengen(self, text=text)
+
+
+class Evalkriterium(Katalogteil):
+    """Eine Rubrik, nach der der Bewerter jedes Evalgespräch seines Evals beurteilt.
+
+    Reiner Text ohne Platzhalter.
+    """
+
+    _eltern: str = "eval"
+    _katalog_pfad: str = "eval__katalog_id"
+
+    eval: models.ForeignKey = models.ForeignKey(
+        Eval,
+        on_delete=models.CASCADE,
+        related_name="kriterien",
+    )
+    text: models.TextField = models.TextField("Kriterium", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Eval eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["eval", "position"],
+                name="simulation_evalkriterium_position_eindeutig",
+            ),
+        ]
+
+    def _katalog_id(self) -> int | None:
+        # Ein Evalkriterium hängt über sein Eval an der Fassung.
+
+        return (
+            Eval.objects.filter(pk=self.eval_id)
+            .values_list("katalog_id", flat=True)
+            .first()
+        )
 
 
 class Anbieter(models.TextChoices):

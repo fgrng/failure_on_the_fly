@@ -1,0 +1,21 @@
+{% comment %}
+    Eine Kriterienliste im Stil der Zuordnungslisten (ADR-0048): je Zeile ein
+    Text, Hoch, Runter und Löschen als Submit-Knöpfe des Editor-Formulars.
+    Erwartet `zeilen` (aus _kriterienzeilen), `bezeichnung` und `leer`.
+{% endcomment %}
+<ol class="zuordnungsliste__liste" aria-label="{{ bezeichnung }}">
+    {% for zeile in zeilen %}
+        <li class="zuordnungsliste__zeile">
+            <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
+            <label class="zuordnung-unsichtbar" for="{{ zeile.feld }}">Kriterium {{ forloop.counter }}</label>
+            <textarea class="zuordnungsliste__text" id="{{ zeile.feld }}" name="{{ zeile.feld }}" rows="2">{{ zeile.text }}</textarea>
+            <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Kriterium {{ forloop.counter }}">
+                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.hoch }}"{% if forloop.first %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.runter }}"{% if forloop.last %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{{ zeile.loeschen }}" aria-label="Kriterium {{ forloop.counter }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+            </span>
+        </li>
+    {% empty %}
+        <li class="zuordnungsliste__leer">{{ leer }}</li>
+    {% endfor %}
+</ol>

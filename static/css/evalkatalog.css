@@ -69,3 +69,12 @@
 
 .evalkatalog-hinweis { margin: 0; color: var(--color-text-muted); }
 .evalkatalog-knoten .zuordnungsliste__text { min-height: 3rem; resize: vertical; }
+
+.evalkatalog-baum__titel { margin: var(--space-3) 0 var(--space-1); font-size: .85rem; color: var(--color-text-muted); }
+.evalkatalog-baum__leer { padding: 0 var(--space-2); color: var(--color-text-muted); }
+.evalkatalog-baum > .button { margin-top: var(--space-2); }
+
+/* Name des Evals neben seinen Gesten Hoch, Runter und Löschen. */
+.evalkatalog-evalkopf { display: flex; gap: var(--space-2); align-items: end; }
+.evalkatalog-evalkopf .vignette-field { flex: 1; }
+.evalkatalog-knoten h3 { margin: 0; }

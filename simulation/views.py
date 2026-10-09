@@ -36,7 +36,10 @@ from .models import (
     VERTRAG_BEWERTER,
     VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
+    Eval,
     Evalkatalog,
+    Evalkriterium,
+    Katalogteil,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
@@ -311,15 +314,58 @@ def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _kriterientexte_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
-    # Jede Geste am Knoten sendet das ganze Formular; so gehen getippte Texte
-    # beim Hinzufügen, Löschen oder Umordnen nicht verloren.
+def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
+    # Jede Geste im Editor sendet das ganze Formular; so gehen getippte Werte
+    # beim Hinzufügen, Löschen oder Umordnen nicht verloren, egal an welchem
+    # Knoten sie stehen.
 
-    for kriterium in katalog.uebergreifende_kriterien.all():
-        text: str | None = request.POST.get(f"kriterium-{kriterium.pk}")
-        if text is not None and text != kriterium.text:
-            kriterium.text = text
-            kriterium.save(update_fields=["text"])
+    if "k" in request.POST:
+        form: EvalkatalogDurchlaufForm = EvalkatalogDurchlaufForm(
+            request.POST, instance=katalog
+        )
+        if form.is_valid():
+            form.save()
+    teile: tuple[tuple[QuerySet[Katalogteil], str, str], ...] = (
+        (katalog.uebergreifende_kriterien.all(), "kriterium", "text"),
+        (katalog.evals.all(), "eval", "name"),
+        (Evalkriterium.objects.filter(eval__katalog=katalog), "evalkriterium", "text"),
+    )
+    for queryset, praefix, feld in teile:
+        for teil in queryset:
+            wert: str | None = request.POST.get(f"{praefix}-{teil.pk}")
+            if wert is not None and wert != getattr(teil, feld):
+                setattr(teil, feld, wert)
+                teil.save(update_fields=[feld])
+
+
+@dataclass(frozen=True)
+class _Kriterienzeile:
+    # Eine Zeile einer Kriterienliste samt den Zielen ihrer Gesten.
+
+    feld: str
+    text: str
+    hoch: str
+    runter: str
+    loeschen: str
+
+
+def _kriterienzeilen(
+    kriterien: QuerySet[Katalogteil], praefix: str, route: str, *args: int
+) -> list[_Kriterienzeile]:
+    # Baut die Zeilen einer Kriterienliste; `route` ist der Namensstamm der Gesten.
+
+    return [
+        _Kriterienzeile(
+            feld=f"{praefix}-{kriterium.pk}",
+            text=kriterium.text,
+            hoch=reverse(f"{route}_verschieben", args=[*args, kriterium.pk, "hoch"]),
+            runter=reverse(
+                f"{route}_verschieben", args=[*args, kriterium.pk, "runter"]
+            ),
+            loeschen=reverse(f"{route}_loeschen", args=[*args, kriterium.pk]),
+        )
+        for kriterium in kriterien
+    ]
 
 
 @administratorin_erforderlich
@@ -328,7 +374,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt und speichert den Knoten Übergreifende Kriterien eines Entwurfs."""
     katalog: Evalkatalog = _katalog_entwurf(pk)
     if request.method == "POST":
-        _kriterientexte_uebernehmen(katalog, request)
+        _eingaben_uebernehmen(katalog, request)
         messages.success(request, "Übergreifende Kriterien gespeichert.")
         return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
     return render(
@@ -337,7 +383,12 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "katalog": katalog,
             "knoten": "kriterien",
-            "kriterien": katalog.uebergreifende_kriterien.all(),
+            "zeilen": _kriterienzeilen(
+                katalog.uebergreifende_kriterien.all(),
+                "kriterium",
+                "simulation:evalkatalog_kriterium",
+                katalog.pk,
+            ),
         },
     )
 
@@ -348,7 +399,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
 def evalkatalog_kriterium_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     """Hängt ein leeres übergreifendes Kriterium ans Ende der Liste."""
     katalog: Evalkatalog = _katalog_entwurf(pk)
-    _kriterientexte_uebernehmen(katalog, request)
+    _eingaben_uebernehmen(katalog, request)
     katalog.kriterium_anlegen()
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
@@ -364,13 +415,21 @@ def evalkatalog_kriterium_loeschen(
     kriterium: UebergreifendesKriterium = get_object_or_404(
         katalog.uebergreifende_kriterien, pk=kriterium_pk
     )
-    _kriterientexte_uebernehmen(katalog, request)
+    _eingaben_uebernehmen(katalog, request)
     kriterium.delete()
     messages.success(request, "Das Kriterium wurde gelöscht.")
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
 _SCHRITTE: dict[str, int] = {"hoch": -1, "runter": 1}
+
+
+def _schritt(richtung: str) -> int:
+    # Nur hoch und runter verschieben.
+
+    if richtung not in _SCHRITTE:
+        raise Http404
+    return _SCHRITTE[richtung]
 
 
 @administratorin_erforderlich
@@ -380,15 +439,133 @@ def evalkatalog_kriterium_verschieben(
     request: HttpRequest, pk: int, kriterium_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein übergreifendes Kriterium eine Zeile hoch oder runter."""
-    if richtung not in _SCHRITTE:
-        raise Http404
+    schritt: int = _schritt(richtung)
     katalog: Evalkatalog = _katalog_entwurf(pk)
     kriterium: UebergreifendesKriterium = get_object_or_404(
         katalog.uebergreifende_kriterien, pk=kriterium_pk
     )
-    _kriterientexte_uebernehmen(katalog, request)
-    kriterium.verschieben(_SCHRITTE[richtung])
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.verschieben(schritt)
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
+
+
+def _eval_im_entwurf(pk: int, eval_pk: int) -> tuple[Evalkatalog, Eval]:
+    # Das Eval muss zum genannten Entwurf gehören.
+
+    katalog: Evalkatalog = _katalog_entwurf(pk)
+    return katalog, get_object_or_404(katalog.evals, pk=eval_pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Hängt ein Eval ans Ende des Katalogs und öffnet seinen Knoten."""
+    katalog: Evalkatalog = _katalog_entwurf(pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_: Eval = katalog.eval_anlegen("Neues Eval")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@transaction.atomic
+def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpResponse:
+    """Zeigt und speichert den Knoten eines Evals samt seiner Evalkriterien."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    if request.method == "POST":
+        _eingaben_uebernehmen(katalog, request)
+        messages.success(request, "Das Eval wurde gespeichert.")
+        return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+    evals: list[Eval] = list(katalog.evals.all())
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            "katalog": katalog,
+            "knoten": "eval",
+            "eval": eval_,
+            "eval_erstes": eval_ == evals[0],
+            "eval_letztes": eval_ == evals[-1],
+            "zeilen": _kriterienzeilen(
+                eval_.kriterien.all(),
+                "evalkriterium",
+                "simulation:evalkatalog_evalkriterium",
+                katalog.pk,
+                eval_.pk,
+            ),
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Löscht ein Eval samt seiner Evalkriterien."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.delete()
+    messages.success(request, "Das Eval wurde gelöscht.")
+    return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_eval_verschieben(
+    request: HttpRequest, pk: int, eval_pk: int, richtung: str
+) -> HttpResponse:
+    """Rückt ein Eval im Katalog eine Stelle hoch oder runter."""
+    schritt: int = _schritt(richtung)
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.verschieben(schritt)
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Hängt ein leeres Evalkriterium ans Ende der Liste des Evals."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    eval_.kriterium_anlegen()
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int
+) -> HttpResponse:
+    """Löscht ein Evalkriterium des Evals."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.delete()
+    messages.success(request, "Das Kriterium wurde gelöscht.")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalkriterium_verschieben(
+    request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int, richtung: str
+) -> HttpResponse:
+    """Rückt ein Evalkriterium eine Zeile hoch oder runter."""
+    schritt: int = _schritt(richtung)
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
+    _eingaben_uebernehmen(katalog, request)
+    kriterium.verschieben(schritt)
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
 @administratorin_erforderlich

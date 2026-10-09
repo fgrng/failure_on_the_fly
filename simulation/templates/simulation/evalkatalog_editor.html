@@ -35,30 +35,45 @@
                     <li><a href="{% url 'simulation:evalkatalog_editor' katalog.pk %}"{% if knoten == "durchlauf" %} aria-current="page"{% endif %}>Durchlauf und Vorlagen</a></li>
                     <li><a href="{% url 'simulation:evalkatalog_kriterien' katalog.pk %}"{% if knoten == "kriterien" %} aria-current="page"{% endif %}>Übergreifende Kriterien ({{ katalog.uebergreifende_kriterien.count }})</a></li>
                 </ul>
+                <h2 class="evalkatalog-baum__titel">Evals</h2>
+                <ul aria-label="Evals">
+                    {% for knoten_eval in katalog.evals.all %}
+                        <li><a href="{% url 'simulation:evalkatalog_eval' katalog.pk knoten_eval.pk %}"{% if knoten == "eval" and knoten_eval == eval %} aria-current="page"{% endif %}>{{ knoten_eval.name|default:"Unbenanntes Eval" }}</a></li>
+                    {% empty %}
+                        <li class="evalkatalog-baum__leer">Noch keine Evals.</li>
+                    {% endfor %}
+                </ul>
+                <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_eval_anlegen' katalog.pk %}">Eval hinzufügen</button>
             </nav>
 
             {% if knoten == "kriterien" %}
                 <section class="evalkatalog-knoten" aria-label="Übergreifende Kriterien">
                     <h2>Übergreifende Kriterien</h2>
                     <p class="evalkatalog-hinweis">Nach diesen Kriterien beurteilt der Bewerter jedes Evalgespräch aller Evals. Formulieren Sie sie kern-neutral: Sie prüfen, was jeder Simulationskern verlangt, etwa Rollentreue, keine Stilregeln einer bestimmten Kern-Fassung. Kriterien sind reiner Text ohne Platzhalter.</p>
-                    <ol class="zuordnungsliste__liste" aria-label="Übergreifende Kriterien">
-                        {% for kriterium in kriterien %}
-                            <li class="zuordnungsliste__zeile">
-                                <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
-                                <label class="zuordnung-unsichtbar" for="kriterium-{{ kriterium.pk }}">Kriterium {{ forloop.counter }}</label>
-                                <textarea class="zuordnungsliste__text" id="kriterium-{{ kriterium.pk }}" name="kriterium-{{ kriterium.pk }}" rows="2">{{ kriterium.text }}</textarea>
-                                <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Kriterium {{ forloop.counter }}">
-                                    <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_kriterium_verschieben' katalog.pk kriterium.pk 'hoch' %}"{% if forloop.first %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
-                                    <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_kriterium_verschieben' katalog.pk kriterium.pk 'runter' %}"{% if forloop.last %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
-                                    <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_kriterium_loeschen' katalog.pk kriterium.pk %}" aria-label="Kriterium {{ forloop.counter }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
-                                </span>
-                            </li>
-                        {% empty %}
-                            <li class="zuordnungsliste__leer">Noch keine übergreifenden Kriterien. Ein Katalog darf ohne sie auskommen.</li>
-                        {% endfor %}
-                    </ol>
+                    {% include "simulation/includes/evalkatalog_kriterienliste.html" with bezeichnung="Übergreifende Kriterien" leer="Noch keine übergreifenden Kriterien. Ein Katalog darf ohne sie auskommen." %}
                     <div>
                         <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_kriterium_anlegen' katalog.pk %}">Kriterium hinzufügen</button>
+                    </div>
+                </section>
+            {% elif knoten == "eval" %}
+                <section class="evalkatalog-knoten" aria-label="Eval">
+                    <h2>Eval</h2>
+                    <div class="evalkatalog-evalkopf">
+                        <div class="vignette-field">
+                            <label for="eval-{{ eval.pk }}">Name</label>
+                            <input type="text" id="eval-{{ eval.pk }}" name="eval-{{ eval.pk }}" value="{{ eval.name }}" maxlength="200">
+                        </div>
+                        <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für dieses Eval">
+                            <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'hoch' %}"{% if eval_erstes %} disabled{% endif %} aria-label="Eval nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                            <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'runter' %}"{% if eval_letztes %} disabled{% endif %} aria-label="Eval nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                            <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_eval_loeschen' katalog.pk eval.pk %}" aria-label="Eval löschen" title="Eval samt Kriterien löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                        </span>
+                    </div>
+                    <h3>Evalkriterien</h3>
+                    <p class="evalkatalog-hinweis">Nach diesen Kriterien beurteilt der Bewerter jedes Evalgespräch dieses Evals. Kriterien sind reiner Text ohne Platzhalter.</p>
+                    {% include "simulation/includes/evalkatalog_kriterienliste.html" with bezeichnung="Evalkriterien" leer="Noch keine Evalkriterien." %}
+                    <div>
+                        <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_evalkriterium_anlegen' katalog.pk eval.pk %}">Evalkriterium hinzufügen</button>
                     </div>
                 </section>
             {% else %}

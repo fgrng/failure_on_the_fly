@@ -58,6 +58,41 @@ urlpatterns: list[URLPattern] = [
         name="evalkatalog_kriterium_verschieben",
     ),
     path(
+        "evalkatalog/<int:pk>/evals/anlegen/",
+        views.evalkatalog_eval_anlegen,
+        name="evalkatalog_eval_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/",
+        views.evalkatalog_eval,
+        name="evalkatalog_eval",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/loeschen/",
+        views.evalkatalog_eval_loeschen,
+        name="evalkatalog_eval_loeschen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/<str:richtung>/",
+        views.evalkatalog_eval_verschieben,
+        name="evalkatalog_eval_verschieben",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/kriterien/anlegen/",
+        views.evalkatalog_evalkriterium_anlegen,
+        name="evalkatalog_evalkriterium_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/kriterien/<int:kriterium_pk>/loeschen/",
+        views.evalkatalog_evalkriterium_loeschen,
+        name="evalkatalog_evalkriterium_loeschen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/kriterien/<int:kriterium_pk>/<str:richtung>/",
+        views.evalkatalog_evalkriterium_verschieben,
+        name="evalkatalog_evalkriterium_verschieben",
+    ),
+    path(
         "evalkatalog/<int:pk>/verwerfen/",
         views.evalkatalog_verwerfen,
         name="evalkatalog_verwerfen",
