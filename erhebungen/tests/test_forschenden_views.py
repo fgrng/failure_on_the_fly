@@ -7,15 +7,22 @@ from datetime import UTC, datetime, timedelta
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import connection
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from pytest_django.asserts import assertContains, assertNotContains, assertRedirects
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    konto_mit_rollen,
+)
 from config.tests.exportkontrakt import exportkontrakt_aus_adr_0029
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
@@ -709,10 +716,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     item.pk,
                     Erhebungsitem.Andockpunkt.NACH_SITZUNG,
                 ],
-            )
+            ),
+            follow=True,
         )
 
-        self.assertEqual(aufnehmen.status_code, 200)
+        self.assertRedirects(
+            aufnehmen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 zeile["pk"]
@@ -730,9 +740,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse(
                 "erhebungen:item_hinzufuegen",
                 args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            )
+            ),
+            follow=True,
         )
-        self.assertEqual(andere_bindung.status_code, 200)
+        self.assertRedirects(
+            andere_bindung, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2
         )
@@ -887,9 +900,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, zweite_zuordnung.pk],
             ),
             {"position": 1},
+            follow=True,
         )
 
-        self.assertEqual(verschieben.status_code, 200)
+        self.assertRedirects(
+            verschieben, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 zeile["pk"]
@@ -962,9 +978,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     drittes_item.pk,
                     Erhebungsitem.Andockpunkt.NACH_SITZUNG,
                 ],
-            )
+            ),
+            follow=True,
         )
-        self.assertEqual(anhaengen.status_code, 200)
+        self.assertRedirects(
+            anhaengen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             Erhebungsitem.objects.get(
                 erhebung=self.erhebung,
@@ -973,66 +992,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             ).position,
             2,
         )
-
-    def test_itemverwaltung_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
-        """Finale Erhebungen verweigern die Änderung ihrer Item-Zuordnungen."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        self.erhebung.finalisieren()
-        gesperrt: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-        self.assertEqual(gesperrt.status_code, 403)
-
-    def test_itemreihenfolge_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
-        """Auch Verschieben ändert eine finale Erhebung nicht."""
-
-        erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
-        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
-        for item in (erstes_item, zweites_item):
-            self.client.post(
-                reverse(
-                    "erhebungen:item_hinzufuegen",
-                    args=[
-                        self.erhebung.pk,
-                        item.pk,
-                        Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                    ],
-                )
-            )
-        zweite_zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
-            erhebung=self.erhebung, item=zweites_item
-        )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        self.erhebung.finalisieren()
-
-        gesperrt: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_verschieben",
-                args=[self.erhebung.pk, zweite_zuordnung.pk],
-            ),
-            {"position": 1},
-        )
-
-        self.assertEqual(gesperrt.status_code, 403)
-        zweite_zuordnung.refresh_from_db()
-        self.assertEqual(zweite_zuordnung.position, 2)
 
     def test_itemverwaltung_ist_nach_dem_zurueckziehen_wieder_offen(self) -> None:
         """Zurückgezogene Erhebungen erlauben wieder Item-Zuordnungen."""
@@ -1050,9 +1009,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse(
                 "erhebungen:item_hinzufuegen",
                 args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            )
+            ),
+            follow=True,
         )
-        self.assertEqual(wieder_offen.status_code, 200)
+        self.assertRedirects(
+            wieder_offen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertContains(wieder_offen, "zuordnungsliste__einfuegen")
         self.assertEqual(
             wieder_offen.context["am_ende_aufgenommene_daten"][0]["label"],
@@ -1435,6 +1397,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, neues.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
             ),
             {"position": 1},
+            follow=True,
         )
 
         self.assertEqual(
@@ -1458,10 +1421,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         umhaengen: HttpResponse = self.client.post(
-            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk])
+            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk]),
+            follow=True,
         )
 
-        self.assertEqual(umhaengen.status_code, 200)
+        self.assertRedirects(
+            umhaengen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 (zeile["pk"], zeile["position"])
@@ -1525,17 +1491,23 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse(
                 "erhebungen:item_entfernen",
                 args=[self.erhebung.pk, zuordnungen[3].pk],
-            )
+            ),
+            follow=True,
         )
         umhaengen: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:item_umhaengen",
                 args=[self.erhebung.pk, zuordnungen[2].pk],
-            )
+            ),
+            follow=True,
         )
 
-        self.assertEqual(entfernen.status_code, 200)
-        self.assertEqual(umhaengen.status_code, 200)
+        self.assertRedirects(
+            entfernen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertRedirects(
+            umhaengen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 (zeile["pk"], zeile["position"])
@@ -1586,83 +1558,203 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             [zweite.pk, dritte.pk],
         )
 
-    def test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen(self) -> None:
-        """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        self.erhebung.finalisieren()
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
+_KEIN_ENTWURF_MELDUNG: str = (
+    "Die Erhebung ist kein Entwurf mehr. Es wurde nichts geändert."
+)
+_SCHREIBROUTEN: list[str] = [
+    "vignette_hinzufuegen",
+    "vignette_entfernen",
+    "vignette_verschieben",
+    "reihenfolge_umschalten",
+    "item_hinzufuegen",
+    "item_entfernen",
+    "item_verschieben",
+    "item_umhaengen",
+    "konfiguration_speichern",
+]
 
-        final_entfernen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_entfernen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
-        )
-        final_aufnehmen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
-        )
-        final_speichern: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
-            {"instruktionstext": "Nicht speichern"},
-        )
-        fremd: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[fremde_erhebung.pk]),
-            {"instruktionstext": "Nicht speichern"},
-        )
-        final_umschalten: HttpResponse = self.client.post(
-            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
-        )
-        final_verschieben: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_verschieben",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            ),
-            {"position": 1},
-        )
-        fremd_umschalten: HttpResponse = self.client.post(
-            reverse("erhebungen:reihenfolge_umschalten", args=[fremde_erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
-        )
 
-        self.assertEqual(final_entfernen.status_code, 302)
-        self.assertEqual(final_aufnehmen.status_code, 302)
-        self.assertEqual(final_speichern.status_code, 302)
-        self.assertEqual(fremd.status_code, 404)
-        self.assertEqual(final_umschalten.status_code, 302)
-        self.assertEqual(final_verschieben.status_code, 403)
-        self.assertEqual(fremd_umschalten.status_code, 404)
-        self.assertFalse(
-            Erhebungsvignette.objects.filter(erhebung=self.erhebung).exists()
-        )
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.instruktionstext, "")
-        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
-        self.erhebung.archivieren()
+def _erhebung_mit_design(konto: Konto) -> Erhebung:
+    """Legt einen Entwurf mit je zwei Vignetten und Items nach jeder Sitzung an."""
 
-        archiv_speichern: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
-            {"instruktionstext": "Noch immer nicht speichern"},
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    for position, fach in enumerate(("Mathematik", "Chemie"), start=1):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung,
+            vignette=finale_vignette(konto, fach=fach),
+            position=position,
         )
-        archiv_aufnehmen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
+    for position, wortlaut in enumerate(("Erstes Item", "Zweites Item"), start=1):
+        _item_zuordnen(
+            erhebung,
+            _finales_item_anlegen(konto, wortlaut),
+            Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position,
         )
+    return erhebung
 
-        self.assertEqual(archiv_speichern.status_code, 302)
-        self.assertEqual(archiv_aufnehmen.status_code, 302)
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.instruktionstext, "")
+
+def _schreibaufruf(
+    route: str, erhebung: Erhebung, konto: Konto
+) -> tuple[str, dict[str, object]]:
+    """Liefert URL und Formulardaten einer Aktion, die im Entwurf etwas änderte."""
+
+    zweite_vignette: Vignette = erhebung.vignettenzugehoerigkeiten.get(
+        position=2
+    ).vignette
+    zweite_zuordnung: Erhebungsitem = erhebung.itemzugehoerigkeiten.get(position=2)
+    argumente: dict[str, list[object]] = {
+        "vignette_hinzufuegen": [
+            erhebung.pk,
+            finale_vignette(konto, fach="Physik").pk,
+        ],
+        "vignette_entfernen": [erhebung.pk, zweite_vignette.pk],
+        "vignette_verschieben": [erhebung.pk, zweite_vignette.pk],
+        "reihenfolge_umschalten": [erhebung.pk],
+        "item_hinzufuegen": [
+            erhebung.pk,
+            _finales_item_anlegen(konto, "Neues Item").pk,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+        ],
+        "item_entfernen": [erhebung.pk, zweite_zuordnung.pk],
+        "item_verschieben": [erhebung.pk, zweite_zuordnung.pk],
+        "item_umhaengen": [erhebung.pk, zweite_zuordnung.pk],
+        "konfiguration_speichern": [erhebung.pk],
+    }
+    daten: dict[str, object] = {
+        "position": 1,
+        "randomisierung": Erhebung.Randomisierung.ZUFAELLIG,
+        "instruktionstext": "Nicht speichern",
+    }
+    return reverse(f"erhebungen:{route}", args=argumente[route]), daten
+
+
+def _zeilen(antwort: HttpResponse) -> dict[str, object]:
+    """Liest die Zeilen, die die Detailseite an die Zuordnungslisten gibt."""
+
+    return {
+        schluessel: antwort.context[schluessel]
+        for schluessel in (
+            "aufgenommene_daten",
+            "nach_sitzung_aufgenommene_daten",
+            "am_ende_aufgenommene_daten",
+        )
+    }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("status", "badge"),
+    [
+        pytest.param(
+            Erhebung.Status.FINAL,
+            '<span class="badge badge--final">Final</span>',
+            id="final",
+        ),
+        pytest.param(
+            Erhebung.Status.ARCHIVIERT,
+            '<span class="badge badge--archived">Archiviert</span>',
+            id="archiviert",
+        ),
+    ],
+)
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_schreibaktion_ausserhalb_des_entwurfs_leitet_mit_meldung_zurueck(
+    client: Client, route: str, status: str, badge: str
+) -> None:
+    """Eine veraltete Schaltfläche führt auf die unveränderte Detailseite (ADR-0051)."""
+
+    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    erhebung: Erhebung = _erhebung_mit_design(ada)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+    erhebung.finalisieren()
+    if status == Erhebung.Status.ARCHIVIERT:
+        erhebung.archivieren()
+    client.force_login(ada)
+    detail_url: str = reverse("erhebungen:detail", args=[erhebung.pk])
+    url, daten = _schreibaufruf(route, erhebung, ada)
+    vorher: HttpResponse = client.get(detail_url)
+
+    antwort: HttpResponse = client.post(url, daten, follow=True)
+
+    assertRedirects(antwort, detail_url)
+    assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
+    assertContains(antwort, badge, html=True)
+    assertContains(
+        antwort,
+        '<script id="randomisierung-daten" type="application/json">"fest"</script>',
+        html=False,
+    )
+    assertNotContains(antwort, "Nicht speichern")
+    assert _zeilen(antwort) == _zeilen(vorher)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_schreibaktion_auf_fremder_erhebung_findet_nichts(
+    client: Client, route: str
+) -> None:
+    """Wer die Erhebung nicht sehen darf, erfährt nicht, dass es sie gibt."""
+
+    grace: Konto = konto_mit_rollen("grace", "Forschende:r")
+    fremde: Erhebung = _erhebung_mit_design(grace)
+    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    client.force_login(ada)
+    # Neue Fassungen gehören ada: Das 404 kommt allein von der fremden Erhebung.
+    url, daten = _schreibaufruf(route, fremde, ada)
+
+    antwort: HttpResponse = client.post(url, daten)
+
+    assert antwort.status_code == 404
+
+
+@pytest.mark.django_db
+def test_loeschen_ausserhalb_des_entwurfs_leitet_mit_meldung_auf_die_liste(
+    client: Client,
+) -> None:
+    """Eine finale Erhebung bleibt in der Liste, die Meldung nennt den Grund."""
+
+    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Finale Erhebung")
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+    erhebung.finalisieren()
+    client.force_login(ada)
+
+    antwort: HttpResponse = client.post(
+        reverse("erhebungen:loeschen", args=[erhebung.pk]), follow=True
+    )
+
+    assertRedirects(antwort, reverse("erhebungen:liste"))
+    assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
+    assertContains(antwort, reverse("erhebungen:detail", args=[erhebung.pk]))
+
+
+@pytest.mark.django_db
+def test_vom_modell_abgewiesene_schreibaktion_leitet_mit_meldung_zurueck(
+    client: Client,
+) -> None:
+    """Die Administration bindet keine eigene Vignette in eine fremde Erhebung ein."""
+
+    grace: Konto = konto_mit_rollen("grace", "Forschende:r")
+    fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
+    administratorin: Konto = konto_mit_rollen("ada")
+    administratorin.is_superuser = True
+    administratorin.save()
+    client.force_login(administratorin)
+    detail_url: str = reverse("erhebungen:detail", args=[fremde.pk])
+
+    antwort: HttpResponse = client.post(
+        reverse(
+            "erhebungen:vignette_hinzufuegen",
+            args=[fremde.pk, finale_vignette(administratorin).pk],
+        ),
+        follow=True,
+    )
+
+    assertRedirects(antwort, detail_url)
+    assertContains(antwort, "Erhebungen können nur eigene Vignetten einbinden.")
+    assert antwort.context["aufgenommene_daten"] == []
 
 
 class ErhebungsansichtAnbieterTests(TestCase):

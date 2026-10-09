@@ -58,7 +58,14 @@ function zuordnungsliste({ datenId, verfuegbarId, randomisierungId, fest }) {
                 });
                 return;
             }
+            // fetch folgt der Weiterleitung auf die Detailseite.
             const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+            if (doc.querySelector(".messages")) {
+                // Abgewiesen, etwa weil die Erhebung inzwischen final ist: Die
+                // Seite zeigt den aktuellen Stand samt Meldung (ADR-0051).
+                document.querySelector(".site-main").replaceWith(doc.querySelector(".site-main"));
+                return;
+            }
             const aktualisierteDaten = Object.fromEntries(
                 Array.from(document.querySelectorAll("[data-zuordnung-daten] script")).map(
                     (element) => [element.id, JSON.parse(doc.getElementById(element.id).textContent)]

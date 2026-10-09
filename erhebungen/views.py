@@ -1,6 +1,7 @@
 """Öffentlicher Einstieg in pseudonyme Erhebungen."""
 
 from datetime import datetime
+from functools import partial, wraps
 from typing import Callable, Iterable
 from uuid import UUID
 
@@ -80,6 +81,9 @@ _ANDERE_ANDOCKPUNKTE: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: Erhebungsitem.Andockpunkt.AM_ENDE,
     Erhebungsitem.Andockpunkt.AM_ENDE: Erhebungsitem.Andockpunkt.NACH_SITZUNG,
 }
+_KEIN_ENTWURF_MELDUNG: str = (
+    "Die Erhebung ist kein Entwurf mehr. Es wurde nichts geändert."
+)
 _BADGE_BESCHRIFTUNGEN: dict[str, str] = {
     Erhebungsitem.Andockpunkt.NACH_SITZUNG: "schon nach jeder Sitzung",
     Erhebungsitem.Andockpunkt.AM_ENDE: "schon am Ende",
@@ -251,15 +255,51 @@ def _einreihen(
     _reihenfolge_schreiben(zugehoerigkeiten, ids)
 
 
-def _validierte_aktion_ausfuehren(
-    request: HttpRequest, aktion: Callable[[], None]
-) -> None:
-    """Führt eine Domänenaktion aus und zeigt ihren Validierungsfehler an."""
+def _validierte_aktion_ausfuehren[Ergebnis](
+    request: HttpRequest, aktion: Callable[[], Ergebnis]
+) -> Ergebnis | None:
+    """Führt eine Domänenaktion aus und zeigt ihren Validierungsfehler an.
+
+    Liefert das Ergebnis der Aktion, nach einem Validierungsfehler nichts.
+    """
 
     try:
-        aktion()
+        return aktion()
     except ValidationError as error:
         messages.error(request, "; ".join(error.messages))
+        return None
+
+
+def _entwurfsaktion(
+    aktion: Callable[..., HttpResponse | None],
+) -> Callable[..., HttpResponse]:
+    """Macht aus einer Änderung am Entwurf eine POST-View mit Weiterleitung.
+
+    Die Aktion bekommt die sichtbare Erhebung und läuft in einer eigenen
+    Transaktion; eine Antwort liefert sie nur für ihre eigenen Fehlerfälle.
+    Ist die Erhebung kein Entwurf mehr oder weist das Modell die Änderung ab,
+    sagt eine Meldung auf der Detailseite, warum nichts geändert wurde
+    (ADR-0051). Die Detailseite rendert erst die Weiterleitung, außerhalb der
+    Transaktion (#249).
+    """
+
+    @wraps(aktion)
+    def view(request: HttpRequest, pk: int, **kwargs: object) -> HttpResponse:
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+        if erhebung.status != Erhebung.Status.ENTWURF:
+            messages.error(request, _KEIN_ENTWURF_MELDUNG)
+            return redirect("erhebungen:detail", pk=erhebung.pk)
+        antwort: HttpResponse | None = _validierte_aktion_ausfuehren(
+            request,
+            transaction.atomic(partial(aktion, request, erhebung, **kwargs)),
+        )
+        if antwort is not None:
+            return antwort
+        return redirect("erhebungen:detail", pk=erhebung.pk)
+
+    return view
 
 
 @login_required
@@ -466,10 +506,10 @@ def stichprobe_archivieren(
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def vignette_hinzufuegen(
-    request: HttpRequest, pk: int, vignette_pk: int
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, vignette_pk: int
+) -> None:
     """Nimmt eine eigene finale Fassung an der gewünschten Listenposition auf.
 
     Ohne Position landet sie am Ende. Die Position gilt unabhängig von der
@@ -477,11 +517,6 @@ def vignette_hinzufuegen(
     Wechsel zu fest gespeichert.
     """
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        return redirect("erhebungen:detail", pk=erhebung.pk)
     vignette: Vignette = get_object_or_404(
         _eigene_finalen_vignetten(request), pk=vignette_pk
     )
@@ -495,39 +530,30 @@ def vignette_hinzufuegen(
     )
     if angelegt:
         _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
-    return redirect("erhebungen:detail", pk=erhebung.pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
-def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpResponse:
+@_entwurfsaktion
+def vignette_entfernen(
+    request: HttpRequest, erhebung: Erhebung, vignette_pk: int
+) -> None:
     """Entfernt eine finale Fassung aus einem eigenen Entwurf und schließt die Lücke."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status == Erhebung.Status.ENTWURF:
-        get_object_or_404(
-            erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk
-        ).delete()
-        _einreihen(erhebung.vignettenzugehoerigkeiten.select_for_update())
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    get_object_or_404(
+        erhebung.vignettenzugehoerigkeiten, vignette_id=vignette_pk
+    ).delete()
+    _einreihen(erhebung.vignettenzugehoerigkeiten.select_for_update())
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def vignette_verschieben(
-    request: HttpRequest, pk: int, vignette_pk: int
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, vignette_pk: int
+) -> HttpResponse | None:
     """Setzt eine Vignette an eine neue Position ihrer Liste."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
     zugehoerigkeiten: QuerySet[Erhebungsvignette] = (
         erhebung.vignettenzugehoerigkeiten.select_for_update()
     )
@@ -538,47 +564,40 @@ def vignette_verschieben(
     if position is None:
         return HttpResponseBadRequest("Position fehlt.")
     _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, position)
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    return None
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def reihenfolge_umschalten(request: HttpRequest, pk: int) -> HttpResponse:
+@_entwurfsaktion
+def reihenfolge_umschalten(
+    request: HttpRequest, erhebung: Erhebung
+) -> HttpResponse | None:
     """Wechselt zwischen fester und zufälliger Vignettenreihenfolge.
 
     Die Positionen der Liste bleiben dabei unberührt; bei zufälliger Reihenfolge
     gelten sie nur nicht für die Teilnahme.
     """
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        return redirect("erhebungen:detail", pk=erhebung.pk)
     randomisierung: str = request.POST.get("randomisierung", "")
     if randomisierung not in Erhebung.Randomisierung.values:
         return HttpResponseBadRequest("Unbekannte Randomisierungsregel.")
     erhebung.randomisierung = randomisierung
     erhebung.save(update_fields=["randomisierung"])
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    return None
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def item_hinzufuegen(
-    request: HttpRequest, pk: int, item_pk: int, andockpunkt: str
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, item_pk: int, andockpunkt: str
+) -> HttpResponse | None:
     """Nimmt eine eigene finale Item-Fassung an einem Andockpunkt auf.
 
     An die gewünschte Position, ohne Position ans Ende.
     """
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
     if andockpunkt not in Erhebungsitem.Andockpunkt.values:
         raise PermissionDenied
     item: FragebogenItem = get_object_or_404(_eigene_finalen_items(request), pk=item_pk)
@@ -596,22 +615,17 @@ def item_hinzufuegen(
         position=_hoechste_position(zugehoerigkeiten) + 1,
     )
     _einreihen(zugehoerigkeiten, zugehoerigkeit.pk, _position(request))
-    return detail(request, pk)
+    return None
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def item_entfernen(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, zugehoerigkeit_pk: int
+) -> None:
     """Entfernt eine Item-Zuordnung aus einem eigenen Entwurf und schließt die Lücke."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
     zugehoerigkeit: Erhebungsitem = get_object_or_404(
         erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk
     )
@@ -622,22 +636,16 @@ def item_entfernen(
             andockpunkt=andockpunkt
         )
     )
-    return detail(request, pk)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def item_verschieben(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, zugehoerigkeit_pk: int
+) -> HttpResponse | None:
     """Setzt eine Item-Zuordnung innerhalb ihres Andockpunkts an eine neue Position."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
     zugehoerigkeit: Erhebungsitem = get_object_or_404(
         erhebung.itemzugehoerigkeiten, pk=zugehoerigkeit_pk
     )
@@ -651,22 +659,17 @@ def item_verschieben(
         zugehoerigkeit.pk,
         position,
     )
-    return detail(request, pk)
+    return None
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-@transaction.atomic
+@_entwurfsaktion
 def item_umhaengen(
-    request: HttpRequest, pk: int, zugehoerigkeit_pk: int
-) -> HttpResponse:
+    request: HttpRequest, erhebung: Erhebung, zugehoerigkeit_pk: int
+) -> HttpResponse | None:
     """Hängt eine Item-Zuordnung ans Ende des anderen Andockpunkts um."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status != Erhebung.Status.ENTWURF:
-        raise PermissionDenied
     zugehoerigkeit: Erhebungsitem = get_object_or_404(
         erhebung.itemzugehoerigkeiten.select_for_update(), pk=zugehoerigkeit_pk
     )
@@ -685,7 +688,7 @@ def item_umhaengen(
             andockpunkt=bisheriger_andockpunkt
         )
     )
-    return detail(request, pk)
+    return None
 
 
 def _konfiguration_uebernehmen(request: HttpRequest, erhebung: Erhebung) -> None:
@@ -705,27 +708,25 @@ def _konfiguration_uebernehmen(request: HttpRequest, erhebung: Erhebung) -> None
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
-def konfiguration_speichern(request: HttpRequest, pk: int) -> HttpResponse:
+@_entwurfsaktion
+def konfiguration_speichern(request: HttpRequest, erhebung: Erhebung) -> None:
     """Speichert Instruktions-, Einwilligungs- und Abschlusstext eines Entwurfs."""
 
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status == Erhebung.Status.ENTWURF:
-        _konfiguration_uebernehmen(request, erhebung)
-    return redirect("erhebungen:detail", pk=erhebung.pk)
+    _konfiguration_uebernehmen(request, erhebung)
 
 
 @login_required
 @_forschende_oder_administratorin_erforderlich
 def loeschen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Löscht einen eigenen Entwurf physisch."""
+    """Löscht einen eigenen Entwurf physisch und kehrt zur Liste zurück."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-    if erhebung.status == Erhebung.Status.ENTWURF:
-        erhebung.delete()
+    if erhebung.status != Erhebung.Status.ENTWURF:
+        messages.error(request, _KEIN_ENTWURF_MELDUNG)
+    else:
+        _validierte_aktion_ausfuehren(request, erhebung.delete)
     return redirect("erhebungen:liste")
 
 
