@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import konto_mit_rollen
+from erhebungen.models import Erhebung
 from konten.navigation import (
     AUTORIN_GRUPPE,
     administratorin_erforderlich,
@@ -223,6 +224,7 @@ class BereichszuordnungTests(TestCase):
             linus, name="Prozente"
         )
         training_veroeffentlicht.veroeffentlichen()
+        erhebung: Erhebung = Erhebung.objects.anlegen(linus, name="Brüche")
         self.client.force_login(linus)
 
         for url, bereich in (
@@ -244,6 +246,8 @@ class BereichszuordnungTests(TestCase):
                 reverse("training:detail", args=[training_veroeffentlicht.pk]),
                 "participant",
             ),
+            (reverse("erhebungen:liste"), "research"),
+            (reverse("erhebungen:detail", args=[erhebung.pk]), "research"),
         ):
             with self.subTest(url=url):
                 seite: str = self.client.get(url).content.decode()
