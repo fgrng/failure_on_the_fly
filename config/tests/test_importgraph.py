@@ -15,9 +15,9 @@ _PROJEKTWURZEL: Path = Path(settings.BASE_DIR)
 
 # Wohin der Produktionscode jeder App zeigen darf (ADR-0016, ADR-0037). Die
 # Tabelle ist die Kantenrichtung: Eine Kante hinzuzufügen ist eine Aussage über
-# die Architektur und gehört in ein ADR, nicht nur hierher. `konten` zeigt auf
-# keine App; `config` und `texte` sind Querschnitt, auf den nur gezeigt wird;
-# `seeds` ist das Blatt, das alles kennen darf.
+# die Architektur und gehört in ein ADR, nicht nur hierher. `konten` und
+# `config` zeigen auf keine App; `texte` ist Querschnitt und zeigt nur auf
+# `konten`; `seeds` ist das Blatt, das alle Domänen-Apps kennen darf.
 _KANTEN: dict[str, frozenset[str]] = {
     "config": frozenset(),
     "konten": frozenset(),
@@ -90,18 +90,18 @@ def _absolut_importierte_module(baum: ast.Module) -> set[str]:
 def _quellen(app: str, *, mit_tests: bool) -> list[Path]:
     # Sammelt die Dateien einer App; die Wurzel wird gelesen, nicht importiert.
 
+    wurzel: Path = _PROJEKTWURZEL / app
+    assert wurzel.is_dir(), f"Die App {app} liegt nicht an der Projektwurzel."
     return [
         datei
-        for datei in sorted((_PROJEKTWURZEL / app).rglob("*.py"))
+        for datei in sorted(wurzel.rglob("*.py"))
         if mit_tests or "tests" not in datei.parts
     ]
 
 
-def _verstoesse(dateien: list[Path], app: str, erlaubt: frozenset[str]) -> list[str]:
-    # Nennt je Datei jeden Import, der in eine andere Projekt-App außerhalb
-    # der erlaubten führt.
+def _verstoesse(dateien: list[Path], verboten: set[str]) -> list[str]:
+    # Nennt je Datei jeden Import, der in eine der verbotenen Apps führt.
 
-    verboten: set[str] = _projekt_apps() - erlaubt - {app}
     gefunden: list[str] = []
     for datei in dateien:
         baum: ast.Module = ast.parse(datei.read_text(encoding="utf-8"))
@@ -122,8 +122,9 @@ def test_app_zeigt_nur_entlang_der_kantentabelle(app: str) -> None:
     """Keine Kante gegen die Richtung aus ADR-0016, auch keine zyklische."""
 
     quellen: list[Path] = _quellen(app, mit_tests=False)
+    verboten: set[str] = _projekt_apps() - _KANTEN[app] - {app}
 
-    assert _verstoesse(quellen, app, _KANTEN[app]) == []
+    assert _verstoesse(quellen, verboten) == []
 
 
 def test_sitzungen_kennt_auch_in_tests_weder_training_noch_erhebungen() -> None:
@@ -134,6 +135,5 @@ def test_sitzungen_kennt_auch_in_tests_weder_training_noch_erhebungen() -> None:
     """
 
     quellen: list[Path] = _quellen("sitzungen", mit_tests=True)
-    erlaubt: frozenset[str] = frozenset(_projekt_apps() - {"training", "erhebungen"})
 
-    assert _verstoesse(quellen, "sitzungen", erlaubt) == []
+    assert _verstoesse(quellen, {"training", "erhebungen"}) == []
