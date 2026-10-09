@@ -44,8 +44,8 @@ Drei Lesarten gelten für das ganze Dokument:
 #### Stichprobe
 
 - **Aufrufe:** `objects.create(erhebung, beginn, ende)`, `archivieren()`, `phase`, `traegt_daten`, `teilnahme_link` (UUID, eindeutig, nicht editierbar).
-- **Invarianten:** `phase` ist `vor`, `laufend` oder `nach`, gemessen an der Systemzeit. Die Grenzen `beginn` und `ende` zählen zu `laufend`. Eine gespeicherte Stichprobe wird nur über `archivieren()` archiviert und nur ohne Daten. Beim Anlegen prüft `save()` das Feld nicht, `objects.create(archiviert=True)` geht durch.
-- **Fehlerfälle:** `ValidationError` bei bereits archivierter oder datentragender Stichprobe und bei `archiviert` über `save()` einer gespeicherten Stichprobe oder über `update`.
+- **Invarianten:** `phase` ist `vor`, `laufend` oder `nach`, gemessen an der Systemzeit. Die Grenzen `beginn` und `ende` zählen zu `laufend`. Eine Stichprobe wird nicht archiviert angelegt und nur über `archivieren()` archiviert, und nur ohne Daten.
+- **Fehlerfälle:** `ValidationError` bei bereits archivierter oder datentragender Stichprobe und bei `archiviert` über `save()` (auch beim Anlegen) oder über `update`.
 - **Konfiguration:** keine.
 
 #### Erhebungsbindung

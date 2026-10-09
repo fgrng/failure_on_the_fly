@@ -45,7 +45,7 @@ class BindungQuerySet(models.QuerySet):
         """Prüft jede Bindung einzeln, bevor die Menge geschrieben wird."""
         objs = list(objs)
         for bindung in objs:
-            bindung._pruefe_bindungsart()
+            bindung.pruefe_bindungsart()
         return super().bulk_create(objs, *args, **kwargs)
 
 
@@ -72,15 +72,17 @@ class Bindung(models.Model):
         Geprüft wird auch beim Ändern: Eine bestehende Bindung auf eine fremde
         Teilnahme umzuhängen schriebe denselben verbotenen Join wie das Anlegen.
         """
-        self._pruefe_bindungsart()
+        self.pruefe_bindungsart()
         super().save(*args, **kwargs)
 
-    def _pruefe_bindungsart(self) -> None:
-        # Fragt je fremder Bindungsart eine Zeile ab, nicht je Bindung: Die
-        # Teilnahme kennt ihre Bindungen nur über deren Rückbeziehungen. Die
-        # eigene Art steht nie in der Abfrage, die Zeile weist sich also auch
-        # beim wiederholten Speichern nicht selbst ab.
+    def pruefe_bindungsart(self) -> None:
+        """Weist die Bindung ab, wenn die Teilnahme schon fremd gebunden ist.
 
+        Fragt je fremder Bindungsart eine Zeile ab, nicht je Bindung: Die
+        Teilnahme kennt ihre Bindungen nur über deren Rückbeziehungen. Die
+        eigene Art steht nie in der Abfrage, die Zeile weist sich also auch
+        beim wiederholten Speichern nicht selbst ab.
+        """
         for fremde_art in self._fremde_bindungsarten():
             if fremde_art.objects.filter(teilnahme_id=self.teilnahme_id).exists():
                 raise ValidationError(UNVERTRAEGLICHE_BINDUNG)
