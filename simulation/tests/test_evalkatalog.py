@@ -487,37 +487,48 @@ def test_uebergreifende_kriterien_duerfen_fehlen() -> None:
     assert katalog.zustand == Evalkatalog.Zustand.FINAL
 
 
-# Jede Lücke nimmt einem vollständigen Katalog genau eine Voraussetzung.
-
-
 def _ohne_eval(katalog: Evalkatalog) -> None:
+    # Löscht das einzige Eval.
+
     katalog.evals.get().delete()
 
 
 def _eval_ohne_evalinput(katalog: Evalkatalog) -> None:
+    # Löscht den einzigen Evalinput des Evals.
+
     katalog.evals.get().inputs.get().delete()
 
 
 def _eval_ohne_evalkriterium(katalog: Evalkatalog) -> None:
+    # Löscht das einzige Evalkriterium des Evals.
+
     katalog.evals.get().kriterien.get().delete()
 
 
 def _evalinput_ohne_inputschritt(katalog: Evalkatalog) -> None:
+    # Löscht alle Inputschritte des Evalinputs.
+
     for schritt in katalog.evals.get().inputs.get().schritte.all():
         schritt.delete()
 
 
 def _leerer_inputschritt(katalog: Evalkatalog) -> None:
+    # Leert den letzten Inputschritt bis auf Leerraum.
+
     schritt: Inputschritt = katalog.evals.get().inputs.get().schritte.last()
     schritt.text = "   "
     schritt.save()
 
 
 def _leeres_evalkriterium(katalog: Evalkatalog) -> None:
+    # Hängt ein leeres zweites Evalkriterium an.
+
     katalog.evals.get().kriterium_anlegen("")
 
 
 def _leeres_uebergreifendes_kriterium(katalog: Evalkatalog) -> None:
+    # Hängt hinter ein gefülltes ein leeres übergreifendes Kriterium.
+
     katalog.kriterium_anlegen("Rollentreue")
     katalog.kriterium_anlegen("")
 
@@ -629,6 +640,22 @@ def test_promptvertrag_und_verlauf_sind_in_beiden_vorlagen_erlaubt() -> None:
     katalog.finalisieren()
 
     assert katalog.zustand == Evalkatalog.Zustand.FINAL
+
+
+@pytest.mark.django_db
+def test_meldung_nennt_ein_namenloses_eval_unbenannt() -> None:
+    """Auch ein Eval ohne Namen bleibt in der Meldung erkennbar."""
+
+    katalog: Evalkatalog = vollstaendiger_katalog()
+    katalog.eval_anlegen("")
+
+    with pytest.raises(ValidationError) as abgelehnt:
+        katalog.finalisieren()
+
+    assert abgelehnt.value.messages == [
+        "Eval „Unbenanntes Eval“ hat kein Evalkriterium.",
+        "Eval „Unbenanntes Eval“ hat keinen Evalinput.",
+    ]
 
 
 @pytest.mark.django_db

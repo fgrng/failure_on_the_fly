@@ -51,12 +51,6 @@ from .models import (
 from .standardkern import STANDARDKERN_VORLAGEN
 
 
-def _finale_fassung() -> Simulationskern | None:
-    # Liefert die eine finale Fassung, die der Kern trägt, sobald es sie gibt.
-
-    return Simulationskern.objects.filter(zustand=Simulationskern.Zustand.FINAL).first()
-
-
 def _archivierte_fassungen() -> QuerySet[Simulationskern]:
     # Liefert die überholten Fassungen, die zuletzt überholte zuerst.
 
@@ -118,7 +112,7 @@ def _lebenszyklus_aktion_ausfuehren(
 @autorin_erforderlich
 def kern(request: HttpRequest) -> HttpResponse:
     """Zeigt die finale Kern-Fassung und die aktive Modell-Konfiguration."""
-    simulationskern: Simulationskern | None = _finale_fassung()
+    simulationskern: Simulationskern | None = Simulationskern.objects.finale_fassung()
     return render(
         request,
         "simulation/kern.html",
@@ -139,7 +133,7 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
             "entwurf": Simulationskern.objects.filter(
                 zustand=Simulationskern.Zustand.ENTWURF
             ).first(),
-            "finale_fassung": _finale_fassung(),
+            "finale_fassung": Simulationskern.objects.finale_fassung(),
             "archivierte_fassungen": _archivierte_fassungen(),
             # Dieselbe Bedingung, die die Anlege-Naht prüft: Nur solange die
             # Historie leer ist, nimmt sie eine erste Fassung an.
@@ -317,17 +311,25 @@ def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
+def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> list[str]:
     # Jede Geste im Editor sendet das ganze Formular; so gehen getippte Werte
     # beim Hinzufügen, Löschen oder Umordnen nicht verloren, egal an welchem
-    # Knoten sie stehen.
+    # Knoten sie stehen. Liefert die Fehler eines ungültigen Durchlaufs, der
+    # dann ungespeichert bleibt.
 
+    durchlauffehler: list[str] = []
     if "k" in request.POST:
         form: EvalkatalogDurchlaufForm = EvalkatalogDurchlaufForm(
             request.POST, instance=katalog
         )
         if form.is_valid():
             form.save()
+        else:
+            durchlauffehler = [
+                f"{form[feld].label}: {meldung}"
+                for feld, meldungen in form.errors.items()
+                for meldung in meldungen
+            ]
     schritte: QuerySet[Inputschritt] = Inputschritt.objects.filter(
         evalinput__eval__katalog=katalog
     )
@@ -351,6 +353,7 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
                 continue
             setattr(teil, feld, wert)
             teil.save(update_fields=[feld])
+    return durchlauffehler
 
 
 @dataclass(frozen=True)
@@ -720,11 +723,14 @@ def evalkatalog_inputschritt_verschieben(
 def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert den Entwurf samt getippter Eingaben oder nennt seine Lücken."""
     katalog: Evalkatalog = _katalog_entwurf(pk)
-    _eingaben_uebernehmen(katalog, request)
-    try:
-        katalog.finalisieren()
-    except ValidationError as fehler:
-        for meldung in fehler.messages:
+    meldungen: list[str] = _eingaben_uebernehmen(katalog, request)
+    if not meldungen:
+        try:
+            katalog.finalisieren()
+        except ValidationError as fehler:
+            meldungen = fehler.messages
+    if meldungen:
+        for meldung in meldungen:
             messages.error(request, meldung)
         return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
     messages.success(

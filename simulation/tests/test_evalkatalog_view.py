@@ -1101,11 +1101,34 @@ class EvalkatalogFinalisierenTests(TestCase):
         # Die getippte Vorlage bleibt gespeichert, damit sie sich korrigieren lässt.
         self.assertEqual(self.katalog.lehrperson_vorlage, "Prüfe $kriterium.")
 
+    def test_ungueltiges_k_wird_abgelehnt_statt_uebergangen(self) -> None:
+        """Ein getipptes *k* unter 1 lässt den Entwurf nie final werden."""
+        response: HttpResponse = self.client.post(
+            self.url,
+            {
+                "k": "-1",
+                "lehrperson_vorlage": self.katalog.lehrperson_vorlage,
+                "bewerter_vorlage": self.katalog.bewerter_vorlage,
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(
+            response, reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+        self.assertIsNone(Evalkatalog.objects.finale_fassung())
+
     def test_finale_fassung_wird_nicht_erneut_finalisiert(self) -> None:
         """Die Route erreicht nur Entwürfe."""
         self.katalog.finalisieren()
 
         self.assertEqual(self.client.post(self.url).status_code, 404)
+
+    def test_uebersicht_ohne_finale_fassung_nennt_keine(self) -> None:
+        """Solange nichts finalisiert ist, zeigt die Systemseite keine Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertNotContains(response, "Finale Fassung")
 
     def test_uebersicht_nennt_die_finale_fassung(self) -> None:
         """Die Systemseite zeigt, seit wann der Katalog final ist."""

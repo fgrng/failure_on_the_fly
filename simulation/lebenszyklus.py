@@ -50,6 +50,11 @@ class FassungManager(models.Manager.from_queryset(FassungQuerySet)):
 
         raise RuntimeError(self.model._meldung_anlege_naht())
 
+    def finale_fassung(self) -> Any:
+        """Die eine gültige finale Fassung oder None, solange es keine gibt."""
+
+        return self.filter(zustand=self.model.Zustand.FINAL).first()
+
     def _erstellen(self, **werte: object) -> Any:
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
 

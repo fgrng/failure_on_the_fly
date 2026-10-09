@@ -371,7 +371,9 @@ leer ist. Übergreifende Kriterien dürfen fehlen. Der Editor nennt dann jede
 Lücke als eigene Meldung, etwa „Evalinput 2 von Eval „Muster“ hat keinen
 Inputschritt.“ oder „Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres
 Vertrags: $inputstrategie.“; der Entwurf bleibt Entwurf, die getippten Werte
-bleiben gespeichert. Ein vollständiger Entwurf wird final, und die
+bleiben gespeichert. Ist der getippte Durchlauf selbst ungültig, etwa ein
+negatives *k*, bleiben *k* und Vorlagen ungespeichert, der Editor nennt den
+Fehler, und der Entwurf bleibt Entwurf. Ein vollständiger Entwurf wird final, und die
 Administrator:in landet auf der Übersicht, die zeigt, seit wann die finale
 Fassung gilt. Ab dann prüft jeder Evallauf gegen sie. Die bisherige finale
 Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt

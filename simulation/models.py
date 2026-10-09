@@ -225,15 +225,12 @@ class EvalkatalogManager(FassungManager):
             raise ValueError("Der Evalkatalog wurde bereits angelegt.")
         return self._erstellen(historie=historie)
 
-    def finale_fassung(self) -> "Evalkatalog | None":
-        """Die Fassung, gegen die jeder Evallauf prüft, oder None ohne sie."""
 
-        return self.filter(zustand=Evalkatalog.Zustand.FINAL).first()
-
-
-def _vorlagenmangel(bezeichnung: str, vorlage: str, vertrag: frozenset[str]) -> str:
+def _vorlagenmangel(
+    bezeichnung: str, vorlage: str, vertrag: frozenset[str]
+) -> str | None:
     # Prüft eine Vorlage wie beim Kern ohne Modellaufruf: nichtleer, gültig und
-    # nur mit Platzhaltern ihres Vertrags. Liefert die Meldung oder "".
+    # nur mit Platzhaltern ihres Vertrags. Liefert die Meldung oder None.
 
     if not vorlage.strip():
         return f"Die {bezeichnung} ist leer."
@@ -247,7 +244,7 @@ def _vorlagenmangel(bezeichnung: str, vorlage: str, vertrag: frozenset[str]) -> 
             + ", ".join(f"${name}" for name in fremde)
             + "."
         )
-    return ""
+    return None
 
 
 class Evalkatalog(VersionierteFassung):
@@ -323,15 +320,23 @@ class Evalkatalog(VersionierteFassung):
 
         Ein Entwurf darf unvollständig gespeichert werden; geprüft wird erst
         beim Finalisieren. Übergreifende Kriterien dürfen fehlen.
+
+        Beispiel: Ein frisch angelegter Katalog liefert ``["Die
+        Lehrperson-Vorlage ist leer.", "Die Bewerter-Vorlage ist leer.", "Der
+        Evalkatalog hat kein Eval."]``, ein vollständiger ``[]``.
         """
 
         meldungen: list[str] = [
-            _vorlagenmangel(
-                "Lehrperson-Vorlage", self.lehrperson_vorlage, VERTRAG_LEHRPERSON
-            ),
-            _vorlagenmangel(
-                "Bewerter-Vorlage", self.bewerter_vorlage, VERTRAG_BEWERTER
-            ),
+            meldung
+            for meldung in (
+                _vorlagenmangel(
+                    "Lehrperson-Vorlage", self.lehrperson_vorlage, VERTRAG_LEHRPERSON
+                ),
+                _vorlagenmangel(
+                    "Bewerter-Vorlage", self.bewerter_vorlage, VERTRAG_BEWERTER
+                ),
+            )
+            if meldung is not None
         ]
         if self.k < 1:
             meldungen.append("k muss mindestens 1 sein.")
@@ -366,7 +371,7 @@ class Evalkatalog(VersionierteFassung):
                             f"Inputschritt {schrittnummer} in Evalinput {nummer} "
                             f"von {name} ist leer."
                         )
-        return [meldung for meldung in meldungen if meldung]
+        return meldungen
 
     @transaction.atomic
     def finalisieren(self) -> None:
