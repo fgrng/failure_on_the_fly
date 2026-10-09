@@ -153,6 +153,8 @@ export class FakeRepo implements Repo {
   readonly conflicting = new Set<string>();
   /** Der Branch, den der Checkout des Hosts gerade ausgecheckt hat. */
   checkedOut = "main";
+  /** Branches, die ein Worktree ausgecheckt hat, etwa der eines Mergers. */
+  readonly checkedOutElsewhere = new Set<string>();
 
   constructor(...branches: string[]) {
     for (const branch of branches) {
@@ -191,6 +193,13 @@ export class FakeRepo implements Repo {
     this.merge("origin/main", branch);
     this.commit(branch);
     return "clean";
+  }
+
+  async fastForward(branch: string, to: string): Promise<boolean> {
+    if (this.checkedOutElsewhere.has(branch)) return false;
+    if (!(await this.contains(to, branch))) return false;
+    this.refs.set(branch, new Set(this.commits(to)));
+    return true;
   }
 
   async push(branch: string): Promise<void> {

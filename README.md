@@ -146,7 +146,8 @@ Für Sandcastle gilt:
   Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
 - Gemergt und geschlossen werden nur Tickets, deren Implementer sein
   Abschlusssignal gegeben hat und deren Branch nachweislich im
-  Integrations-Branch liegt. Das Schließen übernimmt das Skript. Endet der
+  Integrations-Branch liegt. Ein einzelner Branch, der per Fast-Forward
+  passt, landet ohne Merger. Das Schließen übernimmt das Skript. Endet der
   Merger ohne Abschlusssignal, setzt das Skript den Integrations-Branch auf
   seinen Stand davor zurück und schließt keines seiner Tickets.
 - Sind alle Tickets einer Spec geschlossen, folgt ihre Abschlussphase: ein

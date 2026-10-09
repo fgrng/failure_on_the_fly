@@ -30,7 +30,9 @@
 //              Spec zweigt von `sandcastle/standalone` ab.
 //   Review:    Nur für Branches, deren Implementer das Abschlusssignal gab.
 //   Merge:     Ein Merger je Integrations-Branch mergt dessen reviewte
-//              Ticket-Branches, immer in einem eigenen Worktree. Endet er ohne
+//              Ticket-Branches, immer in einem eigenen Worktree. Ein einzelner
+//              Branch, der per Fast-Forward passt, landet ohne Merger; der
+//              Treiber setzt den Integrations-Branch nur vor. Endet er ohne
 //              Abschlusssignal, steht der Integrations-Branch wieder auf dem
 //              Stand davor. Sonst schließt der Treiber jedes Ticket, dessen
 //              Branch gelandet ist. Eine Spec bleibt offen; ihr PR schließt sie.

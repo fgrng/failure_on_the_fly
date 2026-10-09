@@ -82,6 +82,11 @@ export interface Repo {
    * einem Konflikt bleibt `branch` unverändert.
    */
   mergeMain(branch: string): Promise<"clean" | "conflict">;
+  /**
+   * Setzt `branch` auf `to`, wenn das ein Fast-Forward ist und kein Worktree
+   * `branch` ausgecheckt hat; sonst bleibt er, wie er war.
+   */
+  fastForward(branch: string, to: string): Promise<boolean>;
   /** Der Commit, auf dem `branch` steht; auch für Remote-Refs wie MAIN_REF. */
   head(branch: string): Promise<string>;
   /** Setzt `branch` auf `head` zurück, ohne den Checkout des Hosts zu berühren. */
@@ -313,7 +318,7 @@ async function activeIntegrationBranches(deps: WithLog<UpdateDeps>): Promise<str
 async function planImplementAndMerge(
   deps: WithLog<IterationDeps>,
 ): Promise<{ planned: number; landed: Assignment[] }> {
-  const { agents, log } = deps;
+  const { agents, repo, log } = deps;
   const issues = await agents.plan(await frontier(deps));
   if (issues.length === 0) {
     log("No issues to work on.");
@@ -337,8 +342,12 @@ async function planImplementAndMerge(
   const byIntegrationBranch = Map.groupBy(readyIssues, (i) => i.integrationBranch);
   for (const [into, group] of byIntegrationBranch) {
     // Ein Merger je Integrations-Branch: Scheitert einer, bleiben die anderen unberührt.
+    // Ein einzelner Branch, der per Fast-Forward passt, braucht keinen: Sein
+    // Stand ist genau der, den das Review getestet hat.
     const branches = group.map((i) => i.branch);
-    if (!(await mergeOrReset(deps, into, branches))) {
+    if (branches.length === 1 && (await repo.fastForward(into, branches[0]!))) {
+      log(`  ${into}: fast-forwarded to ${branches[0]}, no merger.`);
+    } else if (!(await mergeOrReset(deps, into, branches))) {
       log(`  ! ${into}: merger did not finish, branch reset - no ticket closed.`);
       continue;
     }

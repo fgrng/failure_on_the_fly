@@ -70,6 +70,15 @@ export const gitRepo: Repo = {
     return "clean";
   },
 
+  async fastForward(branch: string, to: string): Promise<boolean> {
+    if (!(await gitRepo.contains(to, branch))) return false;
+    // Den Branch eines Worktrees verschiebt nur, wer dort arbeitet.
+    if (checkedOutBranches().has(branch)) return false;
+    // Der alte Stand als dritter Wert: Ist `branch` inzwischen weiter, scheitert update-ref.
+    git(["update-ref", `refs/heads/${branch}`, await gitRepo.head(to), await gitRepo.head(branch)]);
+    return true;
+  },
+
   async head(branch: string): Promise<string> {
     // Lokaler Branch oder Remote-Ref wie origin/main.
     return git(["rev-parse", "--verify", `${branch}^{commit}`]).trim();
