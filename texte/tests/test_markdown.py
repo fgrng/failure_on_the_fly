@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from django.template import Context, Template, TemplateSyntaxError
 from django.test import SimpleTestCase
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -194,3 +195,37 @@ class ProfilRegisterTests(SimpleTestCase):
         self.assertIn("[Linktext](https://…)", PROFILE["informationstext"].hinweis)
         self.assertNotIn("[Linktext]", PROFILE["szenentext"].hinweis)
         self.assertIn("Schülernotation", PROFILE["szenentext"].hinweis)
+
+
+class ProfilImTemplateTests(SimpleTestCase):
+    """Filter und Tag schlagen das Profil im Register nach."""
+
+    def _rendern(self, quelltext: str) -> str:
+        return Template("{% load texte %}" + quelltext).render(
+            Context({"wert": "**a**"})
+        )
+
+    def test_bekannte_profile_rendern_wie_das_register(self) -> None:
+        for name, profil in PROFILE.items():
+            with self.subTest(profil=name):
+                self.assertEqual(
+                    self._rendern(f'{{{{ wert|markdown:"{name}" }}}}'),
+                    profil.rendern("**a**"),
+                )
+                self.assertEqual(
+                    self._rendern(f'{{% markdown_hinweis "{name}" %}}'), profil.hinweis
+                )
+
+    def test_unbekanntes_profil_nennt_namen_und_bekannte_profile(self) -> None:
+        for quelltext in (
+            '{{ wert|markdown:"gibtsnicht" }}',
+            '{% markdown_hinweis "gibtsnicht" %}',
+        ):
+            with self.subTest(quelltext=quelltext):
+                with self.assertRaises(TemplateSyntaxError) as fehler:
+                    self._rendern(quelltext)
+
+                meldung: str = str(fehler.exception)
+                self.assertIn("gibtsnicht", meldung)
+                for name in PROFILE:
+                    self.assertIn(name, meldung)
