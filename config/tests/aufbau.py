@@ -10,14 +10,16 @@ from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from vignetten.models import Vignette
 
 
-def konto_mit_rollen(username: str, *rollen: str) -> Konto:
-    """Legt ein Konto mit den übergebenen Fachrollen an.
+def konto_mit_rollen(username: str, *rollen: str, is_superuser: bool = False) -> Konto:
+    """Legt ein Konto mit den übergebenen Fachrollen an, auf Wunsch als Admin.
 
     Die Rollen-Gruppen legt die Migration an; ein unbekannter Name scheitert
     deshalb, statt eine wirkungslose Gruppe zu erzeugen.
     """
 
-    angelegt: Konto = Konto.objects.create_user(username=username)
+    angelegt: Konto = Konto.objects.create_user(
+        username=username, is_superuser=is_superuser
+    )
     for rolle in rollen:
         angelegt.groups.add(Group.objects.get(name=rolle))
     return angelegt
