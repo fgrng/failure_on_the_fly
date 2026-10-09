@@ -195,7 +195,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
     def test_alte_finale_fassung_bietet_keine_weitere_reversionierung_an(
         self,
     ) -> None:
-        """Nur die neueste nichtarchivierte Fassung kann einen Entwurf erzeugen."""
+        """Eine überholte Fassung bietet keine neue Fassung an und legt keine an."""
         ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
@@ -214,7 +214,54 @@ class FragebogenItemReversionierenViewTests(TestCase):
         )
 
         self.assertNotContains(detail, "Neue Fassung")
-        self.assertEqual(response.status_code, 404)
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[alte_fassung.pk])
+        )
+        self.assertFalse(
+            FragebogenItem.objects.filter(
+                historie=alte_fassung.historie, zustand=FragebogenItem.Zustand.ENTWURF
+            ).exists()
+        )
+
+    def test_nachfolgerin_verhindert_neue_fassung_mit_fehlermeldung(self) -> None:
+        """Eine überholte Fassung führt nicht auf eine Fehlerseite."""
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Erste Fassung",
+        )
+        alte_fassung.finalisieren()
+        alte_fassung.bearbeiten().finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[alte_fassung.pk]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Nachfolgerin")
+
+    def test_ueberholte_fassung_oeffnet_den_vorhandenen_entwurf(self) -> None:
+        """Ein Versuch auf einer überholten Fassung führt zum offenen Entwurf."""
+        ada: Konto = konto_mit_rollen("ada", FORSCHENDE)
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Erste Fassung",
+        )
+        alte_fassung.finalisieren()
+        entwurf: FragebogenItem = alte_fassung.bearbeiten()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[alte_fassung.pk])
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[entwurf.pk])
+        )
+        self.assertEqual(
+            FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
+        )
 
     def test_zeigt_archivierte_fassung(self) -> None:
         """Die Detailansicht einer vollständig archivierten Historie bleibt erreichbar."""

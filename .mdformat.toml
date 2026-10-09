@@ -1,0 +1,5 @@
+# mdformat prüft nur die hart auf 80 Zeichen umbrochenen Dateien, die Agenten
+# laufend ändern (Liste in .githooks/pre-commit und der CI). Die übrigen
+# Markdown-Dateien schreiben einen Absatz pro Zeile.
+wrap = 80
+number = true

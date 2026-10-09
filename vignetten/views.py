@@ -105,11 +105,15 @@ def anlegen(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form: VignetteForm = VignetteForm(request.POST, request.FILES)
         if form.is_valid():
-            vignette: Vignette = Vignette.objects.anlegen(request.user)
-            for feldname, wert in form.cleaned_data.items():
-                setattr(vignette, feldname, wert)
-            vignette.save()
-            return redirect("vignetten:detail", pk=vignette.pk)
+            try:
+                vignette: Vignette = Vignette.objects.anlegen(request.user)
+            except ValidationError as error:
+                form.add_error(None, error)
+            else:
+                for feldname, wert in form.cleaned_data.items():
+                    setattr(vignette, feldname, wert)
+                vignette.save()
+                return redirect("vignetten:detail", pk=vignette.pk)
     else:
         form = VignetteForm(initial=zufaellige_akteure())
     return render(

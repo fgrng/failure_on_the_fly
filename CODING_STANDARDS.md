@@ -44,7 +44,7 @@ Red flags:
 - Test name describes HOW not WHAT
 - Verifying through external means (e.g. querying a DB) instead of through the interface
 
-Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike. Exempt are migrations and a transition list in `pyproject.toml` that only gets shorter. Constraint tests that check a DB invariant through an internal seam (e.g. `objects._erstellen`) may do so with a per-line `# noqa: SLF001`, never a per-file exemption.
+Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike. Exempt are migrations and a transition list in `pyproject.toml` that only gets shorter. Constraint tests that check a DB invariant through an internal seam (e.g. `objects._erstellen`) may do so with a per-line `# noqa: SLF001`, never a per-file exemption. In production code the same holds for the Anlege-Naht inside one aggregate (a manager setting `_wird_angelegt`, a model calling `objects._erstellen`): per line, with a reason, as in `# noqa: SLF001 -- <Grund>`. Access across modules gets a public name instead.
 
 Build test setup through the public way: `config/tests/aufbau.py` provides accounts with roles, an active model configuration, the final simulation core, vignette drafts and final vignettes.
 

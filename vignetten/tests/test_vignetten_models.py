@@ -379,6 +379,17 @@ class VignetteAnlegenTests(TestCase):
 
         self.assertEqual(list(vignette.historie.eigentuemerinnen.all()), [konto])
 
+    def test_anlegen_ohne_finalen_kern_meldet_den_grund(self) -> None:
+        """Ohne finalen Kern scheitert das Anlegen mit einem Modellfehler."""
+        konto: Konto = get_user_model().objects.create_user(username="ada")
+        Simulationskern.objects.anlegen()
+
+        with self.assertRaisesMessage(
+            ValidationError, "Es gibt noch keinen finalen Simulationskern."
+        ):
+            Vignette.objects.anlegen(konto)
+        self.assertFalse(Vignettenhistorie.objects.exists())
+
     def test_anlegen_vergibt_akteure(self) -> None:
         """Ein neuer Entwurf trägt ohne Formular beide Akteure."""
         vignette: Vignette

@@ -216,16 +216,21 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         werte.setdefault("schuelerin_geschlecht", Vignette.Geschlecht.WEIBLICH)
         werte.setdefault("lehrperson_geschlecht", Vignette.Geschlecht.WEIBLICH)
         vignette: Vignette = self.model(**werte)
-        vignette._wird_angelegt = True
+        vignette._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht: Manager markiert die neue Fassung
         vignette.save(using=self.db)
         return vignette
 
     @transaction.atomic
     def anlegen(self, konto: "Konto") -> "Vignette":
         """Legt einen Entwurf mit Historie und aktuellem finalem Kern an."""
-        kern: Simulationskern = Simulationskern.objects.filter(
-            zustand=Simulationskern.Zustand.FINAL
-        ).latest("finalisiert_am", "pk")
+        try:
+            kern: Simulationskern = Simulationskern.objects.filter(
+                zustand=Simulationskern.Zustand.FINAL
+            ).latest("finalisiert_am", "pk")
+        except Simulationskern.DoesNotExist:
+            raise ValidationError(
+                "Es gibt noch keinen finalen Simulationskern."
+            ) from None
         historie: Vignettenhistorie = Vignettenhistorie.objects.anlegen(konto)
         return self._erstellen(
             historie=historie, gepinnter_kern=kern, **zufaellige_akteure()
@@ -514,7 +519,7 @@ class Vignette(models.Model):
             raise ValidationError(
                 "Diese Fassung hat bereits eine nicht archivierte Nachfolgerin."
             )
-        return type(self).objects._erstellen(
+        return type(self).objects._erstellen(  # noqa: SLF001 -- Anlege-Naht des Aggregats
             historie=quelle.historie,
             vorgaengerin=quelle,
             gepinnter_kern=quelle.gepinnter_kern,

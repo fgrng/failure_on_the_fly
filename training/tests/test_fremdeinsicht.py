@@ -169,6 +169,38 @@ class SelbsteinsichtTests(FremdeinsichtTestCase):
 
                 self.assertEqual(response.status_code, 200)
 
+    def test_trainingsseite_ohne_sitzung_zeigt_noch_keine(self) -> None:
+        """Ohne eigene Sitzung steht „Noch keine“ statt eines Statusmenüs."""
+        self.client.force_login(self.teilnehmerin)
+
+        response: HttpResponse = self.client.get(
+            reverse("training:detail", args=[self.training.pk])
+        )
+
+        self.assertContains(response, "Noch keine")
+
+    def test_trainingsseite_verlinkt_eigene_sitzungen_je_status(self) -> None:
+        """Jedes Statusmenü zählt seine Sitzung und führt zu ihr."""
+        self.client.force_login(self.teilnehmerin)
+        menues: dict[Sitzung.Status, str] = {
+            Sitzung.Status.LAUFEND: "1 laufend ▾",
+            Sitzung.Status.ABGESCHLOSSEN: "1 abgeschlossen ▾",
+            Sitzung.Status.ABGEBROCHEN: "1 abgebrochen ▾",
+            Sitzung.Status.GESCHEITERT: "1 gescheitert ▾",
+        }
+        for status, menue in menues.items():
+            with self.subTest(status=status):
+                sitzung: Sitzung = gespielte_sitzung(
+                    self.training, self.teilnehmerin, self.vignette, status
+                )
+
+                response: HttpResponse = self.client.get(
+                    reverse("training:detail", args=[self.training.pk])
+                )
+
+                self.assertContains(response, menue)
+                self.assertContains(response, ansehen_url(sitzung))
+
     def test_selbsteinsicht_verschweigt_die_denkspur(self) -> None:
         """Auch die eigene Sitzung zeigt in keinem Status eine Denkspur."""
         self.client.force_login(self.teilnehmerin)

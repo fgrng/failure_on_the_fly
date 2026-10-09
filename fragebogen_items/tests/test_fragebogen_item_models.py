@@ -187,6 +187,23 @@ class FragebogenItemLebenszyklusTests(TestCase):
             FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
         )
 
+    def test_bearbeiten_lehnt_fassung_mit_nicht_archivierter_nachfolgerin_ab(
+        self,
+    ) -> None:
+        """Eine überholte Fassung zieht keinen zweiten Folgeentwurf."""
+        konto = get_user_model().objects.create_user(username="ada")
+        alte_fassung = FragebogenItem.objects.anlegen(konto, wortlaut="Erste")
+        alte_fassung.finalisieren()
+        alte_fassung.bearbeiten().finalisieren()
+
+        with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
+            alte_fassung.bearbeiten()
+        self.assertFalse(
+            FragebogenItem.objects.filter(
+                historie=alte_fassung.historie, zustand=FragebogenItem.Zustand.ENTWURF
+            ).exists()
+        )
+
     def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
         """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
         konto = get_user_model().objects.create_user(username="ada")

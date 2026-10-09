@@ -58,15 +58,6 @@ def _bezeichnung(item: FragebogenItem) -> str:
     return item.historie.name or item.wortlaut or "Unbenannter Entwurf"
 
 
-def _ist_neueste_nichtarchivierte_fassung(item: FragebogenItem) -> bool:
-    # Prüft, ob eine Fassung die aktuelle Spitze ihrer Historie ist.
-    return item.zustand != FragebogenItem.Zustand.ARCHIVIERT and not (
-        FragebogenItem.objects.filter(historie=item.historie, pk__gt=item.pk)
-        .exclude(zustand=FragebogenItem.Zustand.ARCHIVIERT)
-        .exists()
-    )
-
-
 def _lebenszyklus_aktion_ausfuehren(
     request: HttpRequest,
     pk: int,
@@ -132,9 +123,6 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "bezeichnung": _bezeichnung(item),
             "zustand_badge": _zustand_badge(item),
             "likert_skalenpole": LikertSkalenpol.choices,
-            "ist_neueste_nichtarchivierte_fassung": (
-                _ist_neueste_nichtarchivierte_fassung(item)
-            ),
             "kann_entarchiviert_werden": item.kann_entarchiviert_werden(),
         },
     )
@@ -175,14 +163,16 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     finale: FragebogenItem = _sichtbares_item(
         request, pk, zustand=FragebogenItem.Zustand.FINAL
     )
-    if not _ist_neueste_nichtarchivierte_fassung(finale):
-        raise Http404
     entwurf: FragebogenItem | None = FragebogenItem.objects.filter(
         historie=finale.historie,
         zustand=FragebogenItem.Zustand.ENTWURF,
     ).first()
     if entwurf is None:
-        entwurf = finale.bearbeiten()
+        try:
+            entwurf = finale.bearbeiten()
+        except ValidationError as error:
+            messages.error(request, "; ".join(error.messages))
+            return redirect("fragebogen_items:detail", pk=finale.pk)
     return redirect("fragebogen_items:detail", pk=entwurf.pk)
 
 
