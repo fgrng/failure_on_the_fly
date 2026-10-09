@@ -139,7 +139,7 @@ class FragebogenItemManager(models.Manager.from_queryset(FragebogenItemQuerySet)
     def _erstellen(self, **werte: object) -> "FragebogenItem":
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
         item: FragebogenItem = self.model(**werte)
-        item._wird_angelegt = True
+        item._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
         item.save(using=self.db)
         return item
 
@@ -269,7 +269,7 @@ class FragebogenItem(models.Model):
             raise ValidationError(
                 "Diese Fassung hat bereits eine nicht archivierte Nachfolgerin."
             )
-        return type(self).objects._erstellen(
+        return type(self).objects._erstellen(  # noqa: SLF001 -- Anlege-Naht des Aggregats
             historie=quelle.historie,
             vorgaengerin=quelle,
             typ=quelle.typ,

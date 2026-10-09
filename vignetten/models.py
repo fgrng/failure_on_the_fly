@@ -216,7 +216,7 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
         werte.setdefault("schuelerin_geschlecht", Vignette.Geschlecht.WEIBLICH)
         werte.setdefault("lehrperson_geschlecht", Vignette.Geschlecht.WEIBLICH)
         vignette: Vignette = self.model(**werte)
-        vignette._wird_angelegt = True
+        vignette._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
         vignette.save(using=self.db)
         return vignette
 
@@ -519,7 +519,7 @@ class Vignette(models.Model):
             raise ValidationError(
                 "Diese Fassung hat bereits eine nicht archivierte Nachfolgerin."
             )
-        return type(self).objects._erstellen(
+        return type(self).objects._erstellen(  # noqa: SLF001 -- Anlege-Naht des Aggregats
             historie=quelle.historie,
             vorgaengerin=quelle,
             gepinnter_kern=quelle.gepinnter_kern,

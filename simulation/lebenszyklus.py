@@ -23,7 +23,7 @@ class FassungQuerySet(models.QuerySet[Any]):
     def update(self, **kwargs: object) -> int:
         """Hält Zustands- und Inhaltsänderungen an den Lebenszyklus-Methoden."""
 
-        raise RuntimeError(self.model._meldung_lebenszyklus())
+        raise RuntimeError(self.model.meldung_lebenszyklus())
 
     def delete(self) -> tuple[int, dict[str, int]]:
         """Löscht gesammelt ausschließlich Entwürfe."""
@@ -35,12 +35,12 @@ class FassungQuerySet(models.QuerySet[Any]):
     def bulk_create(self, objs: list[Any], **kwargs: object) -> list[Any]:
         """Verhindert das Umgehen der Anlege-Naht per Masseneinfügen."""
 
-        raise RuntimeError(self.model._meldung_anlege_naht())
+        raise RuntimeError(self.model.meldung_anlege_naht())
 
     def bulk_update(self, objs: list[Any], fields: list[str], **kwargs: object) -> int:
         """Verhindert das Umgehen der Lebenszyklus-Methoden per Massenupdate."""
 
-        raise RuntimeError(self.model._meldung_lebenszyklus())
+        raise RuntimeError(self.model.meldung_lebenszyklus())
 
 
 class FassungManager(models.Manager.from_queryset(FassungQuerySet)):
@@ -49,7 +49,7 @@ class FassungManager(models.Manager.from_queryset(FassungQuerySet)):
     def create(self, **kwargs: object) -> Any:
         """Verhindert das Umgehen der Anlege-Naht."""
 
-        raise RuntimeError(self.model._meldung_anlege_naht())
+        raise RuntimeError(self.model.meldung_anlege_naht())
 
     def finale_fassung(self) -> Any:
         """Die eine gültige finale Fassung oder None, solange es keine gibt."""
@@ -60,7 +60,7 @@ class FassungManager(models.Manager.from_queryset(FassungQuerySet)):
         # Speichert eine Fassung, die eine Lebenszyklus-Methode erzeugt.
 
         fassung: VersionierteFassung = self.model(**werte)
-        fassung._wird_angelegt = True
+        fassung._wird_angelegt = True  # noqa: SLF001 -- Anlege-Naht der eigenen Fassung
         fassung.save(using=self.db)
         return fassung
 
@@ -105,14 +105,14 @@ class VersionierteFassung(models.Model):
         abstract: bool = True
 
     @classmethod
-    def _meldung_anlege_naht(cls) -> str:
-        # Meldet den Versuch, eine Fassung an der Anlege-Naht vorbei zu erzeugen.
+    def meldung_anlege_naht(cls) -> str:
+        """Meldet den Versuch, eine Fassung an der Anlege-Naht vorbei zu erzeugen."""
 
         return f"{cls._bezeichnung}-Fassungen werden über die Anlege-Naht erzeugt."
 
     @classmethod
-    def _meldung_lebenszyklus(cls) -> str:
-        # Meldet den Versuch, eine Fassung am Lebenszyklus vorbei zu ändern.
+    def meldung_lebenszyklus(cls) -> str:
+        """Meldet den Versuch, eine Fassung am Lebenszyklus vorbei zu ändern."""
 
         return (
             f"{cls._bezeichnung}-Fassungen ändern sich nur über Lebenszyklus-Methoden."
@@ -128,7 +128,7 @@ class VersionierteFassung(models.Model):
 
         if self._state.adding:
             if not getattr(self, "_wird_angelegt", False):
-                raise RuntimeError(self._meldung_anlege_naht())
+                raise RuntimeError(self.meldung_anlege_naht())
         else:
             vorherige_fassung: VersionierteFassung = type(self).objects.get(pk=self.pk)
             if vorherige_fassung.zustand != self.Zustand.ENTWURF:
@@ -178,7 +178,7 @@ class VersionierteFassung(models.Model):
             .exists()
         ):
             raise ValidationError(f"Ein {self._bezeichnung}-Entwurf existiert bereits.")
-        return type(self).objects._erstellen(
+        return type(self).objects._erstellen(  # noqa: SLF001 -- Anlege-Naht des Aggregats
             historie=self.historie,
             vorgaengerin=self,
             **self._kopierwerte(),

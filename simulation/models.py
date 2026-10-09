@@ -450,7 +450,7 @@ class KatalogteilQuerySet(models.QuerySet["Katalogteil"]):
     def delete(self) -> tuple[int, dict[str, int]]:
         """Löscht gesammelt nur Teile von Entwürfen."""
 
-        _nur_an_entwuerfen(set(self.values_list(self.model._katalog_pfad, flat=True)))
+        _nur_an_entwuerfen(set(self.values_list(self.model.katalog_pfad, flat=True)))
         return super().delete()
 
 
@@ -458,13 +458,13 @@ class Katalogteil(models.Model):
     """Ein geordneter Teil einer Evalkatalog-Fassung, änderbar nur am Entwurf.
 
     Vertrag der Unterklassen: `_eltern` nennt den Fremdschlüssel, unter dem die
-    Geschwister hängen, `_katalog_pfad` den Lookup bis zur Fassung. Hängt ein
+    Geschwister hängen, `katalog_pfad` den Lookup bis zur Fassung. Hängt ein
     Teil nicht direkt am Katalog, beginnt sein Pfad mit `<_eltern>__`, etwa
     `eval__katalog_id`.
     """
 
     _eltern: str
-    _katalog_pfad: str
+    katalog_pfad: str
 
     position: models.PositiveIntegerField = models.PositiveIntegerField()
 
@@ -502,12 +502,12 @@ class Katalogteil(models.Model):
         # in der Datenbank, damit auch ein umgehängter Teil die neue Fassung trifft.
 
         eltern_id: int | None = getattr(self, f"{self._eltern}_id")
-        if "__" not in self._katalog_pfad:
+        if "__" not in self.katalog_pfad:
             return eltern_id
         eltern: type[models.Model] = self._meta.get_field(self._eltern).related_model
         return (
             eltern.objects.filter(pk=eltern_id)
-            .values_list(self._katalog_pfad.split("__", 1)[1], flat=True)
+            .values_list(self.katalog_pfad.split("__", 1)[1], flat=True)
             .first()
         )
 
@@ -517,7 +517,7 @@ class Katalogteil(models.Model):
         bisherige: models.QuerySet = (
             type(self)
             .objects.filter(pk=self.pk)
-            .values_list(self._katalog_pfad, flat=True)
+            .values_list(self.katalog_pfad, flat=True)
         )
         _nur_an_entwuerfen({self._katalog_id(), *bisherige})
 
@@ -565,7 +565,7 @@ class UebergreifendesKriterium(Katalogteil):
     """
 
     _eltern: str = "katalog"
-    _katalog_pfad: str = "katalog_id"
+    katalog_pfad: str = "katalog_id"
 
     katalog: models.ForeignKey = models.ForeignKey(
         Evalkatalog,
@@ -589,7 +589,7 @@ class Eval(Katalogteil):
     """Ein Prüffall des Katalogs mit eigenen Evalkriterien (ADR-0046)."""
 
     _eltern: str = "katalog"
-    _katalog_pfad: str = "katalog_id"
+    katalog_pfad: str = "katalog_id"
 
     katalog: models.ForeignKey = models.ForeignKey(
         Evalkatalog,
@@ -632,7 +632,7 @@ class Evalkriterium(Katalogteil):
     """
 
     _eltern: str = "eval"
-    _katalog_pfad: str = "eval__katalog_id"
+    katalog_pfad: str = "eval__katalog_id"
 
     eval: models.ForeignKey = models.ForeignKey(
         Eval,
@@ -660,7 +660,7 @@ class Evalinput(Katalogteil):
     """
 
     _eltern: str = "eval"
-    _katalog_pfad: str = "eval__katalog_id"
+    katalog_pfad: str = "eval__katalog_id"
 
     eval: models.ForeignKey = models.ForeignKey(
         Eval,
@@ -708,7 +708,7 @@ class Inputschritt(Katalogteil):
         GELENKT = "gelenkt", "formuliert nach Strategie"
 
     _eltern: str = "evalinput"
-    _katalog_pfad: str = "evalinput__eval__katalog_id"
+    katalog_pfad: str = "evalinput__eval__katalog_id"
 
     evalinput: models.ForeignKey = models.ForeignKey(
         Evalinput,
