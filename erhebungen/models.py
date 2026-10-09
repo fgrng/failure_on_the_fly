@@ -461,16 +461,7 @@ class Stichprobe(models.Model):
     def traegt_daten(self) -> bool:
         """Erkennt die mit einer Stichprobe verbundenen Erhebungsdaten."""
 
-        for relation in self._meta.related_objects:
-            if (
-                relation.related_model._meta.label_lower
-                != "erhebungen.erhebungsbindung"
-            ):
-                continue
-            return relation.related_model.objects.filter(
-                **{relation.field.name: self}
-            ).exists()
-        return False
+        return self.erhebungsbindung_set.exists()
 
     @property
     def phase(self) -> str:
