@@ -242,6 +242,46 @@ class FragebogenItemReversionierenViewTests(TestCase):
             ).exists()
         )
 
+    def test_nachfolgerin_verhindert_neue_fassung_mit_fehlermeldung(self) -> None:
+        """Eine überholte Fassung führt nicht auf eine Fehlerseite."""
+        ada: Konto = _forschende("ada")
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Erste Fassung",
+        )
+        alte_fassung.finalisieren()
+        alte_fassung.bearbeiten().finalisieren()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[alte_fassung.pk]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Nachfolgerin")
+
+    def test_ueberholte_fassung_oeffnet_den_vorhandenen_entwurf(self) -> None:
+        """Ein Versuch auf einer überholten Fassung führt zum offenen Entwurf."""
+        ada: Konto = _forschende("ada")
+        alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
+            ada,
+            wortlaut="Erste Fassung",
+        )
+        alte_fassung.finalisieren()
+        entwurf: FragebogenItem = alte_fassung.bearbeiten()
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:neue_fassung", args=[alte_fassung.pk])
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[entwurf.pk])
+        )
+        self.assertEqual(
+            FragebogenItem.objects.filter(historie=alte_fassung.historie).count(), 2
+        )
+
     def test_zeigt_archivierte_fassung(self) -> None:
         """Die Detailansicht einer vollständig archivierten Historie bleibt erreichbar."""
         ada: Konto = _forschende("ada")
