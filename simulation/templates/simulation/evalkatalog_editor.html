@@ -38,7 +38,16 @@
                 <h2 class="evalkatalog-baum__titel">Evals</h2>
                 <ul aria-label="Evals">
                     {% for knoten_eval in katalog.evals.all %}
-                        <li><a href="{% url 'simulation:evalkatalog_eval' katalog.pk knoten_eval.pk %}"{% if knoten == "eval" and knoten_eval == eval %} aria-current="page"{% endif %}>{{ knoten_eval.name|default:"Unbenanntes Eval" }}</a></li>
+                        <li>
+                            <a href="{% url 'simulation:evalkatalog_eval' katalog.pk knoten_eval.pk %}"{% if knoten == "eval" and knoten_eval == eval %} aria-current="page"{% endif %}>{{ knoten_eval.name|default:"Unbenanntes Eval" }}</a>
+                            {% with inputs=knoten_eval.inputs.all %}{% if inputs %}
+                                <ul class="evalkatalog-baum__inputs" aria-label="Evalinputs von {{ knoten_eval.name|default:'Unbenanntes Eval' }}">
+                                    {% for knoten_input in inputs %}
+                                        <li><a href="{% url 'simulation:evalkatalog_evalinput' katalog.pk knoten_eval.pk knoten_input.pk %}"{% if knoten == "evalinput" and knoten_input == evalinput %} aria-current="page"{% endif %}>Evalinput {{ forloop.counter }} <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ knoten_input.kuerzel }}</span></a></li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}{% endwith %}
+                        </li>
                     {% empty %}
                         <li class="evalkatalog-baum__leer">Noch keine Evals.</li>
                     {% endfor %}
@@ -66,7 +75,7 @@
                         <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für dieses Eval">
                             <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'hoch' %}"{% if eval_erstes %} disabled{% endif %} aria-label="Eval nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
                             <button type="submit" class="zuordnung-iconknopf" formaction="{% url 'simulation:evalkatalog_eval_verschieben' katalog.pk eval.pk 'runter' %}"{% if eval_letztes %} disabled{% endif %} aria-label="Eval nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
-                            <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_eval_loeschen' katalog.pk eval.pk %}" aria-label="Eval löschen" title="Eval samt Kriterien löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                            <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_eval_loeschen' katalog.pk eval.pk %}" aria-label="Eval löschen" title="Eval samt Kriterien und Evalinputs löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
                         </span>
                     </div>
                     <h3>Evalkriterien</h3>
@@ -75,7 +84,70 @@
                     <div>
                         <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_evalkriterium_anlegen' katalog.pk eval.pk %}">Evalkriterium hinzufügen</button>
                     </div>
+                    <h3>Evalinputs</h3>
+                    <p class="evalkatalog-hinweis">Jeder Evalinput ist ein Drehbuch für die simulierte Lehrperson. Ein neuer startet mit drei leeren Inputschritten.</p>
+                    <ul class="evalkatalog-inputliste" aria-label="Evalinputs">
+                        {% for evalinput in eval.inputs.all %}
+                            <li><a href="{% url 'simulation:evalkatalog_evalinput' katalog.pk eval.pk evalinput.pk %}">Evalinput {{ forloop.counter }}</a> <span class="evalkatalog-kuerzel">{{ evalinput.kuerzel }}</span></li>
+                        {% empty %}
+                            <li class="evalkatalog-hinweis">Noch keine Evalinputs.</li>
+                        {% endfor %}
+                    </ul>
+                    <div>
+                        <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_evalinput_anlegen' katalog.pk eval.pk %}">Evalinput hinzufügen</button>
+                    </div>
                 </section>
+            {% elif knoten == "evalinput" %}
+                <div class="evalkatalog-drehbuchknoten">
+                    <section class="evalkatalog-knoten" aria-label="Evalinput">
+                        <div class="evalkatalog-evalkopf">
+                            <h2>Evalinput {{ nummer }} <span class="evalkatalog-kopfzusatz">zu {{ eval.name|default:"Unbenanntes Eval" }}</span></h2>
+                            <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für diesen Evalinput">
+                                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{% url 'simulation:evalkatalog_evalinput_loeschen' katalog.pk eval.pk evalinput.pk %}" aria-label="Evalinput löschen" title="Evalinput samt Schritten löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                            </span>
+                        </div>
+                        <p class="evalkatalog-hinweis">Jeder Inputschritt ist eine Äußerung der simulierten Lehrperson, auf die die simulierte Schüler:in antwortet. „Sagt wörtlich“ bringt den Text als Inputäußerung vor; „formuliert nach Strategie“ lässt die Lehrperson nach dieser Inputstrategie selbst formulieren, auch bedingt („Nennt sie die zum Muster passende Lösung, äußere Zweifel …“). Reiner Text ohne Platzhalter.</p>
+                        <ol class="drehbuch" aria-label="Inputschritte">
+                            {% for schritt, zeile in schrittzeilen %}
+                                <li class="drehbuch__schritt">
+                                    <div class="drehbuch__blase{% if schritt.art == 'gelenkt' %} drehbuch__blase--gelenkt{% endif %}">
+                                        <div class="drehbuch__kopf">
+                                            <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
+                                            <fieldset class="drehbuch__segment">
+                                                <legend class="zuordnung-unsichtbar">Art von Schritt {{ forloop.counter }}</legend>
+                                                {% for wert, beschriftung in arten %}<label><input type="radio" name="inputschritt-art-{{ schritt.pk }}" value="{{ wert }}"{% if schritt.art == wert %} checked{% endif %}> {{ beschriftung }}</label>{% endfor %}
+                                            </fieldset>
+                                            <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Schritt {{ forloop.counter }}">
+                                                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.hoch }}"{% if forloop.first %} disabled{% endif %} aria-label="Schritt {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
+                                                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.runter }}"{% if forloop.last %} disabled{% endif %} aria-label="Schritt {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
+                                                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{{ zeile.loeschen }}" aria-label="Schritt {{ forloop.counter }} entfernen" title="Entfernen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                                            </span>
+                                        </div>
+                                        <label class="zuordnung-unsichtbar" for="{{ zeile.feld }}">Text von Schritt {{ forloop.counter }}</label>
+                                        <textarea class="drehbuch__text" id="{{ zeile.feld }}" name="{{ zeile.feld }}" rows="2">{{ zeile.text }}</textarea>
+                                    </div>
+                                    <p class="drehbuch__antwort">Schüler:in antwortet</p>
+                                </li>
+                            {% empty %}
+                                <li class="zuordnungsliste__leer">Noch keine Inputschritte.</li>
+                            {% endfor %}
+                        </ol>
+                        <div>
+                            <button type="submit" class="button button--secondary" formaction="{% url 'simulation:evalkatalog_inputschritt_anlegen' katalog.pk eval.pk evalinput.pk %}">Inputschritt hinzufügen</button>
+                        </div>
+                    </section>
+                    <aside class="evalkatalog-beurteilung" aria-label="Evalkriterien">
+                        <h3>Beurteilt nach</h3>
+                        <ol>
+                            {% for kriterium in eval.kriterien.all %}
+                                <li>{{ kriterium.text|default:"(leeres Kriterium)" }}</li>
+                            {% empty %}
+                                <li class="evalkatalog-hinweis">Das Eval hat noch keine Evalkriterien.</li>
+                            {% endfor %}
+                        </ol>
+                        <p class="evalkatalog-hinweis">Die Evalkriterien des Evals, dazu die übergreifenden Kriterien.</p>
+                    </aside>
+                </div>
             {% else %}
                 <section class="evalkatalog-knoten" aria-label="Durchlauf und Vorlagen">
                     <h2>Durchlauf und Vorlagen</h2>

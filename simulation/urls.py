@@ -93,6 +93,36 @@ urlpatterns: list[URLPattern] = [
         name="evalkatalog_evalkriterium_verschieben",
     ),
     path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/anlegen/",
+        views.evalkatalog_evalinput_anlegen,
+        name="evalkatalog_evalinput_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/<int:input_pk>/",
+        views.evalkatalog_evalinput,
+        name="evalkatalog_evalinput",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/<int:input_pk>/loeschen/",
+        views.evalkatalog_evalinput_loeschen,
+        name="evalkatalog_evalinput_loeschen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/<int:input_pk>/schritte/anlegen/",
+        views.evalkatalog_inputschritt_anlegen,
+        name="evalkatalog_inputschritt_anlegen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/<int:input_pk>/schritte/<int:schritt_pk>/loeschen/",
+        views.evalkatalog_inputschritt_loeschen,
+        name="evalkatalog_inputschritt_loeschen",
+    ),
+    path(
+        "evalkatalog/<int:pk>/evals/<int:eval_pk>/inputs/<int:input_pk>/schritte/<int:schritt_pk>/<str:richtung>/",
+        views.evalkatalog_inputschritt_verschieben,
+        name="evalkatalog_inputschritt_verschieben",
+    ),
+    path(
         "evalkatalog/<int:pk>/verwerfen/",
         views.evalkatalog_verwerfen,
         name="evalkatalog_verwerfen",

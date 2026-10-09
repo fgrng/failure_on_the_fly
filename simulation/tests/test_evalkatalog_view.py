@@ -14,7 +14,9 @@ from simulation.models import (
     VERTRAG_PROMPT,
     Eval,
     Evalkatalog,
+    Evalinput,
     Evalkriterium,
+    Inputschritt,
     UebergreifendesKriterium,
 )
 
@@ -645,10 +647,225 @@ class EvalkatalogEvalTests(TestCase):
         self.assertEqual(eval_.name, "Muster")
 
 
+class EvalkatalogEvalinputTests(TestCase):
+    """Evalinputs hängen am Eval und werden als Drehbuch bearbeitet."""
+
+    def setUp(self) -> None:
+        """Legt einen Entwurf mit einem Eval an und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        self.eval_: Eval = self.katalog.eval_anlegen("Muster")
+        self.client.force_login(_administratorin("ada"))
+
+    def _route(self, name: str, *args: object) -> str:
+        # Eine Route unterhalb des Evals.
+        return reverse(
+            f"simulation:evalkatalog_{name}",
+            args=[self.katalog.pk, self.eval_.pk, *args],
+        )
+
+    def _schritte(self, evalinput: Evalinput) -> list[tuple[str, str]]:
+        # Art und Text der Inputschritte in gespeicherter Reihenfolge.
+        return [(s.art, s.text) for s in evalinput.schritte.all()]
+
+    def test_hinzufuegen_legt_einen_evalinput_mit_drei_schritten_an(self) -> None:
+        """Am Eval-Knoten entsteht ein Evalinput nach dem anderen; sein Knoten öffnet sich."""
+        self.assertIn(
+            ("Evalinput hinzufügen", "evalkatalog-formular"),
+            submit_knoepfe(self.client.get(self._route("eval"))),
+        )
+
+        self.client.post(self._route("evalinput_anlegen"))
+        response: HttpResponse = self.client.post(self._route("evalinput_anlegen"))
+
+        zweiter: Evalinput = self.eval_.inputs.last()
+        self.assertRedirects(response, self._route("evalinput", zweiter.pk))
+        self.assertEqual(self.eval_.inputs.count(), 2)
+        self.assertEqual(self._schritte(zweiter), [(Inputschritt.Art.FEST, "")] * 3)
+
+    def test_loeschen_entfernt_den_evalinput_und_fuehrt_zum_eval(self) -> None:
+        """Der Papierkorb am Evalinput nimmt seine Schritte mit."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+
+        response: HttpResponse = self.client.post(
+            self._route("evalinput_loeschen", evalinput.pk)
+        )
+
+        self.assertRedirects(response, self._route("eval"))
+        self.assertFalse(Inputschritt.objects.exists())
+
+    def test_speichern_uebernimmt_texte_und_arten(self) -> None:
+        """Segmentknopf und Text jedes Schritts bleiben gespeichert."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        erster, zweiter, _ = evalinput.schritte.all()
+
+        response: HttpResponse = self.client.post(
+            self._route("evalinput", evalinput.pk),
+            {
+                f"inputschritt-{erster.pk}": "Wie rechnest du 3/4 + 1/2?",
+                f"inputschritt-art-{erster.pk}": "fest",
+                f"inputschritt-{zweiter.pk}": "Nennt sie die Lösung, äußere Zweifel.",
+                f"inputschritt-art-{zweiter.pk}": "gelenkt",
+            },
+        )
+
+        self.assertRedirects(response, self._route("evalinput", evalinput.pk))
+        self.assertEqual(
+            self._schritte(evalinput),
+            [
+                ("fest", "Wie rechnest du 3/4 + 1/2?"),
+                ("gelenkt", "Nennt sie die Lösung, äußere Zweifel."),
+                ("fest", ""),
+            ],
+        )
+
+    def test_unbekannte_art_bleibt_ungespeichert(self) -> None:
+        """Nur fest und gelenkt sind Arten eines Inputschritts."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        schritt: Inputschritt = evalinput.schritte.first()
+
+        self.client.post(
+            self._route("evalinput", evalinput.pk),
+            {f"inputschritt-art-{schritt.pk}": "frei"},
+        )
+
+        schritt.refresh_from_db()
+        self.assertEqual(schritt.art, Inputschritt.Art.FEST)
+
+    def test_schritte_lassen_sich_anlegen_loeschen_und_umordnen(self) -> None:
+        """Die Gesten am Drehbuch wirken nur auf die Schritte dieses Evalinputs."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        anderer: Evalinput = self.eval_.input_anlegen()
+        erster: Inputschritt = evalinput.schritte.first()
+
+        response: HttpResponse = self.client.post(
+            self._route("inputschritt_anlegen", evalinput.pk),
+            {f"inputschritt-{erster.pk}": "A"},
+        )
+        self.assertRedirects(response, self._route("evalinput", evalinput.pk))
+        vierter: Inputschritt = evalinput.schritte.last()
+        self.client.post(
+            self._route("inputschritt_verschieben", evalinput.pk, vierter.pk, "hoch"),
+            {f"inputschritt-{vierter.pk}": "D"},
+        )
+        self.client.post(self._route("inputschritt_loeschen", evalinput.pk, erster.pk))
+
+        self.assertEqual([s.text for s in evalinput.schritte.all()], ["", "D", ""])
+        self.assertEqual(anderer.schritte.count(), 3)
+
+    def test_drehbuch_zeigt_schritte_antworten_und_gelenkte_blasen(self) -> None:
+        """Zwischen den Schritten antwortet die Schüler:in; gelenkte sind markiert."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        schritte: list[Inputschritt] = list(evalinput.schritte.all())
+        schritte[1].art = Inputschritt.Art.GELENKT
+        schritte[1].text = "Äußere Zweifel."
+        schritte[1].save()
+
+        response: HttpResponse = self.client.get(self._route("evalinput", evalinput.pk))
+
+        inhalt: str = response.content.decode()
+        self.assertEqual(
+            inhalt.count('<p class="drehbuch__antwort">Schüler:in antwortet</p>'), 3
+        )
+        self.assertEqual(inhalt.count("drehbuch__blase--gelenkt"), 1)
+        self.assertContains(response, "sagt wörtlich")
+        self.assertContains(response, "formuliert nach Strategie")
+        self.assertRegex(
+            inhalt,
+            rf'name="inputschritt-art-{schritte[1].pk}" value="gelenkt" checked',
+        )
+        self.assertIn(
+            ("Inputschritt hinzufügen", "evalkatalog-formular"),
+            submit_knoepfe(response),
+        )
+
+    def test_hoch_am_ersten_runter_am_letzten_schritt_deaktiviert(self) -> None:
+        """Am Rand des Drehbuchs ist der jeweilige Verschiebeknopf gesperrt."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        erster, _, letzter = evalinput.schritte.all()
+        inhalt: str = self.client.get(
+            self._route("evalinput", evalinput.pk)
+        ).content.decode()
+
+        def knopf(schritt: Inputschritt, richtung: str) -> str:
+            # Das öffnende Tag eines Verschiebeknopfs.
+            ziel: str = self._route(
+                "inputschritt_verschieben", evalinput.pk, schritt.pk, richtung
+            )
+            return re.search(rf'<button[^>]*formaction="{ziel}"[^>]*>', inhalt)[0]
+
+        self.assertIn("disabled", knopf(erster, "hoch"))
+        self.assertNotIn("disabled", knopf(erster, "runter"))
+        self.assertIn("disabled", knopf(letzter, "runter"))
+
+    def test_knoten_zeigt_die_evalkriterien_seines_evals(self) -> None:
+        """Neben dem Drehbuch stehen die Kriterien, nach denen geurteilt wird."""
+        self.eval_.kriterium_anlegen("Nennt die falsche Regel")
+        self.katalog.eval_anlegen("Rolle").kriterium_anlegen("Bleibt in der Rolle")
+        evalinput: Evalinput = self.eval_.input_anlegen()
+
+        response: HttpResponse = self.client.get(self._route("evalinput", evalinput.pk))
+
+        self.assertContains(response, "Nennt die falsche Regel")
+        self.assertNotContains(response, "Bleibt in der Rolle")
+
+    def test_baum_zeigt_die_evalinputs_je_eval_mit_kuerzeln(self) -> None:
+        """Jeder Evalinput hängt unter seinem Eval, mit F/G je Schritt."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        evalinput.schritt_anlegen(Inputschritt.Art.GELENKT)
+        anderes: Eval = self.katalog.eval_anlegen("Rolle")
+
+        inhalt: str = self.client.get(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        ).content.decode()
+
+        baum: str = inhalt[inhalt.index('class="evalkatalog-baum"') :]
+        link: int = baum.index(f'href="{self._route("evalinput", evalinput.pk)}"')
+        self.assertLess(baum.index(f'href="{self._route("eval")}"'), link)
+        self.assertLess(
+            link,
+            baum.index(
+                reverse(
+                    "simulation:evalkatalog_eval", args=[self.katalog.pk, anderes.pk]
+                )
+            ),
+        )
+        self.assertIn("FFFG", baum[link:])
+
+    def test_fremde_evalinputs_und_schritte_sind_nicht_erreichbar(self) -> None:
+        """Evalinput und Schritt müssen zum genannten Eval und Evalinput gehören."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        fremder: Evalinput = self.katalog.eval_anlegen("Rolle").input_anlegen()
+        fremder_schritt: Inputschritt = fremder.schritte.first()
+
+        for url in (
+            self._route("evalinput", fremder.pk),
+            self._route("evalinput_loeschen", fremder.pk),
+            self._route("inputschritt_anlegen", fremder.pk),
+            self._route("inputschritt_loeschen", evalinput.pk, fremder_schritt.pk),
+            self._route(
+                "inputschritt_verschieben", evalinput.pk, fremder_schritt.pk, "runter"
+            ),
+            self._route(
+                "inputschritt_verschieben",
+                evalinput.pk,
+                evalinput.schritte.first().pk,
+                "seitwaerts",
+            ),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
+        self.assertEqual(fremder.schritte.count(), 3)
+
+
 def _evalrouten(
     katalog: Evalkatalog, eval_: Eval, kriterium: Evalkriterium
 ) -> list[str]:
-    """Alle Routen der Evals und Evalkriterien eines Katalogs."""
+    """Alle Routen der Evals, Evalkriterien und Evalinputs eines Katalogs.
+
+    Das Eval trägt einen Evalinput, dessen Routen dazugehören.
+    """
+    evalinput: Evalinput = eval_.inputs.get()
+    schritt: Inputschritt = evalinput.schritte.first()
     return [
         reverse("simulation:evalkatalog_eval_anlegen", args=[katalog.pk]),
         reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
@@ -668,6 +885,29 @@ def _evalrouten(
         reverse(
             "simulation:evalkatalog_evalkriterium_verschieben",
             args=[katalog.pk, eval_.pk, kriterium.pk, "hoch"],
+        ),
+        reverse(
+            "simulation:evalkatalog_evalinput_anlegen", args=[katalog.pk, eval_.pk]
+        ),
+        reverse(
+            "simulation:evalkatalog_evalinput",
+            args=[katalog.pk, eval_.pk, evalinput.pk],
+        ),
+        reverse(
+            "simulation:evalkatalog_evalinput_loeschen",
+            args=[katalog.pk, eval_.pk, evalinput.pk],
+        ),
+        reverse(
+            "simulation:evalkatalog_inputschritt_anlegen",
+            args=[katalog.pk, eval_.pk, evalinput.pk],
+        ),
+        reverse(
+            "simulation:evalkatalog_inputschritt_loeschen",
+            args=[katalog.pk, eval_.pk, evalinput.pk, schritt.pk],
+        ),
+        reverse(
+            "simulation:evalkatalog_inputschritt_verschieben",
+            args=[katalog.pk, eval_.pk, evalinput.pk, schritt.pk, "runter"],
         ),
     ]
 
@@ -718,6 +958,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         eval_: Eval = entwurf.eval_anlegen("Muster")
         kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
+        eval_.input_anlegen()
         entwurf.finalisieren()
 
         for url in _evalrouten(entwurf, eval_, kriterium):
@@ -736,6 +977,7 @@ class EvalkatalogFinaleFassungTests(TestCase):
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         eval_: Eval = entwurf.eval_anlegen("Muster")
         kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
+        eval_.input_anlegen()
         entwurf.finalisieren()
         entwurf.bearbeiten().finalisieren()
 
@@ -761,6 +1003,7 @@ class EvalkatalogZugriffTests(TestCase):
         kriterium = katalog.kriterium_anlegen("A")
         eval_: Eval = katalog.eval_anlegen("Muster")
         evalkriterium: Evalkriterium = eval_.kriterium_anlegen("B")
+        eval_.input_anlegen()
         autorin: Konto = get_user_model().objects.create_user(username="bea")
         autorin.groups.add(Group.objects.get(name="Autor:in"))
         self.client.force_login(autorin)
@@ -801,10 +1044,16 @@ class EvalkatalogZugriffTests(TestCase):
         kriterium = katalog.kriterium_anlegen("A")
         eval_: Eval = katalog.eval_anlegen("Muster")
         evalkriterium: Evalkriterium = eval_.kriterium_anlegen("B")
+        evalinput: Evalinput = eval_.input_anlegen()
         self.client.force_login(_administratorin("ada"))
-        knoten: str = reverse(
-            "simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]
-        )
+        # Die Knoten von Eval und Evalinput zeigen sich auch per GET.
+        knoten: set[str] = {
+            reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
+            reverse(
+                "simulation:evalkatalog_evalinput",
+                args=[katalog.pk, eval_.pk, evalinput.pk],
+            ),
+        }
 
         for url in (
             reverse("simulation:evalkatalog_anlegen"),
@@ -821,7 +1070,7 @@ class EvalkatalogZugriffTests(TestCase):
             *(
                 url
                 for url in _evalrouten(katalog, eval_, evalkriterium)
-                if url != knoten
+                if url not in knoten
             ),
         ):
             with self.subTest(url=url):

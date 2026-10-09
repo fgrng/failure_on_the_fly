@@ -293,7 +293,8 @@ den Entwurf, danach lässt sich wieder ein Katalog anlegen.
 
 Der Editor zeigt links den Katalog als Baum, rechts den gewählten Knoten. Der
 Baum trägt die Knoten „Durchlauf und Vorlagen“ und „Übergreifende Kriterien“,
-darunter jedes Eval als eigenen Knoten in seiner Reihenfolge.
+darunter jedes Eval als eigenen Knoten in seiner Reihenfolge, unter jedem Eval
+seine Evalinputs.
 „Durchlauf und Vorlagen“ trägt *k*, die Zahl der
 Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
 Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
@@ -325,7 +326,7 @@ erreichen nur Entwürfe.
 200 Zeichen, ein längerer Name bleibt ungespeichert); ein Eval ohne Namen
 erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch und
 Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
-gesperrt), der Papierkorb löscht es samt seiner Evalkriterien und führt zurück
+gesperrt), der Papierkorb löscht es samt Evalkriterien und Evalinputs und führt zurück
 zu „Durchlauf und Vorlagen“. Darunter pflegt sie die Evalkriterien des Evals,
 nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
 bearbeiten, löschen und umordnen genau wie die übergreifenden Kriterien, ebenfalls
@@ -335,6 +336,28 @@ Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein n
 Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
 gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
 Alle Routen der Evals und Evalkriterien erreichen nur Entwürfe.
+
+Am Eval-Knoten legt „Evalinput hinzufügen“ einen weiteren Evalinput an; ein Eval
+darf mehrere haben. Ein neuer Evalinput startet mit drei leeren, festen
+Inputschritten und öffnet seinen Knoten. Im Baum hängt jeder Evalinput unter
+seinem Eval („Evalinput 1“, „Evalinput 2“ …), daneben die Folge seiner Schritte
+als Kürzel, F für fest und G für gelenkt (etwa „FGF“). Der Knoten zeigt den
+Evalinput als Drehbuch: Die Inputschritte stehen untereinander, nach jedem steht
+„Schüler:in antwortet“. Ein Segmentknopf je Schritt wählt zwischen „sagt
+wörtlich“ (fest: der Text ist die Inputäußerung) und „formuliert nach
+Strategie“ (gelenkt: der Text ist die Inputstrategie, auch bedingt formuliert).
+Gelenkte Schritte erscheinen als gestrichelte, kursive Blase. Inputschritte
+sind reiner Text ohne Platzhalter. „Inputschritt hinzufügen“ hängt einen leeren,
+festen Schritt ans Ende; je Schritt rücken Hoch und Runter ihn um eine Stelle (am
+Rand gesperrt), der Papierkorb entfernt ihn. Reihenfolge, Art und Text bleiben
+gespeichert; jede Geste übernimmt zugleich alle getippten Werte. Der Papierkorb
+am Kopf löscht den Evalinput samt seiner Schritte und führt zurück zum Eval.
+Neben dem Drehbuch stehen die Evalkriterien des Evals, nach denen seine
+Gespräche beurteilt werden. Die Länge eines Evalgesprächs ist die Zahl der
+Inputschritte; eine eigene Obergrenze gibt es nicht. Ein neuer Entwurf aus einer
+finalen Fassung übernimmt die Evalinputs samt Inputschritten. Leere Schritte
+weist erst das Finalisieren zurück. Alle Routen der Evalinputs und Inputschritte
+erreichen nur Entwürfe.
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
 

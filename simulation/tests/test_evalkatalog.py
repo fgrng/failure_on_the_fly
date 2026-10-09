@@ -10,7 +10,9 @@ from simulation.models import (
     VERTRAG_PROMPT,
     Eval,
     Evalkatalog,
+    Evalinput,
     Evalkriterium,
+    Inputschritt,
     UebergreifendesKriterium,
 )
 
@@ -307,3 +309,132 @@ def test_neuer_entwurf_uebernimmt_evals_und_evalkriterien() -> None:
 
     assert baum(entwurf) == [("Muster", ["A2", "B"]), ("Rolle", ["C"])]
     assert baum(katalog) == [("Muster", ["A", "B"]), ("Rolle", ["C"])]
+
+
+@pytest.mark.django_db
+def test_neuer_evalinput_startet_mit_drei_leeren_festen_inputschritten() -> None:
+    """Der übliche Fall muss nicht zusammengeklickt werden; ein Eval hat mehrere."""
+
+    eval_: Eval = Evalkatalog.objects.anlegen().eval_anlegen("Muster")
+    erster: Evalinput = eval_.input_anlegen()
+    zweiter: Evalinput = eval_.input_anlegen()
+
+    assert list(eval_.inputs.all()) == [erster, zweiter]
+    assert [(s.art, s.text) for s in erster.schritte.all()] == [
+        (Inputschritt.Art.FEST, ""),
+    ] * 3
+
+
+@pytest.mark.django_db
+def test_inputschritte_lassen_sich_umordnen_und_tragen_ihre_art() -> None:
+    """Hoch und Runter ordnen die Schritte; die Kürzel folgen Art und Reihenfolge."""
+
+    evalinput: Evalinput = (
+        Evalkatalog.objects.anlegen().eval_anlegen("Muster").input_anlegen()
+    )
+    gelenkt: Inputschritt = evalinput.schritt_anlegen(
+        Inputschritt.Art.GELENKT, "Nennt sie die Lösung, äußere Zweifel."
+    )
+
+    gelenkt.verschieben(-1)
+
+    assert [s.art for s in evalinput.schritte.all()] == [
+        Inputschritt.Art.FEST,
+        Inputschritt.Art.FEST,
+        Inputschritt.Art.GELENKT,
+        Inputschritt.Art.FEST,
+    ]
+    assert evalinput.kuerzel == "FFGF"
+
+
+@pytest.mark.django_db
+def test_geloeschtes_eval_nimmt_seine_evalinputs_mit() -> None:
+    """Evalinputs und Inputschritte gibt es nur an ihrem Eval."""
+
+    eval_: Eval = Evalkatalog.objects.anlegen().eval_anlegen("Muster")
+    eval_.input_anlegen()
+
+    eval_.delete()
+
+    assert not Evalinput.objects.exists()
+    assert not Inputschritt.objects.exists()
+
+
+@pytest.mark.django_db
+def test_evalinputs_und_inputschritte_einer_finalen_fassung_sind_unveraenderlich() -> (
+    None
+):
+    """Evalinputs und Inputschritte teilen die Schreibsperre der Fassung."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    eval_: Eval = katalog.eval_anlegen("Muster")
+    evalinput: Evalinput = eval_.input_anlegen()
+    schritt: Inputschritt = evalinput.schritte.first()
+    katalog.finalisieren()
+
+    schritt.text = "geändert"
+    for versuch in (
+        evalinput.save,
+        evalinput.delete,
+        schritt.save,
+        schritt.delete,
+        eval_.input_anlegen,
+        evalinput.schritt_anlegen,
+        lambda: schritt.verschieben(1),
+        lambda: Evalinput.objects.filter(eval=eval_).delete(),
+        lambda: Inputschritt.objects.filter(evalinput=evalinput).update(text="x"),
+        lambda: Inputschritt.objects.filter(evalinput=evalinput).delete(),
+    ):
+        with pytest.raises(RuntimeError, match="Entwurf"):
+            versuch()
+
+
+@pytest.mark.django_db
+def test_inputschritt_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf() -> (
+    None
+):
+    """Auch über Evalinput und Eval hinweg nimmt das Umhängen nichts weg."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    schritt: Inputschritt = (
+        katalog.eval_anlegen("Muster").input_anlegen().schritte.first()
+    )
+    katalog.finalisieren()
+    schritt.evalinput = katalog.bearbeiten().evals.get().inputs.get()
+    schritt.position = 99
+
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        schritt.save()
+
+
+@pytest.mark.django_db
+def test_neuer_entwurf_uebernimmt_evalinputs_samt_inputschritten() -> None:
+    """Die Tiefenkopie trägt jeden Evalinput mit Art und Text seiner Schritte weiter."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    eval_: Eval = katalog.eval_anlegen("Muster")
+    eval_.input_anlegen().schritt_anlegen(Inputschritt.Art.GELENKT, "Zweifle")
+    eval_.input_anlegen().schritte.first().delete()
+    katalog.finalisieren()
+
+    entwurf: Evalkatalog = katalog.bearbeiten()
+    kopie: Inputschritt = entwurf.evals.get().inputs.first().schritte.last()
+    kopie.text = "Zweifle laut"
+    kopie.save()
+
+    def inputs(fassung: Evalkatalog) -> list[list[tuple[str, str]]]:
+        # Liefert die Inputschritte jedes Evalinputs des einzigen Evals.
+        return [
+            [(s.art, s.text) for s in i.schritte.all()]
+            for i in fassung.evals.get().inputs.all()
+        ]
+
+    fest: tuple[str, str] = (Inputschritt.Art.FEST, "")
+    assert inputs(entwurf) == [
+        [fest, fest, fest, (Inputschritt.Art.GELENKT, "Zweifle laut")],
+        [fest, fest],
+    ]
+    assert inputs(katalog) == [
+        [fest, fest, fest, (Inputschritt.Art.GELENKT, "Zweifle")],
+        [fest, fest],
+    ]

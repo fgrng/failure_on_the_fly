@@ -78,3 +78,87 @@
 .evalkatalog-evalkopf { display: flex; gap: var(--space-2); align-items: end; }
 .evalkatalog-evalkopf .vignette-field { flex: 1; }
 .evalkatalog-knoten h3 { margin: 0; }
+
+/* Evalinputs im Baum unter ihrem Eval, mit F/G-Kürzeln je Inputschritt. */
+.evalkatalog-baum .evalkatalog-baum__inputs { margin-top: var(--space-1); padding-left: var(--space-3); font-size: .9rem; }
+.evalkatalog-kuerzel { color: var(--color-text-muted); font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em; }
+.evalkatalog-inputliste { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.evalkatalog-kopfzusatz { color: var(--color-text-muted); font-size: .9rem; font-weight: 400; }
+
+/* Evalinput: links das Drehbuch, rechts die Kriterien, nach denen geurteilt wird. */
+.evalkatalog-drehbuchknoten {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, .4fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.evalkatalog-beurteilung {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--area-tint);
+}
+
+.evalkatalog-beurteilung h3, .evalkatalog-beurteilung ol { margin: 0; }
+.evalkatalog-beurteilung ol { padding-left: var(--space-3); }
+
+@media (max-width: 1000px) {
+    .evalkatalog-drehbuchknoten { grid-template-columns: 1fr; }
+}
+
+/* Das Drehbuch: Schritte als Sprechblasen, dazwischen die Antwort der Schüler:in. */
+.drehbuch { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.drehbuch__schritt { display: grid; gap: var(--space-2); }
+
+.drehbuch__blase {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+/* Gelenkte Schritte: gestrichelte, kursive Blase. Der Segmentknopf wirkt ohne
+   Speichern, die Klasse trägt den gespeicherten Stand. */
+.drehbuch__blase--gelenkt,
+.drehbuch__blase:has(input[value="gelenkt"]:checked) {
+    border-style: dashed;
+    border-color: var(--area-solid);
+}
+
+.drehbuch__blase--gelenkt .drehbuch__text,
+.drehbuch__blase:has(input[value="gelenkt"]:checked) .drehbuch__text { font-style: italic; }
+
+.drehbuch__blase:has(input[value="fest"]:checked) { border-style: solid; border-color: var(--color-border); }
+.drehbuch__blase:has(input[value="fest"]:checked) .drehbuch__text { font-style: normal; }
+
+.drehbuch__kopf { display: flex; gap: var(--space-2); align-items: center; }
+.drehbuch__kopf .zuordnungsliste__leiste { margin-left: auto; }
+.drehbuch__text { width: 100%; min-height: 3rem; resize: vertical; }
+
+.drehbuch__segment {
+    position: relative;
+    display: inline-flex;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.drehbuch__segment label { padding: 0 var(--space-2); font-size: .85rem; cursor: pointer; }
+.drehbuch__segment label + label { border-left: 1px solid var(--color-border); }
+.drehbuch__segment input { position: absolute; opacity: 0; }
+.drehbuch__segment label:has(:checked) { background: var(--area-tint); font-weight: 700; }
+.drehbuch__segment label:has(:focus-visible) { outline: 2px solid var(--area-solid); outline-offset: -2px; }
+
+.drehbuch__antwort {
+    margin: 0;
+    padding-left: var(--space-4);
+    color: var(--color-text-muted);
+    font-size: .85rem;
+}

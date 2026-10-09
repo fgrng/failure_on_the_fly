@@ -37,8 +37,10 @@ from .models import (
     VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
     Eval,
+    Evalinput,
     Evalkatalog,
     Evalkriterium,
+    Inputschritt,
     Katalogteil,
     ModellKonfiguration,
     Simulationskern,
@@ -329,6 +331,16 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
         (katalog.uebergreifende_kriterien.all(), "kriterium", "text"),
         (katalog.evals.all(), "eval", "name"),
         (Evalkriterium.objects.filter(eval__katalog=katalog), "evalkriterium", "text"),
+        (
+            Inputschritt.objects.filter(evalinput__eval__katalog=katalog),
+            "inputschritt",
+            "text",
+        ),
+        (
+            Inputschritt.objects.filter(evalinput__eval__katalog=katalog),
+            "inputschritt-art",
+            "art",
+        ),
     )
     for queryset, praefix, feld in teile:
         for teil in queryset:
@@ -510,7 +522,7 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
 def evalkatalog_eval_loeschen(
     request: HttpRequest, pk: int, eval_pk: int
 ) -> HttpResponse:
-    """Löscht ein Eval samt seiner Evalkriterien."""
+    """Löscht ein Eval samt seiner Evalkriterien und Evalinputs."""
     katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
     _eingaben_uebernehmen(katalog, request)
     eval_.delete()
@@ -573,6 +585,143 @@ def evalkatalog_evalkriterium_verschieben(
     _eingaben_uebernehmen(katalog, request)
     kriterium.verschieben(schritt)
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalinput_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Hängt einen Evalinput mit drei leeren Schritten an und öffnet seinen Knoten."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput: Evalinput = eval_.input_anlegen()
+    return redirect(
+        "simulation:evalkatalog_evalinput",
+        pk=katalog.pk,
+        eval_pk=eval_.pk,
+        input_pk=evalinput.pk,
+    )
+
+
+def _evalinput_im_entwurf(
+    pk: int, eval_pk: int, input_pk: int
+) -> tuple[Evalkatalog, Eval, Evalinput]:
+    # Der Evalinput muss zum genannten Eval des Entwurfs gehören.
+
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    return katalog, eval_, get_object_or_404(eval_.inputs, pk=input_pk)
+
+
+def _zum_evalinput(evalinput: Evalinput) -> HttpResponse:
+    # Zurück an den Knoten des Evalinputs.
+
+    return redirect(
+        "simulation:evalkatalog_evalinput",
+        pk=evalinput.eval.katalog_id,
+        eval_pk=evalinput.eval_id,
+        input_pk=evalinput.pk,
+    )
+
+
+@administratorin_erforderlich
+@transaction.atomic
+def evalkatalog_evalinput(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Zeigt und speichert einen Evalinput als Drehbuch seiner Inputschritte."""
+    katalog, eval_, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    if request.method == "POST":
+        _eingaben_uebernehmen(katalog, request)
+        messages.success(request, "Der Evalinput wurde gespeichert.")
+        return _zum_evalinput(evalinput)
+    schritte: list[Inputschritt] = list(evalinput.schritte.all())
+    return render(
+        request,
+        "simulation/evalkatalog_editor.html",
+        {
+            "katalog": katalog,
+            "knoten": "evalinput",
+            "eval": eval_,
+            "evalinput": evalinput,
+            "nummer": list(eval_.inputs.all()).index(evalinput) + 1,
+            "schrittzeilen": zip(
+                schritte,
+                _kriterienzeilen(
+                    schritte,
+                    "inputschritt",
+                    "simulation:evalkatalog_inputschritt",
+                    katalog.pk,
+                    eval_.pk,
+                    evalinput.pk,
+                ),
+            ),
+            "arten": Inputschritt.Art.choices,
+        },
+    )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalinput_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Löscht einen Evalinput samt seiner Inputschritte."""
+    katalog, eval_, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput.delete()
+    messages.success(request, "Der Evalinput wurde gelöscht.")
+    return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int
+) -> HttpResponse:
+    """Hängt einen leeren, festen Inputschritt ans Ende des Drehbuchs."""
+    katalog, _, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput.schritt_anlegen()
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_loeschen(
+    request: HttpRequest, pk: int, eval_pk: int, input_pk: int, schritt_pk: int
+) -> HttpResponse:
+    """Entfernt einen Inputschritt aus dem Drehbuch."""
+    katalog, _, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
+    _eingaben_uebernehmen(katalog, request)
+    schritt.delete()
+    messages.success(request, "Der Inputschritt wurde entfernt.")
+    return _zum_evalinput(evalinput)
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_inputschritt_verschieben(
+    request: HttpRequest,
+    pk: int,
+    eval_pk: int,
+    input_pk: int,
+    schritt_pk: int,
+    richtung: str,
+) -> HttpResponse:
+    """Rückt einen Inputschritt eine Zeile hoch oder runter."""
+    schritt_weite: int = _schritt(richtung)
+    katalog, _, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
+    _eingaben_uebernehmen(katalog, request)
+    schritt.verschieben(schritt_weite)
+    return _zum_evalinput(evalinput)
 
 
 @administratorin_erforderlich

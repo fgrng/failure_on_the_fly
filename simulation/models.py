@@ -264,7 +264,7 @@ class Evalkatalog(VersionierteFassung):
 
     @transaction.atomic
     def bearbeiten(self) -> "Evalkatalog":
-        """Erzeugt einen neuen Entwurf samt Kopie der Kriterien und Evals."""
+        """Erzeugt einen neuen Entwurf samt Kopie der Kriterien und des Eval-Baums."""
 
         entwurf: Evalkatalog = super().bearbeiten()
         for kriterium in self.uebergreifende_kriterien.all():
@@ -280,6 +280,18 @@ class Evalkatalog(VersionierteFassung):
                 Evalkriterium(
                     eval=kopie, position=evalkriterium.position, text=evalkriterium.text
                 ).save()
+            for evalinput in eval_.inputs.all():
+                input_kopie: Evalinput = Evalinput(
+                    eval=kopie, position=evalinput.position
+                )
+                input_kopie.save()
+                for schritt in evalinput.schritte.all():
+                    Inputschritt(
+                        evalinput=input_kopie,
+                        position=schritt.position,
+                        art=schritt.art,
+                        text=schritt.text,
+                    ).save()
         return entwurf
 
     def kriterium_anlegen(self, text: str = "") -> "UebergreifendesKriterium":
@@ -389,9 +401,18 @@ class Katalogteil(models.Model):
         )
 
     def _katalog_id(self) -> int | None:
-        # Die Fassung, an der der Teil hängt; Teile direkt am Katalog.
+        # Die Fassung, an der der Teil hängt; tiefere Teile fragen ihr Elternteil
+        # in der Datenbank, damit auch ein umgehängter Teil die neue Fassung trifft.
 
-        return getattr(self, f"{self._eltern}_id")
+        eltern_id: int | None = getattr(self, f"{self._eltern}_id")
+        if "__" not in self._katalog_pfad:
+            return eltern_id
+        eltern: type[models.Model] = self._meta.get_field(self._eltern).related_model
+        return (
+            eltern.objects.filter(pk=eltern_id)
+            .values_list(self._katalog_pfad.split("__", 1)[1], flat=True)
+            .first()
+        )
 
     def _nur_am_entwurf(self) -> None:
         # Prüft die Fassung des Teils und beim Umhängen auch die bisherige.
@@ -497,6 +518,15 @@ class Eval(Katalogteil):
 
         return Evalkriterium.anhaengen(self, text=text)
 
+    @transaction.atomic
+    def input_anlegen(self) -> "Evalinput":
+        """Hängt einen Evalinput mit drei leeren, festen Inputschritten ans Ende."""
+
+        evalinput: Evalinput = Evalinput.anhaengen(self)
+        for _ in range(3):
+            evalinput.schritt_anlegen()
+        return evalinput
+
 
 class Evalkriterium(Katalogteil):
     """Eine Rubrik, nach der der Bewerter jedes Evalgespräch seines Evals beurteilt.
@@ -524,14 +554,83 @@ class Evalkriterium(Katalogteil):
             ),
         ]
 
-    def _katalog_id(self) -> int | None:
-        # Ein Evalkriterium hängt über sein Eval an der Fassung.
 
-        return (
-            Eval.objects.filter(pk=self.eval_id)
-            .values_list("katalog_id", flat=True)
-            .first()
+class Evalinput(Katalogteil):
+    """Wie die simulierte Lehrperson in einem Evalgespräch spricht (ADR-0046).
+
+    Eine geordnete Folge von Inputschritten; ihre Zahl ist die Länge jedes
+    Evalgesprächs dieses Evalinputs.
+    """
+
+    _eltern: str = "eval"
+    _katalog_pfad: str = "eval__katalog_id"
+
+    eval: models.ForeignKey = models.ForeignKey(
+        Eval,
+        on_delete=models.CASCADE,
+        related_name="inputs",
+    )
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Eval eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["eval", "position"],
+                name="simulation_evalinput_position_eindeutig",
+            ),
+        ]
+
+    @property
+    def kuerzel(self) -> str:
+        """Die Folge der Schritte als F (fest) und G (gelenkt), etwa „FFG“."""
+
+        return "".join(
+            "G" if schritt.art == Inputschritt.Art.GELENKT else "F"
+            for schritt in self.schritte.all()
         )
+
+    def schritt_anlegen(self, art: str = "fest", text: str = "") -> "Inputschritt":
+        """Hängt einen Inputschritt ans Ende des Drehbuchs."""
+
+        return Inputschritt.anhaengen(self, art=art, text=text)
+
+
+class Inputschritt(Katalogteil):
+    """Ein Schritt eines Evalinputs: wörtlich (fest) oder nach Strategie (gelenkt).
+
+    Bei *fest* ist der Text die Inputäußerung, bei *gelenkt* die
+    Inputstrategie. Reiner Text ohne Platzhalter.
+    """
+
+    class Art(models.TextChoices):
+        """Ob die Lehrperson den Text wörtlich sagt oder danach formuliert."""
+
+        FEST = "fest", "sagt wörtlich"
+        GELENKT = "gelenkt", "formuliert nach Strategie"
+
+    _eltern: str = "evalinput"
+    _katalog_pfad: str = "evalinput__eval__katalog_id"
+
+    evalinput: models.ForeignKey = models.ForeignKey(
+        Evalinput,
+        on_delete=models.CASCADE,
+        related_name="schritte",
+    )
+    art: models.CharField = models.CharField(
+        "Art", max_length=10, choices=Art.choices, default=Art.FEST
+    )
+    text: models.TextField = models.TextField("Text", blank=True, default="")
+
+    class Meta(Katalogteil.Meta):
+        """Hält die Position je Evalinput eindeutig."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["evalinput", "position"],
+                name="simulation_inputschritt_position_eindeutig",
+            ),
+        ]
 
 
 class Anbieter(models.TextChoices):
