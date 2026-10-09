@@ -1231,31 +1231,6 @@ def test_anlegen_wiederholt_token_nach_kollision() -> None:
 
 
 @pytest.mark.django_db
-def test_unfertige_teilnahme_verfaellt_nach_ende_des_erhebungszeitraums() -> None:
-    """Eine noch nicht beendete Teilnahme kann nach dem Fenster nicht fortgesetzt werden."""
-
-    erhebung: Erhebung = Erhebung.objects.anlegen(
-        Konto.objects.create_user(username="ada"), name="Brüche"
-    )
-    stichprobe: Stichprobe = Stichprobe.objects.create(
-        erhebung=erhebung,
-        beginn=timezone.make_aware(datetime(2026, 7, 16, 9)),
-        ende=timezone.make_aware(datetime(2026, 7, 16, 17)),
-    )
-    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
-        stichprobe=stichprobe,
-        teilnahme=Teilnahme.objects.create(),
-        token="2345-6789",
-    )
-
-    with patch(
-        "erhebungen.models.timezone.now",
-        return_value=timezone.make_aware(datetime(2026, 7, 16, 17, 1)),
-    ):
-        assert bindung.verfallen
-
-
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("zeitpunkt", "erwartete_phase"),
     [

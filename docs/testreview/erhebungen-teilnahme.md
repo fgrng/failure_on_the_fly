@@ -50,12 +50,11 @@ Drei Lesarten gelten für das ganze Dokument:
 
 #### Erhebungsbindung
 
-- **Aufrufe:** `objects.anlegen(stichprobe)`, `vignetten_ziehen()`, `verfallen`. Felder: `token`, `randomisierungs_seed`, `abgeschlossen_am`, `erstellt_am`.
+- **Aufrufe:** `objects.anlegen(stichprobe)`, `vignetten_ziehen()`. Felder: `token`, `randomisierungs_seed`, `abgeschlossen_am`, `erstellt_am`.
 - **Invarianten:**
   - `anlegen` legt eine frische `Teilnahme` an und vergibt ein Token im Format `XXXX-XXXX` aus `23456789ABCDEFGHJKMNPQRSTVWXYZ`. Bei einer Kollision zieht es neu.
   - Eine Teilnahme hat genau eine Bindung. Die Exklusivität gegen Trainingsbindung und Abschrift liegt in `sitzungen.bindungen` (#330).
   - `vignetten_ziehen()` schreibt die Reihenfolge genau einmal fest. Bei zufälliger Reihenfolge wird der Seed einmal gezogen und gespeichert, die Ziehung folgt `Random(seed).shuffle` über die Liste in Positionsreihenfolge. Die Positionen der Erhebung bleiben dabei unberührt.
-  - `verfallen` ist wahr, wenn die Stichprobe vorbei und die Bindung nicht abgeschlossen ist. Die Eigenschaft hat keinen Aufrufer (#384).
 - **Fehlerfälle:** keine eigenen.
 - **Konfiguration:** keine.
 
@@ -203,15 +202,14 @@ Drei Lesarten gelten für das ganze Dokument:
 
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
-| `test_nach_fensterende_verfaellt_die_laufende_teilnahme` | umschreiben | Schichtdoppelung: `assertTrue(bindung.verfallen)` prüft eine Modelleigenschaft ohne Aufrufer (#384). | Nur die 403 auf `gespraech` und `spielen`. |
-| `test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette` | streichen | Prüft nur `bindung.verfallen`, kein HTTP. Für die Views ist der Fortschritt egal; sie sperren allein nach der Phase. | Das 403 prüft `test_nach_fensterende_verfaellt_die_laufende_teilnahme`. Die Eigenschaft prüft `test_models.py::test_unfertige_teilnahme_verfaellt_nach_ende_des_erhebungszeitraums`, solange es sie gibt (#384). |
+| `test_nach_fensterende_verfaellt_die_laufende_teilnahme` | behalten | Prüft nur noch die 403 auf `gespraech` und `spielen`; die Zusicherung auf `bindung.verfallen` ist mit der Eigenschaft entfallen (#384). | – |
 | `test_fluechtige_teilnahme_spielt_alle_vignetten_ohne_inhaltszeilen` | umschreiben | Erhebungseigen (ADR-0045). Der Debrief ist im Schleifenkörper nur mit „Debrief“ belegt. | „Was ist Ihnen aufgefallen?“ statt „Debrief“. Der Rest bleibt; „keine Inhaltszeile“ ist die Zusage aus ADR-0045. |
 | `test_fluechtige_abschlussseite_ersetzt_den_abschrift_baustein`, `test_fluechtige_sitzung_zeigt_den_abgebrochenen_verlauf`, `test_token_wiedereinstieg_bricht_fluechtige_sitzung_ohne_verlauf_ab`, `test_abgebrochene_fluechtige_sitzung_fuehrt_zu_ihrem_fragebogen`, `test_letzte_abgebrochene_fluechtige_sitzung_fuehrt_zum_abschluss`, `test_debrief_ohne_verlauf_schliesst_die_fluechtige_sitzung_nicht_ab`, `test_fluechtige_sitzung_laeuft_im_selben_browser_weiter`, `test_gespeicherte_sitzung_laeuft_im_frischen_browser_weiter`, `test_fluechtige_teilnahme_verwirft_die_fragebogen_antworten` | behalten | Erhebungseigen: `_sitzung_ohne_verlauf_abbrechen` und das Formular ohne Speicherung. Der Name `…_zeigt_den_abgebrochenen_verlauf` passt nicht zum geprüften Status `gescheitert`; beim Umsetzen umbenennen. | – |
 
 #### Setup
 
 - **`_vignette_anlegen`** ruft `Vignette.objects._erstellen` und legt die Historie von Hand an. Deshalb steht die Datei auf der SLF001-Übergangsliste in `pyproject.toml`. Der öffentliche Weg steht schon in `test_ablauf.py::_finale_vignette_anlegen` (Kern finalisieren, `Vignette.objects.anlegen`, Felder setzen, `finalisieren()`). Den Kreis teilt die Vignette dann mit der Erhebung, weil dasselbe Konto beide anlegt. Wie in #328, #330 und #332 vorgeschlagen, ersetzt ein gemeinsamer Helfer alle Kopien. Danach fällt die Datei von der Liste.
-- **`Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)`** beendet in sieben Tests die Sitzung am Lebenszyklus vorbei: `test_htmx_interaktion_…`, beide Likert-Tests, `test_itemantwort_bleibt_nach_zeitraumende_unangetastet`, `test_abschluss_url_ueberspringt_keine_offene_vignette`, `test_fluechtige_abschlussseite_…` und `test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette`. Der öffentliche Weg ist ein POST auf `debrief`, wie ihn die übrigen Tests der Datei gehen. Der Helfer `_laufende_sitzung_starten` kann dafür einen Schwesterhelfer `_sitzung_abschliessen(bindung)` bekommen.
+- **`Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)`** beendet in sechs Tests die Sitzung am Lebenszyklus vorbei: `test_htmx_interaktion_…`, beide Likert-Tests, `test_itemantwort_bleibt_nach_zeitraumende_unangetastet`, `test_abschluss_url_ueberspringt_keine_offene_vignette` und `test_fluechtige_abschlussseite_…`. Der öffentliche Weg ist ein POST auf `debrief`, wie ihn die übrigen Tests der Datei gehen. Der Helfer `_laufende_sitzung_starten` kann dafür einen Schwesterhelfer `_sitzung_abschliessen(bindung)` bekommen.
 - **Feld `antwort`:** 17 POSTs auf `itemblock` schicken `"antwort": itemantwort.pk`. Die View liest das Feld nicht mehr; das Formular arbeitet mit `item_<pk>` und `weiter`. Der tote Parameter suggeriert eine Schnittstelle, die es nicht gibt. Beim Umsetzen entfernen; wo er der einzige Inhalt war, bleibt `{"weiter": "ja"}`.
 
 ### `erhebungen/tests/test_ablauf.py`
@@ -288,7 +286,6 @@ Lücke: `sitzung_fuer_transkription` sperrt außerhalb des Fensters, aber kein T
 |---|---|---|---|
 | `test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens` | behalten | Das Alphabet steht als Literal im Test. | – |
 | `test_anlegen_wiederholt_token_nach_kollision` | behalten | Startbefund 3: Der Patch ersetzt die Zufallsquelle, eine Systemgrenze. | – |
-| `test_unfertige_teilnahme_verfaellt_nach_ende_des_erhebungszeitraums` | umschreiben | Patch auf `erhebungen.models.timezone.now` (#324). Nur der positive Fall. Fällt mit der Eigenschaft weg, falls #384 sie entfernt. | Mit `time-machine` auf 17:01 (#349). Dazu zwei Gegenfälle: abgeschlossene Bindung verfällt nicht, und um 16:59 verfällt nichts. |
 | `test_phase_leitet_sich_aus_zeitraum_und_systemzeit_ab` | umschreiben | Patch auf `erhebungen.models.timezone.now` (#324). Die Grenzen sind nur beim Beginn geprüft. | Mit `time-machine` (#349). Die Fälle um 17:00 (laufend) ergänzen, damit beide Grenzen geprüft sind. |
 
 ## Folge-Issues

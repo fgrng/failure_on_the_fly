@@ -1895,7 +1895,6 @@ class ErhebungsteilnahmeTests(TestCase):
         self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
         self.stichprobe.save(update_fields=["ende"])
 
-        self.assertTrue(bindung.verfallen)
         self.assertEqual(
             self.client.get(
                 reverse("erhebungen:gespraech", args=[bindung.token])
@@ -2254,16 +2253,3 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(ItemAntwort.objects.exists())
         self.assertEqual(Itemblock.objects.count(), 2)
         self.assertFalse(Itemblock.objects.filter(erledigt_am__isnull=True).exists())
-
-    def test_nach_fensterende_verfaellt_teilnahme_mit_offener_vignette(self) -> None:
-        """Auch nach einer fertigen Sitzung bleibt eine offene Ziehung unfertig."""
-
-        self._vignette_anlegen()
-        self._vignette_anlegen(position=2)
-        self._erhebung_fertigstellen()
-        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
-        Sitzung.objects.update(status=Sitzung.Status.ABGESCHLOSSEN)
-        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
-        self.stichprobe.save(update_fields=["ende"])
-
-        self.assertTrue(bindung.verfallen)

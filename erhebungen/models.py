@@ -548,13 +548,6 @@ class Erhebungsbindung(Bindung):
 
     objects: ErhebungsbindungManager = ErhebungsbindungManager()
 
-    @property
-    def verfallen(self) -> bool:
-        """Zeigt den Ablauf unvollständiger Teilnahmen nach dem Erhebungsfenster an."""
-        if self.stichprobe.phase != Stichprobe.Phase.NACH:
-            return False
-        return self.abgeschlossen_am is None
-
     @transaction.atomic
     def vignetten_ziehen(self) -> None:
         """Schreibt die Reihenfolge dieser Teilnahme genau einmal fest."""
