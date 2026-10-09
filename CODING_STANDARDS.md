@@ -44,7 +44,7 @@ Red flags:
 - Test name describes HOW not WHAT
 - Verifying through external means (e.g. querying a DB) instead of through the interface
 
-Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike. Exempt are migrations and a transition list in `pyproject.toml` that only gets shorter.
+Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` reject access to private members and imports of private names, in tests and production code alike. Exempt are migrations and a transition list in `pyproject.toml` that only gets shorter. Constraint tests that check a DB invariant through an internal seam (e.g. `objects._erstellen`) may do so with a per-line `# noqa: SLF001`, never a per-file exemption.
 
 ### What Tests Never Check
 
@@ -62,6 +62,8 @@ Ruff enforces "Testing private methods" mechanically: `SLF001` and `PLC2701` rej
 
 - Bad: `assert ergebnis == MAX_VERSUCHE` with `MAX_VERSUCHE` imported from the module, or an expected value recomputed with the module's own helper.
 - Good: `assert ergebnis == 3`, with the 3 taken from the spec.
+
+Enum members (Django choices such as `Sitzung.Status.ABGESCHLOSSEN`) are fine as expected values when the test checks *which* state results; they name the state, they don't compute it. Where the stored spelling itself is the promise (e.g. the export, ADR-0029), expect the literal (`"abgeschlossen"`).
 
 **Never the absence of fields or methods.** Removed code is gone; a test for `not hasattr(Vignette, "titel")` guards nothing a caller can observe.
 

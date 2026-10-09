@@ -75,7 +75,7 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) und Python ≥ 3.14.
 
    Die Anwendung ist dann unter http://127.0.0.1:8000/ erreichbar.
 
-Vor jedem Commit läuft der Abschluss aus Tests, Formatierung und Lint:
+Außerhalb von Sandcastle ist vor jedem Commit der Abschluss aus Tests, Formatierung und Lint Pflicht; der pre-commit-Hook führt nur ruff und den Migrationscheck aus, keine Tests:
 
 ```
 uv run pytest

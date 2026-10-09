@@ -20,7 +20,7 @@ Eine Regel für Erwartungswerte gilt durchgehend: Ein Enum-Mitglied wie `Sitzung
 - **Invarianten (DB):**
   - Denkspur und Äußerung sind beide gesetzt oder beide `NULL` (CheckConstraint).
   - `reihenfolge` ist je Sitzung eindeutig.
-  - Ein antwortloser Schritt braucht mindestens einen Fehlversuch, beim Anlegen wie beim Löschen, und beendet das Gespräch. Das halten Trigger aus `sitzungen.0002` bis `0004` fest, nachgezogen in `0007` und `0009`.
+  - Ein antwortloser Schritt braucht mindestens einen Fehlversuch, beim Anlegen wie beim Löschen, und beendet die Sitzung. Das halten Trigger aus `sitzungen.0002` bis `0004` fest, nachgezogen in `0007` und `0009`.
   - Fehlversuche hängen mit `PROTECT` an ihrem Schritt.
   - Je Sitzung gibt es höchstens eine Diagnose.
   - Eine `Vignettenposition` gehört zur Teilnahme und Vignette ihrer Sitzung (`clean()` in `save()`). Ihre Position ist je Teilnahme eindeutig, die Positionen sind danach geordnet.
@@ -312,12 +312,12 @@ Eine Regel für Erwartungswerte gilt durchgehend: Ein Enum-Mitglied wie `Sitzung
 | Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
 |---|---|---|---|
 | Vignetten über `Vignette.objects._erstellen` (vier Tests und der Helfer der `TrainingsabbruchTests`) | umschreiben | SLF001-Übergangsliste, keine DB-Invariante der Vignette im Spiel | gemeinsamer Helfer (siehe Querschnitt) |
-| `test_zeigt_veroeffentlichte_trainings_im_katalog_und_in_der_navigation`, `test_versteckt_unveroeffentlichte_trainings`, `test_listet_finale_vignetten_und_bestaetigt_freie_wahl`, `test_katalog_erfordert_anmeldung`, `test_versteckt_nachtraeglich_archivierte_vignette` | behalten | – | – |
+| `test_zeigt_beigetretene_trainings_im_katalog_und_in_der_navigation`, `test_versteckt_unveroeffentlichte_trainings`, `test_listet_finale_vignetten_und_bestaetigt_freie_wahl`, `test_katalog_erfordert_anmeldung`, `test_versteckt_nachtraeglich_archivierte_vignette` | behalten | – | – |
 | `test_zeilen_sind_ueber_den_namen_verlinkt` | umschreiben | Quelltext: sucht das Alpine-Template als String, dazu Abwesenheiten (`button--secondary`, `>Aktion<`). | Die Zeilendaten prüfen, die die Seite ausliefert: Name, Detail-URL und `action_label` „Öffnen“, bei Ausbilder:innen „Kuratieren“. Ob sie im JSON oder im HTML stehen, zeigt `assertContains` auf die URL. |
 | `test_spielt_vignette_persistiert_und_verwendet_die_trainingsbindung_wieder` | behalten | Durchgehender Ablauf über HTTP mit Wiederverwendung der Bindung. Die DB-Prüfung der Denkspur ist hier Beleg der Persistenz. | – |
 | `test_einwilligung_wird_an_der_teilnahme_gespeichert_bevor_die_sitzung_startet` | behalten | – | – |
 | `TrainingsabbruchTests::test_ablehnung_startet_das_training_mit_tastatureingabe` | behalten | Gehört zur Trainingssitzung und nach `test_sitzung.py`. | – |
-| `TrainingsabbruchTests::test_abbrechen_beendet_die_sitzung_ohne_diagnose` | behalten | Der einzige Abbruch aus dem laufenden Gespräch. `test_sitzung.py::…::test_abbrechen_setzt_den_gewollten_status_ohne_diagnose` bricht erst nach `gespraech_beenden` ab, also aus dem Debrief. Gehört nach `test_sitzung.py`. | – |
+| `TrainingsabbruchTests::test_abbrechen_beendet_die_sitzung_ohne_diagnose` | behalten | Der einzige Abbruch aus dem laufenden Diagnosegespräch. `test_sitzung.py::…::test_abbrechen_setzt_den_gewollten_status_ohne_diagnose` bricht erst nach `gespraech_beenden` ab, also aus dem Debrief. Gehört nach `test_sitzung.py`. | – |
 | `TrainingsabbruchTests::test_endgueltiger_fehlschlag_bewahrt_abbruchschritt_und_fehler` | streichen | Schichtdoppelung: Meldung, Status und `aeusserung is None` prüft `test_sitzung.py`, die drei Fehlversuche prüft der Durchlauf. | `training/tests/test_sitzung.py::…::test_endgueltiger_fehlschlag_bleibt_gescheitert` und `sitzungen/tests/test_durchlauf.py::test_gescheiterter_schritt_…` nach dem Umschreiben |
 
 ### `training/tests/test_sitzung.py`
