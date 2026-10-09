@@ -347,12 +347,19 @@ def test_der_fake_liest_nur_mit_eingeschaltetem_opt_in_fort() -> None:
 
 @pytest.mark.parametrize(
     ("verzoegerung", "wartezeiten"),
-    [(2.5, [2.5, 2.5]), ("2", []), (True, [])],
+    [
+        (2.5, [2.5, 2.5]),
+        ("2", []),
+        (True, []),
+        (-1, []),
+        (float("nan"), []),
+        (float("inf"), []),
+    ],
 )
 def test_der_fake_wartet_nur_mit_einer_zahl_als_verzoegerung(
     verzoegerung: object, wartezeiten: list[float]
 ) -> None:
-    """Die Verzögerung spielt ein langsames Modell; Text oder true zählen nicht."""
+    """Die Verzögerung spielt ein langsames Modell; nur endliche Zahlen ab 0 zählen."""
 
     konfiguration = _fake_konfiguration(
         [{"aeusserung": "Erste."}, {"aeusserung": "Zweite."}],

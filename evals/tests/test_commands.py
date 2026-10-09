@@ -1,4 +1,4 @@
-"""Der Hintergrundprozess im Einmal-Modus über `call_command`."""
+"""Der Hintergrundprozess im Einmal- und im Dauermodus über `call_command`."""
 
 import fcntl
 import logging
@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 import time_machine
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import connection
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
@@ -191,6 +191,73 @@ def test_dauermodus_arbeitet_wartende_nacheinander_ab_und_wartet_dann() -> None:
         Evallauf.Zustand.FERTIG,
         [7.0],
     )
+
+
+@pytest.mark.django_db
+def test_dauermodus_arbeitet_nach_einem_unerwarteten_fehler_weiter() -> None:
+    """Ein Lauf, der unerwartet scheitert, hält den Dienst nicht an."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    ada: Konto = konto_mit_rollen("ada", "Autor:in")
+    gescheitert: Evallauf = _ausgeloest(ada, "Älter", _AUSGELOEST)
+    danach: Evallauf = _ausgeloest(ada, "Jünger", _AUSGELOEST.replace(minute=5))
+    aufrufe: list[list[dict[str, str]]] = []
+
+    def erst_scheitern(nachrichten: list[dict[str, str]]) -> None:
+        aufrufe.append(nachrichten)
+        if len(aufrufe) == 1:
+            raise RuntimeError("unerwartet")
+
+    with (
+        vor_jedem_aufruf(erst_scheitern),
+        mock.patch("time.sleep", _anhalten_nach([], 1)),
+    ):
+        call_command("evallaeufe_abarbeiten")
+
+    gescheitert.refresh_from_db()
+    danach.refresh_from_db()
+    assert (gescheitert.zustand, danach.zustand) == (
+        Evallauf.Zustand.ABGEBROCHEN,
+        Evallauf.Zustand.FERTIG,
+    )
+
+
+@pytest.mark.django_db
+def test_dauermodus_endet_sofort_wenn_ein_anderer_prozess_arbeitet(
+    eigene_sperrdatei: Path,
+) -> None:
+    """Auch der Dienst rührt bei gehaltener Sperre nichts an und pollt nicht."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+    wartend: Evallauf = _ausgeloest(
+        konto_mit_rollen("ada", "Autor:in"), "", _AUSGELOEST
+    )
+    wartezeiten: list[float] = []
+    meldung: StringIO = StringIO()
+
+    with (
+        eigene_sperrdatei.open("a") as sperre,
+        mock.patch("time.sleep", _anhalten_nach(wartezeiten, 1)),
+    ):
+        fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        call_command("evallaeufe_abarbeiten", stderr=meldung)
+
+    wartend.refresh_from_db()
+    assert (wartend.zustand, wartezeiten, meldung.getvalue()) == (
+        Evallauf.Zustand.WARTET,
+        [],
+        "Ein anderer Hintergrundprozess arbeitet bereits.\n",
+    )
+
+
+@pytest.mark.parametrize("intervall", ["0", "-1"])
+def test_dauermodus_verlangt_ein_positives_intervall(intervall: str) -> None:
+    """Ein Intervall ohne Wartezeit ließe den Dienst scheitern oder pausenlos pollen."""
+
+    with pytest.raises(CommandError):
+        call_command("evallaeufe_abarbeiten", "--intervall", intervall)
 
 
 @pytest.mark.django_db

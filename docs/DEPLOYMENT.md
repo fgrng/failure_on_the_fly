@@ -315,11 +315,11 @@ sagt, auf *abgebrochen*: Er stammt von einem Vorgänger, der mittendrin gestorbe
 ist. Wartende Läufe bleiben in der Warteschlange.
 
 Erwartet wird wieder `RUNNING`. Das Log
-(`supervisorctl tail -f failure-on-the-fly-evals stderr`) beginnt mit
-„Hintergrundprozess gestartet“ und nennt danach je Lauf „gestartet“ und „fertig“
-oder „abgebrochen“; ein unerwarteter Fehler steht dort mit Traceback,
+(`supervisorctl tail -f failure-on-the-fly-evals stderr`) nennt zuerst
 aufgeräumte Läufe eines Vorgängers als Warnung „verwaiste Evalläufe
-abgebrochen“.
+abgebrochen“, dann „Hintergrundprozess gestartet“ und danach je Lauf „gestartet“
+und „fertig“ oder „abgebrochen“; ein unerwarteter Fehler steht dort mit
+Traceback.
 
 ## 8. Web-Backends und Domain verbinden
 

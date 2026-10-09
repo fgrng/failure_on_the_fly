@@ -1,5 +1,6 @@
 """Modelle und Abläufe der Simulation."""
 
+import math
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -216,8 +217,13 @@ def _fake_aus(modell_konfiguration: "ModellKonfiguration") -> FakeSprachmodell:
     """Bildet den Fake aus Skript und Verzögerung der Konfiguration."""
 
     verzoegerung: object = modell_konfiguration.parameter.get("verzoegerung", 0)
-    # Nur eine echte Zahl wartet; ein getipptes "2" oder true bleibt sofort.
-    if isinstance(verzoegerung, bool) or not isinstance(verzoegerung, int | float):
+    # Nur eine echte, endliche Zahl ab 0 wartet; ein getipptes "2", true, -1
+    # oder inf bleibt sofort, statt `time.sleep` scheitern zu lassen.
+    if (
+        isinstance(verzoegerung, bool)
+        or not isinstance(verzoegerung, int | float)
+        or not 0 <= verzoegerung < math.inf
+    ):
         verzoegerung = 0
     return FakeSprachmodell(
         modell_konfiguration.parameter.get("skript", []), float(verzoegerung)

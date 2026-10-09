@@ -2,6 +2,7 @@
 
 import fcntl
 import logging
+import math
 import signal
 import time
 from argparse import ArgumentParser
@@ -9,7 +10,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from evals.ausfuehrung import evallauf_ausfuehren
@@ -61,6 +62,10 @@ class Command(BaseCommand):
     ) -> None:
         """Arbeitet nur, wenn kein anderer Hintergrundprozess die Sperre hält."""
 
+        # Ohne echte Wartezeit scheiterte `time.sleep` oder der Dienst pollte
+        # die Datenbank pausenlos.
+        if not 0 < intervall < math.inf:
+            raise CommandError("--intervall braucht eine positive Zahl von Sekunden.")
         with _exklusiv() as allein:
             if not allein:
                 self.stderr.write("Ein anderer Hintergrundprozess arbeitet bereits.")
