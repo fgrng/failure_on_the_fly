@@ -187,13 +187,20 @@ gesperrt, färbt sich das Band rot, heißt „Beitritt gesperrt“, und „Wiede
 öffnen“ hebt die Sperre auf. Jede Eigentümerin des Kreises darf sperren und
 öffnen.
 
-Wer den Link eingeloggt öffnet, tritt bei und landet auf der Trainingsseite;
-erneutes Öffnen führt ohne Fehler direkt dorthin. Ohne Anmeldung führt der
+Wer den Link eingeloggt ohne Kreis- oder Administrationszugang öffnet, tritt
+bei und landet auf der Trainingsseite; auch eine Ausbilderrolle allein
+begründet keinen Kreiszugang. Erneutes Öffnen führt ohne zusätzlichen Beitritt
+direkt dorthin. Ohne Anmeldung führt der
 Link über den Login zurück zum Beitritt. Bei gesperrtem Beitritt sehen neue
 Konten die Meldung „Beitritt gesperrt“ mit der Bitte, sich an die Ausbilder:in
-zu wenden; Beigetretene kommen weiter ins Training, ebenso der Eigentümer-Kreis
-und die Administration, ohne dadurch beizutreten. Der Link eines Entwurfs
-nimmt noch niemanden auf. Ein Training ohne Vignetten lässt sich
+zu wenden; Beigetretene kommen weiter ins Training. Der aktuelle Eigentümer-Kreis
+und die Administration gelangen über offene wie gesperrte Trainings-Links
+direkt zur Trainingsseite, ohne beizutreten: Auch wiederholte Aufrufe erzeugen
+weder Trainingsbindung noch Teilnahme und erhöhen die Zahl der Beigetretenen
+nicht. Erst ein tatsächlicher Sitzungsstart legt bei Bedarf die erforderliche
+Bindung und Teilnahme an. Bestehende Bindungen und Sitzungen bleiben beim
+Linkaufruf unverändert erhalten. Der Link eines Entwurfs bleibt für alle
+Konten unbekannt (404). Ein Training ohne Vignetten lässt sich
 veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die
