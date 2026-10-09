@@ -166,7 +166,8 @@ class EvalkatalogEditorTests(TestCase):
             "verlauf",
         ]
 
-        knoepfe: dict[str, list[str]] = _platzhalter(self.client.get(self.url))
+        response: HttpResponse = self.client.get(self.url)
+        knoepfe: dict[str, list[str]] = _platzhalter(response)
 
         self.assertEqual(
             knoepfe,
@@ -913,6 +914,36 @@ def _evalrouten(
     ]
 
 
+class _Linksammler(HTMLParser):
+    """Sammelt die Links einer Seite mit ihrem Text."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[tuple[str, str | None]] = []
+        self._link: tuple[str | None, list[str]] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            self._link = (dict(attrs).get("href"), [])
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._link is not None:
+            href, text = self._link
+            self.links.append(("".join(text).strip(), href))
+            self._link = None
+
+    def handle_data(self, data: str) -> None:
+        if self._link is not None:
+            self._link[1].append(data)
+
+
+def _links(response: HttpResponse) -> list[tuple[str, str | None]]:
+    """Text und Ziel jedes Links der Seite."""
+    sammler: _Linksammler = _Linksammler()
+    sammler.feed(response.content.decode())
+    return sammler.links
+
+
 class EvalkatalogFinaleFassungTests(TestCase):
     """Eine finale Fassung ist kein Entwurf: kein Editor, kein Verwerfen."""
 
@@ -997,9 +1028,13 @@ class EvalkatalogFinaleFassungTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+        uebersicht: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
         self.assertIn(
-            ("Finale Fassung lesen", _editor(self.katalog)),
-            _links(self.client.get(reverse("simulation:evalkatalog"))),
+            (
+                "Finale Fassung lesen",
+                reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
+            ),
+            _links(uebersicht),
         )
 
 
@@ -1021,41 +1056,6 @@ def _felder(response: HttpResponse) -> list[tuple[str | None, bool]]:
     sammler: _Feldsammler = _Feldsammler()
     sammler.feed(response.content.decode())
     return sammler.felder
-
-
-class _Linksammler(HTMLParser):
-    """Sammelt die Links einer Seite mit ihrem Text."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.links: list[tuple[str, str | None]] = []
-        self._link: tuple[str | None, list[str]] | None = None
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "a":
-            self._link = (dict(attrs).get("href"), [])
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "a" and self._link is not None:
-            href, text = self._link
-            self.links.append(("".join(text).strip(), href))
-            self._link = None
-
-    def handle_data(self, data: str) -> None:
-        if self._link is not None:
-            self._link[1].append(data)
-
-
-def _links(response: HttpResponse) -> list[tuple[str, str | None]]:
-    """Text und Ziel jedes Links der Seite."""
-    sammler: _Linksammler = _Linksammler()
-    sammler.feed(response.content.decode())
-    return sammler.links
-
-
-def _editor(katalog: Evalkatalog) -> str:
-    """Die Adresse des Editors bzw. der Lese-Ansicht einer Fassung."""
-    return reverse("simulation:evalkatalog_editor", args=[katalog.pk])
 
 
 def _editorknoepfe(response: HttpResponse) -> list[str]:
@@ -1223,7 +1223,9 @@ class EvalkatalogNeueFassungTests(TestCase):
         entwurf: Evalkatalog = Evalkatalog.objects.get(
             zustand=Evalkatalog.Zustand.ENTWURF
         )
-        self.assertRedirects(response, _editor(entwurf))
+        self.assertRedirects(
+            response, reverse("simulation:evalkatalog_editor", args=[entwurf.pk])
+        )
         self.assertContains(response, 'name="k" value="5"')
         self.assertContains(
             response, "Sprich mit $schuelerin_name nach $inputstrategie."
@@ -1321,9 +1323,18 @@ class EvalkatalogFinalisierenTests(TestCase):
         self.assertRedirects(response, reverse("simulation:evalkatalog"))
         self.assertContains(response, "Der Evalkatalog ist final.")
         links: list[tuple[str, str | None]] = _links(response)
-        self.assertIn(("Finale Fassung lesen", _editor(entwurf)), links)
+        self.assertIn(
+            (
+                "Finale Fassung lesen",
+                reverse("simulation:evalkatalog_editor", args=[entwurf.pk]),
+            ),
+            links,
+        )
         self.assertContains(response, "Überholte Fassungen")
-        self.assertIn(_editor(self.katalog), [href for _, href in links])
+        self.assertIn(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
+            [href for _, href in links],
+        )
 
     def test_unvollstaendiger_entwurf_bleibt_mit_meldungen_im_editor(self) -> None:
         """Jede Lücke erscheint als Meldung im Editor; der Entwurf bleibt Entwurf."""
