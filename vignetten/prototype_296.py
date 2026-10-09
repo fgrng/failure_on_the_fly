@@ -23,6 +23,12 @@ settings.DEBUG = True
 settings.ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 settings.MIDDLEWARE = []
 settings.TEMPLATES[0]["OPTIONS"]["context_processors"] = []
+# Preview edits must be visible on refresh, including changed stylesheet links.
+settings.TEMPLATES[0]["APP_DIRS"] = False
+settings.TEMPLATES[0]["OPTIONS"]["loaders"] = [
+    "django.template.loaders.filesystem.Loader",
+    "django.template.loaders.app_directories.Loader",
+]
 django.setup()
 
 from config.urls import urlpatterns  # noqa: E402 — URLs need initialized apps.

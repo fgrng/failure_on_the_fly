@@ -3,16 +3,23 @@
 .page { padding-bottom: calc(var(--space-1) * 15); }
 .proto-note { color: var(--color-text-muted); font-size: .85rem; }
 .proto-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0; }
-.proto-workspace { margin-top: var(--space-2); grid-template-columns: minmax(0, .45fr) minmax(0, 1fr); }
+.proto-workspace {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(0, 2fr);
+    gap: var(--space-4);
+    align-items: start;
+    margin-top: var(--space-2);
+}
 .proto-workspace > * { min-width: 0; }
+.proto-inputs { padding: 0 var(--space-3) 0 0; border-right: 1px solid var(--color-border); border-bottom: 0; }
 .proto-inputs h2 { margin: 0; font-size: 1.05rem; }
 .proto-inputs button {
     display: block; width: 100%; padding: var(--space-2);
-    border: 0; border-radius: var(--radius); background: transparent;
+    border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-muted);
     color: var(--color-text); font: inherit; text-align: left; cursor: pointer;
 }
 .proto-inputs button:hover:not(:disabled) { background: var(--color-surface-muted); }
-.proto-inputs button[aria-current="page"] { background: var(--area-tint); }
+.proto-inputs button[aria-current="page"] { background: var(--area-tint); border-color: var(--area-solid); }
 .proto-inputs button:disabled { cursor: default; }
 .proto-inputs button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .proto-input-criterion { display: block; margin-top: var(--space-1); font-size: .8rem; }
@@ -24,7 +31,7 @@
 .proto-conversation-head p { margin: 0 0 var(--space-1); font-size: .85rem; color: var(--color-text-muted); }
 .proto-conversation-head h2 { margin: 0; }
 .proto-repeat { max-width: 16rem; }
-.proto-message { padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.proto-message { padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-muted); }
 .proto-message.teacher { border-left: 3px solid var(--area-solid); }
 .proto-message.student { border-left: 3px solid var(--color-accent); }
 .proto-message details { border-top: 1px solid var(--color-border); padding-top: var(--space-1); color: var(--color-text-muted); font-size: .9rem; }
@@ -50,7 +57,7 @@ dialog::backdrop { background: #0006; }
 .proto-state { margin-top: var(--space-4); padding: var(--space-2); border: 1px dashed var(--color-border); }
 .proto-state label { display: inline-block; margin: var(--space-2) var(--space-2) var(--space-2) 0; }
 .proto-state pre { white-space: pre-wrap; font-size: .85rem; }
-@container hauptbereich (max-width: 760px) {
+@container hauptbereich (max-width: 560px) {
     .proto-workspace { grid-template-columns: 1fr; }
     .proto-inputs { padding: 0 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
     .proto-run-line { align-items: start; flex-direction: column; }

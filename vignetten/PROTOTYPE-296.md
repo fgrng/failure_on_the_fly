@@ -9,7 +9,11 @@ links, Gespräch und Urteile rechts. Der Abschnitt „Vignettenkontext“ entfä
 Die Spalten und Steuerelemente folgen dem bestehenden Evalkatalog-Editor und den
 Vignettenformularen: voller Inhaltsbereich, schmale Auswahl links,
 gekennzeichneter gewählter Input, Formularfeld für die Wiederholung. Auf
-schmalen Inhaltsbereichen stehen die Spalten untereinander.
+schmalen Inhaltsbereichen stehen die Spalten untereinander (erst unter 560 px
+Hauptbereichsbreite). Die ursprünglichen Ergebnisboxen bleiben erhalten.
+
+Der Vorschau-Runner lädt Templates bei jeder Anfrage neu: Nach Änderungen genügt
+ein Neuladen im Browser, auch wenn neue Stylesheets hinzukommen.
 
 Die große Box „Evallauf · Fertig · nicht bestanden“ ist zu prominent. Die zweite
 Runde prüft daher drei unterschiedliche Orte für den Laufstatus, bei
