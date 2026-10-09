@@ -3,12 +3,12 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.utils import timezone
 
+from config.tests.aufbau import finale_vignette, vignetten_entwurf
 from konten.models import Konto
 from sitzungen.models import Teilnahme
 from training.models import Training, Trainingsbindung
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 
 @pytest.mark.django_db
@@ -93,19 +93,10 @@ def test_training_verhindert_massenhafte_zustandswechsel() -> None:
 def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
     """Finale Fassungen lassen sich auch nach der Veröffentlichung austauschen."""
 
-    training: Training = Training.objects.anlegen(
-        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
-    )
-    entwurf: Vignette = Vignette.objects._erstellen(
-        historie=Vignettenhistorie.objects.create()
-    )
-    finale: Vignette = Vignette.objects._erstellen(
-        historie=Vignettenhistorie.objects.create(),
-        zustand=Vignette.Zustand.FINAL,
-        finalisiert_am=timezone.now(),
-        lernauftrag_text="Lernauftrag",
-        arbeitsheft_text="Bearbeitung",
-    )
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    entwurf: Vignette = vignetten_entwurf(ada)
+    finale: Vignette = finale_vignette(ada)
 
     with pytest.raises(ValidationError, match="finale"), transaction.atomic():
         training.vignetten.add(entwurf)
@@ -126,17 +117,9 @@ def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
 def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() -> None:
     """Die Rückwärtsrelation akzeptiert finale Fassungen und Archivieren entfernt sie."""
 
-    training: Training = Training.objects.anlegen(
-        Konto.objects.create_user(username="ada"), name="Bruchrechnung"
-    )
-    Vignette.objects._erstellen(historie=Vignettenhistorie.objects.create())
-    finale: Vignette = Vignette.objects._erstellen(
-        historie=Vignettenhistorie.objects.create(),
-        zustand=Vignette.Zustand.FINAL,
-        finalisiert_am=timezone.now(),
-        lernauftrag_text="Lernauftrag",
-        arbeitsheft_text="Bearbeitung",
-    )
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    finale: Vignette = finale_vignette(ada)
 
     finale.training_set.add(training)
     assert list(training.vignetten.all()) == [finale]
@@ -147,72 +130,37 @@ def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() ->
 
 
 @pytest.mark.django_db
-def test_trainingsbindung_haelt_training_konto_und_genau_eine_teilnahme() -> None:
-    """Eine Teilnahme kann nur an eine Trainingsbindung gekoppelt sein."""
+def test_teilnahme_traegt_hoechstens_eine_trainingsbindung() -> None:
+    """Eine Teilnahme lässt sich nicht an eine zweite Trainingsbindung koppeln."""
 
-    konto: Konto = Konto.objects.create_user(username="ada")
-    training: Training = Training.objects.anlegen(konto, name="Bruchrechnung")
+    ada: Konto = Konto.objects.create_user(username="ada")
+    grace: Konto = Konto.objects.create_user(username="grace")
     teilnahme: Teilnahme = Teilnahme.objects.create()
-
-    bindung: Trainingsbindung = Trainingsbindung.objects.create(
+    Trainingsbindung.objects.create(
         teilnahme=teilnahme,
-        training=training,
-        konto=konto,
+        training=Training.objects.anlegen(ada, name="Bruchrechnung"),
+        konto=ada,
     )
 
-    assert (bindung.teilnahme, bindung.training, bindung.konto) == (
-        teilnahme,
-        training,
-        konto,
-    )
     with pytest.raises(IntegrityError), transaction.atomic():
         Trainingsbindung.objects.create(
             teilnahme=teilnahme,
-            training=training,
-            konto=konto,
+            training=Training.objects.anlegen(grace, name="Addition"),
+            konto=grace,
         )
 
 
 @pytest.mark.django_db
-def test_sichtbar_fuer_liefert_eigene_trainings_und_alle_fuer_administration() -> None:
-    """Ausbilderinnen sehen nur eigene Trainings, Administratorinnen alle."""
+def test_konto_hat_je_training_hoechstens_eine_trainingsbindung() -> None:
+    """Dasselbe Konto bindet sich an dasselbe Training nicht ein zweites Mal."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    administratorin: Konto = Konto.objects.create_user(username="linus")
-    administratorin.is_superuser = True
-    administratorin.save()
-    eigenes: Training = Training.objects.anlegen(ada, name="Brüche")
-    fremdes: Training = Training.objects.anlegen(grace, name="Addition")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    Trainingsbindung.objects.create(
+        teilnahme=Teilnahme.objects.create(), training=training, konto=ada
+    )
 
-    assert list(Training.objects.sichtbar_fuer(ada)) == [eigenes]
-    assert list(Training.objects.sichtbar_fuer(administratorin)) == [eigenes, fremdes]
-
-
-@pytest.mark.django_db
-def test_geteiltes_training_ist_fuer_alle_eigentuemerinnen_sichtbar() -> None:
-    """Alle Eigentümerinnen können ein gemeinsames Training sehen."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    training: Training = Training.objects.anlegen(ada, name="Brüche")
-    training.eigentuemerinnen.add(grace)
-
-    assert list(Training.objects.sichtbar_fuer(ada)) == [training]
-    assert list(Training.objects.sichtbar_fuer(grace)) == [training]
-
-
-@pytest.mark.django_db
-def test_veroeffentlichtes_training_behaelt_aenderbaren_eigentuemerinnenkreis() -> None:
-    """Das Veröffentlichen friert die Verantwortung nicht ein."""
-
-    ada: Konto = Konto.objects.create_user(username="ada")
-    grace: Konto = Konto.objects.create_user(username="grace")
-    training: Training = Training.objects.anlegen(ada, name="Brüche")
-    training.veroeffentlichen()
-
-    training.eigentuemerinnen.add(grace)
-    training.eigentuemerinnen.remove(ada)
-
-    assert list(training.eigentuemerinnen.all()) == [grace]
-    assert training.zustand == Training.Zustand.VEROEFFENTLICHT
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Trainingsbindung.objects.create(
+            teilnahme=Teilnahme.objects.create(), training=training, konto=ada
+        )

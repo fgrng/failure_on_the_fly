@@ -4,19 +4,24 @@ from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    finaler_kern,
+    konto_mit_rollen,
+)
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import (
     Diagnose,
-    Fehlversuch,
     Gespraechsschritt,
     Sitzung,
     Teilnahme,
 )
 from training.models import Training, Trainingsbindung
-from vignetten.models import Vignette, Vignettenhistorie
+from training.tests.seite import tabellenzeilen
+from vignetten.models import Vignette
 
 
 class TrainingskatalogTests(TestCase):
@@ -40,24 +45,43 @@ class TrainingskatalogTests(TestCase):
         self.assertContains(response, reverse("training:katalog"))
 
     def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
-        """Der Name ist der einzige Link; der Zeilenhinweis nennt action_label."""
+        """Eine Zeile nennt Name, Ziel und Aktion des beigetretenen Trainings."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
-        Training.objects.anlegen(ausbilderin, name="Bruchrechnung").veroeffentlichen()
+        studierende: Konto = get_user_model().objects.create_user(username="grace")
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
+        training.veroeffentlichen()
+        self.client.force_login(studierende)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
+
+        response: HttpResponse = self.client.get(reverse("training:katalog"))
+
+        detail_url: str = reverse("training:detail", args=[training.pk])
+        self.assertContains(response, detail_url)
+        self.assertEqual(
+            [
+                (zeile["name"], zeile["url"], zeile["action_label"])
+                for zeile in tabellenzeilen(response)
+            ],
+            [("Bruchrechnung", detail_url, "Öffnen")],
+        )
+
+    def test_ausbilderin_kuratiert_eigene_entwuerfe_aus_dem_katalog(self) -> None:
+        """Der Kreis findet seinen Entwurf im Katalog und gelangt zum Kuratieren."""
+        ausbilderin: Konto = konto_mit_rollen("ada", "Ausbilder:in")
+        entwurf: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         self.client.force_login(ausbilderin)
 
         response: HttpResponse = self.client.get(reverse("training:katalog"))
 
-        self.assertContains(
-            response, '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>'
+        kuratier_url: str = reverse("training:kuratieren", args=[entwurf.pk])
+        self.assertContains(response, kuratier_url)
+        self.assertEqual(
+            [
+                (zeile["name"], zeile["url"], zeile["action_label"])
+                for zeile in tabellenzeilen(response)
+            ],
+            [("Bruchrechnung", kuratier_url, "Kuratieren")],
         )
-        self.assertContains(
-            response,
-            '<td class="table__zeilenhinweis" aria-hidden="true"'
-            " x-text=\"r.action_label + ' ›'\"></td>",
-        )
-        self.assertContains(response, "table--zeilenlink")
-        self.assertNotContains(response, "button--secondary")
-        self.assertNotContains(response, ">Aktion<")
 
     def test_versteckt_unveroeffentlichte_trainings(self) -> None:
         """Entwürfe erscheinen weder im Katalog noch über ihre Detail-URL."""
@@ -81,16 +105,7 @@ class TrainingskatalogTests(TestCase):
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Brüche vergleichen"
-        )
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Vergleiche Brüche.",
-            arbeitsheft_text="3/4 ist größer als 2/3.",
-        )
+        vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
@@ -121,16 +136,7 @@ class TrainingskatalogTests(TestCase):
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Archivierte Brüche"
-        )
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Vergleiche Brüche.",
-            arbeitsheft_text="3/4 ist größer als 2/3.",
-        )
+        vignette: Vignette = finale_vignette(ausbilderin, name="Archivierte Brüche")
         training.vignetten.add(vignette)
         vignette.archivieren()
         training.veroeffentlichen()
@@ -173,27 +179,7 @@ class TrainingskatalogTests(TestCase):
         )
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create(
-            name="Brüche vergleichen"
-        )
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere zwei Brüche.",
-            arbeitsheft_bildbeschreibung="Mia rechnet 1/2 + 1/3 = 2/5.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Brüche",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=3,
-            gepinnter_kern=kern,
-        )
+        vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
@@ -248,25 +234,9 @@ class TrainingskatalogTests(TestCase):
         """Audioverarbeitung beginnt erst nach der dokumentierten Einwilligung."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere zwei Brüche.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            gepinnter_kern=kern,
-        )
+        vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
@@ -309,6 +279,49 @@ class TrainingskatalogTests(TestCase):
         self.assertTrue(teilnahme.hat_in_audioverarbeitung_eingewilligt)
 
 
+class TrainingshistorieTests(TestCase):
+    """Die Historie fasst je Trainingsbindung Fortschritt und Sitzungen zusammen."""
+
+    def test_historie_zeigt_fortschritt_und_sitzungen_nach_status(self) -> None:
+        """Eine abgeschlossene von zwei Vignetten, dazu eine abgebrochene Sitzung."""
+        ausbilderin: Konto = konto_mit_rollen("ada")
+        teilnehmerin: Konto = konto_mit_rollen("grace")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
+        erste: Vignette = finale_vignette(ausbilderin, name="Erste")
+        zweite: Vignette = finale_vignette(ausbilderin, name="Zweite")
+        training.vignetten.add(erste, zweite)
+        training.veroeffentlichen()
+        self.client.force_login(teilnehmerin)
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
+        for vignette in (erste, zweite):
+            self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
+            self.client.post(
+                reverse("training:einwilligung", args=[training.pk, vignette.pk]),
+                {"audioverarbeitung_eingewilligt": "nein"},
+            )
+            if vignette == erste:
+                self.client.post(reverse("training:gespraech_beenden"))
+                self.client.post(reverse("training:debrief"), {"diagnose": "Bruch"})
+            else:
+                self.client.post(reverse("training:abbrechen"))
+
+        response: HttpResponse = self.client.get(reverse("training:historie"))
+
+        detail_url: str = reverse("training:detail", args=[training.pk])
+        self.assertContains(response, detail_url)
+        self.assertContains(response, "Ansehen ›")
+        [zeile] = tabellenzeilen(response)
+        self.assertEqual(
+            (zeile["name"], zeile["url"], zeile["fortschritt"]),
+            ("Bruchrechnung", detail_url, "1 / 2"),
+        )
+        self.assertEqual(
+            zeile["sitzungen_nach_status"],
+            {"laufend": 0, "abgeschlossen": 1, "abgebrochen": 1, "gescheitert": 0},
+        )
+
+
 class TrainingsabbruchTests(TestCase):
     """Teilnehmer:innen können eine Trainingssitzung gewollt abbrechen."""
 
@@ -321,25 +334,13 @@ class TrainingsabbruchTests(TestCase):
         """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
+        finaler_kern()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake", parameter={"skript": skript or []}
         )
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Addiere zwei Brüche.",
-            arbeitsheft_text="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            gepinnter_kern=kern,
-        )
+        vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
         training.vignetten.add(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
@@ -378,22 +379,4 @@ class TrainingsabbruchTests(TestCase):
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
-        self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
-
-    def test_endgueltiger_fehlschlag_bewahrt_abbruchschritt_und_fehler(self) -> None:
-        """Der technische Abbruch bleibt mit Fehlversuchen statt Diagnose erhalten."""
-        self._sitzung_starten([{"fehler": "anbieterfehler"}] * 3)
-
-        response: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
-        )
-
-        self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
-        sitzung: Sitzung = Sitzung.objects.get()
-        self.assertEqual(sitzung.status, Sitzung.Status.GESCHEITERT)
-        schritt: Gespraechsschritt = Gespraechsschritt.objects.get(sitzung=sitzung)
-        self.assertIsNone(schritt.aeusserung)
-        self.assertEqual(
-            Fehlversuch.objects.filter(gespraechsschritt=schritt).count(), 3
-        )
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())

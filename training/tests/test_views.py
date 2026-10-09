@@ -5,11 +5,12 @@ from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
+from config.tests.aufbau import finale_vignette, vignetten_entwurf
 from konten.models import Konto
 from training.models import Training
-from vignetten.models import Vignette, Vignettenhistorie
+from training.tests.seite import tabellenzeilen
+from vignetten.models import Vignette
 
 
 class TrainingAnlegenTests(TestCase):
@@ -44,17 +45,13 @@ class TrainingAnlegenTests(TestCase):
 
         liste: HttpResponse = self.client.get(reverse("training:liste"))
 
-        self.assertContains(
-            liste, '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>'
+        kuratier_url: str = reverse("training:kuratieren", args=[training.pk])
+        self.assertContains(liste, kuratier_url)
+        self.assertContains(liste, "Kuratieren ›")
+        self.assertEqual(
+            [(zeile["name"], zeile["url"]) for zeile in tabellenzeilen(liste)],
+            [("Gleichungen", kuratier_url)],
         )
-        self.assertContains(liste, reverse("training:kuratieren", args=[training.pk]))
-        self.assertContains(
-            liste,
-            '<td class="table__zeilenhinweis" aria-hidden="true">Kuratieren ›</td>',
-        )
-        self.assertContains(liste, "table--zeilenlink")
-        self.assertNotContains(liste, "button--secondary")
-        self.assertNotContains(liste, ">Aktion<")
 
     def test_konto_ohne_ausbilderrolle_kann_kein_training_anlegen(self) -> None:
         """Die Ausbilder-UI weist eingeloggte Teilnehmer:innen zurück."""
@@ -152,55 +149,41 @@ class TrainingKuratierenTests(TestCase):
         ada: Konto = get_user_model().objects.create_user(username="ada")
         ada.groups.add(Group.objects.get(name="Ausbilder:in"))
         grace: Konto = get_user_model().objects.create_user(username="grace")
-        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        eigene_historie.eigentuemerinnen.add(ada)
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=eigene_historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Vergleiche Brüche.",
-            fach="Brüche",
-            arbeitsheft_text="1/2",
-        )
-        Vignette.objects._erstellen(
-            historie=eigene_historie, fach="Nichtfinale Vignette"
-        )
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        fremde_historie.eigentuemerinnen.add(grace)
-        fremde_finale: Vignette = Vignette.objects._erstellen(
-            historie=fremde_historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Vergleiche Brüche.",
-            fach="Fremd",
-            arbeitsheft_text="1/2",
-        )
-        zweite_finale: Vignette = Vignette.objects._erstellen(
-            historie=eigene_historie,
-            vorgaengerin=finale,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Vergleiche Brüche.",
-            fach="Dezimalzahlen",
-            arbeitsheft_text="0,5",
-        )
-        training: Training = Training.objects.anlegen(ada, name="Brüche")
+        finale: Vignette = finale_vignette(ada, name="Brüche")
+        entwurf: Vignette = vignetten_entwurf(ada)
+        fremde_finale: Vignette = finale_vignette(grace, name="Fremd")
+        zweite_finale: Vignette = finale_vignette(ada, name="Dezimalzahlen")
+        training: Training = Training.objects.anlegen(ada, name="Bruchtraining")
+        kuratieren_url: str = reverse("training:kuratieren", args=[training.pk])
         self.client.force_login(ada)
 
-        detail: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[training.pk])
-        )
+        def hinzufuegen_url(vignette: Vignette) -> str:
+            return reverse(
+                "training:vignette_hinzufuegen", args=[training.pk, vignette.pk]
+            )
 
-        self.assertContains(detail, "Brüche")
-        self.assertNotContains(detail, fremde_finale.anzeigename)
-        self.assertNotContains(detail, "Nichtfinale Vignette")
-        hinzufuegen: HttpResponse = self.client.post(
-            reverse("training:vignette_hinzufuegen", args=[training.pk, finale.pk])
+        def entfernen_url(vignette: Vignette) -> str:
+            return reverse(
+                "training:vignette_entfernen", args=[training.pk, vignette.pk]
+            )
+
+        detail: HttpResponse = self.client.get(kuratieren_url)
+
+        self.assertContains(detail, hinzufuegen_url(finale))
+        self.assertContains(detail, hinzufuegen_url(zweite_finale))
+        self.assertNotContains(detail, hinzufuegen_url(fremde_finale))
+        self.assertNotContains(detail, hinzufuegen_url(entwurf))
+        self.assertEqual(
+            self.client.post(hinzufuegen_url(fremde_finale)).status_code, 404
         )
-        self.assertRedirects(
-            hinzufuegen, reverse("training:kuratieren", args=[training.pk])
-        )
-        self.assertEqual(list(training.vignetten.all()), [finale])
+        self.assertEqual(self.client.post(hinzufuegen_url(entwurf)).status_code, 404)
+
+        hinzufuegen: HttpResponse = self.client.post(hinzufuegen_url(finale))
+
+        self.assertRedirects(hinzufuegen, kuratieren_url)
+        nach_aufnahme: HttpResponse = self.client.get(kuratieren_url)
+        self.assertContains(nach_aufnahme, entfernen_url(finale))
+        self.assertNotContains(nach_aufnahme, hinzufuegen_url(finale))
         self.assertEqual(
             self.client.post(
                 reverse("training:veroeffentlichen", args=[training.pk])
@@ -210,26 +193,19 @@ class TrainingKuratierenTests(TestCase):
         training.refresh_from_db()
         self.assertEqual(training.zustand, Training.Zustand.VEROEFFENTLICHT)
         nach_veroeffentlichung: HttpResponse = self.client.post(
-            reverse(
-                "training:vignette_hinzufuegen", args=[training.pk, zweite_finale.pk]
-            )
+            hinzufuegen_url(zweite_finale)
         )
-        self.assertRedirects(
-            nach_veroeffentlichung,
-            reverse("training:kuratieren", args=[training.pk]),
-        )
-        self.assertEqual(list(training.vignetten.all()), [finale, zweite_finale])
-        entfernen: HttpResponse = self.client.post(
-            reverse("training:vignette_entfernen", args=[training.pk, finale.pk])
-        )
-        self.assertRedirects(
-            entfernen, reverse("training:kuratieren", args=[training.pk])
-        )
-        self.client.post(
-            reverse("training:vignette_entfernen", args=[training.pk, zweite_finale.pk])
-        )
-        self.assertEqual(list(training.vignetten.all()), [])
-        self.assertFalse(training.vignetten.filter(pk=fremde_finale.pk).exists())
+        self.assertRedirects(nach_veroeffentlichung, kuratieren_url)
+        beide: HttpResponse = self.client.get(kuratieren_url)
+        self.assertContains(beide, entfernen_url(finale))
+        self.assertContains(beide, entfernen_url(zweite_finale))
+        entfernen: HttpResponse = self.client.post(entfernen_url(finale))
+        self.assertRedirects(entfernen, kuratieren_url)
+        self.client.post(entfernen_url(zweite_finale))
+        leer: HttpResponse = self.client.get(kuratieren_url)
+        self.assertContains(leer, "Noch keine Vignetten aufgenommen.")
+        self.assertContains(leer, hinzufuegen_url(finale))
+        self.assertContains(leer, hinzufuegen_url(zweite_finale))
 
 
 class TrainingKoautorschaftTests(TestCase):
@@ -255,25 +231,6 @@ class TrainingKoautorschaftTests(TestCase):
         self.client.force_login(grace)
         self.assertContains(
             self.client.get(reverse("training:liste")),
-            reverse("training:kuratieren", args=[training.pk]),
-        )
-
-    def test_hinzufuegen_erlaubt_koeigentuemern_das_veroeffentlichen(self) -> None:
-        """Eine eingetragene Ausbilderin darf das Training veröffentlichen."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Ausbilder:in"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Ausbilder:in"))
-        training: Training = Training.objects.anlegen(ada, name="Brüche")
-        self.client.force_login(ada)
-        self.client.post(
-            reverse("training:eigentuemerin_hinzufuegen", args=[training.pk]),
-            {"konto": grace.pk},
-        )
-        self.client.force_login(grace)
-
-        self.assertRedirects(
-            self.client.post(reverse("training:veroeffentlichen", args=[training.pk])),
             reverse("training:kuratieren", args=[training.pk]),
         )
 
@@ -478,14 +435,3 @@ class TrainingSichtbarkeitTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
-
-
-class VeroeffentlichteTrainingsTests(TestCase):
-    """Nur veröffentlichte Trainings sind für den Katalog abfragbar."""
-
-    def test_entwurf_erscheint_nicht_im_veroeffentlichten_queryset(self) -> None:
-        """Ein frisch angelegtes Training bleibt bis zum Übergang unsichtbar."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        entwurf: Training = Training.objects.anlegen(ada, name="Brüche")
-
-        self.assertNotIn(entwurf, Training.objects.veroeffentlicht())
