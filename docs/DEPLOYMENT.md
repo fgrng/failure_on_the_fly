@@ -1,13 +1,13 @@
 # Deployment auf Uberspace 7
 
 Ein Walkthrough für den ersten Produktivbetrieb. Er führt von einem frischen
-Uberspace bis zu einer Instanz, auf der eine Erhebung laufen kann, und beschreibt
-danach den Betrieb: Update, Backup, Logs, Stolpersteine.
+Uberspace bis zu einer Instanz, auf der eine Erhebung laufen kann, und
+beschreibt danach den Betrieb: Update, Backup, Logs, Stolpersteine.
 
-`isabell` steht überall für den eigenen Uberspace-Benutzernamen, `isabell.uber.space`
-für dessen Standarddomain. Das README nennt nur die drei Dinge, die man vor dem
-Deployment wissen muss; dieses Dokument ist die vollständige Anleitung mit
-Inbetriebnahme und Betriebsteil.
+`isabell` steht überall für den eigenen Uberspace-Benutzernamen,
+`isabell.uber.space` für dessen Standarddomain. Das README nennt nur die drei
+Dinge, die man vor dem Deployment wissen muss; dieses Dokument ist die
+vollständige Anleitung mit Inbetriebnahme und Betriebsteil.
 
 Die Uberspace-Handbuchseiten, auf die sich die einzelnen Schritte stützen, sind
 jeweils verlinkt; der Einstieg ist <https://manual.uberspace.de/>.
@@ -34,10 +34,12 @@ Konsequenzen, die den Rest der Anleitung erklären:
 - **SQLite, kein MySQL.** Die Datenbank ist eine Datei im Home. Sie läuft im
   WAL-Modus mit wartendem Writer (siehe `config/settings.py`), damit mehrere
   gleichzeitige Teilnahmen parallel schreiben können. Das automatische
-  MySQL-Backup von Uberspace greift hier folglich **nicht** — siehe Abschnitt 11.
+  MySQL-Backup von Uberspace greift hier folglich **nicht** — siehe Abschnitt
+  11\.
 - **Zugangsdaten liegen in der Datenbank, nicht in der Umgebung.** Sprachmodell-
-  und Transkriptions-Anbieter werden nach der Installation über die Weboberfläche
-  konfiguriert. Eine frisch migrierte Instanz hat kein antwortendes Sprachmodell.
+  und Transkriptions-Anbieter werden nach der Installation über die
+  Weboberfläche konfiguriert. Eine frisch migrierte Instanz hat kein
+  antwortendes Sprachmodell.
 - **TLS endet am Uberspace-Frontend.** gunicorn spricht dahinter HTTP; Django
   erkennt HTTPS am Header `X-Forwarded-Proto`.
 
@@ -46,16 +48,16 @@ Konsequenzen, die den Rest der Anleitung erklären:
 - Ein Uberspace-7-Account mit SSH-Zugang
   (<https://manual.uberspace.de/basics-ssh/>).
 - Python 3.14 ist auf Uberspace vorhanden — das Projekt verlangt `>= 3.14`
-  (<https://manual.uberspace.de/lang-python/>). Fehlt die Version auf dem
-  Host, beschafft `uv python install 3.14` einen eigenen Interpreter ins Home;
+  (<https://manual.uberspace.de/lang-python/>). Fehlt die Version auf dem Host,
+  beschafft `uv python install 3.14` einen eigenen Interpreter ins Home;
   `uv sync` findet ihn dann ohne `--python`-Angabe.
 - Uberspace 7 läuft auf CentOS 7 mit glibc 2.17. Deshalb ist `litellm` in
   `pyproject.toml` auf `< 1.92` festgehalten: Ab 1.92 enthält litellm einen
   Rust-Teil und liefert für Linux nur Wheels für glibc ≥ 2.28; auf dem Host
   müsste `uv sync` sonst aus dem Quellpaket bauen, was am dortigen GCC 9.3
   scheitert. Der Pin fällt erst, wenn der Produktivhost eine neuere glibc hat.
-- Zugriff auf das Git-Repository vom Uberspace aus (öffentliches HTTPS-Clone oder
-  ein Deploy-Key, siehe Schritt 3).
+- Zugriff auf das Git-Repository vom Uberspace aus (öffentliches HTTPS-Clone
+  oder ein Deploy-Key, siehe Schritt 3).
 - Optional eine eigene Domain samt Zugriff auf deren DNS (Schritt 8).
 - Die Anbieter-Zugangsdaten für Sprachmodell und, falls gesprochen werden soll,
   für die Transkription — Letztere nur mit vertraglich zugesicherter
@@ -76,9 +78,9 @@ git clone https://github.com/fgrng/failure_on_the_fly.git ~/failure_on_the_fly
 cd ~/failure_on_the_fly
 ```
 
-Ist das Repository privat, wird auf dem Uberspace ein Schlüssel erzeugt und dessen
-öffentlicher Teil als **Deploy-Key (nur Lesezugriff)** in den GitHub-Einstellungen
-des Repositorys hinterlegt:
+Ist das Repository privat, wird auf dem Uberspace ein Schlüssel erzeugt und
+dessen öffentlicher Teil als **Deploy-Key (nur Lesezugriff)** in den
+GitHub-Einstellungen des Repositorys hinterlegt:
 
 ```bash
 ssh-keygen -t ed25519 -C "uberspace-deploy" -f ~/.ssh/deploy_failure_on_the_fly
@@ -116,10 +118,10 @@ cd ~/failure_on_the_fly
 uv sync --frozen --no-dev --group deploy --python python3.14
 ```
 
-`--frozen` erzwingt, dass genau die gelockten Versionen installiert werden; schlägt
-der Lauf mit einem Hinweis auf eine veraltete Lockdatei fehl, ist das Repository
-nicht sauber ausgecheckt — dann nicht mit `uv lock` nachbessern, sondern den
-Stand prüfen.
+`--frozen` erzwingt, dass genau die gelockten Versionen installiert werden;
+schlägt der Lauf mit einem Hinweis auf eine veraltete Lockdatei fehl, ist das
+Repository nicht sauber ausgecheckt — dann nicht mit `uv lock` nachbessern,
+sondern den Stand prüfen.
 
 Eine kurze Kontrolle, dass die Umgebung steht:
 
@@ -156,18 +158,18 @@ chmod 600 ~/failure_on_the_fly/.env
 
 Was die Werte bedeuten:
 
-| Variable | Bedeutung |
-| --- | --- |
-| `SECRET_KEY` | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git. |
-| `DEBUG` | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen. |
-| `ALLOWED_HOSTS` | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400. |
-| `CSRF_TRUSTED_ORIGINS` | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“. |
-| `DATABASE_PFAD` | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst. |
-| `STATIC_ROOT` | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot. |
-| `MEDIA_ROOT` | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot. |
-| `TIME_ZONE` | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
-| `TRANSKRIPTION_ZERO_RETENTION` | Schaltet die Audio-Transkription frei. Erst auf `True` setzen, wenn die Zero-Retention des Anbieters vertraglich zugesichert ist. |
-| `SECURE_SSL_REDIRECT` | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13). |
+| Variable                       | Bedeutung                                                                                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SECRET_KEY`                   | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git.                                                                                                           |
+| `DEBUG`                        | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen.                                                                |
+| `ALLOWED_HOSTS`                | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400.                                                                                        |
+| `CSRF_TRUSTED_ORIGINS`         | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“.                                                                                  |
+| `DATABASE_PFAD`                | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst.                                                                          |
+| `STATIC_ROOT`                  | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot.                                                                                                                                            |
+| `MEDIA_ROOT`                   | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                    |
+| `TIME_ZONE`                    | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
+| `TRANSKRIPTION_ZERO_RETENTION` | Schaltet die Audio-Transkription frei. Erst auf `True` setzen, wenn die Zero-Retention des Anbieters vertraglich zugesichert ist.                                                                         |
+| `SECURE_SSL_REDIRECT`          | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                             |
 
 Bei einer eigenen Domain (Schritt 8) gehören deren Namen zusätzlich in
 `ALLOWED_HOSTS` und `CSRF_TRUSTED_ORIGINS`.
@@ -194,8 +196,8 @@ uv run python manage.py check --deploy
 
 Erwartet wird genau eine Warnung, `security.W021` zu `SECURE_HSTS_PRELOAD`; die
 ist bewusst offen gelassen, weil die Preload-Liste ein einseitiges Versprechen
-gegenüber allen Browsern ist. Jede andere Warnung — zu `SECRET_KEY`, `DEBUG` oder
-den Cookie-Flags — zeigt einen Fehler in der `.env`.
+gegenüber allen Browsern ist. Jede andere Warnung — zu `SECRET_KEY`, `DEBUG`
+oder den Cookie-Flags — zeigt einen Fehler in der `.env`.
 
 ## 7. Dienst einrichten
 
@@ -218,7 +220,8 @@ Zu den Werten:
 
 - **`--bind 0.0.0.0:8000`** — das Uberspace-Frontend erreicht nur Dienste auf
   `0.0.0.0` oder `::`; `127.0.0.1` funktioniert ausdrücklich nicht. Der Port ist
-  frei wählbar zwischen 1024 und 65535, muss aber zum Backend in Schritt 8 passen.
+  frei wählbar zwischen 1024 und 65535, muss aber zum Backend in Schritt 8
+  passen.
 - **`--worker-class gthread`** — jede Anfrage läuft in einem Thread. Ein
   Gesprächsschritt (bis 90 s) oder eine Transkription (bis 120 s) hält nur
   diesen Thread, nicht den ganzen Prozess.
@@ -232,17 +235,17 @@ Zu den Werten:
   Mehr gleichzeitige Sitzungen brauchen mehr Threads, nicht mehr Prozesse;
   Uberspace erlaubt 1024 Prozesse und Threads zusammen.
 - **`--worker-connections 60`** — gleich der Threadzahl. Sonst nimmt ein voll
-  belegter Prozess weitere Verbindungen an und staut sie hinter seinen
-  Threads, während ein anderer Prozess freie hat. Wer `--threads` ändert,
-  ändert diesen Wert mit.
+  belegter Prozess weitere Verbindungen an und staut sie hinter seinen Threads,
+  während ein anderer Prozess freie hat. Wer `--threads` ändert, ändert diesen
+  Wert mit.
 - **`--timeout 180`** — Notbremse für einen hängenden Prozess, nicht für eine
   einzelne Anfrage: Beim Thread-Worker meldet sich der Prozess weiter, solange
   seine Threads warten. Die Haltezeit einer Anfrage begrenzen die beiden Nähte
-  selbst — ein Gesprächsschritt wartet über alle Versuche zusammen höchstens
-  90 s, eine Transkription höchstens 120 s — und von außen das
-  Uberspace-Frontend, das eine Verbindung nach drei Minuten ohne Daten
-  schließt. Der Wert bleibt über 120 s, damit ein Prozess, der gerade nur
-  wartende Threads führt, nie als hängend gilt.
+  selbst — ein Gesprächsschritt wartet über alle Versuche zusammen höchstens 90
+  s, eine Transkription höchstens 120 s — und von außen das Uberspace-Frontend,
+  das eine Verbindung nach drei Minuten ohne Daten schließt. Der Wert bleibt
+  über 120 s, damit ein Prozess, der gerade nur wartende Threads führt, nie als
+  hängend gilt.
 - **`--error-logfile -`** — gunicorn schreibt seine Fehler nach stderr, wo
   supervisord sie einsammelt.
 
@@ -255,8 +258,8 @@ supervisorctl status failure-on-the-fly
 ```
 
 Erwartet wird `RUNNING`. Bei `BACKOFF` oder `FATAL` zeigt
-`supervisorctl tail -f failure-on-the-fly stderr` den Grund — meist ein fehlender
-`SECRET_KEY` in der `.env` oder ein belegter Port.
+`supervisorctl tail -f failure-on-the-fly stderr` den Grund — meist ein
+fehlender `SECRET_KEY` in der `.env` oder ein belegter Port.
 
 ## 8. Web-Backends und Domain verbinden
 
@@ -298,9 +301,10 @@ uberspace web domain add erhebung.example.org
 
 Der Befehl nennt die einzutragenden A- und AAAA-Records. Sobald das DNS zeigt,
 stellt Uberspace automatisch ein Let's-Encrypt-Zertifikat aus; das kann einige
-Minuten dauern. Jede Subdomain wird einzeln hinzugefügt, Wildcards gibt es nicht.
-Danach den Namen in `.env` unter `ALLOWED_HOSTS` und `CSRF_TRUSTED_ORIGINS`
-ergänzen und `supervisorctl restart failure-on-the-fly` ausführen.
+Minuten dauern. Jede Subdomain wird einzeln hinzugefügt, Wildcards gibt es
+nicht. Danach den Namen in `.env` unter `ALLOWED_HOSTS` und
+`CSRF_TRUSTED_ORIGINS` ergänzen und `supervisorctl restart failure-on-the-fly`
+ausführen.
 
 ## 9. Inbetriebnahme
 
@@ -317,9 +321,9 @@ Administration, der Simulationskern und die Modell-Konfiguration.
 2. **Simulationskern anlegen**, falls noch keine Fassung existiert. Unter
    `/system/kern/verwalten/` stehen dafür zwei Knöpfe: *Neuen Entwurf anlegen*
    legt eine leere erste Fassung an, *Standardkern als Entwurf anlegen* füllt
-   sie mit dem Standardkern. Beide erzeugen einen **Entwurf** — er
-   wird erst spielbar, wenn Sie ihn auf derselben Seite finalisieren; dazwischen
-   können Sie die Vorlagen unter *Bearbeiten* an Ihre Instanz anpassen.
+   sie mit dem Standardkern. Beide erzeugen einen **Entwurf** — er wird erst
+   spielbar, wenn Sie ihn auf derselben Seite finalisieren; dazwischen können
+   Sie die Vorlagen unter *Bearbeiten* an Ihre Instanz anpassen.
 
    Für eine unbeaufsichtigte Einrichtung ohne Anmeldung gibt es denselben Weg
    als Befehl. Er legt den Standardkern an und finalisiert ihn in einem Schritt;
@@ -342,37 +346,38 @@ Administration, der Simulationskern und die Modell-Konfiguration.
    diesen Schalter bleibt das Mikrofon bewusst gesperrt.
 
 5. **Konten und Rollen vergeben.** Unter `/admin/` weitere Konten anlegen,
-   Passwörter setzen und die Groups `Autor:in`, `Ausbilder:in` und `Forschende:r`
-   zuweisen. Konten lassen sich dort bewusst nicht löschen.
+   Passwörter setzen und die Groups `Autor:in`, `Ausbilder:in` und
+   `Forschende:r` zuweisen. Konten lassen sich dort bewusst nicht löschen.
 
 Für eine reine Autor:innen-Workshop-Instanz gibt es stattdessen
 `uv run python manage.py workshopdaten_anlegen` — der Seed läuft auch mit
 `DEBUG=False` und richtet Konten, Kern und eine `fake`-Modell-Konfiguration ein,
-also ganz ohne Zugangsdaten. Der Entwicklungs-Seed
-`entwicklungsdaten_anlegen` läuft dagegen nur mit `DEBUG=True` und hat auf einer
-Produktivinstanz nichts zu suchen.
+also ganz ohne Zugangsdaten. Der Entwicklungs-Seed `entwicklungsdaten_anlegen`
+läuft dagegen nur mit `DEBUG=True` und hat auf einer Produktivinstanz nichts zu
+suchen.
 
 ## 10. Abnahme
 
 Vor der ersten echten Erhebung einmal durchklicken:
 
 - [ ] `https://isabell.uber.space/` zeigt die Startseite, und HTTP leitet auf
-      HTTPS um.
+  HTTPS um.
 - [ ] Die Seite ist vollständig gestylt — sonst stimmt `/static` nicht.
-- [ ] Anmeldung unter `/accounts/login/` funktioniert (Formular ohne CSRF-Fehler).
+- [ ] Anmeldung unter `/accounts/login/` funktioniert (Formular ohne
+  CSRF-Fehler).
 - [ ] `/admin/` ist mit dem Superuser erreichbar.
 - [ ] `/system/kern/` zeigt eine finale Kern-Fassung und die aktive
-      Modell-Konfiguration.
+  Modell-Konfiguration.
 - [ ] Ein Probelauf über eine Vignette liefert eine echte Modellantwort — das
-      prüft Token, Basis-URL und Modellnamen in einem Zug.
+  prüft Token, Basis-URL und Modellnamen in einem Zug.
 - [ ] Ein hochgeladenes Vignettenbild erscheint in der Detailansicht — das prüft
-      `/media`.
-- [ ] Ein Teilnahme-Link einer Testerhebung führt durch Einwilligung, Instruktion
-      und mindestens einen Gesprächsschritt.
+  `/media`.
+- [ ] Ein Teilnahme-Link einer Testerhebung führt durch Einwilligung,
+  Instruktion und mindestens einen Gesprächsschritt.
 - [ ] Der Datenspur-Export lädt als ZIP herunter.
 - [ ] `/media/vignettenbilder/` antwortet mit 403, nicht mit einer Dateiliste.
 - [ ] `/admin/` ist nicht mit einem geratenen Passwort erreichbar — alle Konten
-      tragen lange, zufällige Passwörter.
+  tragen lange, zufällige Passwörter.
 - [ ] Beim Anbieter ist ein Ausgabenlimit gesetzt.
 
 Testdaten aus der Abnahme gehören anschließend aufgeräumt: Die Teststichprobe
@@ -389,8 +394,8 @@ und ist davon **nicht** erfasst.
 
 Eine SQLite-Datei im WAL-Modus darf nicht einfach kopiert werden, solange der
 Dienst schreibt: Ein `cp` erwischt womöglich einen inkonsistenten Zwischenstand.
-Der richtige Weg ist die Backup-API, die einen konsistenten Auszug zieht, ohne den
-Betrieb anzuhalten:
+Der richtige Weg ist die Backup-API, die einen konsistenten Auszug zieht, ohne
+den Betrieb anzuhalten:
 
 ```bash
 mkdir -p ~/backups ~/bin
@@ -418,8 +423,9 @@ chmod +x ~/bin/failure-on-the-fly-backup
 
 Das Skript setzt voraus, dass `DATABASE_PFAD` in der `.env` steht (Schritt 5).
 Jede Sicherung enthält die Anbieter-Tokens im Klartext und sämtliche
-Forschungsdaten — deshalb die engen Rechte auf Verzeichnis und Datei, und deshalb
-gehören die Kopien nirgendwohin, wo die Datenbank selbst nicht liegen dürfte.
+Forschungsdaten — deshalb die engen Rechte auf Verzeichnis und Datei, und
+deshalb gehören die Kopien nirgendwohin, wo die Datenbank selbst nicht liegen
+dürfte.
 
 Täglich per Cronjob (<https://manual.uberspace.de/daemons-cron/>), `crontab -e`:
 
@@ -442,8 +448,8 @@ Damit verlassen personenbezogene Forschungsdaten den Server. Der Zielrechner
 muss im Datenschutzkonzept der Erhebung vorkommen, verschlüsselt sein und die
 Löschfristen der Erhebung einhalten.
 
-Vor jedem Update (Abschnitt 12) und vor jedem Eingriff in die Datenbank gehört ein
-Backup gezogen — von Hand, nicht auf den nächtlichen Lauf vertrauend.
+Vor jedem Update (Abschnitt 12) und vor jedem Eingriff in die Datenbank gehört
+ein Backup gezogen — von Hand, nicht auf den nächtlichen Lauf vertrauend.
 
 ## 12. Update einspielen
 
@@ -466,8 +472,8 @@ Das ist bewusst eine kurze Auszeit, kein unterbrechungsfreies Deployment: Der
 Dienst steht, solange migriert wird, damit kein alter Worker gegen ein neues
 Schema schreibt. Laufende Gesprächsschritte brechen ab. Updates gehören deshalb
 nicht in ein offenes Teilnahmefenster einer Erhebung. Migrationen sind
-unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg führt über das Backup:
-Dienst stoppen, Sicherung an den `DATABASE_PFAD` kopieren, alten Stand
+unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg führt über das
+Backup: Dienst stoppen, Sicherung an den `DATABASE_PFAD` kopieren, alten Stand
 auschecken, Dienst starten.
 
 Unabhängig von neuen Funktionen sollten die Abhängigkeiten regelmäßig auf
@@ -502,23 +508,23 @@ uberspace web log apache_error enable
 tail -f ~/logs/webserver/access_log
 ```
 
-Uberspace kürzt die IP-Adressen in diesen Logs und rotiert sie täglich; nach sieben
-Tagen sind sie weg.
+Uberspace kürzt die IP-Adressen in diesen Logs und rotiert sie täglich; nach
+sieben Tagen sind sie weg.
 
 Häufige Stolpersteine:
 
-| Symptom | Ursache | Abhilfe |
-| --- | --- | --- |
-| „Bad Request (400)“ auf jeder Seite | Hostname fehlt in `ALLOWED_HOSTS` | Namen ergänzen, Dienst neu starten |
-| „CSRF verification failed“ beim Absenden eines Formulars | `CSRF_TRUSTED_ORIGINS` fehlt oder ohne `https://` | Origin mit Schema eintragen, Dienst neu starten |
-| Endlose Weiterleitung | Das Frontend setzt kein `X-Forwarded-Proto` | `SECURE_SSL_REDIRECT=False` in die `.env`, Dienst neu starten |
-| Seite ohne Styles | `collectstatic` nicht gelaufen oder `/static`-Backend fehlt | `collectstatic --noinput`, `uberspace web backend set /static --apache` |
-| Bilder erscheinen nicht | `MEDIA_ROOT` zeigt nicht ins Docroot | `.env` prüfen, `/media`-Backend setzen |
-| `uberspace web backend list` sagt `no service` | Dienst läuft nicht oder falscher Port | `supervisorctl status`, Port in `.ini` und Backend abgleichen |
-| `wrong interface (::1)` | gunicorn lauscht auf localhost | `--bind 0.0.0.0:8000` |
-| Gesprächsschritt bricht nach ~180 s ab | Das Frontend schließt Verbindungen nach drei Minuten ohne Daten | Anbieter/Modell prüfen; beide Nähte begrenzen sich auf 90 s bzw. 120 s, ein längeres Warten ist ein Fehler im Code |
-| 502 oder lange Ladezeiten nur unter Last | Alle Threads warten auf einen Anbieter | `--threads` und `--worker-connections` gemeinsam erhöhen, nicht `--workers`; Dienst neu starten. Häufen sich zugleich Anbieterfehler, greift eher ein Rate-Limit des Anbieters (`docs/research/2026-10-08-worker-belegung-uberspace-anbieter.md`) |
-| Dienst startet nach `supervisorctl update` nicht | `SECRET_KEY` fehlt in der `.env` | `.env` prüfen; Django bricht ohne Schlüssel beim Import ab |
+| Symptom                                                  | Ursache                                                         | Abhilfe                                                                                                                                                                                                                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| „Bad Request (400)“ auf jeder Seite                      | Hostname fehlt in `ALLOWED_HOSTS`                               | Namen ergänzen, Dienst neu starten                                                                                                                                                                                                                |
+| „CSRF verification failed“ beim Absenden eines Formulars | `CSRF_TRUSTED_ORIGINS` fehlt oder ohne `https://`               | Origin mit Schema eintragen, Dienst neu starten                                                                                                                                                                                                   |
+| Endlose Weiterleitung                                    | Das Frontend setzt kein `X-Forwarded-Proto`                     | `SECURE_SSL_REDIRECT=False` in die `.env`, Dienst neu starten                                                                                                                                                                                     |
+| Seite ohne Styles                                        | `collectstatic` nicht gelaufen oder `/static`-Backend fehlt     | `collectstatic --noinput`, `uberspace web backend set /static --apache`                                                                                                                                                                           |
+| Bilder erscheinen nicht                                  | `MEDIA_ROOT` zeigt nicht ins Docroot                            | `.env` prüfen, `/media`-Backend setzen                                                                                                                                                                                                            |
+| `uberspace web backend list` sagt `no service`           | Dienst läuft nicht oder falscher Port                           | `supervisorctl status`, Port in `.ini` und Backend abgleichen                                                                                                                                                                                     |
+| `wrong interface (::1)`                                  | gunicorn lauscht auf localhost                                  | `--bind 0.0.0.0:8000`                                                                                                                                                                                                                             |
+| Gesprächsschritt bricht nach ~180 s ab                   | Das Frontend schließt Verbindungen nach drei Minuten ohne Daten | Anbieter/Modell prüfen; beide Nähte begrenzen sich auf 90 s bzw. 120 s, ein längeres Warten ist ein Fehler im Code                                                                                                                                |
+| 502 oder lange Ladezeiten nur unter Last                 | Alle Threads warten auf einen Anbieter                          | `--threads` und `--worker-connections` gemeinsam erhöhen, nicht `--workers`; Dienst neu starten. Häufen sich zugleich Anbieterfehler, greift eher ein Rate-Limit des Anbieters (`docs/research/2026-10-08-worker-belegung-uberspace-anbieter.md`) |
+| Dienst startet nach `supervisorctl update` nicht         | `SECRET_KEY` fehlt in der `.env`                                | `.env` prüfen; Django bricht ohne Schlüssel beim Import ab                                                                                                                                                                                        |
 
 ## 14. Was beim Produktivbetrieb zu bedenken ist
 
@@ -526,19 +532,20 @@ Häufige Stolpersteine:
   kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber ungeschützt.
   Bildmaterial, das das nicht verträgt, gehört nicht in eine Vignette.
 - **Die Transkription gibt Audio an einen externen Auftragsverarbeiter.**
-  `TRANSKRIPTION_ZERO_RETENTION=True` ist die Zusage der Betreiber:in, nicht eine
-  technische Prüfung (ADR-0026). Ohne Vertrag bleibt der Schalter auf `False`; das
-  Training ist über die Tastatur uneingeschränkt spielbar.
-- **Der Datenspur-Export ist immer UTC**, unabhängig von `TIME_ZONE`. Eingabe und
-  Anzeige in der Oberfläche — etwa der Erhebungszeitraum einer Stichprobe — laufen
-  dagegen in `TIME_ZONE` (voreingestellt `Europe/Berlin`).
+  `TRANSKRIPTION_ZERO_RETENTION=True` ist die Zusage der Betreiber:in, nicht
+  eine technische Prüfung (ADR-0026). Ohne Vertrag bleibt der Schalter auf
+  `False`; das Training ist über die Tastatur uneingeschränkt spielbar.
+- **Der Datenspur-Export ist immer UTC**, unabhängig von `TIME_ZONE`. Eingabe
+  und Anzeige in der Oberfläche — etwa der Erhebungszeitraum einer Stichprobe —
+  laufen dagegen in `TIME_ZONE` (voreingestellt `Europe/Berlin`).
 - **Teilnahme-Token sind ablesbar** und trennen die Forschungsdaten vom Konto
   (ADR-0006, ADR-0018). Ein geteilter Teilnahme-Link ist folglich der Zugang zu
   genau dieser Teilnahme — Links gehören nicht in öffentliche Kanäle.
-- **Die Anmeldung hat keine Sperre gegen Passwort-Raten.** Weder `/accounts/login/`
-  noch `/admin/` begrenzen Fehlversuche. Bis eine Sperre eingebaut ist, sind
-  lange, zufällige Passwörter für alle Konten die einzige Verteidigung — auch
-  für Workshop-Konten, deren Anmeldenamen (`workshop01`, …) erratbar sind.
+- **Die Anmeldung hat keine Sperre gegen Passwort-Raten.** Weder
+  `/accounts/login/` noch `/admin/` begrenzen Fehlversuche. Bis eine Sperre
+  eingebaut ist, sind lange, zufällige Passwörter für alle Konten die einzige
+  Verteidigung — auch für Workshop-Konten, deren Anmeldenamen (`workshop01`, …)
+  erratbar sind.
 - **Die Anwendung begrenzt keine Anbieterkosten.** Wer einen Teilnahme-Link hat,
   kann beliebig viele Gesprächsschritte und Transkriptionen auslösen. Ein
   Ausgabenlimit gehört deshalb in das Konto beim Anbieter, nicht nur in die
