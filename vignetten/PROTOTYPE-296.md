@@ -1,9 +1,30 @@
 # Prototyp #296: Evallauf-Ansicht
 
-Throwaway auf `prototype/296-evallauf`, außerhalb von main. Frage: Wie sieht die
-Autor:in Ergebnisse und welchen Platz bekommen sie an der Vignette?
+Throwaway auf `prototype/296-evallauf`, außerhalb von main.
 
-Start aus diesem Worktree:
+## Festgehaltene Entscheidung
+
+Die Autor:in hat die ursprüngliche Variante C gewählt: Evalinputs und Quoten
+links, Gespräch und Urteile rechts. Der Abschnitt „Vignettenkontext“ entfällt.
+Die Spalten und Steuerelemente folgen dem bestehenden Evalkatalog-Editor und den
+Vignettenformularen: voller Inhaltsbereich, schmale Auswahl links,
+gekennzeichneter gewählter Input, Formularfeld für die Wiederholung. Auf
+schmalen Inhaltsbereichen stehen die Spalten untereinander.
+
+Die große Box „Evallauf · Fertig · nicht bestanden“ ist zu prominent. Die zweite
+Runde prüft daher drei unterschiedliche Orte für den Laufstatus, bei
+unverändertem Zweispaltenlayout:
+
+- A: Knappe Kopfzeile über den Ergebnissen, Aktion rechts, Laufangaben darunter
+  eingeklappt.
+- B: Laufzusammenfassung in der linken Auswahlspalte, vor den Evalinputs.
+- C: Abgeschlossene Läufe als Fußzeile unter den Ergebnissen. Noch nicht
+  gestartete, wartende und laufende Läufe stehen oben.
+
+Diese Statusvarianten sind noch nicht entschieden. Die ursprünglichen drei
+Layoutvarianten liegen im Vorgängercommit `a92c84a`.
+
+## Start und Bedienung
 
 ```sh
 uv run python -m vignetten.prototype_296
@@ -11,28 +32,20 @@ uv run python -m vignetten.prototype_296
 
 Adresse: <http://127.0.0.1:8296/vignetten/296/?variant=A>
 
-- A: Ergebnisse als Matrix direkt unter dem Vignettenkontext.
-- B: Eigene Ergebnisübersicht, Evals als aufklappbare Abschnitte.
-- C: Evalinputs und Quoten links, Gespräch und Urteile rechts.
+Die schwebende Leiste und Pfeiltasten wechseln `?variant=A|B|C`. Alle Varianten
+haben dieselben Beispieldaten. Die Auswahl links zeigt das Gespräch rechts, mit
+Wiederholungen, Denkspur, Fehlversuchen und begründeten Urteilen. Rollentreue
+gilt übergreifend; das andere Kriterium gehört zum jeweiligen Eval.
 
-Alle Varianten haben dieselben Beispieldaten. Die schwebende Leiste und die
-Pfeiltasten wechseln `?variant=A|B|C`. Zellen öffnen die Gespräche mit Auswahl
-der Wiederholung, Denkspur, Fehlversuchen und begründeten Urteilen. Rollentreue
-ist übergreifend; das andere Kriterium gehört zum jeweiligen Eval.
-
-Unter „Prototyp-Zustand / Szenario“ lassen sich alle Laufzustände sowie
-„veraltet“ unabhängig davon ausprobieren. „Starten“ ersetzt das Beispiel durch
-„wartet“; „Stand neu laden“ führt über „läuft“ zu „fertig“. Das ist bewusst eine
+Unter „Prototyp-Zustand / Szenario“ lassen sich sämtliche Laufzustände sowie
+„veraltet“ unabhängig davon ausprobieren. „Erneut prüfen“ ersetzt das Beispiel
+durch „wartet“; „Stand neu laden“ führt über „läuft“ zu „fertig“. Das ist eine
 manuelle Simulation, kein Polling. Die Zustandsanzeige zeigt sämtliche
 Beispielurteile. Fehlende Voraussetzungen blenden Evals samt Hinweis beim
-Finalisieren aus. Finalisieren ist in jedem Szenario möglich.
+Finalisieren aus. Finalisieren bleibt in jedem Szenario möglich.
 
 Der Runner nutzt die echten Templates, Navigation und Design-Tokens, aber keine
-Datenbank, keine Modellaufrufe und keine produktiven Aktionen. Er bindet nur an
-localhost und dient ausschließlich dieser Vorschau. Ein regulärer Django-Start
-erhält weder Prototyp-Route noch Variantenleiste.
-
-Noch keine validierte Entscheidung. Vorschlag zum Prüfen: A für den Überblick an
-der Vignette; B bei vielen Evals; C wenn das Nachlesen der Gespräche die
-häufigste Tätigkeit ist. Die tatsächliche Wahl und das Verhalten bei laufenden
-Läufen werden nach Sichtung in #296 festgehalten und fließen in #299 ein.
+Datenbank, Modellaufrufe oder produktiven Aktionen. Er bindet nur an localhost.
+Ein regulärer Django-Start erhält weder Prototyp-Route noch Variantenleiste. Die
+gewählte Darstellung soll später in #299 umgesetzt werden. Der Branch und ein
+Issue-Verweis wurden noch nicht veröffentlicht.
