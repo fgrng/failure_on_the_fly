@@ -57,7 +57,7 @@ Die Schnittstelle steht in `docs/testreview/config-static.md` (#332). Für diese
   - Lebenszyklus: `item.finalisieren()`, `item.bearbeiten() -> FragebogenItem`, `item.archivieren()`, `item.entarchivieren()`, `item.kann_entarchiviert_werden()`, `item.delete()`.
   - Abfragen: `FragebogenItem.objects.sichtbar_fuer(konto)`, `.einbindbar()` und `QuerySet.delete()`.
   - Die Historie: `FragebogenItemHistorie.objects.anlegen/sichtbar_fuer` und der Eigentümer-Kreis.
-  - `LikertSkalenpol`: sechs Pole in aufsteigender Zustimmung, `stufen()`, `stufe_fuer(pol)`, `fuer_stufe(stufe)` und `stufenbereich_meldung()`.
+  - `LikertSkalenpol`: sechs Pole in aufsteigender Zustimmung, `stufen()`, `stufe_fuer(pol)` und `stufenbereich_meldung()`.
 - **Invarianten:**
   - Fassungen entstehen nur über `anlegen` und `bearbeiten`. `create`, `bulk_create`, `bulk_update`, `update` und ein `save()` auf einer neuen Instanz werfen `RuntimeError`.
   - Finale und archivierte Fassungen sind unveränderlich. Zustandswechsel laufen nur über die Lebenszyklus-Methoden.
@@ -69,7 +69,6 @@ Die Schnittstelle steht in `docs/testreview/config-static.md` (#332). Für diese
 - **Fehlerfälle:**
   - Verstöße gegen den Lebenszyklus werfen `ValidationError`.
   - `bearbeiten()` auf einer überholten Fassung endet aber in einem `IntegrityError` aus dem Constraint. Die Regel „nur die neueste nicht archivierte Fassung“ steht nur in der View (#376).
-  - `fuer_stufe` außerhalb von 1–6 wirft `ValueError`.
 
 ### Fragebogen-Item-Editor (`fragebogen_items/views.py`)
 
