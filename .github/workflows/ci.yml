@@ -22,6 +22,8 @@ jobs:
 
       - run: uv run ruff format --check
       - run: uv run ruff check
+      # Dateiliste wie in .githooks/pre-commit.
+      - run: uv run mdformat --check README.md docs/verhalten.md docs/DEPLOYMENT.md
 
       # Fehlt eine Migration zu einer Model-Änderung, scheitert die CI.
       - run: uv run python manage.py makemigrations --check --dry-run
