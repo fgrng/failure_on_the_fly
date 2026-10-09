@@ -612,9 +612,9 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    if not Training.objects.sichtbar_fuer(request.user).filter(
-        pk=training.pk
-    ).exists() and not training.beitreten(request.user):
+    if Training.objects.sichtbar_fuer(request.user).filter(pk=training.pk).exists():
+        return redirect("training:detail", pk=training.pk)
+    if not training.beitreten(request.user):
         return render(
             request,
             "training/beitritt_gesperrt.html",
