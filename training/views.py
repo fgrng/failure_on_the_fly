@@ -45,12 +45,7 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import (
-    GESPIELTE_FOLGE,
-    abschrift_freigeben,
-    abschrift_holen,
-    abschrift_loeschen,
-)
+from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
 from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
 
@@ -249,7 +244,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     gespielte_folge: QuerySet[Sitzung] = (
         Sitzung.objects.filter(teilnahme=abschrift.teilnahme)
         .select_related("vignette__historie", "diagnose")
-        .order_by(*GESPIELTE_FOLGE)
+        .in_gespielter_folge()
     )
     return [
         {
@@ -495,7 +490,7 @@ def _freigegebene_abschriften(
         _fremd_einsehbare_sitzungen(konto)
         .filter(teilnahme__abschrift__freigegeben_fuer=training)
         .select_related("vignette__historie")
-        .order_by(*GESPIELTE_FOLGE)
+        .in_gespielter_folge()
     ):
         sitzungen_nach_teilnahme.setdefault(sitzung.teilnahme_id, []).append(sitzung)
 

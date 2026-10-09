@@ -6,6 +6,7 @@ keine Datenspur und unterliegt nicht dem Exportkontrakt aus ADR-0029.
 """
 
 import secrets
+from collections import Counter
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -15,8 +16,7 @@ from django.utils.text import slugify
 
 from sitzungen.models import Diagnose, Gespraechsschritt, Sitzung
 
-from .abschriften import GESPIELTE_FOLGE
-from .models import Training
+from .models import Abschrift, Training
 
 
 def trainingsexport_zip(training: Training) -> bytes:
@@ -24,29 +24,15 @@ def trainingsexport_zip(training: Training) -> bytes:
 
     Je Person ein Ordner mit einer Markdown-Datei je abgeschlossener Sitzung;
     freigegebene Abschriften liegen darin als Unterordner mit Erhebungsnamen.
-    Wer das Training sehen darf, prüft der Aufrufer.
+    Wer das Training sehen darf, prüft der Aufrufer. Beispiel::
+
+        teilnehmer-3f9a01c2/01-brüche-addieren.md
+        teilnehmer-3f9a01c2/studie-bruchrechnung/01-brüche-kürzen.md
+        teilnehmer-3f9a01c2/studie-bruchrechnung-2/01-brüche-kürzen.md
+        teilnehmer-a07c5e1b/01-brüche-addieren.md
     """
 
-    # Die Konten dienen nur der Gruppierung; ins Archiv geht keins davon.
-    konto_je_teilnahme: dict[int, int] = dict(
-        training.trainingsbindung_set.values_list("teilnahme_id", "konto_id")
-    )
-    unterordner_je_teilnahme: dict[int, str] = {}
-    for abschrift in training.freigegebene_abschriften.order_by("importiert_am", "pk"):
-        konto_je_teilnahme[abschrift.teilnahme_id] = abschrift.konto_id
-        unterordner_je_teilnahme[abschrift.teilnahme_id] = _freier_name(
-            _dateiname(abschrift.erhebungsname, "abschrift"),
-            {
-                name
-                for teilnahme_id, name in unterordner_je_teilnahme.items()
-                if konto_je_teilnahme[teilnahme_id] == abschrift.konto_id
-            },
-        )
-
-    kennzeichen_je_konto: dict[int, str] = {}
-    dateien: dict[str, str] = {}
-    sitzungen_je_ordner: dict[str, int] = {}
-    for sitzung in (
+    sitzungen: list[Sitzung] = list(
         Sitzung.objects.fremd_einsehbar(Training.objects.filter(pk=training.pk))
         .select_related("vignette__historie", "diagnose")
         .prefetch_related(
@@ -55,22 +41,17 @@ def trainingsexport_zip(training: Training) -> bytes:
                 queryset=Gespraechsschritt.objects.order_by("reihenfolge"),
             )
         )
-        .order_by(*GESPIELTE_FOLGE)
-    ):
-        konto_id: int = konto_je_teilnahme[sitzung.teilnahme_id]
-        if konto_id not in kennzeichen_je_konto:
-            kennzeichen_je_konto[konto_id] = _kennzeichen(
-                set(kennzeichen_je_konto.values())
-            )
-        ordner: str = "/".join(
-            teil
-            for teil in (
-                kennzeichen_je_konto[konto_id],
-                unterordner_je_teilnahme.get(sitzung.teilnahme_id),
-            )
-            if teil
-        )
-        sitzungen_je_ordner[ordner] = sitzungen_je_ordner.get(ordner, 0) + 1
+        .in_gespielter_folge()
+    )
+    ordner_je_teilnahme: dict[int, str] = _ordner_je_teilnahme(
+        training, {sitzung.teilnahme_id for sitzung in sitzungen}
+    )
+
+    dateien: dict[str, str] = {}
+    sitzungen_je_ordner: Counter[str] = Counter()
+    for sitzung in sitzungen:
+        ordner: str = ordner_je_teilnahme[sitzung.teilnahme_id]
+        sitzungen_je_ordner[ordner] += 1
         dateiname: str = (
             f"{ordner}/{sitzungen_je_ordner[ordner]:02d}-"
             f"{_dateiname(sitzung.vignette.anzeigename, 'sitzung')}.md"
@@ -85,13 +66,47 @@ def trainingsexport_zip(training: Training) -> bytes:
     return puffer.getvalue()
 
 
-def _kennzeichen(vergeben: set[str]) -> str:
-    """Zieht ein zufälliges, in diesem Export noch freies Kennzeichen."""
+def _ordner_je_teilnahme(training: Training, teilnahmen: set[int]) -> dict[int, str]:
+    """Ordnet jeder Teilnahme ihren Ordner im Archiv zu.
 
-    while True:
-        kennzeichen: str = f"teilnehmer-{secrets.token_hex(4)}"
-        if kennzeichen not in vergeben:
-            return kennzeichen
+    Die Konten dienen nur der Gruppierung; ins Archiv geht keins davon. Nur
+    Abschriften mit einsehbaren Sitzungen belegen einen Unterordnernamen.
+    """
+
+    konto_je_teilnahme: dict[int, int] = dict(
+        training.trainingsbindung_set.values_list("teilnahme_id", "konto_id")
+    )
+    abschriften: list[Abschrift] = list(
+        training.freigegebene_abschriften.filter(teilnahme_id__in=teilnahmen).order_by(
+            "importiert_am", "pk"
+        )
+    )
+    for abschrift in abschriften:
+        konto_je_teilnahme[abschrift.teilnahme_id] = abschrift.konto_id
+
+    kennzeichen_je_konto: dict[int, str] = _kennzeichen(
+        set(konto_je_teilnahme.values())
+    )
+    ordner: dict[int, str] = {
+        teilnahme_id: kennzeichen_je_konto[konto_id]
+        for teilnahme_id, konto_id in konto_je_teilnahme.items()
+    }
+    for abschrift in abschriften:
+        ordner[abschrift.teilnahme_id] = _freier_name(
+            f"{ordner[abschrift.teilnahme_id]}/"
+            f"{_dateiname(abschrift.erhebungsname, 'abschrift')}",
+            set(ordner.values()),
+        )
+    return ordner
+
+
+def _kennzeichen(konten: set[int]) -> dict[int, str]:
+    """Zieht je Konto ein zufälliges, in diesem Export eindeutiges Kennzeichen."""
+
+    kennzeichen: set[str] = set()
+    while len(kennzeichen) < len(konten):
+        kennzeichen.add(f"teilnehmer-{secrets.token_hex(4)}")
+    return dict(zip(konten, kennzeichen, strict=True))
 
 
 def _dateiname(text: str, ersatz: str) -> str:

@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import F, Q
 
 
 class Teilnahme(models.Model):
@@ -62,6 +62,12 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
             | Q(teilnahme__abschrift__freigegeben_fuer__in=trainings_pks),
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
+
+    def in_gespielter_folge(self) -> "SitzungQuerySet":
+        """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
+        return self.order_by(
+            F("vignettenposition__position").asc(nulls_last=True), "pk"
+        )
 
 
 class Sitzung(models.Model):

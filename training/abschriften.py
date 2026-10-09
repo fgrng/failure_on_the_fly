@@ -8,7 +8,7 @@ Erhebungsbindung.
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, QuerySet
+from django.db.models import QuerySet
 
 from erhebungen.models import Erhebung, Erhebungsbindung
 from konten.models import Konto
@@ -28,12 +28,6 @@ ABLEHNUNG: str = "Zu diesem Teilnahme-Token lässt sich keine Abschrift holen."
 
 FREIGABE_ABGEWIESEN: str = "Freigeben lässt sich nur für beigetretene Trainings."
 """Die Ablehnung einer Freigabe für ein Training ohne eigene Trainingsbindung."""
-
-GESPIELTE_FOLGE: tuple[object, ...] = (
-    F("vignettenposition__position").asc(nulls_last=True),
-    "pk",
-)
-"""Sortiert Sitzungen einer Abschrift in gespielter Folge, ohne Position hinten."""
 
 
 @transaction.atomic

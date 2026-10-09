@@ -249,8 +249,9 @@ Ordner der Person; private und widerrufene fehlen, ebenso laufende,
 abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten,
 keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und keinen
 Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen dürfen der
-Kreis und die Administration, alle anderen bekommen 404. Der Trainingsexport
-ist keine Datenspur und unterliegt nicht dem Exportkontrakt aus ADR-0029.
+Kreis und die Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
+unterliegt nicht dem Exportkontrakt aus ADR-0029.
 
 ## Simulationskern
 

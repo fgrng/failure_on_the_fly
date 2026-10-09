@@ -5,6 +5,7 @@ from zipfile import ZipFile
 
 from django.http import HttpResponse
 from django.urls import reverse
+from django.utils.text import slugify
 
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE
@@ -76,9 +77,19 @@ class ZugriffTests(TrainingsexportTestCase):
 
         self.assertEqual(self._export(fremde).status_code, 404)
 
-    def test_teilnehmerin_bekommt_den_export_nicht(self) -> None:
+    def test_teilnehmerin_bekommt_403(self) -> None:
         """Eine Beigetretene ohne Rolle zieht keinen Export."""
-        self.assertNotEqual(self._export(self.teilnehmerin).status_code, 200)
+        self.assertEqual(self._export(self.teilnehmerin).status_code, 403)
+
+    def test_dateiname_nennt_training_und_zeitpunkt(self) -> None:
+        """Der Download heißt nach Training und UTC-Zeitstempel."""
+        response: HttpResponse = self._export()
+
+        self.assertRegex(
+            response["Content-Disposition"],
+            rf'^attachment; filename="training-{self.training.pk}-'
+            rf'{slugify(self.training.name)}-\d{{8}}T\d{{6}}Z\.zip"$',
+        )
 
     def test_kuratierseite_bietet_den_export_an(self) -> None:
         """Der Knopf steht in der Werkzeugleiste der Fremdeinsicht."""
@@ -119,6 +130,18 @@ class InhaltTests(TrainingsexportTestCase):
         archiv: dict[str, str] = self._archiv()
 
         self.assertEqual(len(self._ordner(archiv)), 2)
+
+    def test_dateien_sind_gezaehlt_und_nach_der_vignette_benannt(self) -> None:
+        """Mehrere Durchläufe derselben Vignette tragen eine laufende Nummer."""
+        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+
+        archiv: dict[str, str] = self._archiv()
+
+        self.assertEqual(
+            sorted(name.split("/", 1)[1] for name in archiv),
+            ["01-brüche-addieren.md", "02-brüche-addieren.md"],
+        )
 
     def test_ordner_heissen_nach_kennzeichen(self) -> None:
         """Der Ordner trägt ein Kennzeichen, keinen Namen."""
@@ -254,7 +277,25 @@ class AbschriftTests(TrainingsexportTestCase):
             abschriftdateien[0].startswith(f"{ordner}/studie-bruchrechnung/")
         )
         self.assertIn("Nur den Zähler gekürzt.", archiv[abschriftdateien[0]])
-        self.assertNotIn("Geheime Denkspur", archiv[abschriftdateien[0]])
+
+    def test_abschrift_geht_ohne_denkspur_hinaus(self) -> None:
+        """Auch die kopierte Denkspur aus der Erhebung bleibt im System."""
+        _abschrift(self.teilnehmerin, self.vignette).freigegeben_fuer.add(self.training)
+
+        (text,) = self._archiv().values()
+
+        self.assertNotIn("Geheime Denkspur", text)
+
+    def test_erhebungsname_bricht_nicht_aus_dem_ordner_aus(self) -> None:
+        """Schrägstriche und Punkte im Namen werden kein Pfad."""
+        abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
+        abschrift.erhebungsname = "../../Studie/Bruch"
+        abschrift.save(update_fields=["erhebungsname"])
+        abschrift.freigegeben_fuer.add(self.training)
+
+        (name,) = self._archiv()
+
+        self.assertEqual(name.split("/")[1:], ["studiebruch", "01-brüche-addieren.md"])
 
     def test_private_abschrift_fehlt(self) -> None:
         """Ohne Freigabe geht die Abschrift nicht hinaus."""
@@ -290,3 +331,16 @@ class AbschriftTests(TrainingsexportTestCase):
 
         self.assertEqual(len(archiv), 2)
         self.assertEqual(len({name.rsplit("/", 1)[0] for name in archiv}), 2)
+
+    def test_abschrift_ohne_einsehbare_sitzung_belegt_keinen_ordnernamen(
+        self,
+    ) -> None:
+        """Eine leer ausgehende Abschrift schiebt die nächste nicht auf „-2“."""
+        _abschrift(
+            self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
+        ).freigegeben_fuer.add(self.training)
+        _abschrift(self.teilnehmerin, self.vignette).freigegeben_fuer.add(self.training)
+
+        (name,) = self._archiv()
+
+        self.assertEqual(name.split("/")[1], "studie-bruchrechnung")
