@@ -14,8 +14,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from config.tests.formular import submit_knoepfe, text_ohne_tags
-from evals.ausfuehrung import evallauf_ausfuehren
-from evals.models import Evallauf
+from config.tests.sprachmodell import vor_jedem_aufruf
 from evals.tests.aufbau import (
     aeusserungen,
     antworten,
@@ -24,6 +23,7 @@ from evals.tests.aufbau import (
     finaler_katalog,
     gelenkt,
     urteile,
+    waehrend_des_laufs,
 )
 from konten.models import Konto
 from simulation.models import Evalinput, Inputschritt, Verwendung
@@ -98,7 +98,6 @@ def test_start_stellt_einen_wartenden_lauf_ohne_zweite_startaktion_ein(
 
     antwort: HttpResponse = _starten(_client(ada), vignette)
 
-    assert Evallauf.objects.get(vignette=vignette).zustand == Evallauf.Zustand.WARTET
     assert "Wartet" in antwort.content.decode()
     assert _STARTEN not in _knoepfe(antwort)
 
@@ -176,10 +175,8 @@ def test_ko_autorin_und_administration_duerfen_starten(ada: Konto) -> None:
     eigene.historie.eigentuemerinnen.add(grace)
     andere: Vignette = finale_vignette(konto_mit_rollen("lin", "Autor:in"))
 
-    _starten(_client(grace), eigene)
-    _starten(_client(admin), andere)
-
-    assert Evallauf.objects.filter(vignette__in=[eigene, andere]).count() == 2
+    assert "Wartet" in text_ohne_tags(_starten(_client(grace), eigene))
+    assert "Wartet" in text_ohne_tags(_starten(_client(admin), andere))
 
 
 @pytest.mark.django_db
@@ -192,7 +189,8 @@ def test_fremde_vignette_bleibt_unlesbar_und_unstartbar(ada: Konto) -> None:
 
     assert client.get(_ansicht(fremde)).status_code == 404
     assert client.post(reverse("evals:starten", args=[fremde.pk])).status_code == 404
-    assert not Evallauf.objects.exists()
+    eigentuemerin = fremde.historie.eigentuemerinnen.get()
+    assert _STARTEN in _knoepfe(_client(eigentuemerin).get(_ansicht(fremde)))
 
 
 @pytest.mark.django_db
@@ -249,11 +247,10 @@ def test_zweiter_start_ersetzt_keinen_wartenden_lauf(ada: Konto) -> None:
     vignette: Vignette = vignetten_entwurf(ada)
     client: Client = _client(ada)
     _starten(client, vignette)
-    erster: Evallauf = Evallauf.objects.get()
 
     antwort: HttpResponse = _starten(client, vignette)
 
-    assert list(Evallauf.objects.all()) == [erster]
+    assert "Wartet" in text_ohne_tags(antwort)
     assert "wartet oder läuft bereits" in antwort.content.decode()
 
 
@@ -266,13 +263,13 @@ def test_neuer_start_ersetzt_den_fertigen_lauf(ada: Konto) -> None:
     client: Client = _client(ada)
     _starten(client, vignette)
     call_command("evallaeufe_abarbeiten", "--einmal")
-    alter: Evallauf = Evallauf.objects.get()
+    vorher = text_ohne_tags(client.get(_ansicht(vignette)))
+    assert "Antwort 1" in vorher
 
     antwort: HttpResponse = _starten(client, vignette)
 
-    neuer: Evallauf = Evallauf.objects.get()
-    assert neuer.pk != alter.pk
-    assert (neuer.zustand, neuer.gespraeche.count()) == (Evallauf.Zustand.WARTET, 0)
+    assert "Wartet" in text_ohne_tags(antwort)
+    assert "Antwort 1" not in text_ohne_tags(antwort)
     assert _STARTEN not in _knoepfe(antwort)
 
 
@@ -287,12 +284,13 @@ def test_archivierte_fassung_ist_nicht_startbar_und_behaelt_ihren_lauf(
     client: Client = _client(ada)
     _starten(client, vignette)
     call_command("evallaeufe_abarbeiten", "--einmal")
-    bisheriger: Evallauf = Evallauf.objects.get()
+    vorher = text_ohne_tags(client.get(_ansicht(vignette)))
     vignette.archivieren()
 
     antwort: HttpResponse = _starten(client, vignette)
 
-    assert list(Evallauf.objects.all()) == [bisheriger]
+    assert "2 von 3" in vorher and "2 von 3" in text_ohne_tags(antwort)
+    assert "Antwort 1" in text_ohne_tags(antwort)
     assert _STARTEN not in _knoepfe(antwort)
     assert "Archivierte Fassungen" in antwort.content.decode()
 
@@ -304,11 +302,10 @@ def test_finalisieren_behaelt_den_lauf_an_derselben_fassung(ada: Konto) -> None:
 
     entwurf: Vignette = finale_vignette(ada).bearbeiten()
     _starten(_client(ada), entwurf)
-    lauf: Evallauf = Evallauf.objects.get()
-
     entwurf.finalisieren()
 
-    assert Vignette.objects.get(evallauf=lauf).zustand == Vignette.Zustand.FINAL
+    seite = text_ohne_tags(_client(ada).get(_ansicht(entwurf)))
+    assert "Final" in seite and "Wartet" in seite
 
 
 @pytest.mark.django_db
@@ -319,9 +316,11 @@ def test_loeschen_des_entwurfs_entfernt_seinen_lauf(ada: Konto) -> None:
     entwurf: Vignette = vignetten_entwurf(ada)
     _starten(_client(ada), entwurf)
 
+    adresse = _ansicht(entwurf)
     entwurf.delete()
 
-    assert not Evallauf.objects.exists()
+    assert _client(ada).get(adresse).status_code == 404
+    call_command("evallaeufe_abarbeiten", "--einmal")
 
 
 @pytest.mark.django_db
@@ -336,7 +335,7 @@ def test_start_nur_per_post(ada: Konto) -> None:
     )
 
     assert antwort.status_code == 405
-    assert not Evallauf.objects.exists()
+    assert _STARTEN in _knoepfe(_client(ada).get(_ansicht(vignette)))
 
 
 def _abgearbeitete_ansicht(ada: Konto) -> str:
@@ -430,7 +429,7 @@ def test_gescheiterte_schuelerin_ist_nicht_erfuellt_statt_unvollstaendig(
 
 
 @pytest.mark.django_db
-def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
+def test_neustart_behaelt_den_abgebrochenen_lauf_mit_dem_fertigen(
     ada: Konto,
 ) -> None:
     """Der Hintergrundprozess räumt beim Start auf; das Geschriebene bleibt lesbar."""
@@ -439,12 +438,8 @@ def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
     drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
     vignette: Vignette = finale_vignette(ada)
     _starten(_client(ada), vignette)
-    lauf: Evallauf = Evallauf.objects.get(vignette=vignette)
-    # Der Prozess stirbt nach dem ersten Gespräch und lässt „Läuft“ stehen.
-    with pytest.raises(IndexError):
-        evallauf_ausfuehren(lauf)
-    Evallauf.objects.filter(pk=lauf.pk).update(zustand=Evallauf.Zustand.LAEUFT)
-
+    call_command("evallaeufe_abarbeiten", "--einmal")
+    # Ein Neustart führt den abgebrochenen Lauf nicht noch einmal aus.
     call_command("evallaeufe_abarbeiten", "--einmal")
 
     seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
@@ -452,7 +447,7 @@ def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
     assert "1 von 2" in seite and "1 noch nicht ausgeführt" in seite
 
 
-# Einsicht in die Evalgespräche: links Evalinputs, rechts das gewählte Gespräch.
+# Auswahl der Evalgespräche: links Evalinputs, rechts das gewählte Gespräch.
 
 
 def _einsicht(ada: Konto, vignette: Vignette, **auswahl: object) -> str:
@@ -671,16 +666,14 @@ def test_offener_lauf_steht_oben_ohne_fusszeile(ada: Konto) -> None:
     assert "Erneut prüfen" not in seite
 
 
-def _mitten_im_lauf(ada: Konto) -> Vignette:
-    # Der Prozess stirbt, sobald das Skript endet, und lässt „Läuft“ stehen.
+def _mitten_im_lauf(
+    ada: Konto, pruefen: Callable[[Vignette], None], nach_aufrufen: int = 2
+) -> None:
+    # Prüft den Teilstand, während der Dienst tatsächlich noch ausführt.
 
     vignette: Vignette = finale_vignette(ada)
     _starten(_client(ada), vignette)
-    lauf: Evallauf = Evallauf.objects.get(vignette=vignette)
-    with pytest.raises(IndexError):
-        evallauf_ausfuehren(lauf)
-    Evallauf.objects.filter(pk=lauf.pk).update(zustand=Evallauf.Zustand.LAEUFT)
-    return vignette
+    waehrend_des_laufs(lambda: pruefen(vignette), nach_aufrufen)
 
 
 @pytest.mark.django_db
@@ -703,15 +696,16 @@ def test_stand_neu_laden_behaelt_die_auswahl(ada: Konto) -> None:
 
     finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
     drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
-    vignette: Vignette = _mitten_im_lauf(ada)
-    evalinput: int = _evalinputs()[0]
 
-    seite: str = _einsicht(ada, vignette, input=evalinput, wiederholung=2)
+    def pruefen(vignette: Vignette) -> None:
+        evalinput: int = _evalinputs()[0]
+        seite: str = _einsicht(ada, vignette, input=evalinput, wiederholung=2)
+        assert (
+            f'href="{_ansicht(vignette)}?input={evalinput}&amp;wiederholung=2">'
+            "Stand neu laden</a>"
+        ) in seite
 
-    assert (
-        f'href="{_ansicht(vignette)}?input={evalinput}&amp;wiederholung=2">'
-        "Stand neu laden</a>"
-    ) in seite
+    _mitten_im_lauf(ada, pruefen)
 
 
 @pytest.mark.django_db
@@ -781,12 +775,13 @@ def test_laufender_lauf_nennt_die_noch_offene_wiederholung(ada: Konto) -> None:
 
     finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
     drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
-    vignette: Vignette = _mitten_im_lauf(ada)
 
-    seite: str = _einsicht(ada, vignette, input=_evalinputs()[0], wiederholung=2)
+    def pruefen(vignette: Vignette) -> None:
+        seite: str = _einsicht(ada, vignette, input=_evalinputs()[0], wiederholung=2)
+        assert "Wiederholung 2 · nicht ausgeführt" in seite
+        assert "Diese Wiederholung wurde noch nicht ausgeführt." in seite
 
-    assert "Wiederholung 2 · nicht ausgeführt" in seite
-    assert "Diese Wiederholung wurde noch nicht ausgeführt." in seite
+    _mitten_im_lauf(ada, pruefen)
 
 
 @pytest.mark.django_db
@@ -798,12 +793,13 @@ def test_laufendes_gespraech_ohne_urteile_ist_noch_nicht_beurteilt(
     finaler_katalog(k=1, schritte=("Eins", "Zwei"), uebergreifende=())
     # Das Skript reicht nur für den ersten Schritt.
     drei_fakes(schuelerin=antworten(1))
-    vignette: Vignette = _mitten_im_lauf(ada)
 
-    seite: str = _einsicht(ada, vignette)
+    def pruefen(vignette: Vignette) -> None:
+        seite: str = _einsicht(ada, vignette)
+        assert "Antwort 1" in seite
+        assert "Muster gezeigt · noch nicht beurteilt" in seite
 
-    assert "Antwort 1" in seite
-    assert "Muster gezeigt · noch nicht beurteilt" in seite
+    _mitten_im_lauf(ada, pruefen, nach_aufrufen=1)
 
 
 # Veraltet und der Hinweis beim Finalisieren.
@@ -970,21 +966,30 @@ def test_finalisieren_bleibt_in_jedem_laufzustand_erlaubt(
 
     entwurf: Vignette = finale_vignette(ada).bearbeiten()
     _starten(_client(ada), entwurf)
-    if ausgang in ("laeuft", "abgebrochen"):
-        # Ein stehengebliebenes „Läuft“ bricht der nächste Prozessstart ab.
-        Evallauf.objects.filter(vignette=entwurf).update(
-            zustand=Evallauf.Zustand.LAEUFT
-        )
-    if ausgang in ("abgebrochen", "veraltet", "fertig"):
+
+    def finalisieren() -> None:
+        _client(ada).post(reverse("vignetten:finalisieren", args=[entwurf.pk]))
+        seite: str = _detail(ada, entwurf)
+        assert "Final" in seite
+        laufseite: str = text_ohne_tags(_client(ada).get(_ansicht(entwurf)))
+        assert ("Vignette bearbeitet" in laufseite) == (ausgang == "veraltet")
+
+    if ausgang == "laeuft":
+        waehrend_des_laufs(finalisieren, nach_aufrufen=0)
+        return
+    if ausgang == "abgebrochen":
+        # Der ausgelöste Lauf hält seine Konfiguration fest. Ein Fehler am
+        # Modellrand bricht den Dienstlauf über seinen öffentlichen Pfad ab.
+        def scheitern(nachrichten: list[dict[str, str]]) -> None:
+            raise RuntimeError("Prozessfehler")
+
+        with vor_jedem_aufruf(scheitern):
+            call_command("evallaeufe_abarbeiten", "--einmal")
+    elif ausgang in ("veraltet", "fertig"):
         call_command("evallaeufe_abarbeiten", "--einmal")
     if ausgang == "veraltet":
         entwurf.save()
-
-    _client(ada).post(reverse("vignetten:finalisieren", args=[entwurf.pk]))
-
-    lauf: Evallauf = Evallauf.objects.get(vignette=entwurf)
-    assert lauf.vignette.zustand == Vignette.Zustand.FINAL
-    assert lauf.veraltet == (ausgang == "veraltet")
+    finalisieren()
 
 
 def _ohne_dritte_verwendung() -> None:

@@ -1,6 +1,7 @@
 """Die Ausführung eines Evallaufs, die der Hintergrundprozess aufruft (ADR-0047)."""
 
 from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 from simulation import (
     Antwortversuch,
@@ -19,6 +20,22 @@ BEWERTER_OHNE_AUSGABE: str = "Der Bewerter lieferte keine auswertbare Ausgabe."
 LEHRPERSON_OHNE_AUSGABE: str = (
     "Die simulierte Lehrperson lieferte keine Äußerung; das Gespräch endet davor."
 )
+
+
+class _Protokollzeile(NamedTuple):
+    # Ein gespielter Wechsel: was die Lehrperson sagte, was die Schüler:in
+    # dachte und was sie antwortete.
+
+    lehrperson: str
+    denkspur: str
+    aeusserung: str
+
+
+class _Eingabe(NamedTuple):
+    # Was eine Rolle beurteilt oder befolgt, unter dem Platzhalter ihrer Vorlage.
+
+    platzhalter: str
+    text: str
 
 
 def evallauf_ausfuehren(evallauf: Evallauf) -> None:
@@ -52,10 +69,10 @@ def _gespraech_fuehren(
     gespraech: Evalgespraech = Evalgespraech.objects.create(
         evallauf=evallauf, evalinput=evalinput, wiederholung=wiederholung
     )
-    protokoll: list[tuple[str, str, str]] = []
+    protokoll: list[_Protokollzeile] = []
     for position, schritt in enumerate(evalinput.schritte.all(), 1):
         verlauf: list[tuple[str, str]] = [
-            (lehrperson, aeusserung) for lehrperson, _, aeusserung in protokoll
+            (zeile.lehrperson, zeile.aeusserung) for zeile in protokoll
         ]
         lehrperson_aeusserung: str | None = (
             _lehrperson_fragen(evallauf, schritt.text, protokoll, ausfuehrung)
@@ -88,10 +105,10 @@ def _gespraech_fuehren(
             _alle_beurteilen(gespraech, kriterien, False, ANTWORTVERSUCH_GESCHEITERT)
             return
         protokoll.append(
-            (
-                lehrperson_aeusserung,
-                versuch.antwort.denkspur,
-                versuch.antwort.aeusserung,
+            _Protokollzeile(
+                lehrperson=lehrperson_aeusserung,
+                denkspur=versuch.antwort.denkspur,
+                aeusserung=versuch.antwort.aeusserung,
             )
         )
     verlauf_mit_denkspur: str = _verlauf_mit_denkspur(protokoll)
@@ -102,7 +119,7 @@ def _gespraech_fuehren(
 def _lehrperson_fragen(
     evallauf: Evallauf,
     inputstrategie: str,
-    protokoll: Sequence[tuple[str, str, str]],
+    protokoll: Sequence[_Protokollzeile],
     ausfuehrung: Ausfuehrung,
 ) -> str | None:
     # Lässt die Lehrperson nach der Strategie formulieren, mit dem bisherigen
@@ -113,7 +130,7 @@ def _lehrperson_fragen(
         evallauf.katalog.lehrperson_vorlage,
         evallauf.lehrperson_konfiguration,
         LEHRPERSON_SCHEMA,
-        ("inputstrategie", inputstrategie),
+        _Eingabe("inputstrategie", inputstrategie),
         _verlauf_ohne_denkspur(protokoll),
         ausfuehrung,
     )
@@ -146,7 +163,7 @@ def _beurteilen(
         evallauf.katalog.bewerter_vorlage,
         evallauf.bewerter_konfiguration,
         BEWERTER_SCHEMA,
-        ("kriterium", kriterium.text),
+        _Eingabe("kriterium", kriterium.text),
         verlauf_mit_denkspur,
         ausfuehrung,
     )
@@ -166,7 +183,7 @@ def _rolle_fragen(
     vorlage: str,
     konfiguration: ModellKonfiguration,
     schema: Mapping[str, object],
-    eingabe: tuple[str, str],
+    eingabe: _Eingabe,
     verlauf: str,
     ausfuehrung: Ausfuehrung,
 ) -> dict[str, object] | None:
@@ -177,35 +194,40 @@ def _rolle_fragen(
     # Text. Eingesetzte Werte werden nicht selbst als Vorlage gerendert.
     # Leer, wenn nach allen Versuchen nichts Auswertbares kam.
 
-    platzhalter, text = eingabe
     return ausgabe_versuchen(
-        vorlage_rendern(
-            vorlage, {**evallauf.platzhalter, platzhalter: text, "verlauf": verlauf}
+        system_prompt=vorlage_rendern(
+            vorlage,
+            {
+                **evallauf.platzhalter,
+                eingabe.platzhalter: eingabe.text,
+                "verlauf": verlauf,
+            },
         ),
-        verlauf,
-        konfiguration,
-        [],
-        text,
-        schema,
-        ausfuehrung,
+        user_prompt=verlauf,
+        modell_konfiguration=konfiguration,
+        verlauf=[],
+        eingabe=eingabe.text,
+        ausgabe_schema=schema,
+        ausfuehrung=ausfuehrung,
     ).ausgabe
 
 
-def _verlauf_ohne_denkspur(protokoll: Sequence[tuple[str, str, str]]) -> str:
+def _verlauf_ohne_denkspur(protokoll: Sequence[_Protokollzeile]) -> str:
     # Der Verlauf für die Lehrperson, je Wechsel nur die beiden Äußerungen.
 
     return "\n".join(
-        f"<lehrperson>{lehrperson}</lehrperson>\n<schuelerin>{aeusserung}</schuelerin>"
-        for lehrperson, _, aeusserung in protokoll
+        f"<lehrperson>{zeile.lehrperson}</lehrperson>\n"
+        f"<schuelerin>{zeile.aeusserung}</schuelerin>"
+        for zeile in protokoll
     )
 
 
-def _verlauf_mit_denkspur(protokoll: Sequence[tuple[str, str, str]]) -> str:
+def _verlauf_mit_denkspur(protokoll: Sequence[_Protokollzeile]) -> str:
     # Der Verlauf für den Bewerter, je Wechsel Äußerung, Denkspur und Antwort.
 
     return "\n".join(
-        f"<lehrperson>{lehrperson}</lehrperson>\n"
-        f"<denkspur>{denkspur}</denkspur>\n"
-        f"<schuelerin>{aeusserung}</schuelerin>"
-        for lehrperson, denkspur, aeusserung in protokoll
+        f"<lehrperson>{zeile.lehrperson}</lehrperson>\n"
+        f"<denkspur>{zeile.denkspur}</denkspur>\n"
+        f"<schuelerin>{zeile.aeusserung}</schuelerin>"
+        for zeile in protokoll
     )

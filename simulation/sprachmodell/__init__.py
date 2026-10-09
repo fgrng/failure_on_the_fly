@@ -204,10 +204,12 @@ class LiteLLMSprachmodell:
                 messages=nachrichten_bauen(
                     system_prompt, user_prompt, verlauf, eingabe
                 ),
+                # Der Schemaname ist neutral: Dieselbe Naht fordert die
+                # Ausgaben von Schüler:in, Lehrperson und Bewerter an.
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "simulation_antwort",
+                        "name": "ausgabe",
                         "schema": ausgabe_schema,
                         "strict": True,
                     },

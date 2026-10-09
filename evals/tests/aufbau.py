@@ -1,6 +1,10 @@
 """Aufbau der Evals-Tests: finaler Katalog und drei fortlesende Fake-Konfigurationen."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+
+from django.core.management import call_command
+
+from config.tests.sprachmodell import vor_jedem_aufruf
 
 from simulation.models import (
     Evalinput,
@@ -113,3 +117,26 @@ def finaler_katalog(
                 evalinput.schritt_anlegen(*schritt)
     katalog.finalisieren()
     return katalog
+
+
+def waehrend_des_laufs(pruefen: Callable[[], None], nach_aufrufen: int = 2) -> None:
+    """Prüft am Modellrand nach geschriebenen Antworten/Urteilen im laufenden Dienst."""
+
+    aufrufe: int = 0
+    fehler: list[Exception] = []
+
+    def vorher(nachrichten: list[dict[str, str]]) -> None:
+        # Der nächste Modellaufruf beginnt erst nach den bisherigen Schreibvorgängen.
+        nonlocal aufrufe
+        if aufrufe == nach_aufrufen:
+            try:
+                pruefen()
+            except Exception as error:
+                fehler.append(error)
+        aufrufe += 1
+
+    with vor_jedem_aufruf(vorher):
+        call_command("evallaeufe_abarbeiten", "--einmal")
+    if fehler:
+        raise fehler[0]
+    assert aufrufe > nach_aufrufen

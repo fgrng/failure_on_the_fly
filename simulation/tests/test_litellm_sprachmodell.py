@@ -59,7 +59,7 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
         response_format={
             "type": "json_schema",
             "json_schema": {
-                "name": "simulation_antwort",
+                "name": "ausgabe",
                 "schema": SCHUELERIN_SCHEMA,
                 "strict": True,
             },

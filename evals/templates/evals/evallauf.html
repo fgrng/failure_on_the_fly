@@ -31,8 +31,8 @@
         </section>
     {% endif %}
 
-    {% if einsicht %}
-        <div class="evalkatalog-editor evallauf-einsicht">
+    {% if auswahl %}
+        <div class="evalkatalog-editor evallauf-auswahl">
             <nav class="evalkatalog-baum evallauf-inputs" aria-label="Evalinputs">
                 <h2>Evalinputs</h2>
                 <p class="evalkatalog-hinweis">Bestanden bei {{ lauf.katalog.k }} von {{ lauf.katalog.k }}.</p>
@@ -41,12 +41,12 @@
                     <ul aria-label="Evalinputs von {{ ergebnis.name }}">
                         {% for zeile in ergebnis.zeilen %}
                             <li>
-                                <a href="{% url 'evals:evallauf' vignette.pk %}?input={{ zeile.evalinput_pk }}"{% if zeile.evalinput_pk == einsicht.evalinput.pk %} aria-current="page"{% endif %}>
+                                <a href="{% url 'evals:evallauf' vignette.pk %}?input={{ zeile.evalinput_pk }}"{% if zeile.evalinput_pk == auswahl.evalinput.pk %} aria-current="page"{% endif %}>
                                     <strong>Evalinput {{ zeile.nummer }}</strong> <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ zeile.kuerzel }}</span>
                                     {% for zelle in zeile.zellen %}
                                         <span class="evallauf-quote">
                                             <span>{{ zelle.kriterium }}</span>
-                                            <span class="{% if zelle.bestanden %}evallauf--erfuellt{% elif zelle.ohne_urteil or zelle.ausstehend %}evallauf--offen{% else %}evallauf--nicht-erfuellt{% endif %}">{{ zelle.erfuellt }} von {{ zelle.k }} · {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}</span>
+                                            <span class="{% if zelle.bestanden %}evallauf--erfuellt{% elif zelle.ohne_urteil or zelle.ausstehend %}evallauf--offen{% else %}evallauf--nicht-erfuellt{% endif %}">{{ zelle.erfuellt }} von {{ zelle.k }} · {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}{% if zelle.korrigiert %} · manuell korrigiert{% endif %}</span>
                                             {% if zelle.ohne_urteil %}<small>{{ zelle.ohne_urteil }} ohne Urteil</small>{% endif %}
                                             {% if zelle.ausstehend %}<small>{{ zelle.ausstehend }} noch nicht ausgeführt</small>{% endif %}
                                         </span>
@@ -60,25 +60,25 @@
 
             <article class="evalkatalog-knoten evallauf-gespraech" aria-labelledby="evallauf-gespraech-titel">
                 <header>
-                    <p class="evalkatalog-hinweis">{{ einsicht.eval_name }}</p>
-                    <h2 id="evallauf-gespraech-titel">Evalinput {{ einsicht.nummer }} <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ einsicht.evalinput.kuerzel }}</span></h2>
+                    <p class="evalkatalog-hinweis">{{ auswahl.eval_name }}</p>
+                    <h2 id="evallauf-gespraech-titel">Evalinput {{ auswahl.nummer }} <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ auswahl.evalinput.kuerzel }}</span></h2>
                 </header>
                 <form class="evallauf-wiederholung" method="get" action="{% url 'evals:evallauf' vignette.pk %}">
-                    <input type="hidden" name="input" value="{{ einsicht.evalinput.pk }}">
+                    <input type="hidden" name="input" value="{{ auswahl.evalinput.pk }}">
                     <div class="vignette-field">
                         <label for="evallauf-wiederholung">Wiederholung</label>
                         <select id="evallauf-wiederholung" name="wiederholung">
-                            {% for zahl, ausgefuehrt in einsicht.wiederholungen %}
-                                <option value="{{ zahl }}"{% if zahl == einsicht.wiederholung %} selected{% endif %}>Wiederholung {{ zahl }}{% if not ausgefuehrt %} · nicht ausgeführt{% endif %}</option>
+                            {% for zahl, ausgefuehrt in auswahl.wiederholungen %}
+                                <option value="{{ zahl }}"{% if zahl == auswahl.wiederholung %} selected{% endif %}>Wiederholung {{ zahl }}{% if not ausgefuehrt %} · nicht ausgeführt{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <button class="button button--secondary" type="submit">Anzeigen</button>
                 </form>
 
-                {% if einsicht.gespraech %}
+                {% if auswahl.gespraech %}
                     <ol class="evallauf-verlauf">
-                        {% for wechsel, schritt in einsicht.wechsel %}
+                        {% for wechsel, schritt in auswahl.wechsel %}
                             <li class="evallauf-blase evallauf-blase--lehrperson">
                                 <strong>Simulierte Lehrperson · Schritt {{ wechsel.position }} ({% if schritt.gelenkt %}gelenkt{% else %}fest{% endif %})</strong>
                                 <p>{{ wechsel.lehrperson_aeusserung }}</p>
@@ -107,7 +107,7 @@
 
                     <h3>Urteile</h3>
                     <ul class="evallauf-urteile">
-                        {% for beurteilung in einsicht.beurteilungen %}
+                        {% for beurteilung in auswahl.beurteilungen %}
                             <li class="evallauf-blase">
                                 {% with urteil=beurteilung.urteil %}
                                     <strong class="{% if urteil.wirksam %}evallauf--erfuellt{% elif urteil.wirksam is False %}evallauf--nicht-erfuellt{% else %}evallauf--offen{% endif %}">{{ beurteilung.kriterium }} · {% if not urteil %}noch nicht beurteilt{% elif urteil.wirksam %}erfüllt{% elif urteil.wirksam is False %}nicht erfüllt{% else %}ohne Urteil{% endif %}{% if urteil.korrigiert %} · manuell korrigiert{% endif %}</strong>

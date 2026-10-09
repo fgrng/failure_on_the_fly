@@ -62,7 +62,7 @@ def evallauf(request: HttpRequest, pk: int) -> HttpResponse:
             "lauf": lauf,
             "uebersicht": lauf.uebersicht() if lauf else [],
             # Ein wartender Lauf hat noch keine Gespräche zum Nachlesen.
-            "einsicht": lauf.einsicht(
+            "auswahl": lauf.gespraech_waehlen(
                 _zahl(request.GET.get("input")), _zahl(request.GET.get("wiederholung"))
             )
             if lauf and lauf.zustand != Evallauf.Zustand.WARTET
@@ -136,7 +136,7 @@ def _urteil_aendern(
     with transaction.atomic():
         urteil: Urteil | None = (
             Urteil.objects.select_for_update()
-            .select_related("gespraech__evallauf")
+            .select_related("gespraech__evallauf__vignette")
             .filter(pk=urteil_pk, gespraech__evallauf__vignette=vignette)
             .first()
         )

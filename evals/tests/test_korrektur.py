@@ -11,8 +11,16 @@ from config.tests.aufbau import finale_vignette, konto_mit_rollen
 from config.tests.formular import submit_knoepfe, text_ohne_tags
 from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf, Urteil
-from evals.tests.aufbau import antworten, drei_fakes, finaler_katalog, urteile
+from evals.tests.aufbau import (
+    antworten,
+    drei_fakes,
+    finaler_katalog,
+    urteile,
+    fake_aktivieren,
+    waehrend_des_laufs,
+)
 from konten.models import Konto
+from simulation.models import Verwendung
 from vignetten.models import Vignette
 
 
@@ -95,7 +103,8 @@ def test_korrektur_macht_aus_zwei_von_drei_bestanden(ada: Konto) -> None:
 
     assert "3 von 3 · bestanden" in korrigiert
     assert "Fertig · Bestanden" in korrigiert
-    assert "Evallauf Fertig · Bestanden." in hinweis_korrigiert
+    assert "Evallauf Fertig · Bestanden · manuell korrigiert." in hinweis_korrigiert
+    assert "3 von 3 · bestanden · manuell korrigiert" in korrigiert
     assert "Muster gezeigt 3 von 3" in hinweis_korrigiert
 
 
@@ -128,14 +137,13 @@ def test_korrektur_haelt_original_person_und_zeitpunkt_getrennt_fest(
 
     vignette: Vignette = _abgearbeitet(ada)
 
-    _korrigieren(_client(ada), vignette, _urteil(2), "  Das Muster ist da.  ")
-
-    urteil: Urteil = _urteil(2)
-    assert (urteil.erfuellt, urteil.begruendung) == (False, "Begründung 2")
-    assert urteil.korrektur_begruendung == "Das Muster ist da."
-    assert urteil.korrigiert_von == ada
-    assert urteil.korrigiert_am is not None
-    assert urteil.wirksam is True
+    seite = text_ohne_tags(
+        _korrigieren(_client(ada), vignette, _urteil(2), "  Das Muster ist da.  ")
+    )
+    assert "Bewerter: nicht erfüllt · Begründung 2" in seite
+    assert "Korrektur von ada" in seite
+    assert "Das Muster ist da." in seite
+    assert "Muster gezeigt · erfüllt · manuell korrigiert" in seite
 
 
 @pytest.mark.django_db
@@ -165,12 +173,12 @@ def test_bestehende_korrektur_laesst_sich_aendern_ohne_historie(ada: Konto) -> N
     vignette.historie.eigentuemerinnen.add(grace)
     _korrigieren(_client(ada), vignette, _urteil(2), "Erste")
 
-    seite: str = _korrigieren(_client(grace), vignette, _urteil(2), "Zweite").content
-    urteil: Urteil = _urteil(2)
-
-    assert (urteil.korrektur_begruendung, urteil.korrigiert_von) == ("Zweite", grace)
-    assert urteil.wirksam is True
-    assert "Korrektur ändern" in [text for text, _ in submit_knoepfe(seite.decode())]
+    antwort = _korrigieren(_client(grace), vignette, _urteil(2), "Zweite")
+    seite = text_ohne_tags(antwort)
+    assert "Korrektur von grace" in seite and "Zweite" in seite
+    assert "Erste" not in seite
+    assert "Muster gezeigt · erfüllt · manuell korrigiert" in seite
+    assert "Korrektur ändern" in [text for text, _ in submit_knoepfe(antwort)]
 
 
 @pytest.mark.django_db
@@ -181,12 +189,10 @@ def test_ruecknahme_stellt_das_bewerterurteil_wieder_her(ada: Konto) -> None:
     vignette: Vignette = _abgearbeitet(ada)
     _korrigieren(_client(ada), vignette, _urteil(2))
 
-    _zuruecknehmen(_client(ada), vignette, _urteil(2))
-
-    urteil: Urteil = _urteil(2)
-    assert not urteil.korrigiert
-    assert (urteil.wirksam, urteil.korrektur_begruendung) == (False, "")
-    assert (urteil.korrigiert_von, urteil.korrigiert_am) == (None, None)
+    seite = text_ohne_tags(_zuruecknehmen(_client(ada), vignette, _urteil(2)))
+    assert "Muster gezeigt · nicht erfüllt" in seite
+    assert "manuell korrigiert" not in seite
+    assert "Korrektur von" not in seite
 
 
 @pytest.mark.django_db
@@ -200,7 +206,7 @@ def test_erfuelltes_urteil_laesst_sich_zu_nicht_erfuellt_korrigieren(
 
     seite: str = text_ohne_tags(_korrigieren(_client(ada), vignette, _urteil(1)))
 
-    assert _urteil(1).wirksam is False
+    assert "Muster gezeigt · nicht erfüllt · manuell korrigiert" in seite
     assert "1 von 3 · nicht bestanden" in seite
 
 
@@ -218,7 +224,9 @@ def test_korrektur_ohne_begruendung_wird_abgewiesen(
         _korrigieren(_client(ada), vignette, _urteil(2), begruendung)
     )
 
-    assert not _urteil(2).korrigiert
+    assert "manuell korrigiert" not in text_ohne_tags(
+        _client(ada).get(reverse("evals:evallauf", args=[vignette.pk]))
+    )
     assert "Eine Korrektur braucht eine Begründung." in seite
 
 
@@ -260,7 +268,7 @@ def test_ohne_urteil_und_gescheiterte_schuelerin_sind_nicht_korrigierbar(
         reverse("evals:evallauf", args=[vignette.pk]), {"wiederholung": 2}
     )
 
-    assert not Urteil.objects.exclude(korrigiert_am=None).exists()
+    assert "manuell korrigiert" not in ohne_urteil + gescheitert
     assert "Nur Bewerterurteile lassen sich korrigieren." in ohne_urteil
     assert "Nur Bewerterurteile lassen sich korrigieren." in gescheitert
     assert "Als erfüllt werten" not in [text for text, _ in submit_knoepfe(antwort)]
@@ -274,19 +282,24 @@ def test_offener_lauf_bleibt_schreibgeschuetzt(
 ) -> None:
     """Solange ein Lauf wartet oder läuft, gibt es weder Formular noch Korrektur."""
 
-    vignette: Vignette = _abgearbeitet(ada)
-    Evallauf.objects.filter(vignette=vignette).update(zustand=zustand)
-
+    vignette: Vignette = finale_vignette(ada).bearbeiten()
+    lauf: Evallauf = Evallauf.objects.ausloesen(vignette)
     client: Client = _client(ada)
 
-    seite: str = text_ohne_tags(_korrigieren(client, vignette, _urteil(2)))
-    antwort: HttpResponse = client.get(
-        reverse("evals:evallauf", args=[vignette.pk]), {"wiederholung": 2}
-    )
+    def pruefen() -> None:
+        seite: str = text_ohne_tags(_korrigieren(client, vignette, _urteil(2)))
+        antwort: HttpResponse = client.get(
+            reverse("evals:evallauf", args=[vignette.pk]), {"wiederholung": 2}
+        )
+        assert "Nur abgeschlossene Evalläufe lassen sich korrigieren." in seite
+        assert "manuell korrigiert" not in text_ohne_tags(antwort)
+        assert "Als erfüllt werten" not in [text for text, _ in submit_knoepfe(antwort)]
 
-    assert not _urteil(2).korrigiert
-    assert "Nur abgeschlossene Evalläufe lassen sich korrigieren." in seite
-    assert "Als erfüllt werten" not in [text for text, _ in submit_knoepfe(antwort)]
+    if zustand == Evallauf.Zustand.WARTET:
+        evallauf_ausfuehren(lauf)
+        pruefen()
+    else:
+        waehrend_des_laufs(pruefen, nach_aufrufen=4)
 
 
 @pytest.mark.django_db
@@ -300,9 +313,8 @@ def test_abgebrochener_lauf_bleibt_nach_korrektur_abgebrochen(ada: Konto) -> Non
 
     seite: str = text_ohne_tags(_korrigieren(_client(ada), vignette, _urteil(1)))
 
-    lauf: Evallauf = Evallauf.objects.get(vignette=vignette)
-    assert lauf.zustand == Evallauf.Zustand.ABGEBROCHEN
-    assert not lauf.bestanden
+    assert "Der Evallauf wurde abgebrochen." in seite
+    assert "Fertig · Bestanden" not in seite
     assert "1 von 2 · nicht bestanden" in seite
     assert "1 noch nicht ausgeführt" in seite
 
@@ -315,16 +327,16 @@ def test_korrektur_aendert_weder_veraltet_noch_die_fassung(ada: Konto) -> None:
     vignette: Vignette = _abgearbeitet(ada, finale_vignette(ada))
     vignette.refresh_from_db()
     stand = vignette.geaendert_am
-    Evallauf.objects.filter(vignette=vignette).update(
-        vignette_geaendert_am=stand.replace(year=2000)
-    )
+    fake_aktivieren(Verwendung.BEWERTER, urteile(True, False, True))
 
     _korrigieren(_client(ada), vignette, _urteil(2))
 
     vignette.refresh_from_db()
     assert vignette.geaendert_am == stand
     assert vignette.zustand == Vignette.Zustand.FINAL
-    assert Evallauf.objects.get(vignette=vignette).veraltet
+    assert "Konfiguration Bewerter gewechselt" in text_ohne_tags(
+        _client(ada).get(reverse("evals:evallauf", args=[vignette.pk]))
+    )
 
 
 @pytest.mark.django_db
@@ -340,7 +352,7 @@ def test_neuer_lauf_ersetzt_den_alten_samt_korrekturen(ada: Konto) -> None:
 
     seite: str = text_ohne_tags(_korrigieren(_client(ada), vignette, altes))
 
-    assert not Urteil.objects.exclude(korrigiert_am=None).exists()
+    assert "manuell korrigiert" not in seite
     assert "Dieses Urteil gehört nicht zum aktuellen Evallauf." in seite
     assert "2 von 3 · nicht bestanden" in seite
 
@@ -362,7 +374,7 @@ def test_urteil_einer_anderen_fassung_laesst_sich_nicht_ueber_diese_aendern(
 
     seite: str = text_ohne_tags(_korrigieren(_client(ada), eigene, fremdes))
 
-    assert not Urteil.objects.exclude(korrigiert_am=None).exists()
+    assert "manuell korrigiert" not in seite
     assert "Dieses Urteil gehört nicht zum aktuellen Evallauf." in seite
 
 
@@ -384,7 +396,9 @@ def test_fremde_und_teilnehmende_duerfen_nicht_korrigieren(ada: Konto) -> None:
     assert lin.post(ruecknahme).status_code == 404
     assert tom.post(adresse, {"begruendung": "x"}).status_code == 403
     assert tom.get(reverse("evals:evallauf", args=[vignette.pk])).status_code == 403
-    assert not _urteil(2).korrigiert
+    assert "manuell korrigiert" not in text_ohne_tags(
+        _client(ada).get(reverse("evals:evallauf", args=[vignette.pk]))
+    )
 
 
 @pytest.mark.django_db
@@ -395,9 +409,8 @@ def test_administration_darf_korrigieren(ada: Konto) -> None:
     vignette: Vignette = _abgearbeitet(ada)
     admin: Konto = konto_mit_rollen("admin", is_superuser=True)
 
-    _korrigieren(_client(admin), vignette, _urteil(2))
-
-    assert _urteil(2).korrigiert_von == admin
+    seite = text_ohne_tags(_korrigieren(_client(admin), vignette, _urteil(2)))
+    assert "Korrektur von admin" in seite
 
 
 @pytest.mark.django_db
@@ -414,18 +427,46 @@ def test_korrektur_nur_per_post_mit_csrf(ada: Konto) -> None:
 
     assert _client(ada).get(adresse).status_code == 405
     assert ohne_token.post(adresse, {"begruendung": "x"}).status_code == 403
-    assert not _urteil(2).korrigiert
+    assert "manuell korrigiert" not in text_ohne_tags(
+        _client(ada).get(reverse("evals:evallauf", args=[vignette.pk]))
+    )
 
 
 @pytest.mark.django_db
 def test_korrigieren_am_modell_prueft_den_laufzustand(ada: Konto) -> None:
-    """Auch ohne View ist ein laufender Lauf geschützt."""
+    """Auch ohne View ist ein offener Lauf geschützt."""
 
     finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
     drei_fakes(schuelerin=antworten(1), bewerter=urteile(False))
     lauf: Evallauf = Evallauf.objects.ausloesen(finale_vignette(ada))
     evallauf_ausfuehren(lauf)
-    Evallauf.objects.filter(pk=lauf.pk).update(zustand=Evallauf.Zustand.LAEUFT)
 
     with pytest.raises(ValidationError):
         _urteil(1).korrigieren("Falsch", ada)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_von_drei")
+@pytest.mark.parametrize("aktion", ["korrigieren", "aendern", "zuruecknehmen"])
+def test_archivierte_fassung_behaelt_ihre_urteile(ada: Konto, aktion: str) -> None:
+    """Archivierung sperrt neue Korrekturen, Änderungen und Rücknahmen samt Formular."""
+
+    vignette: Vignette = _abgearbeitet(ada, finale_vignette(ada))
+    client: Client = _client(ada)
+    urteil: Urteil = _urteil(2)
+    if aktion != "korrigieren":
+        _korrigieren(client, vignette, urteil, "Bestehende Korrektur")
+    vignette.archivieren()
+
+    antwort = (
+        _zuruecknehmen(client, vignette, urteil)
+        if aktion == "zuruecknehmen"
+        else _korrigieren(client, vignette, urteil, "Neue Korrektur")
+    )
+    seite = text_ohne_tags(antwort)
+    assert "Urteile archivierter Fassungen lassen sich nicht korrigieren." in seite
+    assert "Neue Korrektur" not in seite
+    assert ("Bestehende Korrektur" in seite) == (aktion != "korrigieren")
+    assert not {"Als erfüllt werten", "Korrektur ändern", "Korrektur zurücknehmen"} & {
+        text for text, _ in submit_knoepfe(antwort)
+    }

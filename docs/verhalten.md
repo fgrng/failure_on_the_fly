@@ -654,17 +654,21 @@ Bewerterurteil mit seiner Begründung; überschrieben wird es nie. „Korrektur
 Fassungen, „Korrektur zurücknehmen“ lässt wieder das Bewerterurteil gelten. Das
 wirksame Urteil bestimmt überall Quote und Bestehen: in den Quoten links, im
 Gesamtergebnis und im Hinweis beim Finalisieren; aus „2 von 3 · nicht bestanden“
-wird so „3 von 3 · bestanden“ und mit der Rücknahme wieder umgekehrt. Nicht
-korrigierbar sind Kriterien ohne Urteil, nicht ausgeführte Wiederholungen und
-die automatisch nicht erfüllten Urteile eines endgültig gescheiterten
-Antwortversuchs; ein wartender oder laufender Lauf ist schreibgeschützt. Ein
-abgebrochener Lauf bleibt auch mit korrigierten Urteilen abgebrochen und nennt
-kein Gesamtergebnis. Korrigieren und Zurücknehmen laufen per POST mit
-CSRF-Schutz und prüfen Fassung, Laufzustand und Zuordnung des Urteils frisch;
-ein Urteil, das nicht zum aktuellen Lauf der Fassung gehört (etwa aus einem
-alten Browserstand nach „Erneut prüfen“), wird mit Meldung abgewiesen. Eine
-Korrektur ändert weder die Fassung noch „veraltet“. Ein neuer Lauf ersetzt den
-alten samt Korrekturen; auf neue Urteile wird nichts übertragen.
+wird so „3 von 3 · bestanden“ und mit der Rücknahme wieder umgekehrt. Manuelle
+Korrekturen sind auch an den Quoten, im Laufstand und im Finalisierungs-Hinweis
+als „manuell korrigiert“ gekennzeichnet. Nicht korrigierbar sind Kriterien ohne
+Urteil, nicht ausgeführte Wiederholungen und die automatisch nicht erfüllten
+Urteile eines endgültig gescheiterten Antwortversuchs; ein wartender oder
+laufender Lauf ist schreibgeschützt. Archivierte Fassungen bleiben lesbar,
+erlauben aber weder neue Korrekturen noch Änderungen oder Rücknahmen bestehender
+Korrekturen. Ein abgebrochener Lauf bleibt auch mit korrigierten Urteilen
+abgebrochen und nennt kein Gesamtergebnis. Korrigieren und Zurücknehmen laufen
+per POST mit CSRF-Schutz und prüfen Fassung, Laufzustand und Zuordnung des
+Urteils frisch; ein Urteil, das nicht zum aktuellen Lauf der Fassung gehört
+(etwa aus einem alten Browserstand nach „Erneut prüfen“), wird mit Meldung
+abgewiesen. Eine Korrektur ändert weder die Fassung noch „veraltet“. Ein neuer
+Lauf ersetzt den alten samt Korrekturen; auf neue Urteile wird nichts
+übertragen.
 
 ## Transkriptions-Konfiguration
 

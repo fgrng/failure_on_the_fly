@@ -10,7 +10,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 _LAEUFT_SCHON: str = "Für diese Fassung wartet oder läuft bereits ein Evallauf."
+_NICHT_VERFUEGBAR: str = "Evals sind derzeit nicht verfügbar."
 
 # Was ein Urteil beurteilt: ein Evalkriterium oder ein übergreifendes Kriterium.
 type Kriterium = Evalkriterium | UebergreifendesKriterium
@@ -46,6 +47,8 @@ class Zelle:
     nicht_erfuellt: int
     ohne_urteil: int
     k: int
+    # Wie viele der Urteile eine manuelle Korrektur umkehrt.
+    korrigiert: int = 0
 
     @property
     def bestanden(self) -> bool:
@@ -89,7 +92,7 @@ class Beurteilung:
 
 
 @dataclass(frozen=True)
-class Einsicht:
+class Gespraechsauswahl:
     """Das gewählte Evalgespräch eines Laufs; ohne Gespräch nicht ausgeführt."""
 
     eval_name: str
@@ -120,18 +123,15 @@ class EvallaufManager(models.Manager["Evallauf"]):
         scheitert eine Prüfung, bleibt er unverändert.
         """
 
-        if not evals_verfuegbar():
-            raise ValidationError("Evals sind derzeit nicht verfügbar.")
-        try:
-            with transaction.atomic():
-                return self._ausloesen(Vignette.objects.get(pk=vignette.pk))
-        except IntegrityError:
-            raise ValidationError(_LAEUFT_SCHON) from None
+        with transaction.atomic():
+            return self._ausloesen(Vignette.objects.get(pk=vignette.pk))
 
     def _ausloesen(self, vignette: Vignette) -> "Evallauf":
         # Prüft und ersetzt in einer Transaktion; der Stand der Fassung ist
         # der eben gelesene, nicht der eines älteren Objekts der Aufruferin.
 
+        if not evals_verfuegbar():
+            raise ValidationError(_NICHT_VERFUEGBAR)
         if vignette.zustand == Vignette.Zustand.ARCHIVIERT:
             raise ValidationError("Archivierte Fassungen lassen sich nicht prüfen.")
         if vignette.gepinnter_kern is None:
@@ -254,6 +254,14 @@ class Evallauf(models.Model):
         ).exists()
 
     @property
+    def manuell_korrigiert(self) -> bool:
+        """Ob mindestens eine manuelle Korrektur ein Bewerterurteil umkehrt."""
+
+        return Urteil.objects.filter(
+            gespraech__evallauf=self, korrigiert_am__isnull=False
+        ).exists()
+
+    @property
     def bestanden(self) -> bool:
         """Insgesamt bestanden nur als fertiger Lauf, in dem jede Zelle besteht.
 
@@ -276,6 +284,9 @@ class Evallauf(models.Model):
         ohne_urteil=0, k=3)``, und sie besteht nicht.
         """
 
+        urteile: list[Urteil] = list(
+            Urteil.objects.filter(gespraech__evallauf=self).select_related("gespraech")
+        )
         # Je Evalinput, Kriterium und wirksamem Ausgang (erfüllt, nicht
         # erfüllt, ohne Urteil) die Zahl der Urteile.
         zaehler: Counter[tuple[int, type[Kriterium], int, bool | None]] = Counter(
@@ -284,9 +295,13 @@ class Evallauf(models.Model):
                 *urteil.kriterium_schluessel,
                 urteil.wirksam,
             )
-            for urteil in Urteil.objects.filter(
-                gespraech__evallauf=self
-            ).select_related("gespraech")
+            for urteil in urteile
+        )
+        # Je Evalinput und Kriterium die Zahl der korrigierten Urteile.
+        korrigierte: Counter[tuple[int, type[Kriterium], int]] = Counter(
+            (urteil.gespraech.evalinput_id, *urteil.kriterium_schluessel)
+            for urteil in urteile
+            if urteil.korrigiert
         )
         ergebnisse: list[Evalergebnis] = []
         for eval_, kriterien in self.evals_mit_kriterien():
@@ -307,6 +322,7 @@ class Evallauf(models.Model):
                             nicht_erfuellt=zaehler[(*schluessel, False)],
                             ohne_urteil=zaehler[(*schluessel, None)],
                             k=self.katalog.k,
+                            korrigiert=korrigierte[schluessel],
                         )
                     )
                 zeilen.append(
@@ -321,9 +337,9 @@ class Evallauf(models.Model):
             )
         return ergebnisse
 
-    def einsicht(
+    def gespraech_waehlen(
         self, evalinput_pk: int | None, wiederholung: int | None
-    ) -> Einsicht | None:
+    ) -> Gespraechsauswahl | None:
         """Das Gespräch zu Evalinput und Wiederholung; ohne Evalinput keins.
 
         Ein Evalinput außerhalb des festgehaltenen Katalogs weicht dem ersten,
@@ -361,7 +377,7 @@ class Evallauf(models.Model):
             else {}
         )
         schritte: list[Inputschritt] = list(evalinput.schritte.all())
-        return Einsicht(
+        return Gespraechsauswahl(
             _anzeigename(eval_),
             nummer,
             evalinput,
@@ -599,7 +615,7 @@ class Urteil(models.Model):
 
     @property
     def korrigierbar(self) -> bool:
-        """Ob es ein fachliches Bewerterurteil eines abgeschlossenen Laufs ist."""
+        """Ob es ein fachliches Bewerterurteil eines abgeschlossenen Laufs einer nicht archivierten Fassung ist."""
 
         try:
             self._korrigierbar_pruefen()
@@ -608,9 +624,14 @@ class Urteil(models.Model):
         return True
 
     def _korrigierbar_pruefen(self) -> None:
-        # Korrigierbar sind fachliche Bewerterurteile abgeschlossener Läufe;
-        # kein fehlendes und keines, das ein gescheiterter Antwortversuch setzte.
+        # Korrigierbar sind fachliche Bewerterurteile abgeschlossener Läufe
+        # über Entwürfen und finalen Fassungen; kein fehlendes und keines, das
+        # ein gescheiterter Antwortversuch setzte.
 
+        if self.gespraech.evallauf.vignette.zustand == Vignette.Zustand.ARCHIVIERT:
+            raise ValidationError(
+                "Urteile archivierter Fassungen lassen sich nicht korrigieren."
+            )
         if self.gespraech.evallauf.ist_offen:
             raise ValidationError(
                 "Nur abgeschlossene Evalläufe lassen sich korrigieren."

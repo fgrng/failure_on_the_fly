@@ -5,14 +5,14 @@
 <div class="vignette-detail-evalhinweis" id="finalisieren-evalhinweis">
     <p>
         <strong>Vor dem Finalisieren:</strong>
-        {% if not lauf %}Noch kein Evallauf.{% else %}Evallauf {{ lauf.get_zustand_display }}{% if lauf.zustand == "fertig" %} · {% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}{% endif %}{% if lauf.veraltet %} · Veraltet ({{ lauf.veraltungsgruende|join:", " }}){% endif %}{% if lauf.unvollstaendig %} · Unvollständig{% endif %}.{% endif %}
+        {% if not lauf %}Noch kein Evallauf.{% else %}Evallauf {{ lauf.get_zustand_display }}{% if lauf.zustand == "fertig" %} · {% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}{% endif %}{% if lauf.manuell_korrigiert %} · manuell korrigiert{% endif %}{% if lauf.veraltet %} · Veraltet ({{ lauf.veraltungsgruende|join:", " }}){% endif %}{% if lauf.unvollstaendig %} · Unvollständig{% endif %}.{% endif %}
         Finalisieren ist in jedem Fall möglich. <a href="{% url 'evals:evallauf' vignette.pk %}">Evals ansehen</a>
     </p>
     {% if lauf and lauf.zustand != "wartet" %}
         <ul>
             {% for ergebnis in lauf.uebersicht %}
                 {% for zeile in ergebnis.zeilen %}
-                    <li>{{ ergebnis.name }} · Evalinput {{ zeile.nummer }}: {% for zelle in zeile.zellen %}{{ zelle.kriterium }} {{ zelle.erfuellt }} von {{ zelle.k }}{% if zelle.ohne_urteil or zelle.ausstehend %} ({% if zelle.ohne_urteil %}{{ zelle.ohne_urteil }} ohne Urteil{% endif %}{% if zelle.ohne_urteil and zelle.ausstehend %}, {% endif %}{% if zelle.ausstehend %}{{ zelle.ausstehend }} noch nicht ausgeführt{% endif %}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+                    <li>{{ ergebnis.name }} · Evalinput {{ zeile.nummer }}: {% for zelle in zeile.zellen %}{{ zelle.kriterium }} {{ zelle.erfuellt }} von {{ zelle.k }}{% if zelle.korrigiert %} · manuell korrigiert{% endif %}{% if zelle.ohne_urteil or zelle.ausstehend %} ({% if zelle.ohne_urteil %}{{ zelle.ohne_urteil }} ohne Urteil{% endif %}{% if zelle.ohne_urteil and zelle.ausstehend %}, {% endif %}{% if zelle.ausstehend %}{{ zelle.ausstehend }} noch nicht ausgeführt{% endif %}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
                 {% endfor %}
             {% endfor %}
         </ul>

@@ -8,7 +8,7 @@
         {% if not lauf %}
             <span>Noch nicht geprüft</span>
         {% elif lauf.zustand == "fertig" %}
-            <span>Fertig · {% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}</span>{% if lauf.unvollstaendig %} <span class="evallauf--offen">· Unvollständig</span>{% endif %}
+            <span>Fertig · {% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}{% if lauf.manuell_korrigiert %} · manuell korrigiert{% endif %}</span>{% if lauf.unvollstaendig %} <span class="evallauf--offen">· Unvollständig</span>{% endif %}
         {% else %}
             <span>{{ lauf.get_zustand_display }}</span>
         {% endif %}

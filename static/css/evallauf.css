@@ -2,15 +2,15 @@
    Evalgespräch. Spalten, Trennlinie und Auswahl kommen aus evalkatalog.css,
    Felder aus vignette-form.css. */
 
-.evallauf-einsicht {
+.evallauf-auswahl {
     grid-template-columns: minmax(190px, 1fr) minmax(0, 2fr);
     padding-top: var(--space-3);
     border-top: 1px solid var(--color-border);
 }
 
-.evallauf-einsicht > * { min-width: 0; }
+.evallauf-auswahl > * { min-width: 0; }
 /* Hält die Trennlinie rechts, bis der Hauptbereich schmal wird. */
-.evallauf-einsicht .evallauf-inputs { padding: 0 var(--space-3) 0 0; border-right: 1px solid var(--color-border); border-bottom: 0; }
+.evallauf-auswahl .evallauf-inputs { padding: 0 var(--space-3) 0 0; border-right: 1px solid var(--color-border); border-bottom: 0; }
 .evallauf-inputs h2 { margin: 0; font-size: 1.05rem; }
 
 .evallauf-inputs a {
@@ -81,7 +81,7 @@
 
 /* Erst auf schmalem Hauptbereich stehen die Spalten untereinander. */
 @container hauptbereich (max-width: 560px) {
-    .evallauf-einsicht { grid-template-columns: minmax(0, 1fr); }
-    .evallauf-einsicht .evallauf-inputs { padding: 0 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
+    .evallauf-auswahl { grid-template-columns: minmax(0, 1fr); }
+    .evallauf-auswahl .evallauf-inputs { padding: 0 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
     .evallauf-zeile { flex-direction: column; align-items: start; }
 }
