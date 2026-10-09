@@ -71,7 +71,7 @@ extend-ignore-names = ["_meta"]
 "**/migrations/**" = ["D1", "SLF001", "PLC2701"]
 # Übergangsliste (#321): Bestandstreffer von SLF001, dateiweise statt per Glob,
 # damit neue Dateien der Regel sofort unterliegen. Die Liste wird nur kürzer;
-# die Umsetzungstickets zu den Testreviews streichen bereinigte Dateien.
+# Testdateien stehen nicht mehr darauf (#391), es bleibt Produktionscode.
 "fragebogen_items/models.py" = ["SLF001"]
 "simulation/lebenszyklus.py" = ["SLF001"]
 "simulation/models.py" = ["SLF001"]
