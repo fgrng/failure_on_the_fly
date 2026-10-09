@@ -182,3 +182,19 @@ einmal existiert.
   Löschschutz und Vertragstest aufgenommen. Wer stattdessen ein eigenes M2M-Feld
   deklariert, fällt aus allen dreien heraus, ohne dass etwas rot wird — das ist
   die verbleibende Bruchstelle.
+
+## Nachtrag (2026-10): auch die Views sind gemeinsam
+
+Die Views „Eigentümerin hinzufügen“ und „Eigentümerin entfernen“ existieren
+einmal, in `konten/eigentuemer_views.py` (#364, aus dem Architektur-Review
+#255). `eigentuemer_views()` baut das Paar; jede Bestands-App bindet es mit
+dem ein, was sich wirklich unterscheidet: ihrer Rollenprüfung, einer
+Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg liefert
+(bei Vignette und Fragebogen-Item trägt die Historie den Kreis, der Rückweg
+führt auf die Fassung), und ihrer Liste als Ziel nach dem Selbstaustritt.
+URLs, Rollenprüfungen und Rückwege sind unverändert.
+
+Die Kante zeigt weiter von den Apps auf `konten`; der Importgraph-Test in
+`sitzungen/tests/test_importgraph.py` hält fest, dass `konten` keine der vier
+Bestands-Apps importiert. Eine gemeinsame Lebenszyklus-Hülle folgt daraus
+nicht: Sie ist in #255 ausdrücklich verworfen, ADR-0017 gilt fort.

@@ -2,11 +2,12 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
 from sitzungen.bindungen import Bindung
+from vignetten.models import vignette_archiviert
 
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
@@ -164,15 +165,11 @@ def _archivierte_vignette_aus_trainings_entfernen(
     **kwargs: object,
 ) -> None:
     """Entfernt eine gerade archivierte Vignette aus allen Trainings."""
-    from vignetten.models import Vignette
-
-    if instance.zustand == Vignette.Zustand.ARCHIVIERT:
-        Training.vignetten.through.objects.filter(vignette_id=instance.pk).delete()
+    Training.vignetten.through.objects.filter(vignette_id=instance.pk).delete()
 
 
-post_save.connect(
+vignette_archiviert.connect(
     _archivierte_vignette_aus_trainings_entfernen,
-    sender="vignetten.Vignette",
     dispatch_uid="training.archivierte_vignette_aus_trainings_entfernen",
 )
 

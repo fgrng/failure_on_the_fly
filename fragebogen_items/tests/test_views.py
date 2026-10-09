@@ -136,6 +136,21 @@ class FragebogenItemFinalisierenViewTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_abgelehntes_finalisieren_erscheint_als_meldung(self) -> None:
+        """Ein Entwurf ohne Wortlaut bleibt Entwurf, die Ablehnung wird Meldung."""
+        leer: FragebogenItem = FragebogenItem.objects.anlegen(self.ada)
+
+        response: HttpResponse = self.client.post(
+            reverse("fragebogen_items:finalisieren", args=[leer.pk]), follow=True
+        )
+
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[leer.pk])
+        )
+        self.assertContains(response, "Zum Finalisieren fehlt der Wortlaut.")
+        leer.refresh_from_db()
+        self.assertEqual(leer.zustand, FragebogenItem.Zustand.ENTWURF)
+
 
 class FragebogenItemReversionierenViewTests(TestCase):
     """Finale Fassungen erhalten im Editor einen bearbeitbaren Folgeentwurf."""

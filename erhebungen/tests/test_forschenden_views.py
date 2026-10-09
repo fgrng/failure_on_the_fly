@@ -547,6 +547,20 @@ class ErhebungenKoForschendenViewTests(TestCase):
         self.assertFalse(erhebung.eigentuemerinnen.filter(pk=ohne_rolle.pk).exists())
         self.assertFalse(ohne_rolle.groups.exists())
 
+    def test_teilen_mit_unlesbarem_konto_findet_niemanden(self) -> None:
+        """Ein Konto-Feld ohne Zahl endet wie ein unbekanntes Konto, nicht im 500."""
+        ada: Konto = get_user_model().objects.create_user(username="ada")
+        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
+        self.client.force_login(ada)
+
+        hinzufuegen: HttpResponse = self.client.post(
+            reverse("erhebungen:eigentuemerin_hinzufuegen", args=[erhebung.pk]),
+            {"konto": "ada"},
+        )
+
+        self.assertEqual(hinzufuegen.status_code, 404)
+
     def test_administration_kann_fremde_erhebung_uebergeben(self) -> None:
         """Die Administration kann eine fremde Forschende durch eine andere ablösen."""
         grace: Konto = get_user_model().objects.create_user(username="grace")

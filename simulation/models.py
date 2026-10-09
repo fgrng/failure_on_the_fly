@@ -86,7 +86,7 @@ class SimulationskernQuerySet(models.QuerySet["Simulationskern"]):
         """Löscht gesammelt ausschließlich Entwürfe."""
 
         if self.exclude(zustand=Simulationskern.Zustand.ENTWURF).exists():
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
+            raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete()
 
     def bulk_create(
@@ -126,7 +126,7 @@ class SimulationskernManager(models.Manager.from_queryset(SimulationskernQuerySe
 
         historie, _ = KernHistorie.objects.get_or_create(pk=1)
         if self.filter(historie=historie).exists():
-            raise ValueError("Der Simulationskern wurde bereits angelegt.")
+            raise ValidationError("Der Simulationskern wurde bereits angelegt.")
         return self._erstellen(
             historie=historie,
             system_prompt_vorlage=system_prompt_vorlage,
@@ -215,12 +215,12 @@ class Simulationskern(models.Model):
         else:
             vorherige_fassung: Simulationskern = type(self).objects.get(pk=self.pk)
             if vorherige_fassung.zustand != self.Zustand.ENTWURF:
-                raise RuntimeError(_KERN_UNVERAENDERLICH_FEHLERMELDUNG)
+                raise ValidationError(_KERN_UNVERAENDERLICH_FEHLERMELDUNG)
             if (
                 self.zustand != vorherige_fassung.zustand
                 or self.finalisiert_am != vorherige_fassung.finalisiert_am
             ):
-                raise RuntimeError(
+                raise ValidationError(
                     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
                 )
         super().save(*args, **kwargs)
@@ -236,7 +236,7 @@ class Simulationskern(models.Model):
             )
             .exists()
         ):
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
+            raise ValidationError("Nur Entwürfe dürfen physisch gelöscht werden.")
         return super().delete(*args, **kwargs)
 
     def _schreibqueryset(self) -> models.QuerySet["Simulationskern"]:
@@ -256,7 +256,7 @@ class Simulationskern(models.Model):
             )
             .exists()
         ):
-            raise ValueError("Die Kern-Fassung wurde inzwischen geändert.")
+            raise ValidationError("Die Kern-Fassung wurde inzwischen geändert.")
         if (
             type(self)
             .objects.filter(
@@ -265,7 +265,7 @@ class Simulationskern(models.Model):
             )
             .exists()
         ):
-            raise ValueError("Ein Kern-Entwurf existiert bereits.")
+            raise ValidationError("Ein Kern-Entwurf existiert bereits.")
         return type(self).objects._erstellen(
             historie=self.historie,
             vorgaengerin=self,
@@ -282,19 +282,20 @@ class Simulationskern(models.Model):
     def finalisieren(self) -> None:
         """Finalisiert einen vertragskonformen Entwurf."""
 
-        if self.zustand != self.Zustand.ENTWURF:
-            raise ValueError("Nur Entwürfe können finalisiert werden.")
         self.full_clean()
-        self.save()
         finalisiert_am: datetime = timezone.now()
         # Die bisherige finale Fassung weicht vor dem eigenen Zustandswechsel:
         # Der partielle Unique-Index duldet zwei finale Fassungen keine
         # Anweisung lang nebeneinander. Bei der ersten Fassung der Historie
-        # trifft das Archivieren keine Zeile.
+        # trifft das Archivieren keine Zeile; scheitert der Übergang, rollt
+        # die Transaktion es zurück.
         self._schreibqueryset().filter(
             historie=self.historie,
             zustand=self.Zustand.FINAL,
         ).update(zustand=self.Zustand.ARCHIVIERT)
+        # Der geprüfte Inhalt geht mit dem Zustandswechsel in dieselbe
+        # Anweisung; ein save() davor schlüge bei einer inzwischen
+        # finalisierten Fassung mit der Unveränderlichkeit fehl.
         if (
             not self._schreibqueryset()
             .filter(
@@ -304,9 +305,16 @@ class Simulationskern(models.Model):
             .update(
                 zustand=self.Zustand.FINAL,
                 finalisiert_am=finalisiert_am,
+                system_prompt_vorlage=self.system_prompt_vorlage,
+                user_prompt_vorlage=self.user_prompt_vorlage,
+                rahmenhandlung_einleitung=self.rahmenhandlung_einleitung,
+                rahmenhandlung_gespraechseinleitung=(
+                    self.rahmenhandlung_gespraechseinleitung
+                ),
+                rahmenhandlung_debrief=self.rahmenhandlung_debrief,
             )
         ):
-            raise ValueError("Der Kern-Entwurf wurde inzwischen geändert.")
+            raise ValidationError("Nur Entwürfe können finalisiert werden.")
         self.zustand = self.Zustand.FINAL
         self.finalisiert_am = finalisiert_am
 

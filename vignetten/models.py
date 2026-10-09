@@ -11,6 +11,7 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
+from django.dispatch import Signal
 from django.utils import timezone
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
@@ -111,6 +112,11 @@ FELDBESCHRIFTUNGEN: dict[str, str] = {
 
 if TYPE_CHECKING:
     from konten.models import Konto
+
+
+# Geht nach jedem Archivieren an andere Apps (z. B. training), weil der
+# Zustandswechsel als bedingte Aktualisierung kein post_save auslöst.
+vignette_archiviert: Signal = Signal()
 
 
 def vignetten_bild_pfad(_: "Vignette", dateiname: str) -> str:
@@ -451,9 +457,7 @@ class Vignette(models.Model):
                 raise RuntimeError("Vignetten werden über die Anlege-Naht erzeugt.")
         else:
             gespeicherte_fassung: Vignette = type(self).objects.get(pk=self.pk)
-            if self.zustand != gespeicherte_fassung.zustand and not getattr(
-                self, "_wechselt_zustand", False
-            ):
+            if self.zustand != gespeicherte_fassung.zustand:
                 raise ValidationError(
                     "Zustandswechsel laufen über die Lebenszyklus-Methoden."
                 )
@@ -461,7 +465,6 @@ class Vignette(models.Model):
                 getattr(self, modellfeld.attname)
                 != getattr(gespeicherte_fassung, modellfeld.attname)
                 for modellfeld in self._meta.local_fields
-                if modellfeld.name != "zustand"
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         super().save(*args, **kwargs)
@@ -482,16 +485,24 @@ class Vignette(models.Model):
         _fassungslose_historien_entfernen([historie_id])
         return ergebnis
 
-    def _zustand_wechseln(self, zustand: str, update_fields: list[str]) -> None:
-        """Speichert einen ausschließlich intern ausgelösten Zustandsübergang."""
-        # Anders als beim Kern hält save() die Vignetten-Unveränderlichkeit;
-        # daher laufen ihre Zustandskanten über diese geschützte Schreibnaht.
-        self._wechselt_zustand = True
-        try:
-            self.zustand = zustand
-            self.save(update_fields=update_fields)
-        finally:
-            del self._wechselt_zustand
+    def _zustand_wechseln(
+        self,
+        erwarteter_zustand: str,
+        zielzustand: str,
+        fehlermeldung: str,
+        **aktualisierungen: object,
+    ) -> None:
+        # Prüft und schreibt einen Zustandsübergang in einer bedingten
+        # Aktualisierung; die öffentliche update()-Route bleibt gesperrt.
+        if (
+            not models.QuerySet(model=type(self), using=self._state.db)
+            .filter(pk=self.pk, zustand=erwarteter_zustand)
+            .update(zustand=zielzustand, **aktualisierungen)
+        ):
+            raise ValidationError(fehlermeldung)
+        self.zustand = zielzustand
+        for feld, wert in aktualisierungen.items():
+            setattr(self, feld, wert)
 
     @transaction.atomic
     def bearbeiten(self) -> "Vignette":
@@ -548,38 +559,25 @@ class Vignette(models.Model):
     @transaction.atomic
     def archivieren(self) -> None:
         """Archiviert eine finale Fassung."""
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.FINAL,
-            )
-            .exists()
-        ):
-            raise ValidationError("Nur finale Fassungen können archiviert werden.")
-        self._zustand_wechseln(self.Zustand.ARCHIVIERT, ["zustand"])
+        self._zustand_wechseln(
+            self.Zustand.FINAL,
+            self.Zustand.ARCHIVIERT,
+            "Nur finale Fassungen können archiviert werden.",
+        )
+        vignette_archiviert.send(sender=type(self), instance=self)
 
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.ARCHIVIERT,
-            )
-            .exists()
-        ):
-            raise ValidationError(
-                "Nur archivierte Fassungen können entarchiviert werden."
-            )
-        self._zustand_wechseln(self.Zustand.FINAL, ["zustand"])
+        self._zustand_wechseln(
+            self.Zustand.ARCHIVIERT,
+            self.Zustand.FINAL,
+            "Nur archivierte Fassungen können entarchiviert werden.",
+        )
 
     @transaction.atomic
     def finalisieren(self) -> None:
         """Prüft einen Entwurf und friert ihn als finale Fassung ein."""
-        if self.zustand != self.Zustand.ENTWURF:
-            raise ValidationError("Nur Entwürfe können finalisiert werden.")
         fehlende_beschriftungen: list[str] = [
             FELDBESCHRIFTUNGEN[feldname]
             for feldname in _PFLICHTFELD_NAMEN
@@ -610,10 +608,11 @@ class Vignette(models.Model):
         # gepinnt wurde (ADR-0003). Die Detailansicht weist darauf hin
         # (kern_pin_ueberholt), Vorspulen bleibt eine Wahl der Autor:in.
 
-        self.finalisiert_am = timezone.now()
         self._zustand_wechseln(
+            self.Zustand.ENTWURF,
             self.Zustand.FINAL,
-            ["zustand", "finalisiert_am"],
+            "Nur Entwürfe können finalisiert werden.",
+            finalisiert_am=timezone.now(),
         )
 
     class Meta:

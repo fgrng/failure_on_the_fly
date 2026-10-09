@@ -22,3 +22,7 @@ Bricht der Prozess mitten in einem Lauf ab, bleibt der Evallauf **abgebrochen** 
 - Die Instanz betreibt künftig zwei Prozesse; `docs/DEPLOYMENT.md` beschreibt beide.
 - Der Hintergrundprozess schreibt in dieselbe SQLite-Datei wie gunicorn. Bei einem Lauf nach dem anderen ist das eine zusätzliche Schreiberin, keine Last.
 - Er ist das Fundament für eine spätere Regressionsreihe über viele Vignetten.
+
+## Nachtrag (2026-10): Thread-Worker statt drei synchroner Worker
+
+Seit ADR-0050 läuft gunicorn mit dem Thread-Worker; die »drei gunicorn-Worker« oben sind drei Prozesse mit vielen Threads, und `--timeout` begrenzt keine einzelne Anfrage mehr. Die Entscheidung hält trotzdem: Eine Anfrage endet spätestens, wenn das Uberspace-Frontend sie nach drei Minuten ohne Daten schließt, und ein Evallauf dauert Dutzende Minuten.

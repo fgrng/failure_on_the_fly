@@ -95,11 +95,8 @@ def _lebenszyklus_aktion_ausfuehren(
         return redirect("simulation:kern_verwalten")
     try:
         aktion(simulationskern)
-    except (RuntimeError, ValueError, ValidationError) as error:
-        if isinstance(error, ValidationError):
-            messages.error(request, "; ".join(error.messages))
-        else:
-            messages.error(request, str(error))
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
     return redirect("simulation:kern_verwalten")
 
 
@@ -151,8 +148,8 @@ def kern_anlegen(request: HttpRequest, *, mit_vorlage: bool) -> HttpResponse:
         Simulationskern.objects.anlegen(
             **(STANDARDKERN_VORLAGEN if mit_vorlage else {})
         )
-    except ValueError as error:
-        messages.error(request, str(error))
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
     return redirect("simulation:kern_verwalten")
 
 
