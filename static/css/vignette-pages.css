@@ -107,6 +107,7 @@
 }
 
 .fremdeinsicht__matrix {
+    --spalten: 1; /* das Template setzt die Vignettenzahl inline */
     table-layout: fixed;
     width: 100%;
     min-width: calc(16rem + var(--spalten) * 5.5rem);
