@@ -213,9 +213,6 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("vignetten:detail", pk=entwurf.pk)
 
 
-reversionieren = neue_fassung
-
-
 @login_required
 @_autorin_erforderlich
 def bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:

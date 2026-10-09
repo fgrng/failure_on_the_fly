@@ -1689,7 +1689,6 @@ class VignettenLoginTests(TestCase):
             reverse("vignetten:entarchivieren", args=[vignette.pk]),
             reverse("vignetten:vorspulen", args=[vignette.pk]),
             reverse("vignetten:neue_fassung", args=[vignette.pk]),
-            reverse("vignetten:reversionieren", args=[vignette.pk]),
         )
         for url in urls:
             response: HttpResponse = self.client.get(url)
@@ -1715,7 +1714,6 @@ class VignettenRollenTests(TestCase):
             "entarchivieren",
             "vorspulen",
             "neue_fassung",
-            "reversionieren",
         ):
             args = [] if name in {"liste", "anlegen"} else [1]
             self.assertEqual(
