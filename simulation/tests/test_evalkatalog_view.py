@@ -46,6 +46,15 @@ class EvalkatalogUebersichtTests(TestCase):
 
         self.assertFalse(UebergreifendesKriterium.objects.exists())
 
+    def test_verwerfen_nimmt_die_evals_samt_evalkriterien_mit(self) -> None:
+        """Ein Entwurf mit Evals und Evalkriterien lässt sich verwerfen."""
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        katalog.eval_anlegen("Muster").kriterium_anlegen("A")
+
+        self.client.post(reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]))
+
+        self.assertFalse(Evalkriterium.objects.exists())
+
     def test_anlegen_oeffnet_den_editor_des_neuen_entwurfs(self) -> None:
         """Nach dem Anlegen steht die Administratorin im Editor des Entwurfs."""
         response: HttpResponse = self.client.post(
@@ -597,9 +606,43 @@ class EvalkatalogEvalTests(TestCase):
                 "simulation:evalkatalog_eval_verschieben",
                 args=[entwurf.pk, eigenes.pk, "seitwaerts"],
             ),
+            reverse(
+                "simulation:evalkatalog_evalkriterium_verschieben",
+                args=[entwurf.pk, eigenes.pk, eigenes.kriterien.get().pk, "seitwaerts"],
+            ),
         ):
             with self.subTest(url=url):
                 self.assertEqual(self.client.post(url).status_code, 404)
+
+    def test_kriterium_eines_anderen_evals_ist_nicht_erreichbar(self) -> None:
+        """Die Kriteriengesten eines Evals greifen nicht auf seine Geschwister durch."""
+        eval_: Eval = self.katalog.eval_anlegen("Muster")
+        anderes: Eval = self.katalog.eval_anlegen("Rolle")
+        fremdes: Evalkriterium = anderes.kriterium_anlegen("X")
+        anderes.kriterium_anlegen("Y")
+
+        for url in (
+            reverse(
+                "simulation:evalkatalog_evalkriterium_loeschen",
+                args=[self.katalog.pk, eval_.pk, fremdes.pk],
+            ),
+            reverse(
+                "simulation:evalkatalog_evalkriterium_verschieben",
+                args=[self.katalog.pk, eval_.pk, fremdes.pk, "runter"],
+            ),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
+        self.assertEqual([k.text for k in anderes.kriterien.all()], ["X", "Y"])
+
+    def test_zu_langer_name_wird_nicht_gespeichert(self) -> None:
+        """Ein Name über 200 Zeichen verletzt das Feld und bleibt ungespeichert."""
+        eval_: Eval = self.katalog.eval_anlegen("Muster")
+
+        self.client.post(self._knoten(eval_), {f"eval-{eval_.pk}": "x" * 201})
+
+        eval_.refresh_from_db()
+        self.assertEqual(eval_.name, "Muster")
 
 
 def _evalrouten(
@@ -687,6 +730,18 @@ class EvalkatalogFinaleFassungTests(TestCase):
             ],
             [("Muster", ["A"])],
         )
+
+    def test_evalrouten_erreichen_keine_ueberholte_fassung(self) -> None:
+        """Auch eine überholte Fassung bleibt für die Routen der Evals gesperrt."""
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+        eval_: Eval = entwurf.eval_anlegen("Muster")
+        kriterium: Evalkriterium = eval_.kriterium_anlegen("A")
+        entwurf.finalisieren()
+        entwurf.bearbeiten().finalisieren()
+
+        for url in _evalrouten(entwurf, eval_, kriterium):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
 
     def test_finale_fassung_laesst_sich_nicht_verwerfen(self) -> None:
         """Verwerfen erreicht nur Entwürfe; die finale Fassung bleibt bestehen."""

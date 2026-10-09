@@ -333,9 +333,16 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
     for queryset, praefix, feld in teile:
         for teil in queryset:
             wert: str | None = request.POST.get(f"{praefix}-{teil.pk}")
-            if wert is not None and wert != getattr(teil, feld):
-                setattr(teil, feld, wert)
-                teil.save(update_fields=[feld])
+            if wert is None or wert == getattr(teil, feld):
+                continue
+            # Wie bei „Durchlauf und Vorlagen“ bleibt ein ungültiger Wert
+            # ungespeichert, etwa ein Name über der Feldlänge.
+            try:
+                teil._meta.get_field(feld).clean(wert, teil)
+            except ValidationError:
+                continue
+            setattr(teil, feld, wert)
+            teil.save(update_fields=[feld])
 
 
 @dataclass(frozen=True)

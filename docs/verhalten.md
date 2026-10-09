@@ -321,9 +321,10 @@ Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle Routen des Knoten
 erreichen nur Entwürfe.
 
 „Eval hinzufügen“ unter dem Baum hängt ein Eval namens „Neues Eval“ ans Ende und
-öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um; ein Eval
-ohne Namen erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch
-und Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
+öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um (höchstens
+200 Zeichen, ein längerer Name bleibt ungespeichert); ein Eval ohne Namen
+erscheint im Baum als „Unbenanntes Eval“. Neben dem Namen rücken Hoch und
+Runter das Eval um eine Stelle im Katalog (an erster bzw. letzter Stelle
 gesperrt), der Papierkorb löscht es samt seiner Evalkriterien und führt zurück
 zu „Durchlauf und Vorlagen“. Darunter pflegt sie die Evalkriterien des Evals,
 nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
