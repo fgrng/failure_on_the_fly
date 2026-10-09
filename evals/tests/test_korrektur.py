@@ -85,23 +85,34 @@ def zwei_von_drei() -> None:
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_von_drei")
-def test_korrektur_macht_aus_zwei_von_drei_bestanden_und_ruecknahme_stellt_her(
-    ada: Konto,
-) -> None:
+def test_korrektur_macht_aus_zwei_von_drei_bestanden(ada: Konto) -> None:
     """Quote, Bestehen und Finalisierungs-Hinweis folgen dem wirksamen Urteil."""
 
     vignette: Vignette = _abgearbeitet(ada)
-    client: Client = _client(ada)
 
-    korrigiert: str = text_ohne_tags(_korrigieren(client, vignette, _urteil(2)))
+    korrigiert: str = text_ohne_tags(_korrigieren(_client(ada), vignette, _urteil(2)))
     hinweis_korrigiert: str = _detail(ada, vignette)
-    zurueck: str = text_ohne_tags(_zuruecknehmen(client, vignette, _urteil(2)))
-    hinweis_zurueck: str = _detail(ada, vignette)
 
     assert "3 von 3 · bestanden" in korrigiert
     assert "Fertig · Bestanden" in korrigiert
     assert "Evallauf Fertig · Bestanden." in hinweis_korrigiert
     assert "Muster gezeigt 3 von 3" in hinweis_korrigiert
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_von_drei")
+def test_ruecknahme_stellt_zwei_von_drei_nicht_bestanden_wieder_her(
+    ada: Konto,
+) -> None:
+    """Nach der Rücknahme bestimmen wieder die Bewerterurteile Quote und Hinweis."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+    client: Client = _client(ada)
+    _korrigieren(client, vignette, _urteil(2))
+
+    zurueck: str = text_ohne_tags(_zuruecknehmen(client, vignette, _urteil(2)))
+    hinweis_zurueck: str = _detail(ada, vignette)
+
     assert "2 von 3 · nicht bestanden" in zurueck
     assert "Fertig · Nicht bestanden" in zurueck
     assert "Evallauf Fertig · Nicht bestanden." in hinweis_zurueck
@@ -266,10 +277,16 @@ def test_offener_lauf_bleibt_schreibgeschuetzt(
     vignette: Vignette = _abgearbeitet(ada)
     Evallauf.objects.filter(vignette=vignette).update(zustand=zustand)
 
-    seite: str = text_ohne_tags(_korrigieren(_client(ada), vignette, _urteil(2)))
+    client: Client = _client(ada)
+
+    seite: str = text_ohne_tags(_korrigieren(client, vignette, _urteil(2)))
+    antwort: HttpResponse = client.get(
+        reverse("evals:evallauf", args=[vignette.pk]), {"wiederholung": 2}
+    )
 
     assert not _urteil(2).korrigiert
     assert "Nur abgeschlossene Evalläufe lassen sich korrigieren." in seite
+    assert "Als erfüllt werten" not in [text for text, _ in submit_knoepfe(antwort)]
 
 
 @pytest.mark.django_db

@@ -5,15 +5,15 @@ Quote und Bestehen sind abgeleitet und werden nie gespeichert.
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
+from typing import TYPE_CHECKING
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from konten.models import Konto
 from simulation.models import (
     Eval,
     Evalinput,
@@ -27,6 +27,9 @@ from simulation.models import (
     evals_verfuegbar,
 )
 from vignetten.models import Vignette, prompt_platzhalter
+
+if TYPE_CHECKING:
+    from konten.models import Konto
 
 _LAEUFT_SCHON: str = "Für diese Fassung wartet oder läuft bereits ein Evallauf."
 
@@ -346,7 +349,7 @@ class Evallauf(models.Model):
             gespraech.wiederholung: gespraech
             for gespraech in self.gespraeche.filter(
                 evalinput=evalinput
-            ).prefetch_related("wechsel", "urteile")
+            ).prefetch_related("wechsel", "urteile__korrigiert_von")
             if gespraech.wechsel.all() or gespraech.urteile.all()
         }
         if wiederholung not in range(1, self.katalog.k + 1):
@@ -507,7 +510,7 @@ class Urteil(models.Model):
     # ohne Korrektur sind alle drei Felder leer.
     korrektur_begruendung: models.TextField = models.TextField(blank=True, default="")
     korrigiert_von: models.ForeignKey = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "konten.Konto",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -564,7 +567,7 @@ class Urteil(models.Model):
 
         return not self.erfuellt if self.korrigiert else self.erfuellt
 
-    def korrigieren(self, begruendung: str, konto: Konto) -> None:
+    def korrigieren(self, begruendung: str, konto: "Konto") -> None:
         """Kehrt das Bewerterurteil mit eigener Begründung um oder ändert die Korrektur.
 
         Eine frühere Korrektur wird ohne Historie ersetzt.
@@ -574,27 +577,29 @@ class Urteil(models.Model):
         begruendung = begruendung.strip()
         if not begruendung:
             raise ValidationError("Eine Korrektur braucht eine Begründung.")
-        self.korrektur_begruendung = begruendung
-        self.korrigiert_von = konto
-        self.korrigiert_am = timezone.now()
-        self.save(
-            update_fields=["korrektur_begruendung", "korrigiert_von", "korrigiert_am"]
-        )
+        self._korrektur_speichern(begruendung, konto, timezone.now())
 
     def korrektur_zuruecknehmen(self) -> None:
         """Lässt wieder das ursprüngliche Bewerterurteil gelten."""
 
         self._korrigierbar_pruefen()
-        self.korrektur_begruendung = ""
-        self.korrigiert_von = None
-        self.korrigiert_am = None
+        self._korrektur_speichern("", None, None)
+
+    def _korrektur_speichern(
+        self, begruendung: str, konto: "Konto | None", zeitpunkt: datetime | None
+    ) -> None:
+        # Die drei Felder der Korrektur ändern sich nur gemeinsam.
+
+        self.korrektur_begruendung = begruendung
+        self.korrigiert_von = konto
+        self.korrigiert_am = zeitpunkt
         self.save(
             update_fields=["korrektur_begruendung", "korrigiert_von", "korrigiert_am"]
         )
 
     @property
     def korrigierbar(self) -> bool:
-        """Ob sich das Urteil manuell korrigieren lässt; siehe `_korrigierbar_pruefen`."""
+        """Ob es ein fachliches Bewerterurteil eines abgeschlossenen Laufs ist."""
 
         try:
             self._korrigierbar_pruefen()
