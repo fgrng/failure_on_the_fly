@@ -1,1 +1,1 @@
-{% if katalog.zustand == "final" %}Finale Fassung lesen{% elif katalog.zustand == "archiviert" %}Überholte Fassung lesen{% else %}Evalkatalog-Entwurf bearbeiten{% endif %}
+{% if gesperrt %}{{ katalog.zustandsbezeichnung }}e Fassung lesen{% else %}Evalkatalog-Entwurf bearbeiten{% endif %}

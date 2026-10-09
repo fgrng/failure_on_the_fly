@@ -333,13 +333,13 @@ def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> list[str]:
+def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> bool:
     # Jede Geste im Editor sendet das ganze Formular; so gehen getippte Werte
     # beim Hinzufügen, Löschen oder Umordnen nicht verloren, egal an welchem
-    # Knoten sie stehen. Liefert die Fehler eines ungültigen Durchlaufs, der
-    # dann ungespeichert bleibt.
+    # Knoten sie stehen. Ein ungültiger Wert des Durchlaufs bleibt
+    # ungespeichert und wird gemeldet; dann ist das Ergebnis False.
 
-    durchlauffehler: list[str] = []
+    uebernommen: bool = True
     if "k" in request.POST:
         form: EvalkatalogDurchlaufForm = EvalkatalogDurchlaufForm(
             request.POST, instance=katalog
@@ -347,11 +347,13 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> list[st
         if form.is_valid():
             form.save()
         else:
-            durchlauffehler = [
-                f"{form[feld].label}: {meldung}"
-                for feld, meldungen in form.errors.items()
-                for meldung in meldungen
-            ]
+            # Nur gültige Felder stehen in cleaned_data und sind schon
+            # in die Instanz übernommen.
+            katalog.save(update_fields=list(form.cleaned_data))
+            for feld, meldungen in form.errors.items():
+                for meldung in meldungen:
+                    messages.error(request, f"{form[feld].label}: {meldung}")
+            uebernommen = False
     schritte: QuerySet[Inputschritt] = Inputschritt.objects.filter(
         evalinput__eval__katalog=katalog
     )
@@ -375,7 +377,7 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> list[st
                 continue
             setattr(teil, feld, wert)
             teil.save(update_fields=[feld])
-    return durchlauffehler
+    return uebernommen
 
 
 @dataclass(frozen=True)
@@ -413,8 +415,8 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt den Knoten Übergreifende Kriterien; speichert nur in Entwürfe."""
     katalog: Evalkatalog = _fassung(request, pk)
     if request.method == "POST":
-        _eingaben_uebernehmen(katalog, request)
-        messages.success(request, "Übergreifende Kriterien gespeichert.")
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Übergreifende Kriterien gespeichert.")
         return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
     return render(
         request,
@@ -462,8 +464,8 @@ def evalkatalog_kriterium_loeschen(
 _RICHTUNGEN: dict[str, int] = {"hoch": -1, "runter": 1}
 
 
-def _weite(richtung: str) -> int:
-    # Die Verschiebung um eine Zeile; nur hoch und runter.
+def _versatz(richtung: str) -> int:
+    # Hoch ist -1, runter +1; andere Richtungen gibt es nicht.
 
     if richtung not in _RICHTUNGEN:
         raise Http404
@@ -477,13 +479,13 @@ def evalkatalog_kriterium_verschieben(
     request: HttpRequest, pk: int, kriterium_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein übergreifendes Kriterium eine Zeile hoch oder runter."""
-    weite: int = _weite(richtung)
+    versatz: int = _versatz(richtung)
     katalog: Evalkatalog = _fassung(request, pk)
     kriterium: UebergreifendesKriterium = get_object_or_404(
         katalog.uebergreifende_kriterien, pk=kriterium_pk
     )
     _eingaben_uebernehmen(katalog, request)
-    kriterium.verschieben(weite)
+    kriterium.verschieben(versatz)
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
@@ -513,8 +515,8 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
     """Zeigt den Knoten eines Evals samt Evalkriterien; speichert nur in Entwürfe."""
     katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     if request.method == "POST":
-        _eingaben_uebernehmen(katalog, request)
-        messages.success(request, "Das Eval wurde gespeichert.")
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Das Eval wurde gespeichert.")
         return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
     evals: list[Eval] = list(katalog.evals.all())
     return render(
@@ -557,10 +559,10 @@ def evalkatalog_eval_verschieben(
     request: HttpRequest, pk: int, eval_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein Eval im Katalog eine Stelle hoch oder runter."""
-    weite: int = _weite(richtung)
+    versatz: int = _versatz(richtung)
     katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     _eingaben_uebernehmen(katalog, request)
-    eval_.verschieben(weite)
+    eval_.verschieben(versatz)
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
@@ -599,11 +601,11 @@ def evalkatalog_evalkriterium_verschieben(
     request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein Evalkriterium eine Zeile hoch oder runter."""
-    weite: int = _weite(richtung)
+    versatz: int = _versatz(richtung)
     katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
     _eingaben_uebernehmen(katalog, request)
-    kriterium.verschieben(weite)
+    kriterium.verschieben(versatz)
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
@@ -648,8 +650,8 @@ def evalkatalog_evalinput(
     """Zeigt einen Evalinput als Drehbuch; speichert nur in Entwürfe."""
     katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
     if request.method == "POST":
-        _eingaben_uebernehmen(katalog, request)
-        messages.success(request, "Der Evalinput wurde gespeichert.")
+        if _eingaben_uebernehmen(katalog, request):
+            messages.success(request, "Der Evalinput wurde gespeichert.")
         return _zum_evalinput(evalinput)
     schritte: list[Inputschritt] = list(evalinput.schritte.all())
     return render(
@@ -730,11 +732,11 @@ def evalkatalog_inputschritt_verschieben(
     richtung: str,
 ) -> HttpResponse:
     """Rückt einen Inputschritt eine Zeile hoch oder runter."""
-    weite: int = _weite(richtung)
+    versatz: int = _versatz(richtung)
     katalog, _, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
     schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
     _eingaben_uebernehmen(katalog, request)
-    schritt.verschieben(weite)
+    schritt.verschieben(versatz)
     return _zum_evalinput(evalinput)
 
 
@@ -744,14 +746,14 @@ def evalkatalog_inputschritt_verschieben(
 def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Finalisiert den Entwurf samt getippter Eingaben oder nennt seine Lücken."""
     katalog: Evalkatalog = _fassung(request, pk)
-    meldungen: list[str] = _eingaben_uebernehmen(katalog, request)
-    if not meldungen:
-        try:
-            katalog.finalisieren()
-        except ValidationError as fehler:
-            meldungen = fehler.messages
-    if meldungen:
-        for meldung in meldungen:
+    if not _eingaben_uebernehmen(katalog, request):
+        return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
+    try:
+        katalog.finalisieren()
+    except (ValueError, ValidationError) as fehler:
+        for meldung in (
+            fehler.messages if isinstance(fehler, ValidationError) else [str(fehler)]
+        ):
             messages.error(request, meldung)
         return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
     messages.success(

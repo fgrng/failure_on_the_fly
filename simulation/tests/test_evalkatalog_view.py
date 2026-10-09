@@ -2,6 +2,7 @@
 
 import re
 from html.parser import HTMLParser
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -11,6 +12,7 @@ from django.urls import reverse
 
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
+from simulation.lebenszyklus import VersionierteFassung
 from simulation.models import (
     VERTRAG_PROMPT,
     Eval,
@@ -444,6 +446,28 @@ class EvalkatalogEvalTests(TestCase):
         self.katalog.refresh_from_db()
         self.assertEqual(kriterium.text, "Rollentreue")
         self.assertEqual(self.katalog.k, 7)
+
+    def test_ungueltiger_durchlauf_wird_bei_jeder_geste_gemeldet(self) -> None:
+        """Ein ungültiges *k* bleibt ungespeichert und wird genannt; gültige Vorlagen gelten."""
+        for url in (
+            reverse("simulation:evalkatalog_eval_anlegen", args=[self.katalog.pk]),
+            reverse("simulation:evalkatalog_kriterien", args=[self.katalog.pk]),
+        ):
+            with self.subTest(url=url):
+                response: HttpResponse = self.client.post(
+                    url,
+                    {"k": "-1", "lehrperson_vorlage": "L", "bewerter_vorlage": "B"},
+                    follow=True,
+                )
+
+                self.assertContains(
+                    response, "K: Dieser Wert muss größer oder gleich 0 sein."
+                )
+                self.assertNotContains(response, "Übergreifende Kriterien gespeichert.")
+                self.katalog.refresh_from_db()
+                self.assertEqual(self.katalog.k, 3)
+                self.assertEqual(self.katalog.lehrperson_vorlage, "L")
+                self.assertEqual(self.katalog.bewerter_vorlage, "B")
 
     def test_baum_zeigt_jedes_eval_in_seiner_reihenfolge(self) -> None:
         """Jedes Eval ist ein Knoten im Baum; der Baum folgt der Reihenfolge."""
@@ -1395,6 +1419,24 @@ class EvalkatalogFinalisierenTests(TestCase):
         )
         self.assertIsNone(Evalkatalog.objects.finale_fassung())
 
+    def test_zwischenzeitlich_geaenderter_entwurf_wird_gemeldet(self) -> None:
+        """Wechselt der Entwurf beim Finalisieren den Zustand, nennt der Editor das."""
+        with mock.patch.object(
+            VersionierteFassung,
+            "finalisieren",
+            side_effect=ValueError(
+                "Der Evalkatalog-Entwurf wurde inzwischen geändert."
+            ),
+        ):
+            response: HttpResponse = self.client.post(self.url, follow=True)
+
+        self.assertRedirects(
+            response, reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+        )
+        self.assertContains(
+            response, "Der Evalkatalog-Entwurf wurde inzwischen geändert."
+        )
+
     def test_finale_fassung_wird_nicht_erneut_finalisiert(self) -> None:
         """Die Route erreicht nur Entwürfe."""
         self.katalog.finalisieren()
@@ -1504,6 +1546,28 @@ class EvalkatalogZugriffTests(TestCase):
         ):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 405)
+
+    def test_sidebar_markiert_den_evalkatalog_auf_jedem_knoten(self) -> None:
+        """Auch auf den Knoten Kriterien, Eval und Evalinput gilt der Link als aktuell."""
+        self.client.force_login(_administratorin("ada"))
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        eval_: Eval = katalog.eval_anlegen("Muster")
+        evalinput: Evalinput = eval_.input_anlegen()
+        link: str = (
+            f'<a href="{reverse("simulation:evalkatalog")}" aria-current="page">'
+            "Evalkatalog</a>"
+        )
+
+        for url in (
+            reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
+            reverse(
+                "simulation:evalkatalog_evalinput",
+                args=[katalog.pk, eval_.pk, evalinput.pk],
+            ),
+        ):
+            with self.subTest(url=url):
+                self.assertContains(self.client.get(url), link, html=True)
 
     def test_sidebar_fuehrt_administratorinnen_zum_evalkatalog(self) -> None:
         """Der System-Bereich der Sidebar verlinkt den Evalkatalog."""

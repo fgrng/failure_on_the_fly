@@ -373,6 +373,14 @@ class Evalkatalog(VersionierteFassung):
                         )
         return meldungen
 
+    @property
+    def zustandsbezeichnung(self) -> str:
+        """Der Zustand, wie der Editor ihn nennt: archiviert heißt hier überholt."""
+
+        if self.zustand == self.Zustand.ARCHIVIERT:
+            return "Überholt"
+        return self.get_zustand_display()
+
     @transaction.atomic
     def finalisieren(self) -> None:
         """Finalisiert einen vollständigen Entwurf; sonst nennt der Fehler alle Lücken."""
@@ -526,7 +534,7 @@ class Katalogteil(models.Model):
         return super().delete(*args, **kwargs)
 
     @transaction.atomic
-    def verschieben(self, schritt: int) -> None:
+    def verschieben(self, versatz: int) -> None:
         """Tauscht den Platz mit dem Nachbarn davor (-1) oder dahinter (+1).
 
         Am Rand der Liste bleibt alles, wie es ist.
@@ -535,7 +543,7 @@ class Katalogteil(models.Model):
         geschwister: models.QuerySet[Katalogteil] = self._geschwister()
         nachbar: Katalogteil | None = (
             geschwister.filter(position__lt=self.position).last()
-            if schritt < 0
+            if versatz < 0
             else geschwister.filter(position__gt=self.position).first()
         )
         if nachbar is None:
@@ -678,10 +686,12 @@ class Evalinput(Katalogteil):
             "G" if schritt.gelenkt else "F" for schritt in self.schritte.all()
         )
 
-    def schritt_anlegen(self, art: str = "fest", text: str = "") -> "Inputschritt":
-        """Hängt einen Inputschritt ans Ende des Drehbuchs."""
+    def schritt_anlegen(
+        self, art: "Inputschritt.Art | None" = None, text: str = ""
+    ) -> "Inputschritt":
+        """Hängt einen Inputschritt ans Ende des Drehbuchs; ohne Art einen festen."""
 
-        return Inputschritt.anhaengen(self, art=art, text=text)
+        return Inputschritt.anhaengen(self, art=art or Inputschritt.Art.FEST, text=text)
 
 
 class Inputschritt(Katalogteil):

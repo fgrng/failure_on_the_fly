@@ -228,23 +228,29 @@ def lebenszyklus_constraints(praefix: str) -> list[models.BaseConstraint]:
     return [
         models.UniqueConstraint(
             fields=["historie"],
-            condition=Q(zustand="entwurf"),
+            condition=Q(zustand=VersionierteFassung.Zustand.ENTWURF),
             name=f"{praefix}_ein_entwurf_pro_historie",
         ),
         models.UniqueConstraint(
             fields=["historie"],
-            condition=Q(zustand="final"),
+            condition=Q(zustand=VersionierteFassung.Zustand.FINAL),
             name=f"{praefix}_eine_finale_fassung_pro_historie",
         ),
         models.UniqueConstraint(
             fields=["vorgaengerin"],
-            condition=~Q(zustand="archiviert"),
+            condition=~Q(zustand=VersionierteFassung.Zustand.ARCHIVIERT),
             name=f"{praefix}_keine_nichtarchivierten_schwestern",
         ),
         models.CheckConstraint(
             condition=(
-                Q(zustand="entwurf", finalisiert_am__isnull=True)
-                | (~Q(zustand="entwurf") & Q(finalisiert_am__isnull=False))
+                Q(
+                    zustand=VersionierteFassung.Zustand.ENTWURF,
+                    finalisiert_am__isnull=True,
+                )
+                | (
+                    ~Q(zustand=VersionierteFassung.Zustand.ENTWURF)
+                    & Q(finalisiert_am__isnull=False)
+                )
             ),
             name=f"{praefix}_finalisiert_am_passt_zu_zustand",
         ),

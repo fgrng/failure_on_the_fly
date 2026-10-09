@@ -332,7 +332,9 @@ nach denen der Bewerter jedes Evalgespräch dieses Evals beurteilt: anlegen,
 bearbeiten, löschen und umordnen genau wie die übergreifenden Kriterien, ebenfalls
 reiner Text ohne Platzhalter. Jede Geste im Editor, auch „Eval hinzufügen“ aus
 einem anderen Knoten heraus, übernimmt zugleich alle getippten Werte des
-Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein neuer
+Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein
+ungültiger Wert dort, etwa ein negatives *k*, bleibt ungespeichert; der Editor
+nennt ihn, und „Änderungen speichern“ meldet dann keinen Erfolg. Ein neuer
 Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
 gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
 Alle schreibenden Routen der Evals und Evalkriterien erreichen nur Entwürfe.
@@ -372,8 +374,10 @@ Lücke als eigene Meldung, etwa „Evalinput 2 von Eval „Muster“ hat keinen
 Inputschritt.“ oder „Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres
 Vertrags: $inputstrategie.“; der Entwurf bleibt Entwurf, die getippten Werte
 bleiben gespeichert. Ist der getippte Durchlauf selbst ungültig, etwa ein
-negatives *k*, bleiben *k* und Vorlagen ungespeichert, der Editor nennt den
-Fehler, und der Entwurf bleibt Entwurf. Ein vollständiger Entwurf wird final, und die
+negatives *k*, bleibt der ungültige Wert ungespeichert, gültige Vorlagen werden
+übernommen, der Editor nennt den Fehler, und der Entwurf bleibt Entwurf. Ebenso
+bleibt er Entwurf mit einer Meldung, wenn er beim Finalisieren inzwischen
+geändert wurde. Ein vollständiger Entwurf wird final, und die
 Administrator:in landet auf der Übersicht, die zeigt, seit wann die finale
 Fassung gilt. Ab dann prüft jeder Evallauf gegen sie. Die bisherige finale
 Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt

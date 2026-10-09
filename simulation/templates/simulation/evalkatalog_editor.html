@@ -20,12 +20,12 @@
             <h1>{% include "simulation/includes/evalkatalog_titel.html" %}</h1>
             <span>Links der Katalog, rechts der gewählte Knoten.</span>
         </div>
-        <span class="badge">{% if katalog.zustand == "archiviert" %}Überholt{% else %}{{ katalog.get_zustand_display }}{% endif %}</span>
+        <span class="badge">{{ katalog.zustandsbezeichnung }}</span>
     </header>
 
     {% if gesperrt %}
         <div class="evalkatalog-band" role="note">
-            {% if katalog.zustand == "final" %}
+            {% if katalog.zustand == katalog.Zustand.FINAL %}
                 <p>Diese Fassung ist final seit {{ katalog.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen sie; ändern lässt sie sich nicht.</p>
                 {% if neue_fassung_moeglich %}
                     {% include "simulation/includes/evalkatalog_neue_fassung.html" with fassung=katalog %}
