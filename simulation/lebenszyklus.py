@@ -13,6 +13,8 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+_NUR_ENTWUERFE_LOESCHBAR: str = "Nur Entwürfe dürfen physisch gelöscht werden."
+
 
 class FassungQuerySet(models.QuerySet[Any]):
     """Öffentliche Abfragen ohne direkte Schreibroute für Fassungen."""
@@ -25,8 +27,8 @@ class FassungQuerySet(models.QuerySet[Any]):
     def delete(self) -> tuple[int, dict[str, int]]:
         """Löscht gesammelt ausschließlich Entwürfe."""
 
-        if self.exclude(zustand=VersionierteFassung.Zustand.ENTWURF).exists():
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
+        if self.exclude(zustand=self.model.Zustand.ENTWURF).exists():
+            raise RuntimeError(_NUR_ENTWUERFE_LOESCHBAR)
         return super().delete()
 
     def bulk_create(self, objs: list[Any], **kwargs: object) -> list[Any]:
@@ -63,9 +65,11 @@ class VersionierteFassung(models.Model):
     # Benennt das Artefakt in Fehlermeldungen, etwa »Kern« in »Kern-Fassungen«.
     _bezeichnung: str
     _wird_angelegt: bool
+    # Die Historie trägt jedes Artefakt als eigenen Fremdschlüssel.
+    historie: models.ForeignKey
 
     class Zustand(models.TextChoices):
-        """Mögliche Zustände einer Fassung; archiviert heißt überholt."""
+        """Mögliche Zustände einer Fassung; archiviert heißt hier überholt."""
 
         ENTWURF = "entwurf", "Entwurf"
         FINAL = "final", "Final"
@@ -137,16 +141,14 @@ class VersionierteFassung(models.Model):
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
         """Erlaubt das physische Löschen ausschließlich für Entwürfe."""
 
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.ENTWURF,
-            )
-            .exists()
-        ):
-            raise RuntimeError("Nur Entwürfe dürfen physisch gelöscht werden.")
+        if not self._ist_gespeichert_als(self.Zustand.ENTWURF):
+            raise RuntimeError(_NUR_ENTWUERFE_LOESCHBAR)
         return super().delete(*args, **kwargs)
+
+    def _ist_gespeichert_als(self, zustand: str) -> bool:
+        # Prüft den Zustand in der Datenbank statt den im Objekt gehaltenen.
+
+        return type(self).objects.filter(pk=self.pk, zustand=zustand).exists()
 
     def _schreibqueryset(self) -> models.QuerySet[Self]:
         # Liefert die interne Schreibroute der Lebenszyklus-Methoden.
@@ -157,14 +159,7 @@ class VersionierteFassung(models.Model):
     def bearbeiten(self) -> Self:
         """Erzeugt aus einer finalen Fassung einen neuen Entwurf."""
 
-        if (
-            not type(self)
-            .objects.filter(
-                pk=self.pk,
-                zustand=self.Zustand.FINAL,
-            )
-            .exists()
-        ):
+        if not self._ist_gespeichert_als(self.Zustand.FINAL):
             raise ValueError(
                 f"Die {self._bezeichnung}-Fassung wurde inzwischen geändert."
             )
