@@ -191,7 +191,8 @@ Wer den Link eingeloggt öffnet, tritt bei und landet auf der Trainingsseite;
 erneutes Öffnen führt ohne Fehler direkt dorthin. Ohne Anmeldung führt der
 Link über den Login zurück zum Beitritt. Bei gesperrtem Beitritt sehen neue
 Konten die Meldung „Beitritt gesperrt“ mit der Bitte, sich an die Ausbilder:in
-zu wenden; Beigetretene kommen weiter ins Training. Der Link eines Entwurfs
+zu wenden; Beigetretene kommen weiter ins Training, ebenso der Eigentümer-Kreis
+und die Administration, ohne dadurch beizutreten. Der Link eines Entwurfs
 nimmt noch niemanden auf. Ein Training ohne Vignetten lässt sich
 veröffentlichen und beitreten.
 

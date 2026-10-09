@@ -16,9 +16,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
-from django.utils.text import slugify
 
+from config.downloads import zip_download
 from konten.models import Konto
 from konten.navigation import (
     AUSBILDERIN_GRUPPE,
@@ -349,7 +348,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die frei wählbaren Vignetten eines veröffentlichten Trainings inkl. eigener Sitzungen."""
+    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen."""
     training: Training = _zugaengliches_training(request, pk)
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
@@ -520,17 +519,9 @@ def _freigegebene_abschriften(
 def trainingsexport(request: HttpRequest, pk: int) -> HttpResponse:
     """Lädt den Trainingsexport eines sichtbaren Trainings herunter."""
     training: Training = _sichtbares_training(request, pk)
-    zeitstempel: str = (
-        timezone.now().astimezone(timezone.UTC).strftime("%Y%m%dT%H%M%SZ")
+    return zip_download(
+        "training", training.pk, training.name, trainingsexport_zip(training)
     )
-    dateiname: str = (
-        f"training-{training.pk}-{slugify(training.name)}-{zeitstempel}.zip"
-    )
-    response: HttpResponse = HttpResponse(
-        trainingsexport_zip(training), content_type="application/zip"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{dateiname}"'
-    return response
 
 
 @login_required
@@ -632,12 +623,18 @@ def _beitritt_schalten(request: HttpRequest, pk: int, gesperrt: bool) -> HttpRes
 def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
 
-    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training.
+    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training,
+    ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    if not training.beitreten(request.user):
+    if (
+        not training.beitreten(request.user)
+        and not Training.objects.sichtbar_fuer(request.user)
+        .filter(pk=training.pk)
+        .exists()
+    ):
         return render(
             request,
             "training/beitritt_gesperrt.html",

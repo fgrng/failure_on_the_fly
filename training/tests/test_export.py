@@ -3,6 +3,7 @@
 from io import BytesIO
 from zipfile import ZipFile
 
+from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.text import slugify
@@ -32,6 +33,14 @@ class TrainingsexportTestCase(FremdeinsichtTestCase):
         self.client.force_login(konto or self.ausbilderin)
         return self.client.get(
             reverse("training:trainingsexport", args=[self.training.pk])
+        )
+
+    def _freigeben(self, abschrift: Abschrift, *trainings: Training) -> None:
+        # Speichert die Freigaben der Abschrift aus Sicht ihres Kontos.
+        self.client.force_login(abschrift.konto)
+        self.client.post(
+            reverse("training:abschrift_freigaben", args=[abschrift.pk]),
+            {"training": [training.pk for training in trainings]},
         )
 
     def _archiv(self) -> dict[str, str]:
@@ -76,6 +85,30 @@ class ZugriffTests(TrainingsexportTestCase):
         fremde: Konto = _konto("hedy", AUSBILDERIN_GRUPPE)
 
         self.assertEqual(self._export(fremde).status_code, 404)
+
+    def test_neues_kreismitglied_laedt_auch_aeltere_sitzungen(self) -> None:
+        """Der Export folgt der aktuellen Mitgliedschaft, auch rückwirkend."""
+        _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        neues_mitglied: Konto = _konto("katherine", AUSBILDERIN_GRUPPE)
+        self.training.eigentuemerinnen.add(neues_mitglied)
+
+        response: HttpResponse = self._export(neues_mitglied)
+
+        with ZipFile(BytesIO(response.content)) as zip_datei:
+            self.assertEqual(len(zip_datei.namelist()), 1)
+
+    def test_ausgetretenes_kreismitglied_bekommt_404(self) -> None:
+        """Wer den Kreis verlässt, zieht sofort keinen Export mehr."""
+        self.training.eigentuemerinnen.add(_konto("katherine", AUSBILDERIN_GRUPPE))
+        self.training.austreten(self.ausbilderin.pk)
+
+        self.assertEqual(self._export(self.ausbilderin).status_code, 404)
+
+    def test_autorin_der_vignette_bekommt_404(self) -> None:
+        """Autorschaft der Vignette begründet keinen Export, auch mit Rolle."""
+        self.autorin.groups.add(Group.objects.get(name=AUSBILDERIN_GRUPPE))
+
+        self.assertEqual(self._export(self.autorin).status_code, 404)
 
     def test_teilnehmerin_bekommt_403(self) -> None:
         """Eine Beigetretene ohne Rolle zieht keinen Export."""
@@ -163,6 +196,44 @@ class InhaltTests(TrainingsexportTestCase):
         self.assertIn("Ich habe oben und unten zusammengezählt.", text)
         self.assertIn("Zähler und Nenner addiert.", text)
 
+    def test_sitzung_ohne_zeitstempel_kommt_ohne_datum_hinaus(self) -> None:
+        """Eine Bestandssitzung ohne Entstehungszeitpunkt nennt kein Datum."""
+        sitzung: Sitzung = _gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        sitzung.erstellt_am = None
+        sitzung.save(update_fields=["erstellt_am"])
+
+        (text,) = self._archiv().values()
+
+        self.assertNotIn("Datum:", text)
+
+    def test_schritt_ohne_aeusserung_ist_als_solcher_markiert(self) -> None:
+        """Ein endgültig gescheiterter Schritt bleibt im Transkript sichtbar."""
+        sitzung: Sitzung = _gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        Gespraechsschritt.objects.answerless_anlegen(
+            sitzung=sitzung,
+            eingabe="Und jetzt?",
+            reihenfolge=2,
+            fehlversuche=[Fehlversuch(grund="Timeout", rohantwort="")],
+        )
+
+        (text,) = self._archiv().values()
+
+        self.assertIn("**Äußerung:** (keine Antwort)", text)
+
+    def test_sitzung_ohne_diagnose_ist_als_solche_markiert(self) -> None:
+        """Fehlt die Diagnose, sagt der Abschnitt das ausdrücklich."""
+        _gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        ).diagnose.delete()
+
+        (text,) = self._archiv().values()
+
+        self.assertIn("## Diagnose\n\n(keine Diagnose)", text)
+
     def test_transkript_wechselt_eingabe_und_aeusserung(self) -> None:
         """Die Schritte stehen in ihrer Reihenfolge, Eingabe vor Äußerung."""
         sitzung: Sitzung = _gespielte_sitzung(
@@ -221,7 +292,7 @@ class InhaltTests(TrainingsexportTestCase):
         """Weder Name, Benutzername noch Mailadresse stehen im Archiv."""
         _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        abschrift.freigegeben_fuer.add(self.training)
+        self._freigeben(abschrift, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -265,7 +336,7 @@ class AbschriftTests(TrainingsexportTestCase):
         """Sie liegt im Ordner der Person, benannt nach der Erhebung."""
         _gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        abschrift.freigegeben_fuer.add(self.training)
+        self._freigeben(abschrift, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -280,7 +351,7 @@ class AbschriftTests(TrainingsexportTestCase):
 
     def test_abschrift_geht_ohne_denkspur_hinaus(self) -> None:
         """Auch die kopierte Denkspur aus der Erhebung bleibt im System."""
-        _abschrift(self.teilnehmerin, self.vignette).freigegeben_fuer.add(self.training)
+        self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
 
         (text,) = self._archiv().values()
 
@@ -291,7 +362,7 @@ class AbschriftTests(TrainingsexportTestCase):
         abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
         abschrift.erhebungsname = "../../Studie/Bruch"
         abschrift.save(update_fields=["erhebungsname"])
-        abschrift.freigegeben_fuer.add(self.training)
+        self._freigeben(abschrift, self.training)
 
         (name,) = self._archiv()
 
@@ -306,8 +377,8 @@ class AbschriftTests(TrainingsexportTestCase):
     def test_widerrufene_abschrift_fehlt(self) -> None:
         """Nach dem Widerruf geht die Abschrift nicht mehr hinaus."""
         abschrift: Abschrift = _abschrift(self.teilnehmerin, self.vignette)
-        abschrift.freigegeben_fuer.add(self.training)
-        abschrift.freigegeben_fuer.remove(self.training)
+        self._freigeben(abschrift, self.training)
+        self._freigeben(abschrift)
 
         self.assertEqual(self._archiv(), {})
 
@@ -316,16 +387,14 @@ class AbschriftTests(TrainingsexportTestCase):
         abschrift: Abschrift = _abschrift(
             self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
         )
-        abschrift.freigegeben_fuer.add(self.training)
+        self._freigeben(abschrift, self.training)
 
         self.assertEqual(self._archiv(), {})
 
     def test_zwei_abschriften_derselben_erhebung_bleiben_getrennt(self) -> None:
         """Gleiche Erhebungsnamen überschreiben einander nicht."""
         for _ in range(2):
-            _abschrift(self.teilnehmerin, self.vignette).freigegeben_fuer.add(
-                self.training
-            )
+            self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
 
         archiv: dict[str, str] = self._archiv()
 
@@ -336,10 +405,11 @@ class AbschriftTests(TrainingsexportTestCase):
         self,
     ) -> None:
         """Eine leer ausgehende Abschrift schiebt die nächste nicht auf „-2“."""
-        _abschrift(
-            self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN
-        ).freigegeben_fuer.add(self.training)
-        _abschrift(self.teilnehmerin, self.vignette).freigegeben_fuer.add(self.training)
+        self._freigeben(
+            _abschrift(self.teilnehmerin, self.vignette, Sitzung.Status.ABGEBROCHEN),
+            self.training,
+        )
+        self._freigeben(_abschrift(self.teilnehmerin, self.vignette), self.training)
 
         (name,) = self._archiv()
 

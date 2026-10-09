@@ -155,6 +155,45 @@ class BeitrittTests(TestCase):
             response, reverse("training:detail", args=[self.training.pk])
         )
 
+    def test_gesperrter_link_fuehrt_den_kreis_ins_training(self) -> None:
+        """Der Kreis braucht keinen Beitritt und landet trotz Sperre im Training."""
+        self.training.beitritt_gesperrt = True
+        self.training.save(update_fields=["beitritt_gesperrt"])
+        self.client.force_login(self.ausbilderin)
+
+        response: HttpResponse = self.client.get(_beitritt_url(self.training))
+
+        self.assertRedirects(
+            response, reverse("training:detail", args=[self.training.pk])
+        )
+
+    def test_gesperrter_link_fuehrt_die_administration_ins_training(self) -> None:
+        """Die Administration sieht jedes Training und landet trotz Sperre darin."""
+        self.training.beitritt_gesperrt = True
+        self.training.save(update_fields=["beitritt_gesperrt"])
+        self.client.force_login(
+            get_user_model().objects.create_user(username="root", is_superuser=True)
+        )
+
+        response: HttpResponse = self.client.get(_beitritt_url(self.training))
+
+        self.assertRedirects(
+            response, reverse("training:detail", args=[self.training.pk])
+        )
+
+    def test_gesperrter_link_bindet_den_kreis_nicht(self) -> None:
+        """Wer das Training über den Kreis sieht, zählt nicht als beigetreten."""
+        self.training.beitritt_gesperrt = True
+        self.training.save(update_fields=["beitritt_gesperrt"])
+        self.client.force_login(self.ausbilderin)
+        self.client.get(_beitritt_url(self.training))
+
+        response: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[self.training.pk])
+        )
+
+        self.assertContains(response, "0 Personen sind bereits dabei")
+
     def test_link_eines_entwurfs_ist_unbekannt(self) -> None:
         """Ein Entwurf nimmt noch niemanden auf."""
         entwurf: Training = Training.objects.anlegen(self.ausbilderin, name="Entwurf")
@@ -392,6 +431,21 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 405)
+
+    def test_band_eines_entwurfs_vertroestet_auf_das_veroeffentlichen(
+        self,
+    ) -> None:
+        """Vor dem Veröffentlichen nimmt der Link niemanden auf."""
+        entwurf: Training = Training.objects.anlegen(self.ausbilderin, name="Entwurf")
+        self.client.force_login(self.ausbilderin)
+
+        response: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[entwurf.pk])
+        )
+
+        self.assertContains(
+            response, "Der Beitritt ist erst nach dem Veröffentlichen möglich."
+        )
 
     def test_band_zaehlt_die_beigetretenen(self) -> None:
         """Die Zeile unter dem Link nennt die Zahl der Beigetretenen."""

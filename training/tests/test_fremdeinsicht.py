@@ -207,6 +207,24 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
 
         self.assertNotContains(response, "Geheime Denkspur der Schülerin.")
 
+    def test_fremdeinsicht_ist_rein_lesend(self) -> None:
+        """Ohne Abbrechen, Fortsetzen oder Löschen."""
+        sitzung: Sitzung = _gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        self.client.force_login(self.ausbilderin)
+
+        seite: str = self.client.get(_ansehen_url(sitzung)).content.decode()
+
+        for bedienelement in (
+            reverse("training:abbrechen"),
+            reverse("training:gespraech"),
+            "Sitzung abbrechen",
+            "Fortsetzen",
+            "Löschen",
+        ):
+            self.assertNotIn(bedienelement, seite)
+
     def test_sitzung_in_einem_fremden_training_bleibt_verborgen(self) -> None:
         """Dieselbe Person mit derselben Vignette anderswo gehört nicht dazu."""
         fremder_kreis: Konto = _konto("hedy", AUSBILDERIN_GRUPPE)
@@ -351,6 +369,19 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         seite: str = self._kuratierseite()
 
         self.assertLess(seite.index("Anna Zeller"), seite.index("Grace Hopper"))
+
+    def test_training_ohne_beigetretene_zeigt_eine_leerzeile(self) -> None:
+        """Solange niemand beigetreten ist, sagt die Tabelle das."""
+        leeres: Training = Training.objects.anlegen(self.ausbilderin, name="Neu")
+        leeres.vignetten.add(self.vignette)
+        leeres.veroeffentlichen()
+        self.client.force_login(self.ausbilderin)
+
+        response: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[leeres.pk])
+        )
+
+        self.assertContains(response, "Noch niemand ist beigetreten.")
 
     def test_leeres_training_zeigt_einen_hinweis_statt_der_tabelle(self) -> None:
         """Ohne Vignetten gibt es nichts zu tabellieren."""
