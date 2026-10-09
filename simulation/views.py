@@ -415,8 +415,8 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
             if _eingaben_uebernehmen(katalog, request):
                 messages.success(request, "Übergreifende Kriterien gespeichert.")
         return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
-    # Gerendert wird außerhalb der Transaktion: Unter IMMEDIATE hielte jeder
-    # atomic()-Block die Schreibsperre, auch ein lesender (ADR-0051).
+    # Gerendert wird außerhalb der Transaktion (ADR-0051): Unter IMMEDIATE
+    # hielte jeder atomic()-Block die Schreibsperre, auch ein lesender.
     katalog = _fassung(request, pk)
     return render(
         request,

@@ -1635,6 +1635,16 @@ class EvalkatalogTransaktionsgrenzeTests(TransactionTestCase):
             with self.subTest(url=url):
                 self.assertFalse(self._rendern_in_transaktion(url))
 
+    def test_get_rendert_die_ueberholte_fassung_ausserhalb_einer_transaktion(
+        self,
+    ) -> None:
+        """Auch das Lesen einer überholten Fassung nimmt keine Schreibsperre."""
+        self.finale.bearbeiten().finalisieren()
+
+        for url in self._knoten(self.finale):
+            with self.subTest(url=url):
+                self.assertFalse(self._rendern_in_transaktion(url))
+
     def test_post_uebernimmt_alle_eingaben_oder_keine(self) -> None:
         """Bricht die Übernahme mittendrin ab, bleibt nichts gespeichert."""
         entwurf: Evalkatalog = self.finale.bearbeiten()
@@ -1653,6 +1663,7 @@ class EvalkatalogTransaktionsgrenzeTests(TransactionTestCase):
                     url,
                     {f"kriterium-{kriterium.pk}": "Neu", f"eval-{eval_.pk}": "Neu"},
                 )
-            kriterium.refresh_from_db()
-            eval_.refresh_from_db()
-            self.assertEqual((kriterium.text, eval_.name), ("Alt", FUELLTEXT))
+            with self.subTest(url=url):
+                kriterium.refresh_from_db()
+                eval_.refresh_from_db()
+                self.assertEqual((kriterium.text, eval_.name), ("Alt", FUELLTEXT))
