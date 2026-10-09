@@ -4,14 +4,12 @@ Stellvertretend über die Vignetten-Detailseite geprüft; welche Seite welches
 Artefakt nennt, prüfen die View-Tests der einzelnen Apps.
 """
 
-import re
-
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import konto_mit_rollen, vignetten_entwurf
-from config.tests.formular import submit_knoepfe
+from config.tests.formular import submit_knoepfe, text_ohne_tags
 from konten.models import Konto
 from vignetten.models import Vignette
 
@@ -26,11 +24,6 @@ def _vignette_mit_eigentuemerinnen(erste: Konto, *weitere: Konto) -> Vignette:
     vignette: Vignette = vignetten_entwurf(erste)
     vignette.historie.eigentuemerinnen.add(*weitere)
     return vignette
-
-
-def _text(antwort: HttpResponse) -> str:
-    """Liefert den Seitentext ohne Tags, Leerraum zusammengefasst."""
-    return " ".join(re.sub(r"<[^>]+>", "", antwort.content.decode()).split())
 
 
 class EigentuemerinnenAbschnittTests(TestCase):
@@ -61,7 +54,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
 
         response: HttpResponse = self._detail(ada, vignette)
 
-        self.assertIn("ada (Sie)", _text(response))
+        self.assertIn("ada (Sie)", text_ohne_tags(response))
         self.assertContains(
             response,
             reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, ada.pk]),

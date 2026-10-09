@@ -39,7 +39,7 @@ class TrainingskatalogTests(TestCase):
         self,
     ) -> None:
         """Ein beigetretenes Konto findet das Training im Katalog."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         training.veroeffentlichen()
@@ -54,7 +54,7 @@ class TrainingskatalogTests(TestCase):
 
     def test_zeilen_sind_ueber_den_namen_verlinkt(self) -> None:
         """Eine Zeile nennt Name, Ziel und Aktion des beigetretenen Trainings."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         training.veroeffentlichen()
@@ -87,7 +87,7 @@ class TrainingskatalogTests(TestCase):
 
     def test_versteckt_unveroeffentlichte_trainings(self) -> None:
         """Entwürfe erscheinen weder im Katalog noch über ihre Detail-URL."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         entwurf: Training = Training.objects.anlegen(
             ausbilderin, name="Versteckte Bruchrechnung"
@@ -104,7 +104,7 @@ class TrainingskatalogTests(TestCase):
 
     def test_listet_finale_vignetten_und_bestaetigt_freie_wahl(self) -> None:
         """Eine veröffentlichte Sammlung verlinkt jede eingebundene Vignette."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
@@ -135,7 +135,7 @@ class TrainingskatalogTests(TestCase):
 
     def test_versteckt_nachtraeglich_archivierte_vignette(self) -> None:
         """Archivierte Fassungen bleiben trotz bestehender Bindung unspielbar."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Archivierte Brüche")
@@ -159,7 +159,7 @@ class TrainingskatalogTests(TestCase):
         self,
     ) -> None:
         """Die freie Wahl führt über den DB-Sink zu einer abgeschlossenen Sitzung."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
+        ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(
             rahmenhandlung_einleitung="Frau Weber begleitet Sie.",
@@ -234,8 +234,8 @@ class TrainingskatalogTests(TestCase):
         self,
     ) -> None:
         """Audioverarbeitung beginnt erst nach der dokumentierten Einwilligung."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
-        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        ausbilderin: Konto = konto_mit_rollen("ada")
+        teilnehmerin: Konto = konto_mit_rollen("grace")
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
@@ -336,8 +336,8 @@ class TrainingsabbruchTests(TestCase):
         audioverarbeitung_eingewilligt: bool = True,
     ) -> Training:
         """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
-        ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
-        teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
+        ausbilderin: Konto = konto_mit_rollen("ada")
+        teilnehmerin: Konto = konto_mit_rollen("grace")
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake", parameter={"skript": skript or []}
         )

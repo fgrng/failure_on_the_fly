@@ -1,5 +1,6 @@
 """Gemeinsame Zugriffe der View-Tests auf die Formulare einer Seite."""
 
+import re
 from html.parser import HTMLParser
 
 from django.http import HttpResponse
@@ -46,3 +47,13 @@ def submit_knoepfe(antwort: HttpResponse | str) -> list[tuple[str, str | None]]:
     sammler: _Knopfsammler = _Knopfsammler()
     sammler.feed(antwort if isinstance(antwort, str) else antwort.content.decode())
     return sammler.knoepfe
+
+
+def text_ohne_tags(antwort: HttpResponse | str) -> str:
+    """Liefert den Text einer Seite ohne Tags, Leerraum zusammengefasst.
+
+    Ein String gilt als schon gerendertes HTML, etwa ein Ausschnitt der Seite.
+    """
+
+    html: str = antwort if isinstance(antwort, str) else antwort.content.decode()
+    return " ".join(re.sub(r"<[^>]+>", "", html).split())

@@ -2,7 +2,9 @@
 
 import json
 import re
+import sqlite3
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -174,10 +176,10 @@ def test_konto_ohne_forschendenrolle_erhaelt_auf_alle_forschenden_views_403(
     """Die Erhebungs-UI ist von der öffentlichen Teilnahme getrennt geschützt."""
 
     client.force_login(konto_mit_rollen("grace"))
+    # Jede Route mit der Methode, die sie annimmt: Leserouten per GET.
+    anfragen = client.get if route in _LESEROUTEN else client.post
 
-    antwort: HttpResponse = client.post(
-        reverse(f"erhebungen:{route}", kwargs=argumente)
-    )
+    antwort: HttpResponse = anfragen(reverse(f"erhebungen:{route}", kwargs=argumente))
 
     assert antwort.status_code == 403
 
@@ -1496,6 +1498,50 @@ def test_loeschen_ausserhalb_des_entwurfs_leitet_mit_meldung_auf_die_liste(
     assertRedirects(antwort, reverse("erhebungen:liste"))
     assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
     assertContains(antwort, reverse("erhebungen:detail", args=[erhebung.pk]))
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_zweiter_tab_finalisiert_nicht_zwischen_statuspruefung_und_aenderung(
+    client: Client, route: str
+) -> None:
+    """Statusprüfung und Änderung bilden eine Einheit, die kein Tab unterbricht.
+
+    Der zweite Tab versucht zu finalisieren, sobald die Aktion die Erhebung
+    gelesen hat. Er wartet nicht, damit der Test nicht hängt.
+    """
+
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = _erhebung_mit_design(ada)
+    client.force_login(ada)
+    url, daten = _schreibaufruf(route, erhebung, ada)
+    gelesen: list[str] = []
+    zweiter_tab: list[str] = []
+
+    def nach_dem_lesen_finalisieren(
+        execute: Any, sql: str, params: Any, many: bool, context: dict[str, Any]
+    ) -> Any:
+        # Erst bei der nächsten Anweisung ist das Lesen abgeschlossen.
+        if gelesen and not zweiter_tab:
+            try:
+                with sqlite3.connect(
+                    str(connection.settings_dict["NAME"]), uri=True, timeout=0
+                ) as zweite:
+                    zweite.execute(
+                        "UPDATE erhebungen_erhebung SET status = 'final' WHERE id = ?",
+                        [erhebung.pk],
+                    )
+                zweiter_tab.append("finalisiert")
+            except sqlite3.OperationalError:
+                zweiter_tab.append("gesperrt")
+        if 'FROM "erhebungen_erhebung"' in sql:
+            gelesen.append(sql)
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(nach_dem_lesen_finalisieren):
+        client.post(url, daten)
+
+    assert zweiter_tab == ["gesperrt"]
 
 
 @pytest.mark.django_db

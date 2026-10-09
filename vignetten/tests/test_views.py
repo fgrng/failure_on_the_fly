@@ -1123,7 +1123,7 @@ class VignetteNeueFassungViewTests(TestCase):
         )
         self.client.force_login(self.ada)
 
-    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_bildpfad(
+    def test_zieht_aus_finaler_fassung_einen_entwurf_mit_geerbtem_inhalt(
         self,
     ) -> None:
         """Neue Fassung führt auf die Detailseite eines Entwurfs mit dem Inhalt."""

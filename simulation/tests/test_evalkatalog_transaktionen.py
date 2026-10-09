@@ -43,7 +43,6 @@ def test_get_haelt_beim_rendern_keine_schreibsperre(
     def rendern_beobachten(sender: object, template: Template, **kwargs: Any) -> None:
         if template.name != "simulation/evalkatalog_editor.html":
             return
-        assert not connection.in_atomic_block
         with sqlite3.connect(
             str(connection.settings_dict["NAME"]), uri=True, timeout=0
         ) as zweite:
@@ -61,51 +60,62 @@ def test_get_haelt_beim_rendern_keine_schreibsperre(
     assert gerendert == ["simulation/evalkatalog_editor.html"]
 
 
-@pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("knoten", ["kriterien", "eval", "evalinput"])
-@pytest.mark.parametrize("fehler", [False, True])
-def test_post_speichert_alle_eingaben_atomisch(
-    client: Client, knoten: str, fehler: bool
-) -> None:
-    katalog = vollstaendiger_katalog()
+def _geaenderte_eingaben(katalog: Evalkatalog) -> dict[str, str]:
+    # Ändert eine Rubrik und ein Eval; beide speichert jeder der drei Knoten.
     kriterium = katalog.kriterium_anlegen("Bisherige Rubrik")
     eval_ = Eval.objects.get(katalog=katalog)
+    return {
+        f"kriterium-{kriterium.pk}": "Geänderte Rubrik",
+        f"eval-{eval_.pk}": "Geändertes Eval",
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("knoten", ["kriterien", "eval", "evalinput"])
+def test_post_speichert_alle_eingaben_und_leitet_auf_den_knoten(
+    client: Client, knoten: str
+) -> None:
+    """Nach dem Speichern zeigt derselbe Knoten alle geänderten Eingaben."""
+    katalog = vollstaendiger_katalog()
+    daten = _geaenderte_eingaben(katalog)
     url = _knoten(katalog, knoten)
     client.force_login(konto_mit_rollen("ada", is_superuser=True))
-    schreibtransaktionen = []
 
-    def schreiben_beobachten(
+    response = client.post(url, daten)
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == url
+    inhalt = client.get(_knoten(katalog, "kriterien")).content.decode()
+    assert "Geänderte Rubrik" in inhalt
+    assert "Geändertes Eval" in inhalt
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("knoten", ["kriterien", "eval", "evalinput"])
+def test_post_hinterlaesst_nach_datenbankfehler_nichts_teilweise_gespeichert(
+    client: Client, knoten: str
+) -> None:
+    """Scheitert das zweite Schreiben, bleibt auch das erste ungespeichert."""
+    katalog = vollstaendiger_katalog()
+    daten = _geaenderte_eingaben(katalog)
+    url = _knoten(katalog, knoten)
+    client.force_login(konto_mit_rollen("ada", is_superuser=True))
+    geschrieben = []
+
+    def zweites_schreiben_scheitert(
         execute: Any, sql: str, params: Any, many: bool, context: dict[str, Any]
     ) -> Any:
         if sql.startswith("UPDATE"):
-            schreibtransaktionen.append(connection.in_atomic_block)
-            # Ein Datenbankfehler nach dem ersten Schreiben darf keine
-            # teilweise gespeicherten Formulareingaben hinterlassen.
-            if fehler and len(schreibtransaktionen) == 2:
+            geschrieben.append(sql)
+            if len(geschrieben) == 2:
                 raise RuntimeError("Schreiben fehlgeschlagen")
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(schreiben_beobachten):
-        daten = {
-            f"kriterium-{kriterium.pk}": "Geänderte Rubrik",
-            f"eval-{eval_.pk}": "Geändertes Eval",
-        }
-        if fehler:
-            with pytest.raises(RuntimeError, match="Schreiben fehlgeschlagen"):
-                client.post(url, daten)
-        else:
-            response = client.post(url, daten)
-            assert response.status_code == 302
-            assert response.headers["Location"] == url
+    with connection.execute_wrapper(zweites_schreiben_scheitert):
+        with pytest.raises(RuntimeError, match="Schreiben fehlgeschlagen"):
+            client.post(url, daten)
 
-    assert schreibtransaktionen and all(schreibtransaktionen)
-    response = client.get(_knoten(katalog, "kriterien"))
-    inhalt = response.content.decode()
-    if fehler:
-        assert "Bisherige Rubrik" in inhalt
-        assert "Geänderte Rubrik" not in inhalt
-        assert "Geändertes Eval" not in inhalt
-        assert "Ergänzt" in inhalt
-    else:
-        assert "Geänderte Rubrik" in inhalt
-        assert "Geändertes Eval" in inhalt
+    inhalt = client.get(_knoten(katalog, "kriterien")).content.decode()
+    assert "Bisherige Rubrik" in inhalt
+    assert "Geänderte Rubrik" not in inhalt
+    assert "Geändertes Eval" not in inhalt

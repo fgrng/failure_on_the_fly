@@ -379,11 +379,14 @@ class AbschriftTests(TrainingsexportTestCase):
 
         archiv: dict[str, str] = self._archiv()
 
+        # Das Kennzeichen ist zufällig; beide Ordner liegen unter derselben Person.
+        pfade: list[list[str]] = sorted(name.split("/", 1) for name in archiv)
+        kennzeichen: str = pfade[0][0]
         self.assertEqual(
-            sorted(name.split("/", 1)[1] for name in archiv),
+            pfade,
             [
-                "studie-bruchrechnung-2/01-brüche-addieren.md",
-                "studie-bruchrechnung/01-brüche-addieren.md",
+                [kennzeichen, "studie-bruchrechnung-2/01-brüche-addieren.md"],
+                [kennzeichen, "studie-bruchrechnung/01-brüche-addieren.md"],
             ],
         )
 

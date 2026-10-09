@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -18,6 +17,7 @@ from simulation.models import Verwendung
 from simulation.transkription import FakeTranskription
 from sitzungen.models import Sitzung
 from sitzungen.views import transkriptions_endpunkt
+from sitzungen.tests.aufnahme import audioaufnahme
 
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
@@ -52,15 +52,11 @@ class ErhebungsTranskriptionTests(TestCase):
         self.bindung: Erhebungsbindung = Erhebungsbindung.objects.get()
         self.sitzung: Sitzung = Sitzung.objects.get()
 
-    def _aufnahme(self) -> SimpleUploadedFile:
-        # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
-        return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
-
     def _anfragen(self, anbieter: FakeTranskription, sitzung: Sitzung) -> HttpResponse:
         # Ruft den Endpunkt pseudonym auf, so wie es die Teilnahme tut.
         request: HttpRequest = RequestFactory().post(
             "/erhebungen/teilnahme/transkription/",
-            {"audio": self._aufnahme(), "sitzung_pk": sitzung.pk},
+            {"audio": audioaufnahme(), "sitzung_pk": sitzung.pk},
         )
         request.user = AnonymousUser()
         request.session = self.client.session

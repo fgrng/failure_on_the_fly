@@ -20,6 +20,7 @@ from simulation.models import Verwendung
 from sitzungen.models import Sitzung
 from training.models import Abschrift, Training
 from training.tests.aufbau import abschrift_mit_sitzung, ansehen_url
+from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
 
 
@@ -69,15 +70,6 @@ class FreigabeTestCase(TestCase):
         self.client.force_login(self.teilnehmerin)
         response: HttpResponse = self.client.get(
             reverse("training:abschrift", args=[self.abschrift.pk])
-        )
-        self.assertEqual(response.status_code, 200)
-        return response.content.decode()
-
-    def _kuratierseite(self, konto: Konto | None = None) -> str:
-        # Liest die Kuratierseite des Trainings aus Sicht des Kreises.
-        self.client.force_login(konto or self.ausbilderin)
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
         )
         self.assertEqual(response.status_code, 200)
         return response.content.decode()
@@ -280,12 +272,21 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Weder Kreis noch Administration finden sie unter der Tabelle."""
         administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
 
-        self.assertNotIn("Studie Bruchrechnung", self._kuratierseite())
-        self.assertNotIn("Studie Bruchrechnung", self._kuratierseite(administratorin))
+        self.assertNotIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
+        self.assertNotIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, administratorin),
+        )
 
     def test_kuratierseite_meldet_wenn_niemand_freigegeben_hat(self) -> None:
         """Die leere Liste sagt es ausdrücklich."""
-        self.assertIn("Niemand hat eine Abschrift freigegeben.", self._kuratierseite())
+        self.assertIn(
+            "Niemand hat eine Abschrift freigegeben.",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_freigegebene_abschrift_steht_mit_name_erhebung_und_importzeit(
         self,
@@ -299,7 +300,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
             )
         self._freigeben(self.training)
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertInHTML('<th scope="row">Grace Hopper</th>', seite)
         self.assertInHTML("<td>Studie Bruchrechnung</td>", seite)
@@ -311,7 +312,9 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Liste folgt der Sichtbarkeit des Trainings."""
         self._freigeben(self.training)
 
-        seite: str = self._kuratierseite(konto_mit_rollen("root", is_superuser=True))
+        seite: str = kuratierseite(
+            self.client, self.training, konto_mit_rollen("root", is_superuser=True)
+        )
 
         self.assertIn("Studie Bruchrechnung", seite)
 
@@ -321,7 +324,10 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         """Die Sitzung lässt sich aus der Liste lesend öffnen."""
         self._freigeben(self.training)
 
-        self.assertIn(ansehen_url(_sitzung(self.abschrift)), self._kuratierseite())
+        self.assertIn(
+            ansehen_url(_sitzung(self.abschrift)),
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_nicht_abgeschlossene_sitzung_der_abschrift_ist_nicht_verlinkt(
         self,
@@ -333,7 +339,10 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self.abschrift = abgebrochen
         self._freigeben(self.training)
 
-        self.assertNotIn(ansehen_url(_sitzung(abgebrochen)), self._kuratierseite())
+        self.assertNotIn(
+            ansehen_url(_sitzung(abgebrochen)),
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
 
     def test_freigegebene_abschriften_stehen_nach_namen_sortiert(self) -> None:
@@ -349,7 +358,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self.abschrift, self.teilnehmerin = frueh, frueh.konto
         self._freigeben(self.training)
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertLess(seite.index("ada Lovelace"), seite.index("Grace Hopper"))
 

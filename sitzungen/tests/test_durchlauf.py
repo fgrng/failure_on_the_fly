@@ -383,14 +383,18 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_allen_senken_neu_an() -> N
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(("budget", "erschoepft"), [(7, True), (8, False)])
 def test_sitzung_beenden_beendet_die_offene_spanne(
-    time_machine: TimeMachineFixture,
+    time_machine: TimeMachineFixture, budget: int, erschoepft: bool
 ) -> None:
-    """Das Beenden delegiert das Buchen an den Sink."""
+    """Das Beenden delegiert das Buchen an den Sink: Gebucht sind genau 7 s.
+
+    Ein Budget von 7 s ist damit erschöpft, eines von 8 s noch nicht.
+    """
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
     vignette.budget_typ = Vignette.BudgetTyp.ZEIT
-    vignette.budget_wert = 7
+    vignette.budget_wert = budget
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
     beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
@@ -401,7 +405,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
         sink.zug_beginnen(beginn)
         time_machine.shift(7)
         sitzung_beenden(sink)
-        assert _leeren_schritt_anhaengen(sink)
+        assert _leeren_schritt_anhaengen(sink) is erschoepft
     assert _verbrauchte_zeit(datenbank) == 7.0
 
 

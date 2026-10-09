@@ -13,6 +13,7 @@ from django.utils import timezone
 from config.tests.aufbau import finale_vignette
 from config.tests.formular import submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen
+from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
@@ -124,6 +125,7 @@ class _Elementsammler(HTMLParser):
             text.append(data)
 
     def _tags(self) -> tuple[str, ...]:
+        # Liefert die Tags der offenen Elemente, das äußerste zuerst.
         return tuple(offen[0] for offen in self._offen)
 
 
@@ -1239,15 +1241,19 @@ class ErhebungsteilnahmeTests(TestCase):
         self._erhebung_fertigstellen()
         zugehoerigkeit = Erhebungsitem.objects.get()
         bindung = self._laufende_sitzung_starten()
+        # Der Block liegt mit Antwortzeile vor; die Sitzung läuft aber noch,
+        # laut Ablauf ist er also nicht offen.
+        block_vorlegen(
+            bindung, Erhebungsitem.Andockpunkt.NACH_SITZUNG, Sitzung.objects.get()
+        )
 
-        # Die Sitzung läuft noch; ihr Block ist laut Ablauf nicht offen.
         antwort = self.client.post(
             reverse("erhebungen:itemblock", args=[bindung.token]),
             {f"item_{zugehoerigkeit.pk}": "Hilfreich"},
         )
 
         self.assertEqual(antwort.status_code, 400)
-        self.assertFalse(ItemAntwort.objects.exclude(freitext=None).exists())
+        self.assertIsNone(ItemAntwort.objects.get().freitext)
 
     def test_itemantwort_bleibt_nach_zeitraumende_unangetastet(self) -> None:
         """Nach dem harten Zeitfenster schreibt auch der Token-Endpunkt nichts."""

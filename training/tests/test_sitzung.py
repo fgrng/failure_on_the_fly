@@ -27,8 +27,6 @@ class TrainingssitzungTests(TestCase):
         budget_wert: int = 3,
         audioverarbeitung_eingewilligt: bool = True,
         kern_ueberholen: bool = False,
-        lernauftrag_text: str = "Addiere zwei Brüche.",
-        arbeitsheft_text: str = "1/2 + 1/3 = 2/5",
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
         ausbilderin: Konto = konto_mit_rollen("ada")
@@ -51,9 +49,9 @@ class TrainingssitzungTests(TestCase):
         vignette: Vignette = finale_vignette(
             ausbilderin,
             name="Brüche vergleichen",
-            lernauftrag_text=lernauftrag_text,
+            lernauftrag_text="Addiere zwei Brüche.",
             arbeitsheft_bildbeschreibung="Mia rechnet 1/2 + 1/3 = 2/5.",
-            arbeitsheft_text=arbeitsheft_text,
+            arbeitsheft_text="1/2 + 1/3 = 2/5",
             schuelerin_name="Mia",
             lehrperson_name="Weber",
             thema="Brüche",

@@ -17,6 +17,7 @@ from training.tests.aufbau import (
     ansehen_url,
     gespielte_sitzung,
 )
+from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
 
 
@@ -185,28 +186,24 @@ class SelbsteinsichtTests(FremdeinsichtTestCase):
 class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
     """Die Tabelle der Fremdeinsicht auf der Kuratierseite."""
 
-    def _kuratierseite(self) -> str:
-        # Liest die Kuratierseite aus Sicht der Eigentümerin.
-        self.client.force_login(self.ausbilderin)
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-        self.assertEqual(response.status_code, 200)
-        return response.content.decode()
-
     def test_beigetretene_ohne_sitzung_erscheinen_als_zeile(self) -> None:
         """Wer nichts bearbeitet hat, steht trotzdem namentlich in der Tabelle."""
-        self.assertIn("Grace Hopper", self._kuratierseite())
+        self.assertIn(
+            "Grace Hopper", kuratierseite(self.client, self.training, self.ausbilderin)
+        )
 
     def test_vignetten_des_trainings_sind_die_spalten(self) -> None:
         """Jede Vignette des Trainings hat ihren Spaltenkopf."""
-        self.assertIn('title="Brüche addieren"', self._kuratierseite())
+        self.assertIn(
+            'title="Brüche addieren"',
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_spalten_folgen_der_kuratierreihenfolge(self) -> None:
         """Eine später aufgenommene Vignette steht rechts, nicht alphabetisch."""
         self.training.vignetten.add(finale_vignette(self.autorin, name="Addition"))
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertLess(
             seite.index('title="Brüche addieren"'), seite.index('title="Addition"')
@@ -218,7 +215,10 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             self.training, self.teilnehmerin, self.vignette
         )
 
-        self.assertIn(ansehen_url(sitzung), self._kuratierseite())
+        self.assertIn(
+            ansehen_url(sitzung),
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_nicht_abgeschlossene_sitzung_ist_nicht_verlinkt(self) -> None:
         """Laufende, abgebrochene und gescheiterte Sitzungen fehlen."""
@@ -232,7 +232,10 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
                     self.training, self.teilnehmerin, self.vignette, status
                 )
 
-                self.assertNotIn(ansehen_url(sitzung), self._kuratierseite())
+                self.assertNotIn(
+                    ansehen_url(sitzung),
+                    kuratierseite(self.client, self.training, self.ausbilderin),
+                )
 
     def test_sitzungen_sind_je_vignette_nummeriert_und_datiert(self) -> None:
         """Mehrere Durchläufe stehen einzeln, mit Nummer und Datum."""
@@ -242,7 +245,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         with time_machine.travel(datetime(2026, 7, 2, 0, 30, tzinfo=berlin)):
             gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertIn('aria-label="Sitzung vom 01.07.2026">1</a>', seite)
         self.assertIn('aria-label="Sitzung vom 02.07.2026">2</a>', seite)
@@ -255,7 +258,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         gespielte_sitzung(self.training, self.teilnehmerin, weitere)
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertEqual(seite.count('">1</a>'), 2)
 
@@ -267,7 +270,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             )
         )
 
-        seite: str = self._kuratierseite()
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertLess(seite.index("anna Zeller"), seite.index("Grace Hopper"))
 
@@ -288,4 +291,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
         """Ohne Vignetten gibt es nichts zu tabellieren."""
         self.training.vignetten.clear()
 
-        self.assertIn("Dieses Training enthält keine Vignetten.", self._kuratierseite())
+        self.assertIn(
+            "Dieses Training enthält keine Vignetten.",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )

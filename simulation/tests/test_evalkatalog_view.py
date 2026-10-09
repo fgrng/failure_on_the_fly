@@ -1207,7 +1207,6 @@ class EvalkatalogNeueFassungTests(TestCase):
     def setUp(self) -> None:
         """Finalisiert eine Fassung und meldet eine Administratorin an."""
         self.katalog: Evalkatalog = vollstaendiger_katalog()
-        self.katalog.kriterium_anlegen("Rollentreu")
         # Abweichend vom Startwert 3, damit die Kopie von *k* sichtbar wird.
         self.katalog.k = 5
         self.katalog.finalisieren()
@@ -1330,10 +1329,12 @@ class EvalkatalogFinalisierenTests(TestCase):
             ),
             links,
         )
-        self.assertContains(response, "Überholte Fassungen")
+        _, ueberholte_fassungen = response.content.decode().split(
+            "<h2>Überholte Fassungen</h2>"
+        )
         self.assertIn(
-            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
-            [href for _, href in links],
+            f'href="{reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])}"',
+            ueberholte_fassungen,
         )
 
     def test_unvollstaendiger_entwurf_bleibt_mit_meldungen_im_editor(self) -> None:

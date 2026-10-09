@@ -275,26 +275,28 @@ def _entwurfsaktion(
 ) -> Callable[..., HttpResponse]:
     """Macht aus einer Änderung am Entwurf eine POST-View mit Weiterleitung.
 
-    Die Aktion bekommt die sichtbare Erhebung und läuft in einer eigenen
-    Transaktion; eine Antwort liefert sie nur für ihre eigenen Fehlerfälle.
-    Ist die Erhebung kein Entwurf mehr oder weist das Modell die Änderung ab,
-    sagt eine Meldung auf der Detailseite, warum nichts geändert wurde
-    (ADR-0051). Die Detailseite rendert erst die Weiterleitung, außerhalb der
-    Transaktion (#249).
+    Die Aktion bekommt die sichtbare Erhebung; Laden, Statusprüfung und
+    Aktion liegen in einer gemeinsamen Transaktion, damit kein zweiter Tab
+    dazwischen finalisiert. Eine Antwort liefert die Aktion nur für ihre
+    eigenen Fehlerfälle. Ist die Erhebung kein Entwurf mehr oder weist das
+    Modell die Änderung ab, sagt eine Meldung auf der Detailseite, warum nichts
+    geändert wurde (ADR-0051). Die Detailseite rendert erst die Weiterleitung,
+    außerhalb der Transaktion (#249).
     """
 
     @wraps(aktion)
     def view(request: HttpRequest, pk: int, **kwargs: object) -> HttpResponse:
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
-        erhebung: Erhebung = _sichtbare_erhebung(request, pk)
-        if erhebung.status != Erhebung.Status.ENTWURF:
-            messages.error(request, _KEIN_ENTWURF_MELDUNG)
-            return redirect("erhebungen:detail", pk=erhebung.pk)
-        antwort: HttpResponse | None = _validierte_aktion_ausfuehren(
-            request,
-            transaction.atomic(partial(aktion, request, erhebung, **kwargs)),
-        )
+        with transaction.atomic():
+            erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+            if erhebung.status != Erhebung.Status.ENTWURF:
+                messages.error(request, _KEIN_ENTWURF_MELDUNG)
+                return redirect("erhebungen:detail", pk=erhebung.pk)
+            antwort: HttpResponse | None = _validierte_aktion_ausfuehren(
+                request,
+                transaction.atomic(partial(aktion, request, erhebung, **kwargs)),
+            )
         if antwort is not None:
             return antwort
         return redirect("erhebungen:detail", pk=erhebung.pk)

@@ -29,6 +29,7 @@ from sitzungen.views import (
     probelauf_sitzung_fuer_transkription,
     transkriptions_endpunkt,
 )
+from sitzungen.tests.aufnahme import audioaufnahme
 from vignetten.models import Vignette
 
 
@@ -48,10 +49,6 @@ class ProbelaufTranskriptionTests(TestCase):
         self.entwurf.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
         self.entwurf.save()
         self.client.force_login(self.autorin)
-
-    def _aufnahme(self) -> SimpleUploadedFile:
-        # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
-        return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
 
     def _aufnahme_mit_groesse(self, groesse: int) -> SimpleUploadedFile:
         # Der Inhalt ist beliebig; den Endpunkt interessiert allein die Größe.
@@ -74,7 +71,7 @@ class ProbelaufTranskriptionTests(TestCase):
     ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
-            "/sitzungen/transkription/", {"audio": aufnahme or self._aufnahme()}
+            "/sitzungen/transkription/", {"audio": aufnahme or audioaufnahme()}
         )
         request.user = self.autorin
         request.session = self.client.session

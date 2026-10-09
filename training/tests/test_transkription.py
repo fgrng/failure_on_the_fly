@@ -2,7 +2,6 @@
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -17,6 +16,7 @@ from simulation.models import Verwendung
 from simulation.transkription import FakeTranskription
 from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.views import transkriptions_endpunkt
+from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
 from training.views import training_sitzung
 from vignetten.models import Vignette
@@ -25,10 +25,6 @@ from vignetten.models import Vignette
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class TranskriptionsEndpointTests(TestCase):
     """Eine eingewilligte Trainingssitzung kann Audio transkribieren lassen."""
-
-    def _aufnahme(self) -> SimpleUploadedFile:
-        # Erzeugt für jede Anfrage eine frische Datei, weil Django sie einliest.
-        return SimpleUploadedFile("aufnahme.webm", b"audio", "audio/webm")
 
     def _sitzung_starten(self) -> Sitzung:
         # Startet die zur Transkription berechtigte Trainingssitzung über HTTP.
@@ -50,7 +46,7 @@ class TranskriptionsEndpointTests(TestCase):
 
     def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
         request: HttpRequest = RequestFactory().post(
-            "/training/sitzung/transkription/", {"audio": self._aufnahme()}
+            "/training/sitzung/transkription/", {"audio": audioaufnahme()}
         )
         request.user = get_user_model().objects.get(username="grace")
         request.session = self.client.session

@@ -397,12 +397,9 @@ Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
 Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
 Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
 
-Die Knoten „Übergreifende Kriterien“, Eval und Evalinput lesen und rendern auf
-GET außerhalb einer Schreibtransaktion, auch bei finalen und überholten
-Fassungen. Auf POST liegen die Entwurfs- und Zuordnungsprüfung sowie die
-gesamte Eingabenübernahme in einer gemeinsamen atomaren Transaktion. Ein
-unerwarteter Fehler hinterlässt keine teilweise gespeicherten Änderungen;
-nach dem Speichern folgt die Weiterleitung auf denselben Knoten.
+An den Knoten „Übergreifende Kriterien“, Eval und Evalinput wird beim Speichern
+nichts teilweise gespeichert: Scheitert ein Teil, bleiben alle Eingaben
+ungespeichert. Nach dem Speichern folgt die Weiterleitung auf denselben Knoten.
 
 Am Knoten „Übergreifende Kriterien“ (im Baum mit der Zahl seiner Kriterien)
 pflegt die Administrator:in die Rubriken, nach denen der Bewerter jedes

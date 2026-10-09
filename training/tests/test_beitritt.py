@@ -16,6 +16,7 @@ from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import Verwendung
 from sitzungen.models import Sitzung, Teilnahme
 from training.models import Training, Trainingsbindung
+from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
 
 
@@ -432,21 +433,14 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
         self.training.eigentuemerinnen.add(self.ko_eigentuemerin)
         self.training.veroeffentlichen()
 
-    def _kuratierseite(self) -> HttpResponse:
-        return self.client.get(reverse("training:kuratieren", args=[self.training.pk]))
-
     def test_kuratierseite_zeigt_den_link_zum_kopieren(self) -> None:
         """Der volle Link steht lesbar neben dem Kopieren-Knopf."""
-        self.client.force_login(self.ausbilderin)
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
-        response: HttpResponse = self._kuratierseite()
-
-        self.assertContains(response, "Gruppe beitreten lassen")
-        self.assertContains(
-            response, f"http://testserver{_beitritt_url(self.training)}"
-        )
-        self.assertContains(response, "Kopieren")
-        self.assertContains(response, "0 Personen beigetreten")
+        self.assertIn("Gruppe beitreten lassen", seite)
+        self.assertIn(f"http://testserver{_beitritt_url(self.training)}", seite)
+        self.assertIn("Kopieren", seite)
+        self.assertIn("0 Personen beigetreten", seite)
 
     def test_ko_eigentuemerin_sperrt_den_beitritt(self) -> None:
         """Jede Eigentümerin des Kreises darf den Beitritt sperren."""
@@ -524,9 +518,11 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
         for name in ("grace", "linus"):
             self.client.force_login(konto_mit_rollen(name))
             self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
 
-        self.assertContains(self._kuratierseite(), "2 Personen beigetreten")
+        self.assertIn(
+            "2 Personen beigetreten",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_gesperrtes_band_nennt_eine_beigetretene_person_in_der_einzahl(
         self,
@@ -537,4 +533,7 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
         self.client.force_login(self.ausbilderin)
         self.client.post(reverse("training:beitritt_sperren", args=[self.training.pk]))
 
-        self.assertContains(self._kuratierseite(), "1 Person ist bereits dabei")
+        self.assertIn(
+            "1 Person ist bereits dabei",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )

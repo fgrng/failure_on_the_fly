@@ -7,18 +7,13 @@ from django.test import TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import finale_vignette, finaler_kern, konto_mit_rollen
-from config.tests.formular import submit_knoepfe
+from config.tests.formular import submit_knoepfe, text_ohne_tags
 from erhebungen.models import Erhebung
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
 from simulation.models import Simulationskern
 from training.models import Training
 from vignetten.models import Vignette
-
-
-def _text(html: str) -> str:
-    """Entfernt Tags und fasst Leerraum zusammen."""
-    return " ".join(re.sub(r"<[^>]+>", "", html).split())
 
 
 class SeitenvokabularTests(TestCase):
@@ -54,7 +49,7 @@ class SeitenvokabularTests(TestCase):
         ).group(1)
         ueberzeile: str = re.search(r"<p>(.*?)</p>", kopf, re.DOTALL).group(1)
         titel: str = re.search(r"<h1>(.*?)</h1>", kopf, re.DOTALL).group(1)
-        return _text(ueberzeile), _text(titel)
+        return text_ohne_tags(ueberzeile), text_ohne_tags(titel)
 
     def test_seiten_zeigen_ueberzeile_titel_und_knopf(self) -> None:
         """Jede Seite der Tabelle nennt Bereich, Aktion bzw. Objekt und Knopf."""
