@@ -538,23 +538,30 @@ Ausgeführt wird ein Lauf vom Hintergrundprozess
 mit Zeitpunkt; ein Fehler mitten im Lauf hinterlässt ihn „Abgebrochen“, das bis
 dahin Geschriebene bleibt. Ohne `--einmal` verweigert der Command den Dienst;
 der dauerhafte Betrieb folgt. Für jedes Eval, jeden Evalinput und jede
-Wiederholung 1 bis *k* entsteht ein Evalgespräch, für jeden festen Inputschritt
-ein Wechsel: Die Inputäußerung ist die Äußerung der Lehrperson, die Schüler:in
-antwortet über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
-Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
-Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
-Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
-User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Jedes Gespräch, jeder
-Wechsel und jedes Urteil wird sofort geschrieben; kein Modellaufruf hält eine
-Schreibtransaktion offen.
+Wiederholung 1 bis *k* entsteht ein Evalgespräch, für jeden Inputschritt ein
+Wechsel in der Reihenfolge des Evalinputs; feste und gelenkte Schritte dürfen
+sich mischen. Bei einem festen Schritt ist die Inputäußerung wörtlich die
+Äußerung der Lehrperson. Bei einem gelenkten formuliert die simulierte
+Lehrperson sie mit der festgehaltenen Lehrpersonen-Konfiguration: Ihr
+System-Prompt ist die gerenderte Lehrperson-Vorlage des festgehaltenen Katalogs
+mit `$inputstrategie` (Text des Schritts) und `$verlauf` (bisheriger Verlauf
+ohne Denkspur), der User-Prompt dieser Verlauf, die Eingabe die Inputstrategie.
+Die Schüler:in antwortet in beiden Fällen über denselben Antwortversuch wie in
+der Sitzung, ohne Denkspur im Kontext. Danach beurteilt der Bewerter das
+Gespräch nach jedem Evalkriterium des Evals und jedem übergreifenden Kriterium.
+Sein System-Prompt ist die gerenderte Bewerter-Vorlage mit `$kriterium` und
+`$verlauf` (Verlauf samt Denkspur), der User-Prompt der Verlauf, die Eingabe der
+Kriteriumstext. Inputstrategie und Kriterium werden als reiner Text eingesetzt
+und nicht selbst als Vorlage ausgewertet; Anweisungen stehen allein in den
+Vorlagen des Katalogs. Jedes Gespräch, jeder Wechsel und jedes Urteil wird
+sofort geschrieben; kein Modellaufruf hält eine Schreibtransaktion offen.
 
 Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
 einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
 *nicht erfüllt* mit der Begründung „Antwortversuch gescheitert“. Liefert der
 Bewerter nach allen Versuchen nichts Auswertbares, bleibt dieses Kriterium *ohne
-Urteil*. Gelenkte Inputschritte werden noch nicht ausgeführt: Das Gespräch endet
-vor dem ersten gelenkten Schritt, und alle seine Kriterien bleiben *ohne
-Urteil*, statt dass der Schritt still entfiele.
+Urteil*. Liefert die Lehrperson nach allen Versuchen keine Äußerung, endet das
+Gespräch vor diesem Schritt, und alle seine Kriterien bleiben *ohne Urteil*.
 
 Die Ansicht zeigt je Eval eine Tabelle aus Evalinputs (mit der Folge ihrer
 Schritte, etwa „FFG“) und Kriterien, die übergreifenden eingeschlossen. Jede

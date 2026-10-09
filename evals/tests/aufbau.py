@@ -62,17 +62,33 @@ def drei_fakes(
     fake_aktivieren(Verwendung.BEWERTER, bewerter)
 
 
+def aeusserungen(anzahl: int) -> list[dict[str, str]]:
+    """Liefert so viele nummerierte Äußerungen der simulierten Lehrperson."""
+
+    return [
+        {"aeusserung": f"Gelenkte Frage {nummer}"} for nummer in range(1, anzahl + 1)
+    ]
+
+
+def gelenkt(strategie: str) -> tuple[Inputschritt.Art, str]:
+    """Ein gelenkter Inputschritt für `finaler_katalog`."""
+
+    return (Inputschritt.Art.GELENKT, strategie)
+
+
 def finaler_katalog(
     *,
     k: int = 3,
-    schritte: Sequence[str] = ("Wie hast du gerechnet?", "Warum so?"),
-    gelenkt: Sequence[str] = (),
+    schritte: Sequence[str | tuple[Inputschritt.Art, str]] = (
+        "Wie hast du gerechnet?",
+        "Warum so?",
+    ),
     evalkriterien: Sequence[str] = ("Muster gezeigt",),
     uebergreifende: Sequence[str] = ("Rollentreue",),
 ) -> Evalkatalog:
     """Finalisiert einen Katalog mit einem Eval „Muster“ und einem Evalinput.
 
-    Die festen Schritte stehen vorn, die gelenkten dahinter.
+    Ein Text ist ein fester Schritt, `gelenkt(…)` ein gelenkter.
     """
 
     katalog: Evalkatalog = Evalkatalog.objects.anlegen()
@@ -86,9 +102,10 @@ def finaler_katalog(
     for text in evalkriterien:
         eval_.kriterium_anlegen(text)
     evalinput = Evalinput.anhaengen(eval_)
-    for text in schritte:
-        evalinput.schritt_anlegen(text=text)
-    for text in gelenkt:
-        evalinput.schritt_anlegen(Inputschritt.Art.GELENKT, text)
+    for schritt in schritte:
+        if isinstance(schritt, str):
+            evalinput.schritt_anlegen(text=schritt)
+        else:
+            evalinput.schritt_anlegen(*schritt)
     katalog.finalisieren()
     return katalog

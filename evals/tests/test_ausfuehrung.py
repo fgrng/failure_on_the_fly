@@ -11,7 +11,14 @@ from config.tests.aufbau import (
 from config.tests.sprachmodell import anfragen_aufzeichnen
 from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf, Zelle
-from evals.tests.aufbau import antworten, drei_fakes, finaler_katalog, urteile
+from evals.tests.aufbau import (
+    aeusserungen,
+    antworten,
+    drei_fakes,
+    finaler_katalog,
+    gelenkt,
+    urteile,
+)
 from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -176,11 +183,130 @@ def test_versagender_bewerter_laesst_das_kriterium_ohne_urteil() -> None:
 
 
 @pytest.mark.django_db
-def test_gelenkter_schritt_wird_nicht_stillschweigend_ausgelassen() -> None:
-    """Bis gelenkte Schritte laufen, endet das Gespräch davor ohne Urteil."""
+def test_gemischter_evalinput_laeuft_mit_wiederholungen_vollstaendig_durch() -> None:
+    """Feste Schritte wörtlich, gelenkte von der Lehrperson, in Inputreihenfolge."""
 
-    finaler_katalog(k=1, schritte=("Fest",), gelenkt=("Frag nach",))
-    drei_fakes(schuelerin=antworten(1))
+    finaler_katalog(k=2, schritte=("Fest eins", gelenkt("Frag nach"), "Fest zwei"))
+    drei_fakes(
+        schuelerin=antworten(6),
+        bewerter=urteile(*[True] * 4),
+        lehrperson=aeusserungen(2),
+    )
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    lauf: Evallauf = _ausgefuehrter_lauf(vignette)
+
+    assert [
+        [w.lehrperson_aeusserung for w in gespraech.wechsel.all()]
+        for gespraech in lauf.gespraeche.order_by("wiederholung")
+    ] == [
+        ["Fest eins", "Gelenkte Frage 1", "Fest zwei"],
+        ["Fest eins", "Gelenkte Frage 2", "Fest zwei"],
+    ]
+    assert _zellen(lauf) == {
+        "Muster gezeigt": (2, 2, True),
+        "Rollentreue": (2, 2, True),
+    }
+
+
+@pytest.fixture
+def gelenkt_nach_festem_schritt() -> None:
+    """Ein fester, dann ein gelenkter Schritt, beurteilt nach einem Kriterium."""
+
+    finaler_katalog(
+        k=1,
+        schritte=("Wie hast du gerechnet?", gelenkt("Frag nach $schuelerin_name")),
+        uebergreifende=(),
+    )
+    drei_fakes(
+        schuelerin=antworten(2), bewerter=urteile(True), lehrperson=aeusserungen(1)
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_lehrperson_sieht_den_bisherigen_verlauf_ohne_denkspur() -> None:
+    """Die Lehrperson kennt Frage und Antwort, nicht die Denkspur."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, lehrperson, _, _ = _anfragetexte(vignette)
+
+    assert (
+        "Wie hast du gerechnet?" in lehrperson,
+        "Antwort 1" in lehrperson,
+        "Denkspur 1" in lehrperson,
+    ) == (True, True, False)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_lehrperson_erhaelt_ihre_vorlage_mit_strategie_als_reinem_text() -> None:
+    """Die Vorlage wird gerendert, die Strategie darin nicht noch einmal."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, lehrperson, _, _ = _anfragetexte(vignette)
+
+    assert "Sprich mit Lea nach Frag nach $schuelerin_name." in lehrperson
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_schuelerin_und_bewerter_sehen_die_gelenkte_aeusserung() -> None:
+    """Die formulierte Äußerung ist die Eingabe der Schüler:in und Teil des Verlaufs."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, _, zweite_schuelerin, bewerter = _anfragetexte(vignette)
+
+    assert (
+        "Gelenkte Frage 1" in zweite_schuelerin,
+        "Gelenkte Frage 1" in bewerter,
+    ) == (
+        True,
+        True,
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_referenzdiagnose_erreicht_auch_die_lehrperson_nicht() -> None:
+    """Keine der drei Rollen sieht die Referenzdiagnose."""
+
+    vignette: Vignette = finale_vignette(
+        konto_mit_rollen("ada", "Autor:in"), referenzdiagnose="GEHEIME DIAGNOSE"
+    )
+
+    texte: list[str] = _anfragetexte(vignette)
+
+    assert all("GEHEIME DIAGNOSE" not in text for text in texte)
+
+
+@pytest.mark.django_db
+def test_gelenkter_erster_schritt_formuliert_ohne_bisherigen_verlauf() -> None:
+    """Auch ganz vorn spricht die Lehrperson zuerst."""
+
+    finaler_katalog(k=1, schritte=(gelenkt("Begrüße"),), uebergreifende=())
+    drei_fakes(
+        schuelerin=antworten(1), bewerter=urteile(True), lehrperson=aeusserungen(1)
+    )
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    lauf: Evallauf = _ausgefuehrter_lauf(vignette)
+
+    assert [
+        (w.lehrperson_aeusserung, w.aeusserung)
+        for w in lauf.gespraeche.get().wechsel.all()
+    ] == [("Gelenkte Frage 1", "Antwort 1")]
+
+
+@pytest.mark.django_db
+def test_versagende_lehrperson_beendet_das_gespraech_ohne_urteil() -> None:
+    """Ein Infrastrukturfehler ist weder Erfolg noch Befund über die Vignette."""
+
+    finaler_katalog(k=1, schritte=("Fest", gelenkt("Frag nach"), "Danach"))
+    drei_fakes(schuelerin=antworten(1), lehrperson=[{"fehler": "anbieterfehler"}] * 3)
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
     lauf: Evallauf = _ausgefuehrter_lauf(vignette)
@@ -188,20 +314,6 @@ def test_gelenkter_schritt_wird_nicht_stillschweigend_ausgelassen() -> None:
     gespraech = lauf.gespraeche.get()
     assert gespraech.wechsel.count() == 1
     assert {urteil.erfuellt for urteil in gespraech.urteile.all()} == {None}
-
-
-@pytest.mark.django_db
-def test_gelenkter_erster_schritt_laesst_alle_kriterien_ohne_urteil() -> None:
-    """Auch ganz vorn entfällt ein gelenkter Schritt nicht still."""
-
-    finaler_katalog(k=1, schritte=(), gelenkt=("Frag nach",))
-    drei_fakes()
-    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
-
-    lauf: Evallauf = _ausgefuehrter_lauf(vignette)
-
-    zellen: list[Zelle] = lauf.uebersicht()[0].zeilen[0].zellen
-    assert [(z.erfuellt, z.ohne_urteil) for z in zellen] == [(0, 1), (0, 1)]
 
 
 @pytest.mark.django_db

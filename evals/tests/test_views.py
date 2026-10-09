@@ -14,10 +14,12 @@ from config.tests.aufbau import (
 from config.tests.formular import submit_knoepfe
 from evals.models import Evallauf
 from evals.tests.aufbau import (
+    aeusserungen,
     antworten,
     drei_fakes,
     fake_aktivieren,
     finaler_katalog,
+    gelenkt,
     urteile,
 )
 from konten.models import Konto
@@ -138,6 +140,26 @@ def test_fertiger_lauf_zeigt_quote_und_bestehen(ada: Konto) -> None:
     assert "Fertig" in seite
     assert "2 von 3" in seite and "nicht bestanden" in seite
     assert "3 von 3" in seite
+
+
+@pytest.mark.django_db
+def test_gemischter_lauf_zeigt_seine_ergebnisse(ada: Konto) -> None:
+    """Feste und gelenkte Schritte laufen über den Hintergrundprozess durch."""
+
+    finaler_katalog(k=3, schritte=("Fest", gelenkt("Frag nach"), "Danach"))
+    drei_fakes(
+        schuelerin=antworten(9),
+        bewerter=urteile(*[True] * 6),
+        lehrperson=aeusserungen(3),
+    )
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
+
+    assert "FGF" in seite
+    assert seite.count("3 von 3") == 2
 
 
 @pytest.mark.django_db

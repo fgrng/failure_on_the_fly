@@ -11,21 +11,22 @@ from simulation import (
     vorlage_rendern,
 )
 from simulation.models import Evalinput
-from simulation.sprachmodell import BEWERTER_SCHEMA
+from simulation.sprachmodell import BEWERTER_SCHEMA, LEHRPERSON_SCHEMA
 
 from .models import Evalgespraech, Evallauf, Kriterium, Urteil, Wechsel
 
 ANTWORTVERSUCH_GESCHEITERT: str = "Antwortversuch gescheitert"
 BEWERTER_OHNE_AUSGABE: str = "Der Bewerter lieferte keine auswertbare Ausgabe."
-GELENKT_NOCH_NICHT: str = (
-    "Gelenkte Inputschritte werden noch nicht ausgeführt; das Gespräch endet davor."
+LEHRPERSON_OHNE_AUSGABE: str = (
+    "Die simulierte Lehrperson lieferte keine Äußerung; das Gespräch endet davor."
 )
 
 
 def evallauf_ausfuehren(evallauf: Evallauf) -> None:
     """Spielt alle Evals des festgehaltenen Katalogs und beurteilt jedes Gespräch.
 
-    Je Evalinput entstehen k Evalgespräche, je Inputschritt ein Wechsel, danach
+    Je Evalinput entstehen k Evalgespräche, je Inputschritt ein Wechsel (fest
+    wörtlich, gelenkt von der simulierten Lehrperson formuliert), danach
     je Evalkriterium und übergreifendem Kriterium ein Urteil. Geschrieben wird
     sofort und in kurzen Schritten: Kein Modellaufruf hält eine
     Schreibtransaktion offen, und ein Abbruch lässt das Fertige stehen.
@@ -55,21 +56,26 @@ def _gespraech_fuehren(
     verlauf: list[tuple[str, str]] = []
     protokoll: list[tuple[str, str, str]] = []
     for position, schritt in enumerate(evalinput.schritte.all(), 1):
-        if schritt.gelenkt:
-            _alle_beurteilen(gespraech, kriterien, None, GELENKT_NOCH_NICHT)
+        lehrperson_aeusserung: str | None = (
+            _lehrperson_fragen(evallauf, schritt.text, verlauf, ausfuehrung)
+            if schritt.gelenkt
+            else schritt.text
+        )
+        if lehrperson_aeusserung is None:
+            _alle_beurteilen(gespraech, kriterien, None, LEHRPERSON_OHNE_AUSGABE)
             return
         versuch: Antwortversuch = antwort_versuchen(
             evallauf.platzhalter,
             evallauf.kern,
             evallauf.schuelerin_konfiguration,
             verlauf,
-            schritt.text,
+            lehrperson_aeusserung,
             ausfuehrung,
         )
         Wechsel.objects.create(
             gespraech=gespraech,
             position=position,
-            lehrperson_aeusserung=schritt.text,
+            lehrperson_aeusserung=lehrperson_aeusserung,
             denkspur=versuch.antwort.denkspur if versuch.antwort else "",
             aeusserung=versuch.antwort.aeusserung if versuch.antwort else None,
             fehlversuche=[
@@ -80,13 +86,49 @@ def _gespraech_fuehren(
         if versuch.antwort is None:
             _alle_beurteilen(gespraech, kriterien, False, ANTWORTVERSUCH_GESCHEITERT)
             return
-        verlauf.append((schritt.text, versuch.antwort.aeusserung))
+        verlauf.append((lehrperson_aeusserung, versuch.antwort.aeusserung))
         protokoll.append(
-            (schritt.text, versuch.antwort.denkspur, versuch.antwort.aeusserung)
+            (
+                lehrperson_aeusserung,
+                versuch.antwort.denkspur,
+                versuch.antwort.aeusserung,
+            )
         )
     verlauf_mit_denkspur: str = _verlauf_mit_denkspur(protokoll)
     for kriterium in kriterien:
         _beurteilen(evallauf, gespraech, kriterium, verlauf_mit_denkspur, ausfuehrung)
+
+
+def _lehrperson_fragen(
+    evallauf: Evallauf,
+    inputstrategie: str,
+    verlauf: Sequence[tuple[str, str]],
+    ausfuehrung: Ausfuehrung,
+) -> str | None:
+    # Lässt die Lehrperson nach der Strategie formulieren; leer, wenn sie
+    # nach allen Versuchen nichts liefert. Wie beim Bewerter ist die gerenderte
+    # Lehrperson-Vorlage der System-Prompt mit `$inputstrategie` und `$verlauf`
+    # (ohne Denkspur), der User-Prompt der Verlauf, die Eingabe die Strategie.
+    # Die Strategie wird eingesetzt, nicht selbst als Vorlage gerendert.
+
+    verlauf_ohne_denkspur: str = _verlauf_ohne_denkspur(verlauf)
+    ausgabe: dict[str, object] | None = ausgabe_versuchen(
+        vorlage_rendern(
+            evallauf.katalog.lehrperson_vorlage,
+            {
+                **evallauf.platzhalter,
+                "inputstrategie": inputstrategie,
+                "verlauf": verlauf_ohne_denkspur,
+            },
+        ),
+        verlauf_ohne_denkspur,
+        evallauf.lehrperson_konfiguration,
+        [],
+        inputstrategie,
+        LEHRPERSON_SCHEMA,
+        ausfuehrung,
+    ).ausgabe
+    return None if ausgabe is None else str(ausgabe["aeusserung"])
 
 
 def _alle_beurteilen(
@@ -139,6 +181,15 @@ def _beurteilen(
             bool(ausgabe["erfuellt"]),
             str(ausgabe["begruendung"]),
         )
+
+
+def _verlauf_ohne_denkspur(verlauf: Sequence[tuple[str, str]]) -> str:
+    # Der Verlauf für die Lehrperson, je Wechsel nur die beiden Äußerungen.
+
+    return "\n".join(
+        f"<lehrperson>{lehrperson}</lehrperson>\n<schuelerin>{aeusserung}</schuelerin>"
+        for lehrperson, aeusserung in verlauf
+    )
 
 
 def _verlauf_mit_denkspur(protokoll: Sequence[tuple[str, str, str]]) -> str:
