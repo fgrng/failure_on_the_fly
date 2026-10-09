@@ -194,6 +194,66 @@ class BeitrittTests(TestCase):
 
         self.assertContains(response, "0 Personen sind bereits dabei")
 
+    def test_kreis_und_administration_treten_ueber_den_link_nicht_bei(
+        self,
+    ) -> None:
+        """Offen wie gesperrt führt der Link ins Training, ohne zu binden."""
+        administratorin: Konto = get_user_model().objects.create_user(
+            username="root", is_superuser=True
+        )
+
+        for gesperrt in (False, True):
+            self.training.beitritt_gesperrt = gesperrt
+            self.training.save(update_fields=["beitritt_gesperrt"])
+            for konto in (self.ausbilderin, administratorin):
+                with self.subTest(gesperrt=gesperrt, konto=konto.username):
+                    self.client.force_login(konto)
+                    response: HttpResponse = self.client.get(
+                        _beitritt_url(self.training)
+                    )
+                    self.assertRedirects(
+                        response, reverse("training:detail", args=[self.training.pk])
+                    )
+
+        self.assertEqual(
+            (Trainingsbindung.objects.count(), Teilnahme.objects.count()), (0, 0)
+        )
+
+    def test_wiederholter_link_des_kreises_zaehlt_niemanden_als_beigetreten(
+        self,
+    ) -> None:
+        """Auch mehrfaches Öffnen erhöht die Zahl der Beigetretenen nicht."""
+        self.client.force_login(self.ausbilderin)
+        self.client.get(_beitritt_url(self.training))
+        self.client.get(_beitritt_url(self.training))
+
+        response: HttpResponse = self.client.get(
+            reverse("training:kuratieren", args=[self.training.pk])
+        )
+
+        self.assertContains(response, "0 Personen beigetreten")
+
+    def test_link_laesst_eine_bestehende_bindung_des_kreises_stehen(self) -> None:
+        """Eine Bindung aus einer gespielten Sitzung bleibt einzeln erhalten."""
+        bindung: Trainingsbindung = self.training.bindung_fuer(self.ausbilderin)
+        self.client.force_login(self.ausbilderin)
+
+        self.client.get(_beitritt_url(self.training))
+
+        self.assertQuerySetEqual(
+            Trainingsbindung.objects.filter(konto=self.ausbilderin), [bindung]
+        )
+
+    def test_ausbilderin_ausserhalb_des_kreises_tritt_regulaer_bei(self) -> None:
+        """Die Rolle allein gibt keinen Kreiszugang; sie tritt wie alle bei."""
+        fremde: Konto = _konto("lin", AUSBILDERIN_GRUPPE)
+        self.client.force_login(fremde)
+
+        self.client.get(_beitritt_url(self.training))
+        self.client.get(_beitritt_url(self.training))
+
+        self.assertEqual(Trainingsbindung.objects.filter(konto=fremde).count(), 1)
+
     def test_link_eines_entwurfs_ist_unbekannt(self) -> None:
         """Ein Entwurf nimmt noch niemanden auf."""
         entwurf: Training = Training.objects.anlegen(self.ausbilderin, name="Entwurf")
@@ -293,6 +353,18 @@ class GeschlossenesTrainingTests(TestCase):
 
         self.assertContains(detail, "Brüche vergleichen")
         self.assertContains(wahl, "Vignette gewählt")
+
+    def test_sitzungsstart_des_kreises_legt_die_bindung_an(self) -> None:
+        """Erst wer tatsächlich spielt, bekommt eine Trainingsbindung."""
+        self._beitreten(self.ausbilderin)
+
+        self.client.post(
+            reverse("training:wahl", args=[self.training.pk, self.vignette.pk])
+        )
+
+        self.assertTrue(
+            Trainingsbindung.objects.filter(konto=self.ausbilderin).exists()
+        )
 
     def test_bestehende_bindung_gilt_als_beitritt(self) -> None:
         """Eine Bindung aus der Zeit vor dem Trainings-Link behält den Zugang."""

@@ -605,18 +605,16 @@ def _beitritt_schalten(request: HttpRequest, pk: int, gesperrt: bool) -> HttpRes
 def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
 
-    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training,
-    ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
+    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training.
+    Kreis und Administration sehen das Training ohnehin und landen darin,
+    offen wie gesperrt, ohne beizutreten; binden darf erst der Sitzungsstart.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    if (
-        not training.beitreten(request.user)
-        and not Training.objects.sichtbar_fuer(request.user)
-        .filter(pk=training.pk)
-        .exists()
-    ):
+    if not Training.objects.sichtbar_fuer(request.user).filter(
+        pk=training.pk
+    ).exists() and not training.beitreten(request.user):
         return render(
             request,
             "training/beitritt_gesperrt.html",
