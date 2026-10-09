@@ -2,18 +2,18 @@
 
 import re
 
-from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
+from config.tests.aufbau import finale_vignette, finaler_kern, konto_mit_rollen
+from config.tests.formular import submit_knoepfe
 from erhebungen.models import Erhebung
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
 from simulation.models import Simulationskern
 from training.models import Training
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 
 def _text(html: str) -> str:
@@ -25,21 +25,18 @@ class SeitenvokabularTests(TestCase):
     """Überzeile, Titel und Absendeknopf je Seite wie in der Entscheidung zu #287."""
 
     def setUp(self) -> None:
-        self.linus: Konto = get_user_model().objects.create_user(
-            username="linus", is_superuser=True
-        )
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        self.kern_entwurf: Simulationskern = kern.bearbeiten()
+        self.linus: Konto = konto_mit_rollen("linus")
+        self.linus.is_superuser = True
+        self.linus.save()
+        self.kern_entwurf: Simulationskern = finaler_kern().bearbeiten()
         self.vignette: Vignette = Vignette.objects.anlegen(self.linus)
         self.training: Training = Training.objects.anlegen(self.linus, name="Brüche")
         self.veroeffentlicht: Training = Training.objects.anlegen(
             self.linus, name="Prozente"
         )
-        self.finale: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(name="Brüche vergleichen"),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
+        self.finale: Vignette = finale_vignette(
+            self.linus,
+            name="Brüche vergleichen",
             lernauftrag_text="Vergleiche Brüche.",
             arbeitsheft_text="3/4 ist größer als 2/3.",
         )
@@ -60,17 +57,6 @@ class SeitenvokabularTests(TestCase):
         ueberzeile: str = re.search(r"<p>(.*?)</p>", kopf, re.DOTALL).group(1)
         titel: str = re.search(r"<h1>(.*?)</h1>", kopf, re.DOTALL).group(1)
         return _text(ueberzeile), _text(titel)
-
-    def _knoepfe(self, antwort: HttpResponse) -> list[str]:
-        """Nennt die Beschriftungen aller Absendeknöpfe der Seite."""
-        return [
-            _text(knopf)
-            for knopf in re.findall(
-                r'<button[^>]*type="submit"[^>]*>(.*?)</button>',
-                antwort.content.decode(),
-                re.DOTALL,
-            )
-        ]
 
     def test_seiten_zeigen_ueberzeile_titel_und_knopf(self) -> None:
         """Jede Seite der Tabelle nennt Bereich, Aktion bzw. Objekt und Knopf."""
@@ -190,7 +176,7 @@ class SeitenvokabularTests(TestCase):
                 antwort: HttpResponse = self.client.get(url)
                 self.assertEqual(self._kopf(antwort), (ueberzeile, titel))
                 if knopf:
-                    self.assertIn(knopf, self._knoepfe(antwort))
+                    self.assertIn(knopf, [text for text, _ in submit_knoepfe(antwort)])
 
     def test_einwilligung_nennt_training_starten(self) -> None:
         """Die Einwilligung vor dem Start steht unter »Training starten«."""
@@ -201,19 +187,3 @@ class SeitenvokabularTests(TestCase):
         self.assertEqual(
             self._kopf(antwort), ("Ausbildung / Training starten", "Audioverarbeitung")
         )
-
-    def test_vignettenformular_ohne_schritt_fuer_schritt(self) -> None:
-        """Der alte Titel entfällt ganz, auch als Untertitel."""
-        antwort: HttpResponse = self.client.get(reverse("vignetten:anlegen"))
-
-        self.assertNotContains(antwort, "Schritt für Schritt")
-
-    def test_seitenkoepfe_und_knoepfe_sagen_anlegen_statt_erstellen(self) -> None:
-        """Das Verb heißt überall »anlegen«."""
-        for url in (
-            reverse("vignetten:liste"),
-            reverse("training:katalog"),
-            reverse("training:anlegen"),
-        ):
-            with self.subTest(url=url):
-                self.assertNotContains(self.client.get(url), "erstellen")

@@ -203,6 +203,20 @@ Keine Schichtdoppelung: `vignetten/tests/test_views.py::VignetteDetailViewTests:
 | `config/tests/formular.py` | behalten | Schmale Schnittstelle (`submit_knoepfe`), in drei Apps benutzt. Ein zweiter Nutzer innerhalb dieses Bereichs kommt mit dem Umschreiben von `test_seitenvokabular.py` und `test_eigentuemerinnen_abschnitt.py` dazu. |
 | `config/tests/exportkontrakt.py` | behalten | Kontrakt aus einer externen Spec (ADR-0029), von #321 ausdrücklich erlaubt. |
 | `conftest.py` | behalten | Testweite Einstellung, prüft nichts. |
+| `config/tests/aufbau.py` | behalten | Nachtrag (#396): Aufbau über die öffentlichen Manager- und Lebenszyklusmethoden aus #392, in mehreren Apps benutzt. |
+| `config/tests/sprachmodell.py` | behalten | Nachtrag (#396): Aufzeichnung der Anfragen am Fake-Sprachmodell je Test aus #379, in drei Apps benutzt. |
+
+### `config/tests/test_aufbau.py` (Nachtrag #396)
+
+Die Datei kam mit #392 nach dem Review dazu.
+
+| Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
+|---|---|---|---|
+| `test_konto_traegt_die_uebergebenen_rollen`, `test_konto_ohne_rolle_traegt_keine`, `test_konto_mit_unbekannter_rolle_scheitert` | behalten | Prüfen den Helfer über `Konto.rollen()` und die Abweisung eines unbekannten Rollennamens; Erwartungen als Literale. | – |
+| `test_finaler_kern_ist_final`, `test_finaler_kern_liefert_beim_zweiten_aufruf_denselben` | behalten | Äußeres Verhalten des Helfers: Zustand und Wiederverwendung des finalen Kerns. | – |
+| `test_aktive_modell_konfiguration_belegt_die_verwendung` | behalten | Liest die Belegung über den öffentlichen Manager (`belegte`). | – |
+| `test_vignetten_entwurf_ist_ein_entwurf`, `test_vignetten_entwurf_liegt_im_bestand_des_kontos` | behalten | Zustand und Sichtbarkeit über `sichtbar_fuer`. | – |
+| `test_finale_vignette_ist_final_und_pinnt_einen_finalen_kern`, `test_finale_vignette_uebernimmt_uebergebene_felder`, `test_finale_vignette_weist_ein_unbekanntes_feld_ab` | behalten | Die Zusagen des Helfers aus #391 (legt den Kern bei Bedarf an, Felder überschreibbar), Erwartungen als Literale. | – |
 
 ## Folge-Issues
 

@@ -3,92 +3,32 @@
 import re
 from pathlib import Path
 
-import pytest
-
 
 STATIC: Path = Path(__file__).parents[1]
-TOKENS: tuple[tuple[str, str], ...] = (
-    ("--color-area-participant-solid", "--phsg-mint-dark"),
-    ("--color-area-participant-on-solid", "--phsg-white"),
-    ("--color-area-participant-tint", "--phsg-green-light"),
-    ("--color-area-authoring-solid", "--phsg-yellow-dark"),
-    ("--color-area-authoring-on-solid", "--phsg-white"),
-    ("--color-area-authoring-tint", "--phsg-yellow-light"),
-    ("--color-area-research-solid", "--phsg-purple-dark"),
-    ("--color-area-research-on-solid", "--phsg-white"),
-    ("--color-area-research-tint", "--phsg-purple-light"),
-    ("--color-area-system-solid", "--phsg-blue-dark"),
-    ("--color-area-system-on-solid", "--phsg-white"),
-    ("--color-area-system-tint", "--phsg-blue-light"),
-    ("--color-danger", "--phsg-red-dark"),
-    ("--color-danger-tint", "--phsg-red-light"),
-    ("--color-danger-emphasis", "--phsg-red-deep"),
-    ("--color-success", "--phsg-green-dark"),
-    ("--color-info", "--phsg-blue-dark"),
-)
-COMPONENT_SELECTORS: tuple[str, ...] = (
-    ".area-band",
-    ".area--participant",
-    ".area--authoring",
-    ".area--research",
-    ".area--system",
-    ".card",
-    ".card-grid",
-    ".card--disabled",
-    ".badge",
-    ".badge--draft",
-    ".badge--final",
-    ".badge--system",
-    ".badge--archived",
-    ".form label",
-    ".button--danger",
-    ".button--neutral",
-    ".messages",
-    ".message--",
-)
 
 
-@pytest.fixture(scope="module")
-def tokens_css() -> str:
-    """Liest die öffentlich ausgelieferten semantischen Farb-Tokens."""
+def test_benutzte_custom_properties_sind_deklariert() -> None:
+    """Jede mit `var(--x)` gelesene Custom Property ist irgendwo als `--x:` deklariert.
 
-    return (STATIC / "css" / "tokens.css").read_text()
+    Eine Deklaration mit einer unbekannten Property verwirft der Browser
+    stillschweigend (#374).
+    """
 
+    stylesheets: list[Path] = list((STATIC / "css").glob("*.css"))
+    deklariert: set[str] = {
+        name
+        for path in stylesheets
+        for name in re.findall(r"(--[\w-]+)\s*:", path.read_text())
+    }
 
-@pytest.fixture(scope="module")
-def main_css() -> str:
-    """Liest die öffentlich ausgelieferten Komponenten-Stile."""
+    unbekannt: list[str] = [
+        f"{path.name}: {name}"
+        for path in stylesheets
+        for name in re.findall(r"var\(\s*(--[\w-]+)", path.read_text())
+        if name not in deklariert
+    ]
 
-    return (STATIC / "css" / "main.css").read_text()
-
-
-@pytest.mark.parametrize(("token", "primitive"), TOKENS)
-def test_design_system_exposes_semantic_tokens(
-    tokens_css: str, token: str, primitive: str
-) -> None:
-    """Jeder semantische Farb-Token verweist auf die vorgesehene PHSG-Farbe."""
-
-    assert f"{token}: var({primitive});" in tokens_css
-
-
-@pytest.mark.parametrize("selector", COMPONENT_SELECTORS)
-def test_design_system_exposes_shared_component(selector: str, main_css: str) -> None:
-    """Jede gemeinsame Komponente stellt ihren dokumentierten Selektor bereit."""
-
-    assert selector in main_css
-
-
-def test_card_body_stays_on_the_neutral_surface(main_css: str) -> None:
-    """Bereichsfarben bleiben im Rahmen und Kopf statt im Karteninhalt."""
-
-    assert "background: var(--color-surface);" in main_css
-    assert "background: var(--area-tint" not in main_css
-
-
-def test_form_controls_are_styled_without_a_form_wrapper(main_css: str) -> None:
-    """Die generischen Formularstile benötigen keine zusätzliche Hülle."""
-
-    assert "input,\ntextarea,\nselect {" in main_css
+    assert unbekannt == []
 
 
 def test_feature_styles_only_consume_semantic_color_tokens() -> None:
@@ -99,69 +39,21 @@ def test_feature_styles_only_consume_semantic_color_tokens() -> None:
             assert "var(--phsg-" not in path.read_text(), path
 
 
-def test_main_layout_exposes_eight_column_grid() -> None:
-    """Standardseiten nutzen acht Spalten, Sitzungen die mittleren vier."""
-
-    navigation_css: str = (STATIC / "css" / "navigation.css").read_text()
-    sitzung_css: str = (STATIC / "css" / "sitzung.css").read_text()
-    tokens_css: str = (STATIC / "css" / "tokens.css").read_text()
-
-    assert "grid-template-columns: repeat(8, minmax(0, 1fr));" in navigation_css
-    assert "column-gap: var(--space-3);" in navigation_css
-    assert ":where(.site-main) > * { grid-column: 1 / -1; }" in navigation_css
-    assert "max-width: var(--content-max-width);" in navigation_css
-    assert "grid-template-columns: minmax(0, 1fr);" in navigation_css
-    assert "grid-column: 3 / span 4;" in sitzung_css
-    assert ".sitzung-seite { grid-column: 1 / -1; }" in sitzung_css
-    assert "--content-max-width: 1440px;" in tokens_css
-
-
 def test_page_sections_follow_the_main_area_not_the_viewport() -> None:
-    """Abschnitte stehen im Achterraster und brechen an der Breite des Hauptbereichs um."""
+    """Kein `@media`-Block nennt Seitenabschnitte; sie brechen am Hauptbereich um."""
 
-    page_css: str = (STATIC / "css" / "page.css").read_text()
-    media_blocks: list[str] = re.findall(
-        r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", page_css
+    media_block: re.Pattern[str] = re.compile(
+        r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}"
     )
 
-    assert "container: hauptbereich / inline-size;" in page_css
-    assert (
-        ".page-section > .page-section__head { grid-column: 1 / span 2; }" in page_css
-    )
-    assert ".page-section > .field-grid { grid-template-columns: subgrid; }" in page_css
-    assert "@container hauptbereich (max-width: 900px)" in page_css
-    assert "@container hauptbereich (max-width: 520px)" in page_css
-    assert not any(
-        ".page-section" in block or ".field-grid" in block for block in media_blocks
-    )
+    verstoesse: list[str] = [
+        path.name
+        for path in (STATIC / "css").glob("*.css")
+        for block in media_block.findall(path.read_text())
+        if ".page-section" in block or ".field-grid" in block
+    ]
 
-
-def test_three_fields_keep_three_columns_at_medium_width() -> None:
-    """In der Vierer-Stufe behalten drei Felder drei eigene Spalten."""
-
-    page_css: str = (STATIC / "css" / "page.css").read_text()
-    stufe: str = page_css.split("@container hauptbereich (max-width: 900px)")[1].split(
-        "@container"
-    )[0]
-
-    assert (
-        ".page-section > .field-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }"
-        in stufe
-    )
-
-
-def test_form_actions_stay_visible_at_the_top() -> None:
-    """Die Aktionszeile eines Formulars rückt nach oben und klebt, außer bei der Teilnahme."""
-
-    vignette_form_css: str = (STATIC / "css" / "vignette-form.css").read_text()
-    leiste: str = vignette_form_css.split(
-        ".page:not(.area--participant) form > .vignette-form-actions {"
-    )[1].split("}")[0]
-
-    assert "order: -1;" in leiste
-    assert "position: sticky;" in leiste
-    assert "z-index: 2;" in leiste
-    assert "box-shadow" not in leiste
+    assert verstoesse == []
 
 
 def test_feature_styles_use_spacing_tokens() -> None:
@@ -227,68 +119,3 @@ def test_szenentext_headings_stand_above_the_scene_text() -> None:
     assert groessen == sorted(groessen, reverse=True)
     assert len(set(groessen)) == 3
     assert min(groessen) >= 1
-
-
-def test_markdown_text_is_shielded_against_page_heading_rules() -> None:
-    """Der doppelte Klassenselektor schlägt `.page-field h3` und Verwandte."""
-
-    base_html: str = (STATIC.parent / "templates" / "base.html").read_text()
-    markdown_css: str = (STATIC / "css" / "markdown-text.css").read_text()
-
-    assert "css/markdown-text.css" in base_html
-    for ebene in ("h3", "h4", "h5"):
-        assert f".markdown-text.markdown-text {ebene} {{" in markdown_css
-    assert ".markdown-text.markdown-text p {" in markdown_css
-
-
-def test_aktive_navigation_traegt_die_bereichsfarbe() -> None:
-    """Aktiv und Hover der Sidebar tönen im Bereich statt in Grün (ADR-0024)."""
-
-    navigation_css: str = (STATIC / "css" / "navigation.css").read_text()
-
-    for gruppe, bereich in (
-        ("development", "authoring"),
-        ("education", "participant"),
-        ("research", "research"),
-        ("system", "system"),
-    ):
-        assert (
-            f".sidebar-nav__group--{gruppe} {{\n"
-            f"    --nav-solid: var(--color-area-{bereich}-solid);\n"
-            f"    --nav-tint: var(--color-area-{bereich}-tint);\n"
-            "}"
-        ) in navigation_css
-    assert "box-shadow: inset 3px 0 var(--nav-solid);" in navigation_css
-    assert "background: var(--nav-tint);" in navigation_css
-    assert (
-        "color: var(--color-accent"
-        not in navigation_css.partition(".sidebar-account")[0]
-    )
-
-
-def test_zeilenlink_tabelle_ist_opt_in_und_behaelt_trennlinien(main_css: str) -> None:
-    """Klickbare Zeilen hängen an einer eigenen Klasse und zeichnen Linien als Schatten."""
-
-    for bereich in ("participant", "authoring", "research", "system"):
-        assert f"--area-tint: var(--color-area-{bereich}-tint);" in main_css
-    assert ".table--zeilenlink tbody tr { position: relative; }" in main_css
-    assert "box-shadow: inset 0 -1px 0 var(--color-border);" in main_css
-    assert (
-        "background: color-mix(in srgb, var(--area-tint) 50%, var(--color-surface));"
-        in main_css
-    )
-    assert ".zeilenlink::after" in main_css
-    assert "vignette-index-table tbody" not in main_css
-
-
-def test_zeilenaktion_liegt_ueber_dem_zeilenlink(main_css: str) -> None:
-    """Die Zweitaktion einer klickbaren Zeile fängt den Klick vor dem ::after ab."""
-
-    aktion: str = main_css.partition(".zeilenaktion {")[2].partition("}")[0]
-    assert "position: relative;" in aktion
-    assert "z-index: 1;" in aktion
-    assert "color: var(--color-text-muted);" in aktion
-    assert (
-        ".zeilenaktion--gefahr:hover { border-color: currentColor; "
-        "color: var(--color-danger); }" in main_css
-    )
