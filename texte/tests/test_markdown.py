@@ -202,19 +202,30 @@ class ProfilImTemplateTests(SimpleTestCase):
 
     def _rendern(self, quelltext: str) -> str:
         return Template("{% load texte %}" + quelltext).render(
-            Context({"wert": "**a**"})
+            Context({"wert": "**a** [b](https://c.org)"})
         )
 
-    def test_bekannte_profile_rendern_wie_das_register(self) -> None:
-        for name, profil in PROFILE.items():
-            with self.subTest(profil=name):
-                self.assertEqual(
-                    self._rendern(f'{{{{ wert|markdown:"{name}" }}}}'),
-                    profil.rendern("**a**"),
-                )
-                self.assertEqual(
-                    self._rendern(f'{{% markdown_hinweis "{name}" %}}'), profil.hinweis
-                )
+    def test_bekannte_profile_rendern_im_genannten_profil(self) -> None:
+        self.assertEqual(
+            self._rendern('{{ wert|markdown:"informationstext" }}'),
+            '<p><strong>a</strong> <a href="https://c.org" target="_blank" '
+            'rel="noopener noreferrer">b<span class="markdown-text__extern"> '
+            "(öffnet in neuem Tab)</span></a></p>\n",
+        )
+        self.assertEqual(
+            self._rendern('{{ wert|markdown:"szenentext" }}'),
+            "<p><strong>a</strong> [b](https://c.org)</p>\n",
+        )
+
+    def test_bekannte_profile_liefern_ihren_hinweis(self) -> None:
+        informationstext: str = self._rendern(
+            '{% markdown_hinweis "informationstext" %}'
+        )
+        szenentext: str = self._rendern('{% markdown_hinweis "szenentext" %}')
+
+        self.assertIn("[Linktext](https://…)", informationstext)
+        self.assertIn("Schülernotation", szenentext)
+        self.assertNotIn("[Linktext]", szenentext)
 
     def test_unbekanntes_profil_nennt_namen_und_bekannte_profile(self) -> None:
         for quelltext in (
@@ -227,5 +238,5 @@ class ProfilImTemplateTests(SimpleTestCase):
 
                 meldung: str = str(fehler.exception)
                 self.assertIn("gibtsnicht", meldung)
-                for name in PROFILE:
-                    self.assertIn(name, meldung)
+                self.assertIn("informationstext", meldung)
+                self.assertIn("szenentext", meldung)
