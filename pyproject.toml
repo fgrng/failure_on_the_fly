@@ -76,7 +76,6 @@ extend-ignore-names = ["_meta"]
 "simulation/lebenszyklus.py" = ["SLF001"]
 "simulation/models.py" = ["SLF001"]
 "sitzungen/bindungen.py" = ["SLF001"]
-"training/tests/test_beitritt.py" = ["SLF001"]
 "vignetten/models.py" = ["SLF001"]
 
 [tool.ruff.format]
