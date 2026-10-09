@@ -16,7 +16,7 @@ from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
-from pytest_django.asserts import assertContains, assertRedirects
+from pytest_django.asserts import assertContains, assertNotContains, assertRedirects
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
@@ -1630,20 +1630,16 @@ def _schreibaufruf(
     return reverse(f"erhebungen:{route}", args=argumente[route]), daten
 
 
-def _detailstand(antwort: HttpResponse) -> dict[str, object]:
-    """Liest Regel, Text und Zeilen, die die Detailseite zeigt."""
+def _zeilen(antwort: HttpResponse) -> dict[str, object]:
+    """Liest die Zeilen, die die Detailseite an die Zuordnungslisten gibt."""
 
     return {
-        "randomisierung": antwort.context["erhebung"].randomisierung,
-        "instruktionstext": antwort.context["erhebung"].instruktionstext,
-        **{
-            schluessel: antwort.context[schluessel]
-            for schluessel in (
-                "aufgenommene_daten",
-                "nach_sitzung_aufgenommene_daten",
-                "am_ende_aufgenommene_daten",
-            )
-        },
+        schluessel: antwort.context[schluessel]
+        for schluessel in (
+            "aufgenommene_daten",
+            "nach_sitzung_aufgenommene_daten",
+            "am_ende_aufgenommene_daten",
+        )
     }
 
 
@@ -1685,7 +1681,13 @@ def test_schreibaktion_ausserhalb_des_entwurfs_leitet_mit_meldung_zurueck(
     assertRedirects(antwort, detail_url)
     assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
     assertContains(antwort, badge, html=True)
-    assert _detailstand(antwort) == _detailstand(vorher)
+    assertContains(
+        antwort,
+        '<script id="randomisierung-daten" type="application/json">"fest"</script>',
+        html=False,
+    )
+    assertNotContains(antwort, "Nicht speichern")
+    assert _zeilen(antwort) == _zeilen(vorher)
 
 
 @pytest.mark.django_db
@@ -1697,8 +1699,10 @@ def test_schreibaktion_auf_fremder_erhebung_findet_nichts(
 
     grace: Konto = konto_mit_rollen("grace", "Forschende:r")
     fremde: Erhebung = _erhebung_mit_design(grace)
-    client.force_login(konto_mit_rollen("ada", "Forschende:r"))
-    url, daten = _schreibaufruf(route, fremde, grace)
+    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    client.force_login(ada)
+    # Neue Fassungen gehören ada: Das 404 kommt allein von der fremden Erhebung.
+    url, daten = _schreibaufruf(route, fremde, ada)
 
     antwort: HttpResponse = client.post(url, daten)
 
@@ -1724,6 +1728,33 @@ def test_loeschen_ausserhalb_des_entwurfs_leitet_mit_meldung_auf_die_liste(
     assertRedirects(antwort, reverse("erhebungen:liste"))
     assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
     assertContains(antwort, reverse("erhebungen:detail", args=[erhebung.pk]))
+
+
+@pytest.mark.django_db
+def test_vom_modell_abgewiesene_schreibaktion_leitet_mit_meldung_zurueck(
+    client: Client,
+) -> None:
+    """Die Administration bindet keine eigene Vignette in eine fremde Erhebung ein."""
+
+    grace: Konto = konto_mit_rollen("grace", "Forschende:r")
+    fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
+    administratorin: Konto = konto_mit_rollen("ada")
+    administratorin.is_superuser = True
+    administratorin.save()
+    client.force_login(administratorin)
+    detail_url: str = reverse("erhebungen:detail", args=[fremde.pk])
+
+    antwort: HttpResponse = client.post(
+        reverse(
+            "erhebungen:vignette_hinzufuegen",
+            args=[fremde.pk, finale_vignette(administratorin).pk],
+        ),
+        follow=True,
+    )
+
+    assertRedirects(antwort, detail_url)
+    assertContains(antwort, "Erhebungen können nur eigene Vignetten einbinden.")
+    assert antwort.context["aufgenommene_daten"] == []
 
 
 class ErhebungsansichtAnbieterTests(TestCase):

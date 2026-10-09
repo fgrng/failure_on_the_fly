@@ -1,7 +1,7 @@
 """Öffentlicher Einstieg in pseudonyme Erhebungen."""
 
 from datetime import datetime
-from functools import wraps
+from functools import partial, wraps
 from typing import Callable, Iterable
 from uuid import UUID
 
@@ -255,15 +255,19 @@ def _einreihen(
     _reihenfolge_schreiben(zugehoerigkeiten, ids)
 
 
-def _validierte_aktion_ausfuehren(
-    request: HttpRequest, aktion: Callable[[], object]
-) -> None:
-    """Führt eine Domänenaktion aus und zeigt ihren Validierungsfehler an."""
+def _validierte_aktion_ausfuehren[Ergebnis](
+    request: HttpRequest, aktion: Callable[[], Ergebnis]
+) -> Ergebnis | None:
+    """Führt eine Domänenaktion aus und zeigt ihren Validierungsfehler an.
+
+    Liefert das Ergebnis der Aktion, nach einem Validierungsfehler nichts.
+    """
 
     try:
-        aktion()
+        return aktion()
     except ValidationError as error:
         messages.error(request, "; ".join(error.messages))
+        return None
 
 
 def _entwurfsaktion(
@@ -287,12 +291,10 @@ def _entwurfsaktion(
         if erhebung.status != Erhebung.Status.ENTWURF:
             messages.error(request, _KEIN_ENTWURF_MELDUNG)
             return redirect("erhebungen:detail", pk=erhebung.pk)
-        try:
-            with transaction.atomic():
-                antwort: HttpResponse | None = aktion(request, erhebung, **kwargs)
-        except ValidationError as error:
-            messages.error(request, "; ".join(error.messages))
-            antwort = None
+        antwort: HttpResponse | None = _validierte_aktion_ausfuehren(
+            request,
+            transaction.atomic(partial(aktion, request, erhebung, **kwargs)),
+        )
         if antwort is not None:
             return antwort
         return redirect("erhebungen:detail", pk=erhebung.pk)
