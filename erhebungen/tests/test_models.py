@@ -1174,15 +1174,24 @@ def test_stichprobe_laesst_sich_nicht_archiviert_anlegen() -> None:
         )
 
     assert not Stichprobe.objects.exists()
-    assert (
-        Stichprobe.objects.create(
-            erhebung=erhebung,
-            beginn=timezone.now(),
-            ende=timezone.now(),
-            archiviert=False,
-        ).archiviert
-        is False
+
+
+@pytest.mark.django_db
+def test_stichprobe_laesst_sich_ausdruecklich_nicht_archiviert_anlegen() -> None:
+    """Nur archiviertes Anlegen ist gesperrt, nicht das Feld selbst."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
     )
+
+    stichprobe: Stichprobe = Stichprobe.objects.create(
+        erhebung=erhebung,
+        beginn=timezone.now(),
+        ende=timezone.now(),
+        archiviert=False,
+    )
+
+    assert stichprobe.archiviert is False
 
 
 @pytest.mark.django_db
