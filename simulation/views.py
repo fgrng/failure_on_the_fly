@@ -37,10 +37,10 @@ from .models import (
     VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
     Evalkatalog,
-    UebergreifendesKriterium,
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    UebergreifendesKriterium,
     Verwendung,
 )
 from .standardkern import STANDARDKERN_VORLAGEN
@@ -387,7 +387,6 @@ def evalkatalog_kriterium_verschieben(
         katalog.uebergreifende_kriterien, pk=kriterium_pk
     )
     _kriterientexte_uebernehmen(katalog, request)
-    kriterium.refresh_from_db()
     kriterium.verschieben(_SCHRITTE[richtung])
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 

@@ -31,6 +31,15 @@ class EvalkatalogUebersichtTests(TestCase):
 
         self.assertIn(("Evalkatalog anlegen", None), submit_knoepfe(response))
 
+    def test_verwerfen_nimmt_die_kriterien_des_entwurfs_mit(self) -> None:
+        """Ein Entwurf mit übergreifenden Kriterien lässt sich verwerfen."""
+        katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        katalog.kriterium_anlegen("Rollentreue")
+
+        self.client.post(reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]))
+
+        self.assertFalse(UebergreifendesKriterium.objects.exists())
+
     def test_anlegen_oeffnet_den_editor_des_neuen_entwurfs(self) -> None:
         """Nach dem Anlegen steht die Administratorin im Editor des Entwurfs."""
         response: HttpResponse = self.client.post(
@@ -214,6 +223,7 @@ class EvalkatalogKriterienTests(TestCase):
         self.client.force_login(_administratorin("ada"))
 
     def _texte(self) -> list[str]:
+        # Liefert die Texte der Kriterien des Entwurfs in gespeicherter Reihenfolge.
         return [k.text for k in self.katalog.uebergreifende_kriterien.all()]
 
     def test_baum_zeigt_den_knoten_mit_der_zahl_seiner_kriterien(self) -> None:
@@ -298,6 +308,34 @@ class EvalkatalogKriterienTests(TestCase):
 
         self.assertEqual(self._texte(), ["C", "A", "B"])
 
+    def test_hoch_an_der_ersten_zeile_aendert_nichts(self) -> None:
+        """Am Rand der Liste bleibt die Reihenfolge, wie sie ist."""
+        erstes = self.katalog.kriterium_anlegen("A")
+        self.katalog.kriterium_anlegen("B")
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[self.katalog.pk, erstes.pk, "hoch"],
+            )
+        )
+
+        self.assertRedirects(response, self.url)
+        self.assertEqual(self._texte(), ["A", "B"])
+
+    def test_unbekannte_richtung_ist_nicht_erreichbar(self) -> None:
+        """Nur hoch und runter verschieben ein Kriterium."""
+        kriterium = self.katalog.kriterium_anlegen("A")
+
+        response: HttpResponse = self.client.post(
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[self.katalog.pk, kriterium.pk, "seitwaerts"],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_hoch_an_der_ersten_runter_an_der_letzten_zeile_deaktiviert(self) -> None:
         """Am Rand der Liste ist der jeweilige Knopf gesperrt."""
         erstes = self.katalog.kriterium_anlegen("A")
@@ -305,6 +343,7 @@ class EvalkatalogKriterienTests(TestCase):
         inhalt: str = self.client.get(self.url).content.decode()
 
         def knopf(kriterium: UebergreifendesKriterium, richtung: str) -> str:
+            # Liefert das öffnende Tag des Verschiebeknopfs der Zeile.
             ziel: str = reverse(
                 "simulation:evalkatalog_kriterium_verschieben",
                 args=[self.katalog.pk, kriterium.pk, richtung],
@@ -323,14 +362,18 @@ class EvalkatalogKriterienTests(TestCase):
         entwurf: Evalkatalog = self.katalog.bearbeiten()
         fremd = self.katalog.uebergreifende_kriterien.get()
 
-        response: HttpResponse = self.client.post(
+        for url in (
             reverse(
                 "simulation:evalkatalog_kriterium_loeschen",
                 args=[entwurf.pk, fremd.pk],
-            )
-        )
-
-        self.assertEqual(response.status_code, 404)
+            ),
+            reverse(
+                "simulation:evalkatalog_kriterium_verschieben",
+                args=[entwurf.pk, fremd.pk, "runter"],
+            ),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
 
 
 class EvalkatalogFinaleFassungTests(TestCase):

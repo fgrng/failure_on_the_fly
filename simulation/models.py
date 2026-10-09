@@ -296,6 +296,52 @@ class Evalkatalog(VersionierteFassung):
         )
 
 
+_NUR_AM_ENTWURF: str = "Kriterien ändern sich nur an einem Entwurf."
+
+
+def _nur_an_entwuerfen(katalog_ids: set[int]) -> None:
+    # Kriterien teilen die Schreibsperre ihrer Fassung: Jede betroffene
+    # Fassung muss ein Entwurf sein.
+
+    entwuerfe: int = Evalkatalog.objects.filter(
+        pk__in=katalog_ids, zustand=Evalkatalog.Zustand.ENTWURF
+    ).count()
+    if entwuerfe != len(katalog_ids):
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+
+class UebergreifendesKriteriumQuerySet(models.QuerySet["UebergreifendesKriterium"]):
+    """Hält auch gesammelte Schreibzugriffe an der Schreibsperre der Fassung."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Massenänderungen an Kriterien."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def bulk_create(
+        self, objs: list["UebergreifendesKriterium"], **kwargs: object
+    ) -> list["UebergreifendesKriterium"]:
+        """Verhindert das Umgehen der Schreibsperre per Masseneinfügen."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def bulk_update(
+        self,
+        objs: list["UebergreifendesKriterium"],
+        fields: list[str],
+        **kwargs: object,
+    ) -> int:
+        """Verhindert das Umgehen der Schreibsperre per Massenupdate."""
+
+        raise RuntimeError(_NUR_AM_ENTWURF)
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Löscht gesammelt nur Kriterien von Entwürfen."""
+
+        _nur_an_entwuerfen(set(self.values_list("katalog_id", flat=True)))
+        return super().delete()
+
+
 class UebergreifendesKriterium(models.Model):
     """Eine Rubrik, nach der der Bewerter jedes Evalgespräch aller Evals beurteilt.
 
@@ -311,6 +357,10 @@ class UebergreifendesKriterium(models.Model):
     position: models.PositiveIntegerField = models.PositiveIntegerField()
     text: models.TextField = models.TextField("Kriterium", blank=True, default="")
 
+    objects: models.Manager = models.Manager.from_queryset(
+        UebergreifendesKriteriumQuerySet
+    )()
+
     class Meta:
         """Ordnet die Kriterien nach ihrer gespeicherten Position."""
 
@@ -323,12 +373,12 @@ class UebergreifendesKriterium(models.Model):
         ]
 
     def _nur_am_entwurf(self) -> None:
-        # Kriterien teilen die Schreibsperre ihrer Fassung.
+        # Prüft die Fassung des Kriteriums und beim Umhängen auch die bisherige.
 
-        if not Evalkatalog.objects.filter(
-            pk=self.katalog_id, zustand=Evalkatalog.Zustand.ENTWURF
-        ).exists():
-            raise RuntimeError("Kriterien ändern sich nur an einem Entwurf.")
+        bisherige: models.QuerySet = UebergreifendesKriterium.objects.filter(
+            pk=self.pk
+        ).values_list("katalog_id", flat=True)
+        _nur_an_entwuerfen({self.katalog_id, *bisherige})
 
     def save(self, *args: object, **kwargs: object) -> None:
         """Speichert nur an einem Entwurf."""

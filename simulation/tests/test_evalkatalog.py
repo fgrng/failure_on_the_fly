@@ -162,3 +162,31 @@ def test_neuer_entwurf_uebernimmt_die_kriterien_ohne_die_vorgaengerin_zu_beruehr
 
     assert [k.text for k in entwurf.uebergreifende_kriterien.all()] == ["A2", "B"]
     assert [k.text for k in katalog.uebergreifende_kriterien.all()] == ["A", "B"]
+
+
+@pytest.mark.django_db
+def test_kriterien_einer_finalen_fassung_widerstehen_massenaenderungen() -> None:
+    """Auch gesammelt lassen sich Kriterien einer finalen Fassung nicht ändern."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    katalog.kriterium_anlegen("Rollentreue")
+    katalog.finalisieren()
+
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        UebergreifendesKriterium.objects.filter(katalog=katalog).update(text="x")
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        UebergreifendesKriterium.objects.filter(katalog=katalog).delete()
+
+
+@pytest.mark.django_db
+def test_kriterium_wechselt_nicht_aus_einer_finalen_fassung_in_einen_entwurf() -> None:
+    """Das Umhängen nähme der finalen Fassung ein Kriterium weg."""
+
+    katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+    kriterium: UebergreifendesKriterium = katalog.kriterium_anlegen("Rollentreue")
+    katalog.finalisieren()
+    kriterium.katalog = katalog.bearbeiten()
+    kriterium.position = 99
+
+    with pytest.raises(RuntimeError, match="Entwurf"):
+        kriterium.save()
