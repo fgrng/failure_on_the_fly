@@ -1981,9 +1981,28 @@ class StichprobenAnlegenTests(TestCase):
         antwort: HttpResponse = self.client.post(
             reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
             {"beginn": "2026-08-31T17:00", "ende": "2026-08-01T09:00"},
+            follow=True,
         )
 
-        self.assertEqual(antwort.status_code, 400)
+        self.assertRedirects(
+            antwort, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(antwort, "Das Ende darf nicht vor dem Beginn liegen.")
+        self.assertFalse(Stichprobe.objects.filter(erhebung=self.erhebung).exists())
+
+    def test_lehnt_ungueltigen_zeitpunkt_ab(self) -> None:
+        """Ein unlesbarer Zeitpunkt endet in einer Meldung auf der Detailseite."""
+
+        antwort: HttpResponse = self.client.post(
+            reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
+            {"beginn": "kein Datum", "ende": "2026-08-01T09:00"},
+            follow=True,
+        )
+
+        self.assertRedirects(
+            antwort, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertContains(antwort, "Beginn und Ende müssen gültige Zeitpunkte sein.")
         self.assertFalse(Stichprobe.objects.filter(erhebung=self.erhebung).exists())
 
 

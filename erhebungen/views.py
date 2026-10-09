@@ -436,13 +436,15 @@ def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     beginn: datetime | None = parse_datetime(request.POST.get("beginn", ""))
     ende: datetime | None = parse_datetime(request.POST.get("ende", ""))
     if beginn is None or ende is None:
-        return HttpResponseBadRequest("Beginn und Ende müssen gültige Zeitpunkte sein.")
+        messages.error(request, "Beginn und Ende müssen gültige Zeitpunkte sein.")
+        return redirect("erhebungen:detail", pk=erhebung.pk)
     if timezone.is_naive(beginn):
         beginn = timezone.make_aware(beginn)
     if timezone.is_naive(ende):
         ende = timezone.make_aware(ende)
     if ende < beginn:
-        return HttpResponseBadRequest("Das Ende darf nicht vor dem Beginn liegen.")
+        messages.error(request, "Das Ende darf nicht vor dem Beginn liegen.")
+        return redirect("erhebungen:detail", pk=erhebung.pk)
     Stichprobe.objects.create(erhebung=erhebung, beginn=beginn, ende=ende)
     return redirect("erhebungen:detail", pk=erhebung.pk)
 
