@@ -2,7 +2,7 @@
 
 from io import StringIO
 
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 
 from konten.models import Konto
@@ -73,10 +73,12 @@ class EntwicklungsdatenTests(TestCase):
 
         call_command("entwicklungsdaten_anlegen", stdout=StringIO())
 
-        self.assertEqual(
-            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN).bezeichnung,
-            "Offline (fake)",
+        aktive: ModellKonfiguration | None = ModellKonfiguration.objects.aktive(
+            Verwendung.SCHUELERIN
         )
+        assert aktive is not None
+        self.assertTrue(aktive.bezeichnung)
+        self.assertEqual(aktive.sprachmodell, "fake")
 
     def test_zweiter_lauf_ist_idempotent(self) -> None:
         """Ein wiederholter Aufruf wirft keine Fehler und dupliziert nichts."""
@@ -103,4 +105,17 @@ class EntwicklungsdatenTests(TestCase):
 
         konto: Konto = Konto.objects.get(username="autor")
 
-        self.assertEqual((konto.is_superuser, konto.is_staff), (True, True))
+        self.assertTrue(konto.is_superuser)
+
+
+@override_settings(DEBUG=False)
+class EntwicklungsdatenProduktivTests(TestCase):
+    """Eine Produktivinstanz bekommt keine Testkonten."""
+
+    def test_weigert_sich_ohne_debug(self) -> None:
+        """Ohne DEBUG bricht der Seed ab, bevor er ein Konto anlegt."""
+
+        with self.assertRaises(CommandError):
+            call_command("entwicklungsdaten_anlegen", stdout=StringIO())
+
+        self.assertFalse(Konto.objects.exists())

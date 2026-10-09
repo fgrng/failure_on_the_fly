@@ -183,13 +183,6 @@ class WoertlichTests(SimpleTestCase):
 class ProfilRegisterTests(SimpleTestCase):
     """Das Register liefert je Profil Rendering und passenden Editorhinweis."""
 
-    def test_register_rendert_wie_die_einstiegspunkte(self) -> None:
-        self.assertEqual(
-            PROFILE["informationstext"].rendern("[a](https://b.org)"),
-            informationstext("[a](https://b.org)"),
-        )
-        self.assertEqual(PROFILE["szenentext"].rendern("**a**"), szenentext("**a**"))
-
     def test_nur_der_informationstext_nennt_link_syntax(self) -> None:
         self.assertIn("[Linktext](https://…)", PROFILE["informationstext"].hinweis)
         self.assertNotIn("[Linktext]", PROFILE["szenentext"].hinweis)

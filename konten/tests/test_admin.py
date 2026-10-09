@@ -128,36 +128,58 @@ class KontoAdminTests(TestCase):
 
         response: HttpResponse = self.client.get(reverse("admin:index"))
 
-        self.assertContains(response, 'href="/admin/konten/konto/"')
-        self.assertContains(response, 'href="/admin/auth/group/"')
+        self.assertContains(
+            response, f'href="{reverse("admin:konten_konto_changelist")}"'
+        )
+        self.assertContains(
+            response, f'href="{reverse("admin:auth_group_changelist")}"'
+        )
 
-    def test_masken_zeigen_nur_rollenfelder_und_keine_loeschwege(self) -> None:
-        """Konten bleiben bearbeitbar, aber bis #156 weder löschbar noch individualisiert."""
-        administratorin: Konto = get_user_model().objects.create_user(
+    def test_masken_zeigen_nur_rollenfelder(self) -> None:
+        """Konten tragen Rollen und Administration, aber keine Einzelrechte."""
+        administratorin: Konto = Konto.objects.create_user(
             username="administratorin",
             password="sicheres-passwort",
             is_superuser=True,
         )
-        konto: Konto = get_user_model().objects.create_user(
+        konto: Konto = Konto.objects.create_user(
             username="ada", password="sicheres-passwort"
         )
         self.client.force_login(administratorin)
 
-        detail: HttpResponse = self.client.get(
-            reverse("admin:konten_konto_change", args=(konto.pk,))
+        detail = self.client.get(reverse("admin:konten_konto_change", args=(konto.pk,)))
+        liste = self.client.get(reverse("admin:konten_konto_changelist"))
+
+        felder: set[str] = set(detail.context["adminform"].form.fields)
+        self.assertLessEqual({"groups", "is_superuser"}, felder)
+        self.assertFalse({"is_staff", "user_permissions"} & felder)
+        spalten: tuple[str, ...] = tuple(liste.context["cl"].list_display)
+        self.assertIn("is_superuser", spalten)
+        self.assertNotIn("is_staff", spalten)
+
+    def test_konten_sind_nicht_loeschbar(self) -> None:
+        """Bis #156 löscht weder die Löschseite noch die Sammelaktion ein Konto."""
+        administratorin: Konto = Konto.objects.create_user(
+            username="administratorin",
+            password="sicheres-passwort",
+            is_superuser=True,
         )
-        liste: HttpResponse = self.client.get(reverse("admin:konten_konto_changelist"))
+        konto: Konto = Konto.objects.create_user(
+            username="ada", password="sicheres-passwort"
+        )
+        self.client.force_login(administratorin)
+
         loeschen: HttpResponse = self.client.get(
             reverse("admin:konten_konto_delete", args=(konto.pk,))
         )
+        self.client.post(
+            reverse("admin:konten_konto_changelist"),
+            {
+                "action": "delete_selected",
+                "_selected_action": [konto.pk],
+                "post": "yes",
+            },
+        )
 
-        self.assertContains(detail, 'name="groups"')
-        self.assertContains(detail, 'name="is_superuser"')
-        self.assertNotContains(detail, 'name="is_staff"')
-        self.assertNotContains(detail, 'name="user_permissions"')
-        self.assertNotContains(detail, "deletelink")
-        self.assertNotContains(liste, "delete_selected")
-        self.assertNotContains(liste, "column-is_staff")
-        self.assertNotContains(liste, "is_staff__exact")
-        self.assertContains(liste, "column-is_superuser")
         self.assertEqual(loeschen.status_code, 403)
+        self.assertTrue(Konto.objects.filter(pk=konto.pk).exists())

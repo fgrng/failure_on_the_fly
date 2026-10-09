@@ -37,9 +37,12 @@ class _Knopfsammler(HTMLParser):
             self._knopf[1].append(data)
 
 
-def submit_knoepfe(antwort: HttpResponse) -> list[tuple[str, str | None]]:
-    """Liefert Beschriftung und Formular-ID aller Submit-Knöpfe einer Seite."""
+def submit_knoepfe(antwort: HttpResponse | str) -> list[tuple[str, str | None]]:
+    """Liefert Beschriftung und Formular-ID aller Submit-Knöpfe einer Seite.
+
+    Ein String gilt als schon gerendertes HTML, etwa ein einzelnes Include.
+    """
 
     sammler: _Knopfsammler = _Knopfsammler()
-    sammler.feed(antwort.content.decode())
+    sammler.feed(antwort if isinstance(antwort, str) else antwort.content.decode())
     return sammler.knoepfe

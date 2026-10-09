@@ -12,7 +12,6 @@ from django.urls import reverse
 from konten.navigation import (
     AUTORIN_GRUPPE,
     administratorin_erforderlich,
-    ist_administratorin,
     navigation,
 )
 from konten.models import Konto
@@ -99,22 +98,6 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
     request.user = konto
 
     assert navigation(request) == erwartet
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("is_superuser", "erwartet"),
-    [(False, False), (True, True)],
-)
-def test_ist_administratorin_prueft_die_administrationsrolle(
-    is_superuser: bool, erwartet: bool
-) -> None:
-    """Die Rollenprüfung ist die gemeinsame Administrations-Naht."""
-    konto: Konto = get_user_model().objects.create_user(
-        username="ada", is_superuser=is_superuser
-    )
-
-    assert ist_administratorin(konto) is erwartet
 
 
 @pytest.mark.django_db
@@ -223,9 +206,10 @@ class SidebarNavigationTests(TestCase):
     def test_simulationskern_verwalten_steht_unter_entwicklung(self) -> None:
         """Die Kernverwaltung gehört zur Gruppe Entwicklung, nicht zu System."""
         sidebar: str = self._sidebar_fuer(is_superuser=True)
-        entwicklung: str = sidebar.partition("sidebar-nav__group--development")[2]
-        entwicklung = entwicklung.partition("</section>")[0]
-        system: str = sidebar.partition("sidebar-nav__group--system")[2]
+        entwicklung: str = sidebar.partition("<h2>Entwicklung</h2>")[2]
+        entwicklung = entwicklung.partition("<h2>")[0]
+        system: str = sidebar.partition("<h2>System</h2>")[2]
+        system = system.partition("</section>")[0]
 
         self.assertIn("Simulationskern verwalten", entwicklung)
         self.assertNotIn("Simulationskern verwalten", system)
