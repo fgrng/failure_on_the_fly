@@ -145,6 +145,7 @@ def _forschenden_routen() -> list[tuple[str, dict[str, object]]]:
 
 
 _FORSCHENDEN_ROUTEN: list[tuple[str, dict[str, object]]] = _forschenden_routen()
+# Routen unter ``eigene/``, die GET annehmen; jede andere muss POST verlangen.
 _LESEROUTEN: set[str] = {"liste", "anlegen", "detail", "export"}
 
 
@@ -1434,7 +1435,7 @@ def test_schreibaktion_ausserhalb_des_entwurfs_leitet_mit_meldung_zurueck(
 ) -> None:
     """Eine veraltete Schaltfläche führt auf die unveränderte Detailseite (ADR-0051)."""
 
-    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    ada: Konto = forschende("ada")
     erhebung: Erhebung = _erhebung_mit_design(ada)
     aktive_modell_konfiguration(Verwendung.SCHUELERIN)
     erhebung.finalisieren()
@@ -1466,9 +1467,9 @@ def test_schreibaktion_auf_fremder_erhebung_findet_nichts(
 ) -> None:
     """Wer die Erhebung nicht sehen darf, erfährt nicht, dass es sie gibt."""
 
-    grace: Konto = konto_mit_rollen("grace", "Forschende:r")
+    grace: Konto = forschende("grace")
     fremde: Erhebung = _erhebung_mit_design(grace)
-    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
+    ada: Konto = forschende("ada")
     client.force_login(ada)
     # Neue Fassungen gehören ada: Das 404 kommt allein von der fremden Erhebung.
     url, daten = _schreibaufruf(route, fremde, ada)
@@ -1484,10 +1485,8 @@ def test_loeschen_ausserhalb_des_entwurfs_leitet_mit_meldung_auf_die_liste(
 ) -> None:
     """Eine finale Erhebung bleibt in der Liste, die Meldung nennt den Grund."""
 
-    ada: Konto = konto_mit_rollen("ada", "Forschende:r")
-    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Finale Erhebung")
-    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
-    erhebung.finalisieren()
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = finale_erhebung(ada, name="Finale Erhebung")
     client.force_login(ada)
 
     antwort: HttpResponse = client.post(
@@ -1505,7 +1504,7 @@ def test_vom_modell_abgewiesene_schreibaktion_leitet_mit_meldung_zurueck(
 ) -> None:
     """Die Administration bindet keine eigene Vignette in eine fremde Erhebung ein."""
 
-    grace: Konto = konto_mit_rollen("grace", "Forschende:r")
+    grace: Konto = forschende("grace")
     fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
     administratorin: Konto = konto_mit_rollen("ada", is_superuser=True)
     client.force_login(administratorin)
@@ -1535,8 +1534,7 @@ class ErhebungsansichtAnbieterTests(TestCase):
         ModellKonfiguration.objects.aktivieren(
             self.konfiguration, Verwendung.SCHUELERIN
         )
-        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
-        self.erhebung.finalisieren()
+        self.erhebung: Erhebung = finale_erhebung(self.ada)
         self.client.force_login(self.ada)
 
     def test_zeigt_anbieter_sprachmodell_und_parameter(self) -> None:
@@ -1994,13 +1992,12 @@ class ErhebungsExportTests(TestCase):
         ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(
+        erhebung: Erhebung = finale_erhebung(
             ada,
             name="Brüche & Zahlen",
             instruktionstext="Zeile eins\nZeile zwei",
             einwilligungstext="",
         )
-        erhebung.finalisieren()
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=datetime(2026, 7, 1, 8, tzinfo=timezone.UTC),
@@ -2682,18 +2679,37 @@ class ErhebungsExportTests(TestCase):
             export_lesen(response)["itembloecke.csv"],
             [
                 {
-                    "id": str(block.pk),
-                    "teilnahme_token": block.erhebungsbindung.token,
-                    "andockpunkt": andockpunkt,
-                    "sitzung_id": (str(block.sitzung_id) if block.sitzung_id else "NA"),
+                    "id": str(bloecke[0].pk),
+                    "teilnahme_token": "2345-6781",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(bloecke[0].sitzung_id),
                     "vorgelegt_am": "2026-07-01T08:00:00+00:00",
-                    "erledigt_am": (
-                        "2026-07-01T08:05:00+00:00" if block.sitzung_id else "NA"
-                    ),
-                }
-                for block, andockpunkt in zip(
-                    bloecke, ["nach_sitzung", "am_ende"] * 2, strict=True
-                )
+                    "erledigt_am": "2026-07-01T08:05:00+00:00",
+                },
+                {
+                    "id": str(bloecke[1].pk),
+                    "teilnahme_token": "2345-6781",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "NA",
+                },
+                {
+                    "id": str(bloecke[2].pk),
+                    "teilnahme_token": "2345-6782",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(bloecke[2].sitzung_id),
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "2026-07-01T08:05:00+00:00",
+                },
+                {
+                    "id": str(bloecke[3].pk),
+                    "teilnahme_token": "2345-6782",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "NA",
+                },
             ],
         )
 
@@ -3117,9 +3133,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
         """Auch ohne Items bleibt die archivierte Zuordnung als leere Ansicht lesbar."""
 
         ada: Konto = forschende("ada")
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada)
         erhebung.archivieren()
         self.client.force_login(ada)
 
