@@ -764,6 +764,13 @@ stehen am Ende.
 Finale und archivierte Erhebungen zeigen Vignetten und Items weiterhin als
 Listen, samt Reihenfolgeregel, ohne Auswahl und Änderungsaktionen; nach einem
 Rückzug sind sie wieder bearbeitbar.
+Trifft eine Änderung dennoch eine Erhebung, die kein Entwurf mehr ist, etwa
+über eine veraltete Schaltfläche in einem zweiten Tab, bleibt alles, wie es
+war: Die Seite führt zurück auf die Detailseite, beim Löschen auf die Liste,
+und die Meldung »Die Erhebung ist kein Entwurf mehr. Es wurde nichts
+geändert.« nennt den Grund. Weist die Erhebung eine Änderung aus einem anderen
+Grund ab, steht dieser Grund ebenso als Meldung auf der Detailseite. Eine
+fremde Erhebung bleibt dabei unauffindbar.
 Sobald eine Stichprobe besteht, lässt sich an der Erhebung die Datenspur als
 ZIP mit relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,

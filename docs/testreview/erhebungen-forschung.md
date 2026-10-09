@@ -60,7 +60,7 @@ Fünf Lesarten gelten für das ganze Dokument:
 
 - **Aufrufe:**
   - Vignetten: `POST vignette_hinzufuegen` (optional `position`), `vignette_entfernen`, `vignette_verschieben` (`position`). Antwort: Weiterleitung auf die Detailseite.
-  - Items: `POST item_hinzufuegen/<item_pk>/<andockpunkt>` (optional `position`), `item_entfernen`, `item_verschieben` (`position`), `item_umhaengen`. Antwort: die Detailseite direkt mit Status 200.
+  - Items: `POST item_hinzufuegen/<item_pk>/<andockpunkt>` (optional `position`), `item_entfernen`, `item_verschieben` (`position`), `item_umhaengen`. Antwort: Weiterleitung auf die Detailseite (ADR-0051).
   - `POST reihenfolge_umschalten` mit `randomisierung` (`fest` oder `zufällig`).
   - `POST konfiguration_speichern` mit den drei Texten.
 - **Invarianten:**
@@ -70,14 +70,14 @@ Fünf Lesarten gelten für das ganze Dokument:
   - `konfiguration_speichern` übernimmt nur die drei Texte.
 - **Fehlerfälle:**
   - Fremde oder nicht finale Fassung: 404. Item doppelt am Andockpunkt oder Umhängen auf einen besetzten Andockpunkt: 409. Fehlende oder nicht ganzzahlige Position beim Verschieben: 400. Unbekannte Regel: 400. Unbekannter Andockpunkt: 403.
-  - Erhebung kein Entwurf: `vignette_verschieben` und alle Item-Routen 403; `vignette_hinzufuegen`, `vignette_entfernen`, `reihenfolge_umschalten` und `konfiguration_speichern` leiten still auf die Detailseite, ohne etwas zu ändern. Die Wahl des Idioms ist offen (#254).
+  - Erhebung kein Entwurf: Jede dieser Routen leitet ohne Änderung auf die Detailseite und zeigt dort eine Meldung (ADR-0051). Ein `ValidationError` des Modells nimmt denselben Weg.
 - **Konfiguration:** keine.
 
 ### Lebenszyklus-Aktionen
 
 - **Aufrufe:** `POST finalisieren` (übernimmt vorher die gesendeten Texte), `zurueckziehen`, `archivieren`, `entarchivieren`, `loeschen`. Die Regeln liegen in den Modellmethoden (#327).
 - **Invarianten:** Jede Aktion leitet auf die Detailseite, `loeschen` auf die Liste. Ein `ValidationError` des Modells erscheint als Meldung auf der Detailseite.
-- **Fehlerfälle:** `loeschen` auf einer nicht-Entwurfs-Erhebung leitet still auf die Liste (#254).
+- **Fehlerfälle:** `loeschen` auf einer nicht-Entwurfs-Erhebung leitet mit Meldung auf die Liste (ADR-0051).
 - **Konfiguration:** keine.
 
 ### Stichproben
@@ -149,7 +149,6 @@ Fünf Lesarten gelten für das ganze Dokument:
 | `test_nimmt_finale_vignette_auf_und_entfernt_sie_wieder`, `test_item_bleibt_am_anderen_andockpunkt_verfuegbar`, `test_badge_verschwindet_nach_entfernen_am_anderen_andockpunkt`, `test_doppelte_itemaufnahme_am_selben_andockpunkt_wird_abgelehnt`, `test_verschiebt_item_innerhalb_seines_andockpunkts_ohne_seitenwechsel` | behalten | HTTP und die Zeilen an das Skript (Lesarten oben). | – |
 | `test_bibliothek_kennzeichnet_item_am_ende_nach_jeder_sitzung`, `test_bibliothek_kennzeichnet_item_nach_jeder_sitzung_am_ende` | umschreiben | Derselbe Test in zwei Richtungen; der erste prüft das Badge an der Zeile, der zweite nur irgendwo auf der Seite. | Ein Test, parametrisiert über beide Andockpunkte: Nach der Aufnahme an A trägt die angebotene Zeile an B `badge` „schon am Ende“ bzw. „schon nach jeder Sitzung“ und eine `einfuegen_url` für B. |
 | `test_entfernen_schliesst_die_itemreihenfolge_lueckenlos` | streichen | Doppelung: Lückenloses Nachrücken nach dem Entfernen prüft der Umsortieren-Test über die `position` der Zeilen. | `test_entfernen_und_umhaengen_nach_umsortieren_gelingen` |
-| `test_itemverwaltung_ist_ausserhalb_des_entwurfs_gesperrt`, `test_itemreihenfolge_ist_ausserhalb_des_entwurfs_gesperrt`, `test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen` | umschreiben | Drei Tests für eine Regel. Der dritte prüft elf Antworten in einem Durchlauf; welche Route bricht, verrät erst die Zeilennummer. Die Item-Routen außer Hinzufügen und Verschieben sowie `item_umhaengen` sind gar nicht abgedeckt. Die Statuscodes schreiben das gemischte Idiom fest (#254). | Ein Test, parametrisiert über alle Schreibrouten des Entwurfs (Vignetten, Items, Schalter, Konfiguration): Für finale und archivierte Erhebungen bleibt der Zustand unverändert, die Antwort folgt der Entscheidung aus #254. Für eine fremde Erhebung kommt 404. Bis #254 entschieden ist, erwartet der Test die heutigen Codes je Route. |
 | `test_itemverwaltung_ist_nach_dem_zurueckziehen_wieder_offen` | streichen | Schichtdoppelung: Die View prüft nur `status == ENTWURF`; ein zurückgezogener Entwurf ist für sie ein Entwurf wie jeder andere. | `test_models.py::test_zurueckgezogene_erhebung_erlaubt_zuordnungen_wieder` und jeder Item-Test am Entwurf, etwa `test_item_bleibt_am_anderen_andockpunkt_verfuegbar`; dass Zurückziehen bearbeitbar macht, zeigt `test_zurueckziehen_macht_die_erhebung_wieder_bearbeitbar` |
 | `test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit`, `test_haelt_fremde_und_unfertige_fassungen_aus_den_zeilen_heraus` | behalten | Vertrag der Zeilen an das Skript. | – |
 | `test_detailseite_rendert_zuordnungslisten_ueber_include` | streichen | Implementation-coupled: `assertTemplateUsed` hält den Namen eines Includes fest. „>Hoch<“, „>Runter<“ und `name="vignetten"` bewachen entfernte Bedienelemente. | Keiner nötig: Dass die Listen erscheinen, zeigen die Zeilen- und Sperrtests. |
@@ -247,8 +246,8 @@ Mit dem Helfer aus Startbefund 2 lesen alle Tests unten ihre Dateien über `expo
 
 Bestehende Issues, die dieses Review berührt:
 
-- #254 Antwort-Idiom abgewiesener Schreibaktionen (403 oder stille Weiterleitung). Die Sperrtests oben warten auf diese Entscheidung.
-- #249 Die Item-Routen rendern die Detailseite innerhalb von `@transaction.atomic`. Der Befund nennt noch `item_hoch` und `item_runter`; heute betrifft er `item_hinzufuegen`, `item_entfernen`, `item_verschieben` und `item_umhaengen`.
+- #254 Antwort-Idiom abgewiesener Schreibaktionen: entschieden in ADR-0051, umgesetzt mit #393 samt den Sperrtests.
+- #249 Die Item-Routen renderten die Detailseite innerhalb von `@transaction.atomic`. Seit #393 leiten sie weiter; keine Route rendert mehr in einer Transaktion.
 - #385 `Stichprobe.traegt_daten`; die zwei Tests, auf die es sich stützt, bleiben.
 
 Weitere Probleme im Produktionscode hat das Review nicht gefunden. Dass `erhebungen:export` auch für einen Entwurf ohne Stichprobe ein Archiv liefert, obwohl die Seite den Link erst mit einer Stichprobe zeigt, ist kein Mangel: Das Archiv enthält dann nur Kopfzeilen und die Erhebung selbst, und der Kontrakttest baut darauf.
