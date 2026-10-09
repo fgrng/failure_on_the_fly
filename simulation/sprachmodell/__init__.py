@@ -1,14 +1,14 @@
 """Naht zum Sprachmodell und ihr deterministischer Testadapter."""
 
 import json
+import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
 import litellm
 
 
-AUSGABE_SCHEMA: dict[str, object] = {
+SCHUELERIN_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
         "denkspur": {"type": "string"},
@@ -17,6 +17,28 @@ AUSGABE_SCHEMA: dict[str, object] = {
     "required": ["denkspur", "aeusserung"],
     "additionalProperties": False,
 }
+
+LEHRPERSON_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"aeusserung": {"type": "string"}},
+    "required": ["aeusserung"],
+    "additionalProperties": False,
+}
+
+# Die Begründung steht vor dem Urteil, damit das Modell erst abwägt und dann
+# entscheidet — wie die Denkspur vor der Äußerung (ADR-0005).
+BEWERTER_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "begruendung": {"type": "string"},
+        "erfuellt": {"type": "boolean"},
+    },
+    "required": ["begruendung", "erfuellt"],
+    "additionalProperties": False,
+}
+
+# Die JSON-Typen, die in den Ausgabeschemas vorkommen.
+_JSON_TYPEN: dict[str, type] = {"string": str, "boolean": bool}
 
 
 def nachrichten_bauen(
@@ -43,14 +65,6 @@ def nachrichten_bauen(
     return nachrichten
 
 
-@dataclass(frozen=True)
-class Antwort:
-    """Das strukturierte Ergebnis eines geglückten Modellaufrufs."""
-
-    denkspur: str
-    aeusserung: str
-
-
 class _Modellantwortfehler(Exception):
     """Ein verworfener Modellaufruf mit seiner Rohantwort."""
 
@@ -70,6 +84,23 @@ class ContentFilter(_Modellantwortfehler):
     """Der Anbieter hat die Modellantwort gefiltert."""
 
 
+def _ausgabe_pruefen(
+    inhalt: object, ausgabe_schema: Mapping[str, Any], rohantwort: str
+) -> dict[str, object]:
+    """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
+
+    Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch.
+    """
+
+    eigenschaften: Mapping[str, Mapping[str, str]] = ausgabe_schema["properties"]
+    if not isinstance(inhalt, dict) or set(inhalt) != set(eigenschaften):
+        raise Formatbruch(rohantwort)
+    for name, eigenschaft in eigenschaften.items():
+        if not isinstance(inhalt[name], _JSON_TYPEN[eigenschaft["type"]]):
+            raise Formatbruch(rohantwort)
+    return inhalt
+
+
 class Sprachmodell(Protocol):
     """Die einzige austauschbare Naht des Simulationskerns."""
 
@@ -81,8 +112,8 @@ class Sprachmodell(Protocol):
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
         timeout: float,
-    ) -> Antwort:
-        """Liefert die geparste Antwort: Nichts reist am Ausgabeschema vorbei.
+    ) -> dict[str, object]:
+        """Liefert das geparste Objekt des Schemas: Nichts reist an ihm vorbei.
 
         `timeout` ist die Restzeit der Frist, die sich alle Versuche eines
         Gesprächsschritts teilen; der Aufrufer rechnet sie aus.
@@ -92,10 +123,18 @@ class Sprachmodell(Protocol):
 class FakeSprachmodell:
     """Spielt konfigurierte Antworten und maschinelle Fehler deterministisch ab."""
 
-    def __init__(self, skript: Sequence[Mapping[str, Any]]) -> None:
-        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden."""
+    def __init__(
+        self, skript: Sequence[Mapping[str, Any]], verzoegerung: float = 0.0
+    ) -> None:
+        """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden.
+
+        `verzoegerung` lässt jeden Aufruf so viele Sekunden warten, wie ein
+        langsames Modell, etwa um einen Prozessneustart mitten im Evallauf
+        durchzuspielen.
+        """
 
         self.skript: list[Mapping[str, Any]] = list(skript)
+        self.verzoegerung: float = verzoegerung
 
     def antworten(
         self,
@@ -105,31 +144,29 @@ class FakeSprachmodell:
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
         timeout: float,
-    ) -> Antwort:
+    ) -> dict[str, object]:
         """Verbraucht genau einen Eintrag des Fake-Skripts.
 
-        Der Fake antwortet sofort; `timeout` bleibt hier ohne Wirkung.
+        Die Verzögerung hält die Anfragefrist ein. Auch ein abgelaufener
+        Aufruf verbraucht seinen Eintrag und zählt als Anbieterfehler.
         """
 
         eintrag: Mapping[str, Any] = self.skript.pop(0)
+        if self.verzoegerung:
+            time.sleep(min(self.verzoegerung, timeout))
+        if self.verzoegerung >= timeout:
+            raise Anbieterfehler("Die Frist des Fake-Aufrufs wurde überschritten.")
+        rohantwort: str = str(eintrag.get("rohantwort", ""))
         if (fehler := eintrag.get("fehler")) == "formatbruch":
-            raise Formatbruch(str(eintrag.get("rohantwort", "")))
+            raise Formatbruch(rohantwort)
         if fehler == "anbieterfehler":
-            raise Anbieterfehler(str(eintrag.get("rohantwort", "")))
+            raise Anbieterfehler(rohantwort)
         if fehler == "content_filter":
-            raise ContentFilter(str(eintrag.get("rohantwort", "")))
-        try:
-            antwort: Antwort = Antwort(
-                denkspur=eintrag["denkspur"],
-                aeusserung=eintrag["aeusserung"],
-            )
-        except KeyError as exc:
-            raise Formatbruch(str(eintrag.get("rohantwort", ""))) from exc
-        if not isinstance(antwort.denkspur, str) or not isinstance(
-            antwort.aeusserung, str
-        ):
-            raise Formatbruch(str(eintrag.get("rohantwort", "")))
-        return antwort
+            raise ContentFilter(rohantwort)
+        inhalt: dict[str, object] = {
+            name: wert for name, wert in eintrag.items() if name != "rohantwort"
+        }
+        return _ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
 
 
 class LiteLLMSprachmodell:
@@ -155,8 +192,8 @@ class LiteLLMSprachmodell:
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
         timeout: float,
-    ) -> Antwort:
-        """Fordert eine JSON-Ausgabe an und gibt allein die geparste Antwort zurück."""
+    ) -> dict[str, object]:
+        """Fordert eine JSON-Ausgabe an und gibt allein das geparste Objekt zurück."""
 
         # Die Frist ist eine Zusage dieser Naht: `timeout` steht nicht in der
         # Allowlist der Mikro-Stellschrauben und überschreibt einen dort
@@ -169,10 +206,12 @@ class LiteLLMSprachmodell:
                 messages=nachrichten_bauen(
                     system_prompt, user_prompt, verlauf, eingabe
                 ),
+                # Der Schemaname ist neutral: Dieselbe Naht fordert die
+                # Ausgaben von Schüler:in, Lehrperson und Bewerter an.
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "simulation_antwort",
+                        "name": "ausgabe",
                         "schema": ausgabe_schema,
                         "strict": True,
                     },
@@ -192,26 +231,6 @@ class LiteLLMSprachmodell:
             if getattr(auswahl, "finish_reason", None) == "content_filter":
                 raise ContentFilter(rohantwort)
             inhalt: object = json.loads(rohantwort)
-            if not isinstance(inhalt, dict) or set(inhalt) != {
-                "denkspur",
-                "aeusserung",
-            }:
-                raise Formatbruch(rohantwort)
-            antwort: Antwort = Antwort(
-                denkspur=inhalt["denkspur"], aeusserung=inhalt["aeusserung"]
-            )
-        except ContentFilter:
-            raise
-        except (
-            AttributeError,
-            IndexError,
-            KeyError,
-            TypeError,
-            json.JSONDecodeError,
-        ) as exc:
+        except (AttributeError, IndexError, TypeError, json.JSONDecodeError) as exc:
             raise Formatbruch(rohantwort) from exc
-        if not isinstance(antwort.denkspur, str) or not isinstance(
-            antwort.aeusserung, str
-        ):
-            raise Formatbruch(rohantwort)
-        return antwort
+        return _ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)

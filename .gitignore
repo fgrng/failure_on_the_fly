@@ -8,6 +8,7 @@ __pycache__/
 # Lokale Konfiguration und Laufzeitdaten
 .env
 db.sqlite3*
+evallaeufe.lock
 staticfiles/
 media/
 

@@ -1,5 +1,6 @@
 """Modelle und Abläufe der Simulation."""
 
+import math
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -7,9 +8,8 @@ from string import Template
 from typing import TYPE_CHECKING
 
 from simulation.sprachmodell import (
-    AUSGABE_SCHEMA,
+    SCHUELERIN_SCHEMA,
     Anbieterfehler,
-    Antwort,
     ContentFilter,
     FakeSprachmodell,
     Formatbruch,
@@ -61,11 +61,61 @@ class Fehlversuch:
 
 
 @dataclass(frozen=True)
+class Ausgabeversuch:
+    """Wie der Antwortversuch, nur mit dem rohen Objekt eines beliebigen Schemas."""
+
+    # Das geparste Objekt des Ausgabeschemas; leer, wenn kein Versuch glückte.
+    ausgabe: dict[str, object] | None
+    fehlversuche: list[Fehlversuch]
+
+
+@dataclass(frozen=True)
+class Antwort:
+    """Das strukturierte Ergebnis eines geglückten Antwortversuchs."""
+
+    denkspur: str
+    aeusserung: str
+
+
+@dataclass(frozen=True)
 class Antwortversuch:
     """Das flüchtige Ergebnis von höchstens drei Modellaufrufen."""
 
     antwort: Antwort | None
     fehlversuche: list[Fehlversuch]
+
+
+class Ausfuehrung:
+    """Eine zusammenhängende Folge von Modellaufrufen, etwa ein Evallauf.
+
+    Ein Fake mit `skript_fortlesen` liest sein Skript innerhalb einer
+    Ausführung über alle Aufrufe derselben Konfiguration fort; eine neue
+    Ausführung beginnt wieder vorn.
+    """
+
+    def __init__(self) -> None:
+        """Beginnt ohne Fortschritt."""
+
+        self._fakes: dict[
+            tuple[str, int], tuple["ModellKonfiguration", FakeSprachmodell]
+        ] = {}
+
+    def fake(self, modell_konfiguration: "ModellKonfiguration") -> FakeSprachmodell:
+        """Liefert den fortlesenden Fake dieser Konfiguration in dieser Ausführung."""
+
+        # Ungespeicherte Konfigurationen unterscheidet ihre Identität; gehalten
+        # bleiben sie, damit Python dieselbe Identität nicht neu vergibt.
+        schluessel: tuple[str, int] = (
+            ("pk", modell_konfiguration.pk)
+            if modell_konfiguration.pk is not None
+            else ("id", id(modell_konfiguration))
+        )
+        if schluessel not in self._fakes:
+            self._fakes[schluessel] = (
+                modell_konfiguration,
+                _fake_aus(modell_konfiguration),
+            )
+        return self._fakes[schluessel][1]
 
 
 def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
@@ -80,6 +130,7 @@ def antwort_versuchen(
     modell_konfiguration: "ModellKonfiguration",
     verlauf: Sequence[tuple[str, str]],
     eingabe: str,
+    ausfuehrung: Ausfuehrung | None = None,
 ) -> Antwortversuch:
     """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in.
 
@@ -87,9 +138,40 @@ def antwort_versuchen(
     Vignette; `simulation` kennt keine Vignette (ADR-0016).
     """
 
-    system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
-    user_prompt: str = vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
-    sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)
+    ausgabeversuch: Ausgabeversuch = ausgabe_versuchen(
+        vorlage_rendern(kern.system_prompt_vorlage, platzhalter),
+        vorlage_rendern(kern.user_prompt_vorlage, platzhalter),
+        modell_konfiguration,
+        verlauf,
+        eingabe,
+        SCHUELERIN_SCHEMA,
+        ausfuehrung,
+    )
+    if ausgabeversuch.ausgabe is None:
+        return Antwortversuch(None, ausgabeversuch.fehlversuche)
+    antwort: Antwort = Antwort(
+        denkspur=str(ausgabeversuch.ausgabe["denkspur"]),
+        aeusserung=str(ausgabeversuch.ausgabe["aeusserung"]),
+    )
+    return Antwortversuch(antwort, ausgabeversuch.fehlversuche)
+
+
+def ausgabe_versuchen(
+    system_prompt: str,
+    user_prompt: str,
+    modell_konfiguration: "ModellKonfiguration",
+    verlauf: Sequence[tuple[str, str]],
+    eingabe: str,
+    ausgabe_schema: Mapping[str, object],
+    ausfuehrung: Ausfuehrung | None = None,
+) -> Ausgabeversuch:
+    """Erzeugt schreibfrei eine Ausgabe nach dem übergebenen Schema.
+
+    Formatbruch, Anbieterfehler und Content-Filter werden zu Fehlversuchen;
+    nach `MAX_VERSUCHE` oder abgelaufener Frist bleibt die Ausgabe leer.
+    """
+
+    sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration, ausfuehrung)
     fehlversuche: list[Fehlversuch] = []
     # Die Frist steht einmal je Gesprächsschritt und gilt für alle Versuche
     # zusammen; ein hängender Anbieter frisst sie selbst auf, die Wiederholung
@@ -106,12 +188,12 @@ def antwort_versuchen(
             )
             break
         try:
-            antwort: Antwort = sprachmodell.antworten(
+            ausgabe: dict[str, object] = sprachmodell.antworten(
                 system_prompt,
                 user_prompt,
                 verlauf,
                 eingabe,
-                AUSGABE_SCHEMA,
+                ausgabe_schema,
                 _restzeit(frist),
             )
         except Formatbruch as exc:
@@ -121,8 +203,8 @@ def antwort_versuchen(
         except ContentFilter as exc:
             fehlversuche.append(Fehlversuch("Content-Filter", exc.rohantwort))
         else:
-            return Antwortversuch(antwort, fehlversuche)
-    return Antwortversuch(None, fehlversuche)
+            return Ausgabeversuch(ausgabe, fehlversuche)
+    return Ausgabeversuch(None, fehlversuche)
 
 
 def _restzeit(frist: float) -> float:
@@ -131,13 +213,38 @@ def _restzeit(frist: float) -> float:
     return max(frist - time.monotonic(), SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN)
 
 
-def _sprachmodell_aus(modell_konfiguration: "ModellKonfiguration") -> Sprachmodell:
+def _fake_aus(modell_konfiguration: "ModellKonfiguration") -> FakeSprachmodell:
+    """Bildet den Fake aus Skript und Verzögerung der Konfiguration."""
+
+    verzoegerung: object = modell_konfiguration.parameter.get("verzoegerung", 0)
+    # Nur eine echte, endliche Zahl ab 0 wartet; ein getipptes "2", true, -1
+    # oder inf bleibt sofort, statt `time.sleep` scheitern zu lassen.
+    if (
+        isinstance(verzoegerung, bool)
+        or not isinstance(verzoegerung, int | float)
+        or not 0 <= verzoegerung < math.inf
+    ):
+        verzoegerung = 0
+    return FakeSprachmodell(
+        modell_konfiguration.parameter.get("skript", []), float(verzoegerung)
+    )
+
+
+def _sprachmodell_aus(
+    modell_konfiguration: "ModellKonfiguration", ausfuehrung: Ausfuehrung | None
+) -> Sprachmodell:
     """Bildet den in der Konfiguration gewählten Adapter."""
 
     from simulation.models import Anbieter
 
     if modell_konfiguration.anbieter == Anbieter.FAKE:
-        return FakeSprachmodell(modell_konfiguration.parameter.get("skript", []))
+        # Nur ein echtes `true` schaltet ein; ein getipptes "false" bliebe sonst wahr.
+        if (
+            ausfuehrung is not None
+            and modell_konfiguration.parameter.get("skript_fortlesen") is True
+        ):
+            return ausfuehrung.fake(modell_konfiguration)
+        return _fake_aus(modell_konfiguration)
     aufrufparameter: dict[str, object] = dict(modell_konfiguration.parameter)
     aufrufparameter["api_key"] = modell_konfiguration.anbieter_token
     if modell_konfiguration.anbieter_basis_url:

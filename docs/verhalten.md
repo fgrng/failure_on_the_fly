@@ -309,7 +309,17 @@ Bezeichnung angelegt wurden, heißen »<Sprachmodell> (Nr. <Nummer>)«. Der
 Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —, der
 Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
-Modellverhaltens auf, bei `fake` ausschließlich das Skript. Im Editor schlägt
+Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
+`skript_fortlesen` sowie die Zahl `verzoegerung`, die jeden Aufruf so viele
+Sekunden warten lässt wie ein langsames Modell (nur als endliche Zahl ab 0; als
+Text, `true`, negativ oder unendlich wartet er nicht). Die Wartezeit endet
+spätestens an der übergebenen Anfragefrist. Erreicht die Verzögerung diese
+Frist, zählt der Aufruf als Anbieterfehler und verbraucht seinen Skripteintrag;
+weitere Versuche laufen ausschließlich über den bestehenden Mechanismus mit
+gemeinsamer Frist. Ohne `skript_fortlesen` beginnt das Skript bei jedem
+Antwortversuch von vorn, mit ihm — nur als `true`, nicht als Text — liest es
+eine zusammenhängende Ausführung wie ein Evallauf über alle Aufrufe derselben
+Konfiguration fort; jede neue Ausführung beginnt wieder vorn. Im Editor schlägt
 neben dem Sprachmodell der Knopf „Modelle und Basis-URL laden“ die Modelle des
 gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
 `infomaniak` die Sprachmodelle des Kontos. Die beiden unterscheiden sich darin,
@@ -497,6 +507,186 @@ mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
 
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
+
+## Evalläufe
+
+Evals gibt es nur, wenn ein finaler Evalkatalog existiert und alle drei
+Verwendungen (Schüler:in, Lehrperson, Bewerter) belegt sind. Sonst fehlen
+Verlinkung, Ansicht und Start ganz, ohne erklärenden Hinweis; beide Routen
+ergeben 404.
+
+Die Detailansicht einer Vignette nennt dann den Zustand ihres Evallaufs („noch
+keiner“, „Wartet“, „Läuft“, „Fertig“, „Abgebrochen“, dazu gegebenenfalls
+„veraltet“) und verlinkt mit „Evals ansehen“ die Ansicht unter
+`/evals/vignette/<Fassung>/`. Sie steht Mitgliedern des Eigentümer-Kreises und
+der Administration offen; fremde Fassungen ergeben 404, Konten ohne
+Autor:innen-Rolle 403. Vignettentitel und Fassung im Seitenkopf geben den
+Kontext. Ohne Lauf und solange ein Lauf wartet oder läuft, stehen Zustand und
+Aktion oben: „Evallauf starten“ (POST) gibt es an Entwürfen und finalen
+Fassungen, solange kein Lauf wartet oder läuft; archivierte Fassungen sind nicht
+startbar. Während ein Lauf wartet oder läuft, steht statt des Knopfs der
+Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“, das die
+gewählte Auswahl behält; aktualisiert wird nur durch Neuladen, ohne
+automatisches Polling. Ein fertiger oder abgebrochener Lauf steht dagegen als
+dezente Fußzeile unter den Ergebnissen: Zustand samt Gesamtergebnis, „Erneut
+prüfen“ als sekundäre Aktion und eingeklappt die „Angaben zum Lauf“ (Auslöse-,
+Start- und Endzeitpunkt, *k*, Simulationskern, Katalogfassung und die drei
+Konfigurationen). Eine abgewiesene Startprüfung führt mit Meldung zurück auf die
+Ansicht und lässt den bisherigen Lauf unberührt.
+
+Je Fassung gibt es höchstens einen Evallauf. Ein neuer Start ersetzt einen
+fertigen oder abgebrochenen Vorgänger samt seinen Gesprächen im selben Zug; ein
+wartender oder laufender wird auch bei gleichzeitigen Starts weder verdoppelt
+noch ersetzt. Der Start hält den gepinnten Kern, die finale Katalogfassung, die
+drei aktiven Konfigurationen und die Prompt-Werte der Fassung fest: Wird der
+Entwurf danach gespeichert oder vorgespult, spielt der Lauf trotzdem den Stand
+beim Start. Die Referenzdiagnose gehört nicht zu diesen Werten und erreicht
+keinen Modellaufruf. Finalisieren behält den Lauf an derselben Fassung; das
+Löschen eines Entwurfs entfernt ihn.
+
+Ein Lauf ist *veraltet*, sobald sich seit seinem Auslösen etwas geändert hat,
+das ihn bestimmte: Der Entwurf wurde gespeichert (jedes Speichern zählt, auch
+ohne inhaltliche Änderung, und auch das Vorspulen), der gepinnte Kern ist ein
+anderer, eine der drei Verwendungen zeigt auf eine andere Konfiguration, oder
+eine andere Katalogfassung ist final. Verglichen wird mit dem Stand beim
+Auslösen, nicht mit dem Arbeitsbeginn des Hintergrundprozesses; eine Änderung,
+während der Lauf wartet oder läuft, macht ihn also ebenso veraltet. Eine neue
+finale Kern-Fassung allein ändert nichts, solange die Fassung nicht vorspult;
+Finalisieren ändert ebenfalls nichts. Die Ansicht ergänzt jeden Zustand um
+„Veraltet“, nennt darunter die Gründe („Seit dem Start: Vignette bearbeitet,
+Konfiguration Bewerter gewechselt.“) und den Auslösezeitpunkt; die „Angaben zum
+Lauf“ nennen zusätzlich den geprüften Stand der Vignette. Die Ergebnisse bleiben
+lesbar; ein neuer Lauf prüft den aktuellen Stand.
+
+An einem Entwurf steht unmittelbar bei „Finalisieren“ ein Hinweis auf den
+Evallauf: „Vor dem Finalisieren: Noch kein Evallauf.“ oder Zustand samt
+Gesamtergebnis (nur fertig: „Bestanden“/„Nicht bestanden“), „Veraltet“ mit
+Gründen und „Unvollständig“; darunter je Eval und Evalinput die Quote jedes
+Kriteriums samt „ohne Urteil“ und „noch nicht ausgeführt“. Der Hinweis sperrt
+nichts: Finalisieren ist in jedem Zustand des Laufs möglich, allein die
+Vollständigkeitsregeln der Vignette gelten. Ohne verfügbare Evals fehlt er ganz.
+
+Ausgeführt wird ein Lauf vom Hintergrundprozess
+`python manage.py evallaeufe_abarbeiten`, der im Betrieb als eigener
+supervisord-Dienst neben gunicorn läuft (`docs/DEPLOYMENT.md`). Er arbeitet die
+wartenden Läufe nacheinander ab, den ältesten zuerst, setzt jeden auf „Läuft“
+und am Ende auf „Fertig“, jeweils mit Zeitpunkt; ein Fehler mitten im Lauf
+hinterlässt ihn „Abgebrochen“, das bis dahin Geschriebene bleibt. Wartet kein
+Lauf, sieht er nach `--intervall` Sekunden (Standard 10) wieder nach; ein
+Intervall, das keine positive Zahl ist, weist der Command ab. Ein Stopp (SIGTERM
+wie von supervisord, oder Strg+C) bricht einen laufenden Lauf sofort ab,
+schließt ihn als „Abgebrochen“ ab und beendet den Prozess. Mit `--einmal`
+arbeitet er höchstens den ältesten wartenden Lauf ab und endet, für Tests und
+Fehlersuche. Start, Ende, jeder Lauf und aufgeräumte verwaiste Läufe stehen im
+Log auf stderr. Instanzweit arbeitet nur ein Hintergrundprozess: Er hält dafür
+eine Sperrdatei (`EVALLAEUFE_SPERRE`, standardmäßig `evallaeufe.lock` im
+Projektverzeichnis), die das Betriebssystem freigibt, wenn der Prozess endet
+oder stirbt. Findet ein zweiter Aufruf sie gesperrt, meldet er das und rührt
+nichts an, auch keinen laufenden Lauf. Wer die Sperre erhält, setzt zuerst jeden
+Lauf, der noch „Läuft“ sagt, auf „Abgebrochen“ (Endzeitpunkt ist die
+Bereinigung); wartende bleiben wartend. Abgebrochene Läufe werden weder
+fortgesetzt noch um Wiederholungen ergänzt; ein neuer Start beginnt von vorn.
+Wartezeit auf ein Modell belegt keinen Web-Thread, und weil kein Modellaufruf
+eine Schreibtransaktion hält, schreiben Sitzungen währenddessen ungehindert. Für
+jedes Eval, jeden Evalinput und jede Wiederholung 1 bis *k* entsteht ein
+Evalgespräch, für jeden Inputschritt ein Wechsel in der Reihenfolge des
+Evalinputs; feste und gelenkte Schritte dürfen sich mischen. Bei einem festen
+Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei einem
+gelenkten formuliert die simulierte Lehrperson sie mit der festgehaltenen
+Lehrpersonen-Konfiguration: Ihr System-Prompt ist die gerenderte
+Lehrperson-Vorlage des festgehaltenen Katalogs mit `$inputstrategie` (Text des
+Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), der User-Prompt
+dieser Verlauf, die Eingabe die Inputstrategie. Die Schüler:in antwortet in
+beiden Fällen über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
+Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
+Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
+Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
+User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Inputstrategie und
+Kriterium werden als reiner Text eingesetzt und nicht selbst als Vorlage
+ausgewertet; Anweisungen stehen allein in den Vorlagen des Katalogs. Jedes
+Gespräch, jeder Wechsel und jedes Urteil wird sofort geschrieben; kein
+Modellaufruf hält eine Schreibtransaktion offen.
+
+Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
+einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
+*nicht erfüllt* mit der Begründung „Antwortversuch gescheitert“. Liefert der
+Bewerter nach allen Versuchen nichts Auswertbares, bleibt dieses Kriterium *ohne
+Urteil*. Liefert die Lehrperson nach allen Versuchen keine Äußerung, endet das
+Gespräch vor diesem Schritt, und alle seine Kriterien bleiben *ohne Urteil*.
+Fehlversuche von Lehrperson und Bewerter bleiben mit Grund und Rohantwort
+gespeichert, auch wenn eine Wiederholung danach eine gültige Ausgabe liefert.
+Lehrpersonenfehler werden sofort nach dem Versuch festgehalten, Bewerterfehler
+zusammen mit dem Urteil. Ein Prozessabbruch erhält diese Details. Erfolgreiche
+Wiederholungen bleiben erfolgreich; ihre Fehlversuche ändern weder Quote noch
+Bestehen.
+
+Sobald ein Lauf nicht mehr wartet, zeigt die Ansicht zwei Spalten. Links stehen
+je Eval seine Evalinputs (mit der Folge ihrer Schritte, etwa „FFG“) und darunter
+je Kriterium, die übergreifenden eingeschlossen, Quote und Bestehen zusammen,
+etwa „2 von 3 · nicht bestanden“; bestanden ist ein Kriterium nur, wenn alle *k*
+Urteile erfüllt sind. Dahinter stehen getrennt gezählt Kriterien ohne Urteil („1
+ohne Urteil“) und Wiederholungen, die noch nicht oder wegen eines Abbruchs nie
+ausgeführt wurden („1 noch nicht ausgeführt“). Ohne Urteil zählt weder als
+erfüllt noch als nicht erfüllt. Jeder Evalinput ist ein Link; der gewählte ist
+markiert. Rechts steht das Evalgespräch des gewählten Evalinputs (`?input=`) in
+der gewählten Wiederholung (`?wiederholung=`, Auswahlfeld mit „Anzeigen“): die
+Äußerungen von Lehrperson (mit Schritt und Art) und Schüler:in in ihrer
+Reihenfolge, je Antwort die Denkspur, Fehlversuche mit Grund und Rohantwort, ein
+endgültig gescheiterter Antwortversuch als solcher, danach jedes Kriterium mit
+seinem Urteil („erfüllt“, „nicht erfüllt“, „ohne Urteil“, „noch nicht
+beurteilt“) und seiner Begründung. So lässt sich jedes Bewerterurteil fachlich
+nachprüfen und, wenn nötig, manuell korrigieren (siehe unten). Bei allen drei
+Rollen öffnet „Fehlversuche · N“ die technischen Details, zunächst eingeklappt:
+bei der Lehrpersonenäußerung, der Schüler:innen-Antwort oder dem Bewerterurteil.
+Die Übersicht erhält keine zusätzlichen Fehlermarken. Scheitert die Lehrperson
+endgültig, steht im Verlauf etwa „Lehrperson konnte Schritt 1 nicht
+formulieren.“ mit ihren Fehlversuchen; frühere Schritte bleiben sichtbar, eine
+Schüler:innen-Antwort wird dafür nicht angezeigt. Solange nach einem
+erfolgreichen Lehrpersonenversuch noch kein vollständiger Wechsel gespeichert
+ist, zeigt die Ansicht diesen Teilstand ausdrücklich als solchen. Ohne Auswahl
+zeigt die Ansicht den ersten Evalinput und seine erste ausgeführte Wiederholung.
+Eine Wiederholung ohne Gespräch heißt „nicht ausgeführt“. Unlesbare Werte, ein
+Evalinput außerhalb des festgehaltenen Katalogs oder eine Wiederholung außerhalb
+1 bis *k* weichen dieser Vorgabe; gesucht wird stets nur unter den Gesprächen
+des aktuellen Laufs der Fassung, sodass eine alte Adresse nach „Erneut prüfen“
+den aktuellen Stand zeigt. Auf schmalem Hauptbereich stehen die Spalten
+untereinander. Blieb mindestens ein Kriterium ohne Urteil, heißt der Lauf
+*unvollständig*, und die Ansicht empfiehlt einen neuen Lauf. Ein Gesamtergebnis
+nennt nur ein fertiger Lauf („Fertig · Bestanden“ oder „Fertig · Nicht
+bestanden“), bestanden nur, wenn jedes Kriterium jedes Evalinputs besteht; ein
+wartender, laufender oder abgebrochener Teilstand nennt nur seinen Zustand, auch
+wenn jedes bisher geschriebene Urteil erfüllt ist. Ein abgebrochener Lauf zeigt
+seine fertigen Gespräche und Urteile weiter, mit dem Hinweis, dass ein neuer
+Lauf von vorn beginnt. Evalläufe erzeugen weder Teilnahme noch Sitzung und
+erscheinen weder in der Datenspur noch im Trainingsexport.
+
+Ein fachlich falsches Bewerterurteil lässt sich im gewählten Gespräch manuell
+korrigieren, von Mitgliedern des Eigentümer-Kreises und der Administration,
+sobald der Lauf fertig oder abgebrochen ist. Unter dem Urteil öffnet „Urteil
+korrigieren“ ein Formular mit einer Pflicht-Begründung; „Als erfüllt werten“
+bzw. „Als nicht erfüllt werten“ kehrt das Bewerterurteil um. Das Urteil heißt
+dann etwa „Muster gezeigt · erfüllt · manuell korrigiert“, darunter stehen
+Korrektur samt Konto, Zeitpunkt und Begründung und das ursprüngliche
+Bewerterurteil mit seiner Begründung; überschrieben wird es nie. „Korrektur
+ändern“ ersetzt Begründung, Konto und Zeitpunkt ohne Historie früherer
+Fassungen, „Korrektur zurücknehmen“ lässt wieder das Bewerterurteil gelten. Das
+wirksame Urteil bestimmt überall Quote und Bestehen: in den Quoten links, im
+Gesamtergebnis und im Hinweis beim Finalisieren; aus „2 von 3 · nicht bestanden“
+wird so „3 von 3 · bestanden“ und mit der Rücknahme wieder umgekehrt. Manuelle
+Korrekturen sind auch an den Quoten, im Laufstand und im Finalisierungs-Hinweis
+als „manuell korrigiert“ gekennzeichnet. Nicht korrigierbar sind Kriterien ohne
+Urteil, nicht ausgeführte Wiederholungen und die automatisch nicht erfüllten
+Urteile eines endgültig gescheiterten Antwortversuchs; ein wartender oder
+laufender Lauf ist schreibgeschützt. Archivierte Fassungen bleiben lesbar,
+erlauben aber weder neue Korrekturen noch Änderungen oder Rücknahmen bestehender
+Korrekturen. Ein abgebrochener Lauf bleibt auch mit korrigierten Urteilen
+abgebrochen und nennt kein Gesamtergebnis. Korrigieren und Zurücknehmen laufen
+per POST mit CSRF-Schutz und prüfen Fassung, Laufzustand und Zuordnung des
+Urteils frisch; ein Urteil, das nicht zum aktuellen Lauf der Fassung gehört
+(etwa aus einem alten Browserstand nach „Erneut prüfen“), wird mit Meldung
+abgewiesen. Eine Korrektur ändert weder die Fassung noch „veraltet“. Ein neuer
+Lauf ersetzt den alten samt Korrekturen; auf neue Urteile wird nichts
+übertragen.
 
 ## Transkriptions-Konfiguration
 

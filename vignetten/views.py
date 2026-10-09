@@ -14,6 +14,8 @@ from konten.navigation import (
     autorin_erforderlich as _autorin_erforderlich,
 )
 
+from simulation.models import evals_verfuegbar
+
 from .forms import VignetteForm
 from .models import Vignette, Vignettenhistorie, zufaellige_akteure
 
@@ -126,12 +128,16 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Rohfelder einer für die Person sichtbaren Vignettenfassung."""
     vignette: Vignette = _sichtbare_vignette_laden(request, pk)
+    verfuegbar: bool = evals_verfuegbar()
     return render(
         request,
         "vignetten/detail.html",
         {
             "vignette": vignette,
             "zustand_badge": _zustand_badge(vignette),
+            "evals_verfuegbar": verfuegbar,
+            # Über den Reverse-Accessor, ohne Import von evals (ADR-0016).
+            "evallauf": getattr(vignette, "evallauf", None) if verfuegbar else None,
         },
     )
 
