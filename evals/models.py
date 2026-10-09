@@ -61,7 +61,7 @@ class Inputzeile:
     nummer: int
     kuerzel: str
     zellen: list[Zelle]
-    evalinput: int
+    evalinput_pk: int
 
 
 @dataclass(frozen=True)
@@ -96,6 +96,12 @@ class Einsicht:
     # Jeder geschriebene Wechsel mit dem Inputschritt, aus dem er entstand.
     wechsel: list[tuple["Wechsel", Inputschritt]]
     beurteilungen: list[Beurteilung]
+
+
+def _anzeigename(eval_: Eval) -> str:
+    # Der Name eines Evals; ein namenloses heißt „Unbenanntes Eval“.
+
+    return eval_.name or "Unbenanntes Eval"
 
 
 class EvallaufManager(models.Manager["Evallauf"]):
@@ -263,7 +269,7 @@ class Evallauf(models.Model):
                 )
             ergebnisse.append(
                 Evalergebnis(
-                    eval_.name or "Unbenanntes Eval",
+                    _anzeigename(eval_),
                     [kriterium.text for kriterium in kriterien],
                     zeilen,
                 )
@@ -280,16 +286,18 @@ class Evallauf(models.Model):
         anderer Läufe sind so nie erreichbar.
         """
 
-        kandidaten: list[tuple[Eval, list[Kriterium], int, Evalinput]] = [
-            (eval_, kriterien, nummer, evalinput)
+        # Je Evalinput sein Eval, dessen Kriterien und seine Nummer im Eval.
+        kandidaten: dict[int, tuple[Eval, list[Kriterium], int, Evalinput]] = {
+            evalinput.pk: (eval_, kriterien, nummer, evalinput)
             for eval_, kriterien in self.evals_mit_kriterien()
             for nummer, evalinput in enumerate(eval_.inputs.all(), 1)
-        ]
+        }
         if not kandidaten:
             return None
-        eval_, kriterien, nummer, evalinput = next(
-            (kandidat for kandidat in kandidaten if kandidat[3].pk == evalinput_pk),
-            kandidaten[0],
+        eval_, kriterien, nummer, evalinput = (
+            kandidaten[evalinput_pk]
+            if evalinput_pk in kandidaten
+            else next(iter(kandidaten.values()))
         )
         # Ein Gespräch ohne Wechsel und Urteil brach ab, bevor etwas geschah.
         gespraeche: dict[int, Evalgespraech] = {
@@ -309,7 +317,7 @@ class Evallauf(models.Model):
         )
         schritte: list[Inputschritt] = list(evalinput.schritte.all())
         return Einsicht(
-            eval_.name or "Unbenanntes Eval",
+            _anzeigename(eval_),
             nummer,
             evalinput,
             wiederholung,

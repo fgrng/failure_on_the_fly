@@ -23,8 +23,7 @@
 
     {% comment %}
         Ohne Lauf und solange er wartet oder läuft, stehen Zustand und Aktion
-        oben; ein abgeschlossener Lauf steht als Fußzeile unter den Ergebnissen
-        (Prototyp #296, Variante C).
+        oben; ein abgeschlossener Lauf steht als Fußzeile unter den Ergebnissen.
     {% endcomment %}
     {% if not lauf or lauf.ist_offen %}
         <section class="evallauf-kopf" aria-label="Evallauf">
@@ -32,7 +31,7 @@
         </section>
     {% endif %}
 
-    {% if lauf and lauf.zustand != "wartet" and einsicht %}
+    {% if einsicht %}
         <div class="evalkatalog-editor evallauf-einsicht">
             <nav class="evalkatalog-baum evallauf-inputs" aria-label="Evalinputs">
                 <h2>Evalinputs</h2>
@@ -42,7 +41,7 @@
                     <ul aria-label="Evalinputs von {{ ergebnis.name }}">
                         {% for zeile in ergebnis.zeilen %}
                             <li>
-                                <a href="{% url 'evals:evallauf' vignette.pk %}?input={{ zeile.evalinput }}"{% if zeile.evalinput == einsicht.evalinput.pk %} aria-current="page"{% endif %}>
+                                <a href="{% url 'evals:evallauf' vignette.pk %}?input={{ zeile.evalinput_pk }}"{% if zeile.evalinput_pk == einsicht.evalinput.pk %} aria-current="page"{% endif %}>
                                     <strong>Evalinput {{ zeile.nummer }}</strong> <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ zeile.kuerzel }}</span>
                                     {% for zelle in zeile.zellen %}
                                         <span class="evallauf-quote">

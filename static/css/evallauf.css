@@ -1,6 +1,6 @@
 /* Evallauf: links Evalinputs mit Kriterienquoten, rechts das gewählte
-   Evalgespräch (Prototyp #296, Variante C). Spalten, Trennlinie und
-   Auswahl kommen aus evalkatalog.css, Felder aus vignette-form.css. */
+   Evalgespräch. Spalten, Trennlinie und Auswahl kommen aus evalkatalog.css,
+   Felder aus vignette-form.css. */
 
 .evallauf-einsicht {
     grid-template-columns: minmax(190px, 1fr) minmax(0, 2fr);

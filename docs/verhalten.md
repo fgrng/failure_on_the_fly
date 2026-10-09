@@ -518,14 +518,14 @@ geben den Kontext. Ohne Lauf und solange ein Lauf wartet oder läuft, stehen
 Zustand und Aktion oben: „Evallauf starten“ (POST) gibt es an Entwürfen und
 finalen Fassungen, solange kein Lauf wartet oder läuft; archivierte Fassungen
 sind nicht startbar. Während ein Lauf wartet oder läuft, steht statt des Knopfs
-der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“;
-aktualisiert wird nur durch Neuladen, ohne automatisches Polling. Ein fertiger
-oder abgebrochener Lauf steht dagegen als dezente Fußzeile unter den
-Ergebnissen: Zustand samt Gesamtergebnis, „Erneut prüfen“ als sekundäre Aktion
-und eingeklappt die „Angaben zum Lauf“ (Auslöse-, Start- und Endzeitpunkt, *k*,
-Simulationskern, Katalogfassung und die drei Konfigurationen). Eine abgewiesene
-Startprüfung führt mit Meldung zurück auf die Ansicht und lässt den bisherigen
-Lauf unberührt.
+der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“, das
+die gewählte Auswahl behält; aktualisiert wird nur durch Neuladen, ohne
+automatisches Polling. Ein fertiger oder abgebrochener Lauf steht dagegen als
+dezente Fußzeile unter den Ergebnissen: Zustand samt Gesamtergebnis, „Erneut
+prüfen“ als sekundäre Aktion und eingeklappt die „Angaben zum Lauf“ (Auslöse-,
+Start- und Endzeitpunkt, *k*, Simulationskern, Katalogfassung und die drei
+Konfigurationen). Eine abgewiesene Startprüfung führt mit Meldung zurück auf die
+Ansicht und lässt den bisherigen Lauf unberührt.
 
 Je Fassung gibt es höchstens einen Evallauf. Ein neuer Start ersetzt einen
 fertigen oder abgebrochenen Vorgänger samt seinen Gesprächen im selben Zug; ein

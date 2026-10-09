@@ -57,10 +57,11 @@ def evallauf(request: HttpRequest, pk: int) -> HttpResponse:
             "vignette": vignette,
             "lauf": lauf,
             "uebersicht": lauf.uebersicht() if lauf else [],
+            # Ein wartender Lauf hat noch keine Gespräche zum Nachlesen.
             "einsicht": lauf.einsicht(
                 _zahl(request.GET.get("input")), _zahl(request.GET.get("wiederholung"))
             )
-            if lauf
+            if lauf and lauf.zustand != Evallauf.Zustand.WARTET
             else None,
             "startbar": vignette.zustand != Vignette.Zustand.ARCHIVIERT
             and (lauf is None or not lauf.ist_offen),

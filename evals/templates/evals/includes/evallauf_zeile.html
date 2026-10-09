@@ -20,14 +20,15 @@
             <button class="button{% if lauf %} button--secondary{% endif %}" type="submit">{% if lauf %}Erneut prüfen{% else %}Evallauf starten{% endif %}</button>
         </form>
     {% elif lauf.ist_offen %}
-        <a class="button button--secondary" href="{% url 'evals:evallauf' vignette.pk %}">Stand neu laden</a>
+        <a class="button button--secondary" href="{{ request.get_full_path }}">Stand neu laden</a>
     {% endif %}
 </div>
 {% if lauf.ist_offen %}
     <p class="evallauf-zeile__hinweis" role="status">Der Evallauf {% if lauf.zustand == "wartet" %}wartet auf den Hintergrundprozess{% else %}läuft im Hintergrund{% endif %}; die Seite darf geschlossen werden.</p>
 {% elif lauf.zustand == "abgebrochen" %}
     <p class="evallauf-zeile__hinweis">Der Evallauf wurde abgebrochen. Was bis dahin fertig war, bleibt lesbar; nicht ausgeführte Wiederholungen werden nicht fortgesetzt, ein neuer Evallauf beginnt von vorn.</p>
-{% elif lauf.unvollstaendig %}
+{% endif %}
+{% if lauf.unvollstaendig %}
     <p class="evallauf-zeile__hinweis">Unvollständig: Mindestens ein Kriterium blieb ohne Urteil, weil Lehrperson oder Bewerter nichts Auswertbares lieferten. Ein neuer Evallauf lohnt.</p>
 {% endif %}
 {% if lauf %}
