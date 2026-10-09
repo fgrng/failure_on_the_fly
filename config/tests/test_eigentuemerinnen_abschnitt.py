@@ -43,9 +43,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
     def test_tabelle_nennt_name_und_alle_rollen(self) -> None:
         """Jede Zeile trägt den Namen und alle Rollen des Kontos."""
         ada: Konto = _autorin("ada")
-        grace: Konto = _autorin("grace")
-        grace.is_superuser = True
-        grace.save()
+        grace: Konto = konto_mit_rollen("grace", "Autor:in", is_superuser=True)
 
         response: HttpResponse = self._detail(
             ada, _vignette_mit_eigentuemerinnen(ada, grace)

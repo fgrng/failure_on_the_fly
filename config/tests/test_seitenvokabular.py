@@ -25,9 +25,7 @@ class SeitenvokabularTests(TestCase):
     """Überzeile, Titel und Absendeknopf je Seite wie in der Entscheidung zu #287."""
 
     def setUp(self) -> None:
-        self.linus: Konto = konto_mit_rollen("linus")
-        self.linus.is_superuser = True
-        self.linus.save()
+        self.linus: Konto = konto_mit_rollen("linus", is_superuser=True)
         self.kern_entwurf: Simulationskern = finaler_kern().bearbeiten()
         self.vignette: Vignette = Vignette.objects.anlegen(self.linus)
         self.training: Training = Training.objects.anlegen(self.linus, name="Brüche")

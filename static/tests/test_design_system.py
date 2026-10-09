@@ -7,6 +7,12 @@ from pathlib import Path
 STATIC: Path = Path(__file__).parents[1]
 
 
+def _stylesheets() -> list[Path]:
+    """Alle ausgelieferten CSS-Dateien; neue Dateien prüfen die Lint-Regeln mit."""
+
+    return list((STATIC / "css").glob("*.css"))
+
+
 def test_benutzte_custom_properties_sind_deklariert() -> None:
     """Jede mit `var(--x)` gelesene Custom Property ist irgendwo als `--x:` deklariert.
 
@@ -14,11 +20,11 @@ def test_benutzte_custom_properties_sind_deklariert() -> None:
     stillschweigend (#374).
     """
 
-    stylesheets: list[Path] = list((STATIC / "css").glob("*.css"))
+    stylesheets: list[Path] = _stylesheets()
+    # Nur am Anfang einer Deklaration, sonst zählt `.button--danger:hover` mit.
+    deklaration: re.Pattern[str] = re.compile(r"(?:^|[;{])\s*(--[\w-]+)\s*:", re.M)
     deklariert: set[str] = {
-        name
-        for path in stylesheets
-        for name in re.findall(r"(--[\w-]+)\s*:", path.read_text())
+        name for path in stylesheets for name in deklaration.findall(path.read_text())
     }
 
     unbekannt: list[str] = [
@@ -34,7 +40,7 @@ def test_benutzte_custom_properties_sind_deklariert() -> None:
 def test_feature_styles_only_consume_semantic_color_tokens() -> None:
     """Feature-CSS greift nicht direkt auf PHSG-Farbprimitive zu."""
 
-    for path in (STATIC / "css").glob("*.css"):
+    for path in _stylesheets():
         if path.name != "tokens.css":
             assert "var(--phsg-" not in path.read_text(), path
 
@@ -48,7 +54,7 @@ def test_page_sections_follow_the_main_area_not_the_viewport() -> None:
 
     verstoesse: list[str] = [
         path.name
-        for path in (STATIC / "css").glob("*.css")
+        for path in _stylesheets()
         for block in media_block.findall(path.read_text())
         if ".page-section" in block or ".field-grid" in block
     ]
@@ -70,7 +76,7 @@ def test_feature_styles_use_spacing_tokens() -> None:
     )
 
     violations: list[str] = []
-    for path in (STATIC / "css").glob("*.css"):
+    for path in _stylesheets():
         for match in spacing_with_pixels.finditer(path.read_text()):
             violations.append(f"{path.name}: {match.group().strip(' ;{')}")
 
