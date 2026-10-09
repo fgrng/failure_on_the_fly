@@ -20,6 +20,15 @@
     {% if finale_fassung %}
         <h2>Finale Fassung</h2>
         <p>Final seit {{ finale_fassung.finalisiert_am|date:"d.m.Y H:i" }}. Jeder Evallauf prüft gegen diese Fassung.</p>
+        <div class="page-actions">
+            <a class="button button--secondary" href="{% url 'simulation:evalkatalog_editor' finale_fassung.pk %}">Finale Fassung lesen</a>
+            {% if not entwurf %}
+                <form method="post" action="{% url 'simulation:evalkatalog_neue_fassung' finale_fassung.pk %}">
+                    {% csrf_token %}
+                    <button class="button" type="submit" title="Legt einen Entwurf mit dem ganzen Katalog der finalen Fassung an.">Neue Fassung</button>
+                </form>
+            {% endif %}
+        </div>
     {% endif %}
 
     {% if entwurf %}
@@ -40,6 +49,15 @@
                 <button class="button" type="submit">Evalkatalog anlegen</button>
             </form>
         </div>
+    {% endif %}
+
+    {% if ueberholte_fassungen %}
+        <h2>Überholte Fassungen</h2>
+        <ul>
+            {% for fassung in ueberholte_fassungen %}
+                <li><a href="{% url 'simulation:evalkatalog_editor' fassung.pk %}">Fassung vom {{ fassung.finalisiert_am|date:"d.m.Y H:i" }}</a></li>
+            {% endfor %}
+        </ul>
     {% endif %}
 </section>
 {% endblock %}

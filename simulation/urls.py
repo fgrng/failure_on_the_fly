@@ -128,6 +128,11 @@ urlpatterns: list[URLPattern] = [
         name="evalkatalog_finalisieren",
     ),
     path(
+        "evalkatalog/<int:pk>/neue-fassung/",
+        views.evalkatalog_neue_fassung,
+        name="evalkatalog_neue_fassung",
+    ),
+    path(
         "evalkatalog/<int:pk>/verwerfen/",
         views.evalkatalog_verwerfen,
         name="evalkatalog_verwerfen",

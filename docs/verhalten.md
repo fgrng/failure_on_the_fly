@@ -318,8 +318,8 @@ der ersten, Runter an der letzten Zeile gesperrt. Der Papierkorb löscht es. Die
 Reihenfolge bleibt gespeichert. Jede dieser Gesten übernimmt zugleich die
 getippten Texte aller Kriterien, ebenso „Änderungen speichern“. Ein Katalog darf
 ohne übergreifende Kriterien auskommen. Ein neuer Entwurf aus einer finalen
-Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle Routen des Knotens
-erreichen nur Entwürfe.
+Fassung übernimmt die Kriterien in gleicher Reihenfolge. Alle schreibenden
+Routen des Knotens erreichen nur Entwürfe.
 
 „Eval hinzufügen“ unter dem Baum hängt ein Eval namens „Neues Eval“ ans Ende und
 öffnet seinen Knoten. Dort benennt die Administrator:in das Eval um (höchstens
@@ -335,7 +335,7 @@ einem anderen Knoten heraus, übernimmt zugleich alle getippten Werte des
 Formulars; gültige Werte von „Durchlauf und Vorlagen“ eingeschlossen. Ein neuer
 Entwurf aus einer finalen Fassung übernimmt die Evals samt Evalkriterien in
 gleicher Reihenfolge. Leere Kriterien weist erst das Finalisieren zurück.
-Alle Routen der Evals und Evalkriterien erreichen nur Entwürfe.
+Alle schreibenden Routen der Evals und Evalkriterien erreichen nur Entwürfe.
 
 Am Eval-Knoten legt „Evalinput hinzufügen“ einen weiteren Evalinput an; ein Eval
 darf mehrere haben. Ein neuer Evalinput startet mit drei leeren, festen
@@ -356,8 +356,8 @@ Neben dem Drehbuch stehen die Evalkriterien des Evals, nach denen seine
 Gespräche beurteilt werden. Die Länge eines Evalgesprächs ist die Zahl der
 Inputschritte; eine eigene Obergrenze gibt es nicht. Ein neuer Entwurf aus einer
 finalen Fassung übernimmt die Evalinputs samt Inputschritten. Leere Schritte
-weist erst das Finalisieren zurück. Alle Routen der Evalinputs und Inputschritte
-erreichen nur Entwürfe.
+weist erst das Finalisieren zurück. Alle schreibenden Routen der Evalinputs und
+Inputschritte erreichen nur Entwürfe.
 
 „Finalisieren“ in der Aktionszeile des Editors übernimmt zuerst alle getippten
 Werte und prüft dann den Entwurf, ohne ein Sprachmodell aufzurufen. Abgelehnt
@@ -380,6 +380,27 @@ Fassung ist im selben Schritt überholt; überholt ist nicht umkehrbar, es gibt
 immer genau eine finale Fassung. Andere Apps fragen sie über
 `Evalkatalog.objects.finale_fassung()` ab, das ohne finale Fassung `None`
 liefert.
+
+Finale und überholte Fassungen lassen sich vollständig lesen, damit
+nachvollziehbar bleibt, wogegen ein älterer Evallauf geprüft hat. Die Übersicht
+führt mit „Finale Fassung lesen“ zur finalen Fassung und listet unter
+„Überholte Fassungen“ jede überholte, die zuletzt gültige zuerst, mit dem
+Datum, ab dem sie galt. Beide öffnen sich im Editor über dieselben Adressen wie
+ein Entwurf, mit Baum und allen Knoten. Ein Hinweisband nennt den Zustand („final
+seit …“ bzw. „überholt“, mit dem Datum, ab dem sie galt). Alle Felder sind
+gesperrt; Platzhalterknöpfe, Hinzufügen, Hoch, Runter, Löschen, Speichern und
+Finalisieren fehlen, die Aktionszeile führt nur zurück zur Übersicht. Jede
+schreibende Anfrage an eine finale oder überholte Fassung wird abgewiesen.
+
+„Neue Fassung“ (auf der Übersicht und im Hinweisband der finalen Fassung) leitet
+aus der finalen Fassung einen Entwurf ab und öffnet seinen Editor. Der Entwurf
+ist eine Tiefenkopie: *k*, beide Vorlagen, die übergreifenden Kriterien und der
+ganze Baum aus Evals, Evalkriterien, Evalinputs und Inputschritten (mit Art und
+Text) in gleicher Reihenfolge; er verweist auf die finale Fassung als
+Vorgängerin. Änderungen am Entwurf berühren die Vorgängerin nicht. Solange ein
+Entwurf besteht, bieten die Seiten „Neue Fassung“ nicht an, und ein Versuch wird
+mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
+überholten Fassungen und Entwürfen lässt sich keine neue Fassung ableiten.
 
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.

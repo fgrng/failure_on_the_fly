@@ -1,6 +1,7 @@
 """HTTP-Tests für den Evalkatalog-Editor im System-Bereich."""
 
 import re
+from html.parser import HTMLParser
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -934,13 +935,16 @@ class EvalkatalogFinaleFassungTests(TestCase):
         vervollstaendigen(self.katalog).finalisieren()
         self.client.force_login(_administratorin("ada"))
 
-    def test_finale_fassung_hat_keinen_editor(self) -> None:
-        """Der Editor erreicht nur Entwürfe."""
-        response: HttpResponse = self.client.get(
-            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])
+    def test_finale_fassung_nimmt_keine_eingaben_an(self) -> None:
+        """Lesen ja, Speichern nein: Der Editor schreibt nur in Entwürfe."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
+            {"k": "7", "lehrperson_vorlage": "x", "bewerter_vorlage": "y"},
         )
 
         self.assertEqual(response.status_code, 404)
+        self.katalog.refresh_from_db()
+        self.assertEqual(self.katalog.k, 3)
 
     def test_kriterienrouten_erreichen_nur_entwuerfe(self) -> None:
         """An einer finalen Fassung ändert keine Kriterienroute etwas."""
@@ -1006,6 +1010,271 @@ class EvalkatalogFinaleFassungTests(TestCase):
         )
 
         self.assertTrue(Evalkatalog.objects.filter(pk=self.katalog.pk).exists())
+
+
+class _Feldsammler(HTMLParser):
+    """Sammelt die Eingabefelder einer Seite mit ihrer Sperre."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.felder: list[tuple[str | None, bool]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        werte: dict[str, str | None] = dict(attrs)
+        if tag in ("input", "textarea", "select") and werte.get("type") != "hidden":
+            self.felder.append((werte.get("name"), "disabled" in werte))
+
+
+def _felder(response: HttpResponse) -> list[tuple[str | None, bool]]:
+    """Name und Sperre jedes sichtbaren Eingabefelds der Seite."""
+    sammler: _Feldsammler = _Feldsammler()
+    sammler.feed(response.content.decode())
+    return sammler.felder
+
+
+def _editorknoepfe(response: HttpResponse) -> list[str]:
+    """Die Beschriftungen der Submit-Knöpfe im Editor-Formular."""
+    return [
+        text
+        for text, formular in submit_knoepfe(response)
+        if formular == "evalkatalog-formular"
+    ]
+
+
+class EvalkatalogLeseansichtTests(TestCase):
+    """Finale und überholte Fassungen öffnen sich gesperrt im Editor."""
+
+    def setUp(self) -> None:
+        """Finalisiert eine Fassung mit Kriterium und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = Evalkatalog.objects.anlegen()
+        self.katalog.kriterium_anlegen("Rollentreu")
+        self.eval_: Eval = self.katalog.eval_anlegen("Muster")
+        self.eval_.input_anlegen().schritt_anlegen(Inputschritt.Art.GELENKT, "Zweifle")
+        vervollstaendigen(self.katalog).finalisieren()
+        self.evalinput: Evalinput = self.eval_.inputs.get()
+        self.client.force_login(_administratorin("ada"))
+
+    def _knoten(self, katalog: Evalkatalog) -> list[str]:
+        # Die Adressen aller vier Knotenarten der Fassung.
+        eval_: Eval = katalog.evals.get()
+        return [
+            reverse("simulation:evalkatalog_editor", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_eval", args=[katalog.pk, eval_.pk]),
+            reverse(
+                "simulation:evalkatalog_evalinput",
+                args=[katalog.pk, eval_.pk, eval_.inputs.get().pk],
+            ),
+        ]
+
+    def test_jeder_knoten_zeigt_seine_werte_mit_gesperrten_feldern(self) -> None:
+        """Alle Felder sind da, aber gesperrt; kein Knopf ändert etwas."""
+        for url, inhalt in zip(
+            self._knoten(self.katalog),
+            ("Sprich mit $schuelerin_name", "Rollentreu", "Muster", "Zweifle"),
+        ):
+            with self.subTest(url=url):
+                response: HttpResponse = self.client.get(url)
+
+                self.assertContains(response, inhalt)
+                felder: list[tuple[str | None, bool]] = _felder(response)
+                self.assertTrue(felder)
+                self.assertTrue(all(gesperrt for _, gesperrt in felder), felder)
+                self.assertNotContains(response, "formaction=")
+                self.assertNotContains(response, "data-platzhalter=")
+                self.assertNotContains(response, "data-ungespeichert-warnen")
+                self.assertEqual(_editorknoepfe(response), [])
+                self.assertIn(
+                    "Neue Fassung", [text for text, _ in submit_knoepfe(response)]
+                )
+
+    def test_finale_fassung_traegt_ein_hinweisband(self) -> None:
+        """Das Band nennt den Zustand und seit wann die Fassung gilt."""
+        response: HttpResponse = self.client.get(self._knoten(self.katalog)[0])
+
+        self.assertContains(response, 'class="evalkatalog-band"')
+        self.assertContains(response, "Diese Fassung ist final")
+        self.assertContains(response, "Finale Fassung lesen")
+
+    def test_ueberholte_fassung_traegt_ein_hinweisband_ohne_neue_fassung(
+        self,
+    ) -> None:
+        """Eine überholte Fassung lässt sich nur lesen; neu abgeleitet wird aus der finalen."""
+        self.katalog.bearbeiten().finalisieren()
+
+        for url in self._knoten(self.katalog):
+            with self.subTest(url=url):
+                response: HttpResponse = self.client.get(url)
+
+                self.assertContains(response, "Diese Fassung ist überholt")
+                self.assertContains(response, "Überholte Fassung lesen")
+                self.assertEqual(_editorknoepfe(response), [])
+                self.assertNotIn(
+                    "Neue Fassung", [text for text, _ in submit_knoepfe(response)]
+                )
+                self.assertTrue(all(gesperrt for _, gesperrt in _felder(response)))
+
+    def test_entwurf_bleibt_bearbeitbar(self) -> None:
+        """Im Entwurf sind die Felder offen und ohne Hinweisband."""
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+
+        for url in self._knoten(entwurf):
+            with self.subTest(url=url):
+                response: HttpResponse = self.client.get(url)
+
+                self.assertNotContains(response, 'class="evalkatalog-band"')
+                self.assertFalse(any(gesperrt for _, gesperrt in _felder(response)))
+                self.assertContains(response, "formaction=")
+
+    def test_baum_der_lese_ansicht_fuehrt_zu_den_knoten_der_fassung(self) -> None:
+        """Der Baum verlinkt die Knoten derselben Fassung."""
+        response: HttpResponse = self.client.get(self._knoten(self.katalog)[0])
+
+        for url in self._knoten(self.katalog)[1:]:
+            self.assertContains(response, f'href="{url}"')
+
+    def test_uebersicht_verlinkt_die_finale_fassung(self) -> None:
+        """Die Systemseite führt zur Lese-Ansicht der finalen Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertContains(
+            response,
+            f'href="{reverse("simulation:evalkatalog_editor", args=[self.katalog.pk])}"',
+        )
+
+    def test_uebersicht_listet_die_ueberholten_fassungen_neueste_zuerst(
+        self,
+    ) -> None:
+        """Jede überholte Fassung steht mit Link zur Lese-Ansicht in der Liste."""
+        zweite: Evalkatalog = self.katalog.bearbeiten()
+        zweite.finalisieren()
+        zweite.bearbeiten().finalisieren()
+
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertContains(response, "Überholte Fassungen")
+        inhalt: str = response.content.decode()
+        links: list[str] = [
+            reverse("simulation:evalkatalog_editor", args=[fassung.pk])
+            for fassung in (zweite, self.katalog)
+        ]
+        positionen: list[int] = [inhalt.index(f'href="{link}"') for link in links]
+        self.assertEqual(positionen, sorted(positionen))
+
+    def test_ohne_ueberholte_fassung_fehlt_die_liste(self) -> None:
+        """Solange nichts überholt ist, zeigt die Seite keine leere Liste."""
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertNotContains(response, "Überholte Fassungen")
+
+
+class EvalkatalogNeueFassungTests(TestCase):
+    """Aus der finalen Fassung leitet die Administrator:in einen Entwurf ab."""
+
+    def setUp(self) -> None:
+        """Finalisiert eine Fassung und meldet eine Administratorin an."""
+        self.katalog: Evalkatalog = vollstaendiger_katalog()
+        self.katalog.kriterium_anlegen("Rollentreu")
+        self.katalog.finalisieren()
+        self.url: str = reverse(
+            "simulation:evalkatalog_neue_fassung", args=[self.katalog.pk]
+        )
+        self.client.force_login(_administratorin("ada"))
+
+    def test_neue_fassung_oeffnet_den_editor_einer_tiefenkopie(self) -> None:
+        """Der neue Entwurf trägt den ganzen Katalog und verweist auf die Vorgängerin."""
+        response: HttpResponse = self.client.post(self.url)
+
+        entwurf: Evalkatalog = Evalkatalog.objects.get(
+            zustand=Evalkatalog.Zustand.ENTWURF
+        )
+        self.assertRedirects(
+            response, reverse("simulation:evalkatalog_editor", args=[entwurf.pk])
+        )
+        self.assertEqual(entwurf.vorgaengerin, self.katalog)
+        self.assertEqual(entwurf.lehrperson_vorlage, self.katalog.lehrperson_vorlage)
+        self.assertEqual(
+            [k.text for k in entwurf.uebergreifende_kriterien.all()], ["Rollentreu"]
+        )
+        self.assertEqual(
+            [
+                [[(s.art, s.text) for s in i.schritte.all()] for i in e.inputs.all()]
+                for e in entwurf.evals.all()
+            ],
+            [
+                [[(s.art, s.text) for s in i.schritte.all()] for i in e.inputs.all()]
+                for e in self.katalog.evals.all()
+            ],
+        )
+
+    def test_aenderungen_am_entwurf_beruehren_die_vorgaengerin_nicht(self) -> None:
+        """Gespeicherte Eingaben im neuen Entwurf bleiben in ihm."""
+        self.client.post(self.url)
+        entwurf: Evalkatalog = Evalkatalog.objects.get(
+            zustand=Evalkatalog.Zustand.ENTWURF
+        )
+        eval_: Eval = entwurf.evals.get()
+
+        self.client.post(
+            reverse("simulation:evalkatalog_eval", args=[entwurf.pk, eval_.pk]),
+            {f"eval-{eval_.pk}": "Umbenannt"},
+        )
+
+        self.assertEqual(entwurf.evals.get().name, "Umbenannt")
+        self.assertEqual(self.katalog.evals.get().name, "Ergänzt")
+
+    def test_bei_bestehendem_entwurf_wird_keine_neue_fassung_abgeleitet(
+        self,
+    ) -> None:
+        """Ein zweiter Entwurf wird mit Meldung abgelehnt."""
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+
+        response: HttpResponse = self.client.post(self.url, follow=True)
+
+        self.assertRedirects(response, reverse("simulation:evalkatalog"))
+        self.assertContains(response, "Ein Evalkatalog-Entwurf existiert bereits.")
+        self.assertEqual(
+            list(Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.ENTWURF)),
+            [entwurf],
+        )
+
+    def test_bei_bestehendem_entwurf_bieten_die_seiten_keine_neue_fassung_an(
+        self,
+    ) -> None:
+        """Übersicht und Lese-Ansicht führen dann zum Entwurf statt abzuleiten."""
+        self.katalog.bearbeiten()
+
+        for url in (
+            reverse("simulation:evalkatalog"),
+            reverse("simulation:evalkatalog_editor", args=[self.katalog.pk]),
+        ):
+            with self.subTest(url=url):
+                response: HttpResponse = self.client.get(url)
+
+                self.assertNotIn(
+                    "Neue Fassung", [text for text, _ in submit_knoepfe(response)]
+                )
+
+    def test_uebersicht_bietet_die_neue_fassung_an(self) -> None:
+        """Ohne Entwurf steht „Neue Fassung“ bei der finalen Fassung."""
+        response: HttpResponse = self.client.get(reverse("simulation:evalkatalog"))
+
+        self.assertIn("Neue Fassung", [text for text, _ in submit_knoepfe(response)])
+        self.assertContains(response, f'action="{self.url}"')
+
+    def test_neue_fassung_entsteht_nur_aus_der_finalen(self) -> None:
+        """Entwürfe und überholte Fassungen erreicht die Route nicht."""
+        entwurf: Evalkatalog = self.katalog.bearbeiten()
+        self.assertEqual(
+            self.client.post(
+                reverse("simulation:evalkatalog_neue_fassung", args=[entwurf.pk])
+            ).status_code,
+            404,
+        )
+        entwurf.finalisieren()
+
+        self.assertEqual(self.client.post(self.url).status_code, 404)
+        self.assertEqual(Evalkatalog.objects.count(), 2)
 
 
 class EvalkatalogFinalisierenTests(TestCase):
@@ -1162,6 +1431,7 @@ class EvalkatalogZugriffTests(TestCase):
             reverse("simulation:evalkatalog_editor", args=[katalog.pk]),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
             reverse("simulation:evalkatalog_finalisieren", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_neue_fassung", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterien", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
             reverse(
@@ -1208,6 +1478,7 @@ class EvalkatalogZugriffTests(TestCase):
             reverse("simulation:evalkatalog_anlegen"),
             reverse("simulation:evalkatalog_verwerfen", args=[katalog.pk]),
             reverse("simulation:evalkatalog_finalisieren", args=[katalog.pk]),
+            reverse("simulation:evalkatalog_neue_fassung", args=[katalog.pk]),
             reverse("simulation:evalkatalog_kriterium_anlegen", args=[katalog.pk]),
             reverse(
                 "simulation:evalkatalog_kriterium_loeschen",

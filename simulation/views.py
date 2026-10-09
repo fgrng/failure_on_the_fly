@@ -230,6 +230,9 @@ def evalkatalog(request: HttpRequest) -> HttpResponse:
                 zustand=Evalkatalog.Zustand.ENTWURF
             ).first(),
             "finale_fassung": Evalkatalog.objects.finale_fassung(),
+            "ueberholte_fassungen": Evalkatalog.objects.filter(
+                zustand=Evalkatalog.Zustand.ARCHIVIERT
+            ).order_by("-finalisiert_am", "-pk"),
             # Dieselbe Bedingung, die die Anlege-Naht prüft.
             "katalog_fehlt": not Evalkatalog.objects.exists(),
         },
@@ -268,19 +271,41 @@ def _platzhalterknoepfe(
     ]
 
 
-def _katalog_entwurf(pk: int) -> Evalkatalog:
-    # Die Bearbeitungsrouten erreichen nur Entwürfe.
+def _katalog_entwurf(pk: int, *, lesend: bool = False) -> Evalkatalog:
+    # Die Bearbeitungsrouten erreichen nur Entwürfe; lesend zeigen die Knoten
+    # auch finale und überholte Fassungen.
 
-    return get_object_or_404(
-        Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.ENTWURF),
-        pk=pk,
-    )
+    fassungen: QuerySet[Evalkatalog] = Evalkatalog.objects.all()
+    if not lesend:
+        fassungen = fassungen.filter(zustand=Evalkatalog.Zustand.ENTWURF)
+    return get_object_or_404(fassungen, pk=pk)
+
+
+def _lesend(request: HttpRequest) -> bool:
+    # Nur ein POST schreibt; jeder andere Aufruf eines Knotens liest.
+
+    return request.method != "POST"
+
+
+def _editor_kontext(katalog: Evalkatalog, knoten: str) -> dict[str, object]:
+    # Was jeder Knoten braucht; außerhalb von Entwürfen sind die Felder
+    # gesperrt und die Bearbeitungsknöpfe fehlen.
+
+    return {
+        "katalog": katalog,
+        "knoten": knoten,
+        "gesperrt": katalog.zustand != Evalkatalog.Zustand.ENTWURF,
+        "neue_fassung_moeglich": katalog.zustand == Evalkatalog.Zustand.FINAL
+        and not Evalkatalog.objects.filter(
+            zustand=Evalkatalog.Zustand.ENTWURF
+        ).exists(),
+    }
 
 
 @administratorin_erforderlich
 def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
-    """Bearbeitet den Knoten Durchlauf und Vorlagen eines Katalog-Entwurfs."""
-    katalog: Evalkatalog = _katalog_entwurf(pk)
+    """Zeigt den Knoten Durchlauf und Vorlagen; speichert nur in Entwürfe."""
+    katalog: Evalkatalog = _katalog_entwurf(pk, lesend=_lesend(request))
     form: EvalkatalogDurchlaufForm
     if request.method == "POST":
         form = EvalkatalogDurchlaufForm(request.POST, instance=katalog)
@@ -290,12 +315,15 @@ def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
             return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
     else:
         form = EvalkatalogDurchlaufForm(instance=katalog)
+    kontext: dict[str, object] = _editor_kontext(katalog, "durchlauf")
+    if kontext["gesperrt"]:
+        for feld in form.fields.values():
+            feld.disabled = True
     return render(
         request,
         "simulation/evalkatalog_editor.html",
         {
-            "katalog": katalog,
-            "knoten": "durchlauf",
+            **kontext,
             "form": form,
             "vorlagen": [
                 (
@@ -388,8 +416,8 @@ def _listenzeilen(
 @administratorin_erforderlich
 @transaction.atomic
 def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt und speichert den Knoten Übergreifende Kriterien eines Entwurfs."""
-    katalog: Evalkatalog = _katalog_entwurf(pk)
+    """Zeigt den Knoten Übergreifende Kriterien; speichert nur in Entwürfe."""
+    katalog: Evalkatalog = _katalog_entwurf(pk, lesend=_lesend(request))
     if request.method == "POST":
         _eingaben_uebernehmen(katalog, request)
         messages.success(request, "Übergreifende Kriterien gespeichert.")
@@ -398,8 +426,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         "simulation/evalkatalog_editor.html",
         {
-            "katalog": katalog,
-            "knoten": "kriterien",
+            **_editor_kontext(katalog, "kriterien"),
             "zeilen": _listenzeilen(
                 katalog.uebergreifende_kriterien.all(),
                 "kriterium",
@@ -466,10 +493,12 @@ def evalkatalog_kriterium_verschieben(
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
-def _eval_im_entwurf(pk: int, eval_pk: int) -> tuple[Evalkatalog, Eval]:
-    # Das Eval muss zum genannten Entwurf gehören.
+def _eval_im_entwurf(
+    pk: int, eval_pk: int, *, lesend: bool = False
+) -> tuple[Evalkatalog, Eval]:
+    # Das Eval muss zum genannten Entwurf gehören (lesend: zur Fassung).
 
-    katalog: Evalkatalog = _katalog_entwurf(pk)
+    katalog: Evalkatalog = _katalog_entwurf(pk, lesend=lesend)
     return katalog, get_object_or_404(katalog.evals, pk=eval_pk)
 
 
@@ -487,8 +516,8 @@ def evalkatalog_eval_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
 @administratorin_erforderlich
 @transaction.atomic
 def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpResponse:
-    """Zeigt und speichert den Knoten eines Evals samt seiner Evalkriterien."""
-    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    """Zeigt den Knoten eines Evals samt Evalkriterien; speichert nur in Entwürfe."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk, lesend=_lesend(request))
     if request.method == "POST":
         _eingaben_uebernehmen(katalog, request)
         messages.success(request, "Das Eval wurde gespeichert.")
@@ -498,8 +527,7 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
         request,
         "simulation/evalkatalog_editor.html",
         {
-            "katalog": katalog,
-            "knoten": "eval",
+            **_editor_kontext(katalog, "eval"),
             "eval": eval_,
             "eval_erstes": eval_ == evals[0],
             "eval_letztes": eval_ == evals[-1],
@@ -586,11 +614,12 @@ def evalkatalog_evalkriterium_verschieben(
 
 
 def _evalinput_im_entwurf(
-    pk: int, eval_pk: int, input_pk: int
+    pk: int, eval_pk: int, input_pk: int, *, lesend: bool = False
 ) -> tuple[Evalkatalog, Eval, Evalinput]:
-    # Der Evalinput muss zum genannten Eval des Entwurfs gehören.
+    # Der Evalinput muss zum genannten Eval des Entwurfs gehören (lesend: der
+    # Fassung).
 
-    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk, lesend=lesend)
     return katalog, eval_, get_object_or_404(eval_.inputs, pk=input_pk)
 
 
@@ -623,8 +652,10 @@ def evalkatalog_evalinput_anlegen(
 def evalkatalog_evalinput(
     request: HttpRequest, pk: int, eval_pk: int, input_pk: int
 ) -> HttpResponse:
-    """Zeigt und speichert einen Evalinput als Drehbuch seiner Inputschritte."""
-    katalog, eval_, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
+    """Zeigt einen Evalinput als Drehbuch; speichert nur in Entwürfe."""
+    katalog, eval_, evalinput = _evalinput_im_entwurf(
+        pk, eval_pk, input_pk, lesend=_lesend(request)
+    )
     if request.method == "POST":
         _eingaben_uebernehmen(katalog, request)
         messages.success(request, "Der Evalinput wurde gespeichert.")
@@ -634,8 +665,7 @@ def evalkatalog_evalinput(
         request,
         "simulation/evalkatalog_editor.html",
         {
-            "katalog": katalog,
-            "knoten": "evalinput",
+            **_editor_kontext(katalog, "evalinput"),
             "eval": eval_,
             "evalinput": evalinput,
             "nummer": list(eval_.inputs.all()).index(evalinput) + 1,
@@ -737,6 +767,21 @@ def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
         request, "Der Evalkatalog ist final. Jeder Evallauf prüft ab jetzt gegen ihn."
     )
     return redirect("simulation:evalkatalog")
+
+
+@administratorin_erforderlich
+@require_POST
+def evalkatalog_neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
+    """Leitet aus der finalen Fassung einen Entwurf ab und öffnet seinen Editor."""
+    katalog: Evalkatalog = get_object_or_404(
+        Evalkatalog.objects.filter(zustand=Evalkatalog.Zustand.FINAL), pk=pk
+    )
+    try:
+        entwurf: Evalkatalog = katalog.bearbeiten()
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("simulation:evalkatalog")
+    return redirect("simulation:evalkatalog_editor", pk=entwurf.pk)
 
 
 @administratorin_erforderlich
