@@ -796,7 +796,10 @@ Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die
 private Item-Bibliothek. Dort legen sie Freitext- oder Likert-Items zunächst als
 Entwurf an und finalisieren sie, sobald ihr Wortlaut feststeht. Finale Fassungen
 sind unveränderlich und für Erhebungen einbindbar; eine neue Fassung erzeugt
-stattdessen einen bearbeitbaren Folgeentwurf. Finale Fassungen lassen sich
+stattdessen einen bearbeitbaren Folgeentwurf. Liegt in der Historie schon ein
+Entwurf, führt »Neue Fassung« zu diesem Entwurf. Eine überholte Fassung, die
+bereits eine nicht archivierte Nachfolgerin hat, bietet keine neue Fassung an;
+ein Versuch führt mit einer Meldung zurück auf ihre Detailansicht. Finale Fassungen lassen sich
 archivieren und bei Bedarf wieder entarchivieren; Entwürfe lassen sich physisch
 löschen. Lehnt das Item das Finalisieren oder Archivieren ab, etwa weil der
 Wortlaut fehlt, erscheint der Grund als Meldung auf der Detailansicht. Die Bibliothek zeigt Items aus dem eigenen Eigentümer-Kreis;

@@ -214,7 +214,7 @@ class FragebogenItemReversionierenViewTests(TestCase):
     def test_alte_finale_fassung_bietet_keine_weitere_reversionierung_an(
         self,
     ) -> None:
-        """Nur die neueste nichtarchivierte Fassung kann einen Entwurf erzeugen."""
+        """Eine überholte Fassung bietet keine neue Fassung an und legt keine an."""
         ada: Konto = _forschende("ada")
         alte_fassung: FragebogenItem = FragebogenItem.objects.anlegen(
             ada,
@@ -233,7 +233,14 @@ class FragebogenItemReversionierenViewTests(TestCase):
         )
 
         self.assertNotContains(detail, "Neue Fassung")
-        self.assertEqual(response.status_code, 404)
+        self.assertRedirects(
+            response, reverse("fragebogen_items:detail", args=[alte_fassung.pk])
+        )
+        self.assertFalse(
+            FragebogenItem.objects.filter(
+                historie=alte_fassung.historie, zustand=FragebogenItem.Zustand.ENTWURF
+            ).exists()
+        )
 
     def test_zeigt_archivierte_fassung(self) -> None:
         """Die Detailansicht einer vollständig archivierten Historie bleibt erreichbar."""
