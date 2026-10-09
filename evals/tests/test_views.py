@@ -404,10 +404,10 @@ def test_abgebrochener_lauf_zeigt_das_fertige_und_das_ausstehende(ada: Konto) ->
 
     seite: str = _abgearbeitete_ansicht(ada)
 
-    assert "Abgebrochen" in seite
+    assert "Der Evallauf wurde abgebrochen." in seite
     assert "1 von 2" in seite
     assert "1 noch nicht ausgeführt" in seite
-    assert "<dd>Bestanden</dd>" not in seite
+    assert "<dt>Gesamtergebnis</dt><dd>—</dd>" in seite
     assert "Unvollständig" not in seite
 
 
@@ -446,5 +446,5 @@ def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
     call_command("evallaeufe_abarbeiten", "--einmal")
 
     seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
-    assert "Abgebrochen" in seite
+    assert "Der Evallauf wurde abgebrochen." in seite
     assert "1 von 2" in seite and "1 noch nicht ausgeführt" in seite

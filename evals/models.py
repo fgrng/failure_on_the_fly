@@ -3,6 +3,7 @@
 Quote und Bestehen sind abgeleitet und werden nie gespeichert.
 """
 
+from collections import Counter
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
@@ -197,17 +198,18 @@ class Evallauf(models.Model):
         ohne_urteil=0, k=3)``, und sie besteht nicht.
         """
 
-        # Je Zelle die Zahl der Urteile erfüllt, nicht erfüllt, ohne Urteil.
-        zaehler: dict[tuple[int, type[Kriterium], int], list[int]] = {}
-        for urteil in Urteil.objects.filter(gespraech__evallauf=self).select_related(
-            "gespraech"
-        ):
-            schluessel: tuple[int, type[Kriterium], int] = (
+        # Je Evalinput, Kriterium und Ausgang (erfüllt, nicht erfüllt, ohne
+        # Urteil) die Zahl der Urteile.
+        zaehler: Counter[tuple[int, type[Kriterium], int, bool | None]] = Counter(
+            (
                 urteil.gespraech.evalinput_id,
                 *urteil.kriterium_schluessel,
+                urteil.erfuellt,
             )
-            stand: list[int] = zaehler.setdefault(schluessel, [0, 0, 0])
-            stand[{True: 0, False: 1, None: 2}[urteil.erfuellt]] += 1
+            for urteil in Urteil.objects.filter(
+                gespraech__evallauf=self
+            ).select_related("gespraech")
+        )
         ergebnisse: list[Evalergebnis] = []
         for eval_, kriterien in self.evals_mit_kriterien():
             zeilen: list[Inputzeile] = []
@@ -215,14 +217,18 @@ class Evallauf(models.Model):
             for nummer, evalinput in enumerate(eval_.inputs.all(), 1):
                 zellen: list[Zelle] = []
                 for kriterium in kriterien:
+                    schluessel: tuple[int, type[Kriterium], int] = (
+                        evalinput.pk,
+                        type(kriterium),
+                        kriterium.pk,
+                    )
                     zellen.append(
                         Zelle(
                             kriterium.text,
-                            *zaehler.get(
-                                (evalinput.pk, type(kriterium), kriterium.pk),
-                                [0, 0, 0],
-                            ),
-                            self.katalog.k,
+                            erfuellt=zaehler[(*schluessel, True)],
+                            nicht_erfuellt=zaehler[(*schluessel, False)],
+                            ohne_urteil=zaehler[(*schluessel, None)],
+                            k=self.katalog.k,
                         )
                     )
                 zeilen.append(Inputzeile(nummer, evalinput.kuerzel, zellen))

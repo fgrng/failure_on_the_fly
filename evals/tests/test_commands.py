@@ -2,6 +2,7 @@
 
 import fcntl
 from datetime import UTC, datetime
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -128,15 +129,18 @@ def test_zweiter_prozess_laesst_aktiven_lauf_und_warteschlange_unberuehrt(
     _verwaist(aktiv)
     wartend: Evallauf = _ausgeloest(ada, "Wartend", _AUSGELOEST.replace(minute=5))
 
+    meldung: StringIO = StringIO()
+
     with eigene_sperrdatei.open("a") as sperre:
         fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        call_command("evallaeufe_abarbeiten", "--einmal")
+        call_command("evallaeufe_abarbeiten", "--einmal", stderr=meldung)
 
     aktiv.refresh_from_db()
     wartend.refresh_from_db()
-    assert (aktiv.zustand, wartend.zustand) == (
+    assert (aktiv.zustand, wartend.zustand, meldung.getvalue()) == (
         Evallauf.Zustand.LAEUFT,
         Evallauf.Zustand.WARTET,
+        "Ein anderer Hintergrundprozess arbeitet bereits.\n",
     )
 
 
