@@ -6,7 +6,7 @@ from unittest import mock
 
 import time_machine
 
-from simulation.sprachmodell import Antwort, FakeSprachmodell, nachrichten_bauen
+from simulation.sprachmodell import FakeSprachmodell, nachrichten_bauen
 
 
 @contextmanager
@@ -25,7 +25,7 @@ def _vor_jedem_aufruf(
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
         timeout: float,
-    ) -> Antwort:
+    ) -> dict[str, object]:
         # Erst der Testadapter, dann antwortet der echte Fake.
         vorher(nachrichten_bauen(system_prompt, user_prompt, verlauf, eingabe))
         return echte_antworten(

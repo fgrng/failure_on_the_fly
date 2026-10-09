@@ -6,11 +6,16 @@ from unittest.mock import Mock, patch
 import pytest
 from litellm import ContentPolicyViolationError
 
-from simulation import SPRACHMODELL_FRIST_SEKUNDEN, antwort_versuchen
+from simulation import (
+    SPRACHMODELL_FRIST_SEKUNDEN,
+    antwort_versuchen,
+    ausgabe_versuchen,
+)
 from simulation.models import Anbieter, ModellKonfiguration, Simulationskern
 from simulation.sprachmodell import (
-    AUSGABE_SCHEMA,
-    Antwort,
+    BEWERTER_SCHEMA,
+    LEHRPERSON_SCHEMA,
+    SCHUELERIN_SCHEMA,
     ContentFilter,
     Formatbruch,
     LiteLLMSprachmodell,
@@ -35,11 +40,15 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
     antwort = LiteLLMSprachmodell(
         "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
     ).antworten(
-        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+        "System",
+        "Kontext",
+        [],
+        "Eingabe",
+        SCHUELERIN_SCHEMA,
+        SPRACHMODELL_FRIST_SEKUNDEN,
     )
 
-    assert antwort.denkspur == "Ich addiere."
-    assert antwort.aeusserung == "2/5."
+    assert antwort == {"denkspur": "Ich addiere.", "aeusserung": "2/5."}
     completion.assert_called_once_with(
         model="anthropic/claude-opus-4-8",
         messages=[
@@ -51,7 +60,7 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
             "type": "json_schema",
             "json_schema": {
                 "name": "simulation_antwort",
-                "schema": AUSGABE_SCHEMA,
+                "schema": SCHUELERIN_SCHEMA,
                 "strict": True,
             },
         },
@@ -83,7 +92,7 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
             ("Und warum so?", "Weil es so passt."),
         ],
         "Stimmt das denn?",
-        AUSGABE_SCHEMA,
+        SCHUELERIN_SCHEMA,
         SPRACHMODELL_FRIST_SEKUNDEN,
     )
 
@@ -118,10 +127,15 @@ def test_litellm_adapter_reicht_native_reasoning_felder_nicht_durch(
     )
 
     antwort = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-        "System", "Kontext", [], "Eingabe", AUSGABE_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+        "System",
+        "Kontext",
+        [],
+        "Eingabe",
+        SCHUELERIN_SCHEMA,
+        SPRACHMODELL_FRIST_SEKUNDEN,
     )
 
-    assert antwort == Antwort(denkspur="Ich addiere.", aeusserung="2/5.")
+    assert antwort == {"denkspur": "Ich addiere.", "aeusserung": "2/5."}
 
 
 def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> None:
@@ -178,7 +192,7 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
             "Kontext",
             [],
             "Eingabe",
-            AUSGABE_SCHEMA,
+            SCHUELERIN_SCHEMA,
             SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
@@ -200,7 +214,7 @@ def test_litellm_adapter_kennzeichnet_content_policy_exception_als_filter() -> N
             "Kontext",
             [],
             "Eingabe",
-            AUSGABE_SCHEMA,
+            SCHUELERIN_SCHEMA,
             SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
@@ -216,7 +230,7 @@ def test_litellm_adapter_kennzeichnet_fehlende_antworthuelle_als_formatbruch() -
             "Kontext",
             [],
             "Eingabe",
-            AUSGABE_SCHEMA,
+            SCHUELERIN_SCHEMA,
             SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
@@ -245,7 +259,93 @@ def test_litellm_adapter_kennzeichnet_zusaetzliches_feld_als_formatbruch() -> No
             "Kontext",
             [],
             "Eingabe",
-            AUSGABE_SCHEMA,
+            SCHUELERIN_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
+        )
+
+
+def _completion_mit(inhalt: str) -> Mock:
+    # Liefert den Inhalt als einzige Modellantwort, ohne das Netz zu berühren.
+
+    return Mock(
+        return_value=SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=inhalt))]
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("ausgabe_schema", "inhalt", "erwartet"),
+    [
+        (LEHRPERSON_SCHEMA, '{"aeusserung": "Warum?"}', {"aeusserung": "Warum?"}),
+        (
+            BEWERTER_SCHEMA,
+            '{"begruendung": "Muster gezeigt.", "erfuellt": false}',
+            {"begruendung": "Muster gezeigt.", "erfuellt": False},
+        ),
+    ],
+)
+def test_litellm_adapter_liefert_das_objekt_des_uebergebenen_schemas(
+    ausgabe_schema: dict[str, object], inhalt: str, erwartet: dict[str, object]
+) -> None:
+    """Lehrperson und Bewerter reisen über dieselbe Naht wie die Schüler:in."""
+
+    completion: Mock = _completion_mit(inhalt)
+
+    ausgabe = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
+        "System", "Kontext", [], "Eingabe", ausgabe_schema, SPRACHMODELL_FRIST_SEKUNDEN
+    )
+
+    assert ausgabe == erwartet
+    response_format = completion.call_args.kwargs["response_format"]
+    assert response_format["json_schema"]["schema"] == ausgabe_schema
+
+
+def test_bewerter_schema_fordert_die_begruendung_vor_dem_urteil_an() -> None:
+    """Das Modell wägt erst ab und entscheidet dann."""
+
+    assert list(BEWERTER_SCHEMA["properties"]) == ["begruendung", "erfuellt"]
+
+
+@pytest.mark.parametrize(
+    "inhalt",
+    [
+        '{"begruendung": "Muster gezeigt."}',
+        '{"begruendung": "Muster gezeigt.", "erfuellt": "true"}',
+        '{"begruendung": "Muster gezeigt.", "erfuellt": true, "extra": 1}',
+        '{"begruendung": 3, "erfuellt": true}',
+    ],
+)
+def test_litellm_adapter_verwirft_ausgabe_neben_dem_bewerter_schema(
+    inhalt: str,
+) -> None:
+    """Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch."""
+
+    with pytest.raises(Formatbruch) as exc_info:
+        LiteLLMSprachmodell("openai/gpt-test", {}, _completion_mit(inhalt)).antworten(
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            BEWERTER_SCHEMA,
+            SPRACHMODELL_FRIST_SEKUNDEN,
+        )
+
+    assert exc_info.value.rohantwort == inhalt
+
+
+def test_litellm_adapter_verwirft_falsch_typisierte_aeusserung() -> None:
+    """Auch eine Lehrperson muss ihre Äußerung als Text liefern."""
+
+    with pytest.raises(Formatbruch):
+        LiteLLMSprachmodell(
+            "openai/gpt-test", {}, _completion_mit('{"aeusserung": ["Warum?"]}')
+        ).antworten(
+            "System",
+            "Kontext",
+            [],
+            "Eingabe",
+            LEHRPERSON_SCHEMA,
             SPRACHMODELL_FRIST_SEKUNDEN,
         )
 
@@ -425,6 +525,38 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
         "Anbieterfehler",
         "Anbieterfehler",
     ]
+
+
+def test_ausgabe_versuchen_teilt_die_frist_auch_fuer_den_bewerter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lehrperson und Bewerter teilen sich dieselbe Frist je Versuchsfolge."""
+
+    uhr = _Testuhr()
+    monkeypatch.setattr("simulation.time.monotonic", uhr)
+    completion = _haengender_anbieter(uhr, 54.0)
+
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        ausgabeversuch = ausgabe_versuchen(
+            "Du bewertest.",
+            "Kriterium",
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+                parameter={},
+            ),
+            verlauf=[],
+            eingabe="Verlauf",
+            ausgabe_schema=BEWERTER_SCHEMA,
+        )
+
+    assert ausgabeversuch.ausgabe is None
+    assert [aufruf.kwargs["timeout"] for aufruf in completion.call_args_list] == [
+        90.0,
+        36.0,
+    ]
+    assert len(ausgabeversuch.fehlversuche) == 3
 
 
 def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(

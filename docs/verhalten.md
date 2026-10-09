@@ -309,24 +309,27 @@ Bezeichnung angelegt wurden, heißen »<Sprachmodell> (Nr. <Nummer>)«. Der
 Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —, der
 Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
-Modellverhaltens auf, bei `fake` ausschließlich das Skript. Im Editor schlägt
-neben dem Sprachmodell der Knopf „Modelle und Basis-URL laden“ die Modelle des
-gewählten Anbieters vor: bei `openrouter` die mit Structured Output, bei
-`infomaniak` die Sprachmodelle des Kontos. Die beiden unterscheiden sich darin,
-was der Abruf verlangt: `openrouter` beantwortet seine Modellliste öffentlich,
-ganz ohne Zugangsdaten, `infomaniak` erst gegen das im Formular eingetippte
-Token — weder eine gespeicherte Fassung noch die Basis-URL sind dafür nötig. Bei
-`fake` erscheint der Knopf nicht; dieser Anbieter telefoniert nicht nach außen.
-Bei `infomaniak` füllt derselbe Druck zusätzlich die Basis-URL: Aus der
-Produktabfrage des Kontos entsteht die Endpunktwurzel des Sprachmodells. Sie
-entsteht nur bei genau einem AI-Produkt — ein geratenes wäre schlimmer als ein
-leeres Feld — und überschreibt nie eine schon getippte Angabe. Die Liste wird
-nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie nicht kennt,
-ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei überschreibbar.
-Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste führt, kann an
-dieser Naht trotzdem scheitern, und was sie nicht führt, kann laufen. Die
-prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches Modell,
-bevor es eine Erhebung erreicht. Aktiv ist je Verwendung (Schüler:in,
+Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
+`skript_fortlesen`: Ohne ihn beginnt das Skript bei jedem Antwortversuch von
+vorn, mit ihm liest es eine zusammenhängende Ausführung wie ein Evallauf über
+alle Aufrufe derselben Konfiguration fort; jede neue Ausführung beginnt wieder
+vorn. Im Editor schlägt neben dem Sprachmodell der Knopf „Modelle und Basis-URL
+laden“ die Modelle des gewählten Anbieters vor: bei `openrouter` die mit
+Structured Output, bei `infomaniak` die Sprachmodelle des Kontos. Die beiden
+unterscheiden sich darin, was der Abruf verlangt: `openrouter` beantwortet seine
+Modellliste öffentlich, ganz ohne Zugangsdaten, `infomaniak` erst gegen das im
+Formular eingetippte Token — weder eine gespeicherte Fassung noch die Basis-URL
+sind dafür nötig. Bei `fake` erscheint der Knopf nicht; dieser Anbieter
+telefoniert nicht nach außen. Bei `infomaniak` füllt derselbe Druck zusätzlich
+die Basis-URL: Aus der Produktabfrage des Kontos entsteht die Endpunktwurzel des
+Sprachmodells. Sie entsteht nur bei genau einem AI-Produkt — ein geratenes wäre
+schlimmer als ein leeres Feld — und überschreibt nie eine schon getippte Angabe.
+Die Liste wird nur auf Druck geholt und bleibt ein Vorschlag — ein Name, den sie
+nicht kennt, ist weiterhin eintragbar, und die eingesetzte Wurzel ist frei
+überschreibbar. Über die Tauglichkeit sagt der Vorschlag nichts: Was die Liste
+führt, kann an dieser Naht trotzdem scheitern, und was sie nicht führt, kann
+laufen. Die prüfende Instanz bleibt der Probelauf — er entlarvt ein untaugliches
+Modell, bevor es eine Erhebung erreicht. Aktiv ist je Verwendung (Schüler:in,
 Lehrperson, Bewerter) höchstens eine Konfiguration; dieselbe darf mehreren
 Verwendungen dienen, und eine einmal belegte Verwendung bleibt belegt.
 Sitzungen, Probelauf, Training und der Pin der Erhebung lesen allein die
