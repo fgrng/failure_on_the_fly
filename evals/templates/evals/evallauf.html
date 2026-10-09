@@ -5,6 +5,9 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vignette-form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/evalkatalog.css' %}">
+    <link rel="stylesheet" href="{% static 'css/evallauf.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -18,74 +21,114 @@
         <a class="button button--secondary" href="{% url 'vignetten:detail' vignette.pk %}">Zur Vignette</a>
     </header>
 
-    <section class="page-section" aria-labelledby="evallauf-zustand">
-        <header class="page-section__head">
-            <b>01</b><span><h2 id="evallauf-zustand">Zustand</h2><small>Der jüngste Evallauf dieser Fassung</small></span>
-        </header>
-        {% if lauf %}
-            <dl class="field-grid field-grid--three">
-                <div><dt>Zustand</dt><dd>{{ lauf.get_zustand_display }}</dd></div>
-                <div><dt>Ausgelöst</dt><dd>{{ lauf.ausgeloest_am|date:"d.m.Y H:i" }}</dd></div>
-                <div><dt>Gestartet</dt><dd>{{ lauf.gestartet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
-                <div><dt>Beendet</dt><dd>{{ lauf.beendet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
-                <div><dt>Wiederholungen je Evalinput</dt><dd>{{ lauf.katalog.k }}</dd></div>
-                <div><dt>Gesamtergebnis</dt><dd>{% if lauf.zustand == "fertig" %}{% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}{% else %}—{% endif %}</dd></div>
-            </dl>
-            {% if lauf.unvollstaendig %}
-                <p class="system-page-hint">Unvollständig: Mindestens ein Kriterium blieb ohne Urteil, weil Lehrperson oder Bewerter nichts Auswertbares lieferten. Ein neuer Evallauf lohnt.</p>
-            {% endif %}
-            {% if lauf.zustand == "abgebrochen" %}
-                <p class="system-page-hint">Der Evallauf wurde abgebrochen. Was bis dahin fertig war, bleibt lesbar; nicht ausgeführte Wiederholungen werden nicht fortgesetzt, ein neuer Evallauf beginnt von vorn.</p>
-            {% endif %}
-        {% else %}
-            <p>Für diese Fassung gibt es noch keinen Evallauf.</p>
-        {% endif %}
-        <div class="vignette-detail-actions">
-            {% if startbar %}
-                <form method="post" action="{% url 'evals:starten' vignette.pk %}">
-                    {% csrf_token %}
-                    <button class="button" type="submit">Evallauf starten</button>
-                </form>
-            {% elif lauf.ist_offen %}
-                <small class="system-page-hint">Der Evallauf wird im Hintergrund ausgeführt; die Seite darf geschlossen werden.</small>
-                <a class="button button--secondary" href="{% url 'evals:evallauf' vignette.pk %}">Stand neu laden</a>
-            {% endif %}
-        </div>
-    </section>
+    {% comment %}
+        Ohne Lauf und solange er wartet oder läuft, stehen Zustand und Aktion
+        oben; ein abgeschlossener Lauf steht als Fußzeile unter den Ergebnissen
+        (Prototyp #296, Variante C).
+    {% endcomment %}
+    {% if not lauf or lauf.ist_offen %}
+        <section class="evallauf-kopf" aria-label="Evallauf">
+            {% include "evals/includes/evallauf_zeile.html" %}
+        </section>
+    {% endif %}
 
-    {% if lauf and lauf.zustand != "wartet" %}
-        {% for ergebnis in uebersicht %}
-            <section class="page-section" aria-label="Eval {{ ergebnis.name }}">
-                <header class="page-section__head">
-                    <b>{{ forloop.counter|add:1|stringformat:"02d" }}</b><span><h2>{{ ergebnis.name }}</h2><small>Je Evalinput und Kriterium: Quote und Bestehen</small></span>
-                </header>
-                <div class="table-wrap">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Evalinput</th>
-                                {% for kriterium in ergebnis.kriterien %}<th>{{ kriterium }}</th>{% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for zeile in ergebnis.zeilen %}
-                                <tr>
-                                    <th>Evalinput {{ zeile.nummer }} <small>{{ zeile.kuerzel }}</small></th>
+    {% if lauf and lauf.zustand != "wartet" and einsicht %}
+        <div class="evalkatalog-editor evallauf-einsicht">
+            <nav class="evalkatalog-baum evallauf-inputs" aria-label="Evalinputs">
+                <h2>Evalinputs</h2>
+                <p class="evalkatalog-hinweis">Bestanden bei {{ lauf.katalog.k }} von {{ lauf.katalog.k }}.</p>
+                {% for ergebnis in uebersicht %}
+                    <h3 class="evalkatalog-baum__titel">{{ ergebnis.name }}</h3>
+                    <ul aria-label="Evalinputs von {{ ergebnis.name }}">
+                        {% for zeile in ergebnis.zeilen %}
+                            <li>
+                                <a href="{% url 'evals:evallauf' vignette.pk %}?input={{ zeile.evalinput }}"{% if zeile.evalinput == einsicht.evalinput.pk %} aria-current="page"{% endif %}>
+                                    <strong>Evalinput {{ zeile.nummer }}</strong> <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ zeile.kuerzel }}</span>
                                     {% for zelle in zeile.zellen %}
-                                        <td>
-                                            {{ zelle.erfuellt }} von {{ zelle.k }} ·
-                                            {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}
-                                            {% if zelle.ohne_urteil %}<small>({{ zelle.ohne_urteil }} ohne Urteil)</small>{% endif %}
-                                            {% if zelle.ausstehend %}<small>({{ zelle.ausstehend }} noch nicht ausgeführt)</small>{% endif %}
-                                        </td>
+                                        <span class="evallauf-quote">
+                                            <span>{{ zelle.kriterium }}</span>
+                                            <span class="{% if zelle.bestanden %}evallauf--erfuellt{% elif zelle.ohne_urteil or zelle.ausstehend %}evallauf--offen{% else %}evallauf--nicht-erfuellt{% endif %}">{{ zelle.erfuellt }} von {{ zelle.k }} · {% if zelle.bestanden %}bestanden{% else %}nicht bestanden{% endif %}</span>
+                                            {% if zelle.ohne_urteil %}<small>{{ zelle.ohne_urteil }} ohne Urteil</small>{% endif %}
+                                            {% if zelle.ausstehend %}<small>{{ zelle.ausstehend }} noch nicht ausgeführt</small>{% endif %}
+                                        </span>
                                     {% endfor %}
-                                </tr>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+            </nav>
+
+            <article class="evalkatalog-knoten evallauf-gespraech" aria-labelledby="evallauf-gespraech-titel">
+                <header>
+                    <p class="evalkatalog-hinweis">{{ einsicht.eval_name }}</p>
+                    <h2 id="evallauf-gespraech-titel">Evalinput {{ einsicht.nummer }} <span class="evalkatalog-kuerzel" title="F fest, G gelenkt">{{ einsicht.evalinput.kuerzel }}</span></h2>
+                </header>
+                <form class="evallauf-wiederholung" method="get" action="{% url 'evals:evallauf' vignette.pk %}">
+                    <input type="hidden" name="input" value="{{ einsicht.evalinput.pk }}">
+                    <div class="vignette-field">
+                        <label for="evallauf-wiederholung">Wiederholung</label>
+                        <select id="evallauf-wiederholung" name="wiederholung">
+                            {% for zahl, ausgefuehrt in einsicht.wiederholungen %}
+                                <option value="{{ zahl }}"{% if zahl == einsicht.wiederholung %} selected{% endif %}>Wiederholung {{ zahl }}{% if not ausgefuehrt %} · nicht ausgeführt{% endif %}</option>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        {% endfor %}
+                        </select>
+                    </div>
+                    <button class="button button--secondary" type="submit">Anzeigen</button>
+                </form>
+
+                {% if einsicht.gespraech %}
+                    <ol class="evallauf-verlauf">
+                        {% for wechsel, schritt in einsicht.wechsel %}
+                            <li class="evallauf-blase evallauf-blase--lehrperson">
+                                <strong>Simulierte Lehrperson · Schritt {{ wechsel.position }} ({% if schritt.gelenkt %}gelenkt{% else %}fest{% endif %})</strong>
+                                <p>{{ wechsel.lehrperson_aeusserung }}</p>
+                            </li>
+                            <li class="evallauf-blase evallauf-blase--schuelerin">
+                                <strong>Simulierte Schüler:in</strong>
+                                {% if wechsel.aeusserung is None %}
+                                    <p class="evallauf--nicht-erfuellt">Keine Antwort: Antwortversuch endgültig gescheitert.</p>
+                                {% else %}
+                                    <p>{{ wechsel.aeusserung }}</p>
+                                    <details open><summary>Denkspur</summary><p>{{ wechsel.denkspur }}</p></details>
+                                {% endif %}
+                                {% if wechsel.fehlversuche %}
+                                    <details>
+                                        <summary>Fehlversuche · {{ wechsel.fehlversuche|length }}</summary>
+                                        <ol>
+                                            {% for fehlversuch in wechsel.fehlversuche %}
+                                                <li>{{ fehlversuch.grund }}{% if fehlversuch.rohantwort %}<pre>{{ fehlversuch.rohantwort }}</pre>{% endif %}</li>
+                                            {% endfor %}
+                                        </ol>
+                                    </details>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ol>
+
+                    <h3>Urteile</h3>
+                    <ul class="evallauf-urteile">
+                        {% for beurteilung in einsicht.beurteilungen %}
+                            <li class="evallauf-blase">
+                                {% with urteil=beurteilung.urteil %}
+                                    <strong class="{% if urteil.erfuellt %}evallauf--erfuellt{% elif urteil.erfuellt is False %}evallauf--nicht-erfuellt{% else %}evallauf--offen{% endif %}">{{ beurteilung.kriterium }} · {% if not urteil %}noch nicht beurteilt{% elif urteil.erfuellt %}erfüllt{% elif urteil.erfuellt is False %}nicht erfüllt{% else %}ohne Urteil{% endif %}</strong>
+                                    {% if urteil.begruendung %}<p>{{ urteil.begruendung }}</p>{% endif %}
+                                {% endwith %}
+                                <small>{% if beurteilung.uebergreifend %}Übergreifendes Kriterium{% else %}Evalkriterium{% endif %}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="evalkatalog-hinweis">Diese Wiederholung wurde {% if lauf.ist_offen %}noch {% endif %}nicht ausgeführt.</p>
+                {% endif %}
+            </article>
+        </div>
+    {% endif %}
+
+    {% if lauf and not lauf.ist_offen %}
+        <footer class="evallauf-fuss" aria-label="Angaben zum Evallauf">
+            {% include "evals/includes/evallauf_zeile.html" %}
+        </footer>
     {% endif %}
 </section>
 {% endblock %}

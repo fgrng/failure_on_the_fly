@@ -14,6 +14,15 @@ from vignetten.models import Vignette
 from .models import Evallauf
 
 
+def _zahl(wert: str | None) -> int | None:
+    # Eine Auswahl aus der Adresse; Unlesbares gilt als nicht gewählt.
+
+    try:
+        return int(wert or "")
+    except ValueError:
+        return None
+
+
 def _fassung_laden(request: HttpRequest, pk: int) -> Vignette:
     # Ohne verfügbare Evals gibt es die Route nicht; fremde Fassungen auch nicht.
 
@@ -25,11 +34,21 @@ def _fassung_laden(request: HttpRequest, pk: int) -> Vignette:
 @login_required
 @autorin_erforderlich
 def evallauf(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt Zustand und Übersicht des Evallaufs; neu laden aktualisiert den Stand."""
+    """Zeigt Zustand, Übersicht und ein gewähltes Evalgespräch des Evallaufs.
+
+    `input` und `wiederholung` wählen das Gespräch; neu laden aktualisiert den Stand.
+    """
 
     vignette: Vignette = _fassung_laden(request, pk)
     lauf: Evallauf | None = (
-        Evallauf.objects.filter(vignette=vignette).select_related("katalog").first()
+        Evallauf.objects.filter(vignette=vignette)
+        .select_related(
+            "katalog",
+            "schuelerin_konfiguration",
+            "lehrperson_konfiguration",
+            "bewerter_konfiguration",
+        )
+        .first()
     )
     return render(
         request,
@@ -38,6 +57,11 @@ def evallauf(request: HttpRequest, pk: int) -> HttpResponse:
             "vignette": vignette,
             "lauf": lauf,
             "uebersicht": lauf.uebersicht() if lauf else [],
+            "einsicht": lauf.einsicht(
+                _zahl(request.GET.get("input")), _zahl(request.GET.get("wiederholung"))
+            )
+            if lauf
+            else None,
             "startbar": vignette.zustand != Vignette.Zustand.ARCHIVIERT
             and (lauf is None or not lauf.ist_offen),
         },

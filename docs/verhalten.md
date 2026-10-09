@@ -513,14 +513,19 @@ Die Detailansicht einer Vignette nennt dann den Zustand ihres Evallaufs („noch
 keiner“, „Wartet“, „Läuft“, „Fertig“, „Abgebrochen“) und verlinkt mit „Evals
 ansehen“ die Ansicht unter `/evals/vignette/<Fassung>/`. Sie steht Mitgliedern
 des Eigentümer-Kreises und der Administration offen; fremde Fassungen ergeben
-404, Konten ohne Autor:innen-Rolle 403. Die Ansicht zeigt Zustand, Auslöse-,
-Start- und Endzeitpunkt und *k*. „Evallauf starten“ (POST) gibt es an Entwürfen
-und finalen Fassungen, solange kein Lauf wartet oder läuft; archivierte
-Fassungen sind nicht startbar. Während ein Lauf wartet oder läuft, steht statt
-des Knopfs der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu
-laden“; aktualisiert wird nur durch Neuladen. Eine abgewiesene Startprüfung
-führt mit Meldung zurück auf die Ansicht und lässt den bisherigen Lauf
-unberührt.
+404, Konten ohne Autor:innen-Rolle 403. Vignettentitel und Fassung im Seitenkopf
+geben den Kontext. Ohne Lauf und solange ein Lauf wartet oder läuft, stehen
+Zustand und Aktion oben: „Evallauf starten“ (POST) gibt es an Entwürfen und
+finalen Fassungen, solange kein Lauf wartet oder läuft; archivierte Fassungen
+sind nicht startbar. Während ein Lauf wartet oder läuft, steht statt des Knopfs
+der Hinweis, dass die Seite geschlossen werden darf, und „Stand neu laden“;
+aktualisiert wird nur durch Neuladen, ohne automatisches Polling. Ein fertiger
+oder abgebrochener Lauf steht dagegen als dezente Fußzeile unter den
+Ergebnissen: Zustand samt Gesamtergebnis, „Erneut prüfen“ als sekundäre Aktion
+und eingeklappt die „Angaben zum Lauf“ (Auslöse-, Start- und Endzeitpunkt, *k*,
+Simulationskern, Katalogfassung und die drei Konfigurationen). Eine abgewiesene
+Startprüfung führt mit Meldung zurück auf die Ansicht und lässt den bisherigen
+Lauf unberührt.
 
 Je Fassung gibt es höchstens einen Evallauf. Ein neuer Start ersetzt einen
 fertigen oder abgebrochenen Vorgänger samt seinen Gesprächen im selben Zug; ein
@@ -571,22 +576,37 @@ Bewerter nach allen Versuchen nichts Auswertbares, bleibt dieses Kriterium *ohne
 Urteil*. Liefert die Lehrperson nach allen Versuchen keine Äußerung, endet das
 Gespräch vor diesem Schritt, und alle seine Kriterien bleiben *ohne Urteil*.
 
-Die Ansicht zeigt je Eval eine Tabelle aus Evalinputs (mit der Folge ihrer
-Schritte, etwa „FFG“) und Kriterien, die übergreifenden eingeschlossen. Jede
-Zelle nennt Quote und Bestehen zusammen, etwa „2 von 3 · nicht bestanden“;
-bestanden ist eine Zelle nur, wenn alle *k* Urteile erfüllt sind. Dahinter
-stehen getrennt gezählt Kriterien ohne Urteil („1 ohne Urteil“) und
-Wiederholungen, die noch nicht oder wegen eines Abbruchs nie ausgeführt wurden
-(„1 noch nicht ausgeführt“). Ohne Urteil zählt weder als erfüllt noch als nicht
-erfüllt. Blieb mindestens ein Kriterium ohne Urteil, heißt der Lauf
-*unvollständig*, und die Ansicht empfiehlt einen neuen Lauf. Das
-„Gesamtergebnis“ lautet nur an einem fertigen Lauf „Bestanden“ oder „Nicht
-bestanden“, bestanden nur, wenn jede Zelle besteht; ein wartender, laufender
-oder abgebrochener Teilstand zeigt „—“, auch wenn jedes bisher geschriebene
-Urteil erfüllt ist. Ein abgebrochener Lauf zeigt seine fertigen Gespräche und
-Urteile weiter, mit dem Hinweis, dass ein neuer Lauf von vorn beginnt. Evalläufe
-erzeugen weder Teilnahme noch Sitzung und erscheinen weder in der Datenspur noch
-im Trainingsexport.
+Sobald ein Lauf nicht mehr wartet, zeigt die Ansicht zwei Spalten. Links stehen
+je Eval seine Evalinputs (mit der Folge ihrer Schritte, etwa „FFG“) und darunter
+je Kriterium, die übergreifenden eingeschlossen, Quote und Bestehen zusammen,
+etwa „2 von 3 · nicht bestanden“; bestanden ist ein Kriterium nur, wenn alle *k*
+Urteile erfüllt sind. Dahinter stehen getrennt gezählt Kriterien ohne Urteil („1
+ohne Urteil“) und Wiederholungen, die noch nicht oder wegen eines Abbruchs nie
+ausgeführt wurden („1 noch nicht ausgeführt“). Ohne Urteil zählt weder als
+erfüllt noch als nicht erfüllt. Jeder Evalinput ist ein Link; der gewählte ist
+markiert. Rechts steht das Evalgespräch des gewählten Evalinputs (`?input=`) in
+der gewählten Wiederholung (`?wiederholung=`, Auswahlfeld mit „Anzeigen“): die
+Äußerungen von Lehrperson (mit Schritt und Art) und Schüler:in in ihrer
+Reihenfolge, je Antwort die Denkspur, Fehlversuche mit Grund und Rohantwort, ein
+endgültig gescheiterter Antwortversuch als solcher, danach jedes Kriterium mit
+seinem Urteil („erfüllt“, „nicht erfüllt“, „ohne Urteil“, „noch nicht
+beurteilt“) und seiner Begründung. So lässt sich jedes Bewerterurteil fachlich
+nachprüfen; ändern lässt es sich hier nicht. Ohne Auswahl zeigt die Ansicht den
+ersten Evalinput und seine erste ausgeführte Wiederholung. Eine Wiederholung
+ohne Gespräch heißt „nicht ausgeführt“. Unlesbare Werte, ein Evalinput außerhalb
+des festgehaltenen Katalogs oder eine Wiederholung außerhalb 1 bis *k* weichen
+dieser Vorgabe; gesucht wird stets nur unter den Gesprächen des aktuellen Laufs
+der Fassung, sodass eine alte Adresse nach „Erneut prüfen“ den aktuellen Stand
+zeigt. Auf schmalem Hauptbereich stehen die Spalten untereinander. Blieb
+mindestens ein Kriterium ohne Urteil, heißt der Lauf *unvollständig*, und die
+Ansicht empfiehlt einen neuen Lauf. Ein Gesamtergebnis nennt nur ein fertiger
+Lauf („Fertig · Bestanden“ oder „Fertig · Nicht bestanden“), bestanden nur, wenn
+jedes Kriterium jedes Evalinputs besteht; ein wartender, laufender oder
+abgebrochener Teilstand nennt nur seinen Zustand, auch wenn jedes bisher
+geschriebene Urteil erfüllt ist. Ein abgebrochener Lauf zeigt seine fertigen
+Gespräche und Urteile weiter, mit dem Hinweis, dass ein neuer Lauf von vorn
+beginnt. Evalläufe erzeugen weder Teilnahme noch Sitzung und erscheinen weder in
+der Datenspur noch im Trainingsexport.
 
 ## Transkriptions-Konfiguration
 

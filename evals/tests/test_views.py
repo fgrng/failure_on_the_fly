@@ -139,8 +139,8 @@ def test_fertiger_lauf_zeigt_quote_und_bestehen(ada: Konto) -> None:
     seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
 
     assert "Fertig" in seite
-    assert "2 von 3" in seite and "nicht bestanden" in seite
-    assert "3 von 3" in seite
+    assert "2 von 3 · nicht bestanden" in seite
+    assert "3 von 3 · bestanden" in seite
 
 
 @pytest.mark.django_db
@@ -160,7 +160,7 @@ def test_gemischter_lauf_zeigt_seine_ergebnisse(ada: Konto) -> None:
     seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
 
     assert "FGF" in seite
-    assert seite.count("3 von 3") == 2
+    assert seite.count("3 von 3 · bestanden") == 2
 
 
 @pytest.mark.django_db
@@ -376,7 +376,7 @@ def test_fertiger_lauf_mit_fehlendem_urteil_ist_unvollstaendig_und_nicht_bestand
     assert "Fertig" in seite
     assert "1 ohne Urteil" in seite
     assert "Unvollständig" in seite
-    assert "<dd>Nicht bestanden</dd>" in seite
+    assert "Fertig · Nicht bestanden" in seite
 
 
 @pytest.mark.django_db
@@ -390,7 +390,7 @@ def test_fertiger_lauf_mit_allen_urteilen_erfuellt_besteht_insgesamt(
 
     seite: str = _abgearbeitete_ansicht(ada)
 
-    assert "<dd>Bestanden</dd>" in seite
+    assert "Fertig · Bestanden" in seite
     assert "Unvollständig" not in seite
 
 
@@ -407,7 +407,7 @@ def test_abgebrochener_lauf_zeigt_das_fertige_und_das_ausstehende(ada: Konto) ->
     assert "Der Evallauf wurde abgebrochen." in seite
     assert "1 von 2" in seite
     assert "1 noch nicht ausgeführt" in seite
-    assert "<dt>Gesamtergebnis</dt><dd>—</dd>" in seite
+    assert "Fertig ·" not in seite
     assert "Unvollständig" not in seite
 
 
@@ -423,7 +423,7 @@ def test_gescheiterte_schuelerin_ist_nicht_erfuellt_statt_unvollstaendig(
     seite: str = _abgearbeitete_ansicht(ada)
 
     assert "0 von 1" in seite
-    assert "<dd>Nicht bestanden</dd>" in seite
+    assert "Fertig · Nicht bestanden" in seite
     assert "Unvollständig" not in seite
 
 
@@ -448,3 +448,208 @@ def test_neustart_zeigt_den_verwaisten_lauf_abgebrochen_mit_dem_fertigen(
     seite: str = _client(ada).get(_ansicht(vignette)).content.decode()
     assert "Der Evallauf wurde abgebrochen." in seite
     assert "1 von 2" in seite and "1 noch nicht ausgeführt" in seite
+
+
+# Einsicht in die Evalgespräche: links Evalinputs, rechts das gewählte Gespräch.
+
+
+def _einsicht(ada: Konto, vignette: Vignette, **auswahl: object) -> str:
+    # Liest die Ansicht mit einer Auswahl aus Evalinput und Wiederholung.
+
+    return _client(ada).get(_ansicht(vignette), auswahl).content.decode()
+
+
+def _abgearbeitet(ada: Konto) -> Vignette:
+    # Startet über einer finalen Fassung und arbeitet den Lauf ab.
+
+    vignette: Vignette = finale_vignette(ada)
+    _starten(_client(ada), vignette)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+    return vignette
+
+
+def _evalinputs(vignette: Vignette) -> list[int]:
+    # Die Evalinputs des Laufs in Katalogreihenfolge.
+
+    return [
+        evalinput.pk
+        for eval_, _ in vignette.evallauf.evals_mit_kriterien()
+        for evalinput in eval_.inputs.all()
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_ohne_auswahl_zeigt_die_einsicht_das_erste_gespraech(ada: Konto) -> None:
+    """Verlauf, Denkspur und begründete Urteile der ersten Wiederholung."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+
+    seite: str = _einsicht(ada, vignette)
+
+    assert "Wie hast du gerechnet?" in seite and "Warum so?" in seite
+    assert "Antwort 1" in seite and "Denkspur 1" in seite
+    assert "Antwort 3" not in seite
+    assert "Begründung 1" in seite and "Begründung 2" in seite
+    assert 'aria-current="page"' in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_gewaehlte_wiederholung_zeigt_ihr_gespraech_und_urteil(ada: Konto) -> None:
+    """Die zweite Wiederholung mit ihrem nicht erfüllten Urteil samt Begründung."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+
+    seite: str = _einsicht(
+        ada, vignette, input=_evalinputs(vignette)[0], wiederholung=2
+    )
+
+    assert "Antwort 3" in seite and "Antwort 1" not in seite
+    assert "Muster gezeigt · nicht erfüllt" in seite
+    assert "Begründung 3" in seite
+    assert '<option value="2" selected>' in seite
+
+
+@pytest.mark.django_db
+def test_wechsel_des_evalinputs_bleibt_in_derselben_ansicht(ada: Konto) -> None:
+    """Der zweite Evalinput ist verlinkt und zeigt seine eigenen Gespräche."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=(), inputs=2)
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, False))
+    vignette: Vignette = _abgearbeitet(ada)
+    zweiter: int = _evalinputs(vignette)[1]
+
+    seite: str = _einsicht(ada, vignette, input=zweiter)
+
+    assert f'href="{_ansicht(vignette)}?input={zweiter}" aria-current="page"' in seite
+    assert "Antwort 2" in seite and "Antwort 1" not in seite
+    assert "Begründung 2" in seite
+
+
+@pytest.mark.django_db
+def test_gescheiterte_schuelerin_zeigt_fehlversuche_im_gespraech(ada: Konto) -> None:
+    """Ein Wechsel ohne Antwort nennt das Scheitern und jeden Fehlversuch."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=[{"fehler": "anbieterfehler"}] * 3)
+    vignette: Vignette = _abgearbeitet(ada)
+
+    seite: str = _einsicht(ada, vignette)
+
+    assert "Antwortversuch endgültig gescheitert" in seite
+    assert "Fehlversuche · 3" in seite
+    assert "Muster gezeigt · nicht erfüllt" in seite
+
+
+@pytest.mark.django_db
+def test_unvollstaendiger_lauf_zeigt_das_fehlende_urteil_im_gespraech(
+    ada: Konto,
+) -> None:
+    """Ein Kriterium ohne Urteil steht als solches im Gespräch."""
+
+    finaler_katalog(k=1, uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=[{"fehler": "formatbruch"}] * 3)
+    vignette: Vignette = _abgearbeitet(ada)
+
+    seite: str = _einsicht(ada, vignette)
+
+    assert "Muster gezeigt · ohne Urteil" in seite
+    assert "Unvollständig" in seite
+
+
+@pytest.mark.django_db
+def test_abgebrochener_lauf_nennt_die_nicht_ausgefuehrte_wiederholung(
+    ada: Konto,
+) -> None:
+    """Die erste Wiederholung bleibt lesbar, die zweite gibt es nicht."""
+
+    finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+    vignette: Vignette = _abgearbeitet(ada)
+    evalinput: int = _evalinputs(vignette)[0]
+
+    erste: str = _einsicht(ada, vignette, input=evalinput, wiederholung=1)
+    zweite: str = _einsicht(ada, vignette, input=evalinput, wiederholung=2)
+
+    assert "Antwort 1" in erste
+    assert "Muster gezeigt · erfüllt" in erste
+    assert "Antwort 1" not in zweite
+    assert "Diese Wiederholung wurde nicht ausgeführt." in zweite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+@pytest.mark.parametrize(
+    "auswahl",
+    [{"input": "x", "wiederholung": "y"}, {"wiederholung": 99}, {"input": 0}],
+    ids=["unlesbar", "wiederholung-ausserhalb", "fremder-input"],
+)
+def test_ungueltige_auswahl_zeigt_die_erste_wiederholung(
+    ada: Konto, auswahl: dict[str, object]
+) -> None:
+    """Was nicht zu diesem Lauf passt, weicht der Vorgabe statt zu scheitern."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+
+    seite: str = _einsicht(ada, vignette, **auswahl)
+
+    assert "Antwort 1" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_auswahl_erreicht_keine_gespraeche_einer_anderen_fassung(ada: Konto) -> None:
+    """Der Evalinput eines fremden Laufs zeigt nur Gespräche dieser Fassung."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+    andere: Vignette = vignetten_entwurf(ada)
+    _starten(_client(ada), andere)
+
+    seite: str = _einsicht(ada, andere, input=_evalinputs(vignette)[0])
+
+    assert "Antwort 1" not in seite
+    assert "Wartet" in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_ersetzter_lauf_zeigt_den_aktuellen_stand(ada: Konto) -> None:
+    """Eine alte Auswahl nach erneutem Prüfen führt auf den wartenden Lauf."""
+
+    vignette: Vignette = _abgearbeitet(ada)
+    evalinput: int = _evalinputs(vignette)[0]
+    _starten(_client(ada), vignette)
+
+    seite: str = _einsicht(ada, vignette, input=evalinput, wiederholung=2)
+
+    assert "Wartet" in seite
+    assert "Antwort 3" not in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_abgeschlossener_lauf_steht_als_fusszeile_unter_den_ergebnissen(
+    ada: Konto,
+) -> None:
+    """Zustand, Erneut prüfen und eingeklappte Angaben folgen dem Gespräch."""
+
+    seite: str = _einsicht(ada, _abgearbeitet(ada))
+
+    fuss: int = seite.index('<footer class="evallauf-fuss"')
+    assert seite.index("Antwort 1") < fuss
+    assert seite.index("Erneut prüfen") > fuss
+    assert seite.index("<summary>Angaben zum Lauf</summary>") > fuss
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_offener_lauf_steht_oben_ohne_fusszeile(ada: Konto) -> None:
+    """Wartet ein Lauf, stehen Zustand und Neuladen über den Ergebnissen."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+
+    seite: str = _starten(_client(ada), vignette).content.decode()
+
+    assert '<footer class="evallauf-fuss"' not in seite
+    assert "Erneut prüfen" not in seite

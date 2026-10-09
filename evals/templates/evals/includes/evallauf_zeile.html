@@ -1,0 +1,49 @@
+{% comment %}
+    Zustand des Evallaufs als knappe Zeile mit Aktion; darunter Hinweise und
+    die eingeklappten Angaben zum Lauf. Steht oben oder als Fußzeile.
+{% endcomment %}
+<div class="evallauf-zeile">
+    <p>
+        <span class="evallauf-zeile__marke">Evallauf</span>
+        {% if not lauf %}
+            <span>Noch nicht geprüft</span>
+        {% elif lauf.zustand == "fertig" %}
+            <span>Fertig · {% if lauf.bestanden %}Bestanden{% else %}Nicht bestanden{% endif %}</span>{% if lauf.unvollstaendig %} <span class="evallauf--offen">· Unvollständig</span>{% endif %}
+        {% else %}
+            <span>{{ lauf.get_zustand_display }}</span>
+        {% endif %}
+        {% if lauf.beendet_am %}<small>{{ lauf.beendet_am|date:"d.m.Y H:i" }} · {{ lauf.katalog.k }} Wiederholungen je Evalinput</small>{% endif %}
+    </p>
+    {% if startbar %}
+        <form method="post" action="{% url 'evals:starten' vignette.pk %}">
+            {% csrf_token %}
+            <button class="button{% if lauf %} button--secondary{% endif %}" type="submit">{% if lauf %}Erneut prüfen{% else %}Evallauf starten{% endif %}</button>
+        </form>
+    {% elif lauf.ist_offen %}
+        <a class="button button--secondary" href="{% url 'evals:evallauf' vignette.pk %}">Stand neu laden</a>
+    {% endif %}
+</div>
+{% if lauf.ist_offen %}
+    <p class="evallauf-zeile__hinweis" role="status">Der Evallauf {% if lauf.zustand == "wartet" %}wartet auf den Hintergrundprozess{% else %}läuft im Hintergrund{% endif %}; die Seite darf geschlossen werden.</p>
+{% elif lauf.zustand == "abgebrochen" %}
+    <p class="evallauf-zeile__hinweis">Der Evallauf wurde abgebrochen. Was bis dahin fertig war, bleibt lesbar; nicht ausgeführte Wiederholungen werden nicht fortgesetzt, ein neuer Evallauf beginnt von vorn.</p>
+{% elif lauf.unvollstaendig %}
+    <p class="evallauf-zeile__hinweis">Unvollständig: Mindestens ein Kriterium blieb ohne Urteil, weil Lehrperson oder Bewerter nichts Auswertbares lieferten. Ein neuer Evallauf lohnt.</p>
+{% endif %}
+{% if lauf %}
+    <details class="evallauf-angaben">
+        <summary>Angaben zum Lauf</summary>
+        <dl class="field-grid field-grid--three">
+            <div><dt>Ausgelöst</dt><dd>{{ lauf.ausgeloest_am|date:"d.m.Y H:i" }}</dd></div>
+            <div><dt>Gestartet</dt><dd>{{ lauf.gestartet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
+            <div><dt>Beendet</dt><dd>{{ lauf.beendet_am|date:"d.m.Y H:i"|default:"—" }}</dd></div>
+            <div><dt>Wiederholungen je Evalinput</dt><dd>{{ lauf.katalog.k }}</dd></div>
+            <div><dt>Simulationskern</dt><dd>{{ lauf.kern_id }}</dd></div>
+            <div><dt>Evalkatalog</dt><dd>Fassung {{ lauf.katalog_id }}</dd></div>
+            <div><dt>Schüler:in</dt><dd>{{ lauf.schuelerin_konfiguration.bezeichnung }}</dd></div>
+            <div><dt>Lehrperson</dt><dd>{{ lauf.lehrperson_konfiguration.bezeichnung }}</dd></div>
+            <div><dt>Bewerter</dt><dd>{{ lauf.bewerter_konfiguration.bezeichnung }}</dd></div>
+        </dl>
+        {% if not lauf.ist_offen %}<p>Ein neuer Lauf ersetzt dieses Ergebnis.</p>{% endif %}
+    </details>
+{% endif %}

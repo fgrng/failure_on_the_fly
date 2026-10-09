@@ -87,8 +87,9 @@ def finaler_katalog(
     ),
     evalkriterien: Sequence[str] = ("Muster gezeigt",),
     uebergreifende: Sequence[str] = ("Rollentreue",),
+    inputs: int = 1,
 ) -> Evalkatalog:
-    """Finalisiert einen Katalog mit einem Eval „Muster“ und einem Evalinput.
+    """Finalisiert einen Katalog mit einem Eval „Muster“ und gleichen Evalinputs.
 
     Ein Text ist ein fester Schritt, `gelenkt(…)` ein gelenkter.
     """
@@ -103,11 +104,12 @@ def finaler_katalog(
     eval_ = katalog.eval_anlegen("Muster")
     for text in evalkriterien:
         eval_.kriterium_anlegen(text)
-    evalinput = Evalinput.anhaengen(eval_)
-    for schritt in schritte:
-        if isinstance(schritt, str):
-            evalinput.schritt_anlegen(text=schritt)
-        else:
-            evalinput.schritt_anlegen(*schritt)
+    for _ in range(inputs):
+        evalinput = Evalinput.anhaengen(eval_)
+        for schritt in schritte:
+            if isinstance(schritt, str):
+                evalinput.schritt_anlegen(text=schritt)
+            else:
+                evalinput.schritt_anlegen(*schritt)
     katalog.finalisieren()
     return katalog

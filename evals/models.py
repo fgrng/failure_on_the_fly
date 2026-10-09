@@ -16,6 +16,7 @@ from simulation.models import (
     Evalinput,
     Evalkatalog,
     Evalkriterium,
+    Inputschritt,
     ModellKonfiguration,
     Simulationskern,
     UebergreifendesKriterium,
@@ -60,6 +61,7 @@ class Inputzeile:
     nummer: int
     kuerzel: str
     zellen: list[Zelle]
+    evalinput: int
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,31 @@ class Evalergebnis:
     name: str
     kriterien: list[str]
     zeilen: list[Inputzeile]
+
+
+@dataclass(frozen=True)
+class Beurteilung:
+    """Ein Kriterium eines Gesprächs mit seinem Urteil, sobald es geschrieben ist."""
+
+    kriterium: str
+    uebergreifend: bool
+    urteil: "Urteil | None"
+
+
+@dataclass(frozen=True)
+class Einsicht:
+    """Das gewählte Evalgespräch eines Laufs; ohne Gespräch nicht ausgeführt."""
+
+    eval_name: str
+    nummer: int
+    evalinput: Evalinput
+    wiederholung: int
+    # Die Wiederholungen 1..k und ob es zu ihnen ein Gespräch gibt.
+    wiederholungen: list[tuple[int, bool]]
+    gespraech: "Evalgespraech | None"
+    # Jeder geschriebene Wechsel mit dem Inputschritt, aus dem er entstand.
+    wechsel: list[tuple["Wechsel", Inputschritt]]
+    beurteilungen: list[Beurteilung]
 
 
 class EvallaufManager(models.Manager["Evallauf"]):
@@ -231,7 +258,9 @@ class Evallauf(models.Model):
                             k=self.katalog.k,
                         )
                     )
-                zeilen.append(Inputzeile(nummer, evalinput.kuerzel, zellen))
+                zeilen.append(
+                    Inputzeile(nummer, evalinput.kuerzel, zellen, evalinput.pk)
+                )
             ergebnisse.append(
                 Evalergebnis(
                     eval_.name or "Unbenanntes Eval",
@@ -240,6 +269,65 @@ class Evallauf(models.Model):
                 )
             )
         return ergebnisse
+
+    def einsicht(
+        self, evalinput_pk: int | None, wiederholung: int | None
+    ) -> Einsicht | None:
+        """Das Gespräch zu Evalinput und Wiederholung; ohne Evalinput keins.
+
+        Ein Evalinput außerhalb des festgehaltenen Katalogs weicht dem ersten,
+        eine Wiederholung außerhalb 1..k der ersten ausgeführten. Gespräche
+        anderer Läufe sind so nie erreichbar.
+        """
+
+        kandidaten: list[tuple[Eval, list[Kriterium], int, Evalinput]] = [
+            (eval_, kriterien, nummer, evalinput)
+            for eval_, kriterien in self.evals_mit_kriterien()
+            for nummer, evalinput in enumerate(eval_.inputs.all(), 1)
+        ]
+        if not kandidaten:
+            return None
+        eval_, kriterien, nummer, evalinput = next(
+            (kandidat for kandidat in kandidaten if kandidat[3].pk == evalinput_pk),
+            kandidaten[0],
+        )
+        # Ein Gespräch ohne Wechsel und Urteil brach ab, bevor etwas geschah.
+        gespraeche: dict[int, Evalgespraech] = {
+            gespraech.wiederholung: gespraech
+            for gespraech in self.gespraeche.filter(
+                evalinput=evalinput
+            ).prefetch_related("wechsel", "urteile")
+            if gespraech.wechsel.all() or gespraech.urteile.all()
+        }
+        if wiederholung not in range(1, self.katalog.k + 1):
+            wiederholung = min(gespraeche, default=1)
+        gespraech: Evalgespraech | None = gespraeche.get(wiederholung)
+        urteile: dict[tuple[type[Kriterium], int], Urteil] = (
+            {urteil.kriterium_schluessel: urteil for urteil in gespraech.urteile.all()}
+            if gespraech
+            else {}
+        )
+        schritte: list[Inputschritt] = list(evalinput.schritte.all())
+        return Einsicht(
+            eval_.name or "Unbenanntes Eval",
+            nummer,
+            evalinput,
+            wiederholung,
+            [(zahl, zahl in gespraeche) for zahl in range(1, self.katalog.k + 1)],
+            gespraech,
+            [
+                (wechsel, schritte[wechsel.position - 1])
+                for wechsel in (gespraech.wechsel.all() if gespraech else [])
+            ],
+            [
+                Beurteilung(
+                    kriterium.text,
+                    isinstance(kriterium, UebergreifendesKriterium),
+                    urteile.get((type(kriterium), kriterium.pk)),
+                )
+                for kriterium in kriterien
+            ],
+        )
 
     def evals_mit_kriterien(self) -> list[tuple[Eval, list[Kriterium]]]:
         """Je Eval des festgehaltenen Katalogs seine Kriterien, die übergreifenden zuletzt.
