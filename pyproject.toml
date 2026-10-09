@@ -86,8 +86,6 @@ extend-ignore-names = ["_meta"]
 "training/tests/test_transkription.py" = ["SLF001"]
 "training/tests/test_views.py" = ["SLF001"]
 "vignetten/models.py" = ["SLF001"]
-"vignetten/tests/test_views.py" = ["SLF001"]
-"vignetten/tests/test_vignetten_models.py" = ["SLF001"]
 
 [tool.ruff.format]
 # Django generiert Migrationen; ihr Umbruch ist nicht unsere Entscheidung.
