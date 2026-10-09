@@ -182,6 +182,18 @@ EVALLAEUFE_SPERRE: Path = Path(
     os.environ.get("EVALLAEUFE_SPERRE", BASE_DIR / "evallaeufe.lock")
 )
 
+# Start, Ende und Abbrüche des Hintergrundprozesses gehen nach stderr, wo
+# supervisord sie einsammelt; Djangos eigenes Logging bleibt unverändert.
+LOGGING: dict[str, object] = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "betrieb": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"}
+    },
+    "handlers": {"stderr": {"class": "logging.StreamHandler", "formatter": "betrieb"}},
+    "loggers": {"evals": {"handlers": ["stderr"], "level": "INFO"}},
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field
 

@@ -21,7 +21,9 @@ Browser ──HTTPS──> Uberspace-Frontend (nginx + Apache, Let's-Encrypt-Zer
                      ├── /static  ──> Apache liefert Dateien aus ~/html/static
                      ├── /media   ──> Apache liefert Dateien aus ~/html/media
                      └── /        ──> gunicorn auf 0.0.0.0:8000 (nur intern erreichbar)
-                                        └── Django (config.wsgi) ──> SQLite-Datei
+                                        └── Django (config.wsgi) ──┐
+                                                                    ├──> SQLite-Datei
+Evallauf-Dienst (manage.py evallaeufe_abarbeiten) ──> Django ───────┘
 ```
 
 Konsequenzen, die den Rest der Anleitung erklären:
@@ -31,6 +33,12 @@ Konsequenzen, die den Rest der Anleitung erklären:
   auf das Sprachmodell, eine Transkription auf ihren Anbieter; jede wartende
   Anfrage hält einen Thread. Ausgelegt ist das für 150 gleichzeitige Sitzungen
   (ADR-0050).
+- **Ein zweiter Dienst für Evalläufe.** Ein Evallauf dauert zwanzig bis vierzig
+  Minuten. Ihn arbeitet ein eigener supervisord-Dienst ab, nicht gunicorn: Er
+  holt ausgelöste Läufe aus der Datenbank, einen nach dem anderen, und belegt
+  dabei keinen Web-Thread (ADR-0047). Er liest dieselbe `.env` und schreibt in
+  dieselbe SQLite-Datei; Gespräche und Urteile schreibt er in kurzen
+  Einzelschritten, kein Modellaufruf hält eine Schreibsperre.
 - **SQLite, kein MySQL.** Die Datenbank ist eine Datei im Home. Sie läuft im
   WAL-Modus mit wartendem Writer (siehe `config/settings.py`), damit mehrere
   gleichzeitige Teilnahmen parallel schreiben können. Das automatische
@@ -169,6 +177,7 @@ Was die Werte bedeuten:
 | `MEDIA_ROOT`                   | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                    |
 | `TIME_ZONE`                    | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
 | `TRANSKRIPTION_ZERO_RETENTION` | Schaltet die Audio-Transkription frei. Erst auf `True` setzen, wenn die Zero-Retention des Anbieters vertraglich zugesichert ist.                                                                         |
+| `EVALLAEUFE_SPERRE`            | Optional. Sperrdatei, mit der höchstens ein Evallauf-Dienst arbeitet; voreingestellt `evallaeufe.lock` im Projektverzeichnis. Nur ändern, wenn das Projektverzeichnis nicht beschreibbar ist.             |
 | `SECURE_SSL_REDIRECT`          | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                             |
 
 Bei einer eigenen Domain (Schritt 8) gehören deren Namen zusätzlich in
@@ -199,7 +208,7 @@ ist bewusst offen gelassen, weil die Preload-Liste ein einseitiges Versprechen
 gegenüber allen Browsern ist. Jede andere Warnung — zu `SECRET_KEY`, `DEBUG`
 oder den Cookie-Flags — zeigt einen Fehler in der `.env`.
 
-## 7. Dienst einrichten
+## 7. Dienste einrichten
 
 Siehe <https://manual.uberspace.de/daemons-supervisord/>. Die Dienstdefinition
 liegt in `~/etc/services.d/`:
@@ -260,6 +269,57 @@ supervisorctl status failure-on-the-fly
 Erwartet wird `RUNNING`. Bei `BACKOFF` oder `FATAL` zeigt
 `supervisorctl tail -f failure-on-the-fly stderr` den Grund — meist ein
 fehlender `SECRET_KEY` in der `.env` oder ein belegter Port.
+
+Der zweite Dienst arbeitet die Evalläufe ab. Er ruft das Management-Command
+direkt mit dem Python der Umgebung auf, nicht über `uv run`, damit supervisord
+seine Signale ohne Zwischenprozess zustellt:
+
+```bash
+cat > ~/etc/services.d/failure-on-the-fly-evals.ini <<'EOF'
+[program:failure-on-the-fly-evals]
+directory=%(ENV_HOME)s/failure_on_the_fly
+command=%(ENV_HOME)s/failure_on_the_fly/.venv/bin/python manage.py evallaeufe_abarbeiten --intervall 10
+startsecs=10
+autostart=yes
+autorestart=yes
+stopsignal=TERM
+stopwaitsecs=30
+EOF
+supervisorctl reread
+supervisorctl update
+supervisorctl status failure-on-the-fly-evals
+```
+
+Zu den Werten:
+
+- **`--intervall 10`** — so viele Sekunden wartet der Dienst, wenn kein Evallauf
+  wartet, bevor er wieder in der Datenbank nachsieht. Ein gestarteter Lauf
+  beginnt also spätestens nach zehn Sekunden. Wartende Läufe arbeitet er ohne
+  Pause nacheinander ab, den ältesten zuerst.
+- **`stopsignal=TERM`** — beim Stoppen bricht der Dienst einen laufenden
+  Evallauf sofort ab, markiert ihn als *abgebrochen* und endet. Das Fertige
+  bleibt sichtbar; fortgesetzt wird nicht, die Autor:in startet neu.
+- **`stopwaitsecs=30`** — Zeit für diesen Abschluss. Reicht sie nicht, beendet
+  supervisord den Prozess hart; der Lauf steht dann noch auf *läuft*, bis der
+  nächste Start ihn aufräumt.
+- **`startsecs=10`** — der Dienst gilt erst als gestartet, wenn er so lange
+  läuft. Hält schon ein anderer Prozess die Sperre (etwa ein von Hand
+  gestartetes `evallaeufe_abarbeiten`), endet er sofort mit „Ein anderer
+  Hintergrundprozess arbeitet bereits.“ und landet nach einigen Versuchen in
+  `FATAL`.
+
+Instanzweit arbeitet nur ein Evallauf-Prozess. Er hält dafür die Sperrdatei
+`EVALLAEUFE_SPERRE`, die das Betriebssystem freigibt, sobald der Prozess endet
+oder stirbt. Wer die Sperre erhält, setzt zuerst jeden Lauf, der noch *läuft*
+sagt, auf *abgebrochen*: Er stammt von einem Vorgänger, der mittendrin gestorben
+ist. Wartende Läufe bleiben in der Warteschlange.
+
+Erwartet wird wieder `RUNNING`. Das Log
+(`supervisorctl tail -f failure-on-the-fly-evals stderr`) beginnt mit
+„Hintergrundprozess gestartet“ und nennt danach je Lauf „gestartet“ und „fertig“
+oder „abgebrochen“; ein unerwarteter Fehler steht dort mit Traceback,
+aufgeräumte Läufe eines Vorgängers als Warnung „verwaiste Evalläufe
+abgebrochen“.
 
 ## 8. Web-Backends und Domain verbinden
 
@@ -375,6 +435,9 @@ Vor der ersten echten Erhebung einmal durchklicken:
 - [ ] Ein Teilnahme-Link einer Testerhebung führt durch Einwilligung,
   Instruktion und mindestens einen Gesprächsschritt.
 - [ ] Der Datenspur-Export lädt als ZIP herunter.
+- [ ] `supervisorctl status` zeigt beide Dienste als `RUNNING`; sind ein finaler
+  Evalkatalog und alle drei Verwendungen belegt, wird ein gestarteter Evallauf
+  binnen Sekunden *läuft* und am Ende *fertig*.
 - [ ] `/media/vignettenbilder/` antwortet mit 403, nicht mit einer Dateiliste.
 - [ ] `/admin/` ist nicht mit einem geratenen Passwort erreichbar — alle Konten
   tragen lange, zufällige Passwörter.
@@ -448,6 +511,26 @@ Damit verlassen personenbezogene Forschungsdaten den Server. Der Zielrechner
 muss im Datenschutzkonzept der Erhebung vorkommen, verschlüsselt sein und die
 Löschfristen der Erhebung einhalten.
 
+Der Evallauf-Dienst ändert am Backup nichts: Er schreibt in dieselbe Datei, und
+die Backup-API zieht auch während eines Laufs einen konsistenten Auszug. Ein
+Lauf, der zum Zeitpunkt der Sicherung lief, steht darin auf *läuft*.
+
+**Wiederherstellen:** beide Dienste stoppen, die Sicherung an den
+`DATABASE_PFAD` kopieren, die WAL-Dateien der alten Datenbank entfernen, beide
+Dienste starten:
+
+```bash
+supervisorctl stop failure-on-the-fly failure-on-the-fly-evals
+ZIEL=$(sed -n 's/^DATABASE_PFAD=//p' ~/failure_on_the_fly/.env)
+cp ~/backups/db-JJJJ-MM-TT.sqlite3 "$ZIEL"
+rm -f "$ZIEL-wal" "$ZIEL-shm"
+supervisorctl start failure-on-the-fly failure-on-the-fly-evals
+```
+
+Bleiben die WAL-Dateien liegen, spielt SQLite sie in die zurückgeholte Datei
+ein. Ein Lauf, der in der Sicherung auf *läuft* stand, ist nach dem Start des
+Evallauf-Dienstes *abgebrochen*.
+
 Vor jedem Update (Abschnitt 12) und vor jedem Eingriff in die Datenbank gehört
 ein Backup gezogen — von Hand, nicht auf den nächtlichen Lauf vertrauend.
 
@@ -458,23 +541,24 @@ Der Ablauf für eine neue Version:
 ```bash
 ~/bin/failure-on-the-fly-backup
 cd ~/failure_on_the_fly
-supervisorctl stop failure-on-the-fly
+supervisorctl stop failure-on-the-fly failure-on-the-fly-evals
 git pull
 uv sync --frozen --no-dev --group deploy --python python3.14
 uv run python manage.py migrate
 uv run python manage.py collectstatic --noinput
 uv run python manage.py check --deploy
-supervisorctl start failure-on-the-fly
-supervisorctl status failure-on-the-fly
+supervisorctl start failure-on-the-fly failure-on-the-fly-evals
+supervisorctl status
 ```
 
-Das ist bewusst eine kurze Auszeit, kein unterbrechungsfreies Deployment: Der
-Dienst steht, solange migriert wird, damit kein alter Worker gegen ein neues
-Schema schreibt. Laufende Gesprächsschritte brechen ab. Updates gehören deshalb
-nicht in ein offenes Teilnahmefenster einer Erhebung. Migrationen sind
-unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg führt über das
-Backup: Dienst stoppen, Sicherung an den `DATABASE_PFAD` kopieren, alten Stand
-auschecken, Dienst starten.
+Das ist bewusst eine kurze Auszeit, kein unterbrechungsfreies Deployment: Beide
+Dienste stehen, solange migriert wird, damit kein alter Prozess gegen ein neues
+Schema schreibt. Laufende Gesprächsschritte brechen ab, ein laufender Evallauf
+endet *abgebrochen*; wartende Läufe arbeitet der Dienst nach dem Start ab.
+Updates gehören deshalb nicht in ein offenes Teilnahmefenster einer Erhebung.
+Migrationen sind unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg
+führt über das Backup: Dienst stoppen, Sicherung an den `DATABASE_PFAD`
+kopieren, alten Stand auschecken, Dienst starten.
 
 Unabhängig von neuen Funktionen sollten die Abhängigkeiten regelmäßig auf
 bekannte Schwachstellen geprüft werden — auf dem Entwicklungsrechner, nicht auf
@@ -489,12 +573,26 @@ ein Update wie oben.
 
 ## 13. Betrieb und Fehlersuche
 
-**Dienst:**
+**Dienste:**
 
 ```bash
 supervisorctl status
 supervisorctl restart failure-on-the-fly
 supervisorctl tail -f failure-on-the-fly stderr
+supervisorctl restart failure-on-the-fly-evals
+supervisorctl tail -f failure-on-the-fly-evals stderr
+```
+
+Ein Neustart des Evallauf-Dienstes bricht einen laufenden Evallauf ab und lässt
+die Sitzungen unberührt; ein Neustart von gunicorn lässt einen Evallauf
+weiterlaufen. Zur Fehlersuche lässt sich bei gestopptem Dienst ein einzelner
+Lauf im Vordergrund abarbeiten:
+
+```bash
+supervisorctl stop failure-on-the-fly-evals
+cd ~/failure_on_the_fly
+.venv/bin/python manage.py evallaeufe_abarbeiten --einmal
+supervisorctl start failure-on-the-fly-evals
 ```
 
 Die Logs von supervisord liegen unter `~/logs/`.
@@ -524,6 +622,8 @@ Häufige Stolpersteine:
 | `wrong interface (::1)`                                  | gunicorn lauscht auf localhost                                  | `--bind 0.0.0.0:8000`                                                                                                                                                                                                                             |
 | Gesprächsschritt bricht nach ~180 s ab                   | Das Frontend schließt Verbindungen nach drei Minuten ohne Daten | Anbieter/Modell prüfen; beide Nähte begrenzen sich auf 90 s bzw. 120 s, ein längeres Warten ist ein Fehler im Code                                                                                                                                |
 | 502 oder lange Ladezeiten nur unter Last                 | Alle Threads warten auf einen Anbieter                          | `--threads` und `--worker-connections` gemeinsam erhöhen, nicht `--workers`; Dienst neu starten. Häufen sich zugleich Anbieterfehler, greift eher ein Rate-Limit des Anbieters (`docs/research/2026-10-08-worker-belegung-uberspace-anbieter.md`) |
+| Evallauf bleibt auf „Wartet“                             | Evallauf-Dienst läuft nicht                                     | `supervisorctl status failure-on-the-fly-evals`, Log lesen, Dienst starten                                                                                                                                                                        |
+| Evallauf-Dienst in `FATAL`, Log „arbeitet bereits“       | Ein anderer Prozess hält die Sperrdatei                         | Von Hand gestarteten `evallaeufe_abarbeiten` beenden (`ps -u $USER -f`), dann `supervisorctl start failure-on-the-fly-evals`                                                                                                                      |
 | Dienst startet nach `supervisorctl update` nicht         | `SECRET_KEY` fehlt in der `.env`                                | `.env` prüfen; Django bricht ohne Schlüssel beim Import ab                                                                                                                                                                                        |
 
 ## 14. Was beim Produktivbetrieb zu bedenken ist
@@ -554,6 +654,10 @@ Häufige Stolpersteine:
   Djangos Auth-Routen einschließlich `password_reset`; ohne konfigurierten
   Mailversand läuft dieser Weg ins Leere. Passwörter setzt bis dahin die
   Administration unter `/admin/`.
+- **Evalläufe kosten wie Sitzungen.** Ein Lauf macht gut zweihundert
+  Modellaufrufe über die drei aktiven Konfigurationen. Er läuft nur, wenn eine
+  Autor:in ihn startet, und instanzweit nur einer zugleich; das Ausgabenlimit
+  beim Anbieter gilt auch für ihn.
 - **Der Instanzzustand steckt in zwei Dingen:** der SQLite-Datei und
   `~/html/media`. Wer beides hat, kann die Instanz woanders wieder aufbauen; die
   `.env` mit ihrem `SECRET_KEY` gehört an einen dritten, sicheren Ort.

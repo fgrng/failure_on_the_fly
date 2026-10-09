@@ -310,7 +310,9 @@ Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —, 
 Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
 Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
-`skript_fortlesen`: Ohne ihn beginnt das Skript bei jedem Antwortversuch von
+`skript_fortlesen` sowie die Zahl `verzoegerung`, die jeden Aufruf so viele
+Sekunden warten lässt wie ein langsames Modell (als Text oder `true` wartet er
+nicht). Ohne `skript_fortlesen` beginnt das Skript bei jedem Antwortversuch von
 vorn, mit ihm — nur als `true`, nicht als Text — liest es eine zusammenhängende
 Ausführung wie ein Evallauf über alle Aufrufe derselben Konfiguration fort; jede
 neue Ausführung beginnt wieder vorn. Im Editor schlägt neben dem Sprachmodell
@@ -533,19 +535,27 @@ keinen Modellaufruf. Finalisieren behält den Lauf an derselben Fassung; das
 Löschen eines Entwurfs entfernt ihn.
 
 Ausgeführt wird ein Lauf vom Hintergrundprozess
-`python manage.py evallaeufe_abarbeiten --einmal`. Er nimmt höchstens den
-ältesten wartenden Lauf, setzt ihn auf „Läuft“ und am Ende auf „Fertig“, jeweils
-mit Zeitpunkt; ein Fehler mitten im Lauf hinterlässt ihn „Abgebrochen“, das bis
-dahin Geschriebene bleibt. Instanzweit arbeitet nur ein Hintergrundprozess: Er
-hält dafür eine Sperrdatei (`EVALLAEUFE_SPERRE`, standardmäßig `evallaeufe.lock`
-im Projektverzeichnis), die das Betriebssystem freigibt, wenn der Prozess endet
+`python manage.py evallaeufe_abarbeiten`, der im Betrieb als eigener
+supervisord-Dienst neben gunicorn läuft (`docs/DEPLOYMENT.md`). Er arbeitet die
+wartenden Läufe nacheinander ab, den ältesten zuerst, setzt jeden auf „Läuft“
+und am Ende auf „Fertig“, jeweils mit Zeitpunkt; ein Fehler mitten im Lauf
+hinterlässt ihn „Abgebrochen“, das bis dahin Geschriebene bleibt. Wartet kein
+Lauf, sieht er nach `--intervall` Sekunden (Standard 10) wieder nach. Ein Stopp
+(SIGTERM wie von supervisord, oder Strg+C) bricht einen laufenden Lauf sofort
+ab, schließt ihn als „Abgebrochen“ ab und beendet den Prozess. Mit `--einmal`
+arbeitet er höchstens den ältesten wartenden Lauf ab und endet, für Tests und
+Fehlersuche. Start, Ende, jeder Lauf und aufgeräumte verwaiste Läufe stehen im
+Log auf stderr. Instanzweit arbeitet nur ein Hintergrundprozess: Er hält dafür
+eine Sperrdatei (`EVALLAEUFE_SPERRE`, standardmäßig `evallaeufe.lock` im
+Projektverzeichnis), die das Betriebssystem freigibt, wenn der Prozess endet
 oder stirbt. Findet ein zweiter Aufruf sie gesperrt, meldet er das und rührt
 nichts an, auch keinen laufenden Lauf. Wer die Sperre erhält, setzt zuerst jeden
 Lauf, der noch „Läuft“ sagt, auf „Abgebrochen“ (Endzeitpunkt ist die
 Bereinigung); wartende bleiben wartend. Abgebrochene Läufe werden weder
 fortgesetzt noch um Wiederholungen ergänzt; ein neuer Start beginnt von vorn.
-Ohne `--einmal` verweigert der Command den Dienst; der dauerhafte Betrieb folgt.
-Für jedes Eval, jeden Evalinput und jede Wiederholung 1 bis *k* entsteht ein
+Wartezeit auf ein Modell belegt keinen Web-Thread, und weil kein Modellaufruf
+eine Schreibtransaktion hält, schreiben Sitzungen währenddessen ungehindert. Für
+jedes Eval, jeden Evalinput und jede Wiederholung 1 bis *k* entsteht ein
 Evalgespräch, für jeden Inputschritt ein Wechsel in der Reihenfolge des
 Evalinputs; feste und gelenkte Schritte dürfen sich mischen. Bei einem festen
 Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei einem

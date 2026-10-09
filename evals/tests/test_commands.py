@@ -1,18 +1,31 @@
 """Der Hintergrundprozess im Einmal-Modus über `call_command`."""
 
 import fcntl
+import logging
+import signal
+from collections.abc import Callable
 from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 import pytest
 import time_machine
-from django.core.management import CommandError, call_command
+from django.core.management import call_command
+from django.db import connection
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
+from config.tests.sprachmodell import vor_jedem_aufruf
 from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf
-from evals.tests.aufbau import antworten, drei_fakes, finaler_katalog, urteile
+from evals.tests.aufbau import (
+    aeusserungen,
+    antworten,
+    drei_fakes,
+    finaler_katalog,
+    gelenkt,
+    urteile,
+)
 from konten.models import Konto
 
 _AUSGELOEST: datetime = datetime(2026, 10, 9, 9, 0, tzinfo=UTC)
@@ -144,8 +157,140 @@ def test_zweiter_prozess_laesst_aktiven_lauf_und_warteschlange_unberuehrt(
     )
 
 
-def test_ohne_einmal_modus_verweigert_der_command() -> None:
-    """Der dauerhafte Dienst folgt; bis dahin gibt es nur den Einmal-Modus."""
+def _anhalten_nach(wartezeiten: list[float], anzahl: int) -> Callable[[float], None]:
+    # Ersetzt das Warten des Dienstes: merkt sich jede Wartezeit und schickt
+    # nach `anzahl` Wartezeiten ein SIGTERM, wie supervisord beim Stoppen.
 
-    with pytest.raises(CommandError):
+    def warten(sekunden: float) -> None:
+        wartezeiten.append(sekunden)
+        if len(wartezeiten) >= anzahl:
+            signal.raise_signal(signal.SIGTERM)
+
+    return warten
+
+
+@pytest.mark.django_db
+def test_dauermodus_arbeitet_wartende_nacheinander_ab_und_wartet_dann() -> None:
+    """Ohne --einmal nimmt der Dienst den ältesten zuerst und pollt bei leerer Warteschlange."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    ada: Konto = konto_mit_rollen("ada", "Autor:in")
+    juengerer: Evallauf = _ausgeloest(ada, "Jünger", _AUSGELOEST.replace(minute=5))
+    aeltester: Evallauf = _ausgeloest(ada, "Älter", _AUSGELOEST)
+    wartezeiten: list[float] = []
+
+    with mock.patch("time.sleep", _anhalten_nach(wartezeiten, 1)):
+        call_command("evallaeufe_abarbeiten", "--intervall", "7")
+
+    aeltester.refresh_from_db()
+    juengerer.refresh_from_db()
+    assert aeltester.gestartet_am < juengerer.gestartet_am
+    assert (aeltester.zustand, juengerer.zustand, wartezeiten) == (
+        Evallauf.Zustand.FERTIG,
+        Evallauf.Zustand.FERTIG,
+        [7.0],
+    )
+
+
+@pytest.mark.django_db
+def test_dauermodus_nimmt_einen_waehrend_des_wartens_ausgeloesten_lauf() -> None:
+    """Nach einer Wartezeit ohne Arbeit pollt der Dienst erneut."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+    ada: Konto = konto_mit_rollen("ada", "Autor:in")
+    spaeter: list[Evallauf] = []
+    wartezeiten: list[float] = []
+    anhalten: Callable[[float], None] = _anhalten_nach(wartezeiten, 2)
+
+    def warten(sekunden: float) -> None:
+        # Während der ersten Wartezeit startet die Autor:in einen Lauf.
+        if not wartezeiten:
+            spaeter.append(Evallauf.objects.ausloesen(finale_vignette(ada)))
+        anhalten(sekunden)
+
+    with mock.patch("time.sleep", warten):
         call_command("evallaeufe_abarbeiten")
+
+    spaeter[0].refresh_from_db()
+    assert (spaeter[0].zustand, len(wartezeiten)) == (Evallauf.Zustand.FERTIG, 2)
+
+
+@pytest.mark.django_db
+def test_stopp_mitten_im_lauf_bricht_ihn_ab_und_beendet_den_dienst(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """SIGTERM im Lauf: Fertiges bleibt, der Lauf ist abgebrochen, das Log sagt es."""
+
+    finaler_katalog(k=2, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    lauf: Evallauf = _ausgeloest(konto_mit_rollen("ada", "Autor:in"), "", _AUSGELOEST)
+    aufrufe: list[list[dict[str, str]]] = []
+
+    def stoppen(nachrichten: list[dict[str, str]]) -> None:
+        # Nach Antwort und Urteil des ersten Gesprächs stoppt supervisord.
+        aufrufe.append(nachrichten)
+        if len(aufrufe) == 3:
+            signal.raise_signal(signal.SIGTERM)
+
+    with (
+        caplog.at_level(logging.INFO),
+        vor_jedem_aufruf(stoppen),
+        mock.patch("time.sleep", _anhalten_nach([], 1)),
+    ):
+        call_command("evallaeufe_abarbeiten")
+
+    lauf.refresh_from_db()
+    assert (lauf.zustand, lauf.uebersicht()[0].zeilen[0].zellen[0].erfuellt) == (
+        Evallauf.Zustand.ABGEBROCHEN,
+        1,
+    )
+    assert [r.getMessage() for r in caplog.records] == [
+        "Hintergrundprozess gestartet, Intervall 10.0 s.",
+        f"Evallauf {lauf.pk} gestartet.",
+        f"Evallauf {lauf.pk} abgebrochen.",
+        "Hintergrundprozess beendet.",
+    ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_kein_modellaufruf_haelt_eine_schreibtransaktion() -> None:
+    """Zwischen den kurzen Schreibvorgängen bleibt die Datenbank für andere frei."""
+
+    finaler_katalog(k=1, schritte=("Eins", gelenkt("Nachfragen")))
+    drei_fakes(
+        schuelerin=antworten(2),
+        lehrperson=aeusserungen(1),
+        bewerter=urteile(True, True),
+    )
+    _ausgeloest(konto_mit_rollen("ada", "Autor:in"), "", _AUSGELOEST)
+    offen: list[bool] = []
+
+    with vor_jedem_aufruf(
+        lambda _nachrichten: offen.append(connection.in_atomic_block)
+    ):
+        call_command("evallaeufe_abarbeiten", "--einmal")
+
+    assert offen == [False] * 5
+
+
+@pytest.mark.django_db
+def test_dauermodus_bricht_beim_start_verwaiste_laeufe_ab(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Nach einem Neustart des Dienstes steht kein Lauf mehr auf „Läuft“."""
+
+    finaler_katalog(k=1, schritte=("Eins",), uebergreifende=())
+    drei_fakes(schuelerin=antworten(1), bewerter=urteile(True))
+    verwaist: Evallauf = _ausgeloest(
+        konto_mit_rollen("ada", "Autor:in"), "", _AUSGELOEST
+    )
+    _verwaist(verwaist)
+
+    with caplog.at_level(logging.INFO), mock.patch("time.sleep", _anhalten_nach([], 1)):
+        call_command("evallaeufe_abarbeiten")
+
+    verwaist.refresh_from_db()
+    assert verwaist.zustand == Evallauf.Zustand.ABGEBROCHEN
+    assert "1 verwaiste Evalläufe abgebrochen." in caplog.messages

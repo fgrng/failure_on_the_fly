@@ -10,7 +10,7 @@ from simulation.sprachmodell import FakeSprachmodell, nachrichten_bauen
 
 
 @contextmanager
-def _vor_jedem_aufruf(
+def vor_jedem_aufruf(
     vorher: Callable[[list[dict[str, str]]], None],
 ) -> Iterator[None]:
     """Reicht im Block die Nachrichten jedes Fake-Aufrufs an ``vorher`` weiter."""
@@ -47,7 +47,7 @@ def anfragen_aufzeichnen() -> Iterator[list[list[dict[str, str]]]]:
     """Zeichnet die Nachrichten jedes Fake-Aufrufs im Block in eine frische Liste auf."""
 
     anfragen: list[list[dict[str, str]]] = []
-    with _vor_jedem_aufruf(anfragen.append):
+    with vor_jedem_aufruf(anfragen.append):
         yield anfragen
 
 
@@ -58,5 +58,5 @@ def modellaufrufe_dauern(
     """Lässt im Block jeden Fake-Aufruf die Uhr um ``sekunden`` vorspulen."""
 
     # Das Modell rechnet: Die Wanduhr läuft weiter, dann antwortet der Fake.
-    with _vor_jedem_aufruf(lambda _nachrichten: uhr.shift(sekunden)):
+    with vor_jedem_aufruf(lambda _nachrichten: uhr.shift(sekunden)):
         yield
