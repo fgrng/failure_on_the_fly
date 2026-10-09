@@ -110,7 +110,7 @@
                         <ol class="drehbuch" aria-label="Inputschritte">
                             {% for schritt, zeile in schrittzeilen %}
                                 <li class="drehbuch__schritt">
-                                    <div class="drehbuch__blase{% if schritt.art == 'gelenkt' %} drehbuch__blase--gelenkt{% endif %}">
+                                    <div class="drehbuch__blase{% if schritt.gelenkt %} drehbuch__blase--gelenkt{% endif %}">
                                         <div class="drehbuch__kopf">
                                             <span class="zuordnungsliste__nummer">{{ forloop.counter }}</span>
                                             <fieldset class="drehbuch__segment">

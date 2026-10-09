@@ -327,20 +327,15 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
         )
         if form.is_valid():
             form.save()
+    schritte: QuerySet[Inputschritt] = Inputschritt.objects.filter(
+        evalinput__eval__katalog=katalog
+    )
     teile: tuple[tuple[QuerySet[Katalogteil], str, str], ...] = (
         (katalog.uebergreifende_kriterien.all(), "kriterium", "text"),
         (katalog.evals.all(), "eval", "name"),
         (Evalkriterium.objects.filter(eval__katalog=katalog), "evalkriterium", "text"),
-        (
-            Inputschritt.objects.filter(evalinput__eval__katalog=katalog),
-            "inputschritt",
-            "text",
-        ),
-        (
-            Inputschritt.objects.filter(evalinput__eval__katalog=katalog),
-            "inputschritt-art",
-            "art",
-        ),
+        (schritte, "inputschritt", "text"),
+        (schritte, "inputschritt-art", "art"),
     )
     for queryset, praefix, feld in teile:
         for teil in queryset:
@@ -358,8 +353,8 @@ def _eingaben_uebernehmen(katalog: Evalkatalog, request: HttpRequest) -> None:
 
 
 @dataclass(frozen=True)
-class _Kriterienzeile:
-    # Eine Zeile einer Kriterienliste samt den Zielen ihrer Gesten.
+class _Listenzeile:
+    # Eine Zeile einer Kriterien- oder Schrittliste samt den Zielen ihrer Gesten.
 
     feld: str
     text: str
@@ -368,22 +363,21 @@ class _Kriterienzeile:
     loeschen: str
 
 
-def _kriterienzeilen(
-    kriterien: QuerySet[Katalogteil], praefix: str, route: str, *args: int
-) -> list[_Kriterienzeile]:
-    # Baut die Zeilen einer Kriterienliste; `route` ist der Namensstamm der Gesten.
+def _listenzeilen(
+    teile: QuerySet[Katalogteil], praefix: str, route: str, *args: int
+) -> list[_Listenzeile]:
+    # Baut die Zeilen einer Kriterien- oder Schrittliste; `route` ist der
+    # Namensstamm der Gesten.
 
     return [
-        _Kriterienzeile(
-            feld=f"{praefix}-{kriterium.pk}",
-            text=kriterium.text,
-            hoch=reverse(f"{route}_verschieben", args=[*args, kriterium.pk, "hoch"]),
-            runter=reverse(
-                f"{route}_verschieben", args=[*args, kriterium.pk, "runter"]
-            ),
-            loeschen=reverse(f"{route}_loeschen", args=[*args, kriterium.pk]),
+        _Listenzeile(
+            feld=f"{praefix}-{teil.pk}",
+            text=teil.text,
+            hoch=reverse(f"{route}_verschieben", args=[*args, teil.pk, "hoch"]),
+            runter=reverse(f"{route}_verschieben", args=[*args, teil.pk, "runter"]),
+            loeschen=reverse(f"{route}_loeschen", args=[*args, teil.pk]),
         )
-        for kriterium in kriterien
+        for teil in teile
     ]
 
 
@@ -402,7 +396,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "katalog": katalog,
             "knoten": "kriterien",
-            "zeilen": _kriterienzeilen(
+            "zeilen": _listenzeilen(
                 katalog.uebergreifende_kriterien.all(),
                 "kriterium",
                 "simulation:evalkatalog_kriterium",
@@ -440,15 +434,15 @@ def evalkatalog_kriterium_loeschen(
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
-_SCHRITTE: dict[str, int] = {"hoch": -1, "runter": 1}
+_RICHTUNGEN: dict[str, int] = {"hoch": -1, "runter": 1}
 
 
-def _schritt(richtung: str) -> int:
-    # Nur hoch und runter verschieben.
+def _weite(richtung: str) -> int:
+    # Die Verschiebung um eine Zeile; nur hoch und runter.
 
-    if richtung not in _SCHRITTE:
+    if richtung not in _RICHTUNGEN:
         raise Http404
-    return _SCHRITTE[richtung]
+    return _RICHTUNGEN[richtung]
 
 
 @administratorin_erforderlich
@@ -458,13 +452,13 @@ def evalkatalog_kriterium_verschieben(
     request: HttpRequest, pk: int, kriterium_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein übergreifendes Kriterium eine Zeile hoch oder runter."""
-    schritt: int = _schritt(richtung)
+    weite: int = _weite(richtung)
     katalog: Evalkatalog = _katalog_entwurf(pk)
     kriterium: UebergreifendesKriterium = get_object_or_404(
         katalog.uebergreifende_kriterien, pk=kriterium_pk
     )
     _eingaben_uebernehmen(katalog, request)
-    kriterium.verschieben(schritt)
+    kriterium.verschieben(weite)
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
@@ -505,7 +499,7 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
             "eval": eval_,
             "eval_erstes": eval_ == evals[0],
             "eval_letztes": eval_ == evals[-1],
-            "zeilen": _kriterienzeilen(
+            "zeilen": _listenzeilen(
                 eval_.kriterien.all(),
                 "evalkriterium",
                 "simulation:evalkatalog_evalkriterium",
@@ -537,10 +531,10 @@ def evalkatalog_eval_verschieben(
     request: HttpRequest, pk: int, eval_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein Eval im Katalog eine Stelle hoch oder runter."""
-    schritt: int = _schritt(richtung)
+    weite: int = _weite(richtung)
     katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
     _eingaben_uebernehmen(katalog, request)
-    eval_.verschieben(schritt)
+    eval_.verschieben(weite)
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
@@ -579,30 +573,12 @@ def evalkatalog_evalkriterium_verschieben(
     request: HttpRequest, pk: int, eval_pk: int, kriterium_pk: int, richtung: str
 ) -> HttpResponse:
     """Rückt ein Evalkriterium eine Zeile hoch oder runter."""
-    schritt: int = _schritt(richtung)
+    weite: int = _weite(richtung)
     katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
     kriterium: Evalkriterium = get_object_or_404(eval_.kriterien, pk=kriterium_pk)
     _eingaben_uebernehmen(katalog, request)
-    kriterium.verschieben(schritt)
+    kriterium.verschieben(weite)
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
-
-
-@administratorin_erforderlich
-@require_POST
-@transaction.atomic
-def evalkatalog_evalinput_anlegen(
-    request: HttpRequest, pk: int, eval_pk: int
-) -> HttpResponse:
-    """Hängt einen Evalinput mit drei leeren Schritten an und öffnet seinen Knoten."""
-    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
-    _eingaben_uebernehmen(katalog, request)
-    evalinput: Evalinput = eval_.input_anlegen()
-    return redirect(
-        "simulation:evalkatalog_evalinput",
-        pk=katalog.pk,
-        eval_pk=eval_.pk,
-        input_pk=evalinput.pk,
-    )
 
 
 def _evalinput_im_entwurf(
@@ -623,6 +599,19 @@ def _zum_evalinput(evalinput: Evalinput) -> HttpResponse:
         eval_pk=evalinput.eval_id,
         input_pk=evalinput.pk,
     )
+
+
+@administratorin_erforderlich
+@require_POST
+@transaction.atomic
+def evalkatalog_evalinput_anlegen(
+    request: HttpRequest, pk: int, eval_pk: int
+) -> HttpResponse:
+    """Hängt einen Evalinput mit drei leeren Schritten an und öffnet seinen Knoten."""
+    katalog, eval_ = _eval_im_entwurf(pk, eval_pk)
+    _eingaben_uebernehmen(katalog, request)
+    evalinput: Evalinput = eval_.input_anlegen()
+    return _zum_evalinput(evalinput)
 
 
 @administratorin_erforderlich
@@ -648,7 +637,7 @@ def evalkatalog_evalinput(
             "nummer": list(eval_.inputs.all()).index(evalinput) + 1,
             "schrittzeilen": zip(
                 schritte,
-                _kriterienzeilen(
+                _listenzeilen(
                     schritte,
                     "inputschritt",
                     "simulation:evalkatalog_inputschritt",
@@ -716,11 +705,11 @@ def evalkatalog_inputschritt_verschieben(
     richtung: str,
 ) -> HttpResponse:
     """Rückt einen Inputschritt eine Zeile hoch oder runter."""
-    schritt_weite: int = _schritt(richtung)
+    weite: int = _weite(richtung)
     katalog, _, evalinput = _evalinput_im_entwurf(pk, eval_pk, input_pk)
     schritt: Inputschritt = get_object_or_404(evalinput.schritte, pk=schritt_pk)
     _eingaben_uebernehmen(katalog, request)
-    schritt.verschieben(schritt_weite)
+    schritt.verschieben(weite)
     return _zum_evalinput(evalinput)
 
 

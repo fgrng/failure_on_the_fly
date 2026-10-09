@@ -1,7 +1,7 @@
 {% comment %}
     Eine Kriterienliste im Stil der Zuordnungslisten (ADR-0048): je Zeile ein
     Text, Hoch, Runter und Löschen als Submit-Knöpfe des Editor-Formulars.
-    Erwartet `zeilen` (aus _kriterienzeilen), `bezeichnung` und `leer`.
+    Erwartet `zeilen` (aus _listenzeilen), `bezeichnung` und `leer`.
 {% endcomment %}
 <ol class="zuordnungsliste__liste" aria-label="{{ bezeichnung }}">
     {% for zeile in zeilen %}

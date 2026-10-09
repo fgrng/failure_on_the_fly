@@ -691,7 +691,19 @@ class EvalkatalogEvalinputTests(TestCase):
         )
 
         self.assertRedirects(response, self._route("eval"))
+        self.assertFalse(self.eval_.inputs.exists())
         self.assertFalse(Inputschritt.objects.exists())
+
+    def test_eval_knoten_listet_seine_evalinputs_mit_kuerzeln(self) -> None:
+        """Am Eval führt je Evalinput ein Link samt F/G-Kürzel zu seinem Drehbuch."""
+        evalinput: Evalinput = self.eval_.input_anlegen()
+        evalinput.schritt_anlegen(Inputschritt.Art.GELENKT)
+
+        inhalt: str = self.client.get(self._route("eval")).content.decode()
+
+        liste: str = inhalt[inhalt.index('class="evalkatalog-inputliste"') :]
+        link: int = liste.index(f'href="{self._route("evalinput", evalinput.pk)}"')
+        self.assertIn("FFFG", liste[link:])
 
     def test_speichern_uebernimmt_texte_und_arten(self) -> None:
         """Segmentknopf und Text jedes Schritts bleiben gespeichert."""

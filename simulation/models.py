@@ -362,8 +362,9 @@ class Katalogteil(models.Model):
     """Ein geordneter Teil einer Evalkatalog-Fassung, änderbar nur am Entwurf.
 
     Vertrag der Unterklassen: `_eltern` nennt den Fremdschlüssel, unter dem die
-    Geschwister hängen, `_katalog_pfad` den Lookup bis zur Fassung. Wer nicht
-    direkt am Katalog hängt, überschreibt `_katalog_id`.
+    Geschwister hängen, `_katalog_pfad` den Lookup bis zur Fassung. Hängt ein
+    Teil nicht direkt am Katalog, beginnt sein Pfad mit `<_eltern>__`, etwa
+    `eval__katalog_id`.
     """
 
     _eltern: str
@@ -586,8 +587,7 @@ class Evalinput(Katalogteil):
         """Die Folge der Schritte als F (fest) und G (gelenkt), etwa „FFG“."""
 
         return "".join(
-            "G" if schritt.art == Inputschritt.Art.GELENKT else "F"
-            for schritt in self.schritte.all()
+            "G" if schritt.gelenkt else "F" for schritt in self.schritte.all()
         )
 
     def schritt_anlegen(self, art: str = "fest", text: str = "") -> "Inputschritt":
@@ -631,6 +631,12 @@ class Inputschritt(Katalogteil):
                 name="simulation_inputschritt_position_eindeutig",
             ),
         ]
+
+    @property
+    def gelenkt(self) -> bool:
+        """Ob die Lehrperson nach der Inputstrategie selbst formuliert."""
+
+        return self.art == self.Art.GELENKT
 
 
 class Anbieter(models.TextChoices):
