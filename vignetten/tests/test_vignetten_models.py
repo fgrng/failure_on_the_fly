@@ -688,8 +688,8 @@ def test_finalisieren_lehnt_leeren_teil_ab(teil: str, label: str) -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("teil", "label"), _TEILE)
-def test_finalisieren_nimmt_teil_nur_mit_bild_an(teil: str, label: str) -> None:
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_finalisieren_nimmt_teil_nur_mit_bild_an(teil: str) -> None:
     """Ein Bild mit Beschreibung erfüllt die Alternative ohne Text."""
 
     vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))
@@ -703,10 +703,8 @@ def test_finalisieren_nimmt_teil_nur_mit_bild_an(teil: str, label: str) -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("teil", "label"), _TEILE)
-def test_finalisieren_erlaubt_leere_bildbeschreibung_ohne_bild(
-    teil: str, label: str
-) -> None:
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_finalisieren_erlaubt_leere_bildbeschreibung_ohne_bild(teil: str) -> None:
     """Eine Bildbeschreibung ist nur zusammen mit einem Bild erforderlich."""
 
     vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))

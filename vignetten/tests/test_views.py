@@ -42,12 +42,30 @@ def _autorin(username: str) -> Konto:
 
 
 def _entwurf(konto: Konto, **felder: object) -> Vignette:
-    """Legt einen Entwurf an und speichert die übergebenen Inhaltsfelder."""
+    """Legt einen Entwurf an und speichert die übergebenen Inhaltsfelder.
+
+    Ein unbekanntes Feld scheitert, statt still ignoriert zu werden.
+    """
     vignette: Vignette = vignetten_entwurf(konto)
     for feld, wert in felder.items():
+        if not hasattr(vignette, feld):
+            raise TypeError(f"Vignette hat kein Feld {feld!r}.")
         setattr(vignette, feld, wert)
     vignette.save()
     return vignette
+
+
+def _geschlechter(vignette: Vignette) -> dict[str, str]:
+    """Liefert die bei jedem Speichern mitgesendeten Pflichtfelder."""
+    return {
+        "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
+        "lehrperson_geschlecht": vignette.lehrperson_geschlecht,
+    }
+
+
+def _kern_ueberholen(vignette: Vignette) -> None:
+    """Überholt den gepinnten Kern durch eine finalisierte Nachfolgefassung."""
+    vignette.gepinnter_kern.bearbeiten().finalisieren()
 
 
 def _vignette_mit_eigentuemerinnen(erste: Konto, *weitere: Konto) -> Vignette:
@@ -250,15 +268,11 @@ class VignetteDetailViewTests(TestCase):
         self.assertContains(response, "Hinweis Lernauftrag")
         self.assertContains(response, "Hinweis Arbeitsheft")
 
-    def _kern_ueberholen(self, vignette: Vignette) -> Vignette:
-        # Überholt den gepinnten Kern durch eine finalisierte Nachfolgefassung.
-        vignette.gepinnter_kern.bearbeiten().finalisieren()
-        return vignette
-
     def test_zeigt_den_hinweis_am_entwurf_mit_ueberholtem_kern(self) -> None:
         """Der Entwurf sagt, dass der Pin überholt und trotzdem tragfähig ist."""
         ada: Konto = _autorin("ada")
-        vignette: Vignette = self._kern_ueberholen(vignetten_entwurf(ada))
+        vignette: Vignette = vignetten_entwurf(ada)
+        _kern_ueberholen(vignette)
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
@@ -283,7 +297,8 @@ class VignetteDetailViewTests(TestCase):
     def test_zeigt_keinen_hinweis_an_nicht_vorspulbaren_fassungen(self) -> None:
         """Finale und archivierte Fassungen sind gepinnt (ADR-0004), nicht vorspulbar."""
         ada: Konto = _autorin("ada")
-        vignette: Vignette = self._kern_ueberholen(finale_vignette(ada))
+        vignette: Vignette = finale_vignette(ada)
+        _kern_ueberholen(vignette)
         self.client.force_login(ada)
 
         finale_antwort: HttpResponse = self.client.get(
@@ -462,13 +477,6 @@ class VignetteBearbeitenViewTests(TestCase):
         self.vignette: Vignette = vignetten_entwurf(self.ada)
         self.client.force_login(self.ada)
 
-    def _geschlechter(self) -> dict[str, Vignette.Geschlecht]:
-        """Liefert die beim Teil-POST stets mitgesendeten Pflichtfelder."""
-        return {
-            "schuelerin_geschlecht": self.vignette.schuelerin_geschlecht,
-            "lehrperson_geschlecht": self.vignette.lehrperson_geschlecht,
-        }
-
     def test_speichert_entwurf_mit_leeren_inhaltsfeldern(self) -> None:
         """Entwürfe bleiben beim Bearbeiten bewusst lückentolerant."""
         self.vignette.lernauftrag_text = "Wird gelöscht."
@@ -476,7 +484,7 @@ class VignetteBearbeitenViewTests(TestCase):
 
         response: HttpResponse = self.client.post(
             reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
-            self._geschlechter(),
+            _geschlechter(self.vignette),
         )
 
         self.assertRedirects(
@@ -527,7 +535,7 @@ class VignetteBearbeitenViewTests(TestCase):
             self.client.post(
                 bearbeiten_url,
                 {
-                    **self._geschlechter(),
+                    **_geschlechter(self.vignette),
                     "arbeitsheft_bild": _gif_upload(),
                     "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
                 },
@@ -540,7 +548,7 @@ class VignetteBearbeitenViewTests(TestCase):
             self.client.post(
                 bearbeiten_url,
                 {
-                    **self._geschlechter(),
+                    **_geschlechter(self.vignette),
                     "arbeitsheft_bild-clear": "on",
                     "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
                 },
@@ -564,7 +572,7 @@ class VignetteBearbeitenViewTests(TestCase):
             self.client.post(
                 bearbeiten_url,
                 {
-                    **self._geschlechter(),
+                    **_geschlechter(self.vignette),
                     "arbeitsheft_bild": _gif_upload(),
                     "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
                 },
@@ -577,7 +585,7 @@ class VignetteBearbeitenViewTests(TestCase):
             self.client.post(
                 bearbeiten_url,
                 {
-                    **self._geschlechter(),
+                    **_geschlechter(self.vignette),
                     "arbeitsheft_bildbeschreibung": "27 + 15 = 312",
                 },
             )
@@ -612,7 +620,7 @@ class VignetteBearbeitenViewTests(TestCase):
         response: HttpResponse = self.client.post(
             reverse("vignetten:bearbeiten", args=[self.vignette.pk]),
             {
-                **self._geschlechter(),
+                **_geschlechter(self.vignette),
                 "lernauftrag_bild": SimpleUploadedFile(
                     "notizen.txt", b"kein Bild", content_type="text/plain"
                 ),
@@ -634,7 +642,7 @@ class VignetteBearbeitenViewTests(TestCase):
             )
             self.client.post(
                 bearbeiten_url,
-                {**self._geschlechter(), "lernauftrag_bild": _gif_upload()},
+                {**_geschlechter(self.vignette), "lernauftrag_bild": _gif_upload()},
             )
             self.vignette.refresh_from_db()
 
@@ -684,14 +692,6 @@ def _angemeldeter_entwurf(client: Client) -> Vignette:
     ada: Konto = _autorin("ada")
     client.force_login(ada)
     return vignetten_entwurf(ada)
-
-
-def _geschlechter(vignette: Vignette) -> dict[str, str]:
-    """Liefert die bei jedem Speichern mitgesendeten Pflichtfelder."""
-    return {
-        "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
-        "lehrperson_geschlecht": vignette.lehrperson_geschlecht,
-    }
 
 
 @pytest.mark.django_db
