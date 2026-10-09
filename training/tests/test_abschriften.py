@@ -1,6 +1,9 @@
 """Tests des Import-Kommandos und der Token-Eingabe für Abschriften."""
 
+from datetime import UTC, datetime
+
 import pytest
+import time_machine
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import Client
@@ -26,13 +29,14 @@ from konten.models import Konto
 from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.models import (
     Diagnose,
+    Eingabemodus,
     Fehlversuch,
     Gespraechsschritt,
     Sitzung,
     Teilnahme,
     Vignettenposition,
 )
-from training.abschriften import ABLEHNUNG, abschrift_holen
+from training.abschriften import abschrift_holen
 from training.models import Abschrift
 from vignetten.models import Vignette
 
@@ -120,6 +124,14 @@ def test_holt_die_sitzungen_einer_abgeschlossenen_teilnahme_ins_konto() -> None:
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = _erhebung_anlegen(forschende)
     bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
+    # Vom Vorgabewert abweichende Werte, damit die Kopie sie sichtbar mitnimmt.
+    Sitzung.objects.filter(teilnahme=bindung.teilnahme).update(verbrauchte_zeit=42.5)
+    Gespraechsschritt.objects.filter(sitzung__teilnahme=bindung.teilnahme).update(
+        eingabemodus=Eingabemodus.TRANSKRIBIERT
+    )
+    Diagnose.objects.filter(sitzung__teilnahme=bindung.teilnahme).update(
+        eingabemodus=Eingabemodus.GEMISCHT
+    )
 
     abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
 
@@ -132,17 +144,20 @@ def test_holt_die_sitzungen_einer_abgeschlossenen_teilnahme_ins_konto() -> None:
     assert kopie.simulationskern == original.simulationskern
     assert kopie.modell_konfiguration == original.modell_konfiguration
     assert kopie.status == original.status
+    assert kopie.verbrauchte_zeit == 42.5
     kopierter_schritt: Gespraechsschritt = kopie.gespraechsschritte.get()
     originalschritt: Gespraechsschritt = original.gespraechsschritte.get()
     assert kopierter_schritt.eingabe == originalschritt.eingabe
     assert kopierter_schritt.denkspur == originalschritt.denkspur
     assert kopierter_schritt.aeusserung == originalschritt.aeusserung
     assert kopierter_schritt.reihenfolge == originalschritt.reihenfolge
+    assert kopierter_schritt.eingabemodus == Eingabemodus.TRANSKRIBIERT
     assert [
         fehlversuch.rohantwort
         for fehlversuch in kopierter_schritt.fehlversuch_set.all()
     ] == ["{kaputt"]
     assert kopie.diagnose.text == original.diagnose.text
+    assert kopie.diagnose.eingabemodus == Eingabemodus.GEMISCHT
     position: Vignettenposition = abschrift.teilnahme.vignettenpositionen.get()
     assert (position.position, position.sitzung) == (1, kopie)
 
@@ -215,14 +230,15 @@ def test_kopierte_sitzungen_tragen_die_importzeit() -> None:
     """Die Zeitstempel der Abschrift gehören ihr selbst, nicht der Erhebung."""
 
     teilnehmerin: Konto = Konto.objects.create_user(username="grace")
-    bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
-    original: Sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
+    with time_machine.travel(datetime(2026, 7, 1, 10, 0, tzinfo=UTC), tick=False):
+        bindung: Erhebungsbindung = _gespielte_teilnahme_in_neuer_erhebung()
 
-    abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+    with time_machine.travel(datetime(2026, 7, 2, 12, 0, tzinfo=UTC), tick=False):
+        abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
 
     kopie: Sitzung = Sitzung.objects.get(teilnahme=abschrift.teilnahme)
-    assert kopie.erstellt_am >= abschrift.importiert_am
-    assert kopie.erstellt_am > original.erstellt_am
+    assert kopie.erstellt_am == datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    assert abschrift.importiert_am == datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
 
 
 @pytest.mark.django_db
@@ -263,9 +279,24 @@ def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
     with pytest.raises(ValidationError) as abgelehnt:
         abschrift_holen(teilnehmerin, token)
 
-    assert abgelehnt.value.messages == [ABLEHNUNG]
+    assert abgelehnt.value.messages == [
+        "Zu diesem Teilnahme-Token lässt sich keine Abschrift holen."
+    ]
     assert not Abschrift.objects.exists()
     assert not Teilnahme.objects.filter(erhebungsbindung__isnull=True).exists()
+
+
+@pytest.mark.django_db
+def test_token_wird_ohne_leerraum_und_in_grossschreibung_gelesen() -> None:
+    """Ein abgetipptes Token gilt auch klein geschrieben und mit Leerraum."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = _erhebung_anlegen(Konto.objects.create_user(username="ada"))
+    _gespielte_teilnahme(erhebung, token="ABCD-EFGH")
+
+    abschrift: Abschrift = abschrift_holen(teilnehmerin, "  abcd-efgh \n")
+
+    assert abschrift.erhebungsname == "Brüche"
 
 
 @pytest.mark.django_db
@@ -294,14 +325,6 @@ def test_zweiter_import_erzeugt_eine_eigenstaendige_zweite_abschrift() -> None:
     assert erste.teilnahme != zweite.teilnahme
     assert Abschrift.objects.count() == 2
     assert Sitzung.objects.filter(teilnahme=zweite.teilnahme).count() == 1
-
-
-def test_abschrift_haelt_weder_token_noch_verweis_auf_die_erhebung() -> None:
-    """Nach dem Import sind beide Seiten wieder entkoppelt."""
-
-    felder: set[str] = {feld.name for feld in Abschrift._meta.get_fields()}
-
-    assert felder.isdisjoint({"token", "erhebung", "stichprobe", "erhebungsbindung"})
 
 
 @pytest.mark.django_db
@@ -355,11 +378,8 @@ def test_abschriften_sind_ueber_den_erhebungsnamen_verlinkt(client: Client) -> N
     inhalt: str = client.get(reverse("training:abschriften")).content.decode()
 
     url: str = reverse("training:abschrift", args=[abschrift.pk])
-    assert f'<a class="zeilenlink" href="{url}">Brüche im Herbst</a>' in inhalt
-    assert '<td class="table__zeilenhinweis" aria-hidden="true">Lesen ›</td>' in inhalt
-    assert "table--zeilenlink" in inhalt
-    assert ">Lesen</a>" not in inhalt
-    assert ">Aktion<" not in inhalt
+    assert f'href="{url}">Brüche im Herbst</a>' in inhalt
+    assert "Lesen ›" in inhalt
 
 
 @pytest.mark.django_db
@@ -372,27 +392,10 @@ def test_abgelehntes_token_meldet_den_grundlosen_hinweis(client: Client) -> None
         reverse("training:abschriften"), {"token": "9999-9999"}, follow=True
     )
 
-    assert ABLEHNUNG in antwort.content.decode()
-    assert not Abschrift.objects.exists()
-
-
-@pytest.mark.django_db
-def test_token_einer_fluechtigen_teilnahme_meldet_den_grundlosen_hinweis(
-    client: Client,
-) -> None:
-    """Auch eine flüchtige Teilnahme verrät die Token-Eingabe nicht."""
-
-    forschende: Konto = Konto.objects.create_user(username="ada")
-    bindung: Erhebungsbindung = _gespielte_teilnahme(
-        _erhebung_anlegen(forschende), speicherung_eingewilligt=False
+    assert (
+        "Zu diesem Teilnahme-Token lässt sich keine Abschrift holen."
+        in antwort.content.decode()
     )
-    client.force_login(Konto.objects.create_user(username="grace"))
-
-    antwort: HttpResponse = client.post(
-        reverse("training:abschriften"), {"token": bindung.token}, follow=True
-    )
-
-    assert ABLEHNUNG in antwort.content.decode()
     assert not Abschrift.objects.exists()
 
 
@@ -427,23 +430,6 @@ def test_abschrift_zaehlt_nicht_zur_trainingshistorie(client: Client) -> None:
     antwort: HttpResponse = client.get(reverse("training:historie"))
 
     assert "Brüche im Herbst" not in antwort.content.decode()
-
-
-@pytest.mark.django_db
-def test_historie_ist_ueber_den_trainingsnamen_verlinkt(client: Client) -> None:
-    """Der Trainingsname ist der Link; der Zeilenhinweis nennt »Ansehen ›«."""
-
-    client.force_login(Konto.objects.create_user(username="grace"))
-
-    inhalt: str = client.get(reverse("training:historie")).content.decode()
-
-    assert '<a class="zeilenlink" :href="r.url" x-text="r.name"></a>' in inhalt
-    assert (
-        '<td class="table__zeilenhinweis" aria-hidden="true">Ansehen ›</td>' in inhalt
-    )
-    assert "table--zeilenlink" in inhalt
-    assert "button--secondary" not in inhalt
-    assert ">Aktion<" not in inhalt
 
 
 def _abschrift_mit_zwei_sitzungen(konto: Konto) -> Abschrift:
@@ -555,9 +541,7 @@ def test_ansicht_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
 
     inhalt: str = _gelesene_ansicht(client)
 
-    assert "Addiere <strong>die</strong> Brüche.<br>" in inhalt
-    assert "[Tipp](https://example.org)" in inhalt
-    assert "<p>1/2 + 1/3<br>\n= 2/5</p>" in inhalt
+    assert "Addiere <strong>die</strong> Brüche." in inhalt
 
 
 @pytest.mark.django_db

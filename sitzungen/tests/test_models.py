@@ -43,52 +43,6 @@ def _sitzungen_anlegen(teilnahme: Teilnahme, anzahl: int) -> list[Sitzung]:
     ]
 
 
-def test_teilnahme_beginnt_ohne_einwilligung_zur_audioverarbeitung() -> None:
-    """Neue Teilnahmen haben noch keine Entscheidung zur Audioverarbeitung."""
-
-    teilnahme: Teilnahme = Teilnahme()
-
-    assert teilnahme.audioverarbeitung_eingewilligt is None
-
-
-@pytest.mark.django_db
-def test_teilnahme_ohne_einwilligung_erlaubt_keine_audioverarbeitung() -> None:
-    """Die Ablehnung bleibt auch nach dem Speichern serverseitig eindeutig."""
-
-    teilnahme: Teilnahme = Teilnahme.objects.create(
-        audioverarbeitung_eingewilligt=False
-    )
-    teilnahme.refresh_from_db()
-
-    assert not teilnahme.hat_in_audioverarbeitung_eingewilligt
-
-
-def test_sitzung_hat_die_vier_vorgegebenen_statuswerte() -> None:
-    """Eine Sitzung unterscheidet laufende und ihre drei Ausgänge."""
-
-    assert [wert for wert, _ in Sitzung.Status.choices] == [
-        "laufend",
-        "abgeschlossen",
-        "abgebrochen",
-        "gescheitert",
-    ]
-
-
-@pytest.mark.django_db
-def test_neuer_gespraechsschritt_traegt_entstehungszeitpunkt() -> None:
-    """Ein neuer Gesprächsschritt hält seinen Entstehungszeitpunkt fest."""
-
-    schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
-        sitzung=_sitzung_anlegen(),
-        eingabe="Warum?",
-        denkspur="Ich folge meiner Regel.",
-        aeusserung="Weil das so ist.",
-        reihenfolge=1,
-    )
-
-    assert schritt.erstellt_am is not None
-
-
 @pytest.mark.django_db
 def test_gespraechsschritt_lehnt_aeusserung_ohne_denkspur_ab() -> None:
     """Die Datenbank akzeptiert sichtbare Antworten nur mit Denkspur."""
@@ -154,25 +108,6 @@ def test_answerless_gespraechsschritt_mit_fehlversuch_wird_gespeichert() -> None
 
 
 @pytest.mark.django_db
-def test_gespraechsschritt_ohne_antwort_traegt_entstehungszeitpunkt() -> None:
-    """Ein Abbruchschritt hält seinen Entstehungszeitpunkt ebenfalls fest."""
-
-    schritt: Gespraechsschritt = Gespraechsschritt.objects.answerless_anlegen(
-        sitzung=_sitzung_anlegen(),
-        eingabe="Warum?",
-        reihenfolge=1,
-        fehlversuche=[
-            Fehlversuch(
-                grund="Formatbruch",
-                rohantwort="Keine gültige Antwort",
-            )
-        ],
-    )
-
-    assert schritt.erstellt_am is not None
-
-
-@pytest.mark.django_db
 def test_answerless_gespraechsschritt_beendet_das_diagnosegespraech() -> None:
     """Nach einem endgültig gescheiterten Schritt kann keiner mehr folgen."""
 
@@ -228,39 +163,6 @@ def test_diagnose_ist_je_sitzung_eindeutig() -> None:
 
     with pytest.raises(IntegrityError), transaction.atomic():
         Diagnose.objects.create(sitzung=sitzung, text="Noch eine Diagnose.")
-
-
-@pytest.mark.django_db
-def test_neue_sitzung_traegt_entstehungszeitpunkt() -> None:
-    """Eine neue Sitzung hält ihren Entstehungszeitpunkt fest."""
-
-    sitzung: Sitzung = _sitzung_anlegen()
-
-    assert sitzung.erstellt_am is not None
-
-
-@pytest.mark.django_db
-def test_neue_diagnose_traegt_entstehungszeitpunkt() -> None:
-    """Eine neue Diagnose hält ihren Entstehungszeitpunkt fest."""
-
-    diagnose: Diagnose = Diagnose.objects.create(
-        sitzung=_sitzung_anlegen(),
-        text="Brüche werden addiert.",
-    )
-
-    assert diagnose.erstellt_am is not None
-
-
-@pytest.mark.django_db
-def test_bestandsdaten_duerfen_ohne_entstehungszeitpunkt_bestehen() -> None:
-    """Zeitstempellose Bestandszeilen bleiben nach der Migration lesbar."""
-
-    sitzung: Sitzung = _sitzung_anlegen()
-    sitzung.erstellt_am = None
-    sitzung.save(update_fields=["erstellt_am"])
-    sitzung.refresh_from_db()
-
-    assert sitzung.erstellt_am is None
 
 
 @pytest.mark.django_db

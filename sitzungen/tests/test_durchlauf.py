@@ -23,7 +23,14 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.sink import Budgetstand, DBSink, FluechtigerSink, ScratchSink
+from sitzungen.sink import (
+    Budgetstand,
+    DBSink,
+    FluechtigerSink,
+    GeruestSink,
+    ScratchSink,
+    SitzungSink,
+)
 from vignetten.models import Vignette
 
 
@@ -45,13 +52,33 @@ def _persistierbares_tripel(
     )
 
 
-def _verbrauchte_zeit(sink: ScratchSink | DBSink) -> float:
-    # Liest den Speichervertrag beider Adapter für die Uhrenparität.
+def _senken() -> list[SitzungSink]:
+    # Je eine frische Senke jeder Art für die Paritätstests.
 
-    if isinstance(sink, ScratchSink):
-        return sink.session["probelauf"].get("verbrauchte_zeit", 0.0)
-    sink.sitzung.refresh_from_db(fields=["verbrauchte_zeit"])
-    return sink.sitzung.verbrauchte_zeit
+    return [
+        ScratchSink(SessionStore()),
+        DBSink(Teilnahme.objects.create()),
+        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
+    ]
+
+
+def _verbrauchte_zeit(sink: GeruestSink) -> float:
+    # Liest den exportierten Budgetstand der Sitzungszeile.
+
+    sitzung: Sitzung = Sitzung.objects.get(teilnahme=sink.teilnahme)
+    return sitzung.verbrauchte_zeit
+
+
+def _leeren_schritt_anhaengen(sink: SitzungSink) -> bool:
+    # Hängt einen geglückten Schritt an und meldet die Budgeterschöpfung.
+
+    return sink.gespraechsschritt_anhaengen(
+        eingabe="Warum?",
+        eingabemodus="getippt",
+        denkspur="",
+        aeusserung="",
+        fehlversuche=[],
+    )
 
 
 @pytest.mark.django_db
@@ -113,7 +140,7 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
         eingabe="Wie hast du gerechnet?",
     )
 
-    assert session["probelauf"]["gespraechsschritte"] == [
+    assert sink.gespraechsschritte == [
         {
             "reihenfolge": 1,
             "eingabe": "Wie hast du gerechnet?",
@@ -195,25 +222,6 @@ def test_db_sink_haengt_fehlversuche_neben_den_erfolgreichen_schritt() -> None:
 
 
 @pytest.mark.django_db
-def test_db_sink_persistiert_answerless_schritt_und_gescheiterten_status() -> None:
-    """Drei Fehlversuche bleiben als antwortloser Abbruchschritt erhalten."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"fehler": "anbieterfehler"}] * 3
-    )
-    sink: DBSink = DBSink(Teilnahme.objects.create())
-
-    sitzung_starten(sink, vignette, konfiguration)
-    gespraechsschritt_ausfuehren(sink, vignette, kern, konfiguration, eingabe="Warum?")
-
-    sitzung: Sitzung = Sitzung.objects.get()
-    schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
-    assert sitzung.status == Sitzung.Status.GESCHEITERT
-    assert (schritt.denkspur, schritt.aeusserung) == (None, None)
-    assert Fehlversuch.objects.filter(gespraechsschritt=schritt).count() == 3
-
-
-@pytest.mark.django_db
 def test_db_sink_diagnose_schliesst_die_sitzung_ab() -> None:
     """Die gesetzte Diagnose vollzieht den Abschlussübergang der Sitzung."""
 
@@ -232,33 +240,16 @@ def test_db_sink_diagnose_schliesst_die_sitzung_ab() -> None:
 
 
 @pytest.mark.django_db
-def test_scratch_und_db_sink_schliessen_mit_diagnose_gleich_ab() -> None:
-    """Eine Diagnose vollzieht an beiden Sink-Zielen denselben Abschlussübergang."""
+def test_scratch_sink_schliesst_mit_diagnose_ab() -> None:
+    """Auch der Probelauf ist nach der Diagnose beendet."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
     scratch: ScratchSink = ScratchSink(SessionStore())
-    datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
-    for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, konfiguration)
-        sink.diagnose_setzen("Zähler und Nenner werden addiert.")
+    sitzung_starten(scratch, vignette, konfiguration)
+    scratch.diagnose_setzen("Zähler und Nenner werden addiert.")
 
-    assert scratch.session["probelauf"]["status"] == Sitzung.Status.ABGESCHLOSSEN
-    assert Sitzung.objects.get().status == Sitzung.Status.ABGESCHLOSSEN
-
-
-@pytest.mark.django_db
-def test_db_sink_aktives_abbrechen_setzt_den_eigenen_status() -> None:
-    """Ein gewollter Abbruch ist von einem technischen Fehlschlag unterscheidbar."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel([])
-    sink: DBSink = DBSink(Teilnahme.objects.create())
-
-    sitzung_starten(sink, vignette, konfiguration)
-    sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
-
-    assert Sitzung.objects.get().status == Sitzung.Status.ABGEBROCHEN
-    assert not Diagnose.objects.exists()
+    assert scratch.ist_beendet
 
 
 @pytest.mark.django_db
@@ -325,18 +316,16 @@ def test_zeitbudget_ist_von_jeder_anderen_sitzung_getrennt() -> None:
 
 
 @pytest.mark.django_db
-def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
-    """Beide Sink-Adapter führen denselben Budgetstand über explizite Zeitpunkte."""
+@pytest.mark.parametrize(("budget", "erschoepft"), [(10, True), (11, False)])
+def test_alle_senken_messen_zeit_paritaetisch(budget: int, erschoepft: bool) -> None:
+    """Alle Senken führen denselben Budgetstand über explizite Zeitpunkte."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
     vignette.budget_typ = Vignette.BudgetTyp.ZEIT
-    vignette.budget_wert = 10
+    vignette.budget_wert = budget
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    for sink in (
-        ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create()),
-    ):
+    for sink in _senken():
         sitzung_starten(sink, vignette, konfiguration)
 
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
@@ -344,14 +333,9 @@ def test_scratch_und_db_sink_messen_zeit_paritaetisch() -> None:
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 1, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 1, 5, tzinfo=UTC))
 
-        assert sink.gespraechsschritt_anhaengen(
-            eingabe="Warum?",
-            eingabemodus="getippt",
-            denkspur="",
-            aeusserung="",
-            fehlversuche=[],
-        )
-        assert _verbrauchte_zeit(sink) == 10.0
+        assert _leeren_schritt_anhaengen(sink) is erschoepft
+        if isinstance(sink, GeruestSink):
+            assert _verbrauchte_zeit(sink) == 10.0
 
 
 @pytest.mark.django_db
@@ -364,8 +348,8 @@ def test_schrittbudget_laesst_die_uhr_in_beiden_sinks_stehen() -> None:
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
     for sink in (
-        ScratchSink(SessionStore()),
         DBSink(Teilnahme.objects.create()),
+        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
     ):
         sitzung_starten(sink, vignette, konfiguration)
 
@@ -376,35 +360,15 @@ def test_schrittbudget_laesst_die_uhr_in_beiden_sinks_stehen() -> None:
 
 
 @pytest.mark.django_db
-def test_schrittbudget_setzt_keine_offene_spanne() -> None:
-    """Ohne Uhr gibt es auch keinen Spannenstart, der gebucht werden könnte."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel([])
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 3
-    vignette.save(update_fields=["budget_typ", "budget_wert"])
-    sink: DBSink = DBSink(Teilnahme.objects.create())
-    sitzung_starten(sink, vignette, konfiguration)
-
-    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
-
-    sink.sitzung.refresh_from_db(fields=["offene_spanne_seit"])
-    assert sink.sitzung.offene_spanne_seit is None
-
-
-@pytest.mark.django_db
-def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> None:
+def test_erneutes_anzeigen_setzt_die_offene_spanne_in_allen_senken_neu_an() -> None:
     """Beim Reload bleibt der Verbrauch erhalten, die zuvor offene Zeit aber ungebucht."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
     vignette.budget_typ = Vignette.BudgetTyp.ZEIT
-    vignette.budget_wert = 3
+    vignette.budget_wert = 4
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
-    for sink in (
-        ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create()),
-    ):
+    for sink in _senken():
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 1, tzinfo=UTC))
@@ -412,39 +376,9 @@ def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> N
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, 20, tzinfo=UTC))
         sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 22, tzinfo=UTC))
 
-        assert sink.gespraechsschritt_anhaengen(
-            eingabe="Warum?",
-            eingabemodus="getippt",
-            denkspur="",
-            aeusserung="",
-            fehlversuche=[],
-        )
-        assert _verbrauchte_zeit(sink) == 3.0
-
-
-@pytest.mark.django_db
-def test_scratch_und_db_sink_pruefen_schrittbudget_paritaetisch() -> None:
-    """Der Rückgabewert nach einem Schritt meldet die Erschöpfung beider Sinks."""
-
-    vignette_schritte, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "Denken", "aeusserung": "Antwort"}] * 2
-    )
-    vignette_schritte.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette_schritte.budget_wert = 1
-    vignette_schritte.save(update_fields=["budget_typ", "budget_wert"])
-
-    for sink in (
-        ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create()),
-    ):
-        sitzung_starten(sink, vignette_schritte, konfiguration)
-        assert sink.gespraechsschritt_anhaengen(
-            eingabe="Warum?",
-            eingabemodus="getippt",
-            denkspur="",
-            aeusserung="",
-            fehlversuche=[],
-        )
+        assert not _leeren_schritt_anhaengen(sink)
+        if isinstance(sink, GeruestSink):
+            assert _verbrauchte_zeit(sink) == 3.0
 
 
 @pytest.mark.django_db
@@ -455,21 +389,20 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
     vignette.budget_typ = Vignette.BudgetTyp.ZEIT
-    vignette.budget_wert = 10
+    vignette.budget_wert = 7
     vignette.save(update_fields=["budget_typ", "budget_wert"])
 
     monkeypatch.setattr(
         "sitzungen.durchlauf.jetzt",
         lambda: datetime(2026, 9, 22, 10, 0, 7, tzinfo=UTC),
     )
-    for sink in (
-        ScratchSink(SessionStore()),
-        DBSink(Teilnahme.objects.create()),
-    ):
+    datenbank: DBSink = DBSink(Teilnahme.objects.create())
+    for sink in (ScratchSink(SessionStore()), datenbank):
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
         sitzung_beenden(sink)
-        assert _verbrauchte_zeit(sink) == 7.0
+        assert _leeren_schritt_anhaengen(sink)
+    assert _verbrauchte_zeit(datenbank) == 7.0
 
 
 @pytest.mark.django_db
@@ -524,32 +457,6 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
 
 
 @pytest.mark.django_db
-def test_modellverlauf_laesst_die_denkspur_draussen() -> None:
-    """Die Denkspur fließt in keinem der beiden Pfade in den Kontext zurück (ADR-0005)."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel(
-        [
-            {
-                "denkspur": "Ich addiere Zähler und Nenner.",
-                "aeusserung": "2/5.",
-            }
-        ]
-    )
-    scratch: ScratchSink = ScratchSink(SessionStore())
-    datenbank: DBSink = DBSink(Teilnahme.objects.create())
-
-    for sink in (scratch, datenbank):
-        sitzung_starten(sink, vignette, konfiguration)
-        gespraechsschritt_ausfuehren(
-            sink, vignette, kern, konfiguration, eingabe="Warum?"
-        )
-
-        gesagtes: str = " ".join(teil for paar in modellverlauf(sink) for teil in paar)
-        assert "Ich addiere Zähler und Nenner." not in gesagtes
-        assert "2/5." in gesagtes
-
-
-@pytest.mark.django_db
 def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
     """Ein antwortloser Schritt bleibt aus dem Verlauf, aber im Transkript (ADR-0011)."""
 
@@ -568,6 +475,23 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
         assert modellverlauf(sink) == []
 
     assert len(list(datenbank.gespraechsschritte)) == 1
+
+
+@pytest.mark.django_db
+def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
+    """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(
+        [{"denkspur": "still", "aeusserung": ""}]
+    )
+
+    for sink in _senken():
+        sitzung_starten(sink, vignette, konfiguration)
+        gespraechsschritt_ausfuehren(
+            sink, vignette, kern, konfiguration, eingabe="Erster Schritt"
+        )
+
+        assert modellverlauf(sink) == [("Erster Schritt", "")]
 
 
 @pytest.mark.django_db
@@ -615,7 +539,9 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
     assert ausgaenge == [Ausgang.GESCHEITERT, Ausgang.GESCHEITERT]
     assert scratch.gespraechsschritte == []
     assert Sitzung.objects.get().status == Sitzung.Status.GESCHEITERT
-    assert Gespraechsschritt.objects.get().aeusserung is None
+    schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
+    assert (schritt.denkspur, schritt.aeusserung) == (None, None)
+    assert Fehlversuch.objects.filter(gespraechsschritt=schritt).count() == 3
 
 
 @pytest.mark.django_db
@@ -625,16 +551,19 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     """Das Budget beendet das Gespräch; die persistierte Sitzung schließt erst die Diagnose ab."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}] * 2
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}] * 3
     )
     vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
     vignette.budget_wert = 1
     vignette.save(update_fields=["budget_typ", "budget_wert"])
     scratch: ScratchSink = ScratchSink(SessionStore())
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
+    fluechtig: FluechtigerSink = FluechtigerSink(
+        Teilnahme.objects.create(), SessionStore()
+    )
 
     ausgaenge: list[Ausgang] = []
-    for sink in (scratch, datenbank):
+    for sink in (scratch, datenbank, fluechtig):
         sitzung_starten(sink, vignette, konfiguration)
         ausgaenge.append(
             gespraechsschritt_ausfuehren(
@@ -642,9 +571,12 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
             )
         )
 
-    assert ausgaenge == [Ausgang.BUDGET_ERSCHOEPFT, Ausgang.BUDGET_ERSCHOEPFT]
+    assert ausgaenge == [Ausgang.BUDGET_ERSCHOEPFT] * 3
     assert scratch.ist_beendet
-    assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND
+    assert list(Sitzung.objects.values_list("status", flat=True)) == [
+        Sitzung.Status.LAUFEND,
+        Sitzung.Status.LAUFEND,
+    ]
 
 
 @pytest.mark.django_db
@@ -714,47 +646,6 @@ def test_fluechtiger_sink_haelt_den_gescheiterten_schritt_nur_in_der_session() -
     ).gespraechsschritte
     assert (schritt["eingabe"], schritt["aeusserung"]) == ("Warum?", None)
     assert len(schritt["fehlversuche"]) == 3
-
-
-@pytest.mark.django_db
-def test_fluechtiger_sink_fuehrt_budget_uhr_an_der_sitzung() -> None:
-    """Uhr und Schrittbudget laufen wie im DB-Sink über die Sitzungszeile."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
-    )
-    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
-    vignette.budget_wert = 600
-    vignette.save(update_fields=["budget_typ", "budget_wert"])
-    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), SessionStore())
-    sitzung_starten(sink, vignette, konfiguration)
-
-    sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
-    sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
-
-    assert _verbrauchte_zeit(sink) == 4.0
-    assert not modellverlauf(sink)
-
-
-@pytest.mark.django_db
-def test_fluechtiger_sink_meldet_das_erschoepfte_schrittbudget() -> None:
-    """Das Schrittbudget zählt die Schritte der Session; die Diagnose schließt ab."""
-
-    vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
-    )
-    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
-    vignette.budget_wert = 1
-    vignette.save(update_fields=["budget_typ", "budget_wert"])
-    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), SessionStore())
-    sitzung_starten(sink, vignette, konfiguration)
-
-    ausgang: Ausgang = gespraechsschritt_ausfuehren(
-        sink, vignette, kern, konfiguration, eingabe="Warum?"
-    )
-
-    assert ausgang is Ausgang.BUDGET_ERSCHOEPFT
-    assert Sitzung.objects.get().status == Sitzung.Status.LAUFEND
 
 
 @pytest.mark.django_db

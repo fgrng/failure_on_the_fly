@@ -139,6 +139,21 @@ def test_prompt_platzhalter_reicht_spitze_klammern_unveraendert_durch() -> None:
     assert platzhalter["schuelerin_name"] == "Mia & Tom"
 
 
+def test_prompt_platzhalter_reicht_markdown_unveraendert_durch() -> None:
+    """Das Sprachmodell liest die Markdown-Quelle, nicht das Gerenderte (ADR-0044)."""
+
+    platzhalter: dict[str, str] = prompt_platzhalter(
+        Vignette(lernauftrag_text="Addiere **zwei** Brüche.\n[Tipp](https://x.org)")
+    )
+
+    assert platzhalter["lernauftrag"] == (
+        "<lernauftrag>\n"
+        "<lernauftrag_text>Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
+        "</lernauftrag_text>\n"
+        "</lernauftrag>"
+    )
+
+
 def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
     """Leere lange Prompt-Inhalte werden nicht mit einer Umgebung versehen."""
 

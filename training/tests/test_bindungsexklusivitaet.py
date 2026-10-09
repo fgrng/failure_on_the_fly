@@ -10,7 +10,6 @@ from django.utils import timezone
 
 from erhebungen.models import Erhebung, Erhebungsbindung, Stichprobe
 from konten.models import Konto
-from sitzungen.bindungen import UMHAENGEN_FEHLERMELDUNG, UNVERTRAEGLICHE_BINDUNG
 from sitzungen.models import Teilnahme
 from training.models import Abschrift, Training, Trainingsbindung
 
@@ -66,7 +65,7 @@ def test_erhebungsteilnahme_nimmt_keine_trainingsbindung_an() -> None:
 
     bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(_stichprobe())
 
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         _trainingsbindung(bindung.teilnahme, _teilnehmerin())
 
 
@@ -76,7 +75,7 @@ def test_erhebungsteilnahme_nimmt_keine_abschrift_an() -> None:
 
     bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(_stichprobe())
 
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         _abschrift(bindung.teilnahme, _teilnehmerin())
 
 
@@ -87,7 +86,7 @@ def test_trainingsteilnahme_nimmt_keine_erhebungsbindung_an() -> None:
     teilnahme: Teilnahme = Teilnahme.objects.create()
     _trainingsbindung(teilnahme, _teilnehmerin())
 
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         _erhebungsbindung(teilnahme)
 
 
@@ -98,7 +97,7 @@ def test_abschriftsteilnahme_nimmt_keine_erhebungsbindung_an() -> None:
     teilnahme: Teilnahme = Teilnahme.objects.create()
     _abschrift(teilnahme, _teilnehmerin())
 
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         _erhebungsbindung(teilnahme)
 
 
@@ -123,7 +122,7 @@ def test_bestehende_bindung_laesst_sich_nicht_umhaengen() -> None:
     erhebungsbindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(_stichprobe())
 
     abschrift.teilnahme = erhebungsbindung.teilnahme
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         abschrift.save()
 
 
@@ -134,7 +133,7 @@ def test_mengen_update_haengt_keine_teilnahme_um() -> None:
     _abschrift(Teilnahme.objects.create(), _teilnehmerin())
     erhebungsbindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(_stichprobe())
 
-    with pytest.raises(RuntimeError, match=UMHAENGEN_FEHLERMELDUNG):
+    with pytest.raises(RuntimeError, match="Mengen-Update"):
         Abschrift.objects.update(teilnahme=erhebungsbindung.teilnahme)
 
 
@@ -144,7 +143,7 @@ def test_bulk_create_weist_die_unvertraegliche_bindung_ab() -> None:
 
     erhebungsbindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(_stichprobe())
 
-    with pytest.raises(ValidationError, match=UNVERTRAEGLICHE_BINDUNG):
+    with pytest.raises(ValidationError, match="Bindung der anderen Art"):
         Abschrift.objects.bulk_create(
             [
                 Abschrift(
