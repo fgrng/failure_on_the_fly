@@ -5,12 +5,16 @@ from datetime import datetime
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, connection, transaction
-from django.db.migrations.executor import MigrationExecutor
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
+from config.tests.aufbau import (
+    finale_vignette,
+    finaler_kern,
+    konto_mit_rollen,
+    vignetten_entwurf,
+)
 from konten.models import Konto
 from simulation.models import Simulationskern
 from vignetten.models import (
@@ -61,7 +65,7 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
         "lernauftrag_simulationshinweise": "",
         "arbeitsheft_simulationshinweise": "",
         "schuelerin_name": "Mia",
-        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "schuelerin_geschlecht": "weiblich",
         "fach": "Mathematik",
         "thema": "Brüche",
         "klassenstufe": "5",
@@ -168,31 +172,16 @@ def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
     ) == ("", "", "", "", "")
 
 
-def test_prompt_platzhalter_entfernt_marker_ohne_bild() -> None:
-    """Ein unvollständiger Entwurf gibt den Marker nie an das Modell weiter."""
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_prompt_platzhalter_entfernt_marker_ohne_bild(teil: str) -> None:
+    """Ein Teil ohne Bild gibt den Marker nie an das Modell weiter."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(arbeitsheft_text="Oben\n[BILD]\nunten\n[bild]")
+        Vignette(**{f"{teil}_text": "Oben\n[BILD]\nunten\n[bild]"})
     )
 
-    assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft>\n"
-        "<arbeitsheft_text>Oben\nunten\n</arbeitsheft_text>\n"
-        "</arbeitsheft>"
-    )
-
-
-def test_prompt_platzhalter_entfernt_lernauftrag_marker_ohne_bild() -> None:
-    """Ein Lernauftrag ohne Bild gibt den Marker nie an das Modell weiter."""
-
-    platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(lernauftrag_text="Oben\n[BILD]\nunten\n[bild]")
-    )
-
-    assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>\n"
-        "<lernauftrag_text>Oben\nunten\n</lernauftrag_text>\n"
-        "</lernauftrag>"
+    assert platzhalter[teil] == (
+        f"<{teil}>\n<{teil}_text>Oben\nunten\n</{teil}_text>\n</{teil}>"
     )
 
 
@@ -236,79 +225,45 @@ def test_positionsmarker_auf_eigener_zeile_zerlegt_den_text() -> None:
     assert (teil.text_vor_bild, teil.text_nach_bild) == ("Oben\n", "Mitte\nunten")
 
 
-def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text() -> None:
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text(teil: str) -> None:
     """Ohne Marker steht die Bildbeschreibung im Prompt nach dem Text."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
         Vignette(
-            arbeitsheft_text="Rechnung oben",
-            arbeitsheft_bild="vignettenbilder/heft.gif",
-            arbeitsheft_bildbeschreibung="Durchgestrichene Rechnung",
+            **{
+                f"{teil}_text": "Aufgabe oben",
+                f"{teil}_bild": "vignettenbilder/blatt.gif",
+                f"{teil}_bildbeschreibung": "Blatt mit Skizze",
+            }
         )
     )
 
-    assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft>\n"
-        "<arbeitsheft_text>Rechnung oben</arbeitsheft_text>\n"
-        "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
-        "</arbeitsheft_bildbeschreibung>\n"
-        "</arbeitsheft>"
+    assert platzhalter[teil] == (
+        f"<{teil}>\n"
+        f"<{teil}_text>Aufgabe oben</{teil}_text>\n"
+        f"<{teil}_bildbeschreibung>Blatt mit Skizze</{teil}_bildbeschreibung>\n"
+        f"</{teil}>"
     )
 
 
-def test_prompt_platzhalter_ordnet_lernauftrag_bild_ohne_marker_nach_dem_text() -> None:
-    """Ohne Marker steht die Lernauftrag-Bildbeschreibung im Prompt nach dem Text."""
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_prompt_platzhalter_laesst_leere_textstuecke_weg(teil: str) -> None:
+    """Ein Teil nur mit Bild erzeugt keine leere Textumgebung."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
         Vignette(
-            lernauftrag_text="Aufgabe oben",
-            lernauftrag_bild="vignettenbilder/auftrag.gif",
-            lernauftrag_bildbeschreibung="Arbeitsblatt mit Skizze",
+            **{
+                f"{teil}_bild": "vignettenbilder/blatt.gif",
+                f"{teil}_bildbeschreibung": "Blatt mit Skizze",
+            }
         )
     )
 
-    assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>\n"
-        "<lernauftrag_text>Aufgabe oben</lernauftrag_text>\n"
-        "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
-        "</lernauftrag_bildbeschreibung>\n"
-        "</lernauftrag>"
-    )
-
-
-def test_prompt_platzhalter_laesst_leere_textstuecke_weg() -> None:
-    """Ein Arbeitsheft nur mit Bild erzeugt keine leere Textumgebung."""
-
-    platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
-            arbeitsheft_bild="vignettenbilder/heft.gif",
-            arbeitsheft_bildbeschreibung="Durchgestrichene Rechnung",
-        )
-    )
-
-    assert platzhalter["arbeitsheft"] == (
-        "<arbeitsheft>\n"
-        "<arbeitsheft_bildbeschreibung>Durchgestrichene Rechnung"
-        "</arbeitsheft_bildbeschreibung>\n"
-        "</arbeitsheft>"
-    )
-
-
-def test_prompt_platzhalter_laesst_leere_lernauftrag_textstuecke_weg() -> None:
-    """Ein Lernauftrag nur mit Bild erzeugt keine leere Textumgebung."""
-
-    platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
-            lernauftrag_bild="vignettenbilder/auftrag.gif",
-            lernauftrag_bildbeschreibung="Arbeitsblatt mit Skizze",
-        )
-    )
-
-    assert platzhalter["lernauftrag"] == (
-        "<lernauftrag>\n"
-        "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Skizze"
-        "</lernauftrag_bildbeschreibung>\n"
-        "</lernauftrag>"
+    assert platzhalter[teil] == (
+        f"<{teil}>\n"
+        f"<{teil}_bildbeschreibung>Blatt mit Skizze</{teil}_bildbeschreibung>\n"
+        f"</{teil}>"
     )
 
 
@@ -326,9 +281,9 @@ def test_rahmen_platzhalter_enthaelt_alle_weiblichen_werte() -> None:
 
     assert rahmen_platzhalter(vignette) == {
         "schuelerin_name": "Mia",
-        "schuelerin_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "schuelerin_geschlecht": "weiblich",
         "lehrperson_name": "Koch",
-        "lehrperson_geschlecht": Vignette.Geschlecht.WEIBLICH,
+        "lehrperson_geschlecht": "weiblich",
         "fach": "Mathematik",
         "thema": "Brüche",
         "klassenstufe": "5",
@@ -367,7 +322,7 @@ def test_bildkuerzel_mappt_geschlecht_auf_w_oder_m() -> None:
 
     vignette_w: Vignette = Vignette(
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-        lehrperson_geschlecht="",
+        lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
     )
     assert vignette_w.schuelerin_bildkuerzel == "w"
     assert vignette_w.lehrperson_bildkuerzel == "w"
@@ -430,9 +385,9 @@ class VignetteAnlegenTests(TestCase):
         vignette, _, _ = self._vignette_mit_zwei_finalen_kernen_anlegen()
 
         self.assertTrue(vignette.schuelerin_name)
-        self.assertIn(vignette.schuelerin_geschlecht, Vignette.Geschlecht.values)
+        self.assertIn(vignette.schuelerin_geschlecht, {"weiblich", "männlich"})
         self.assertTrue(vignette.lehrperson_name)
-        self.assertIn(vignette.lehrperson_geschlecht, Vignette.Geschlecht.values)
+        self.assertIn(vignette.lehrperson_geschlecht, {"weiblich", "männlich"})
 
 
 class VignetteConstraintTests(TestCase):
@@ -448,31 +403,32 @@ class VignetteConstraintTests(TestCase):
                     feldname: "",
                 }
                 with self.assertRaises(IntegrityError), transaction.atomic():
-                    Vignette.objects._erstellen(
+                    Vignette.objects._erstellen(  # noqa: SLF001
                         historie=Vignettenhistorie.objects.create(), **werte
                     )
 
     def test_historie_hat_hoechstens_einen_entwurf(self) -> None:
         """Ein zweiter Entwurf derselben Historie scheitert am Unique-Index."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        Vignette.objects._erstellen(historie=historie)
+        Vignette.objects._erstellen(historie=historie)  # noqa: SLF001
 
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects._erstellen(historie=historie)
+            Vignette.objects._erstellen(historie=historie)  # noqa: SLF001
 
     def test_finalisiert_am_muss_genau_dem_zustand_entsprechen(self) -> None:
         """Eine finale Fassung darf keinen leeren Finalisierungszeitpunkt haben."""
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects._erstellen(
+            Vignette.objects._erstellen(  # noqa: SLF001
                 historie=Vignettenhistorie.objects.create(),
                 zustand=Vignette.Zustand.FINAL,
+                lernauftrag_text="Lernauftrag",
                 arbeitsheft_text="Bearbeitung",
             )
 
     def test_entwurf_darf_keinen_finalisierungszeitpunkt_haben(self) -> None:
         """Ein Entwurf kann keinen bereits gesetzten Finalisierungszeitpunkt tragen."""
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects._erstellen(
+            Vignette.objects._erstellen(  # noqa: SLF001
                 historie=Vignettenhistorie.objects.create(),
                 finalisiert_am=timezone.now(),
             )
@@ -481,14 +437,14 @@ class VignetteConstraintTests(TestCase):
         """Eine archivierte Schwester kann nicht erneut final werden."""
         historie: Vignettenhistorie = Vignettenhistorie.objects.create()
         finalisiert_am: datetime = timezone.now()
-        vorgaengerin: Vignette = Vignette.objects._erstellen(
+        vorgaengerin: Vignette = Vignette.objects._erstellen(  # noqa: SLF001
             historie=historie,
             zustand=Vignette.Zustand.FINAL,
             finalisiert_am=finalisiert_am,
             lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
-        Vignette.objects._erstellen(
+        Vignette.objects._erstellen(  # noqa: SLF001
             historie=historie,
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.FINAL,
@@ -496,7 +452,7 @@ class VignetteConstraintTests(TestCase):
             lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
-        archivierte_schwester: Vignette = Vignette.objects._erstellen(
+        archivierte_schwester: Vignette = Vignette.objects._erstellen(  # noqa: SLF001
             historie=historie,
             vorgaengerin=vorgaengerin,
             zustand=Vignette.Zustand.ARCHIVIERT,
@@ -507,50 +463,24 @@ class VignetteConstraintTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             archivierte_schwester.entarchivieren()
 
-    def test_finale_fassung_braucht_arbeitsheft_text_oder_bild(self) -> None:
-        """Die Arbeitsheft-OR-Constraint schützt finale Fassungen."""
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Vignette.objects._erstellen(
-                historie=Vignettenhistorie.objects.create(),
-                zustand=Vignette.Zustand.FINAL,
-                finalisiert_am=timezone.now(),
-            )
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("teil", "anderer_teil"),
+    [("lernauftrag", "arbeitsheft"), ("arbeitsheft", "lernauftrag")],
+)
+def test_finale_fassung_braucht_text_oder_bild_im_teil(
+    teil: str, anderer_teil: str
+) -> None:
+    """Die Text-oder-Bild-Constraint jedes Teils schützt finale Fassungen."""
 
-@pytest.mark.django_db(transaction=True)
-def test_geschlechter_migration_fuellt_leere_bestandswerte_auf() -> None:
-    """Die Pflicht-Constraint-Migration bleibt für alte Entwürfe installierbar."""
-
-    vorher: list[tuple[str, str]] = [
-        ("vignetten", "0006_vignette_arbeitsheft_simulationshinweise_and_more")
-    ]
-    nachher: list[tuple[str, str]] = MigrationExecutor(
-        connection
-    ).loader.graph.leaf_nodes()
-    executor = MigrationExecutor(connection)
-    executor.migrate(vorher)
-    try:
-        apps = executor.loader.project_state(vorher).apps
-        Historie = apps.get_model("vignetten", "Vignettenhistorie")
-        VignetteVorher = apps.get_model("vignetten", "Vignette")
-        alte_fassung = VignetteVorher.objects.create(
-            historie=Historie.objects.create(),
-            schuelerin_geschlecht="",
-            lehrperson_geschlecht="",
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Vignette.objects._erstellen(  # noqa: SLF001
+            historie=Vignettenhistorie.objects.create(),
+            zustand=Vignette.Zustand.FINAL,
+            finalisiert_am=timezone.now(),
+            **{f"{teil}_text": "", f"{anderer_teil}_text": "Inhalt"},
         )
-
-        executor = MigrationExecutor(connection)
-        executor.migrate([("vignetten", "0007_geschlechter_nicht_leer")])
-        apps = executor.loader.project_state(
-            [("vignetten", "0007_geschlechter_nicht_leer")]
-        ).apps
-        VignetteNachher = apps.get_model("vignetten", "Vignette")
-        migrierte_fassung = VignetteNachher.objects.get(pk=alte_fassung.pk)
-    finally:
-        MigrationExecutor(connection).migrate(nachher)
-
-    assert migrierte_fassung.schuelerin_geschlecht == Vignette.Geschlecht.WEIBLICH
-    assert migrierte_fassung.lehrperson_geschlecht == Vignette.Geschlecht.WEIBLICH
 
 
 class VignetteSichtbarFuerQuerySetTests(TestCase):
@@ -558,53 +488,22 @@ class VignetteSichtbarFuerQuerySetTests(TestCase):
 
     def setUp(self) -> None:
         """Erzeugt Fassungen für verschiedene Sichtbarkeitsrollen."""
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.grace: Konto = get_user_model().objects.create_user(username="grace")
-        self.linus: Konto = get_user_model().objects.create_user(username="linus")
-        self.dijkstra: Konto = get_user_model().objects.create_user(username="dijkstra")
-        self.administratorin: Konto = get_user_model().objects.create_user(
-            username="admin"
-        )
-        self.administratorin.is_superuser = True
-        self.administratorin.save()
+        self.ada: Konto = konto_mit_rollen("ada")
+        grace: Konto = konto_mit_rollen("grace")
+        linus: Konto = konto_mit_rollen("linus")
+        self.dijkstra: Konto = konto_mit_rollen("dijkstra")
+        self.administratorin: Konto = konto_mit_rollen("admin", is_superuser=True)
 
-        eigene_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        eigene_historie.eigentuemerinnen.add(self.ada)
-        self.eigene_fassung: Vignette = Vignette.objects._erstellen(
-            historie=eigene_historie
-        )
-        geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        geteilte_historie.eigentuemerinnen.add(self.ada, self.grace)
-        self.geteilte_finale: Vignette = Vignette.objects._erstellen(
-            historie=geteilte_historie,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-        )
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        fremde_historie.eigentuemerinnen.add(self.linus)
-        self.fremde_fassung: Vignette = Vignette.objects._erstellen(
-            historie=fremde_historie
-        )
+        self.eigene_fassung: Vignette = vignetten_entwurf(self.ada)
+        self.geteilte_finale: Vignette = finale_vignette(self.ada)
+        self.geteilte_finale.historie.eigentuemerinnen.add(grace)
+        self.fremde_fassung: Vignette = vignetten_entwurf(linus)
 
     def test_sichtbar_fuer_liefert_eigene_und_geteilte_fassungen(self) -> None:
         """Eine Eigentümerin sieht eigene und geteilte Fassungen."""
         self.assertEqual(
             list(Vignette.objects.sichtbar_fuer(self.ada)),
             [self.eigene_fassung, self.geteilte_finale],
-        )
-
-    def test_sichtbar_fuer_liefert_koeigentuemerin_geteilte_fassung(self) -> None:
-        """Eine Ko-Eigentümerin sieht die geteilte Fassung."""
-        self.assertEqual(
-            list(Vignette.objects.sichtbar_fuer(self.grace)), [self.geteilte_finale]
-        )
-
-    def test_sichtbar_fuer_liefert_dritter_ihre_fassung(self) -> None:
-        """Eine nicht beteiligte Person sieht nur ihre eigene Fassung."""
-        self.assertEqual(
-            list(Vignette.objects.sichtbar_fuer(self.linus)), [self.fremde_fassung]
         )
 
     def test_sichtbar_fuer_liefert_unbeteiligter_keine_fassung(self) -> None:
@@ -634,102 +533,48 @@ class VignetteSichtbarFuerQuerySetTests(TestCase):
 
 
 class VignetteQuerySetTests(TestCase):
-    """Die QuerySet-Methoden filtern Vignetten und ihre Historien."""
-
-    def test_sichtbar_fuer_liefert_nur_den_eigentuemer_kreis(self) -> None:
-        """Ko-Eigentümerinnen sehen dieselbe Historie, fremde Konten nicht."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        linus: Konto = get_user_model().objects.create_user(username="linus")
-        geteilte_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        geteilte_historie.eigentuemerinnen.add(ada, grace)
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        fremde_historie.eigentuemerinnen.add(linus)
-
-        self.assertEqual(
-            list(Vignettenhistorie.objects.sichtbar_fuer(grace)), [geteilte_historie]
-        )
-
-    def test_sichtbar_fuer_liefert_alle_historien_fuer_administration(self) -> None:
-        """Die Administration sieht auch fremde Vignettenhistorien."""
-        administratorin: Konto = get_user_model().objects.create_user(username="admin")
-        administratorin.is_superuser = True
-        administratorin.save()
-        fremde_historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        fremde_historie.eigentuemerinnen.add(
-            get_user_model().objects.create_user(username="linus")
-        )
-
-        self.assertEqual(
-            list(Vignettenhistorie.objects.sichtbar_fuer(administratorin)),
-            [fremde_historie],
-        )
+    """Die QuerySet-Methoden filtern Vignetten."""
 
     def test_einbindbar_liefert_nur_finale_fassungen(self) -> None:
         """Entwürfe und archivierte Fassungen sind nicht einbindbar."""
-        Vignette.objects._erstellen(historie=Vignettenhistorie.objects.create())
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-        )
-        Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            zustand=Vignette.Zustand.ARCHIVIERT,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-        )
+        ada: Konto = konto_mit_rollen("ada")
+        vignetten_entwurf(ada)
+        finale: Vignette = finale_vignette(ada)
+        finale_vignette(ada).archivieren()
 
         self.assertEqual(list(Vignette.objects.einbindbar()), [finale])
 
-    def test_historie_archivieren_beruehrt_keine_fassung(self) -> None:
-        """Das Archiv-Flag der Historie ist unabhängig vom Fassungslifecycle."""
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        vignette: Vignette = Vignette.objects._erstellen(historie=historie)
 
-        historie.archiviert = True
-        historie.save(update_fields=["archiviert"])
-
-        vignette.refresh_from_db()
-        self.assertTrue(historie.archiviert)
-        self.assertEqual(vignette.zustand, Vignette.Zustand.ENTWURF)
+def _vollstaendiger_entwurf(konto: Konto) -> Vignette:
+    """Legt einen finalisierbaren Entwurf an, gepinnt auf den finalen Kern."""
+    vignette: Vignette = vignetten_entwurf(konto)
+    vignette.fehlermuster_beschreibung = "Zählt die Stellenwerte einzeln."
+    vignette.lernauftrag_text = "Addiere 27 und 15."
+    vignette.arbeitsheft_bildbeschreibung = "27 + 15 = 312"
+    vignette.arbeitsheft_text = "27 + 15 = 312"
+    vignette.schuelerin_name = "Mia"
+    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.lehrperson_name = "Frau Weber"
+    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
+    vignette.fach = "Mathematik"
+    vignette.thema = "Addition"
+    vignette.klassenstufe = "5"
+    vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
+    vignette.budget_wert = 5
+    vignette.save()
+    return vignette
 
 
 class VignetteFinalisierenTests(TestCase):
     """Das Finalisieren prüft die Vignette über ihre öffentliche Modell-API."""
 
-    def _vollstaendigen_entwurf_anlegen(
-        self, kern_ueberholen: bool = False
-    ) -> Vignette:
-        # Erstellt einen vollständigen Entwurf, auf Wunsch mit überholtem Kern-Pin.
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        if kern_ueberholen:
-            kern.bearbeiten().finalisieren()
-        return Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag_text="Addiere 27 und 15.",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Frau Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
+    def setUp(self) -> None:
+        """Legt die Autorin der Entwürfe an."""
+        self.ada: Konto = konto_mit_rollen("ada")
 
     def test_finalisieren_ueberfuehrt_vollstaendigen_entwurf_nach_final(self) -> None:
         """Eine vollständige Fassung wird final und erhält einen Zeitpunkt."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
 
         vignette.finalisieren()
 
@@ -739,7 +584,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finale_fassung_ist_unveraenderlich(self) -> None:
         """Inhalte einer finalen Fassung lassen sich nicht mehr überschreiben."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
         vignette.finalisieren()
         vignette.lernauftrag_text = "Addiere 28 und 15."
 
@@ -748,7 +593,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisiert_am_wird_nie_zurueckgesetzt(self) -> None:
         """Der Finalisierungszeitpunkt überlebt jede spätere Zustandsänderung."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
         vignette.finalisieren()
         vignette.finalisiert_am = None
 
@@ -757,7 +602,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finale_fassung_laesst_keine_massenmutation_zu(self) -> None:
         """Auch der QuerySet-Zugang kann eine finale Fassung nicht verändern."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
         vignette.finalisieren()
 
         with self.assertRaises(RuntimeError):
@@ -765,28 +610,8 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisieren_lehnt_nichtentwuerfe_ab(self) -> None:
         """Finalisieren ist ausschließlich die Kante vom Entwurf nach final."""
-        finale: Vignette = self._vollstaendigen_entwurf_anlegen()
-        finale.finalisieren()
-        kern2: Simulationskern = finale.gepinnter_kern.bearbeiten()
-        kern2.finalisieren()
-        archivierte: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag_text="Addiere 27 und 15.",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Frau Weber",
-            lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern2,
-        )
-        archivierte.finalisieren()
+        finale: Vignette = finale_vignette(self.ada)
+        archivierte: Vignette = finale_vignette(self.ada)
         archivierte.archivieren()
 
         for vignette in (finale, archivierte):
@@ -796,7 +621,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
         """Eine inzwischen finalisierte Fassung meldet den abgelehnten Übergang."""
-        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
+        erster_tab: Vignette = _vollstaendiger_entwurf(self.ada)
         zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
         erster_tab.finalisieren()
 
@@ -807,8 +632,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_archivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
         """Eine inzwischen archivierte Fassung meldet den abgelehnten Übergang."""
-        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
-        erster_tab.finalisieren()
+        erster_tab: Vignette = finale_vignette(self.ada)
         zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
         erster_tab.archivieren()
 
@@ -819,8 +643,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_entarchivieren_in_zweitem_tab_lehnt_den_uebergang_ab(self) -> None:
         """Eine inzwischen entarchivierte Fassung meldet den abgelehnten Übergang."""
-        erster_tab: Vignette = self._vollstaendigen_entwurf_anlegen()
-        erster_tab.finalisieren()
+        erster_tab: Vignette = finale_vignette(self.ada)
         erster_tab.archivieren()
         zweiter_tab: Vignette = Vignette.objects.get(pk=erster_tab.pk)
         erster_tab.entarchivieren()
@@ -830,85 +653,9 @@ class VignetteFinalisierenTests(TestCase):
         ):
             zweiter_tab.entarchivieren()
 
-    def test_finalisieren_lehnt_leeren_lernauftrag_ab(self) -> None:
-        """Der Lernauftrag braucht sichtbar Text oder ein Bild."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.lernauftrag_text = ""
-
-        with self.assertRaisesMessage(ValidationError, "Lernauftrag"):
-            vignette.finalisieren()
-
-    def test_finalisieren_nimmt_lernauftrag_nur_mit_bild_an(self) -> None:
-        """Ein Bild allein erfüllt die Lernauftrag-Alternative."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.lernauftrag_text = ""
-        vignette.lernauftrag_bild = "vignettenbilder/auftrag.gif"
-        vignette.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
-
-        vignette.finalisieren()
-
-        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
-
-    def test_finalisieren_erlaubt_leere_lernauftrag_bildbeschreibung_ohne_bild(
-        self,
-    ) -> None:
-        """Eine Lernauftrag-Bildbeschreibung ist ohne Bild nicht erforderlich."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.lernauftrag_bildbeschreibung = ""
-
-        vignette.finalisieren()
-
-        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
-
-    def test_finalisieren_braucht_lernauftrag_bildbeschreibung_mit_bild(self) -> None:
-        """Ein Lernauftrag-Bild braucht beim Finalisieren seinen Alt-Text."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.lernauftrag_bild = "vignettenbilder/auftrag.gif"
-
-        with self.assertRaisesMessage(ValidationError, "Lernauftrag-Bild"):
-            vignette.finalisieren()
-
-    def test_finalisieren_lehnt_leeres_arbeitsheft_ab(self) -> None:
-        """Das Arbeitsheft braucht sichtbar Text oder ein Bild."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.arbeitsheft_text = ""
-
-        with self.assertRaisesMessage(ValidationError, "Arbeitsheft"):
-            vignette.finalisieren()
-
-    def test_finalisieren_nimmt_arbeitsheft_nur_mit_bild_an(self) -> None:
-        """Ein Bild allein erfüllt die Arbeitsheft-Alternative."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.arbeitsheft_text = ""
-        vignette.arbeitsheft_bild = SimpleUploadedFile(
-            "arbeitsheft.png", b"bild", content_type="image/png"
-        )
-
-        vignette.finalisieren()
-
-        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
-
-    def test_finalisieren_erlaubt_leere_bildbeschreibung_ohne_bild(self) -> None:
-        """Eine Beschreibung ist nur zusammen mit einem Bild erforderlich."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.arbeitsheft_bildbeschreibung = ""
-
-        vignette.finalisieren()
-
-        self.assertEqual(vignette.zustand, Vignette.Zustand.FINAL)
-
-    def test_finalisieren_braucht_bildbeschreibung_mit_bild(self) -> None:
-        """Ein sichtbares Bild ist ohne seinen Alt-Text nicht finalisierbar."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
-        vignette.arbeitsheft_bild = "vignettenbilder/heft.gif"
-        vignette.arbeitsheft_bildbeschreibung = ""
-
-        with self.assertRaisesMessage(ValidationError, "Bildbeschreibung"):
-            vignette.finalisieren()
-
     def test_finalisieren_lehnt_nichtpositives_budget_ab(self) -> None:
         """Ein Gesprächsbudget muss mindestens einen Schritt oder eine Zeit tragen."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
         vignette.budget_wert = 0
 
         with self.assertRaisesMessage(ValidationError, "größer als 0"):
@@ -916,7 +663,8 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisieren_laesst_ueberholten_kern_pin_zu(self) -> None:
         """Ein überholter Pin hält niemanden auf; Vorspulen ist eine Wahl."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen(kern_ueberholen=True)
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
+        vignette.gepinnter_kern.bearbeiten().finalisieren()
 
         vignette.finalisieren()
 
@@ -928,7 +676,7 @@ class VignetteFinalisierenTests(TestCase):
 
     def test_finalisieren_lehnt_fehlenden_kern_pin_ab(self) -> None:
         """Ohne gepinnten Kern gäbe es zur Spielzeit kein Gesprächsverhalten."""
-        vignette: Vignette = self._vollstaendigen_entwurf_anlegen()
+        vignette: Vignette = _vollstaendiger_entwurf(self.ada)
         vignette.gepinnter_kern = None
         vignette.save()
 
@@ -936,23 +684,84 @@ class VignetteFinalisierenTests(TestCase):
             vignette.finalisieren()
 
 
+_TEILE: list[tuple[str, str]] = [
+    ("lernauftrag", "Lernauftrag"),
+    ("arbeitsheft", "Arbeitsheft"),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("teil", "label"), _TEILE)
+def test_finalisieren_lehnt_leeren_teil_ab(teil: str, label: str) -> None:
+    """Jeder Teil des Aufgabenkontexts braucht sichtbar Text oder ein Bild."""
+
+    vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))
+    setattr(vignette, f"{teil}_text", "")
+
+    with pytest.raises(ValidationError, match=f"{label} Text oder ein Bild"):
+        vignette.finalisieren()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_finalisieren_nimmt_teil_nur_mit_bild_an(teil: str) -> None:
+    """Ein Bild mit Beschreibung erfüllt die Alternative ohne Text."""
+
+    vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))
+    setattr(vignette, f"{teil}_text", "")
+    setattr(vignette, f"{teil}_bild", "vignettenbilder/blatt.gif")
+    setattr(vignette, f"{teil}_bildbeschreibung", "Blatt mit Zahlenreihe")
+
+    vignette.finalisieren()
+
+    assert vignette.zustand == Vignette.Zustand.FINAL
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_finalisieren_erlaubt_leere_bildbeschreibung_ohne_bild(teil: str) -> None:
+    """Eine Bildbeschreibung ist nur zusammen mit einem Bild erforderlich."""
+
+    vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))
+    setattr(vignette, f"{teil}_bildbeschreibung", "")
+
+    vignette.finalisieren()
+
+    assert vignette.zustand == Vignette.Zustand.FINAL
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("teil", "label"), _TEILE)
+def test_finalisieren_braucht_bildbeschreibung_mit_bild(teil: str, label: str) -> None:
+    """Ein sichtbares Bild ist ohne seinen Alt-Text nicht finalisierbar."""
+
+    vignette: Vignette = _vollstaendiger_entwurf(konto_mit_rollen("ada"))
+    setattr(vignette, f"{teil}_bild", "vignettenbilder/blatt.gif")
+    setattr(vignette, f"{teil}_bildbeschreibung", "")
+
+    with pytest.raises(ValidationError, match=f"{label}-Bild"):
+        vignette.finalisieren()
+
+
 class VignetteBearbeitenTests(TestCase):
     """Das Bearbeiten erzeugt eine neue, unveränderte Entwurfsfassung."""
 
+    def setUp(self) -> None:
+        """Legt die Autorin der Fassungen an."""
+        self.ada: Konto = konto_mit_rollen("ada")
+
     def test_bearbeiten_erbt_pin_und_akteure_ohne_finale_zu_mutieren(self) -> None:
-        """Eine finale Fassung bleibt beim Anlegen ihres Nachfolgeentwurfs erhalten."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
+        """Der Folgeentwurf übernimmt alle Inhalte; die Quelle bleibt final."""
+        finale: Vignette = finale_vignette(
+            self.ada,
             fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
             lernauftrag_text="Addiere 27 und 15.",
             lernauftrag_bild="vignettenbilder/auftrag.gif",
             lernauftrag_bildbeschreibung="Arbeitsblatt mit Addition",
             lernauftrag_simulationshinweise="Zusatzhinweis zum Lernauftrag",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
             arbeitsheft_text="27 + 15 = 312",
             arbeitsheft_bild="vignettenbilder/heft.gif",
+            arbeitsheft_bildbeschreibung="Heftseite mit 312",
             arbeitsheft_simulationshinweise="Zusatzhinweis zum Arbeitsheft",
             schuelerin_name="Mia",
             schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
@@ -961,35 +770,70 @@ class VignetteBearbeitenTests(TestCase):
             fach="Mathematik",
             thema="Addition",
             klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
+            referenzdiagnose="Stellenwerte werden nicht ausgerichtet.",
+            budget_typ=Vignette.BudgetTyp.ZEIT,
             budget_wert=5,
-            gepinnter_kern=kern,
         )
-        finale.finalisieren()
         finale.schuelerin_name = "Nicht gespeicherter Name"
 
         entwurf: Vignette = finale.bearbeiten()
 
-        self.assertEqual(entwurf.zustand, Vignette.Zustand.ENTWURF)
-        self.assertEqual(entwurf.historie, finale.historie)
-        self.assertEqual(entwurf.vorgaengerin, finale)
-        self.assertEqual(entwurf.gepinnter_kern, kern)
-        self.assertEqual(entwurf.lernauftrag_bild.name, "vignettenbilder/auftrag.gif")
         self.assertEqual(
-            entwurf.lernauftrag_bildbeschreibung, "Arbeitsblatt mit Addition"
+            {
+                "zustand": entwurf.zustand,
+                "historie": entwurf.historie,
+                "vorgaengerin": entwurf.vorgaengerin,
+                "gepinnter_kern": entwurf.gepinnter_kern,
+                "fehlermuster_beschreibung": entwurf.fehlermuster_beschreibung,
+                "lernauftrag_text": entwurf.lernauftrag_text,
+                "lernauftrag_bild": entwurf.lernauftrag_bild.name,
+                "lernauftrag_bildbeschreibung": entwurf.lernauftrag_bildbeschreibung,
+                "lernauftrag_simulationshinweise": (
+                    entwurf.lernauftrag_simulationshinweise
+                ),
+                "arbeitsheft_text": entwurf.arbeitsheft_text,
+                "arbeitsheft_bild": entwurf.arbeitsheft_bild.name,
+                "arbeitsheft_bildbeschreibung": entwurf.arbeitsheft_bildbeschreibung,
+                "arbeitsheft_simulationshinweise": (
+                    entwurf.arbeitsheft_simulationshinweise
+                ),
+                "schuelerin_name": entwurf.schuelerin_name,
+                "schuelerin_geschlecht": entwurf.schuelerin_geschlecht,
+                "lehrperson_name": entwurf.lehrperson_name,
+                "lehrperson_geschlecht": entwurf.lehrperson_geschlecht,
+                "fach": entwurf.fach,
+                "thema": entwurf.thema,
+                "klassenstufe": entwurf.klassenstufe,
+                "referenzdiagnose": entwurf.referenzdiagnose,
+                "budget_typ": entwurf.budget_typ,
+                "budget_wert": entwurf.budget_wert,
+            },
+            {
+                "zustand": "entwurf",
+                "historie": finale.historie,
+                "vorgaengerin": finale,
+                "gepinnter_kern": finaler_kern(),
+                "fehlermuster_beschreibung": "Zählt die Stellenwerte einzeln.",
+                "lernauftrag_text": "Addiere 27 und 15.",
+                "lernauftrag_bild": "vignettenbilder/auftrag.gif",
+                "lernauftrag_bildbeschreibung": "Arbeitsblatt mit Addition",
+                "lernauftrag_simulationshinweise": "Zusatzhinweis zum Lernauftrag",
+                "arbeitsheft_text": "27 + 15 = 312",
+                "arbeitsheft_bild": "vignettenbilder/heft.gif",
+                "arbeitsheft_bildbeschreibung": "Heftseite mit 312",
+                "arbeitsheft_simulationshinweise": "Zusatzhinweis zum Arbeitsheft",
+                "schuelerin_name": "Mia",
+                "schuelerin_geschlecht": "weiblich",
+                "lehrperson_name": "Herr Koch",
+                "lehrperson_geschlecht": "männlich",
+                "fach": "Mathematik",
+                "thema": "Addition",
+                "klassenstufe": "5",
+                "referenzdiagnose": "Stellenwerte werden nicht ausgerichtet.",
+                "budget_typ": "zeit",
+                "budget_wert": 5,
+            },
         )
-        self.assertEqual(
-            entwurf.lernauftrag_simulationshinweise, "Zusatzhinweis zum Lernauftrag"
-        )
-        self.assertEqual(entwurf.arbeitsheft_bild.name, "vignettenbilder/heft.gif")
-        self.assertEqual(entwurf.arbeitsheft_bildbeschreibung, "27 + 15 = 312")
-        self.assertEqual(
-            entwurf.arbeitsheft_simulationshinweise, "Zusatzhinweis zum Arbeitsheft"
-        )
-        self.assertEqual(entwurf.schuelerin_name, "Mia")
-        self.assertEqual(entwurf.schuelerin_geschlecht, Vignette.Geschlecht.WEIBLICH)
-        self.assertEqual(entwurf.lehrperson_name, "Herr Koch")
-        self.assertEqual(entwurf.lehrperson_geschlecht, Vignette.Geschlecht.MAENNLICH)
         finale.refresh_from_db()
         self.assertEqual(finale.zustand, Vignette.Zustand.FINAL)
 
@@ -997,25 +841,8 @@ class VignetteBearbeitenTests(TestCase):
         self,
     ) -> None:
         """Eine Historie bleibt linear, statt den Datenbank-Constraint auszulösen."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-            gepinnter_kern=kern,
-        )
-        Vignette.objects._erstellen(
-            historie=finale.historie,
-            vorgaengerin=finale,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-            gepinnter_kern=kern,
-        )
+        finale: Vignette = finale_vignette(self.ada)
+        finale.bearbeiten().finalisieren()
 
         with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
             finale.bearbeiten()
@@ -1024,34 +851,10 @@ class VignetteBearbeitenTests(TestCase):
         self,
     ) -> None:
         """Eine archivierte Zwischenspitze gibt ältere Fassungen nicht frei."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        erste: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-            gepinnter_kern=kern,
-        )
-        zweite: Vignette = Vignette.objects._erstellen(
-            historie=erste.historie,
-            vorgaengerin=erste,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-            gepinnter_kern=kern,
-        )
-        Vignette.objects._erstellen(
-            historie=erste.historie,
-            vorgaengerin=zweite,
-            zustand=Vignette.Zustand.FINAL,
-            finalisiert_am=timezone.now(),
-            lernauftrag_text="Lernauftrag",
-            arbeitsheft_text="Bearbeitung",
-            gepinnter_kern=kern,
-        )
+        erste: Vignette = finale_vignette(self.ada)
+        zweite: Vignette = erste.bearbeiten()
+        zweite.finalisieren()
+        zweite.bearbeiten().finalisieren()
         zweite.archivieren()
 
         with self.assertRaisesMessage(ValidationError, "Nachfolgerin"):
@@ -1059,14 +862,9 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_vorspulen_aktualisiert_nur_den_pin_eines_entwurfs(self) -> None:
         """Der Kern-Pin wechselt ausschließlich auf ausdrücklichen Aufruf im Entwurf."""
-        erster_kern: Simulationskern = Simulationskern.objects.anlegen()
-        erster_kern.finalisieren()
-        neuester_kern: Simulationskern = erster_kern.bearbeiten()
+        entwurf: Vignette = vignetten_entwurf(self.ada)
+        neuester_kern: Simulationskern = entwurf.gepinnter_kern.bearbeiten()
         neuester_kern.finalisieren()
-        entwurf: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            gepinnter_kern=erster_kern,
-        )
 
         entwurf.vorspulen()
 
@@ -1075,26 +873,7 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_finale_fassung_kann_archiviert_und_entarchiviert_werden(self) -> None:
         """Die beiden Archiv-Kanten ändern nur den Zustand der finalen Fassung."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag_text="Addiere 27 und 15.",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Herr Koch",
-            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
-        vignette.finalisieren()
+        vignette: Vignette = finale_vignette(self.ada)
 
         with self.assertRaisesMessage(ValidationError, "Entwürfe"):
             vignette.vorspulen()
@@ -1109,26 +888,7 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_nur_entwuerfe_duerfen_physisch_geloescht_werden(self) -> None:
         """Finale und archivierte Fassungen bleiben als Datenspur erhalten."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag_text="Addiere 27 und 15.",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Herr Koch",
-            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
-        finale.finalisieren()
+        finale: Vignette = finale_vignette(self.ada)
         entwurf: Vignette = finale.bearbeiten()
 
         entwurf.delete()
@@ -1142,8 +902,8 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_letzte_fassung_nimmt_ihre_historie_mit(self) -> None:
         """Eine Historie ohne Fassung trägt nichts mehr und bleibt nicht zurück."""
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        entwurf: Vignette = Vignette.objects._erstellen(historie=historie)
+        entwurf: Vignette = vignetten_entwurf(self.ada)
+        historie: Vignettenhistorie = entwurf.historie
 
         entwurf.delete()
 
@@ -1151,40 +911,20 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_historie_mit_weiterer_fassung_bleibt_bestehen(self) -> None:
         """Nur die leer gewordene Historie wird abgeräumt, keine belegte."""
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-        finale: Vignette = Vignette.objects._erstellen(
-            historie=historie,
-            fehlermuster_beschreibung="Zählt die Stellenwerte einzeln.",
-            lernauftrag_text="Addiere 27 und 15.",
-            arbeitsheft_bildbeschreibung="27 + 15 = 312",
-            arbeitsheft_text="27 + 15 = 312",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            lehrperson_name="Herr Koch",
-            lehrperson_geschlecht=Vignette.Geschlecht.MAENNLICH,
-            fach="Mathematik",
-            thema="Addition",
-            klassenstufe="5",
-            budget_typ=Vignette.BudgetTyp.SCHRITTE,
-            budget_wert=5,
-            gepinnter_kern=kern,
-        )
-        finale.finalisieren()
+        finale: Vignette = finale_vignette(self.ada)
         entwurf: Vignette = finale.bearbeiten()
 
         entwurf.delete()
 
-        self.assertTrue(Vignettenhistorie.objects.filter(pk=historie.pk).exists())
+        self.assertTrue(
+            Vignettenhistorie.objects.filter(pk=finale.historie.pk).exists()
+        )
 
     def test_massenloeschung_raeumt_leer_gewordene_historien_ab(self) -> None:
         """Auch der QuerySet-Weg hinterlässt keine fassungslose Historie."""
         historien: list[Vignettenhistorie] = [
-            Vignettenhistorie.objects.create() for _ in range(2)
+            vignetten_entwurf(self.ada).historie for _ in range(2)
         ]
-        for historie in historien:
-            Vignette.objects._erstellen(historie=historie)
 
         Vignette.objects.filter(zustand=Vignette.Zustand.ENTWURF).delete()
 
@@ -1196,9 +936,7 @@ class VignetteBearbeitenTests(TestCase):
 
     def test_zustandswechsel_sind_auf_lebenszyklus_methoden_beschraenkt(self) -> None:
         """Direkte ORM-Saves dürfen keine Kante des Automaten umgehen."""
-        entwurf: Vignette = Vignette.objects._erstellen(
-            historie=Vignettenhistorie.objects.create(),
-        )
+        entwurf: Vignette = vignetten_entwurf(self.ada)
         entwurf.zustand = Vignette.Zustand.ARCHIVIERT
 
         with self.assertRaisesMessage(ValidationError, "Zustandswechsel"):
