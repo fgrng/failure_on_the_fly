@@ -59,5 +59,5 @@ Finalisieren aus. Finalisieren bleibt in jedem Szenario möglich.
 Der Runner nutzt die echten Templates, Navigation und Design-Tokens, aber keine
 Datenbank, Modellaufrufe oder produktiven Aktionen. Er bindet nur an localhost.
 Ein regulärer Django-Start erhält weder Prototyp-Route noch Variantenleiste. Die
-gewählte Darstellung soll später in #299 umgesetzt werden. Der Branch und ein
-Issue-Verweis wurden noch nicht veröffentlicht.
+gewählte Darstellung soll später in #299 umgesetzt werden. Dieser Branch dient
+als Primärquelle für die in #296 festgehaltene Entscheidung.
