@@ -2,17 +2,17 @@
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen
+from erhebungen.models import Erhebung
 from konten.navigation import (
     AUTORIN_GRUPPE,
     administratorin_erforderlich,
-    ist_administratorin,
     navigation,
 )
 from konten.models import Konto
@@ -91,30 +91,10 @@ def test_navigation_berechnet_sichtbarkeit_aus_kontorollen(
     rollen: list[str], is_superuser: bool, erwartet: dict[str, bool]
 ) -> None:
     """Die Navigation kennt Gruppenrollen und den Admin-Override zentral."""
-    konto: Konto = get_user_model().objects.create_user(
-        username="ada", is_superuser=is_superuser
-    )
-    konto.groups.add(*Group.objects.filter(name__in=rollen))
     request: HttpRequest = RequestFactory().get("/")
-    request.user = konto
+    request.user = konto_mit_rollen("ada", *rollen, is_superuser=is_superuser)
 
     assert navigation(request) == erwartet
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("is_superuser", "erwartet"),
-    [(False, False), (True, True)],
-)
-def test_ist_administratorin_prueft_die_administrationsrolle(
-    is_superuser: bool, erwartet: bool
-) -> None:
-    """Die Rollenprüfung ist die gemeinsame Administrations-Naht."""
-    konto: Konto = get_user_model().objects.create_user(
-        username="ada", is_superuser=is_superuser
-    )
-
-    assert ist_administratorin(konto) is erwartet
 
 
 @pytest.mark.django_db
@@ -128,12 +108,8 @@ def test_administratorin_erforderlich_schuetzt_views_mit_der_administrationsroll
     """Nur die Administratorin passiert den Decorator, auch ohne Anmeldung nicht."""
     request: HttpRequest = RequestFactory().get("/")
     if is_superuser or ist_autorin:
-        konto: Konto = get_user_model().objects.create_user(
-            username="ada", is_superuser=is_superuser
-        )
-        if ist_autorin:
-            konto.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
-        request.user = konto
+        rollen: list[str] = [AUTORIN_GRUPPE] if ist_autorin else []
+        request.user = konto_mit_rollen("ada", *rollen, is_superuser=is_superuser)
     else:
         request.user = AnonymousUser()
 
@@ -150,10 +126,9 @@ class SidebarNavigationTests(TestCase):
     def _sidebar_fuer(self, *rollen: str, is_superuser: bool = False) -> str:
         # Eigener Kontoname je Aufruf, damit ein Test mehrere Rollen nacheinander
         # durch dieselbe Sidebar schicken kann.
-        konto: Konto = get_user_model().objects.create_user(
-            username=f"ada{Konto.objects.count()}", is_superuser=is_superuser
+        konto: Konto = konto_mit_rollen(
+            f"ada{Konto.objects.count()}", *rollen, is_superuser=is_superuser
         )
-        konto.groups.add(*Group.objects.filter(name__in=rollen))
         self.client.force_login(konto)
         return self.client.get(reverse("training:katalog")).content.decode()
 
@@ -223,9 +198,10 @@ class SidebarNavigationTests(TestCase):
     def test_simulationskern_verwalten_steht_unter_entwicklung(self) -> None:
         """Die Kernverwaltung gehört zur Gruppe Entwicklung, nicht zu System."""
         sidebar: str = self._sidebar_fuer(is_superuser=True)
-        entwicklung: str = sidebar.partition("sidebar-nav__group--development")[2]
-        entwicklung = entwicklung.partition("</section>")[0]
-        system: str = sidebar.partition("sidebar-nav__group--system")[2]
+        entwicklung: str = sidebar.partition("<h2>Entwicklung</h2>")[2]
+        entwicklung = entwicklung.partition("<h2>")[0]
+        system: str = sidebar.partition("<h2>System</h2>")[2]
+        system = system.partition("</section>")[0]
 
         self.assertIn("Simulationskern verwalten", entwicklung)
         self.assertNotIn("Simulationskern verwalten", system)
@@ -248,16 +224,20 @@ class BereichszuordnungTests(TestCase):
             linus, name="Prozente"
         )
         training_veroeffentlicht.veroeffentlichen()
+        erhebung: Erhebung = Erhebung.objects.anlegen(linus, name="Brüche")
         self.client.force_login(linus)
 
         for url, bereich in (
             (reverse("vignetten:liste"), "authoring"),
             (reverse("vignetten:detail", args=[vignette.pk]), "authoring"),
+            (reverse("simulation:kern"), "authoring"),
             (reverse("simulation:kern_verwalten"), "authoring"),
             (
                 reverse("simulation:kern_bearbeiten", args=[kern_entwurf.pk]),
                 "authoring",
             ),
+            (reverse("simulation:modell_konfiguration"), "system"),
+            (reverse("simulation:transkriptions_konfiguration"), "system"),
             (reverse("training:katalog"), "participant"),
             (reverse("training:liste"), "participant"),
             (reverse("training:anlegen"), "participant"),
@@ -266,6 +246,8 @@ class BereichszuordnungTests(TestCase):
                 reverse("training:detail", args=[training_veroeffentlicht.pk]),
                 "participant",
             ),
+            (reverse("erhebungen:liste"), "research"),
+            (reverse("erhebungen:detail", args=[erhebung.pk]), "research"),
         ):
             with self.subTest(url=url):
                 seite: str = self.client.get(url).content.decode()

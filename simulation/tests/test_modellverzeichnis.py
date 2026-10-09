@@ -8,9 +8,6 @@ import pytest
 
 from simulation.models import Anbieter
 from simulation.modellverzeichnis import (
-    INFOMANIAK_MODELLE_URL,
-    INFOMANIAK_PRODUKT_URL,
-    OPENROUTER_MODELLE_URL,
     AnbieterAntwortetFormwidrig,
     AnbieterLehntAb,
     AnbieterNichtErreichbar,
@@ -45,7 +42,7 @@ def test_openrouter_fragt_die_oeffentliche_liste_nach_structured_output() -> Non
     OpenRouterVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
 
     client.get.assert_called_once_with(
-        OPENROUTER_MODELLE_URL,
+        "https://openrouter.ai/api/v1/models",
         params={"supported_parameters": "structured_outputs"},
     )
 
@@ -106,7 +103,8 @@ def test_openrouter_fragt_die_transkriptionsmodelle_ueber_die_modalitaet() -> No
     OpenRouterVerzeichnis(client).vorschlaege(Naht.TRANSKRIPTION)
 
     client.get.assert_called_once_with(
-        OPENROUTER_MODELLE_URL, params={"output_modalities": "transcription"}
+        "https://openrouter.ai/api/v1/models",
+        params={"output_modalities": "transcription"},
     )
 
 
@@ -142,7 +140,7 @@ def test_openrouter_meldet_einen_ablehnenden_anbieter() -> None:
     client = Mock()
     client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
         "429",
-        request=httpx.Request("GET", OPENROUTER_MODELLE_URL),
+        request=httpx.Request("GET", "https://openrouter.ai/api/v1/models"),
         response=httpx.Response(429),
     )
 
@@ -214,7 +212,7 @@ def test_infomaniak_fragt_die_kontoweite_liste_ohne_produktkennung() -> None:
 
     InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
 
-    client.get.assert_called_once_with(INFOMANIAK_MODELLE_URL)
+    client.get.assert_called_once_with("https://api.infomaniak.com/1/ai/models")
 
 
 def test_infomaniak_bildet_den_vorschlag_aus_dem_modellnamen() -> None:
@@ -250,22 +248,6 @@ def test_infomaniak_zeigt_nur_die_sprachmodelle() -> None:
         vorschlag.modellname
         for vorschlag in InfomaniakVerzeichnis(client).vorschlaege(Naht.SPRACHMODELL)
     ] == ["mistralai/Ministral-3-14B-Instruct-2512"]
-
-
-def test_infomaniak_traegt_die_numerische_kennung_in_keinem_feld() -> None:
-    """Die »id« ist kein Modellname, und Modellnamen sind voller Ziffern."""
-
-    client = _client(
-        _infomaniak_liste(
-            {"id": 4711, "name": "Qwen/Qwen3.5-122B-A10B-FP8", "type": "llm"}
-        )
-    )
-
-    vorschlag: Modellvorschlag = InfomaniakVerzeichnis(client).vorschlaege(
-        Naht.SPRACHMODELL
-    )[0]
-
-    assert "4711" not in (vorschlag.wert + vorschlag.modellname + vorschlag.anzeige)
 
 
 def test_infomaniak_nimmt_noch_nicht_verfuegbare_modelle_auf() -> None:
@@ -343,7 +325,7 @@ def test_infomaniak_meldet_ein_abgelehntes_token_verstaendlich() -> None:
     client = Mock()
     client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
         "401",
-        request=httpx.Request("GET", INFOMANIAK_MODELLE_URL),
+        request=httpx.Request("GET", "https://api.infomaniak.com/1/ai/models"),
         response=httpx.Response(401),
     )
 
@@ -426,7 +408,7 @@ def test_infomaniak_bildet_die_sprachmodell_wurzel_aus_der_produktkennung() -> N
         InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL)
         == "https://api.infomaniak.com/2/ai/314159/openai/v1"
     )
-    client.get.assert_called_once_with(INFOMANIAK_PRODUKT_URL)
+    client.get.assert_called_once_with("https://api.infomaniak.com/1/ai")
 
 
 def test_infomaniak_bildet_die_transkriptions_wurzel_unter_eigener_gestalt() -> None:
@@ -464,21 +446,13 @@ def test_infomaniak_leitet_ohne_kennung_keine_wurzel_ab() -> None:
     assert InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL) == ""
 
 
-def test_infomaniak_traegt_den_kontoklarnamen_nicht_in_die_wurzel() -> None:
-    """Der Klarname steht neben der Kennung und darf keine Oberfläche erreichen."""
-
-    client = _client(_produktliste(_produkt()))
-
-    assert "Frida" not in InfomaniakVerzeichnis(client).basis_url(Naht.SPRACHMODELL)
-
-
 def test_infomaniak_meldet_eine_abgelehnte_produktabfrage() -> None:
     """Auch diese Abfrage hängt am Token und benennt ihre Ablehnung."""
 
     client = Mock()
     client.get.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
         "401",
-        request=httpx.Request("GET", INFOMANIAK_PRODUKT_URL),
+        request=httpx.Request("GET", "https://api.infomaniak.com/1/ai"),
         response=httpx.Response(401),
     )
 

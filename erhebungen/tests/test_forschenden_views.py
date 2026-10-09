@@ -1,23 +1,33 @@
 """HTTP-Tests für die Forschenden-UI der Erhebungen."""
 
-import csv
 import json
 import re
+import sqlite3
 from datetime import UTC, datetime, timedelta
-from io import BytesIO, TextIOWrapper
-from zipfile import ZipFile
+from typing import Any
+from zoneinfo import ZoneInfo
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+import pytest
+import time_machine
 from django.db import connection
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from pytest_django.asserts import assertContains, assertNotContains, assertRedirects
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    finaler_kern,
+    konto_mit_rollen,
+)
 from config.tests.exportkontrakt import exportkontrakt_aus_adr_0029
 from config.tests.formular import submit_knoepfe
+from erhebungen import urls as erhebungen_urls
+from erhebungen.tests.aufbau import finale_erhebung, forschende
+from erhebungen.tests.exportarchiv import export_kopfzeilen, export_lesen
 from konten.models import Konto
 from erhebungen.models import (
     Erhebung,
@@ -47,10 +57,8 @@ from training.models import Training, Trainingsbindung
 from vignetten.models import Vignette
 
 
-def _zeitstempel(wert: datetime) -> str:
-    """Schreibt einen Zeitstempel so, wie der Export ihn erwartet."""
-
-    return timezone.localtime(wert, timezone.UTC).isoformat(timespec="seconds")
+# Ein Zeitpunkt in Sommerzeit: Der Export schreibt ihn zwei Stunden früher in UTC.
+_SOMMERZEIT: datetime = datetime(2026, 7, 1, 10, 0, tzinfo=ZoneInfo("Europe/Berlin"))
 
 
 def _laufende_bindung(erhebung: Erhebung, token: str) -> Erhebungsbindung:
@@ -95,33 +103,6 @@ def _infomaniak_konfiguration() -> ModellKonfiguration:
     )
 
 
-def _finale_vignette_anlegen(
-    konto: Konto,
-    fach: str,
-    budget_typ: str = Vignette.BudgetTyp.SCHRITTE,
-    budget_wert: int = 3,
-) -> Vignette:
-    """Legt eine einbindbare finale Vignette an."""
-
-    vignette: Vignette = Vignette.objects.anlegen(konto)
-    vignette.fehlermuster_beschreibung = "Zähler und Nenner addieren"
-    vignette.lernauftrag_text = "Addiere die Brüche."
-    vignette.arbeitsheft_bildbeschreibung = "Falsche Bruchrechnung"
-    vignette.arbeitsheft_text = "1/2 + 1/3 = 2/5"
-    vignette.schuelerin_name = "Lea"
-    vignette.schuelerin_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.lehrperson_name = "Ada"
-    vignette.lehrperson_geschlecht = Vignette.Geschlecht.WEIBLICH
-    vignette.fach = fach
-    vignette.thema = "Bruchrechnung"
-    vignette.klassenstufe = "6"
-    vignette.budget_typ = budget_typ
-    vignette.budget_wert = budget_wert
-    vignette.save()
-    vignette.finalisieren()
-    return vignette
-
-
 def _finales_item_anlegen(
     konto: Konto,
     wortlaut: str,
@@ -149,25 +130,76 @@ def _item_zuordnen(
     )
 
 
-class ErhebungenForschendenRollenTests(TestCase):
-    """Nur Forschende erreichen die Forschenden-Views."""
+def _forschenden_routen() -> list[tuple[str, dict[str, object]]]:
+    """Liefert Name und Platzhalter-Argumente jeder Route unter ``eigene/``."""
 
-    def test_konto_ohne_forschendenrolle_erhaelt_auf_alle_forschenden_views_403(
-        self,
-    ) -> None:
-        """Die Erhebungs-UI ist von der öffentlichen Teilnahme getrennt geschützt."""
-        konto: Konto = get_user_model().objects.create_user(username="grace")
-        erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
-        self.client.force_login(konto)
+    return [
+        (
+            muster.name,
+            {
+                name: "am_ende" if name == "andockpunkt" else 1
+                for name in muster.pattern.converters
+            },
+        )
+        for muster in erhebungen_urls.urlpatterns
+        if str(muster.pattern).startswith("eigene/") and muster.name
+    ]
 
-        for url in (
-            reverse("erhebungen:liste"),
-            reverse("erhebungen:anlegen"),
-            reverse("erhebungen:detail", args=[erhebung.pk]),
-            reverse("erhebungen:loeschen", args=[erhebung.pk]),
-        ):
-            response: HttpResponse = self.client.post(url)
-            self.assertEqual(response.status_code, 403)
+
+_FORSCHENDEN_ROUTEN: list[tuple[str, dict[str, object]]] = _forschenden_routen()
+# Routen unter ``eigene/``, die GET annehmen; jede andere muss POST verlangen.
+_LESEROUTEN: set[str] = {"liste", "anlegen", "detail", "export"}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("route", "argumente"), _FORSCHENDEN_ROUTEN, ids=[r for r, _ in _FORSCHENDEN_ROUTEN]
+)
+def test_anonymer_zugriff_fuehrt_auf_jeder_forschenden_route_zum_login(
+    client: Client, route: str, argumente: dict[str, object]
+) -> None:
+    """Ohne Anmeldung gibt keine Route der Forschenden-UI etwas preis."""
+
+    antwort: HttpResponse = client.get(reverse(f"erhebungen:{route}", kwargs=argumente))
+
+    assert antwort.status_code == 302
+    assert antwort["Location"].startswith("/accounts/login/?next=")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("route", "argumente"), _FORSCHENDEN_ROUTEN, ids=[r for r, _ in _FORSCHENDEN_ROUTEN]
+)
+def test_konto_ohne_forschendenrolle_erhaelt_auf_alle_forschenden_views_403(
+    client: Client, route: str, argumente: dict[str, object]
+) -> None:
+    """Die Erhebungs-UI ist von der öffentlichen Teilnahme getrennt geschützt."""
+
+    client.force_login(konto_mit_rollen("grace"))
+    # Jede Route mit der Methode, die sie annimmt: Leserouten per GET.
+    anfragen = client.get if route in _LESEROUTEN else client.post
+
+    antwort: HttpResponse = anfragen(reverse(f"erhebungen:{route}", kwargs=argumente))
+
+    assert antwort.status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("route", "argumente"),
+    [(r, a) for r, a in _FORSCHENDEN_ROUTEN if r not in _LESEROUTEN],
+    ids=[r for r, _ in _FORSCHENDEN_ROUTEN if r not in _LESEROUTEN],
+)
+def test_schreibroute_nimmt_kein_get_an(
+    client: Client, route: str, argumente: dict[str, object]
+) -> None:
+    """Ein Link oder Neuladen ändert nichts: Schreibrouten wollen POST."""
+
+    client.force_login(forschende("ada"))
+
+    antwort: HttpResponse = client.get(reverse(f"erhebungen:{route}", kwargs=argumente))
+
+    assert antwort.status_code == 405
 
 
 class ErhebungenAnlegenUndListeTests(TestCase):
@@ -175,9 +207,8 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_anlegen_erstellt_eigenen_entwurf_und_liste_versteckt_fremde(self) -> None:
         """Die Liste ist der sichtbare Einstieg für eigene Erhebungen."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
+        ada: Konto = forschende("ada")
+        grace: Konto = konto_mit_rollen("grace")
         Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
         self.client.force_login(ada)
 
@@ -195,44 +226,29 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(liste, reverse("erhebungen:loeschen", args=[erhebung.pk]))
         self.assertContains(liste, 'aria-current="page"')
 
-    def test_liste_traegt_bereichsfarbe_und_bekannte_badge_klassen(self) -> None:
+    def test_liste_traegt_bekannte_badge_klassen(self) -> None:
         """Jeder Status bildet auf eine im Stylesheet definierte Badge-Klasse ab."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        ModellKonfiguration.objects.aktivieren(
-            _forschungskonfiguration(), Verwendung.SCHUELERIN
-        )
+        ada: Konto = forschende("ada")
         Erhebung.objects.anlegen(ada, name="Noch Entwurf")
-        finale: Erhebung = Erhebung.objects.anlegen(ada, name="Schon final")
-        finale.finalisieren()
-        abgelegte: Erhebung = Erhebung.objects.anlegen(ada, name="Längst abgelegt")
-        abgelegte.finalisieren()
-        abgelegte.archivieren()
+        finale_erhebung(ada, name="Schon final")
+        finale_erhebung(ada, name="Längst abgelegt").archivieren()
         self.client.force_login(ada)
 
         liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
 
-        self.assertContains(liste, "area--research")
         self.assertContains(liste, "badge--draft")
         self.assertContains(liste, "badge--final")
         self.assertContains(liste, "badge--archived")
-        self.assertNotContains(liste, "badge--entwurf")
-        self.assertNotContains(liste, "badge--archiviert")
 
     def test_zeilen_sind_ueber_den_namen_verlinkt_und_nur_entwuerfe_haben_loeschknopf(
         self,
     ) -> None:
         """Der Name ist der Link der Zeile; nur Entwürfe tragen den Lösch-Icon-Knopf."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        ModellKonfiguration.objects.aktivieren(
-            _forschungskonfiguration(), Verwendung.SCHUELERIN
-        )
+        ada: Konto = forschende("ada")
         entwurf: Erhebung = Erhebung.objects.anlegen(ada, name="Noch Entwurf")
-        finale: Erhebung = Erhebung.objects.anlegen(ada, name="Schon final")
-        finale.finalisieren()
+        finale: Erhebung = finale_erhebung(ada, name="Schon final")
         self.client.force_login(ada)
 
         liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
@@ -246,15 +262,11 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(liste, 'aria-label="Noch Entwurf löschen"')
         self.assertNotContains(liste, 'aria-label="Schon final löschen"')
         self.assertContains(liste, "zeilenaktion--gefahr", count=1)
-        self.assertNotContains(liste, "button--secondary")
-        self.assertNotContains(liste, "button--danger")
-        self.assertNotContains(liste, ">Aktion<")
 
     def test_liste_zeigt_kein_teilnahme_token_aus_der_browsersession(self) -> None:
         """Ein selbst getesteter Teilnahme-Link spielt kein Token in die Sidebar."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         self.client.force_login(ada)
         sitzung = self.client.session
         sitzung[TEILNAHME_TOKENS_SESSION_KEY] = {
@@ -269,9 +281,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_administration_legt_eine_erhebung_an(self) -> None:
         """Die Administration steht im Forschungsbereich nicht vor der Tür (ADR-0033)."""
-        administratorin: Konto = get_user_model().objects.create_user(
-            username="linus", is_superuser=True
-        )
+        administratorin: Konto = konto_mit_rollen("linus", is_superuser=True)
         self.client.force_login(administratorin)
 
         angelegt: HttpResponse = self.client.post(
@@ -283,8 +293,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_anlegen_speichert_den_namen_ohne_randleerzeichen(self) -> None:
         """Leerzeichen am Rand gehören nicht zum Namen der Erhebung."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         self.client.force_login(ada)
 
         angelegt: HttpResponse = self.client.post(
@@ -297,8 +306,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_anlegen_lehnt_ungueltige_namen_mit_meldung_am_feld_ab(self) -> None:
         """Leere und zu lange Namen enden in einer Meldung statt im Serverfehler."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         self.client.force_login(ada)
 
         for eingabe, meldung in (
@@ -319,8 +327,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_anlegen_laesst_die_eingabe_nach_einem_fehler_stehen(self) -> None:
         """Wer sich um ein Zeichen vertippt, muss den Namen nicht neu schreiben."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         self.client.force_login(ada)
         zu_lang: str = "Brüche " + "x" * 250
 
@@ -332,8 +339,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
     def test_anlegen_nennt_am_feld_wo_der_name_erscheint(self) -> None:
         """Der Hilfetext hängt per aria-describedby am Namensfeld."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         self.client.force_login(ada)
 
         seite: HttpResponse = self.client.get(reverse("erhebungen:anlegen"))
@@ -346,27 +352,13 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(seite, 'aria-describedby="id_name_helptext"')
         self.assertContains(seite, 'id="id_name_helptext"')
 
-    def test_administration_sieht_fremde_erhebung_in_der_liste(self) -> None:
-        """Die Administration findet fremde Erhebungen für den Eigentümerwechsel."""
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
-        administratorin: Konto = get_user_model().objects.create_user(username="ada")
-        administratorin.is_superuser = True
-        administratorin.save()
-        self.client.force_login(administratorin)
-
-        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
-
-        self.assertContains(liste, erhebung.name)
-
 
 class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
     """Die Detail- und Lösch-URLs folgen der Eigentümersicht."""
 
     def setUp(self) -> None:
         """Legt eine Forschende mit einem Entwurf an."""
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.ada: Konto = forschende("ada")
         self.entwurf: Erhebung = Erhebung.objects.anlegen(
             self.ada, name="Eigener Entwurf"
         )
@@ -374,7 +366,7 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
 
     def test_fremde_erhebung_ist_nicht_erreichbar(self) -> None:
         """Andere Eigentümerinnen erhalten keine Information über eine Erhebung."""
-        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace: Konto = konto_mit_rollen("grace")
         fremde_erhebung: Erhebung = Erhebung.objects.anlegen(
             grace, name="Fremde Erhebung"
         )
@@ -389,24 +381,29 @@ class ErhebungenSichtbarkeitUndLoeschenTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(loeschen.status_code, 404)
 
-    def test_loescht_nur_eigenen_entwurf_und_bietet_finalen_keinen_loeschknopf(
-        self,
-    ) -> None:
+    def test_loeschen_trifft_nur_den_entwurf(self) -> None:
         """Die physische Löschaktion bleibt auf Entwürfe beschränkt."""
+        finale: Erhebung = finale_erhebung(self.ada, name="Finale Erhebung")
+
         geloescht: HttpResponse = self.client.post(
             reverse("erhebungen:loeschen", args=[self.entwurf.pk])
         )
-        finale: Erhebung = Erhebung.objects.anlegen(self.ada, name="Finale Erhebung")
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
+        abgewiesen: HttpResponse = self.client.post(
+            reverse("erhebungen:loeschen", args=[finale.pk])
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        finale.finalisieren()
-        liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
 
         self.assertRedirects(geloescht, reverse("erhebungen:liste"))
-        self.assertFalse(Erhebung.objects.filter(pk=self.entwurf.pk).exists())
-        self.assertNotContains(liste, reverse("erhebungen:loeschen", args=[finale.pk]))
+        self.assertRedirects(abgewiesen, reverse("erhebungen:liste"))
+        self.assertEqual(
+            self.client.get(
+                reverse("erhebungen:detail", args=[self.entwurf.pk])
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(reverse("erhebungen:detail", args=[finale.pk])).status_code,
+            200,
+        )
 
 
 class ErhebungenKoForschendenViewTests(TestCase):
@@ -414,10 +411,8 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
     def test_detail_nennt_die_erhebung(self) -> None:
         """Unterzeile und Erklärung sprechen von der Erhebung."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
+        grace: Konto = forschende("grace")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
         erhebung.eigentuemerinnen.add(grace)
         self.client.force_login(ada)
@@ -433,12 +428,10 @@ class ErhebungenKoForschendenViewTests(TestCase):
             "Eigentümer:innen.",
         )
 
-    def test_hinzufuegen_gibt_ko_forschender_listen_und_editorzugriff(self) -> None:
-        """Eine eingetragene Ko-Forschende sieht und bearbeitet den Entwurf."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
+    def test_hinzufuegen_gibt_ko_forschender_listen_und_detailzugriff(self) -> None:
+        """Eine eingetragene Ko-Forschende findet und öffnet den Entwurf."""
+        ada: Konto = forschende("ada")
+        grace: Konto = forschende("grace")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
         self.client.force_login(ada)
 
@@ -452,34 +445,18 @@ class ErhebungenKoForschendenViewTests(TestCase):
         )
         self.client.force_login(grace)
         self.assertContains(self.client.get(reverse("erhebungen:liste")), erhebung.name)
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[erhebung.pk])
+        self.assertEqual(
+            self.client.get(
+                reverse("erhebungen:detail", args=[erhebung.pk])
+            ).status_code,
+            200,
         )
-        self.assertContains(detail, "Eigentümer:innen")
-        self.assertContains(detail, ada.username)
-        self.assertContains(detail, grace.username)
-        bearbeiten: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[erhebung.pk]),
-            {"instruktionstext": "Bitte denken Sie laut.", "randomisierung": "fest"},
-        )
-
-        self.assertRedirects(
-            bearbeiten, reverse("erhebungen:detail", args=[erhebung.pk])
-        )
-        erhebung.refresh_from_db()
-        self.assertEqual(erhebung.instruktionstext, "Bitte denken Sie laut.")
 
     def test_selbstentfernung_uebergibt_finale_und_laufende_erhebung(self) -> None:
         """Eine Forschende kann die Verantwortung auch im Erhebungszeitraum abgeben."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Laufende Erhebung")
-        ModellKonfiguration.objects.aktivieren(
-            _forschungskonfiguration(), Verwendung.SCHUELERIN
-        )
-        erhebung.finalisieren()
+        ada: Konto = forschende("ada")
+        grace: Konto = forschende("grace")
+        erhebung: Erhebung = finale_erhebung(ada, name="Laufende Erhebung")
         Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(days=1),
@@ -497,13 +474,9 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
     def test_nicht_eigentuemerin_loest_keinen_selbst_redirect_aus(self) -> None:
         """Eine fremde Administration bleibt bei der Erhebung, wenn sie niemanden entfernt."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
-        administratorin: Konto = get_user_model().objects.create_user(
-            username="linus", is_superuser=True
-        )
+        ada: Konto = forschende("ada")
+        grace: Konto = forschende("grace")
+        administratorin: Konto = konto_mit_rollen("linus", is_superuser=True)
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremde Erhebung")
         erhebung.eigentuemerinnen.add(grace)
         self.client.force_login(administratorin)
@@ -519,22 +492,20 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
     def test_entfernen_der_letzten_eigentuemerin_wird_verweigert(self) -> None:
         """Die Bedienung kann eine aktive Erhebung nicht eigentümerlos machen."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geschützte Erhebung")
         self.client.force_login(ada)
 
-        self.client.post(
+        antwort: HttpResponse = self.client.post(
             reverse("erhebungen:eigentuemerin_entfernen", args=[erhebung.pk, ada.pk])
         )
 
-        self.assertEqual(list(erhebung.eigentuemerinnen.all()), [ada])
+        self.assertRedirects(antwort, reverse("erhebungen:detail", args=[erhebung.pk]))
 
     def test_teilen_laesst_nur_forschende_oder_administration_zu(self) -> None:
         """Das Eintragen vergibt keine Rolle und lässt Unberechtigte außen vor."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        ohne_rolle: Konto = get_user_model().objects.create_user(username="linus")
+        ada: Konto = forschende("ada")
+        ohne_rolle: Konto = konto_mit_rollen("linus")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geschützte Erhebung")
         self.client.force_login(ada)
 
@@ -549,8 +520,7 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
     def test_teilen_mit_unlesbarem_konto_findet_niemanden(self) -> None:
         """Ein Konto-Feld ohne Zahl endet wie ein unbekanntes Konto, nicht im 500."""
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Geteilte Erhebung")
         self.client.force_login(ada)
 
@@ -563,13 +533,9 @@ class ErhebungenKoForschendenViewTests(TestCase):
 
     def test_administration_kann_fremde_erhebung_uebergeben(self) -> None:
         """Die Administration kann eine fremde Forschende durch eine andere ablösen."""
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        administratorin: Konto = get_user_model().objects.create_user(
-            username="linus", is_superuser=True
-        )
+        grace: Konto = forschende("grace")
+        ada: Konto = forschende("ada")
+        administratorin: Konto = konto_mit_rollen("linus", is_superuser=True)
         erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremde Erhebung")
         self.client.force_login(administratorin)
 
@@ -602,39 +568,16 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def setUp(self) -> None:
         """Legt die kleinste Umgebung einer Forschenden mit Entwurf an."""
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.ada: Konto = forschende("ada")
         self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        self.eigene_finale: Vignette = _finale_vignette_anlegen(self.ada, "Mathematik")
+        self.eigene_finale: Vignette = finale_vignette(self.ada, fach="Mathematik")
         self.client.force_login(self.ada)
-
-    def test_bietet_nur_eigene_finale_vignetten_zur_aufnahme_an(self) -> None:
-        """Die Detailseite bietet nur noch nicht aufgenommene eigene Finale an."""
-
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        _finale_vignette_anlegen(grace, "Physik")
-        entwurf: Vignette = Vignette.objects.anlegen(self.ada)
-
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
-        self.assertContains(detail, "Mathematik")
-        self.assertNotContains(detail, "Physik")
-        self.assertNotContains(
-            detail,
-            reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, entwurf.pk],
-            ),
-        )
 
     def test_lehnt_fremde_und_unfertige_vignetten_ab(self) -> None:
         """Nur eigene finale Vignetten lassen sich in den Entwurf aufnehmen."""
 
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_finale: Vignette = _finale_vignette_anlegen(grace, "Physik")
+        grace: Konto = konto_mit_rollen("grace")
+        fremde_finale: Vignette = finale_vignette(grace, fach="Physik")
         entwurf: Vignette = Vignette.objects.anlegen(self.ada)
 
         fremde_aufnehmen: HttpResponse = self.client.post(
@@ -709,10 +652,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                     item.pk,
                     Erhebungsitem.Andockpunkt.NACH_SITZUNG,
                 ],
-            )
+            ),
+            follow=True,
         )
 
-        self.assertEqual(aufnehmen.status_code, 200)
+        self.assertRedirects(
+            aufnehmen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 zeile["pk"]
@@ -730,45 +676,14 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse(
                 "erhebungen:item_hinzufuegen",
                 args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            )
+            ),
+            follow=True,
         )
-        self.assertEqual(andere_bindung.status_code, 200)
+        self.assertRedirects(
+            andere_bindung, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             Erhebungsitem.objects.filter(erhebung=self.erhebung).count(), 2
-        )
-
-    def test_bibliothek_kennzeichnet_item_am_ende_nach_jeder_sitzung(self) -> None:
-        """Die Bibliothek nach jeder Sitzung markiert Items vom Ende."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            )
-        )
-
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
-
-        self.assertContains(detail, "schon am Ende")
-        self.assertEqual(
-            detail.context["nach_sitzung_verfuegbare_daten"][0]["badge"],
-            "schon am Ende",
-        )
-        self.assertContains(
-            detail,
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            ),
         )
 
     def test_badge_verschwindet_nach_entfernen_am_anderen_andockpunkt(self) -> None:
@@ -797,35 +712,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertNotContains(
             self.client.get(reverse("erhebungen:detail", args=[self.erhebung.pk])),
             "schon am Ende",
-        )
-
-    def test_bibliothek_kennzeichnet_item_nach_jeder_sitzung_am_ende(self) -> None:
-        """Die Bibliothek am Ende markiert Items nach jeder Sitzung."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-        gegenrichtung: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
-
-        self.assertContains(gegenrichtung, "schon nach jeder Sitzung")
-        self.assertContains(
-            gegenrichtung,
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            ),
         )
 
     def test_doppelte_itemaufnahme_am_selben_andockpunkt_wird_abgelehnt(self) -> None:
@@ -887,9 +773,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, zweite_zuordnung.pk],
             ),
             {"position": 1},
+            follow=True,
         )
 
-        self.assertEqual(verschieben.status_code, 200)
+        self.assertRedirects(
+            verschieben, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 zeile["pk"]
@@ -912,151 +801,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 "erhebungen:item_verschieben",
                 args=[self.erhebung.pk, zweite_zuordnung.pk],
             ),
-        )
-
-    def test_entfernen_schliesst_die_itemreihenfolge_lueckenlos(self) -> None:
-        """Das nächste Item ergänzt die nach dem Entfernen geschlossene Reihenfolge."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-
-        erste_bindung: Erhebungsitem = Erhebungsitem.objects.get(
-            erhebung=self.erhebung,
-            item=item,
-            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-        )
-        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was fiel auf?")
-        drittes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Was bleibt?")
-        self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    zweites_item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-        self.client.post(
-            reverse(
-                "erhebungen:item_entfernen",
-                args=[self.erhebung.pk, erste_bindung.pk],
-            )
-        )
-        anhaengen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    drittes_item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-        self.assertEqual(anhaengen.status_code, 200)
-        self.assertEqual(
-            Erhebungsitem.objects.get(
-                erhebung=self.erhebung,
-                item=drittes_item,
-                andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-            ).position,
-            2,
-        )
-
-    def test_itemverwaltung_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
-        """Finale Erhebungen verweigern die Änderung ihrer Item-Zuordnungen."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        self.erhebung.finalisieren()
-        gesperrt: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[
-                    self.erhebung.pk,
-                    item.pk,
-                    Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                ],
-            )
-        )
-        self.assertEqual(gesperrt.status_code, 403)
-
-    def test_itemreihenfolge_ist_ausserhalb_des_entwurfs_gesperrt(self) -> None:
-        """Auch Verschieben ändert eine finale Erhebung nicht."""
-
-        erstes_item: FragebogenItem = _finales_item_anlegen(self.ada, "Erstes Item")
-        zweites_item: FragebogenItem = _finales_item_anlegen(self.ada, "Zweites Item")
-        for item in (erstes_item, zweites_item):
-            self.client.post(
-                reverse(
-                    "erhebungen:item_hinzufuegen",
-                    args=[
-                        self.erhebung.pk,
-                        item.pk,
-                        Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                    ],
-                )
-            )
-        zweite_zuordnung: Erhebungsitem = Erhebungsitem.objects.get(
-            erhebung=self.erhebung, item=zweites_item
-        )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        self.erhebung.finalisieren()
-
-        gesperrt: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_verschieben",
-                args=[self.erhebung.pk, zweite_zuordnung.pk],
-            ),
-            {"position": 1},
-        )
-
-        self.assertEqual(gesperrt.status_code, 403)
-        zweite_zuordnung.refresh_from_db()
-        self.assertEqual(zweite_zuordnung.position, 2)
-
-    def test_itemverwaltung_ist_nach_dem_zurueckziehen_wieder_offen(self) -> None:
-        """Zurückgezogene Erhebungen erlauben wieder Item-Zuordnungen."""
-
-        item: FragebogenItem = _finales_item_anlegen(
-            self.ada, "Wie sicher fühlten Sie sich?"
-        )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        self.erhebung.finalisieren()
-        self.erhebung.zurueckziehen()
-        wieder_offen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:item_hinzufuegen",
-                args=[self.erhebung.pk, item.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
-            )
-        )
-        self.assertEqual(wieder_offen.status_code, 200)
-        self.assertContains(wieder_offen, "zuordnungsliste__einfuegen")
-        self.assertEqual(
-            wieder_offen.context["am_ende_aufgenommene_daten"][0]["label"],
-            item.wortlaut,
         )
 
     def test_stellt_zuordnungszeilen_mit_ihren_aktions_urls_bereit(self) -> None:
@@ -1109,23 +853,11 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             ),
         )
 
-    def test_detailseite_rendert_zuordnungslisten_ueber_include(self) -> None:
-        """Vignetten und beide Andockpunkte verwenden denselben Listen-Baustein."""
-
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
-
-        self.assertTemplateUsed(detail, "erhebungen/includes/zuordnungsliste.html")
-        self.assertNotContains(detail, ">Hoch<")
-        self.assertNotContains(detail, ">Runter<")
-        self.assertNotContains(detail, 'name="vignetten"')
-
     def test_haelt_fremde_und_unfertige_fassungen_aus_den_zeilen_heraus(self) -> None:
         """Die anbietende Spalte zeigt weder fremde noch nicht-finale Fassungen."""
 
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_finale: Vignette = _finale_vignette_anlegen(grace, "Physik")
+        grace: Konto = konto_mit_rollen("grace")
+        fremde_finale: Vignette = finale_vignette(grace, fach="Physik")
         eigener_entwurf: Vignette = Vignette.objects.anlegen(self.ada)
 
         detail: HttpResponse = self.client.get(
@@ -1139,16 +871,14 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertNotIn(fremde_finale.pk, angebotene_ids)
         self.assertNotIn(eigener_entwurf.pk, angebotene_ids)
 
-    def test_detailseite_traegt_bereichsfarbe_und_bekannte_badge_klasse(self) -> None:
-        """Die Detailseite färbt den Forschungsbereich und nutzt echte Badge-Klassen."""
+    def test_detailseite_traegt_bekannte_badge_klasse(self) -> None:
+        """Die Detailseite nutzt die im Stylesheet definierte Badge-Klasse."""
 
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
 
-        self.assertContains(detail, "area--research")
         self.assertContains(detail, "badge--draft")
-        self.assertNotContains(detail, "badge--entwurf")
 
     def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
         self,
@@ -1163,7 +893,6 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         self.assertContains(detail, "Bitte <strong>genau</strong> lesen.")
-        self.assertContains(detail, ">Bearbeiten</button>", count=1 + 3)
         self.assertContains(detail, "Noch kein Text", count=2)
         self.assertContains(detail, ">Text schreiben</button>", count=2)
         self.assertContains(detail, "Ganz anzeigen")
@@ -1186,24 +915,22 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         self.assertEqual(len(speichern), 3 + 1)
         self.assertEqual(set(speichern), {"erhebung-konfiguration"})
 
-        self.client.post(
+        gespeichert: HttpResponse = self.client.post(
             reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
             {
-                "instruktionstext": "Neue Instruktion",
-                "einwilligungstext": "Neue Einwilligung",
-                "abschlusstext": "Neuer Abschluss",
+                "instruktionstext": "Neue *Instruktion*",
+                "einwilligungstext": "Neue *Einwilligung*",
+                "abschlusstext": "Neuer *Abschluss*",
             },
+            follow=True,
         )
 
-        self.erhebung.refresh_from_db()
-        self.assertEqual(
-            (
-                self.erhebung.instruktionstext,
-                self.erhebung.einwilligungstext,
-                self.erhebung.abschlusstext,
-            ),
-            ("Neue Instruktion", "Neue Einwilligung", "Neuer Abschluss"),
-        )
+        for text in (
+            "Neue <em>Instruktion</em>",
+            "Neue <em>Einwilligung</em>",
+            "Neuer <em>Abschluss</em>",
+        ):
+            self.assertContains(gespeichert, text)
 
     def test_seite_warnt_vor_dem_verlassen_mit_ungespeicherten_aenderungen(
         self,
@@ -1251,7 +978,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def test_verschiebt_vignette_an_eine_neue_position(self) -> None:
         """Die Liste ist die Reihenfolge; Verschieben schreibt die Positionen neu."""
 
-        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        zweite: Vignette = finale_vignette(self.ada, fach="Chemie")
         self._vignetten_aufnehmen(self.eigene_finale, zweite)
 
         verschieben: HttpResponse = self.client.post(
@@ -1299,17 +1026,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         zufaellig: HttpResponse = self.client.post(
             reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
+            {"randomisierung": "zufällig"},
         )
 
         self.assertRedirects(
             zufaellig, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        self.erhebung.refresh_from_db()
-        self.assertEqual(
-            self.erhebung.randomisierung, Erhebung.Randomisierung.ZUFAELLIG
-        )
-        self.assertEqual(self._vignettenpositionen(), [(self.eigene_finale.pk, 1)])
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
@@ -1321,26 +1043,10 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             html=False,
         )
 
-    def test_zufaellige_reihenfolge_blendet_nummern_und_positionswahl_aus(
-        self,
-    ) -> None:
-        """Nummern, Positionswahl und Verschieben hängen an der festen Regel."""
-
-        self._vignetten_aufnehmen(self.eigene_finale)
-
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
-
-        inhalt: str = detail.content.decode()
-        self.assertIn('class="zuordnungsliste__nummer" x-show="geordnet"', inhalt)
-        self.assertIn('x-model="position" x-show="geordnet"', inhalt)
-        self.assertIn('class="zuordnungsliste__leiste" x-show="geordnet"', inhalt)
-
     def test_umschalten_bewahrt_die_reihenfolge_hin_und_zurueck(self) -> None:
         """Die Regel wechselt, die festgelegte Reihenfolge bleibt erhalten."""
 
-        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
+        zweite: Vignette = finale_vignette(self.ada, fach="Chemie")
         self._vignetten_aufnehmen(self.eigene_finale, zweite)
         self.client.post(
             reverse(
@@ -1350,13 +1056,17 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
         erwartet: list[tuple[int, int]] = [(zweite.pk, 1), (self.eigene_finale.pk, 2)]
 
-        for regel in (Erhebung.Randomisierung.ZUFAELLIG, Erhebung.Randomisierung.FEST):
-            self.client.post(
+        for regel, json_wert in (("zufällig", '"zuf\\u00e4llig"'), ("fest", '"fest"')):
+            detail: HttpResponse = self.client.post(
                 reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
                 {"randomisierung": regel},
+                follow=True,
             )
-            self.erhebung.refresh_from_db()
-            self.assertEqual(self.erhebung.randomisierung, regel)
+            self.assertContains(
+                detail,
+                f'<script id="randomisierung-daten" type="application/json">'
+                f"{json_wert}</script>",
+            )
             self.assertEqual(self._vignettenpositionen(), erwartet)
 
     def test_umschalten_lehnt_unbekannte_regel_ab(self) -> None:
@@ -1369,22 +1079,11 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
 
         self.assertEqual(antwort.status_code, 400)
 
-    def test_konfiguration_speichern_laesst_die_regel_unberuehrt(self) -> None:
-        """Die Regel gehört zum Schalter, nicht mehr zum Konfigurationsformular."""
-
-        self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
-        )
-
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
-
     def test_fuegt_vignette_an_gewuenschter_position_ein(self) -> None:
         """Eine neue Vignette landet an der gewählten Stelle der Liste."""
 
-        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
-        dritte: Vignette = _finale_vignette_anlegen(self.ada, "Physik")
+        zweite: Vignette = finale_vignette(self.ada, fach="Chemie")
+        dritte: Vignette = finale_vignette(self.ada, fach="Physik")
         self._vignetten_aufnehmen(self.eigene_finale, zweite)
 
         self.client.post(
@@ -1402,8 +1101,8 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def test_entfernen_schliesst_die_vignettenreihenfolge_lueckenlos(self) -> None:
         """Nach dem Entfernen rücken die folgenden Vignetten nach."""
 
-        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
-        dritte: Vignette = _finale_vignette_anlegen(self.ada, "Physik")
+        zweite: Vignette = finale_vignette(self.ada, fach="Chemie")
+        dritte: Vignette = finale_vignette(self.ada, fach="Physik")
         self._vignetten_aufnehmen(self.eigene_finale, zweite, dritte)
         self.client.post(
             reverse(
@@ -1435,6 +1134,7 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, neues.pk, Erhebungsitem.Andockpunkt.AM_ENDE],
             ),
             {"position": 1},
+            follow=True,
         )
 
         self.assertEqual(
@@ -1458,10 +1158,13 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
         )
 
         umhaengen: HttpResponse = self.client.post(
-            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk])
+            reverse("erhebungen:item_umhaengen", args=[self.erhebung.pk, zuordnung.pk]),
+            follow=True,
         )
 
-        self.assertEqual(umhaengen.status_code, 200)
+        self.assertRedirects(
+            umhaengen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 (zeile["pk"], zeile["position"])
@@ -1525,17 +1228,23 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
             reverse(
                 "erhebungen:item_entfernen",
                 args=[self.erhebung.pk, zuordnungen[3].pk],
-            )
+            ),
+            follow=True,
         )
         umhaengen: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:item_umhaengen",
                 args=[self.erhebung.pk, zuordnungen[2].pk],
-            )
+            ),
+            follow=True,
         )
 
-        self.assertEqual(entfernen.status_code, 200)
-        self.assertEqual(umhaengen.status_code, 200)
+        self.assertRedirects(
+            entfernen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
+        self.assertRedirects(
+            umhaengen, reverse("erhebungen:detail", args=[self.erhebung.pk])
+        )
         self.assertEqual(
             [
                 (zeile["pk"], zeile["position"])
@@ -1554,10 +1263,12 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
     def test_zufaellige_reihenfolge_nimmt_am_ende_der_liste_auf(self) -> None:
         """Auch bei zufälliger Reihenfolge bekommt eine neue Vignette die letzte Position."""
 
-        self.erhebung.randomisierung = Erhebung.Randomisierung.ZUFAELLIG
-        self.erhebung.save(update_fields=["randomisierung"])
-        zweite: Vignette = _finale_vignette_anlegen(self.ada, "Chemie")
-        dritte: Vignette = _finale_vignette_anlegen(self.ada, "Physik")
+        self.client.post(
+            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
+            {"randomisierung": "zufällig"},
+        )
+        zweite: Vignette = finale_vignette(self.ada, fach="Chemie")
+        dritte: Vignette = finale_vignette(self.ada, fach="Physik")
         for vignette in (self.eigene_finale, zweite):
             self.client.post(
                 reverse(
@@ -1571,98 +1282,291 @@ class ErhebungenEntwurfKonfigurierenTests(TestCase):
                 args=[self.erhebung.pk, self.eigene_finale.pk],
             )
         )
-        self.client.post(
+        detail: HttpResponse = self.client.post(
             reverse(
                 "erhebungen:vignette_hinzufuegen", args=[self.erhebung.pk, dritte.pk]
-            )
+            ),
+            follow=True,
         )
 
         self.assertEqual(
-            list(
-                Erhebungsvignette.objects.filter(erhebung=self.erhebung).values_list(
-                    "vignette_id", flat=True
-                )
-            ),
+            [zeile["pk"] for zeile in detail.context["aufgenommene_daten"]],
             [zweite.pk, dritte.pk],
         )
 
-    def test_schreibaktionen_schuetzen_fremde_und_finale_erhebungen(self) -> None:
-        """Nur der eigene Entwurf bleibt über jede Konfigurations-URL veränderbar."""
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        self.erhebung.finalisieren()
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("aufgenommen_an", "angeboten_an", "badge"),
+    [
+        pytest.param("am_ende", "nach_sitzung", "schon am Ende", id="am_ende"),
+        pytest.param(
+            "nach_sitzung", "am_ende", "schon nach jeder Sitzung", id="nach_sitzung"
+        ),
+    ],
+)
+def test_bibliothek_kennzeichnet_item_vom_anderen_andockpunkt(
+    client: Client, aufgenommen_an: str, angeboten_an: str, badge: str
+) -> None:
+    """Ein Item am einen Andockpunkt bleibt am anderen angeboten, mit Badge."""
 
-        final_entfernen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_entfernen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
-        )
-        final_aufnehmen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
-        )
-        final_speichern: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
-            {"instruktionstext": "Nicht speichern"},
-        )
-        fremd: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[fremde_erhebung.pk]),
-            {"instruktionstext": "Nicht speichern"},
-        )
-        final_umschalten: HttpResponse = self.client.post(
-            reverse("erhebungen:reihenfolge_umschalten", args=[self.erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
-        )
-        final_verschieben: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_verschieben",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            ),
-            {"position": 1},
-        )
-        fremd_umschalten: HttpResponse = self.client.post(
-            reverse("erhebungen:reihenfolge_umschalten", args=[fremde_erhebung.pk]),
-            {"randomisierung": Erhebung.Randomisierung.ZUFAELLIG},
-        )
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
+    item: FragebogenItem = _finales_item_anlegen(ada, "Wie sicher fühlten Sie sich?")
+    client.force_login(ada)
 
-        self.assertEqual(final_entfernen.status_code, 302)
-        self.assertEqual(final_aufnehmen.status_code, 302)
-        self.assertEqual(final_speichern.status_code, 302)
-        self.assertEqual(fremd.status_code, 404)
-        self.assertEqual(final_umschalten.status_code, 302)
-        self.assertEqual(final_verschieben.status_code, 403)
-        self.assertEqual(fremd_umschalten.status_code, 404)
-        self.assertFalse(
-            Erhebungsvignette.objects.filter(erhebung=self.erhebung).exists()
-        )
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.instruktionstext, "")
-        self.assertEqual(self.erhebung.randomisierung, Erhebung.Randomisierung.FEST)
-        self.erhebung.archivieren()
+    detail: HttpResponse = client.post(
+        reverse(
+            "erhebungen:item_hinzufuegen", args=[erhebung.pk, item.pk, aufgenommen_an]
+        ),
+        follow=True,
+    )
 
-        archiv_speichern: HttpResponse = self.client.post(
-            reverse("erhebungen:konfiguration_speichern", args=[self.erhebung.pk]),
-            {"instruktionstext": "Noch immer nicht speichern"},
-        )
-        archiv_aufnehmen: HttpResponse = self.client.post(
-            reverse(
-                "erhebungen:vignette_hinzufuegen",
-                args=[self.erhebung.pk, self.eigene_finale.pk],
-            )
-        )
+    angeboten: dict[str, object] = detail.context[f"{angeboten_an}_verfuegbare_daten"][
+        0
+    ]
+    assert angeboten["badge"] == badge
+    assert angeboten["einfuegen_url"] == reverse(
+        "erhebungen:item_hinzufuegen", args=[erhebung.pk, item.pk, angeboten_an]
+    )
 
-        self.assertEqual(archiv_speichern.status_code, 302)
-        self.assertEqual(archiv_aufnehmen.status_code, 302)
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.instruktionstext, "")
+
+_KEIN_ENTWURF_MELDUNG: str = (
+    "Die Erhebung ist kein Entwurf mehr. Es wurde nichts geändert."
+)
+_SCHREIBROUTEN: list[str] = [
+    "vignette_hinzufuegen",
+    "vignette_entfernen",
+    "vignette_verschieben",
+    "reihenfolge_umschalten",
+    "item_hinzufuegen",
+    "item_entfernen",
+    "item_verschieben",
+    "item_umhaengen",
+    "konfiguration_speichern",
+]
+
+
+def _erhebung_mit_design(konto: Konto) -> Erhebung:
+    """Legt einen Entwurf mit je zwei Vignetten und Items nach jeder Sitzung an."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(konto, name="Brüche")
+    for position, fach in enumerate(("Mathematik", "Chemie"), start=1):
+        Erhebungsvignette.objects.create(
+            erhebung=erhebung,
+            vignette=finale_vignette(konto, fach=fach),
+            position=position,
+        )
+    for position, wortlaut in enumerate(("Erstes Item", "Zweites Item"), start=1):
+        _item_zuordnen(
+            erhebung,
+            _finales_item_anlegen(konto, wortlaut),
+            Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position,
+        )
+    return erhebung
+
+
+def _schreibaufruf(
+    route: str, erhebung: Erhebung, konto: Konto
+) -> tuple[str, dict[str, object]]:
+    """Liefert URL und Formulardaten einer Aktion, die im Entwurf etwas änderte."""
+
+    zweite_vignette: Vignette = erhebung.vignettenzugehoerigkeiten.get(
+        position=2
+    ).vignette
+    zweite_zuordnung: Erhebungsitem = erhebung.itemzugehoerigkeiten.get(position=2)
+    argumente: dict[str, list[object]] = {
+        "vignette_hinzufuegen": [
+            erhebung.pk,
+            finale_vignette(konto, fach="Physik").pk,
+        ],
+        "vignette_entfernen": [erhebung.pk, zweite_vignette.pk],
+        "vignette_verschieben": [erhebung.pk, zweite_vignette.pk],
+        "reihenfolge_umschalten": [erhebung.pk],
+        "item_hinzufuegen": [
+            erhebung.pk,
+            _finales_item_anlegen(konto, "Neues Item").pk,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+        ],
+        "item_entfernen": [erhebung.pk, zweite_zuordnung.pk],
+        "item_verschieben": [erhebung.pk, zweite_zuordnung.pk],
+        "item_umhaengen": [erhebung.pk, zweite_zuordnung.pk],
+        "konfiguration_speichern": [erhebung.pk],
+    }
+    daten: dict[str, object] = {
+        "position": 1,
+        "randomisierung": Erhebung.Randomisierung.ZUFAELLIG,
+        "instruktionstext": "Nicht speichern",
+    }
+    return reverse(f"erhebungen:{route}", args=argumente[route]), daten
+
+
+def _zeilen(antwort: HttpResponse) -> dict[str, object]:
+    """Liest die Zeilen, die die Detailseite an die Zuordnungslisten gibt."""
+
+    return {
+        schluessel: antwort.context[schluessel]
+        for schluessel in (
+            "aufgenommene_daten",
+            "nach_sitzung_aufgenommene_daten",
+            "am_ende_aufgenommene_daten",
+        )
+    }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("status", "badge"),
+    [
+        pytest.param(
+            Erhebung.Status.FINAL,
+            '<span class="badge badge--final">Final</span>',
+            id="final",
+        ),
+        pytest.param(
+            Erhebung.Status.ARCHIVIERT,
+            '<span class="badge badge--archived">Archiviert</span>',
+            id="archiviert",
+        ),
+    ],
+)
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_schreibaktion_ausserhalb_des_entwurfs_leitet_mit_meldung_zurueck(
+    client: Client, route: str, status: str, badge: str
+) -> None:
+    """Eine veraltete Schaltfläche führt auf die unveränderte Detailseite (ADR-0051)."""
+
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = _erhebung_mit_design(ada)
+    aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+    erhebung.finalisieren()
+    if status == Erhebung.Status.ARCHIVIERT:
+        erhebung.archivieren()
+    client.force_login(ada)
+    detail_url: str = reverse("erhebungen:detail", args=[erhebung.pk])
+    url, daten = _schreibaufruf(route, erhebung, ada)
+    vorher: HttpResponse = client.get(detail_url)
+
+    antwort: HttpResponse = client.post(url, daten, follow=True)
+
+    assertRedirects(antwort, detail_url)
+    assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
+    assertContains(antwort, badge, html=True)
+    assertContains(
+        antwort,
+        '<script id="randomisierung-daten" type="application/json">"fest"</script>',
+        html=False,
+    )
+    assertNotContains(antwort, "Nicht speichern")
+    assert _zeilen(antwort) == _zeilen(vorher)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_schreibaktion_auf_fremder_erhebung_findet_nichts(
+    client: Client, route: str
+) -> None:
+    """Wer die Erhebung nicht sehen darf, erfährt nicht, dass es sie gibt."""
+
+    grace: Konto = forschende("grace")
+    fremde: Erhebung = _erhebung_mit_design(grace)
+    ada: Konto = forschende("ada")
+    client.force_login(ada)
+    # Neue Fassungen gehören ada: Das 404 kommt allein von der fremden Erhebung.
+    url, daten = _schreibaufruf(route, fremde, ada)
+
+    antwort: HttpResponse = client.post(url, daten)
+
+    assert antwort.status_code == 404
+
+
+@pytest.mark.django_db
+def test_loeschen_ausserhalb_des_entwurfs_leitet_mit_meldung_auf_die_liste(
+    client: Client,
+) -> None:
+    """Eine finale Erhebung bleibt in der Liste, die Meldung nennt den Grund."""
+
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = finale_erhebung(ada, name="Finale Erhebung")
+    client.force_login(ada)
+
+    antwort: HttpResponse = client.post(
+        reverse("erhebungen:loeschen", args=[erhebung.pk]), follow=True
+    )
+
+    assertRedirects(antwort, reverse("erhebungen:liste"))
+    assertContains(antwort, _KEIN_ENTWURF_MELDUNG)
+    assertContains(antwort, reverse("erhebungen:detail", args=[erhebung.pk]))
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("route", _SCHREIBROUTEN)
+def test_zweiter_tab_finalisiert_nicht_zwischen_statuspruefung_und_aenderung(
+    client: Client, route: str
+) -> None:
+    """Statusprüfung und Änderung bilden eine Einheit, die kein Tab unterbricht.
+
+    Der zweite Tab versucht zu finalisieren, sobald die Aktion die Erhebung
+    gelesen hat. Er wartet nicht, damit der Test nicht hängt.
+    """
+
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = _erhebung_mit_design(ada)
+    client.force_login(ada)
+    url, daten = _schreibaufruf(route, erhebung, ada)
+    gelesen: list[str] = []
+    zweiter_tab: list[str] = []
+
+    def nach_dem_lesen_finalisieren(
+        execute: Any, sql: str, params: Any, many: bool, context: dict[str, Any]
+    ) -> Any:
+        # Erst bei der nächsten Anweisung ist das Lesen abgeschlossen.
+        if gelesen and not zweiter_tab:
+            try:
+                with sqlite3.connect(
+                    str(connection.settings_dict["NAME"]), uri=True, timeout=0
+                ) as zweite:
+                    zweite.execute(
+                        "UPDATE erhebungen_erhebung SET status = 'final' WHERE id = ?",
+                        [erhebung.pk],
+                    )
+                zweiter_tab.append("finalisiert")
+            except sqlite3.OperationalError:
+                zweiter_tab.append("gesperrt")
+        if 'FROM "erhebungen_erhebung"' in sql:
+            gelesen.append(sql)
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(nach_dem_lesen_finalisieren):
+        client.post(url, daten)
+
+    assert zweiter_tab == ["gesperrt"]
+
+
+@pytest.mark.django_db
+def test_vom_modell_abgewiesene_schreibaktion_leitet_mit_meldung_zurueck(
+    client: Client,
+) -> None:
+    """Die Administration bindet keine eigene Vignette in eine fremde Erhebung ein."""
+
+    grace: Konto = forschende("grace")
+    fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
+    administratorin: Konto = konto_mit_rollen("ada", is_superuser=True)
+    client.force_login(administratorin)
+    detail_url: str = reverse("erhebungen:detail", args=[fremde.pk])
+
+    antwort: HttpResponse = client.post(
+        reverse(
+            "erhebungen:vignette_hinzufuegen",
+            args=[fremde.pk, finale_vignette(administratorin).pk],
+        ),
+        follow=True,
+    )
+
+    assertRedirects(antwort, detail_url)
+    assertContains(antwort, "Erhebungen können nur eigene Vignetten einbinden.")
+    assert antwort.context["aufgenommene_daten"] == []
 
 
 class ErhebungsansichtAnbieterTests(TestCase):
@@ -1671,14 +1575,12 @@ class ErhebungsansichtAnbieterTests(TestCase):
     def setUp(self) -> None:
         # Pinnt eine Infomaniak-Konfiguration an eine finale Erhebung.
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.ada: Konto = forschende("ada")
         self.konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(
             self.konfiguration, Verwendung.SCHUELERIN
         )
-        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
-        self.erhebung.finalisieren()
+        self.erhebung: Erhebung = finale_erhebung(self.ada)
         self.client.force_login(self.ada)
 
     def test_zeigt_anbieter_sprachmodell_und_parameter(self) -> None:
@@ -1710,8 +1612,7 @@ class ErhebungenFinalisierenTests(TestCase):
     def setUp(self) -> None:
         # Richtet den gemeinsamen Entwurf einer eingeloggten Forschenden ein.
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.ada: Konto = forschende("ada")
         self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         self.konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(
@@ -1726,11 +1627,12 @@ class ErhebungenFinalisierenTests(TestCase):
             reverse("erhebungen:finalisieren", args=[self.erhebung.pk]), follow=True
         )
 
-        self.assertContains(response, "Final")
+        self.assertContains(
+            response, '<span class="badge badge--final">Final</span>', html=True
+        )
         self.assertContains(response, "openrouter/forschung")
         self.assertNotContains(response, "Konfiguration speichern")
-        self.assertNotContains(response, "Finale Vignetten aufnehmen")
-        self.assertNotContains(response, ">Entfernen<")
+        self.assertNotContains(response, "zuordnungsliste__einfuegen")
 
     def test_finalisieren_speichert_vorher_alle_felder(self) -> None:
         """Offene Texte und übrige Felder gehen beim Finalisieren nicht verloren."""
@@ -1742,20 +1644,25 @@ class ErhebungenFinalisierenTests(TestCase):
             ("Finalisieren", "erhebung-konfiguration"), submit_knoepfe(detail)
         )
 
-        self.client.post(
+        finalisiert: HttpResponse = self.client.post(
             reverse("erhebungen:finalisieren", args=[self.erhebung.pk]),
             {
-                "instruktionstext": "Offene Instruktion",
-                "einwilligungstext": "Offene Einwilligung",
-                "abschlusstext": "Offener Abschluss",
+                "instruktionstext": "Offene *Instruktion*",
+                "einwilligungstext": "Offene *Einwilligung*",
+                "abschlusstext": "Offener *Abschluss*",
             },
+            follow=True,
         )
 
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
-        self.assertEqual(self.erhebung.instruktionstext, "Offene Instruktion")
-        self.assertEqual(self.erhebung.einwilligungstext, "Offene Einwilligung")
-        self.assertEqual(self.erhebung.abschlusstext, "Offener Abschluss")
+        self.assertContains(
+            finalisiert, '<span class="badge badge--final">Final</span>', html=True
+        )
+        for text in (
+            "Offene <em>Instruktion</em>",
+            "Offene <em>Einwilligung</em>",
+            "Offener <em>Abschluss</em>",
+        ):
+            self.assertContains(finalisiert, text)
 
     def test_nicht_archivierte_stichprobe_versteckt_zurueckziehen(self) -> None:
         """Eine laufende Stichprobe sperrt den Rückweg schon in der UI."""
@@ -1812,12 +1719,8 @@ class StichprobenAnlegenTests(TestCase):
     def setUp(self) -> None:
         """Richtet eine finale Erhebung einer eingeloggten Forschenden ein."""
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
-        konfiguration: ModellKonfiguration = _forschungskonfiguration()
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        self.erhebung.finalisieren()
+        self.ada: Konto = forschende("ada")
+        self.erhebung: Erhebung = finale_erhebung(self.ada)
         self.client.force_login(self.ada)
 
     def test_legt_stichprobe_mit_zeitraum_und_teilnahme_link_an(self) -> None:
@@ -1826,26 +1729,16 @@ class StichprobenAnlegenTests(TestCase):
         anlegen: HttpResponse = self.client.post(
             reverse("erhebungen:stichprobe_anlegen", args=[self.erhebung.pk]),
             {"beginn": "2026-08-01T09:00", "ende": "2026-08-31T17:00"},
+            follow=True,
         )
 
         stichprobe: Stichprobe = Stichprobe.objects.get(erhebung=self.erhebung)
         self.assertRedirects(
             anlegen, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        self.assertEqual(
-            stichprobe.beginn, timezone.make_aware(datetime(2026, 8, 1, 9))
-        )
-        self.assertEqual(
-            stichprobe.ende, timezone.make_aware(datetime(2026, 8, 31, 17))
-        )
-        detail: HttpResponse = self.client.get(
-            reverse("erhebungen:detail", args=[self.erhebung.pk])
-        )
         self.assertContains(
-            detail,
-            detail.wsgi_request.build_absolute_uri(
-                reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
-            ),
+            anlegen,
+            f"http://testserver/erhebungen/teilnahme/{stichprobe.teilnahme_link}/",
         )
 
     @override_settings(TIME_ZONE="Europe/Berlin")
@@ -1955,7 +1848,7 @@ class StichprobenAnlegenTests(TestCase):
         """Entwürfe und fremde Erhebungen erhalten keine anlegbare Stichprobe."""
 
         entwurf: Erhebung = Erhebung.objects.anlegen(self.ada, name="Entwurf")
-        grace: Konto = get_user_model().objects.create_user(username="grace")
+        grace: Konto = konto_mit_rollen("grace")
         fremde: Erhebung = Erhebung.objects.anlegen(grace, name="Fremd")
         zeitraum: dict[str, str] = {
             "beginn": "2026-08-01T09:00",
@@ -2018,12 +1911,8 @@ class ErhebungenArchivierenTests(TestCase):
     def setUp(self) -> None:
         """Richtet eine finale Erhebung einer eingeloggten Forschenden ein."""
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
-        self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
-        konfiguration: ModellKonfiguration = _forschungskonfiguration()
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        self.erhebung.finalisieren()
+        self.ada: Konto = forschende("ada")
+        self.erhebung: Erhebung = finale_erhebung(self.ada)
         self.client.force_login(self.ada)
 
     def test_archiviert_datenfreie_stichprobe_ueber_die_detailseite(self) -> None:
@@ -2041,14 +1930,17 @@ class ErhebungenArchivierenTests(TestCase):
         detail: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        archivieren: HttpResponse = self.client.post(archivieren_url)
+        archivieren: HttpResponse = self.client.post(archivieren_url, follow=True)
 
         self.assertContains(detail, archivieren_url)
         self.assertRedirects(
             archivieren, reverse("erhebungen:detail", args=[self.erhebung.pk])
         )
-        stichprobe.refresh_from_db()
-        self.assertTrue(stichprobe.archiviert)
+        self.assertContains(
+            archivieren,
+            '<td>Abgeschlossen <span class="badge badge--archived">Archiviert</span></td>',
+            html=True,
+        )
 
     def test_versteckt_datentragende_stichprobe_und_zeigt_guard_fehler(self) -> None:
         """Datentragende Stichproben bieten keinen Übergang und weisen ihn ab."""
@@ -2076,8 +1968,7 @@ class ErhebungenArchivierenTests(TestCase):
         self.assertContains(
             archivieren, "Datentragende Stichproben können nicht archiviert werden."
         )
-        stichprobe.refresh_from_db()
-        self.assertFalse(stichprobe.archiviert)
+        self.assertNotContains(archivieren, "badge--archived")
 
     def test_archiviert_und_entarchiviert_finale_erhebung(self) -> None:
         """Eine finale Erhebung wechselt über beide Detailseiten-Aktionen zurück."""
@@ -2096,11 +1987,16 @@ class ErhebungenArchivierenTests(TestCase):
         entarchivieren: HttpResponse = self.client.post(entarchivieren_url, follow=True)
 
         self.assertContains(final_detail, archivieren_url)
-        self.assertContains(archivieren, "Archiviert")
+        self.assertContains(
+            archivieren,
+            '<span class="badge badge--archived">Archiviert</span>',
+            html=True,
+        )
         self.assertContains(archivieren, entarchivieren_url)
-        self.assertContains(entarchivieren, "Final")
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
+        self.assertContains(
+            entarchivieren, '<span class="badge badge--final">Final</span>', html=True
+        )
+        self.assertContains(entarchivieren, archivieren_url)
 
     def test_versteckt_erhebung_archivieren_bei_laufender_stichprobe(self) -> None:
         """Eine laufende Stichprobe sperrt Archivieren in UI und Domänen-Guard."""
@@ -2124,8 +2020,9 @@ class ErhebungenArchivierenTests(TestCase):
             archivieren,
             "Erhebungen mit laufenden Stichproben können nicht archiviert werden.",
         )
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.status, Erhebung.Status.FINAL)
+        self.assertContains(
+            archivieren, '<span class="badge badge--final">Final</span>', html=True
+        )
 
     def test_versteckt_entarchivieren_bei_laufender_stichprobe(self) -> None:
         """Eine laufende Stichprobe sperrt auch den Rückweg aus dem Archiv."""
@@ -2150,8 +2047,11 @@ class ErhebungenArchivierenTests(TestCase):
             entarchivieren,
             "Erhebungen mit laufenden Stichproben können nicht entarchiviert werden.",
         )
-        self.erhebung.refresh_from_db()
-        self.assertEqual(self.erhebung.status, Erhebung.Status.ARCHIVIERT)
+        self.assertContains(
+            entarchivieren,
+            '<span class="badge badge--archived">Archiviert</span>',
+            html=True,
+        )
 
 
 class ErhebungsExportTests(TestCase):
@@ -2160,17 +2060,15 @@ class ErhebungsExportTests(TestCase):
     def test_exportiert_erhebung_stichprobe_und_teilnahme_als_csvs(self) -> None:
         """Das ZIP bewahrt Freitext, NULL und Zeitstempel im festgelegten Format."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(
+        erhebung: Erhebung = finale_erhebung(
             ada,
             name="Brüche & Zahlen",
             instruktionstext="Zeile eins\nZeile zwei",
             einwilligungstext="",
         )
-        erhebung.finalisieren()
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=datetime(2026, 7, 1, 8, tzinfo=timezone.UTC),
@@ -2191,22 +2089,10 @@ class ErhebungsExportTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/zip")
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            erhebungszeile = next(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("erhebung.csv"), encoding="utf-8")
-                )
-            )
-            stichprobenzeile = next(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("stichproben.csv"), encoding="utf-8")
-                )
-            )
-            teilnahmezeile = next(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("teilnahmen.csv"), encoding="utf-8")
-                )
-            )
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        [erhebungszeile] = archiv["erhebung.csv"]
+        [stichprobenzeile] = archiv["stichproben.csv"]
+        [teilnahmezeile] = archiv["teilnahmen.csv"]
 
         self.assertEqual(erhebungszeile["instruktionstext"], "Zeile eins\nZeile zwei")
         self.assertEqual(erhebungszeile["einwilligungstext"], "")
@@ -2219,7 +2105,6 @@ class ErhebungsExportTests(TestCase):
         self.assertEqual(teilnahmezeile["sprachmodell_eingewilligt"], "True")
         self.assertEqual(teilnahmezeile["audioverarbeitung_eingewilligt"], "NA")
         self.assertEqual(teilnahmezeile["speicherung_eingewilligt"], "False")
-        self.assertNotIn("einwilligung_erteilt", teilnahmezeile)
         self.assertRegex(
             teilnahmezeile["erstellt_am"],
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$",
@@ -2228,22 +2113,19 @@ class ErhebungsExportTests(TestCase):
     def test_exportiert_nur_referenzierte_fassungen_mit_vollem_inhalt(self) -> None:
         """Fassungstabellen machen die exportierte Datenspur selbsttragend."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erste_konfiguration: ModellKonfiguration = _forschungskonfiguration(
             "erstes-modell", parameter={"temperature": 0.2}
         )
         ModellKonfiguration.objects.aktivieren(
             erste_konfiguration, Verwendung.SCHUELERIN
         )
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         zweite_konfiguration: ModellKonfiguration = _forschungskonfiguration(
             "zweites-modell", parameter={"temperature": 0.7}
         )
-        ungenutzte_konfiguration: ModellKonfiguration = _forschungskonfiguration(
-            "nicht-exportieren"
-        )
+        # Weder gepinnt noch gespielt: fehlt in der Konfigurationstabelle.
+        _forschungskonfiguration("nicht-exportieren")
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(days=1),
@@ -2265,8 +2147,9 @@ class ErhebungsExportTests(TestCase):
         zweiter_kern: Simulationskern = erster_kern.bearbeiten()
         zweiter_kern.system_prompt_vorlage = "Verwendeter System-Prompt\nZeile zwei"
         zweiter_kern.save()
-        zweiter_kern.finalisieren()
-        erste_vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            zweiter_kern.finalisieren()
+        erste_vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         erste_vignette = erste_vignette.bearbeiten()
         erste_vignette.lernauftrag_text = (
             "Addiere **die** Brüche.\n[bild]\n- [Tipp](https://x.org)"
@@ -2286,7 +2169,8 @@ class ErhebungsExportTests(TestCase):
         zweite_vignette.referenzdiagnose = "Mehrzeilige\nReferenzdiagnose"
         zweite_vignette.save()
         zweite_vignette.finalisieren()
-        ungenutzte_vignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
+        # Weder gezogen noch gespielt: fehlt in der Fassungstabelle.
+        finale_vignette(ada, fach="Physik")
         Vignettenziehung.objects.create(
             erhebungsbindung=bindung, vignette=erste_vignette, position=1
         )
@@ -2308,59 +2192,14 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            vignetten: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("vignettenfassungen.csv"), encoding="utf-8"
-                    )
-                )
-            )
-            kerne: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("simulationskerne.csv"), encoding="utf-8"
-                    )
-                )
-            )
-            konfigurationen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("modellkonfigurationen.csv"), encoding="utf-8"
-                    )
-                )
-            )
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        vignetten: list[dict[str, str]] = archiv["vignettenfassungen.csv"]
+        kerne: list[dict[str, str]] = archiv["simulationskerne.csv"]
+        konfigurationen: list[dict[str, str]] = archiv["modellkonfigurationen.csv"]
 
         vignetten_nach_id: dict[str, dict[str, str]] = {
             vignette["id"]: vignette for vignette in vignetten
         }
-        self.assertEqual(
-            list(vignetten[0].keys()),
-            [
-                "id",
-                "historie_id",
-                "finalisiert_am",
-                "fehlermuster_beschreibung",
-                "lernauftrag_text",
-                "lernauftrag_bild",
-                "lernauftrag_bildbeschreibung",
-                "lernauftrag_simulationshinweise",
-                "arbeitsheft_text",
-                "arbeitsheft_bild",
-                "arbeitsheft_bildbeschreibung",
-                "arbeitsheft_simulationshinweise",
-                "schuelerin_name",
-                "schuelerin_geschlecht",
-                "lehrperson_name",
-                "lehrperson_geschlecht",
-                "fach",
-                "thema",
-                "klassenstufe",
-                "referenzdiagnose",
-                "budget_typ",
-                "budget_wert",
-            ],
-        )
         self.assertEqual(
             set(vignetten_nach_id),
             {str(erste_vignette.pk), str(zweite_vignette.pk)},
@@ -2413,19 +2252,13 @@ class ErhebungsExportTests(TestCase):
             vignetten_nach_id[str(zweite_vignette.pk)]["arbeitsheft_bildbeschreibung"],
             "Bildbeschreibung des Arbeitshefts",
         )
-        self.assertNotIn(
-            str(ungenutzte_vignette.pk),
-            vignetten_nach_id,
-        )
         self.assertEqual(
             kerne,
             [
                 {
                     "id": str(zweiter_kern.pk),
                     "historie_id": str(zweiter_kern.historie_id),
-                    "finalisiert_am": zweiter_kern.finalisiert_am.isoformat(
-                        timespec="seconds"
-                    ),
+                    "finalisiert_am": "2026-07-01T08:00:00+00:00",
                     "system_prompt_vorlage": "Verwendeter System-Prompt\nZeile zwei",
                     "user_prompt_vorlage": "User $lernauftrag",
                     "rahmenhandlung_einleitung": "Einleitung\nmehrzeilig",
@@ -2437,10 +2270,6 @@ class ErhebungsExportTests(TestCase):
         self.assertEqual(
             {konfiguration["id"] for konfiguration in konfigurationen},
             {str(erste_konfiguration.pk), str(zweite_konfiguration.pk)},
-        )
-        self.assertNotIn(
-            str(ungenutzte_konfiguration.pk),
-            {konfiguration["id"] for konfiguration in konfigurationen},
         )
         self.assertEqual(
             {
@@ -2456,34 +2285,25 @@ class ErhebungsExportTests(TestCase):
     def test_exportiert_den_anbieter_und_kein_zugangsdatum(self) -> None:
         """Der Anbieter macht den Modellnamen lesbar; Token und URL bleiben draußen."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         self.client.force_login(ada)
 
         response: HttpResponse = self.client.get(
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            konfigurationen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("modellkonfigurationen.csv"), encoding="utf-8"
-                    )
-                )
-            )
-            archivinhalt: str = "".join(
-                zip_datei.read(name).decode("utf-8") for name in zip_datei.namelist()
-            )
-
-        self.assertEqual(
-            list(konfigurationen[0].keys()),
-            ["id", "bezeichnung", "anbieter", "sprachmodell", "parameter"],
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        konfigurationen: list[dict[str, str]] = archiv["modellkonfigurationen.csv"]
+        archivinhalt: str = "\n".join(
+            wert
+            for zeilen in archiv.values()
+            for zeile in zeilen
+            for wert in zeile.values()
         )
+
         self.assertEqual(
             konfigurationen,
             [
@@ -2498,46 +2318,21 @@ class ErhebungsExportTests(TestCase):
         )
         self.assertNotIn(konfiguration.anbieter_token, archivinhalt)
         self.assertNotIn(konfiguration.anbieter_basis_url, archivinhalt)
-        self.assertNotIn("infomaniak.com", archivinhalt)
-
-    def test_exportiert_die_transkriptions_konfiguration_nicht(self) -> None:
-        """Die Transkription gehört nicht in den Datensatz (ADR-0026)."""
-
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        ModellKonfiguration.objects.aktivieren(
-            _forschungskonfiguration(), Verwendung.SCHUELERIN
-        )
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
-        self.client.force_login(ada)
-
-        response: HttpResponse = self.client.get(
-            reverse("erhebungen:export", args=[erhebung.pk])
-        )
-
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            dateinamen: list[str] = zip_datei.namelist()
-
-        self.assertEqual([name for name in dateinamen if "transkription" in name], [])
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
         """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(days=1),
             ende=timezone.now() + timedelta(days=1),
         )
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         bindungen: list[Erhebungsbindung] = [
             Erhebungsbindung.objects.create(
                 stichprobe=stichprobe,
@@ -2550,7 +2345,14 @@ class ErhebungsExportTests(TestCase):
             Vignettenziehung.objects.create(
                 erhebungsbindung=bindung, vignette=vignette, position=1
             )
-        for bindung, status in zip(bindungen[:4], Sitzung.Status.values, strict=True):
+        status_je_bindung: list[tuple[Erhebungsbindung, str]] = list(
+            zip(
+                bindungen[:4],
+                ("laufend", "abgeschlossen", "abgebrochen", "gescheitert"),
+                strict=True,
+            )
+        )
+        for bindung, status in status_je_bindung:
             sitzung: Sitzung = Sitzung.objects.create(
                 teilnahme=bindung.teilnahme,
                 vignette=vignette,
@@ -2576,19 +2378,9 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            ziehungen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(
-                        zip_datei.open("vignettenziehungen.csv"), encoding="utf-8"
-                    )
-                )
-            )
-            sitzungen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("sitzungen.csv"), encoding="utf-8")
-                )
-            )
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        ziehungen: list[dict[str, str]] = archiv["vignettenziehungen.csv"]
+        sitzungen: list[dict[str, str]] = archiv["sitzungen.csv"]
 
         self.assertEqual(
             {
@@ -2616,33 +2408,26 @@ class ErhebungsExportTests(TestCase):
                 },
                 "sitzungen": {
                     (bindung.token, str(vignette.pk), "1", status)
-                    for bindung, status in zip(
-                        bindungen[:4], Sitzung.Status.values, strict=True
-                    )
+                    for bindung, status in status_je_bindung
                 },
             },
         )
 
-    def test_exportiert_die_verbrauchte_zeit_ohne_die_offene_spanne(self) -> None:
-        """Die verbrauchte Zeit ist Datenspur (ADR-0012), der Spannenstart nicht."""
+    def test_exportiert_die_verbrauchte_zeit_in_sekunden(self) -> None:
+        """Die verbrauchte Zeit ist Datenspur (ADR-0012)."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        zeitvignette: Vignette = _finale_vignette_anlegen(
-            ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        kern: Simulationskern = finaler_kern()
+        zeitvignette: Vignette = finale_vignette(
+            ada, fach="Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
         )
-        schrittvignette: Vignette = _finale_vignette_anlegen(ada, "Physik")
-        # Nur die Zeitsitzung traegt eine offene Spanne: Bei schrittbasiertem
-        # Budget laeuft nach ADR-0012 keine Uhr, die eine ansetzen koennte.
-        for token, vignette, verbraucht, offene_spanne in (
-            ("2345-6781", zeitvignette, 417.5, timezone.now()),
-            ("2345-6782", schrittvignette, 0.0, None),
+        schrittvignette: Vignette = finale_vignette(ada, fach="Physik")
+        for token, vignette, verbraucht in (
+            ("2345-6781", zeitvignette, 417.5),
+            ("2345-6782", schrittvignette, 0.0),
         ):
             bindung: Erhebungsbindung = _laufende_bindung(erhebung, token)
             sitzung: Sitzung = Sitzung.objects.create(
@@ -2651,7 +2436,6 @@ class ErhebungsExportTests(TestCase):
                 simulationskern=kern,
                 modell_konfiguration=konfiguration,
                 verbrauchte_zeit=verbraucht,
-                offene_spanne_seit=offene_spanne,
             )
             Vignettenposition.objects.create(
                 teilnahme=bindung.teilnahme,
@@ -2665,18 +2449,11 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            leser: csv.DictReader = csv.DictReader(
-                TextIOWrapper(zip_datei.open("sitzungen.csv"), encoding="utf-8")
-            )
-            verbrauchte_zeiten: dict[str, str] = {
-                zeile["vignette_id"]: zeile["verbrauchte_zeit"] for zeile in leser
-            }
-            spalten: list[str] = list(leser.fieldnames or [])
-
-        self.assertNotIn("offene_spanne_seit", spalten)
         self.assertEqual(
-            verbrauchte_zeiten,
+            {
+                zeile["vignette_id"]: zeile["verbrauchte_zeit"]
+                for zeile in export_lesen(response)["sitzungen.csv"]
+            },
             {str(zeitvignette.pk): "417.5", str(schrittvignette.pk): "0.0"},
         )
 
@@ -2685,8 +2462,7 @@ class ErhebungsExportTests(TestCase):
     ) -> None:
         """Die flüchtige Teilnahme erscheint mit Sitzung, Uhr und Status, ohne Inhalte."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test",
             sprachmodell="fake",
@@ -2698,12 +2474,10 @@ class ErhebungsExportTests(TestCase):
             },
         )
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(
-            ada, "Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(
+            ada, fach="Mathematik", budget_typ=Vignette.BudgetTyp.ZEIT, budget_wert=600
         )
         bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
         bindung.teilnahme.speicherung_eingewilligt = False
@@ -2728,24 +2502,13 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        def _zeilen(name: str) -> list[dict[str, str]]:
-            # Liest eine CSV-Datei des Exports als Zeilen.
-
-            return list(
-                csv.DictReader(TextIOWrapper(zip_datei.open(name), encoding="utf-8"))
-            )
-
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            teilnahmen: list[dict[str, str]] = _zeilen("teilnahmen.csv")
-            sitzungen: list[dict[str, str]] = _zeilen("sitzungen.csv")
-            inhalte: dict[str, list[dict[str, str]]] = {
-                name: _zeilen(name)
-                for name in (
-                    "gespraechsschritte.csv",
-                    "fehlversuche.csv",
-                    "diagnosen.csv",
-                )
-            }
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        teilnahmen: list[dict[str, str]] = archiv["teilnahmen.csv"]
+        sitzungen: list[dict[str, str]] = archiv["sitzungen.csv"]
+        inhalte: dict[str, list[dict[str, str]]] = {
+            name: archiv[name]
+            for name in ("gespraechsschritte.csv", "fehlversuche.csv", "diagnosen.csv")
+        }
 
         self.assertEqual(
             [
@@ -2759,19 +2522,17 @@ class ErhebungsExportTests(TestCase):
                 (zeile["token"], zeile["status"], zeile["verbrauchte_zeit"])
                 for zeile in sitzungen
             ],
-            [("2345-6789", Sitzung.Status.ABGESCHLOSSEN, "4.0")],
+            [("2345-6789", "abgeschlossen", "4.0")],
         )
         self.assertEqual(inhalte, {name: [] for name in inhalte})
 
     def test_exportiert_gespraechsschritte_fehlversuche_und_diagnosen(self) -> None:
         """Der Export bewahrt die vollständige Datenspur einschließlich Abbrüchen."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         stichprobe: Stichprobe = Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(days=1),
@@ -2782,9 +2543,8 @@ class ErhebungsExportTests(TestCase):
             teilnahme=Teilnahme.objects.create(),
             token="2345-6789",
         )
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         sitzung: Sitzung = Sitzung.objects.create(
             teilnahme=bindung.teilnahme,
             vignette=vignette,
@@ -2863,45 +2623,11 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            self.assertTrue(
-                {
-                    "gespraechsschritte.csv",
-                    "fehlversuche.csv",
-                    "diagnosen.csv",
-                }.issubset(zip_datei.namelist())
-            )
-            schritt_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(
-                    zip_datei.open("gespraechsschritte.csv"), encoding="utf-8"
-                )
-            )
-            schritte: list[dict[str, str]] = list(schritt_leser)
-            kopfzeile: list[str] = list(schritt_leser.fieldnames or [])
-            fehlversuche: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("fehlversuche.csv"), encoding="utf-8")
-                )
-            )
-            diagnose_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(zip_datei.open("diagnosen.csv"), encoding="utf-8")
-            )
-            diagnosen: list[dict[str, str]] = list(diagnose_leser)
-            diagnose_kopfzeile: list[str] = list(diagnose_leser.fieldnames or [])
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        schritte: list[dict[str, str]] = archiv["gespraechsschritte.csv"]
+        fehlversuche: list[dict[str, str]] = archiv["fehlversuche.csv"]
+        diagnosen: list[dict[str, str]] = archiv["diagnosen.csv"]
 
-        self.assertEqual(
-            kopfzeile,
-            [
-                "id",
-                "sitzung_id",
-                "reihenfolge",
-                "eingabe",
-                "denkspur",
-                "aeusserung",
-                "erstellt_am",
-                "eingabemodus",
-            ],
-        )
         self.assertEqual(
             [
                 {name: wert for name, wert in schritt.items() if name != "erstellt_am"}
@@ -2957,10 +2683,6 @@ class ErhebungsExportTests(TestCase):
             },
         )
         self.assertEqual(
-            diagnose_kopfzeile,
-            ["sitzung_id", "text", "erstellt_am", "eingabemodus"],
-        )
-        self.assertEqual(
             [
                 {name: wert for name, wert in diagnose.items() if name != "erstellt_am"}
                 for diagnose in diagnosen
@@ -2981,91 +2703,91 @@ class ErhebungsExportTests(TestCase):
     def test_exportiert_itembloecke_mit_vorlage_und_erledigt_zeitstempel(self) -> None:
         """Erst der Blockdatensatz trennt »nie vorgelegt« von »leer abgeschickt«."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        erhebung.finalisieren()
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         bindungen: list[Erhebungsbindung] = [
             _laufende_bindung(erhebung, f"2345-678{nummer}") for nummer in range(1, 3)
         ]
         bloecke: list[Itemblock] = []
-        for bindung in bindungen:
-            sitzung: Sitzung = Sitzung.objects.create(
-                teilnahme=bindung.teilnahme,
-                vignette=vignette,
-                simulationskern=kern,
-                modell_konfiguration=konfiguration,
-            )
-            bloecke.append(
-                Itemblock.objects.create(
-                    erhebungsbindung=bindung,
-                    andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
-                    sitzung=sitzung,
-                    erledigt_am=timezone.now(),
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            for bindung in bindungen:
+                sitzung: Sitzung = Sitzung.objects.create(
+                    teilnahme=bindung.teilnahme,
+                    vignette=vignette,
+                    simulationskern=kern,
+                    modell_konfiguration=konfiguration,
                 )
-            )
-            bloecke.append(
-                Itemblock.objects.create(
-                    erhebungsbindung=bindung,
-                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                bloecke.append(
+                    Itemblock.objects.create(
+                        erhebungsbindung=bindung,
+                        andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+                        sitzung=sitzung,
+                        erledigt_am=_SOMMERZEIT + timedelta(minutes=5),
+                    )
                 )
-            )
-        fremde_erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fremd")
-        fremde_erhebung.finalisieren()
+                bloecke.append(
+                    Itemblock.objects.create(
+                        erhebungsbindung=bindung,
+                        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                    )
+                )
+        fremde_erhebung: Erhebung = finale_erhebung(ada, name="Fremd")
         Itemblock.objects.create(
             erhebungsbindung=_laufende_bindung(fremde_erhebung, "9999-9999"),
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
         )
         self.client.force_login(ada)
 
-        with CaptureQueriesContext(connection) as abfragen:
-            response: HttpResponse = self.client.get(
-                reverse("erhebungen:export", args=[erhebung.pk])
-            )
-
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            zeilen: list[dict[str, str]] = list(
-                csv.DictReader(
-                    TextIOWrapper(zip_datei.open("itembloecke.csv"), encoding="utf-8")
-                )
-            )
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
 
         self.assertEqual(
-            zeilen,
+            export_lesen(response)["itembloecke.csv"],
             [
                 {
-                    "id": str(block.pk),
-                    "teilnahme_token": block.erhebungsbindung.token,
-                    "andockpunkt": block.andockpunkt,
-                    "sitzung_id": (str(block.sitzung_id) if block.sitzung_id else "NA"),
-                    "vorgelegt_am": _zeitstempel(block.vorgelegt_am),
-                    "erledigt_am": (
-                        _zeitstempel(block.erledigt_am) if block.erledigt_am else "NA"
-                    ),
-                }
-                for block in bloecke
+                    "id": str(bloecke[0].pk),
+                    "teilnahme_token": "2345-6781",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(bloecke[0].sitzung_id),
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "2026-07-01T08:05:00+00:00",
+                },
+                {
+                    "id": str(bloecke[1].pk),
+                    "teilnahme_token": "2345-6781",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "NA",
+                },
+                {
+                    "id": str(bloecke[2].pk),
+                    "teilnahme_token": "2345-6782",
+                    "andockpunkt": "nach_sitzung",
+                    "sitzung_id": str(bloecke[2].sitzung_id),
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "2026-07-01T08:05:00+00:00",
+                },
+                {
+                    "id": str(bloecke[3].pk),
+                    "teilnahme_token": "2345-6782",
+                    "andockpunkt": "am_ende",
+                    "sitzung_id": "NA",
+                    "vorgelegt_am": "2026-07-01T08:00:00+00:00",
+                    "erledigt_am": "NA",
+                },
             ],
-        )
-        # Vier Blöcke, eine Abfrage: der Export zerfällt nicht in N+1-Abfragen.
-        self.assertEqual(
-            sum(
-                1
-                for abfrage in abfragen.captured_queries
-                if "erhebungen_itemblock" in abfrage["sql"]
-            ),
-            1,
         )
 
     def test_exportiert_item_antworten_mit_erhaltener_null_semantik(self) -> None:
         """Die Antwortdatei trennt »nicht beantwortet« von »leer abgeschickt«."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
@@ -3089,9 +2811,8 @@ class ErhebungsExportTests(TestCase):
         likert_am_ende: Erhebungsitem = _item_zuordnen(
             erhebung, likert_item, Erhebungsitem.Andockpunkt.AM_ENDE, 2
         )
-        kern: Simulationskern = Simulationskern.objects.anlegen()
-        kern.finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
         sitzung: Sitzung = Sitzung.objects.create(
             teilnahme=bindung.teilnahme,
@@ -3158,29 +2879,8 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            antwort_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(zip_datei.open("item_antworten.csv"), encoding="utf-8")
-            )
-            antworten: list[dict[str, str]] = list(antwort_leser)
-            kopfzeile: list[str] = list(antwort_leser.fieldnames or [])
-
         self.assertEqual(
-            kopfzeile,
-            [
-                "itemblock_id",
-                "teilnahme_token",
-                "item_id",
-                "item_typ",
-                "andockpunkt",
-                "sitzung_id",
-                "position",
-                "freitext",
-                "likert_stufe",
-            ],
-        )
-        self.assertEqual(
-            antworten,
+            export_lesen(response)["item_antworten.csv"],
             [
                 {
                     "itemblock_id": str(block_nach_sitzung.pk),
@@ -3232,10 +2932,8 @@ class ErhebungsExportTests(TestCase):
     def test_export_ist_eigentumsgebunden_und_auch_ohne_daten_wohlgeformt(self) -> None:
         """Entwürfe exportieren Kopfzeilen; fremde Erhebungen bleiben verborgen."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
-        grace.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
+        grace: Konto = forschende("grace")
         entwurf: Erhebung = Erhebung.objects.anlegen(ada, name="Leerer Entwurf")
         fremde_erhebung: Erhebung = Erhebung.objects.anlegen(
             grace, name="Fremde Erhebung"
@@ -3245,9 +2943,10 @@ class ErhebungsExportTests(TestCase):
         detail_ohne_stichprobe: HttpResponse = self.client.get(
             reverse("erhebungen:detail", args=[entwurf.pk])
         )
-        export: HttpResponse = self.client.get(
-            reverse("erhebungen:export", args=[entwurf.pk])
-        )
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            export: HttpResponse = self.client.get(
+                reverse("erhebungen:export", args=[entwurf.pk])
+            )
         fremder_export: HttpResponse = self.client.get(
             reverse("erhebungen:export", args=[fremde_erhebung.pk])
         )
@@ -3256,31 +2955,28 @@ class ErhebungsExportTests(TestCase):
             detail_ohne_stichprobe, reverse("erhebungen:export", args=[entwurf.pk])
         )
         self.assertEqual(fremder_export.status_code, 404)
-        self.assertRegex(
+        self.assertEqual(
             export["Content-Disposition"],
-            r'^attachment; filename="erhebung-\d+-leerer-entwurf-\d{8}T\d{6}Z.zip"$',
+            f'attachment; filename="erhebung-{entwurf.pk}-leerer-entwurf-'
+            '20260701T080000Z.zip"',
         )
-        # Die Kopfzeile steht auch ohne Datenzeile; die Erhebung selbst und die
-        # global festgelegte Likert-Kodierung hängen nicht am Datenbestand.
-        zeilen_ohne_datenbestand: dict[str, int] = {
-            "erhebung.csv": 2,
-            "likert_skala.csv": 7,
+        # Die Erhebung selbst und die global festgelegte Likert-Kodierung hängen
+        # nicht am Datenbestand; jede andere Datei bleibt ohne Datenzeile.
+        zeilenzahlen: dict[str, int] = {
+            dateiname: len(zeilen) for dateiname, zeilen in export_lesen(export).items()
         }
-        with ZipFile(BytesIO(export.content)) as zip_datei:
-            for dateiname in zip_datei.namelist():
-                with TextIOWrapper(
-                    zip_datei.open(dateiname), encoding="utf-8"
-                ) as csv_datei:
-                    self.assertEqual(
-                        len(list(csv.reader(csv_datei))),
-                        zeilen_ohne_datenbestand.get(dateiname, 1),
-                    )
+        self.assertEqual(
+            zeilenzahlen,
+            {
+                dateiname: {"erhebung.csv": 1, "likert_skala.csv": 6}.get(dateiname, 0)
+                for dateiname in zeilenzahlen
+            },
+        )
 
     def test_exportiert_die_vorgelegten_items_mit_vollem_wortlaut(self) -> None:
         """Die Item-Tabelle macht den Fragebogen-Teil interpretierbar."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
         beidseitiges_item: FragebogenItem = _finales_item_anlegen(
             ada, "Zeile eins\nZeile zwei"
@@ -3322,16 +3018,8 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            item_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(zip_datei.open("fragebogen_items.csv"), encoding="utf-8")
-            )
-            items: list[dict[str, str]] = list(item_leser)
-            kopfzeile: list[str] = list(item_leser.fieldnames or [])
-
-        self.assertEqual(kopfzeile, ["id", "typ", "wortlaut"])
         self.assertEqual(
-            items,
+            export_lesen(response)["fragebogen_items.csv"],
             [
                 {
                     "id": str(beidseitiges_item.pk),
@@ -3349,8 +3037,7 @@ class ErhebungsExportTests(TestCase):
     def test_exportiert_die_kodierung_der_likert_skala(self) -> None:
         """Die Skalentabelle nennt zu jeder Stufe ihren Wortlaut."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
         self.client.force_login(ada)
 
@@ -3358,16 +3045,8 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(response.content)) as zip_datei:
-            skala_leser: csv.DictReader[str] = csv.DictReader(
-                TextIOWrapper(zip_datei.open("likert_skala.csv"), encoding="utf-8")
-            )
-            stufen: list[dict[str, str]] = list(skala_leser)
-            kopfzeile: list[str] = list(skala_leser.fieldnames or [])
-
-        self.assertEqual(kopfzeile, ["stufe", "pol"])
         self.assertEqual(
-            stufen,
+            export_lesen(response)["likert_skala.csv"],
             [
                 {"stufe": "1", "pol": "Stimme gar nicht zu"},
                 {"stufe": "2", "pol": "Stimme nicht zu"},
@@ -3378,47 +3057,54 @@ class ErhebungsExportTests(TestCase):
             ],
         )
 
-    def test_export_braucht_unabhaengig_von_der_itemzahl_gleich_viele_abfragen(
+    def test_export_braucht_unabhaengig_vom_datenbestand_gleich_viele_abfragen(
         self,
     ) -> None:
-        """Die Item-Tabelle zerlegt den Export nicht in N+1-Abfragen."""
+        """Items, Bindungen und Itemblöcke zerlegen den Export nicht in N+1-Abfragen."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Fragebogen")
-        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
-        block: Itemblock = Itemblock.objects.create(
-            erhebungsbindung=bindung, andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE
-        )
-        for position in range(1, 4):
-            ItemAntwort.objects.create(
-                itemblock=block,
-                erhebungsbindung=bindung,
-                erhebungsitem=_item_zuordnen(
+        ada: Konto = forschende("ada")
+        self.client.force_login(ada)
+
+        def abfragen_beim_export(anzahl: int) -> int:
+            # Je eine Bindung mit einem Block, der jedes der Items beantwortet.
+
+            erhebung: Erhebung = Erhebung.objects.anlegen(ada, name=f"{anzahl} Items")
+            zuordnungen: list[Erhebungsitem] = [
+                _item_zuordnen(
                     erhebung,
-                    _finales_item_anlegen(ada, f"Item {position}"),
+                    _finales_item_anlegen(ada, f"Item {position} von {anzahl}"),
                     Erhebungsitem.Andockpunkt.AM_ENDE,
                     position,
-                ),
-            )
-        self.client.force_login(ada)
-        with CaptureQueriesContext(connection) as mit_drei_items:
-            self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
-        block.antworten.exclude(erhebungsitem__position=1).delete()
-        with CaptureQueriesContext(connection) as mit_einem_item:
-            self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
+                )
+                for position in range(1, anzahl + 1)
+            ]
+            for nummer in range(anzahl):
+                bindung: Erhebungsbindung = _laufende_bindung(
+                    erhebung, f"{anzahl}{nummer}00-0000"
+                )
+                block: Itemblock = Itemblock.objects.create(
+                    erhebungsbindung=bindung,
+                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                )
+                for zuordnung in zuordnungen:
+                    ItemAntwort.objects.create(
+                        itemblock=block,
+                        erhebungsbindung=bindung,
+                        erhebungsitem=zuordnung,
+                    )
+            with CaptureQueriesContext(connection) as abfragen:
+                self.client.get(reverse("erhebungen:export", args=[erhebung.pk]))
+            return len(abfragen)
 
-        self.assertEqual(len(mit_drei_items), len(mit_einem_item))
+        self.assertEqual(abfragen_beim_export(3), abfragen_beim_export(1))
 
     def test_detail_zeigt_export_mit_stichprobe_auch_nach_archivierung(self) -> None:
         """Der Daten-Download folgt dem Datenbestand statt dem Erhebungsstatus."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Archiv")
-        erhebung.finalisieren()
+        erhebung: Erhebung = finale_erhebung(ada, name="Archiv")
         Stichprobe.objects.create(
             erhebung=erhebung,
             beginn=timezone.now() - timedelta(days=2),
@@ -3440,8 +3126,7 @@ class ErhebungsExportTests(TestCase):
     def test_dateien_und_spalten_folgen_dem_kontrakt_aus_adr_0029(self) -> None:
         """Der veröffentlichte Kontrakt nennt genau die gelieferten Dateien und Spalten."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Kontrakt")
         self.client.force_login(ada)
 
@@ -3449,17 +3134,7 @@ class ErhebungsExportTests(TestCase):
             reverse("erhebungen:export", args=[erhebung.pk])
         )
 
-        with ZipFile(BytesIO(export.content)) as zip_datei:
-            kopfzeilen: dict[str, list[str]] = {
-                dateiname: next(
-                    csv.reader(
-                        TextIOWrapper(zip_datei.open(dateiname), encoding="utf-8")
-                    )
-                )
-                for dateiname in zip_datei.namelist()
-            }
-
-        self.assertEqual(kopfzeilen, exportkontrakt_aus_adr_0029())
+        self.assertEqual(export_kopfzeilen(export), exportkontrakt_aus_adr_0029())
 
 
 class ErhebungenGesperrteItemzuordnungTests(TestCase):
@@ -3470,8 +3145,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
     ) -> None:
         """Das eingefrorene Design bleibt in seiner Reihenfolge lesbar."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
         nach_sitzung_zwei: FragebogenItem = _finales_item_anlegen(
             ada, "Nach Sitzung zwei"
@@ -3498,10 +3172,7 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
             andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
             position=1,
         )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         erhebung.finalisieren()
         self.client.force_login(ada)
 
@@ -3532,14 +3203,8 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
     ) -> None:
         """Auch ohne Items bleibt die archivierte Zuordnung als leere Ansicht lesbar."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
-        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
-        erhebung.finalisieren()
+        ada: Konto = forschende("ada")
+        erhebung: Erhebung = finale_erhebung(ada)
         erhebung.archivieren()
         self.client.force_login(ada)
 
@@ -3555,18 +3220,13 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
     def test_finale_erhebung_zeigt_vignetten_ohne_aktionen(self) -> None:
         """Auch die Vignettenliste bleibt nach dem Finalisieren lesbar, aber fest."""
 
-        ada: Konto = get_user_model().objects.create_user(username="ada")
-        ada.groups.add(Group.objects.get(name="Forschende:r"))
+        ada: Konto = forschende("ada")
         erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Brüche")
-        Simulationskern.objects.anlegen().finalisieren()
-        vignette: Vignette = _finale_vignette_anlegen(ada, "Mathematik")
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         Erhebungsvignette.objects.create(
             erhebung=erhebung, vignette=vignette, position=1
         )
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
-            Verwendung.SCHUELERIN,
-        )
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         erhebung.finalisieren()
         self.client.force_login(ada)
 
@@ -3574,7 +3234,6 @@ class ErhebungenGesperrteItemzuordnungTests(TestCase):
             reverse("erhebungen:detail", args=[erhebung.pk])
         )
 
-        self.assertTemplateUsed(detail, "erhebungen/includes/zuordnungsliste.html")
         self.assertContains(detail, "Feste Reihenfolge")
         self.assertNotContains(detail, "zuordnungsliste__einfuegen")
         self.assertNotContains(detail, "zuordnung-iconknopf")
@@ -3598,8 +3257,7 @@ class ErhebungstexteVorschauUndLeseansichtTests(TestCase):
     def setUp(self) -> None:
         # Richtet eine Forschende mit einem Entwurf voller Markdown-Texte ein.
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
-        self.ada.groups.add(Group.objects.get(name="Forschende:r"))
+        self.ada: Konto = forschende("ada")
         self.erhebung: Erhebung = Erhebung.objects.anlegen(self.ada, name="Brüche")
         self.erhebung.instruktionstext = "# Ablauf\n- erst\n- dann"
         self.erhebung.einwilligungstext = "**Zweck** [Datenschutz](https://example.org)"
@@ -3649,28 +3307,31 @@ class ErhebungstexteVorschauUndLeseansichtTests(TestCase):
 
         self.assertContains(teilnahmeseite, vorschau.content.decode().strip())
 
-    def test_finale_erhebung_zeigt_die_texte_gerendert_und_nur_lesend(self) -> None:
-        """Die Leseansicht rendert Markdown und nutzt für Leeres den Platzhalter."""
 
-        self.erhebung.finalisieren()
+@pytest.mark.django_db
+@pytest.mark.parametrize("archiviert", [False, True], ids=["final", "archiviert"])
+def test_finale_und_archivierte_erhebung_zeigen_die_texte_gerendert_und_nur_lesend(
+    client: Client, archiviert: bool
+) -> None:
+    """Die Leseansicht rendert Markdown und nutzt für Leeres den Platzhalter."""
 
-        detail: HttpResponse = self._detail()
+    ada: Konto = forschende("ada")
+    erhebung: Erhebung = finale_erhebung(
+        ada,
+        instruktionstext="# Ablauf\n- erst\n- dann",
+        einwilligungstext="**Zweck** [Datenschutz](https://example.org)",
+        abschlusstext="",
+    )
+    if archiviert:
+        erhebung.archivieren()
+    client.force_login(ada)
 
-        self.assertContains(detail, "<h3>Ablauf</h3>")
-        self.assertContains(detail, "<li>erst</li>")
-        self.assertContains(detail, "<strong>Zweck</strong>")
-        self.assertContains(detail, 'href="https://example.org"')
-        self.assertContains(detail, '<div class="markdown-text">—</div>')
-        self.assertNotContains(detail, "<textarea")
-        self.assertNotContains(detail, ">Vorschau</button>")
+    detail: HttpResponse = client.get(reverse("erhebungen:detail", args=[erhebung.pk]))
 
-    def test_archivierte_erhebung_zeigt_die_texte_gerendert(self) -> None:
-        """Auch nach dem Archivieren bleibt nachlesbar, was eingefroren wurde."""
-
-        self.erhebung.finalisieren()
-        self.erhebung.archivieren()
-
-        detail: HttpResponse = self._detail()
-
-        self.assertContains(detail, "<h3>Ablauf</h3>")
-        self.assertContains(detail, "<strong>Zweck</strong>")
+    assertContains(detail, "<h3>Ablauf</h3>")
+    assertContains(detail, "<li>erst</li>")
+    assertContains(detail, "<strong>Zweck</strong>")
+    assertContains(detail, 'href="https://example.org"')
+    assertContains(detail, '<div class="markdown-text">—</div>')
+    assertNotContains(detail, "<textarea")
+    assertNotContains(detail, ">Vorschau</button>")

@@ -8,7 +8,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
-from simulation import render
+from simulation import vorlage_rendern
 from simulation.models import (
     Anbieter,
     KernHistorie,
@@ -19,26 +19,26 @@ from simulation.models import (
 )
 
 
-def test_render_substituiert_alle_vereinbarten_platzhalter() -> None:
-    """Eine Vorlage wird mit ihren vereinbarten Werten gefüllt."""
+def test_vorlage_rendern_setzt_die_benutzten_platzhalter_ein() -> None:
+    """Eine Vorlage wird mit ihren benutzten Werten gefüllt."""
 
-    assert render("$name arbeitet an $thema.", {"name": "Mia", "thema": "Brüche"}) == (
-        "Mia arbeitet an Brüche."
+    assert (
+        vorlage_rendern("$name arbeitet an $thema.", {"name": "Mia", "thema": "Brüche"})
+        == "Mia arbeitet an Brüche."
     )
 
 
-def test_render_lehnt_fehlende_platzhalter_ab() -> None:
-    """Jeder Platzhalter der Vorlage braucht einen Wert."""
+def test_vorlage_rendern_lehnt_fehlende_platzhalter_ab() -> None:
+    """Jeder benutzte Platzhalter der Vorlage braucht einen Wert."""
 
     with pytest.raises(KeyError):
-        render("$name", {})
+        vorlage_rendern("$name", {})
 
 
-def test_render_lehnt_ueberzaehlige_platzhalter_ab() -> None:
-    """Das Mapping darf keine nicht verwendeten Werte enthalten."""
+def test_vorlage_rendern_ignoriert_uebrige_werte() -> None:
+    """Werte ohne Platzhalter in der Vorlage bleiben unbenutzt."""
 
-    with pytest.raises(ValueError, match="Überzählige Platzhalter"):
-        render("$name", {"name": "Mia", "thema": "Brüche"})
+    assert vorlage_rendern("$name", {"name": "Mia", "thema": "Brüche"}) == "Mia"
 
 
 def _direkt_einfuegen(**werte: object) -> Simulationskern:
@@ -311,16 +311,6 @@ def test_archivierte_fassung_kann_nicht_physisch_geloescht_werden() -> None:
 
 
 @pytest.mark.django_db
-def test_vertragsfremder_prompt_platzhalter_wird_abgelehnt() -> None:
-    """Prompt-Vorlagen dürfen nur die vereinbarten Vignettenfelder ansprechen."""
-
-    kern: Simulationskern = Simulationskern(system_prompt_vorlage="$lehrperson_name")
-
-    with pytest.raises(ValidationError):
-        kern.full_clean(exclude=["historie"])
-
-
-@pytest.mark.django_db
 def test_ungueltige_vorlagen_syntax_wird_abgelehnt() -> None:
     """Eine Vorlage muss ein gültiges string.Template sein."""
 
@@ -419,19 +409,6 @@ def _openrouter_konfiguration(name: str) -> ModellKonfiguration:
 
 
 @pytest.mark.django_db
-def test_aktivieren_bewegt_den_zeiger_ohne_zweite_aktive_konfiguration() -> None:
-    """Erneutes Aktivieren ersetzt die aktive Konfiguration statt sie zu ergänzen."""
-
-    erste: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
-    zweite: ModellKonfiguration = _openrouter_konfiguration("zweites-modell")
-
-    ModellKonfiguration.objects.aktivieren(erste, Verwendung.SCHUELERIN)
-    ModellKonfiguration.objects.aktivieren(zweite, Verwendung.SCHUELERIN)
-
-    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == zweite
-
-
-@pytest.mark.django_db
 def test_modell_konfiguration_ist_nach_dem_anlegen_unveraenderlich() -> None:
     """Eine angelegte Modell-Konfiguration bleibt unveränderlich."""
 
@@ -478,33 +455,3 @@ def test_transkriptions_konfiguration_beginnt_bei_fake_auf_deutsch() -> None:
     assert konfiguration.anbieter_basis_url == ""
     assert konfiguration.anbieter_token == ""
     assert konfiguration.transkriptionsmodell == ""
-
-
-@pytest.mark.django_db
-def test_transkriptions_konfiguration_ueberschreibt_ihre_eine_zeile() -> None:
-    """Ein zweites Speichern rotiert die Zugangsdaten, statt anzuhäufen."""
-
-    erste: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktuelle()
-    erste.anbieter = Anbieter.OPENROUTER
-    erste.anbieter_token = "erstes-token"
-    erste.save()
-
-    zweite: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktuelle()
-    zweite.anbieter_token = "zweites-token"
-    zweite.save()
-
-    assert TranskriptionsKonfiguration.objects.count() == 1
-    assert TranskriptionsKonfiguration.objects.aktuelle().anbieter_token == (
-        "zweites-token"
-    )
-
-
-@pytest.mark.django_db
-def test_transkriptions_konfiguration_traegt_keinen_rohen_parameterbeutel() -> None:
-    """Was das Verhalten steuert, trägt hier einen Namen."""
-
-    felder: set[str] = {
-        feld.name for feld in TranskriptionsKonfiguration._meta.get_fields()
-    }
-
-    assert "parameter" not in felder

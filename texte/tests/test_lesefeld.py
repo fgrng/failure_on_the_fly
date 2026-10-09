@@ -4,6 +4,8 @@ from django import forms
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
+from config.tests.formular import submit_knoepfe
+
 
 def _lesefeld(wert: str, profil: str = "szenentext") -> str:
     return render_to_string(
@@ -49,10 +51,7 @@ class MarkdownLesefeldTests(SimpleTestCase):
     def test_speichern_sendet_das_umgebende_formular(self) -> None:
         """Speichern ist ein Submit-Knopf, Abbrechen nicht."""
 
-        html: str = _lesefeld("x")
-
-        self.assertIn('<button type="submit" class="button">Speichern</button>', html)
-        self.assertIn("feld.value = feld.defaultValue", html)
+        self.assertEqual(submit_knoepfe(_lesefeld("x")), [("Speichern", None)])
 
 
 class _Formular(forms.Form):
@@ -107,7 +106,7 @@ class LesefeldFormularfeldTests(SimpleTestCase):
         self.assertNotIn(">Vorschau</button>", html)
         self.assertIn('<textarea name="hinweise"', html)
         self.assertIn("Nur für die Simulation.", html)
-        self.assertIn('<button type="submit" class="button">Speichern</button>', html)
+        self.assertEqual(submit_knoepfe(html), [("Speichern", None)])
 
     def test_leerer_klartext_laedt_zum_schreiben_ein(self) -> None:
         """Auch ohne Markdown zeigt ein leerer Text »Text schreiben«."""

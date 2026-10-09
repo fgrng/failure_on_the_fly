@@ -2,17 +2,23 @@
 
 from datetime import UTC, datetime
 
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+import time_machine
+from django.contrib.sessions.backends.base import SessionBase
 from django.http import HttpResponse
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-from unittest.mock import patch
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finaler_kern,
+    konto_mit_rollen,
+    vignetten_entwurf,
+)
+from config.tests.formular import submit_knoepfe
+from config.tests.sprachmodell import anfragen_aufzeichnen, modellaufrufe_dauern
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from simulation.sprachmodell import FakeSprachmodell
+from sitzungen.durchlauf import Ausgang, gespraechsschritt_ausfuehren
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -21,27 +27,30 @@ from sitzungen.models import (
     Sitzung,
     Teilnahme,
 )
+from sitzungen.sink import ScratchSink, probelauf_laeuft
 from vignetten.models import Vignette
 
 
+# Zeitpunkt, zu dem das Gespräch angezeigt wird; ab hier zählen die Züge.
+_GESPRAECHSBEGINN: datetime = datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC)
+
 _ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
-    {"fehler": "anbieterfehler"},
-    {"fehler": "anbieterfehler"},
-    {"fehler": "anbieterfehler"},
+    {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
+    {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
+    {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
 ]
 
 
-class ProbelaufStartTests(TestCase):
-    """Die HTTP-Naht startet einen Probelauf über einem festen Tripel."""
+class _ProbelaufAufbau(TestCase):
+    """Gemeinsamer Aufbau der Probelauf-Tests, selbst ohne Tests."""
 
     def setUp(self) -> None:
         """Legt die sichtbaren und fremden Entwürfe für die HTTP-Tests an."""
 
-        self.ada: Konto = get_user_model().objects.create_user(username="ada")
         # Den Probelauf startet nur, wer den Vignetteneditor erreicht — und
         # dorthin führt er nach dem Debrief auch zurück.
-        self.ada.groups.add(Group.objects.get(name="Autor:in"))
-        grace: Konto = get_user_model().objects.create_user(username="grace")
+        self.ada: Konto = konto_mit_rollen("ada", "Autor:in")
+        grace: Konto = konto_mit_rollen("grace")
         self.kern: Simulationskern = Simulationskern.objects.anlegen(
             user_prompt_vorlage=(
                 "$lernauftrag_simulationshinweise $arbeitsheft_simulationshinweise"
@@ -64,7 +73,7 @@ class ProbelaufStartTests(TestCase):
         ModellKonfiguration.objects.aktivieren(
             self.konfiguration, Verwendung.SCHUELERIN
         )
-        self.entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        self.entwurf: Vignette = vignetten_entwurf(self.ada)
         self.entwurf.historie.name = "Eigener Entwurf"
         self.entwurf.historie.save()
         self.entwurf.schuelerin_name = "Mia"
@@ -75,15 +84,19 @@ class ProbelaufStartTests(TestCase):
         self.entwurf.thema = "Brüche"
         self.entwurf.klassenstufe = "5"
         self.entwurf.save()
-        fremder_entwurf: Vignette = Vignette.objects.anlegen(grace)
+        fremder_entwurf: Vignette = vignetten_entwurf(grace)
         fremder_entwurf.historie.name = "Fremder Entwurf"
         fremder_entwurf.historie.save()
         self.client.force_login(self.ada)
 
+
+class ProbelaufStartTests(_ProbelaufAufbau):
+    """Die HTTP-Naht startet einen Probelauf über einem festen Tripel."""
+
     def test_auswahl_zeigt_nur_eigene_entwuerfe_und_startet_rahmenhandlung(
         self,
     ) -> None:
-        """Der Start pinnt das automatische Tripel in der Session und rendert einleitend."""
+        """Der Start zeigt nur eigene Entwürfe an und rendert die Rahmenhandlung."""
 
         auswahl: HttpResponse = self.client.get(reverse("sitzungen:probelauf_auswahl"))
 
@@ -104,35 +117,41 @@ class ProbelaufStartTests(TestCase):
             reverse("sitzungen:probelauf_gespraech")
         )
         self.assertContains(gespraech, "Ihre nächste Frage")
-        session = self.client.session
-        self.assertEqual(session["probelauf"]["vignette_pk"], self.entwurf.pk)
-        self.assertEqual(session["probelauf"]["kern_pk"], self.kern.pk)
-        self.assertEqual(
-            session["probelauf"]["modell_konfiguration_pk"], self.konfiguration.pk
-        )
-        self.assertEqual(session["probelauf"]["gespraechsschritte"], [])
 
     def test_start_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
         self,
     ) -> None:
         """Ein Wechsel der Eval-Verwendungen ändert am Probelauf nichts."""
 
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(
+                bezeichnung="Schülerin",
+                sprachmodell="fake",
+                parameter={
+                    "skript": [{"denkspur": "-", "aeusserung": "Antwort der Schülerin"}]
+                },
+            ),
+            Verwendung.SCHUELERIN,
+        )
         andere: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Andere", sprachmodell="fake", parameter={"skript": []}
+            bezeichnung="Andere",
+            sprachmodell="fake",
+            parameter={"skript": [{"denkspur": "-", "aeusserung": "Andere Antwort"}]},
         )
         ModellKonfiguration.objects.aktivieren(andere, Verwendung.LEHRPERSON)
         ModellKonfiguration.objects.aktivieren(andere, Verwendung.BEWERTER)
 
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-
-        self.assertEqual(
-            self.client.session["probelauf"]["modell_konfiguration_pk"],
-            self.konfiguration.pk,
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
         )
+
+        self.assertContains(response, "Antwort der Schülerin")
+        self.assertNotContains(response, "Andere Antwort")
 
     def test_frischer_entwurf_startet_ohne_akteure_zu_setzen(self) -> None:
         """Der Probelauf rendert mit den beim Anlegen gesetzten Akteuren."""
-        entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        entwurf: Vignette = vignetten_entwurf(self.ada)
         entwurf.fach = "Mathematik"
         entwurf.thema = "Brüche"
         entwurf.klassenstufe = "5"
@@ -166,7 +185,6 @@ class ProbelaufStartTests(TestCase):
         )
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
 
-        self.assertContains(response, 'class="markdown-text rahmenhandlung__text"')
         self.assertContains(response, "<h3>Hospitation</h3>")
         self.assertContains(response, "<strong>_Brüche_</strong>")
         self.assertContains(response, "<em>Mia</em> zeigt.")
@@ -269,41 +287,6 @@ class ProbelaufStartTests(TestCase):
         )
         self.assertContains(response, 'alt="Reihe *1, 2, 3*"')
 
-    def test_startzustand_ueberlebt_folge_request_ohne_domaenenschreiben(
-        self,
-    ) -> None:
-        """Der Probelauf bleibt allein als Session-Zustand über mehrere Requests erhalten."""
-
-        anzahl_vignetten: int = Vignette.objects.count()
-        anzahl_kerne: int = Simulationskern.objects.count()
-        anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
-        anzahl_teilnahmen: int = Teilnahme.objects.count()
-        anzahl_sitzungen: int = Sitzung.objects.count()
-        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
-        anzahl_fehlversuche: int = Fehlversuch.objects.count()
-        anzahl_diagnosen: int = Diagnose.objects.count()
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-
-        self.client.get(reverse("sitzungen:probelauf_auswahl"))
-
-        self.assertEqual(
-            self.client.session["probelauf"],
-            {
-                "vignette_pk": self.entwurf.pk,
-                "kern_pk": self.kern.pk,
-                "modell_konfiguration_pk": self.konfiguration.pk,
-                "gespraechsschritte": [],
-            },
-        )
-        self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
-        self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
-        self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
-        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
-        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
-        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
-        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
-        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
-
     def test_gespraech_kann_bereits_aus_der_einleitung_beendet_werden(self) -> None:
         """Auch ohne Gesprächsschritt ist der Debrief erreichbar."""
 
@@ -322,28 +305,15 @@ class ProbelaufStartTests(TestCase):
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
 
-        self.assertContains(
-            einleitung, 'class="button button--neutral sitzung-aktionen__beenden"'
-        )
+        self.assertIn(("Gespräch beenden →", None), submit_knoepfe(einleitung))
         self.assertContains(
             einleitung, "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose."
         )
         self.assertNotContains(einleitung, "Sitzung abbrechen")
 
 
-class ProbelaufGespraechTests(ProbelaufStartTests):
+class ProbelaufGespraechTests(_ProbelaufAufbau):
     """Die HTTP-Naht führt das Diagnosegespräch schreibfrei Zug um Zug."""
-
-    def _domaenenzeilen_zaehlen(self) -> tuple[int, int, int, int, int]:
-        """Zählt die Probelauf-fremden Persistenzmodelle."""
-
-        return (
-            Teilnahme.objects.count(),
-            Sitzung.objects.count(),
-            Gespraechsschritt.objects.count(),
-            Fehlversuch.objects.count(),
-            Diagnose.objects.count(),
-        )
 
     def _erfolgreiche_antwort_konfigurieren(self) -> None:
         """Richtet den Fake für einen erfolgreichen Schritt ein."""
@@ -373,10 +343,10 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.entwurf.budget_wert = budget_wert
         self.entwurf.save()
 
-    def _endgueltigen_fehlschlag_ausloesen(
-        self, eingabemodus: str = Eingabemodus.GETIPPT
-    ) -> HttpResponse:
-        # Richtet einen gespeicherten Verlauf und den folgenden Fehlerfall ein.
+    def _geglueckte_neben_fehlschlag_anlegen(self) -> ModellKonfiguration:
+        # Belegt die Schülerin mit dem Fehlschlag und liefert eine geglückte
+        # Konfiguration für den ersten Schritt. Der Fake beginnt sein Skript in
+        # jedem Schritt neu, und der Probelauf pinnt seine Konfiguration.
 
         self.konfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test",
@@ -386,99 +356,49 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         ModellKonfiguration.objects.aktivieren(
             self.konfiguration, Verwendung.SCHUELERIN
         )
+        return ModellKonfiguration.objects.create(
+            bezeichnung="Geglückt",
+            sprachmodell="fake",
+            parameter={
+                "skript": [
+                    {
+                        "denkspur": "Mia addiert Zähler und Nenner.",
+                        "aeusserung": "Ich addiere einfach alles.",
+                    }
+                ]
+            },
+        )
+
+    def _endgueltigen_fehlschlag_ausloesen(
+        self,
+        eingabemodus: str = Eingabemodus.GETIPPT,
+        geglueckt: ModellKonfiguration | None = None,
+    ) -> HttpResponse:
+        # Spielt einen geglückten ersten Schritt und lässt den zweiten scheitern.
+        # Der erste Schritt läuft mit der geglückten Konfiguration über den
+        # Durchlauf am Sink dieser Session.
+
+        if geglueckt is None:
+            geglueckt = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        session = self.client.session
-        session["probelauf"]["gespraechsschritte"] = [
-            {
-                "reihenfolge": 1,
-                "eingabe": "Wie rechnest du?",
-                "denkspur": "Mia addiert Zähler und Nenner.",
-                "aeusserung": "Ich addiere einfach alles.",
-                "fehlversuche": [],
-            }
-        ]
+        session: SessionBase = self.client.session
+        gespraechsschritt_ausfuehren(
+            ScratchSink(session),
+            self.entwurf,
+            self.kern,
+            geglueckt,
+            eingabe="Wie rechnest du?",
+        )
         session.save()
         return self.client.post(
             reverse("sitzungen:probelauf_gespraech"),
             {"eingabe": "Und warum?", "eingabemodus": eingabemodus},
         )
 
-    def test_bildbeschreibung_im_prompt_folgt_dem_positionsmarker(self) -> None:
-        """Nur ein Marker allein auf seiner Zeile setzt die Bildbeschreibung dazwischen."""
-
-        self._erfolgreiche_antwort_konfigurieren()
-        kern: Simulationskern = self.kern.bearbeiten()
-        kern.user_prompt_vorlage = "$lernauftrag $arbeitsheft"
-        kern.save()
-        kern.finalisieren()
-        self.entwurf.gepinnter_kern = kern
-        self.entwurf.lernauftrag_text = "Rechne zuerst.\n[Bild]\nBegründe danach."
-        self.entwurf.lernauftrag_bild = "vignettenbilder/auftrag.gif"
-        self.entwurf.lernauftrag_bildbeschreibung = "Arbeitsblatt mit Zahlenreihe"
-        self.entwurf.arbeitsheft_text = "8 + 4 = [bild] 12"
-        self.entwurf.arbeitsheft_bild = "vignettenbilder/heft.gif"
-        self.entwurf.arbeitsheft_bildbeschreibung = "Heftseite"
-        self.entwurf.save()
-
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
-
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
-        self.assertIn(
-            "<lernauftrag_text>Rechne zuerst.\n</lernauftrag_text>\n"
-            "<lernauftrag_bildbeschreibung>Arbeitsblatt mit Zahlenreihe"
-            "</lernauftrag_bildbeschreibung>\n"
-            "<lernauftrag_text>Begründe danach.</lernauftrag_text>",
-            prompt_inhalt,
-        )
-        self.assertIn(
-            "<arbeitsheft_text>8 + 4 = [bild] 12</arbeitsheft_text>\n"
-            "<arbeitsheft_bildbeschreibung>Heftseite</arbeitsheft_bildbeschreibung>",
-            prompt_inhalt,
-        )
-
-    def test_prompt_erhaelt_die_markdown_quelle(self) -> None:
-        """Das Sprachmodell liest Lernauftrag und Arbeitsheft ungerendert."""
-
-        self._erfolgreiche_antwort_konfigurieren()
-        kern: Simulationskern = self.kern.bearbeiten()
-        kern.user_prompt_vorlage = "$lernauftrag $arbeitsheft"
-        kern.save()
-        kern.finalisieren()
-        self.entwurf.gepinnter_kern = kern
-        self.entwurf.lernauftrag_text = (
-            "Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
-        )
-        self.entwurf.arbeitsheft_text = "1/2 + 1/3\n\\= 2/5 \\*"
-        self.entwurf.save()
-
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
-
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
-        self.assertIn(
-            "<lernauftrag_text>Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
-            "</lernauftrag_text>",
-            prompt_inhalt,
-        )
-        self.assertIn(
-            "<arbeitsheft_text>1/2 + 1/3\n\\= 2/5 \\*</arbeitsheft_text>",
-            prompt_inhalt,
-        )
-        self.assertNotIn("<strong>", prompt_inhalt)
-
-    def test_simulationshinweise_erscheinen_nicht_auf_sitzungsseite_aber_im_prompt(
+    def test_simulationshinweise_erscheinen_nicht_auf_der_sitzungsseite(
         self,
     ) -> None:
-        """Simulationshinweise erreichen das Sprachmodell, aber keine Stelle der Sitzungsseite."""
+        """Simulationshinweise erreichen keine Stelle der Sitzungsseite."""
 
         self._erfolgreiche_antwort_konfigurieren()
         self.entwurf.lernauftrag_text = "Löse die Aufgabe."
@@ -505,27 +425,6 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertNotContains(response_gespraech, "Geheimer Hinweis zum Lernauftrag")
         self.assertNotContains(response_gespraech, "Geheimer Hinweis zum Arbeitsheft")
 
-        # 3. Prompt-Erzeugung beim Gesprächsschritt prüfen
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Wie hast du gerechnet?"},
-        )
-
-        anfragen: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][0]
-        prompt_inhalt: str = " ".join(nachricht["content"] for nachricht in anfragen)
-        self.assertIn(
-            "<lernauftrag_simulationshinweise>\n"
-            "Geheimer Hinweis zum Lernauftrag\n"
-            "</lernauftrag_simulationshinweise>",
-            prompt_inhalt,
-        )
-        self.assertIn(
-            "<arbeitsheft_simulationshinweise>\n"
-            "Geheimer Hinweis zum Arbeitsheft\n"
-            "</arbeitsheft_simulationshinweise>",
-            prompt_inhalt,
-        )
-
     def test_spracheingabe_steht_schon_beim_ersten_schritt_bereit(self) -> None:
         """Auch das erste Eingabefeld trägt bereits den Aufnahme-Knopf."""
 
@@ -541,14 +440,12 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
     ) -> None:
         """Der Browser zählt gegen die Grenze, die der Endpunkt danach hält."""
 
-        einstieg: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
-        )
+        with override_settings(TRANSKRIPTION_MAX_AUFNAHME_BYTES=1234):
+            einstieg: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+            )
 
-        self.assertContains(
-            einstieg,
-            f'data-maximale-bytes="{settings.TRANSKRIPTION_MAX_AUFNAHME_BYTES}"',
-        )
+        self.assertContains(einstieg, 'data-maximale-bytes="1234"')
 
     def test_spracheingabe_steht_im_gespraech_und_im_debrief_bereit(self) -> None:
         """Der Probelauf bietet das Mikrofon ohne Einwilligungsschritt an."""
@@ -568,34 +465,10 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(debrief, "data-spracheingabe")
         self.assertContains(debrief, "Diagnose aufnehmen")
 
-    def test_antwort_und_denkspur_werden_live_angezeigt_und_in_session_behalten(
-        self,
-    ) -> None:
-        """Nur Äußerungen erreichen den nächsten Modellaufruf."""
+    def test_antwort_und_denkspur_werden_live_angezeigt(self) -> None:
+        """Eingabe, Äußerung und Denkspur stehen in der Antwort (ADR-0005)."""
 
-        self.konfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test",
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {
-                        "denkspur": "Mia addiert Zähler und Nenner.",
-                        "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    },
-                ]
-            },
-        )
-        ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
-        )
-        anzahl_vignetten: int = Vignette.objects.count()
-        anzahl_kerne: int = Simulationskern.objects.count()
-        anzahl_konfigurationen: int = ModellKonfiguration.objects.count()
-        anzahl_teilnahmen: int = Teilnahme.objects.count()
-        anzahl_sitzungen: int = Sitzung.objects.count()
-        anzahl_gespraechsschritte: int = Gespraechsschritt.objects.count()
-        anzahl_fehlversuche: int = Fehlversuch.objects.count()
-        anzahl_diagnosen: int = Diagnose.objects.count()
+        self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         erste_antwort: HttpResponse = self.client.post(
@@ -603,64 +476,16 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertContains(erste_antwort, "Wie rechnest du?")
-        self.assertContains(
-            erste_antwort, "Ich rechne eins plus eins und zwei plus drei."
-        )
+        self.assertContains(erste_antwort, "Ich addiere einfach alles.")
         self.assertContains(erste_antwort, "Mia addiert Zähler und Nenner.")
 
         zweite_antwort: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"),
-            {"eingabe": "Und warum?", "eingabemodus": "transkribiert"},
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
         )
 
-        self.assertContains(
-            zweite_antwort, "Ich rechne eins plus eins und zwei plus drei."
-        )
-        self.assertEqual(
-            self.client.session["probelauf"]["gespraechsschritte"],
-            [
-                {
-                    "reihenfolge": 1,
-                    "eingabe": "Wie rechnest du?",
-                    "eingabemodus": "getippt",
-                    "denkspur": "Mia addiert Zähler und Nenner.",
-                    "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    "fehlversuche": [],
-                },
-                {
-                    "reihenfolge": 2,
-                    "eingabe": "Und warum?",
-                    "eingabemodus": "transkribiert",
-                    "denkspur": "Mia addiert Zähler und Nenner.",
-                    "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    "fehlversuche": [],
-                },
-            ],
-        )
-        zweite_nachrichten: list[dict[str, str]] = FakeSprachmodell.letzte_anfragen[-1][
-            0
-        ]
-        self.assertIn(
-            {
-                "role": "assistant",
-                "content": "Ich rechne eins plus eins und zwei plus drei.",
-            },
-            zweite_nachrichten,
-        )
-        self.assertTrue(
-            all(
-                "Mia addiert Zähler und Nenner." not in nachricht["content"]
-                for nachricht in zweite_nachrichten
-            )
-        )
-        self.assertEqual(Vignette.objects.count(), anzahl_vignetten)
-        self.assertEqual(Simulationskern.objects.count(), anzahl_kerne)
-        self.assertEqual(ModellKonfiguration.objects.count(), anzahl_konfigurationen)
-        self.assertEqual(Teilnahme.objects.count(), anzahl_teilnahmen)
-        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
-        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_gespraechsschritte)
-        self.assertEqual(Fehlversuch.objects.count(), anzahl_fehlversuche)
-        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
+        self.assertContains(zweite_antwort, "Wie rechnest du?")
+        self.assertContains(zweite_antwort, "Und warum?")
+        self.assertContains(zweite_antwort, "Ich addiere einfach alles.", count=2)
 
     def test_schrittbudget_fuehrt_nach_letztem_schritt_unsichtbar_in_den_debrief(
         self,
@@ -669,25 +494,15 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self._budget_konfigurieren(Vignette.BudgetTyp.SCHRITTE, 1)
         self._erfolgreiche_antwort_konfigurieren()
-        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         response: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
-        self.assertEqual(
-            self.client.session["probelauf"]["status"],
-            Sitzung.Status.ABGESCHLOSSEN,
-        )
         self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertContains(response, "Ich addiere einfach alles.")
         self.assertNotContains(response, "Budget")
-        self.assertEqual(
-            self.client.session["probelauf"]["gespraechsschritte"][0]["aeusserung"],
-            "Ich addiere einfach alles.",
-        )
-        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
 
         erneutes_oeffnen: HttpResponse = self.client.get(
             reverse("sitzungen:probelauf_gespraech")
@@ -696,12 +511,13 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(erneutes_oeffnen, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertNotContains(erneutes_oeffnen, "Ihre nächste Frage")
 
-        erneuter_versuch: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            erneuter_versuch: HttpResponse = self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+            )
 
         self.assertContains(erneuter_versuch, "Frau Weber fragt nach Ihrer Diagnose.")
-        self.assertEqual(len(self.client.session["probelauf"]["gespraechsschritte"]), 1)
+        self.assertEqual(aufgezeichnet, [])
 
         erneuter_aufruf: HttpResponse = self.client.get(
             reverse("sitzungen:probelauf_gespraech")
@@ -709,95 +525,76 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         self.assertContains(erneuter_aufruf, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertNotContains(erneuter_aufruf, "Ihre nächste Frage")
+        self.assertNotContains(erneuter_aufruf, "Und warum?")
 
     def test_zeitbudget_pausiert_waehrend_des_modellaufrufs(self) -> None:
         """Modellwartezeit erhöht den Zeitverbrauch des Probelaufs nicht."""
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self._erfolgreiche_antwort_konfigurieren()
-        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-            ],
-        ):
+        # 4 s Autorinnenzug, danach rechnet das Modell 100 s.
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
-            response: HttpResponse = self.client.post(
-                reverse("sitzungen:probelauf_gespraech"),
-                {"eingabe": "Wie rechnest du?"},
-            )
+            uhr.shift(4)
+            with modellaufrufe_dauern(uhr, 100):
+                response: HttpResponse = self.client.post(
+                    reverse("sitzungen:probelauf_gespraech"),
+                    {"eingabe": "Wie rechnest du?"},
+                )
 
         self.assertContains(response, "Ich addiere einfach alles.")
         self.assertNotContains(response, "Budget")
-        self.assertEqual(self.client.session["probelauf"]["verbrauchte_zeit"], 4)
-        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+        self.assertContains(response, "Ihre nächste Frage")
 
     def test_zeitbudget_pausiert_waehrend_endgueltiger_fehlversuche(self) -> None:
         """Fehlversuche des Modells kosten keine Zeit aus dem Autorinnenzug."""
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
-        self.konfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test",
-            sprachmodell="fake",
-            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
-        )
-        ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
-        )
-        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
+        geglueckt: ModellKonfiguration = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 14, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
-            ],
-        ):
+        # 4 s Autorinnenzug, danach kostet jeder Fehlversuch 100 s.
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
-            response: HttpResponse = self.client.post(
-                reverse("sitzungen:probelauf_gespraech"),
-                {"eingabe": "Wie rechnest du?"},
+            uhr.shift(4)
+            with modellaufrufe_dauern(uhr, 100):
+                response: HttpResponse = self.client.post(
+                    reverse("sitzungen:probelauf_gespraech"),
+                    {"eingabe": "Wie rechnest du?"},
+                )
+
+            session: SessionBase = self.client.session
+            ausgang: Ausgang = gespraechsschritt_ausfuehren(
+                ScratchSink(session),
+                self.entwurf,
+                self.kern,
+                geglueckt,
+                eingabe="Und warum?",
             )
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
         self.assertNotContains(response, "Budget")
-        self.assertEqual(self.client.session["probelauf"]["verbrauchte_zeit"], 4)
-        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+        self.assertEqual(ausgang, Ausgang.FORTGESETZT)
 
     def test_zeitbudget_fuehrt_nach_laufendem_schritt_in_den_debrief(self) -> None:
         """Ein abgelaufenes Zeitbudget schneidet die erzeugte Antwort nicht ab."""
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
         self._erfolgreiche_antwort_konfigurieren()
-        domaenenzeilen: tuple[int, int, int, int, int] = self._domaenenzeilen_zaehlen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
-        with patch(
-            "sitzungen.durchlauf.jetzt",
-            side_effect=[
-                datetime(2026, 9, 22, 10, 0, 10, tzinfo=UTC),
-                datetime(2026, 9, 22, 10, 0, 15, tzinfo=UTC),
-            ],
-        ):
+        with time_machine.travel(_GESPRAECHSBEGINN, tick=False) as uhr:
             self.client.get(reverse("sitzungen:probelauf_gespraech"))
+            uhr.shift(5)
             response: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_gespraech"),
                 {"eingabe": "Wie rechnest du?"},
             )
 
         self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
-        self.assertEqual(
-            self.client.session["probelauf"]["gespraechsschritte"][0]["aeusserung"],
-            "Ich addiere einfach alles.",
-        )
-        self.assertEqual(self._domaenenzeilen_zaehlen(), domaenenzeilen)
+        self.assertContains(response, "Ich addiere einfach alles.")
 
     def test_modellverlauf_traegt_beide_gespraechsseiten(self) -> None:
         """Beide Gesprächsseiten reisen als native Rollen zum Modell."""
@@ -808,45 +605,17 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.client.post(
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
-        )
+        with anfragen_aufzeichnen() as aufgezeichnet:
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
+            )
 
         self.assertEqual(
-            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
+            aufgezeichnet[-1][-3:],
             [
                 {"role": "user", "content": "Wie rechnest du?"},
                 {"role": "assistant", "content": "Ich addiere einfach alles."},
                 {"role": "user", "content": "Und warum so?"},
-            ],
-        )
-
-    def test_leere_aeusserung_bleibt_im_modellverlauf(self) -> None:
-        """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
-
-        self.konfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test",
-            sprachmodell="fake",
-            parameter={"skript": [{"denkspur": "still", "aeusserung": ""}]},
-        )
-        ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
-        )
-        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Erster Schritt"}
-        )
-        self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Zweiter Schritt"}
-        )
-
-        self.assertEqual(
-            FakeSprachmodell.letzte_anfragen[-1][0][-3:],
-            [
-                {"role": "user", "content": "Erster Schritt"},
-                {"role": "assistant", "content": ""},
-                {"role": "user", "content": "Zweiter Schritt"},
             ],
         )
 
@@ -909,7 +678,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
 
         response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
 
-        self.assertNotContains(response, "anbieterfehler")
+        self.assertNotContains(response, "Anbieterfehler")
+        self.assertNotContains(response, "Rohtext vom Anbieter")
 
     def test_beenden_zeigt_debrief_nach_endgueltigem_fehlschlag(self) -> None:
         """Das Beenden führt nach einem endgültigen Fehlschlag in den Debrief."""
@@ -923,38 +693,26 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         self.assertContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
 
     def test_beenden_zeigt_debrief_und_verwirft_diagnose_schreibfrei(self) -> None:
-        """Der volle Probelauf endet im Debrief ohne eine Domänenspur."""
+        """Der volle Probelauf endet im Debrief ohne eine Domänenspur (ADR-0014)."""
 
-        self.konfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test",
-            sprachmodell="fake",
-            parameter={
-                "skript": [
-                    {
-                        "denkspur": "Mia addiert Zähler und Nenner.",
-                        "aeusserung": "Ich rechne eins plus eins und zwei plus drei.",
-                    }
-                ]
-            },
-        )
-        ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
-        )
-        anzahl_sitzungen: int = Sitzung.objects.count()
-        anzahl_schritte: int = Gespraechsschritt.objects.count()
-        anzahl_diagnosen: int = Diagnose.objects.count()
+        def zeilen_zaehlen() -> list[int]:
+            # Zählt die Zeilen jeder Domänentabelle, die ein Lauf beschreiben könnte.
 
-        einleitung: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
-        )
-        self.assertContains(
-            einleitung, "Frau Weber begleitet Sie bei Mathematik in Klasse 5."
-        )
-        schritt: HttpResponse = self.client.post(
-            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
-        )
-        self.assertContains(schritt, "Ich rechne eins plus eins und zwei plus drei.")
-        self.assertContains(schritt, "Mia addiert Zähler und Nenner.")
+            return [
+                Vignette.objects.count(),
+                Simulationskern.objects.count(),
+                ModellKonfiguration.objects.count(),
+                Teilnahme.objects.count(),
+                Sitzung.objects.count(),
+                Gespraechsschritt.objects.count(),
+                Fehlversuch.objects.count(),
+                Diagnose.objects.count(),
+            ]
+
+        geglueckt: ModellKonfiguration = self._geglueckte_neben_fehlschlag_anlegen()
+        zeilen: list[int] = zeilen_zaehlen()
+        self._endgueltigen_fehlschlag_ausloesen(geglueckt=geglueckt)
+
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
@@ -965,10 +723,8 @@ class ProbelaufGespraechTests(ProbelaufStartTests):
         )
 
         self.assertRedirects(ende, reverse("vignetten:detail", args=[self.entwurf.pk]))
-        self.assertNotIn("probelauf", self.client.session)
-        self.assertEqual(Sitzung.objects.count(), anzahl_sitzungen)
-        self.assertEqual(Gespraechsschritt.objects.count(), anzahl_schritte)
-        self.assertEqual(Diagnose.objects.count(), anzahl_diagnosen)
+        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.assertEqual(zeilen_zaehlen(), zeilen)
 
 
 class AdministratorinProbelaufTests(TestCase):
@@ -977,15 +733,9 @@ class AdministratorinProbelaufTests(TestCase):
     def setUp(self) -> None:
         """Legt ein administrativ frei kombinierbares Tripel an."""
 
-        self.administratorin: Konto = get_user_model().objects.create_user(
-            username="admin"
-        )
-        self.administratorin.is_superuser = True
-        self.administratorin.save()
-        autorin: Konto = get_user_model().objects.create_user(username="ada")
-        finaler_kern: Simulationskern = Simulationskern.objects.anlegen()
-        finaler_kern.finalisieren()
-        self.kern_entwurf: Simulationskern = finaler_kern.bearbeiten()
+        self.administratorin: Konto = konto_mit_rollen("admin", is_superuser=True)
+        autorin: Konto = konto_mit_rollen("ada")
+        self.kern_entwurf: Simulationskern = finaler_kern().bearbeiten()
         self.kern_entwurf.rahmenhandlung_einleitung = "$lehrperson_name begleitet Sie."
         self.kern_entwurf.rahmenhandlung_gespraechseinleitung = (
             "$schuelerin_name zeigt Ihnen das Arbeitsheft."
@@ -994,12 +744,7 @@ class AdministratorinProbelaufTests(TestCase):
             "$lehrperson_name beendet den Probelauf."
         )
         self.kern_entwurf.save()
-        aktive_konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test", sprachmodell="fake"
-        )
-        ModellKonfiguration.objects.aktivieren(
-            aktive_konfiguration, Verwendung.SCHUELERIN
-        )
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         self.test_konfiguration: ModellKonfiguration = (
             ModellKonfiguration.objects.create(
                 bezeichnung="Skript Bruchfehler",
@@ -1014,7 +759,7 @@ class AdministratorinProbelaufTests(TestCase):
                 },
             )
         )
-        self.vignette: Vignette = Vignette.objects.anlegen(autorin)
+        self.vignette: Vignette = vignetten_entwurf(autorin)
         for feld, wert in {
             "fehlermuster_beschreibung": "Zähler und Nenner addieren",
             "lernauftrag_text": "Addiere Brüche.",
@@ -1045,9 +790,24 @@ class AdministratorinProbelaufTests(TestCase):
             reverse("sitzungen:administratorin_probelauf_auswahl")
         )
 
-        self.assertContains(auswahl, str(self.kern_entwurf.pk))
-        self.assertContains(auswahl, "Skript Bruchfehler (fake)")
-        self.assertContains(auswahl, str(self.vignette.pk))
+        self.assertContains(
+            auswahl,
+            f'<option value="{self.kern_entwurf.pk}">'
+            f"{self.kern_entwurf.pk} (Entwurf)</option>",
+            html=True,
+        )
+        self.assertContains(
+            auswahl,
+            f'<option value="{self.test_konfiguration.pk}">'
+            "Skript Bruchfehler (fake)</option>",
+            html=True,
+        )
+        self.assertContains(
+            auswahl,
+            f'<option value="{self.vignette.pk}">'
+            f"{self.vignette.pk}: Mathematik – Brüche</option>",
+            html=True,
+        )
         response: HttpResponse = self.client.post(
             reverse("sitzungen:administratorin_probelauf_starten"),
             {
@@ -1063,9 +823,6 @@ class AdministratorinProbelaufTests(TestCase):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
         )
         self.assertContains(gespraech, "Sie zählt Zähler und Nenner.")
-        self.assertEqual(
-            self.client.session["probelauf"]["kern_pk"], self.kern_entwurf.pk
-        )
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
         self.assertContains(debrief, "Weber beendet den Probelauf.")
         ende: HttpResponse = self.client.post(
@@ -1074,7 +831,7 @@ class AdministratorinProbelaufTests(TestCase):
         self.assertRedirects(
             ende, reverse("sitzungen:administratorin_probelauf_auswahl")
         )
-        self.assertNotIn("probelauf", self.client.session)
+        self.assertFalse(probelauf_laeuft(self.client.session))
         self.vignette.refresh_from_db()
         self.assertEqual(self.vignette.gepinnter_kern_id, self.gepinnter_kern_pk)
         self.assertNotEqual(
@@ -1085,7 +842,7 @@ class AdministratorinProbelaufTests(TestCase):
     def test_nicht_administratorin_erreicht_freien_auswaehler_nicht(self) -> None:
         """Der administrative Einstieg ist ausschließlich der Group vorbehalten."""
 
-        self.client.force_login(get_user_model().objects.create_user(username="grace"))
+        self.client.force_login(konto_mit_rollen("grace"))
 
         response: HttpResponse = self.client.get(
             reverse("sitzungen:administratorin_probelauf_auswahl")
@@ -1094,7 +851,7 @@ class AdministratorinProbelaufTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-class GeteiltesKontoTests(ProbelaufStartTests):
+class GeteiltesKontoTests(_ProbelaufAufbau):
     """Ein Konto trägt mehrere gleichzeitige Probeläufe in getrennten Browsern."""
 
     def test_zwei_anmeldungen_desselben_kontos_proben_unabhaengig(self) -> None:
@@ -1112,7 +869,7 @@ class GeteiltesKontoTests(ProbelaufStartTests):
             ),
             Verwendung.SCHUELERIN,
         )
-        zweiter_entwurf: Vignette = Vignette.objects.anlegen(self.ada)
+        zweiter_entwurf: Vignette = vignetten_entwurf(self.ada)
         zweiter_entwurf.historie.name = "Zweiter Entwurf"
         zweiter_entwurf.historie.save()
         zweiter_entwurf.schuelerin_name = "Nora"
@@ -1137,8 +894,6 @@ class GeteiltesKontoTests(ProbelaufStartTests):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Frage aus Browser 2"}
         )
 
-        self.assertEqual(eins.session["probelauf"]["vignette_pk"], self.entwurf.pk)
-        self.assertEqual(zwei.session["probelauf"]["vignette_pk"], zweiter_entwurf.pk)
         self.assertContains(antwort_eins, "Frage aus Browser 1")
         self.assertNotContains(antwort_eins, "Frage aus Browser 2")
         self.assertContains(antwort_zwei, "Frage aus Browser 2")

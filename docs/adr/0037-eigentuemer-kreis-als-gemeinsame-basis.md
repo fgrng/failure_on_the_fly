@@ -194,7 +194,7 @@ Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg liefer
 führt auf die Fassung), und ihrer Liste als Ziel nach dem Selbstaustritt.
 URLs, Rollenprüfungen und Rückwege sind unverändert.
 
-Die Kante zeigt weiter von den Apps auf `konten`; der Importgraph-Test in
-`sitzungen/tests/test_importgraph.py` hält fest, dass `konten` keine der vier
-Bestands-Apps importiert. Eine gemeinsame Lebenszyklus-Hülle folgt daraus
+Die Kante zeigt weiter von den Apps auf `konten`; der Importgraph-Wächter in
+`config/tests/test_importgraph.py` hält fest, dass `konten` keine andere App
+importiert. Eine gemeinsame Lebenszyklus-Hülle folgt daraus
 nicht: Sie ist in #255 ausdrücklich verworfen, ADR-0017 gilt fort.

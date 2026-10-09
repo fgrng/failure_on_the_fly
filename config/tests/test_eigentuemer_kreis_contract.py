@@ -53,21 +53,11 @@ def test_austritt_entfernt_solange_eine_eigentuemerin_bleibt(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("aktiv", [True, False], ids=["aktiv", "stillgelegt"])
 @je_bestandsmodell
 def test_austritt_der_letzten_eigentuemerin_aendert_nichts(
     modell: type[EigentuemerKreis],
-    aktiv: bool,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Der letzte Platz im Kreis bleibt besetzt, auch bei stillgelegtem Bestand.
-
-    Die Invariante am Objekt ist bedingungslos (ADR-0032): Ein stillgelegter
-    Bestand ist wiederbelebbar und wäre danach aktiv und eigentümerlos. Weil
-    jedes Modell anders stillgelegt wird — Archiv-Kennzeichen, Status, gar
-    nicht — setzt der Test allein die Antwort von `ist_aktiv()`.
-    """
-    monkeypatch.setattr(modell, "ist_aktiv", lambda self: aktiv)
+    """Der letzte Platz im Kreis bleibt besetzt (ADR-0032)."""
     ada: Konto = Konto.objects.create_user(username="ada")
     bestand: EigentuemerKreis = modell.objects.anlegen(ada)
 

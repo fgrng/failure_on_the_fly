@@ -415,9 +415,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
             if _eingaben_uebernehmen(katalog, request):
                 messages.success(request, "Übergreifende Kriterien gespeichert.")
         return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
-    # Gerendert wird außerhalb der Transaktion (ADR-0051): Unter IMMEDIATE
-    # hielte jeder atomic()-Block die Schreibsperre, auch ein lesender.
-    katalog = _fassung(request, pk)
+    katalog: Evalkatalog = _fassung(request, pk)
     return render(
         request,
         "simulation/evalkatalog_editor.html",
@@ -518,7 +516,6 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
             if _eingaben_uebernehmen(katalog, request):
                 messages.success(request, "Das Eval wurde gespeichert.")
         return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
-    # Rendern außerhalb der Transaktion, siehe evalkatalog_kriterien.
     katalog, eval_ = _eval_der_fassung(request, pk, eval_pk)
     evals: list[Eval] = list(katalog.evals.all())
     return render(
@@ -651,13 +648,12 @@ def evalkatalog_evalinput(
     """Zeigt einen Evalinput als Drehbuch; speichert nur in Entwürfe."""
     if request.method == "POST":
         with transaction.atomic():
-            katalog, _, evalinput = _evalinput_der_fassung(
+            katalog, eval_, evalinput = _evalinput_der_fassung(
                 request, pk, eval_pk, input_pk
             )
             if _eingaben_uebernehmen(katalog, request):
                 messages.success(request, "Der Evalinput wurde gespeichert.")
         return _zum_evalinput(evalinput)
-    # Rendern außerhalb der Transaktion, siehe evalkatalog_kriterien.
     katalog, eval_, evalinput = _evalinput_der_fassung(request, pk, eval_pk, input_pk)
     schritte: list[Inputschritt] = list(evalinput.schritte.all())
     return render(

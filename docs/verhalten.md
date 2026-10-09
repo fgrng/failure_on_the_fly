@@ -188,17 +188,20 @@ gesperrt, färbt sich das Band rot, heißt „Beitritt gesperrt“, und „Wiede
 öffnen“ hebt die Sperre auf. Jede Eigentümerin des Kreises darf sperren und
 öffnen.
 
-Wer den Link eingeloggt öffnet, tritt bei und landet auf der Trainingsseite;
-erneutes Öffnen führt ohne Fehler direkt dorthin. Ohne Anmeldung führt der Link
-über den Login zurück zum Beitritt. Bei gesperrtem Beitritt sehen neue Konten
-die Meldung „Beitritt gesperrt“ mit der Bitte, sich an die Ausbilder:in zu
-wenden; Beigetretene kommen weiter ins Training. Der Eigentümer-Kreis und die
-Administration landen über den offenen wie den gesperrten Link auf der
-Trainingsseite, ohne dadurch beizutreten: Sie zählen nicht als Beigetretene und
-erscheinen nicht in Fremdeinsicht und Trainingsexport. Erst wenn sie selbst eine
-Sitzung starten, entsteht ihre Trainingsbindung. Eine Ausbilder:in außerhalb des
-Kreises tritt wie alle anderen bei. Der Link eines Entwurfs nimmt noch niemanden
-auf. Ein Training ohne Vignetten lässt sich veröffentlichen und beitreten.
+Wer den Link eingeloggt ohne Kreis- oder Administrationszugang öffnet, tritt bei
+und landet auf der Trainingsseite; auch eine Ausbilderrolle allein begründet
+keinen Kreiszugang. Erneutes Öffnen führt ohne zusätzlichen Beitritt direkt
+dorthin. Ohne Anmeldung führt der Link über den Login zurück zum Beitritt. Bei
+gesperrtem Beitritt sehen neue Konten die Meldung „Beitritt gesperrt“ mit der
+Bitte, sich an die Ausbilder:in zu wenden; Beigetretene kommen weiter ins
+Training. Der aktuelle Eigentümer-Kreis und die Administration gelangen über
+offene wie gesperrte Trainings-Links direkt zur Trainingsseite, ohne
+beizutreten: Auch wiederholte Aufrufe erzeugen weder Trainingsbindung noch
+Teilnahme und erhöhen die Zahl der Beigetretenen nicht. Erst ein tatsächlicher
+Sitzungsstart legt bei Bedarf die erforderliche Bindung und Teilnahme an.
+Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf unverändert erhalten.
+Der Link eines Entwurfs bleibt für alle Konten unbekannt (404). Ein Training
+ohne Vignetten lässt sich veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
@@ -390,6 +393,10 @@ Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
 Übersicht. Die Aktionszeile klebt wie bei den übrigen Formularen oben. Wer den
 Editor mit ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
 
+An den Knoten „Übergreifende Kriterien“, Eval und Evalinput wird beim Speichern
+nichts teilweise gespeichert: Scheitert ein Teil, bleiben alle Eingaben
+ungespeichert. Nach dem Speichern folgt die Weiterleitung auf denselben Knoten.
+
 Am Knoten „Übergreifende Kriterien“ (im Baum mit der Zahl seiner Kriterien)
 pflegt die Administrator:in die Rubriken, nach denen der Bewerter jedes
 Evalgespräch aller Evals beurteilt, etwa Rollentreue. Kriterien sind reiner Text
@@ -487,13 +494,6 @@ Vorgängerin. Änderungen am Entwurf berühren die Vorgängerin nicht. Solange e
 Entwurf besteht, bieten die Seiten „Neue Fassung“ nicht an, und ein Versuch wird
 mit der Meldung „Ein Evalkatalog-Entwurf existiert bereits.“ abgelehnt. Aus
 überholten Fassungen und Entwürfen lässt sich keine neue Fassung ableiten.
-
-Die Knoten „Übergreifende Kriterien“, Eval und Evalinput lesen und rendern auf
-GET außerhalb einer Schreibtransaktion, bei Entwürfen wie bei finalen und
-überholten Fassungen; das Anzeigen hält die Schreibsperre der Datenbank nicht
-(wie bei der Erhebung, ADR-0051). „Änderungen speichern“ an diesen Knoten
-übernimmt alle getippten Werte in einer Transaktion: Bricht die Übernahme
-unerwartet ab, bleibt keiner der Werte gespeichert.
 
 Autor:innen und alle anderen Rollen erhalten auf keiner Route des Evalkatalogs
 Zugriff.
@@ -765,18 +765,25 @@ bleibt gespeichert, beim Wechsel zurück zu fest gilt wieder die zuvor
 festgelegte Reihenfolge, neu aufgenommene Vignetten stehen am Ende. Finale und
 archivierte Erhebungen zeigen Vignetten und Items weiterhin als Listen, samt
 Reihenfolgeregel, ohne Auswahl und Änderungsaktionen; nach einem Rückzug sind
-sie wieder bearbeitbar. Sobald eine Stichprobe besteht, lässt sich an der
-Erhebung die Datenspur als ZIP mit relationalen CSV-Dateien herunterladen,
-einschließlich der geplanten Vignettenziehungen, der tatsächlich gelaufenen
-Sitzungen, Gesprächsschritte, Fehlversuche und Diagnosen. Jeder Gesprächsschritt
-und jede Diagnose vermerken dabei den Eingabemodus: ob der Text getippt,
-eingesprochen oder aus beidem zusammengesetzt wurde. Der Wert wird im Browser
-der Teilnehmer:in bestimmt und ist damit eine Angabe für die Auswertung, kein
-Nachweis. Jede Sitzungszeile nennt die verbrauchte Zeit in Sekunden; bei einer
-Vignette mit schrittbasiertem Budget bleibt sie bei null, der Wert ist also
-zusammen mit dem Budget-Typ der Vignettenfassung zu lesen. Die verwendeten
-Vignettenfassungen, Simulationskern-Fassungen und Modell-Konfigurationen liegen
-mit ihrem vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
+sie wieder bearbeitbar. Trifft eine Änderung dennoch eine Erhebung, die kein
+Entwurf mehr ist, etwa über eine veraltete Schaltfläche in einem zweiten Tab,
+bleibt alles, wie es war: Die Seite führt zurück auf die Detailseite, beim
+Löschen auf die Liste, und die Meldung »Die Erhebung ist kein Entwurf mehr. Es
+wurde nichts geändert.« nennt den Grund. Weist die Erhebung eine Änderung aus
+einem anderen Grund ab, steht dieser Grund ebenso als Meldung auf der
+Detailseite. Eine fremde Erhebung bleibt dabei unauffindbar. Sobald eine
+Stichprobe besteht, lässt sich an der Erhebung die Datenspur als ZIP mit
+relationalen CSV-Dateien herunterladen, einschließlich der geplanten
+Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
+Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
+dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
+zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
+ist damit eine Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile
+nennt die verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem
+Budget bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
+Vignettenfassung zu lesen. Die verwendeten Vignettenfassungen,
+Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem
+vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
 Datenbankzugriff interpretierbar bleibt. Für den Fragebogen-Teil gilt dasselbe:
 Die tatsächlich vorgelegten Fassungen der Fragebogen-Items liegen mit ihrem
 vollen Wortlaut bei; eine zugeordnete, aber nie vorgelegte Fassung erscheint

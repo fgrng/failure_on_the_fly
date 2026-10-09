@@ -17,7 +17,7 @@ from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
 from texte.markdown import szenentext, woertlich
-from vignetten.models import Vignette, rahmen_platzhalter
+from vignetten.models import Vignette, prompt_platzhalter, rahmen_platzhalter
 
 
 def jetzt() -> datetime:
@@ -94,7 +94,7 @@ def gespraechsschritt_ausfuehren(
 
     sink.zug_beenden(jetzt())
     antwortversuch: Antwortversuch = antwort_versuchen(
-        vignette,
+        prompt_platzhalter(vignette),
         simulationskern,
         modell_konfiguration,
         modellverlauf(sink),

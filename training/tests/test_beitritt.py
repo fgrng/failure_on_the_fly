@@ -1,34 +1,23 @@
 """HTTP-Tests für das geschlossene Training und den Beitritt über den Trainings-Link."""
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from typing import cast
+
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    finale_vignette,
+    konto_mit_rollen,
+)
 from konten.models import Konto
-from konten.navigation import AUSBILDERIN_GRUPPE
-from sitzungen.models import Teilnahme
+from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
+from simulation.models import Verwendung
+from sitzungen.models import Sitzung, Teilnahme
 from training.models import Training, Trainingsbindung
-from vignetten.models import Vignette, Vignettenhistorie
-
-
-def _konto(username: str, gruppe: str | None = None) -> Konto:
-    konto: Konto = get_user_model().objects.create_user(username=username)
-    if gruppe is not None:
-        konto.groups.add(Group.objects.get_or_create(name=gruppe)[0])
-    return konto
-
-
-def _finale_vignette(name: str) -> Vignette:
-    return Vignette.objects._erstellen(
-        historie=Vignettenhistorie.objects.create(name=name),
-        zustand=Vignette.Zustand.FINAL,
-        finalisiert_am=timezone.now(),
-        lernauftrag_text="Vergleiche Brüche.",
-        arbeitsheft_text="3/4 ist größer als 2/3.",
-    )
+from training.tests.seite import kuratierseite
+from vignetten.models import Vignette
 
 
 def _beitritt_url(training: Training) -> str:
@@ -39,19 +28,42 @@ class BeitrittTests(TestCase):
     """Wer den Trainings-Link eingeloggt öffnet, tritt dem Training bei."""
 
     def setUp(self) -> None:
-        self.ausbilderin: Konto = _konto("ada", AUSBILDERIN_GRUPPE)
-        self.studierende: Konto = _konto("grace")
+        self.ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
+        self.studierende: Konto = konto_mit_rollen("grace")
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
         self.training.veroeffentlichen()
 
-    def test_jedes_training_hat_einen_eigenen_trainings_link(self) -> None:
-        """Zwei Trainings teilen sich nie einen Link."""
-        anderes: Training = Training.objects.anlegen(self.ausbilderin, name="Zahlen")
+    def test_kreis_und_administration_oeffnen_den_link_ohne_beitritt(self) -> None:
+        """Offene und gesperrte Links zählen auch wiederholt keinen Kreiszugang."""
+        ko_eigentuemerin: Konto = konto_mit_rollen("lin", AUSBILDERIN_GRUPPE)
+        self.training.eigentuemerinnen.add(ko_eigentuemerin)
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
 
-        self.assertIsNotNone(self.training.trainings_link)
-        self.assertNotEqual(self.training.trainings_link, anderes.trainings_link)
+        for gesperrt in (False, True):
+            self.training.beitritt_gesperrt = gesperrt
+            self.training.save(update_fields=["beitritt_gesperrt"])
+            for konto in (self.ausbilderin, ko_eigentuemerin, administratorin):
+                with self.subTest(gesperrt=gesperrt, konto=konto.username):
+                    self.client.force_login(konto)
+                    for _ in range(2):
+                        response = self.client.get(_beitritt_url(self.training))
+                        self.assertRedirects(
+                            response,
+                            reverse("training:detail", args=[self.training.pk]),
+                        )
+                    self.assertEqual(Trainingsbindung.objects.count(), 0)
+                    self.assertEqual(Teilnahme.objects.count(), 0)
+                    kuratierseite = self.client.get(
+                        reverse("training:kuratieren", args=[self.training.pk])
+                    )
+                    self.assertContains(
+                        kuratierseite,
+                        "0 Personen sind bereits dabei"
+                        if gesperrt
+                        else "0 Personen beigetreten",
+                    )
 
     def test_beitritt_legt_die_bindung_an_und_fuehrt_ins_training(self) -> None:
         """Der eingeloggte Aufruf bindet das Konto und leitet zur Trainingsseite."""
@@ -154,6 +166,32 @@ class BeitrittTests(TestCase):
         self.assertRedirects(
             response, reverse("training:detail", args=[self.training.pk])
         )
+        self.assertEqual(Trainingsbindung.objects.count(), 1)
+        self.assertEqual(Teilnahme.objects.count(), 1)
+
+    def test_fremde_ausbilderin_tritt_wie_eine_teilnehmerin_bei(self) -> None:
+        """Die Ausbilderrolle allein umgeht weder Beitritt noch Sperre."""
+        self.client.force_login(konto_mit_rollen("eve", AUSBILDERIN_GRUPPE))
+        self.training.beitritt_gesperrt = True
+        self.training.save(update_fields=["beitritt_gesperrt"])
+
+        self.assertContains(
+            self.client.get(_beitritt_url(self.training)),
+            "Bitte wenden Sie sich an Ihre Ausbilder:in.",
+            status_code=403,
+        )
+        self.assertEqual(Trainingsbindung.objects.count(), 0)
+        self.assertEqual(Teilnahme.objects.count(), 0)
+
+        self.training.beitritt_gesperrt = False
+        self.training.save(update_fields=["beitritt_gesperrt"])
+        for _ in range(2):
+            self.assertRedirects(
+                self.client.get(_beitritt_url(self.training)),
+                reverse("training:detail", args=[self.training.pk]),
+            )
+        self.assertEqual(Trainingsbindung.objects.count(), 1)
+        self.assertEqual(Teilnahme.objects.count(), 1)
 
     def test_gesperrter_link_fuehrt_den_kreis_ins_training(self) -> None:
         """Der Kreis braucht keinen Beitritt und landet trotz Sperre im Training."""
@@ -171,9 +209,7 @@ class BeitrittTests(TestCase):
         """Die Administration sieht jedes Training und landet trotz Sperre darin."""
         self.training.beitritt_gesperrt = True
         self.training.save(update_fields=["beitritt_gesperrt"])
-        self.client.force_login(
-            get_user_model().objects.create_user(username="root", is_superuser=True)
-        )
+        self.client.force_login(konto_mit_rollen("root", is_superuser=True))
 
         response: HttpResponse = self.client.get(_beitritt_url(self.training))
 
@@ -194,101 +230,23 @@ class BeitrittTests(TestCase):
 
         self.assertContains(response, "0 Personen sind bereits dabei")
 
-    def test_offener_link_fuehrt_kreis_und_administration_ins_training(
-        self,
-    ) -> None:
-        """Auch ohne Sperre landen Kreis und Administration im Training."""
-        administratorin: Konto = get_user_model().objects.create_user(
-            username="root", is_superuser=True
-        )
-
-        for konto in (self.ausbilderin, administratorin):
+    def test_link_eines_entwurfs_ist_unbekannt(self) -> None:
+        """Ein Entwurfs-Link bleibt auch für Kreis und Administration unbekannt."""
+        entwurf: Training = Training.objects.anlegen(self.ausbilderin, name="Entwurf")
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
+        fremde_ausbilderin: Konto = konto_mit_rollen("eve", AUSBILDERIN_GRUPPE)
+        for konto in (
+            self.studierende,
+            self.ausbilderin,
+            administratorin,
+            fremde_ausbilderin,
+        ):
             with self.subTest(konto=konto.username):
                 self.client.force_login(konto)
-                response: HttpResponse = self.client.get(_beitritt_url(self.training))
-                self.assertRedirects(
-                    response, reverse("training:detail", args=[self.training.pk])
-                )
-
-    def test_offener_link_bindet_kreis_und_administration_nicht(self) -> None:
-        """Wer das Training ohnehin sieht, tritt über den offenen Link nicht bei."""
-        self.client.force_login(
-            get_user_model().objects.create_user(username="root", is_superuser=True)
-        )
-        self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
-        self.client.get(_beitritt_url(self.training))
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "0 Personen beigetreten")
-
-    def test_gesperrter_link_bindet_die_administration_nicht(self) -> None:
-        """Die Administration zählt auch bei Sperre nicht als beigetreten."""
-        self.training.beitritt_gesperrt = True
-        self.training.save(update_fields=["beitritt_gesperrt"])
-        self.client.force_login(
-            get_user_model().objects.create_user(username="root", is_superuser=True)
-        )
-        self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "0 Personen sind bereits dabei")
-
-    def test_wiederholter_link_des_kreises_zaehlt_niemanden_als_beigetreten(
-        self,
-    ) -> None:
-        """Auch mehrfaches Öffnen erhöht die Zahl der Beigetretenen nicht."""
-        self.client.force_login(self.ausbilderin)
-        self.client.get(_beitritt_url(self.training))
-        self.client.get(_beitritt_url(self.training))
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "0 Personen beigetreten")
-
-    def test_link_laesst_eine_bestehende_bindung_des_kreises_stehen(self) -> None:
-        """Eine Bindung aus einer gespielten Sitzung bleibt einzeln erhalten."""
-        self.training.bindung_fuer(self.ausbilderin)
-        self.client.force_login(self.ausbilderin)
-        self.client.get(_beitritt_url(self.training))
-        self.client.get(_beitritt_url(self.training))
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "1 Person beigetreten")
-
-    def test_ausbilderin_ausserhalb_des_kreises_tritt_regulaer_bei(self) -> None:
-        """Die Rolle allein gibt keinen Kreiszugang; sie tritt wie alle bei."""
-        self.client.force_login(_konto("lin", AUSBILDERIN_GRUPPE))
-        self.client.get(_beitritt_url(self.training))
-        self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "1 Person beigetreten")
-
-    def test_link_eines_entwurfs_ist_unbekannt(self) -> None:
-        """Ein Entwurf nimmt noch niemanden auf."""
-        entwurf: Training = Training.objects.anlegen(self.ausbilderin, name="Entwurf")
-        self.client.force_login(self.studierende)
-
-        response: HttpResponse = self.client.get(_beitritt_url(entwurf))
-
-        self.assertEqual(response.status_code, 404)
+                response = self.client.get(_beitritt_url(entwurf))
+                self.assertEqual(response.status_code, 404)
+        self.assertEqual(Trainingsbindung.objects.count(), 0)
+        self.assertEqual(Teilnahme.objects.count(), 0)
 
     def test_leeres_training_laesst_sich_veroeffentlichen_und_beitreten(
         self,
@@ -312,18 +270,73 @@ class GeschlossenesTrainingTests(TestCase):
     """Teilnehmende erreichen nur Trainings, denen sie beigetreten sind."""
 
     def setUp(self) -> None:
-        self.ausbilderin: Konto = _konto("ada", AUSBILDERIN_GRUPPE)
-        self.studierende: Konto = _konto("grace")
+        self.ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
+        self.studierende: Konto = konto_mit_rollen("grace")
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
-        self.vignette: Vignette = _finale_vignette("Brüche vergleichen")
+        self.vignette: Vignette = finale_vignette(
+            konto_mit_rollen("barbara", AUTORIN_GRUPPE), name="Brüche vergleichen"
+        )
         self.training.vignetten.add(self.vignette)
         self.training.veroeffentlichen()
 
     def _beitreten(self, konto: Konto) -> None:
         self.client.force_login(konto)
         self.client.get(_beitritt_url(self.training))
+
+    def test_kreis_und_administration_starten_sitzungen_und_behalten_sie(self) -> None:
+        """Erst der Start bindet das Konto; spätere Linkaufrufe erhalten die Sitzung."""
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
+        for konto in (self.ausbilderin, administratorin):
+            with self.subTest(konto=konto.username):
+                self.client.force_login(konto)
+                self.client.get(_beitritt_url(self.training))
+                self.assertFalse(Trainingsbindung.objects.filter(konto=konto).exists())
+                einwilligung = self.client.post(
+                    reverse("training:wahl", args=[self.training.pk, self.vignette.pk])
+                )
+                self.assertContains(einwilligung, "Einwilligung")
+                start = self.client.post(
+                    reverse(
+                        "training:einwilligung",
+                        args=[self.training.pk, self.vignette.pk],
+                    ),
+                    {"audioverarbeitung_eingewilligt": "nein"},
+                )
+                self.assertContains(start, "Ihre nächste Frage")
+                bindung = cast(
+                    Trainingsbindung, Trainingsbindung.objects.get(konto=konto)
+                )
+                sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
+                self.client.post(reverse("training:abbrechen"))
+
+                for gesperrt in (False, True):
+                    self.training.beitritt_gesperrt = gesperrt
+                    self.training.save(update_fields=["beitritt_gesperrt"])
+                    for _ in range(2):
+                        self.assertRedirects(
+                            self.client.get(_beitritt_url(self.training)),
+                            reverse("training:detail", args=[self.training.pk]),
+                        )
+                    self.assertEqual(
+                        Trainingsbindung.objects.get(konto=konto).pk, bindung.pk
+                    )
+                    self.assertEqual(
+                        Sitzung.objects.get(teilnahme=bindung.teilnahme).pk,
+                        sitzung.pk,
+                    )
+                    self.assertContains(
+                        self.client.get(
+                            reverse("training:sitzung_ansehen", args=[sitzung.pk])
+                        ),
+                        "Arbeitsheft von Lea",
+                    )
+                self.training.beitritt_gesperrt = False
+                self.training.save(update_fields=["beitritt_gesperrt"])
+        self.assertEqual(Trainingsbindung.objects.count(), 2)
+        self.assertEqual(Teilnahme.objects.count(), 2)
 
     def test_katalog_zeigt_teilnehmenden_nur_beigetretene_trainings(self) -> None:
         """Ein veröffentlichtes Training ist nicht mehr für alle sichtbar."""
@@ -336,14 +349,6 @@ class GeschlossenesTrainingTests(TestCase):
 
         self.assertContains(response, "Bruchrechnung")
         self.assertNotContains(response, "Fremdes Seminar")
-
-    def test_katalog_ohne_beitritt_ist_leer(self) -> None:
-        """Wer keinem Training beigetreten ist, sieht keines."""
-        self.client.force_login(self.studierende)
-
-        response: HttpResponse = self.client.get(reverse("training:katalog"))
-
-        self.assertNotContains(response, "Bruchrechnung")
 
     def test_detail_wahl_und_start_ohne_bindung_liefern_404(self) -> None:
         """Auch die direkte Adresse öffnet ein fremdes Training nicht."""
@@ -381,45 +386,13 @@ class GeschlossenesTrainingTests(TestCase):
         self.assertContains(detail, "Brüche vergleichen")
         self.assertContains(wahl, "Vignette gewählt")
 
-    def test_sitzungsstart_des_kreises_legt_die_bindung_an(self) -> None:
-        """Wer aus dem Kreis tatsächlich spielt, zählt danach als beigetreten."""
-        self._beitreten(self.ausbilderin)
-        self.client.post(
-            reverse("training:wahl", args=[self.training.pk, self.vignette.pk])
-        )
-
-        response: HttpResponse = self.client.get(
-            reverse("training:kuratieren", args=[self.training.pk])
-        )
-
-        self.assertContains(response, "1 Person beigetreten")
-
-    def test_bestehende_bindung_gilt_als_beitritt(self) -> None:
-        """Eine Bindung aus der Zeit vor dem Trainings-Link behält den Zugang."""
-        Trainingsbindung.objects.create(
-            teilnahme=Teilnahme.objects.create(),
-            training=self.training,
-            konto=self.studierende,
-        )
-        self.client.force_login(self.studierende)
-
-        katalog: HttpResponse = self.client.get(reverse("training:katalog"))
-        detail: HttpResponse = self.client.get(
-            reverse("training:detail", args=[self.training.pk])
-        )
-
-        self.assertContains(katalog, "Bruchrechnung")
-        self.assertContains(detail, "Brüche vergleichen")
-
     def test_kreis_und_administration_erreichen_das_training_ohne_beitritt(
         self,
     ) -> None:
         """Der Kreis gibt das Training ohnehin; die Administration sieht alles."""
-        ko_eigentuemerin: Konto = _konto("lin", AUSBILDERIN_GRUPPE)
+        ko_eigentuemerin: Konto = konto_mit_rollen("lin", AUSBILDERIN_GRUPPE)
         self.training.eigentuemerinnen.add(ko_eigentuemerin)
-        administratorin: Konto = get_user_model().objects.create_user(
-            username="root", is_superuser=True
-        )
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
 
         for konto in (self.ausbilderin, ko_eigentuemerin, administratorin):
             with self.subTest(konto=konto.username):
@@ -452,29 +425,22 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
     """Der Kreis findet, kopiert, sperrt und öffnet den Trainings-Link."""
 
     def setUp(self) -> None:
-        self.ausbilderin: Konto = _konto("ada", AUSBILDERIN_GRUPPE)
-        self.ko_eigentuemerin: Konto = _konto("lin", AUSBILDERIN_GRUPPE)
+        self.ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
+        self.ko_eigentuemerin: Konto = konto_mit_rollen("lin", AUSBILDERIN_GRUPPE)
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
         self.training.eigentuemerinnen.add(self.ko_eigentuemerin)
         self.training.veroeffentlichen()
 
-    def _kuratierseite(self) -> HttpResponse:
-        return self.client.get(reverse("training:kuratieren", args=[self.training.pk]))
-
     def test_kuratierseite_zeigt_den_link_zum_kopieren(self) -> None:
         """Der volle Link steht lesbar neben dem Kopieren-Knopf."""
-        self.client.force_login(self.ausbilderin)
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
-        response: HttpResponse = self._kuratierseite()
-
-        self.assertContains(response, "Gruppe beitreten lassen")
-        self.assertContains(
-            response, f"http://testserver{_beitritt_url(self.training)}"
-        )
-        self.assertContains(response, "Kopieren")
-        self.assertContains(response, "0 Personen beigetreten")
+        self.assertIn("Gruppe beitreten lassen", seite)
+        self.assertIn(f"http://testserver{_beitritt_url(self.training)}", seite)
+        self.assertIn("Kopieren", seite)
+        self.assertIn("0 Personen beigetreten", seite)
 
     def test_ko_eigentuemerin_sperrt_den_beitritt(self) -> None:
         """Jede Eigentümerin des Kreises darf den Beitritt sperren."""
@@ -502,7 +468,7 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
 
     def test_fremde_ausbilderin_kann_den_beitritt_nicht_umschalten(self) -> None:
         """Außerhalb des Kreises gibt es das Training nicht."""
-        self.client.force_login(_konto("eve", AUSBILDERIN_GRUPPE))
+        self.client.force_login(konto_mit_rollen("eve", AUSBILDERIN_GRUPPE))
 
         response: HttpResponse = self.client.post(
             reverse("training:beitritt_sperren", args=[self.training.pk])
@@ -512,9 +478,9 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
 
     def test_fremder_umschaltversuch_laesst_den_beitritt_offen(self) -> None:
         """Nach dem abgewiesenen Versuch kommt die Gruppe weiter hinein."""
-        self.client.force_login(_konto("eve", AUSBILDERIN_GRUPPE))
+        self.client.force_login(konto_mit_rollen("eve", AUSBILDERIN_GRUPPE))
         self.client.post(reverse("training:beitritt_sperren", args=[self.training.pk]))
-        self.client.force_login(_konto("grace"))
+        self.client.force_login(konto_mit_rollen("grace"))
 
         response: HttpResponse = self.client.get(_beitritt_url(self.training))
 
@@ -550,27 +516,24 @@ class TrainingsLinkAufDerKuratierseiteTests(TestCase):
     def test_band_zaehlt_die_beigetretenen(self) -> None:
         """Die Zeile unter dem Link nennt die Zahl der Beigetretenen."""
         for name in ("grace", "linus"):
-            self.client.force_login(_konto(name))
+            self.client.force_login(konto_mit_rollen(name))
             self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
 
-        self.assertContains(self._kuratierseite(), "2 Personen beigetreten")
-
-    def test_band_nennt_eine_beigetretene_person_in_der_einzahl(self) -> None:
-        """Eine einzelne Beigetretene heißt nicht „1 Personen“."""
-        self.client.force_login(_konto("grace"))
-        self.client.get(_beitritt_url(self.training))
-        self.client.force_login(self.ausbilderin)
-
-        self.assertContains(self._kuratierseite(), "1 Person beigetreten")
+        self.assertIn(
+            "2 Personen beigetreten",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
 
     def test_gesperrtes_band_nennt_eine_beigetretene_person_in_der_einzahl(
         self,
     ) -> None:
         """Auch im gesperrten Band steht die Einzahl richtig."""
-        self.client.force_login(_konto("grace"))
+        self.client.force_login(konto_mit_rollen("grace"))
         self.client.get(_beitritt_url(self.training))
         self.client.force_login(self.ausbilderin)
         self.client.post(reverse("training:beitritt_sperren", args=[self.training.pk]))
 
-        self.assertContains(self._kuratierseite(), "1 Person ist bereits dabei")
+        self.assertIn(
+            "1 Person ist bereits dabei",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )

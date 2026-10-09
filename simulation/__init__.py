@@ -19,7 +19,6 @@ from simulation.sprachmodell import (
 
 if TYPE_CHECKING:
     from simulation.models import ModellKonfiguration, Simulationskern
-    from vignetten.models import Vignette
 
 
 MAX_VERSUCHE: int = 3
@@ -69,40 +68,25 @@ class Antwortversuch:
     fehlversuche: list[Fehlversuch]
 
 
-def render(vorlage_text: str, mapping: Mapping[str, str]) -> str:
-    """Füllt eine Vorlage mit genau ihren vereinbarten Platzhaltern."""
-
-    vorlage: Template = Template(vorlage_text)
-    ueberzaehlige_platzhalter: set[str] = set(mapping) - set(vorlage.get_identifiers())
-    if ueberzaehlige_platzhalter:
-        raise ValueError(
-            f"Überzählige Platzhalter: {', '.join(sorted(ueberzaehlige_platzhalter))}."
-        )
-    return vorlage.substitute(mapping)
-
-
 def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
-    """Übergibt dem strikten Renderer nur die in der Vorlage benutzten Platzhalter."""
+    """Setzt die in der Vorlage benutzten Platzhalter ein; übrige Werte bleiben unbenutzt."""
 
-    vorlage: Template = Template(vorlage_text)
-    return render(
-        vorlage_text,
-        {name: platzhalter[name] for name in vorlage.get_identifiers()},
-    )
+    return Template(vorlage_text).substitute(platzhalter)
 
 
 def antwort_versuchen(
-    vignette: "Vignette",
+    platzhalter: Mapping[str, str],
     kern: "Simulationskern",
     modell_konfiguration: "ModellKonfiguration",
     verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> Antwortversuch:
-    """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in."""
+    """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in.
 
-    from vignetten.models import prompt_platzhalter
+    Die Prompt-Platzhalter (Name → Text) berechnet die Aufruferin aus ihrer
+    Vignette; `simulation` kennt keine Vignette (ADR-0016).
+    """
 
-    platzhalter: dict[str, str] = prompt_platzhalter(vignette)
     system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
     user_prompt: str = vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)

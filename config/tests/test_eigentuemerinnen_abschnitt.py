@@ -4,27 +4,26 @@ Stellvertretend über die Vignetten-Detailseite geprüft; welche Seite welches
 Artefakt nennt, prüfen die View-Tests der einzelnen Apps.
 """
 
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
+from config.tests.aufbau import konto_mit_rollen, vignetten_entwurf
+from config.tests.formular import submit_knoepfe, text_ohne_tags
 from konten.models import Konto
-from vignetten.models import Vignette, Vignettenhistorie
+from vignetten.models import Vignette
 
 
-def _autorin(username: str, **kwargs: object) -> Konto:
+def _autorin(username: str) -> Konto:
     """Legt ein Konto mit der Rolle Autor:in an."""
-    konto: Konto = Konto.objects.create_user(username=username, **kwargs)
-    konto.groups.add(Group.objects.get(name="Autor:in"))
-    return konto
+    return konto_mit_rollen(username, "Autor:in")
 
 
-def _vignette_mit_eigentuemerinnen(*konten: Konto) -> Vignette:
+def _vignette_mit_eigentuemerinnen(erste: Konto, *weitere: Konto) -> Vignette:
     """Legt eine Vignette mit dem angegebenen Eigentümer-Kreis an."""
-    historie: Vignettenhistorie = Vignettenhistorie.objects.create()
-    historie.eigentuemerinnen.add(*konten)
-    return Vignette.objects._erstellen(historie=historie)
+    vignette: Vignette = vignetten_entwurf(erste)
+    vignette.historie.eigentuemerinnen.add(*weitere)
+    return vignette
 
 
 class EigentuemerinnenAbschnittTests(TestCase):
@@ -37,7 +36,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
     def test_tabelle_nennt_name_und_alle_rollen(self) -> None:
         """Jede Zeile trägt den Namen und alle Rollen des Kontos."""
         ada: Konto = _autorin("ada")
-        grace: Konto = _autorin("grace", is_superuser=True)
+        grace: Konto = konto_mit_rollen("grace", "Autor:in", is_superuser=True)
 
         response: HttpResponse = self._detail(
             ada, _vignette_mit_eigentuemerinnen(ada, grace)
@@ -55,9 +54,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
 
         response: HttpResponse = self._detail(ada, vignette)
 
-        self.assertContains(
-            response, 'ada <span class="eigentuemerinnen__sie">(Sie)</span>', html=True
-        )
+        self.assertIn("ada (Sie)", text_ohne_tags(response))
         self.assertContains(
             response,
             reverse("vignetten:eigentuemerin_entfernen", args=[vignette.pk, ada.pk]),
@@ -96,11 +93,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
         self.assertContains(
             response, f'<option value="{grace.pk}">grace</option>', html=True
         )
-        self.assertContains(
-            response,
-            '<button class="button" type="submit">Hinzufügen</button>',
-            html=True,
-        )
+        self.assertIn("Hinzufügen", [text for text, _ in submit_knoepfe(response)])
 
     def test_ohne_moegliche_ergaenzungen_steht_ein_satz(self) -> None:
         """Gibt es niemanden mehr, fehlt das leere Auswahlfeld."""
@@ -108,7 +101,7 @@ class EigentuemerinnenAbschnittTests(TestCase):
 
         response: HttpResponse = self._detail(ada, _vignette_mit_eigentuemerinnen(ada))
 
-        self.assertNotContains(response, '<select name="konto">')
+        self.assertNotContains(response, 'name="konto"')
         self.assertContains(
             response,
             "Alle Konten mit der Rolle Autor:in und alle Administrator:innen "

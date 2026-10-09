@@ -8,11 +8,6 @@ from openai import APIConnectionError
 
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
-    INFOMANIAK_ANTWORTFORMAT,
-    INFOMANIAK_INTERVALL_SEKUNDEN,
-    MINDEST_ANFRAGEFRIST_SEKUNDEN,
-    PLATZHALTER_TRANSKRIPT,
-    TRANSKRIPTION_BUDGET_SEKUNDEN,
     AnbieterNichtErreichbar,
     FakeTranskription,
     InfomaniakTranskription,
@@ -130,7 +125,7 @@ def test_anbieterfunktion_bildet_fuer_fake_einen_platzhalter_ohne_netz() -> None
         anbieter = transkriptions_anbieter()
 
     assert anbieter.transkribieren(b"aufgenommene-audiobytes") == (
-        PLATZHALTER_TRANSKRIPT
+        "Dies ist ein Platzhalter-Transkript."
     )
     openai.assert_not_called()
 
@@ -139,13 +134,11 @@ def test_anbieterfunktion_bildet_fuer_fake_einen_platzhalter_ohne_netz() -> None
 def test_anbieterfunktion_haelt_keinen_adapter_ueber_anfragen_hinweg() -> None:
     """Jede Anfrage bekommt einen frischen Adapter mit vollem Skript."""
 
-    erster: FakeTranskription = transkriptions_anbieter()
-    erster.transkribieren(b"aufgenommene-audiobytes")
+    transkriptions_anbieter().transkribieren(b"aufgenommene-audiobytes")
 
-    zweiter: FakeTranskription = transkriptions_anbieter()
-
-    assert zweiter is not erster
-    assert zweiter.transkribieren(b"aufgenommene-audiobytes") == PLATZHALTER_TRANSKRIPT
+    assert transkriptions_anbieter().transkribieren(b"aufgenommene-audiobytes") == (
+        "Dies ist ein Platzhalter-Transkript."
+    )
 
 
 @pytest.mark.django_db
@@ -164,17 +157,22 @@ def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguratio
     konfiguration.sprache = "fr"
     konfiguration.save()
 
+    audio = b"aufgenommene-audiobytes"
+
     with patch("simulation.transkription.OpenAI") as openai:
-        anbieter: OpenAITranskription = transkriptions_anbieter()
+        openai.return_value.audio.transcriptions.create.return_value.text = "Bonjour."
+        transkriptions_anbieter().transkribieren(audio)
 
     openai.assert_called_once_with(
         base_url="https://openrouter.ai/api/v1",
         api_key="geheimes-token",
-        timeout=TRANSKRIPTION_BUDGET_SEKUNDEN,
+        timeout=120.0,
     )
-    assert anbieter.client is openai.return_value
-    assert anbieter.modell == "whisper-large-v3"
-    assert anbieter.sprache == "fr"
+    openai.return_value.audio.transcriptions.create.assert_called_once_with(
+        model="whisper-large-v3",
+        language="fr",
+        file=("aufnahme.webm", audio, "audio/webm"),
+    )
 
 
 @pytest.mark.django_db
@@ -229,8 +227,8 @@ def _infomaniak_transkription(client: Mock) -> InfomaniakTranskription:
     )
 
 
-# Der am echten Konto beobachtete Text. Mit dem abgesendeten
-# INFOMANIAK_ANTWORTFORMAT steht er unverändert im `data`-Feld des Stapels:
+# Der am echten Konto beobachtete Text. Mit dem abgesendeten Antwortformat
+# `text` steht er unverändert im `data`-Feld des Stapels:
 # eine schlichte Zeichenkette mit `\n` zwischen den Zeilen, keine Abbildung und
 # kein JSON. Der abschließende Zeilenumbruch stammt vom Anbieter.
 _BEOBACHTETES_TRANSKRIPT: str = "Vielen Dank.\nVielen Dank.\nVielen Dank.\n"
@@ -298,21 +296,6 @@ def test_infomaniak_transkription_holt_das_ergebnis_nach_dem_absenden() -> None:
     )
 
 
-def test_infomaniak_transkription_sendet_das_vereinbarte_antwortformat() -> None:
-    """Das Absenden nennt das Format, an dem die Gestalt des Ergebnisses hängt."""
-
-    client = Mock()
-    client.post.return_value = _absende_antwort()
-    client.get.return_value = _fertiger_stapel()
-
-    _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
-
-    assert client.post.call_args.kwargs["data"]["response_format"] == (
-        INFOMANIAK_ANTWORTFORMAT
-    )
-    assert INFOMANIAK_ANTWORTFORMAT == "text"
-
-
 def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> None:
     """Der laufende Zustand führt zur nächsten Abfrage, der fertige zum Text."""
 
@@ -335,7 +318,7 @@ def test_infomaniak_transkription_fragt_nach_einem_laufenden_stapel_erneut() -> 
 
     assert text == _BEOBACHTETES_TRANSKRIPT
     assert client.get.call_count == 3
-    assert uhr.jetzt == 2 * INFOMANIAK_INTERVALL_SEKUNDEN
+    assert uhr.jetzt == 4.0
 
 
 def test_infomaniak_transkription_endet_nach_dem_budget_statt_endlos_zu_fragen() -> (
@@ -355,12 +338,9 @@ def test_infomaniak_transkription_endet_nach_dem_budget_statt_endlos_zu_fragen()
     ):
         _infomaniak_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
-    # Eine Abfrage sofort, dann eine je Intervall, bis das Budget erreicht ist.
-    erwartete_abfragen = (
-        int(TRANSKRIPTION_BUDGET_SEKUNDEN / INFOMANIAK_INTERVALL_SEKUNDEN) + 1
-    )
-    assert client.get.call_count == erwartete_abfragen
-    assert uhr.jetzt == TRANSKRIPTION_BUDGET_SEKUNDEN
+    # Eine Abfrage sofort, dann eine alle 2 s, bis die 120 s erreicht sind.
+    assert client.get.call_count == 61
+    assert uhr.jetzt == 120.0
 
 
 def test_infomaniak_transkription_begrenzt_jede_anfrage_auf_die_restzeit() -> None:
@@ -380,11 +360,11 @@ def test_infomaniak_transkription_begrenzt_jede_anfrage_auf_die_restzeit() -> No
 
     # Das Absenden darf das ganze Budget nutzen, jede Abfrage nur den Rest —
     # bis zur Mindestfrist, mit der die letzte noch sauber scheitert.
-    assert client.post.call_args.kwargs["timeout"] == TRANSKRIPTION_BUDGET_SEKUNDEN
+    assert client.post.call_args.kwargs["timeout"] == 120.0
     fristen = [aufruf.kwargs["timeout"] for aufruf in client.get.call_args_list]
     assert fristen == sorted(fristen, reverse=True)
-    assert fristen[0] == TRANSKRIPTION_BUDGET_SEKUNDEN
-    assert fristen[-1] == MINDEST_ANFRAGEFRIST_SEKUNDEN
+    assert fristen[0] == 120.0
+    assert fristen[-1] == 1.0
 
 
 def test_infomaniak_transkription_reicht_einen_gemeldeten_fehlschlag_weiter() -> None:
@@ -497,14 +477,20 @@ def test_anbieterfunktion_bildet_fuer_infomaniak_den_asynchronen_adapter() -> No
     konfiguration.sprache = "fr"
     konfiguration.save()
 
+    audio = b"aufgenommene-audiobytes"
+
     with patch("simulation.transkription.httpx.Client") as httpx_client:
-        anbieter: InfomaniakTranskription = transkriptions_anbieter()
+        httpx_client.return_value.post.return_value = _absende_antwort()
+        httpx_client.return_value.get.return_value = _fertiger_stapel()
+        transkriptions_anbieter().transkribieren(audio)
 
     httpx_client.assert_called_once_with(
         headers={"Authorization": "Bearer geheimes-token"},
-        timeout=TRANSKRIPTION_BUDGET_SEKUNDEN,
+        timeout=120.0,
     )
-    assert anbieter.client is httpx_client.return_value
-    assert anbieter.basis_url == "https://api.infomaniak.com/1/ai/4711/openai"
-    assert anbieter.modell == "whisper"
-    assert anbieter.sprache == "fr"
+    httpx_client.return_value.post.assert_called_once_with(
+        "https://api.infomaniak.com/1/ai/4711/openai/audio/transcriptions",
+        data={"model": "whisper", "language": "fr", "response_format": "text"},
+        files={"file": ("aufnahme.webm", audio, "audio/webm")},
+        timeout=ANY,
+    )
