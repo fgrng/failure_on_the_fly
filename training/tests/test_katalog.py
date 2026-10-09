@@ -8,7 +8,6 @@ from django.urls import reverse
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
     finale_vignette,
-    finaler_kern,
     konto_mit_rollen,
 )
 from konten.models import Konto
@@ -22,6 +21,15 @@ from sitzungen.models import (
 from training.models import Training, Trainingsbindung
 from training.tests.seite import tabellenzeilen
 from vignetten.models import Vignette
+
+
+def _katalogzeilen(response: HttpResponse) -> list[tuple[object, object, object]]:
+    # Liest je Katalogzeile Name, Ziel und Aktion.
+
+    return [
+        (zeile["name"], zeile["url"], zeile["action_label"])
+        for zeile in tabellenzeilen(response)
+    ]
 
 
 class TrainingskatalogTests(TestCase):
@@ -58,10 +66,7 @@ class TrainingskatalogTests(TestCase):
         detail_url: str = reverse("training:detail", args=[training.pk])
         self.assertContains(response, detail_url)
         self.assertEqual(
-            [
-                (zeile["name"], zeile["url"], zeile["action_label"])
-                for zeile in tabellenzeilen(response)
-            ],
+            _katalogzeilen(response),
             [("Bruchrechnung", detail_url, "Öffnen")],
         )
 
@@ -76,10 +81,7 @@ class TrainingskatalogTests(TestCase):
         kuratier_url: str = reverse("training:kuratieren", args=[entwurf.pk])
         self.assertContains(response, kuratier_url)
         self.assertEqual(
-            [
-                (zeile["name"], zeile["url"], zeile["action_label"])
-                for zeile in tabellenzeilen(response)
-            ],
+            _katalogzeilen(response),
             [("Bruchrechnung", kuratier_url, "Kuratieren")],
         )
 
@@ -294,17 +296,19 @@ class TrainingshistorieTests(TestCase):
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
-        for vignette in (erste, zweite):
-            self.client.post(reverse("training:wahl", args=[training.pk, vignette.pk]))
-            self.client.post(
-                reverse("training:einwilligung", args=[training.pk, vignette.pk]),
-                {"audioverarbeitung_eingewilligt": "nein"},
-            )
-            if vignette == erste:
-                self.client.post(reverse("training:gespraech_beenden"))
-                self.client.post(reverse("training:debrief"), {"diagnose": "Bruch"})
-            else:
-                self.client.post(reverse("training:abbrechen"))
+        self.client.post(reverse("training:wahl", args=[training.pk, erste.pk]))
+        self.client.post(
+            reverse("training:einwilligung", args=[training.pk, erste.pk]),
+            {"audioverarbeitung_eingewilligt": "nein"},
+        )
+        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(reverse("training:debrief"), {"diagnose": "Bruch"})
+        self.client.post(reverse("training:wahl", args=[training.pk, zweite.pk]))
+        self.client.post(
+            reverse("training:einwilligung", args=[training.pk, zweite.pk]),
+            {"audioverarbeitung_eingewilligt": "nein"},
+        )
+        self.client.post(reverse("training:abbrechen"))
 
         response: HttpResponse = self.client.get(reverse("training:historie"))
 
@@ -334,7 +338,6 @@ class TrainingsabbruchTests(TestCase):
         """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
         ausbilderin: Konto = get_user_model().objects.create_user(username="ada")
         teilnehmerin: Konto = get_user_model().objects.create_user(username="grace")
-        finaler_kern()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test", sprachmodell="fake", parameter={"skript": skript or []}
         )

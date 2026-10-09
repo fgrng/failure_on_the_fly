@@ -18,7 +18,7 @@ from config.tests.formular import submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen.durchlauf import gespraechsschritt_ausfuehren
+from sitzungen.durchlauf import Ausgang, gespraechsschritt_ausfuehren
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -340,7 +340,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.entwurf.budget_wert = budget_wert
         self.entwurf.save()
 
-    def _fehlschlag_konfigurieren(self) -> ModellKonfiguration:
+    def _geglueckte_neben_fehlschlag_anlegen(self) -> ModellKonfiguration:
         # Belegt die Schülerin mit dem Fehlschlag und liefert eine geglückte
         # Konfiguration für den ersten Schritt. Der Fake beginnt sein Skript in
         # jedem Schritt neu, und der Probelauf pinnt seine Konfiguration.
@@ -376,7 +376,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         # Durchlauf am Sink dieser Session.
 
         if geglueckt is None:
-            geglueckt = self._fehlschlag_konfigurieren()
+            geglueckt = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
         session: SessionBase = self.client.session
         gespraechsschritt_ausfuehren(
@@ -553,14 +553,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         """Fehlversuche des Modells kosten keine Zeit aus dem Autorinnenzug."""
 
         self._budget_konfigurieren(Vignette.BudgetTyp.ZEIT, 5)
-        self.konfiguration = ModellKonfiguration.objects.create(
-            bezeichnung="Test",
-            sprachmodell="fake",
-            parameter={"skript": _ENDGUELTIGER_FEHLSCHLAG},
-        )
-        ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
-        )
+        geglueckt: ModellKonfiguration = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
         with patch(
@@ -577,9 +570,22 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
                 {"eingabe": "Wie rechnest du?"},
             )
 
+        session: SessionBase = self.client.session
+        with patch(
+            "sitzungen.durchlauf.jetzt",
+            return_value=datetime(2026, 9, 22, 10, 1, 54, tzinfo=UTC),
+        ):
+            ausgang: Ausgang = gespraechsschritt_ausfuehren(
+                ScratchSink(session),
+                self.entwurf,
+                self.kern,
+                geglueckt,
+                eingabe="Und warum?",
+            )
+
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
         self.assertNotContains(response, "Budget")
-        self.assertNotContains(response, "Frau Weber fragt nach Ihrer Diagnose.")
+        self.assertEqual(ausgang, Ausgang.FORTGESETZT)
 
     def test_zeitbudget_fuehrt_nach_laufendem_schritt_in_den_debrief(self) -> None:
         """Ein abgelaufenes Zeitbudget schneidet die erzeugte Antwort nicht ab."""
@@ -704,6 +710,8 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         """Der volle Probelauf endet im Debrief ohne eine Domänenspur (ADR-0014)."""
 
         def zeilen_zaehlen() -> list[int]:
+            # Zählt die Zeilen jeder Domänentabelle, die ein Lauf beschreiben könnte.
+
             return [
                 Vignette.objects.count(),
                 Simulationskern.objects.count(),
@@ -715,7 +723,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
                 Diagnose.objects.count(),
             ]
 
-        geglueckt: ModellKonfiguration = self._fehlschlag_konfigurieren()
+        geglueckt: ModellKonfiguration = self._geglueckte_neben_fehlschlag_anlegen()
         zeilen: list[int] = zeilen_zaehlen()
         self._endgueltigen_fehlschlag_ausloesen(geglueckt=geglueckt)
 

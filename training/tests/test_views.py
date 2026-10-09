@@ -158,11 +158,15 @@ class TrainingKuratierenTests(TestCase):
         self.client.force_login(ada)
 
         def hinzufuegen_url(vignette: Vignette) -> str:
+            # Adresse der Hinzufügen-Aktion für die Vignette in diesem Training.
+
             return reverse(
                 "training:vignette_hinzufuegen", args=[training.pk, vignette.pk]
             )
 
         def entfernen_url(vignette: Vignette) -> str:
+            # Adresse der Entfernen-Aktion für die Vignette in diesem Training.
+
             return reverse(
                 "training:vignette_entfernen", args=[training.pk, vignette.pk]
             )

@@ -52,7 +52,7 @@ def _persistierbares_tripel(
     )
 
 
-def _senken() -> list[ScratchSink | DBSink | FluechtigerSink]:
+def _senken() -> list[SitzungSink]:
     # Je eine frische Senke jeder Art für die Paritätstests.
 
     return [
@@ -317,9 +317,7 @@ def test_zeitbudget_ist_von_jeder_anderen_sitzung_getrennt() -> None:
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(("budget", "erschoepft"), [(10, True), (11, False)])
-def test_scratch_und_db_sink_messen_zeit_paritaetisch(
-    budget: int, erschoepft: bool
-) -> None:
+def test_alle_senken_messen_zeit_paritaetisch(budget: int, erschoepft: bool) -> None:
     """Alle Senken führen denselben Budgetstand über explizite Zeitpunkte."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
@@ -362,7 +360,7 @@ def test_schrittbudget_laesst_die_uhr_in_beiden_sinks_stehen() -> None:
 
 
 @pytest.mark.django_db
-def test_erneutes_anzeigen_setzt_die_offene_spanne_in_beiden_sinks_neu_an() -> None:
+def test_erneutes_anzeigen_setzt_die_offene_spanne_in_allen_senken_neu_an() -> None:
     """Beim Reload bleibt der Verbrauch erhalten, die zuvor offene Zeit aber ungebucht."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
