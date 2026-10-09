@@ -223,9 +223,14 @@ class VignetteManager(models.Manager.from_queryset(VignetteQuerySet)):
     @transaction.atomic
     def anlegen(self, konto: "Konto") -> "Vignette":
         """Legt einen Entwurf mit Historie und aktuellem finalem Kern an."""
-        kern: Simulationskern = Simulationskern.objects.filter(
-            zustand=Simulationskern.Zustand.FINAL
-        ).latest("finalisiert_am", "pk")
+        try:
+            kern: Simulationskern = Simulationskern.objects.filter(
+                zustand=Simulationskern.Zustand.FINAL
+            ).latest("finalisiert_am", "pk")
+        except Simulationskern.DoesNotExist:
+            raise ValidationError(
+                "Es gibt noch keinen finalen Simulationskern."
+            ) from None
         historie: Vignettenhistorie = Vignettenhistorie.objects.anlegen(konto)
         return self._erstellen(
             historie=historie, gepinnter_kern=kern, **zufaellige_akteure()
