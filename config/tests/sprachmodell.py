@@ -1,6 +1,6 @@
-"""Gemeinsame Aufzeichnung der Anfragen an das Fake-Sprachmodell."""
+"""Gemeinsame Testadapter am Fake-Sprachmodell."""
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from unittest import mock
 
@@ -37,3 +37,39 @@ def anfragen_aufzeichnen() -> Iterator[list[list[dict[str, str]]]]:
 
     with mock.patch.object(FakeSprachmodell, "antworten", aufzeichnend):
         yield anfragen
+
+
+@contextmanager
+def modellaufrufe_dauern(
+    vorspulen: Callable[[float], object], sekunden: float
+) -> Iterator[None]:
+    """Lässt im Block jeden Fake-Aufruf die Uhr um ``sekunden`` vorspulen.
+
+    ``vorspulen`` ist das ``shift`` eines laufenden time-machine-Travellers.
+    """
+
+    echte_antworten = FakeSprachmodell.antworten
+
+    def dauernd(
+        sprachmodell: FakeSprachmodell,
+        system_prompt: str,
+        user_prompt: str,
+        verlauf: Sequence[tuple[str, str]],
+        eingabe: str,
+        ausgabe_schema: Mapping[str, object],
+        timeout: float,
+    ) -> Antwort:
+        # Das Modell rechnet: Die Wanduhr läuft weiter, dann antwortet der Fake.
+        vorspulen(sekunden)
+        return echte_antworten(
+            sprachmodell,
+            system_prompt,
+            user_prompt,
+            verlauf,
+            eingabe,
+            ausgabe_schema,
+            timeout,
+        )
+
+    with mock.patch.object(FakeSprachmodell, "antworten", dauernd):
+        yield
