@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Prototyp #296 · Evallauf{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+<link rel="stylesheet" href="{% static 'css/prototype-296.css' %}">
+<script src="{% static 'js/prototype-296.js' %}" defer></script>
+{% endblock %}
+{% block content %}
+<section class="page area--authoring">
+  <p class="proto-note">Prototyp #296 · Beispieldaten · Wie viel Ergebnis gehört auf die Vignettenseite?</p>
+  <header class="page-head"><div><p>Entwicklung / Vignetten / Fassung 3</p><h1>Mathematik: Gleichungen lösen</h1><span>Klassenstufe 7 · Lina · Entwurf</span></div><span class="badge">Entwurf</span></header>
+  <div class="proto-actions"><button class="button button--secondary" data-action="context">Vignette ansehen</button><button class="button button--secondary" data-action="results">Evallauf ansehen</button><button class="button" data-action="finalize">Finalisieren</button></div>
+  <section id="context" class="page-section"><h2>Vignettenkontext</h2><div class="field-grid"><div><h3>Lernauftrag</h3><p>Löse 3x + 5 = 17. Erkläre jeden Rechenschritt.</p></div><div><h3>Fehlermuster</h3><p>Lina verändert nur eine Seite der Gleichung. Bei Nachfragen verteidigt sie dieses Vorgehen.</p></div></div><p>Gepinnter Kern: Fassung 12 · Eigentümer-Kreis: Autor:innen Mathematik</p></section>
+  <section id="results" class="page-section" aria-label="Evallauf-Ergebnisse"></section>
+  <dialog id="conversation"><div id="conversation-body"></div><button class="button button--secondary" data-action="close-conversation">Schließen</button></dialog>
+  <dialog id="finalize"><h2>Vignette finalisieren</h2><div id="finalize-status"></div><p>Du kannst die Vignette unabhängig vom Evallauf finalisieren.</p><div class="proto-actions"><button class="button button--secondary" data-action="close-finalize">Zurück</button><button class="button" data-action="confirm-finalize">Jetzt finalisieren</button></div><p id="finalized" role="status"></p></dialog>
+  <details class="proto-state"><summary>Prototyp-Zustand / Szenario</summary><label>Szenario <select id="scenario"><option value="failed">Fertig · nicht bestanden</option><option value="passed">Fertig · bestanden</option><option value="none">Kein Evallauf</option><option value="waiting">Wartet</option><option value="running">Läuft</option><option value="incomplete">Fertig · unvollständig</option><option value="aborted">Abgebrochen</option><option value="hidden">Kein finaler Katalog / Rollen unbelegt</option></select></label> <label><input type="checkbox" id="stale"> Veraltet (Modellwechsel)</label><pre id="state"></pre><p>„Starten“ simuliert eine Warteschlange. „Neu laden“ schreitet zum nächsten Zustand. Alle Daten bleiben im Browser-Speicher.</p></details>
+</section>
+<nav class="proto-switcher" aria-label="Prototyp-Varianten"><button id="prev" aria-label="Vorherige Variante">←</button><strong id="variant-label"></strong><button id="next" aria-label="Nächste Variante">→</button></nav>
+{% endblock %}
