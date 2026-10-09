@@ -1,6 +1,6 @@
 # Testreview: Sitzungen und Training
 
-Bereich aus #330 (Spec #321). Geprüft sind alle Dateien in `sitzungen/tests/` und `training/tests/`. Maßstab sind die Prüfkriterien aus #321 und der Abschnitt „What Tests Never Check“ in `CODING_STANDARDS.md`. Zwei Entscheidungen gelten für alle Einträge:
+Bereich aus #330 (Spec #321). Geprüft sind alle Dateien in `sitzungen/tests/` und `training/tests/`. Die vier Dateien aus #355 (`test_beitritt.py`, `test_export.py`, `test_freigabe.py`, `test_fremdeinsicht.py`, zusammen 125 Tests) kamen erst danach; sie bewertet der Nachtrag aus #394 (Spec #391) nach denselben Kriterien. Seine Schnittstellen-Abschnitte stehen am Ende von „Schnittstelle“, seine Befunde am Ende von „Befunde“. Maßstab sind die Prüfkriterien aus #321 und der Abschnitt „What Tests Never Check“ in `CODING_STANDARDS.md`. Zwei Entscheidungen gelten für alle Einträge:
 
 - **Zeit (#324):** Ein Test, der `sitzungen.durchlauf.jetzt` über den Modulpfad patcht, bekommt *umschreiben*. Zieltest ist derselbe Ablauf mit `time-machine` als Uhr. Umgesetzt wird das in #349.
 - **Migrationen (#325, ADR-0031):** Kein Test dieses Bereichs migriert per `MigrationExecutor`. Ein Modelltest hält aber den Zustand nach `sitzungen.0007` fest; er steht unten unter `test_models.py`.
@@ -149,6 +149,82 @@ Eine Regel für Erwartungswerte gilt durchgehend: Ein Enum-Mitglied wie `Sitzung
   - `abschrift_ansehen`: nur lesend, in gespielter Reihenfolge, ohne Denkspur.
   - `abschrift_entfernen`: nur POST.
   - Fremde Abschriften ergeben 404.
+
+### Geschlossenes Training und Beitritt (`training/models.py`, `training/views.py`, Nachtrag #394)
+
+- **Aufrufe:**
+  - `Training.trainings_link` (UUID, je Training fest) und `Training.beitritt_gesperrt`.
+  - `Training.beitreten(konto) -> bool` lädt oder legt die Trainingsbindung an und sagt, ob das Konto danach dabei ist.
+  - `Training.bindung_fuer(konto)`: die eine Trainingsbindung je Konto, auch bei einem parallelen zweiten Aufruf.
+  - `Training.objects.beigetreten_von(konto)` und `zugaenglich_fuer(konto)` (Trainingsbindung oder `sichtbar_fuer`).
+  - HTTP: `beitreten/<trainings_link>/` (Login nötig) sowie `eigene/<pk>/beitritt/sperren/` und `…/oeffnen/` (nur POST, nur der Kreis).
+- **Invarianten (ADR-0049):**
+  - Teilnehmende erreichen Katalogeintrag, `detail`, `wahl` und `einwilligung` nur mit Trainingsbindung. Kreis und Administration erreichen ihre Trainings ohne Beitritt.
+  - Der Beitritt ist wiederholbar und zählt jede Person einmal.
+  - Ohne Login führt der Link über den Login zurück zum Beitritt.
+  - Die Sperre hält nur Neue fern. Beigetretene, Kreis und Administration kommen weiter ins Training. Bei gesperrtem Link entsteht für Kreis und Administration keine Bindung; beim offenen Link entsteht eine (#410).
+  - Der Link eines Entwurfs nimmt niemanden auf. Ein leeres Training lässt sich veröffentlichen und beitreten.
+  - Die Trainingsseite trägt den festen Hinweis auf die Fremdeinsicht. Die Kuratierseite zeigt das Band mit dem absoluten Link, „Kopieren“, Sperren bzw. Öffnen und der Zahl der Beigetretenen in Einzahl oder Mehrzahl.
+- **Fehlerfälle:** 403 mit Meldung bei gesperrtem Beitritt. 404 für den Link eines Entwurfs, für Trainings ohne eigene Bindung und für einen fremden Kreis beim Umschalten. 405 bei GET auf Sperren und Öffnen.
+- **Konfiguration:** keine.
+
+### Freigabe (`training/abschriften.py`, `training/views.py`, Nachtrag #394)
+
+- **Aufrufe:**
+  - `abschrift_freigeben(abschrift, trainings)` setzt die Freigaben genau auf die genannten Trainings. Was nicht genannt ist, ist widerrufen.
+  - `Abschrift.freigegeben_fuer` bzw. rückwärts `Training.freigegebene_abschriften`.
+  - HTTP: `abschriften/<pk>/freigaben/` (nur POST, Feld `training` mehrfach), danach zurück zur Abschriftseite. Die Abschriftseite zeigt die Checkbox-Liste der beigetretenen Trainings und im Kopf, für wen freigegeben ist.
+- **Invarianten (ADR-0049):**
+  - Freigeben lässt sich nur für beigetretene Trainings, für beliebig viele und unabhängig von ihren Vignetten.
+  - Eine abgewiesene Auswahl ändert nichts.
+  - Widerruf und Löschen der Abschrift beenden die Fremdeinsicht sofort.
+  - Die Freigabe öffnet den Vignettenbestand nicht: Die Vignette der Abschrift bleibt für den Kreis außerhalb von Liste, Detail und Aufnahme (ADR-0015).
+- **Fehlerfälle:** `ValidationError(FREIGABE_ABGEWIESEN)` am Kommando. Über HTTP 404 für ein Training ohne eigene Bindung, eine nicht lesbare Auswahl und eine fremde Abschrift, 405 bei GET.
+- **Konfiguration:** keine.
+
+### Fremdeinsicht und Selbsteinsicht (`sitzungen/models.py`, `training/views.py`, Nachtrag #394)
+
+- **Aufrufe:**
+  - `Sitzung.objects.fremd_einsehbar(trainings)`: abgeschlossene Sitzungen unter einer Trainingsbindung dieser Trainings oder unter einer für sie freigegebenen Abschrift. Wer die Trainings sieht, entscheidet der Aufrufer.
+  - `Sitzung.objects.in_gespielter_folge()`
+  - HTTP: `sitzung/<pk>/ansehen/` zeigt lesend die eigene Trainingssitzung in jedem Status (Selbsteinsicht). Eine fremde zeigt es nur über `fremd_einsehbar(Training.objects.sichtbar_fuer(konto))`.
+  - Die Kuratierseite zeigt die Tabelle der Fremdeinsicht und die Liste „Freigegebene Abschriften“.
+- **Invarianten (ADR-0049):**
+  - Einsicht folgt dem Anlass, nie der Vignette: keine Sitzungen fremder Trainings, keine Einsicht für die Autorin.
+  - Einsicht folgt der aktuellen Kreismitgliedschaft, auch rückwirkend; nach dem Austritt gibt es keine mehr. Die Administration folgt aus `sichtbar_fuer`.
+  - Fremd sind nur abgeschlossene Sitzungen einsehbar, selbst jeder Status. Beide Ansichten zeigen keine Denkspur und keine Bedienelemente.
+  - Ihre Abschriften liest die Teilnehmerin nur auf der Abschriftseite, nicht über `sitzung_ansehen`.
+  - Tabelle: Zeilen sind alle Beigetretenen nach Namen, ohne Rücksicht auf Groß- und Kleinschreibung und auch ohne Sitzung. Spalten sind die Vignetten in Kuratierreihenfolge. Jede Zelle hält die abgeschlossenen Sitzungen, je Vignette ab 1 nummeriert und datiert. Ohne Beigetretene steht eine Leerzeile da, ohne Vignetten ein Hinweis statt der Tabelle.
+  - Liste der freigegebenen Abschriften: nach Namen, mit Erhebungsname, Importzeitpunkt und den verlinkten abgeschlossenen Sitzungen. Ist sie leer, steht dort eine Meldung.
+- **Fehlerfälle:** 404 für jede nicht einsehbare Sitzung.
+- **Konfiguration:** `TIME_ZONE` für die angezeigten Daten.
+
+### Trainingsexport (`training/export.py`, `config/downloads.py`, Nachtrag #394)
+
+- **Aufrufe:**
+  - `trainingsexport_zip(training) -> bytes` liefert dieselben Sitzungen wie `fremd_einsehbar` für genau dieses Training.
+  - `zip_download(art, pk, name, inhalt)` antwortet mit `application/zip` und dem Dateinamen `<art>-<pk>-<slug>-<UTC %Y%m%dT%H%M%SZ>.zip`. Der Erhebungsexport teilt sich die Funktion.
+  - HTTP: `eigene/<pk>/export/` für Kreis und Administration. Der Knopf steht in der Werkzeugleiste der Fremdeinsicht.
+- **Invarianten (ADR-0049):**
+  - Je Person gibt es einen Ordner `teilnehmer-<hex>`, das Kennzeichen wird je Export neu gezogen. Darin liegt `NN-<slug der Vignette>.md` je abgeschlossener Sitzung, gezählt je Ordner.
+  - Freigegebene Abschriften liegen als Unterordner `<slug des Erhebungsnamens>` im Ordner der Person. Gleiche Namen bekommen `-2`, `-3`; nur Abschriften mit einsehbaren Sitzungen belegen einen Namen. Ein Erhebungsname wird nie zum Pfad.
+  - Eine Datei nennt Vignette, Ausgang und Datum; das Datum fehlt bei Bestandssitzungen ohne Zeitstempel. Es folgen das Transkript als Wechsel von Eingabe und Äußerung („(keine Antwort)“ beim antwortlosen Schritt) und die Diagnose („(keine Diagnose)“).
+  - Keine Kontodaten, keine Denkspur, keine Fehlversuche. Kein Exportkontrakt nach ADR-0029.
+- **Fehlerfälle:** 403 ohne Ausbilder:innen-Rolle. 404 für fremde Kreise, Ausgetretene und die Autorin.
+- **Konfiguration:** keine. Zeitstempel und Kennzeichen kommen aus Systemzeit und Zufall, beides Systemgrenzen.
+
+### Formulare und Routen des Trainings (`training/forms.py`, `training/urls.py`, Nachtrag #394)
+
+- **Aufrufe:**
+  - `TrainingForm` erfasst nur `name`. `anlegen` übergibt ihn an `Training.objects.anlegen`.
+  - Die Routen im Namensraum `training`:
+    - Teilnahme: `katalog`, `historie`, `detail`, `beitreten`, `wahl`, `einwilligung`, die Sitzungsrouten und `transkription`.
+    - Abschriften: `abschriften`, `abschrift`, `abschrift_freigaben` und `abschrift_loeschen`.
+    - Ausbilder-UI: `liste`, `anlegen`, `kuratieren`, `veroeffentlichen`, `trainingsexport`, `beitritt_sperren`, `beitritt_oeffnen`, `eigentuemerin_hinzufuegen`, `eigentuemerin_entfernen`, `vignette_hinzufuegen` und `vignette_entfernen`.
+  - `transkription` ist der Baustein `transkriptions_endpunkt` mit `training_sitzung` als Auflöser.
+- **Invarianten:** Schreibende Routen nehmen nur POST an: `veroeffentlichen`, `beitritt_*`, `vignette_*`, `eigentuemerin_*`, `abschrift_freigaben`, `abschrift_loeschen`, `einwilligung` und die Sitzungsaktionen außer `gespraech`. Die Routen des Eigentümer-Kreises folgen dem gemeinsamen Segment `eigentuemerinnen/` (`config/tests/test_eigentuemer_kreis_routen.py`).
+- **Fehlerfälle:** 405 bei falscher Methode. Ein leerer Name zeigt das Formular erneut.
+- **Konfiguration:** keine.
 
 ## Befunde
 
@@ -363,11 +439,119 @@ Eine Regel für Erwartungswerte gilt durchgehend: Ein Enum-Mitglied wie `Sitzung
 
 Zwischen Trainingssitzung und Training-Views liegt die Doppelung nicht in `test_views.py`, das die Ausbilder-UI prüft. Sie liegt in der Klasse `TrainingsabbruchTests` in `test_katalog.py`, deren Fehlschlag-Test `test_sitzung.py` wiederholt. Ihr Abbruch-Test startet aus dem laufenden Gespräch und trägt damit Eigenes bei. Dazu kommen die Endpunkttests der Transkription und die Darstellungstests des geteilten Includes über drei Seiten.
 
+### Nachtrag #394: Beitritt, Freigabe, Fremdeinsicht, Trainingsexport
+
+Die vier Dateien kamen mit #355 nach dem Review oben. Zwei Muster ziehen sich durch:
+
+- **Negative Zusicherungen ohne Status:** Die Helfer `_kuratierseite` und `_abschriftseite` lesen `content.decode()` und prüfen den Status nicht. Ein `assertNotIn` auf so einer Seite besteht auch, wenn sie mit 403 oder 404 antwortet. Diese Helfer bekommen *umschreiben*; die Tests, die sie benutzen, bleiben danach, wie sie sind.
+- **Dieselbe Einsichtsregel auf mehreren Ausgaben:** `fremd_einsehbar` speist die Sitzungsansicht, die Tabelle, die Abschriftenliste und den Export. Eine Ausgabe behält einen Fall nur, wenn sie ihn selbst entscheiden könnte. Dazu gehört eine eigene Filterung oder ein eigener Aufruf der Regel. Fälle, die schon durch den Datenzustand feststehen, entfallen.
+
+Die Denkspur-Tests der Sitzungsansicht bleiben alle drei: Fremdeinsicht, Selbsteinsicht und freigegebene Abschrift. Jeder steht für eine Zelle der Matrix aus ADR-0049, und eine künftige Einsicht der Forschenden mit Denkspur (#356) könnte genau an Betrachter oder Anlass unterscheiden. Im Export entscheidet `_markdown` ohne Anlass; dort genügt ein Denkspur-Test.
+
+#### `training/tests/test_beitritt.py`
+
+| Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
+|---|---|---|---|
+| Hilfsfunktion `_konto` | umschreiben | Eigene Kopie des Kontos mit Rolle, wie in `test_freigabe.py` und `test_fremdeinsicht.py` | gemeinsamer Helfer aus #392 |
+| Hilfsfunktion `_finale_vignette` | umschreiben | Legt die Fassung über `Vignette.objects._erstellen` an (SLF001-Übergangsliste), ohne gepinnten Kern. | finale Vignette aus #392. Danach fällt die Datei von der Übergangsliste. |
+| Hilfsfunktion `_beitritt_url`; Sperre im Aufbau über `training.save(update_fields=["beitritt_gesperrt"])` | behalten | Öffentliches Feld, Testaufbau. Das Sperren über HTTP prüft `TrainingsLinkAufDerKuratierseiteTests`. | – |
+| `BeitrittTests::test_jedes_training_hat_einen_eigenen_trainings_link` | streichen | Tautologisch: `default=uuid4, unique=True` ist die Felddefinition. Der Vergleich zweier Feldwerte prüft nichts, was jemand beobachtet. | `test_beitritt_legt_die_bindung_an_und_fuehrt_ins_training`: Der Link führt in sein Training. `GeschlossenesTrainingTests::test_katalog_zeigt_teilnehmenden_nur_beigetretene_trainings`: Ein Beitritt öffnet kein zweites Training. |
+| `BeitrittTests::test_beitritt_legt_die_bindung_an_und_fuehrt_ins_training` | behalten | `assertRedirects` lädt die Trainingsseite mit; 200 gibt es dort nur mit Bindung. | – |
+| `BeitrittTests::test_erneutes_oeffnen_fuehrt_ohne_fehler_ins_training`, `…::test_erneutes_oeffnen_zaehlt_nicht_doppelt` | behalten | Wiederholbarkeit des Beitritts, über die Seite gezählt | – |
+| `BeitrittTests::test_ohne_login_fuehrt_der_link_ueber_den_login_zurueck`, `…::test_login_kehrt_zum_beitritt_zurueck_und_fuehrt_ins_training` | behalten | Zwei Hälften eines Wegs: Hinleitung zum Login und Rückkehr danach | – |
+| `BeitrittTests::test_gesperrter_link_meldet_die_sperre`, `…::test_gesperrter_link_laesst_niemanden_beitreten`, `…::test_gesperrter_link_fuehrt_beigetretene_weiter_ins_training`, `…::test_gesperrter_link_fuehrt_den_kreis_ins_training`, `…::test_gesperrter_link_fuehrt_die_administration_ins_training` | behalten | Die Sperre aus Sicht jeder Rolle, Meldung als Literal | – |
+| `BeitrittTests::test_gesperrter_link_bindet_den_kreis_nicht` | behalten | Den offenen Fall prüft kein Test. Dort bindet die View den Kreis heute doch; was gelten soll, entscheidet #410. | – |
+| `BeitrittTests::test_link_eines_entwurfs_ist_unbekannt`, `…::test_leeres_training_laesst_sich_veroeffentlichen_und_beitreten` | behalten | – | – |
+| `GeschlossenesTrainingTests::test_katalog_zeigt_teilnehmenden_nur_beigetretene_trainings` | behalten | Der Gegenfall zu `test_katalog.py::…::test_zeigt_beigetretene_trainings_im_katalog_und_in_der_navigation`: Ein veröffentlichtes fremdes Training fehlt. | – |
+| `GeschlossenesTrainingTests::test_katalog_ohne_beitritt_ist_leer` | streichen | Schichtdoppelung in derselben Klasse: Dass ein veröffentlichtes Training ohne Bindung fehlt, zeigt schon „Fremdes Seminar“ im Test darüber. | `test_katalog_zeigt_teilnehmenden_nur_beigetretene_trainings` |
+| `GeschlossenesTrainingTests::test_detail_wahl_und_start_ohne_bindung_liefern_404`, `…::test_beigetretene_erreichen_detail_und_wahl`, `…::test_kreis_und_administration_erreichen_das_training_ohne_beitritt` | behalten | Die Zugangsregel aus ADR-0049 über alle Einstiege | – |
+| `GeschlossenesTrainingTests::test_bestehende_bindung_gilt_als_beitritt` | streichen | Besteht per Konstruktion: Eine Bindung „aus der Zeit vor dem Trainings-Link“ ist dieselbe Zeile, die der Beitritt anlegt. `zugaenglich_fuer` kann sie nicht unterscheiden. | `test_beigetretene_erreichen_detail_und_wahl` und `test_katalog_zeigt_teilnehmenden_nur_beigetretene_trainings` |
+| `GeschlossenesTrainingTests::test_trainingsseite_zeigt_den_festen_hinweis_zur_fremdeinsicht` | behalten | Zusage aus ADR-0049, Text als Literal | – |
+| `TrainingsLinkAufDerKuratierseiteTests::test_kuratierseite_zeigt_den_link_zum_kopieren` | behalten | „Kopieren“ belegt nur den Knopf; die Zwischenablage beobachtet pytest nicht. | – |
+| `TrainingsLinkAufDerKuratierseiteTests::test_ko_eigentuemerin_sperrt_den_beitritt`, `…::test_ko_eigentuemerin_oeffnet_den_gesperrten_beitritt`, `…::test_fremde_ausbilderin_kann_den_beitritt_nicht_umschalten`, `…::test_fremder_umschaltversuch_laesst_den_beitritt_offen`, `…::test_umschalten_nur_per_post` | behalten | Der Abweisungstest mit Folgeprüfung hält fest, dass vor dem Schreiben geprüft wird. | – |
+| `TrainingsLinkAufDerKuratierseiteTests::test_band_eines_entwurfs_vertroestet_auf_das_veroeffentlichen`, `…::test_band_zaehlt_die_beigetretenen`, `…::test_gesperrtes_band_nennt_eine_beigetretene_person_in_der_einzahl` | behalten | Mehrzahl im offenen Band, Einzahl im gesperrten Band, je ein Zweig des Templates | – |
+| `TrainingsLinkAufDerKuratierseiteTests::test_band_nennt_eine_beigetretene_person_in_der_einzahl` | streichen | Schichtdoppelung in derselben Datei: „1 Person beigetreten“ erwartet schon `test_erneutes_oeffnen_zaehlt_nicht_doppelt`. | `BeitrittTests::test_erneutes_oeffnen_zaehlt_nicht_doppelt` |
+
+#### `training/tests/test_freigabe.py`
+
+| Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
+|---|---|---|---|
+| Hilfsfunktionen `_konto`, `_finale_vignette` | umschreiben | Öffentlicher Weg, aber Kopien derselben Helfer in `test_fremdeinsicht.py` | gemeinsame Helfer aus #392 |
+| Hilfsfunktion `_abschrift` | behalten, verlegen | `Abschrift`, `Sitzung` usw. per `objects.create` sind Testaufbau. Die Freigabe hängt nicht daran, wie die Abschrift entstand; `abschrift_holen` bräuchte eine ganze Erhebung. `test_export.py` importiert den Helfer aus diesem Testmodul. | in ein gemeinsames Aufbaumodul der Trainingstests (siehe Querschnitt) |
+| Hilfsfunktionen `_sitzung`, `_ansehen_url`, `FreigabeTestCase._freigeben`, `…._status_fuer` | behalten | – | – |
+| `FreigabeTestCase._abschriftseite`, `…._kuratierseite` | umschreiben | Lesen `content.decode()` ohne Status. Die negativen Zusicherungen der Datei bestehen dann auch auf einer Fehlerseite. | Der Helfer prüft Status 200, bevor er den Text liefert. |
+| `FreigebenTests::test_freigabe_leitet_zur_abschriftseite_zurueck`, `…::test_freigabe_fuer_ein_training_ohne_eigene_bindung_wird_abgewiesen`, `…::test_abgewiesene_freigabe_oeffnet_keine_fremdeinsicht`, `…::test_fremde_abschrift_laesst_sich_nicht_freigeben`, `…::test_abgewiesene_freigabe_laesst_die_bisherige_freigabe_stehen`, `…::test_freigeben_verlangt_post`, `…::test_abschrift_laesst_sich_fuer_mehrere_trainings_freigeben` | behalten | Kommando und Abweisungen über HTTP und die Wirkung auf die Einsicht | – |
+| `FreigebenTests::test_freigabe_mit_unlesbarer_auswahl_wird_abgewiesen`, `…::test_freigabe_mit_hochgestellter_ziffer_wird_abgewiesen` | behalten | Grenzfälle der Auswahl: `"²".isdigit()` ist wahr, `int("²")` scheitert. Beide ließen sich parametrisieren, das ist aber kein Befund. | – |
+| `FreigebenTests::test_freigabe_gelingt_unabhaengig_von_den_vignetten_des_trainings` | streichen | Schichtdoppelung: Das Training des `FreigabeTestCase` ist immer leer. Freigeben und Lesen prüfen mehrere Tests der Datei, mit Inhalt statt nur 200. | `FremdeinsichtInAbschriftenTests::test_kreis_liest_die_freigegebene_sitzung_samt_fremder_szene` |
+| `FreigebenTests::test_abschriftseite_bietet_nur_beigetretene_trainings_an` | umschreiben | Die positive Hälfte besteht per Konstruktion: „Bruchrechnung“ steht schon im Erhebungsnamen „Studie Bruchrechnung“ im Seitenkopf. | Die Checkbox des Trainings über `assertContains(…, '<label><input type="checkbox" name="training" value="<pk>"> Bruchrechnung</label>', html=True)`. „Anderes Seminar“ fehlt weiterhin. |
+| `FreigebenTests::test_abschriftseite_zeigt_die_aktuelle_freigabe_angehakt` | umschreiben | `f'value="{pk}" checked'` legt die Reihenfolge der Attribute fest. | Dasselbe Element mit `checked` über `assertContains(…, html=True)` |
+| `FreigebenTests::test_abschriftseite_zeigt_ohne_freigabe_nichts_angehakt` | umschreiben | `"checked" not in` über die ganze Seite und ohne Status | Positiv: Die Checkbox steht ohne `checked` in der Seite, über `assertContains(…, html=True)`. |
+| `FreigebenTests::test_abschriftseite_nennt_die_freigegebenen_trainings_im_kopf`, `…::test_private_abschrift_bleibt_im_kopf_privat` | behalten | Kopfzeile als Literal | – |
+| `FreigebenTests::test_abschriftseite_ohne_beitritt_bietet_keine_freigabe_an` | umschreiben | Prüft nur eine Abwesenheit. Dafür überschreibt er `self.abschrift` und `self.teilnehmerin`, um den Helfer zu nutzen. | Positiv den Hinweis „Sie sind noch keinem Training beigetreten.“ erwarten. „Freigaben speichern“ fehlt weiterhin. Die Seite wird direkt für das zweite Konto geladen. |
+| `FreigebenTests::test_abschriftseite_nennt_keinen_export` | streichen | Prüft, dass etwas nie Gebautes fehlt (Entscheidung aus #362). Jedes harmlose „Export“ auf der Seite bräche ihn. | Kein Ersatz nötig. Die Entscheidung steht in `docs/verhalten.md`. |
+| `FreigebenTests::test_widerruf_beendet_die_fremdeinsicht_sofort` | behalten | – | – |
+| `FreigebenTests::test_widerruf_entfernt_die_abschrift_aus_der_kuratierseite` | streichen | Besteht durch den Datenzustand: Nach dem Widerruf ist die Abschrift so privat wie nie freigegeben. Dass der Widerruf wirkt, zeigt der Test darüber. | `test_widerruf_beendet_die_fremdeinsicht_sofort` und `FremdeinsichtInAbschriftenTests::test_private_abschrift_fehlt_auf_der_kuratierseite` |
+| `FreigebenTests::test_loeschen_der_abschrift_beendet_die_fremdeinsicht` | streichen | Besteht durch den Datenzustand: Nach dem Löschen gibt es die Sitzung nicht mehr, jeder Aufruf ergibt 404. | `test_abschriften.py::test_loeschen_entfernt_abschrift_teilnahme_und_kopierte_sitzungen` |
+| `FremdeinsichtInAbschriftenTests::test_private_abschrift_ist_fuer_den_kreis_nicht_einsehbar`, `…::test_private_abschrift_ist_fuer_die_administration_nicht_einsehbar` | behalten | Zelle „Abschrift, Fremdeinsicht“ der Matrix | – |
+| `FremdeinsichtInAbschriftenTests::test_private_abschrift_fehlt_auf_der_kuratierseite`, `…::test_kuratierseite_meldet_wenn_niemand_freigegeben_hat` | behalten | Nach dem Umschreiben von `_kuratierseite` | – |
+| `FremdeinsichtInAbschriftenTests::test_freigegebene_abschrift_steht_mit_name_erhebung_und_importzeit` | umschreiben | „Grace Hopper“ steht auch als Zeile der Tabelle darüber. Das Datum rechnet `astimezone()` in der Zeitzone des Prozesses nach, nicht in `TIME_ZONE`; das Template zeigt außerdem die Uhrzeit. | Mit `time-machine` zu einem festen Zeitpunkt importieren, etwa 2026-07-02 00:30 Europe/Berlin. Erwartet sind `<th scope="row">Grace Hopper</th>`, `<td>Studie Bruchrechnung</td>` und `<td>02.07.2026 00:30</td>` über `assertContains(…, html=True)`. |
+| `FremdeinsichtInAbschriftenTests::test_administration_findet_die_freigegebene_abschrift_unter_der_tabelle`, `…::test_freigegebene_abschrift_verlinkt_ihre_abgeschlossene_sitzung`, `…::test_nicht_abgeschlossene_sitzung_der_abschrift_ist_nicht_verlinkt` | behalten | Die Abschriftenliste filtert selbst über die Freigabe. Der letzte Test prüft zusätzlich die Ansicht (404). | – |
+| `FremdeinsichtInAbschriftenTests::test_freigegebene_abschriften_stehen_nach_namen_sortiert` | umschreiben | Besteht per Konstruktion: Beide Personen sind beigetreten, und die Tabelle darüber sortiert dieselben Namen. `seite.index` findet zuerst die Tabelle. | Die Reihenfolge nur im Teil ab „Freigegebene Abschriften“ prüfen. |
+| `FremdeinsichtInAbschriftenTests::test_kreis_liest_die_freigegebene_sitzung_samt_fremder_szene`, `…::test_freigegebene_sitzung_verschweigt_die_denkspur`, `…::test_administration_liest_die_freigegebene_sitzung`, `…::test_fremder_kreis_liest_die_freigegebene_sitzung_nicht` | behalten | Die Sitzungsansicht für den Anlass Abschrift, dritte Ausnahme von ADR-0015 | – |
+| `FremdeinsichtInAbschriftenTests::test_fremde_vignette_bleibt_ausserhalb_des_vignettenbestands`, `…::test_fremde_vignette_fehlt_in_der_vignettenliste_des_kreises`, `…::test_fremde_vignette_ist_im_detail_nicht_erreichbar` | behalten | Die Freigabe öffnet den Bestand nicht. Der erste Docstring spricht von der Kuratierseite, der Test schickt aber den POST. Die Prüfung ist richtig, nur der Docstring ungenau. | – |
+| `FremdeinsichtInAbschriftenTests::test_eigene_abschrift_bleibt_der_trainings_sitzungsansicht_fremd` | behalten | – | – |
+
+#### `training/tests/test_fremdeinsicht.py`
+
+| Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
+|---|---|---|---|
+| Hilfsfunktionen `_konto`, `_finale_vignette`; aktive Modell-Konfiguration in `FremdeinsichtTestCase.setUp` | umschreiben | Kopien, siehe `test_freigabe.py` | gemeinsame Helfer aus #392 |
+| Hilfsfunktion `_gespielte_sitzung`, Klasse `FremdeinsichtTestCase` | behalten, verlegen | Testaufbau über `objects.create`. Ein gespielter Ablauf über HTTP bräuchte Fake-Skripte und ergäbe dieselben Zeilen. `test_export.py` importiert beide aus diesem Testmodul. | in ein gemeinsames Aufbaumodul der Trainingstests (siehe Querschnitt) |
+| Hilfsfunktion `_ansehen_url`, `SitzungAnsehenTests._status_fuer` | behalten | – | – |
+| `FremdeinsichtTabelleTests._kuratierseite` | umschreiben | Wie in `test_freigabe.py`: kein Status | Der Helfer prüft Status 200. |
+| `SitzungAnsehenTests::test_kreismitglied_liest_eine_abgeschlossene_sitzung`, `…::test_kreismitglied_liest_die_abgegebene_diagnose` | behalten | – | – |
+| `SitzungAnsehenTests::test_ko_eigentuemerin_liest_eine_abgeschlossene_sitzung` | streichen | Derselbe Datenzustand wie im Test darunter: Ein zweites Kreismitglied und eine Sitzung bestehen; nur die Reihenfolge des Aufbaus unterscheidet sich, und die Regel kennt keine Zeit. | `test_neues_kreismitglied_liest_auch_aeltere_sitzungen` |
+| `SitzungAnsehenTests::test_neues_kreismitglied_liest_auch_aeltere_sitzungen`, `…::test_ausgetretenes_kreismitglied_bekommt_404`, `…::test_administration_liest_eine_abgeschlossene_sitzung`, `…::test_fremdes_konto_bekommt_404`, `…::test_autorin_der_vignette_bekommt_404`, `…::test_nicht_abgeschlossene_sitzungen_bleiben_dem_kreis_verborgen`, `…::test_sitzung_in_einem_fremden_training_bleibt_verborgen` | behalten | Die Fälle der Einsichtsregel an der Ansicht, die sie durchsetzt. Hier gilt der Fall „fremdes Training“ zu Recht für einen fremden Kreis: Gegen diese Ansicht schützt allein die Sichtbarkeit. | – |
+| `SitzungAnsehenTests::test_fremdeinsicht_verschweigt_die_denkspur` | behalten | Zelle „Training, Fremdeinsicht“ (siehe oben) | – |
+| `SitzungAnsehenTests::test_fremdeinsicht_ist_rein_lesend` | umschreiben | `assertNotIn` auf `content.decode()` ohne Status. Auf einer 404 bestünde er. | `assertNotContains` für jedes Bedienelement; das prüft zugleich Status 200. |
+| `SelbsteinsichtTests::test_eigene_sitzung_ist_in_jedem_status_lesbar`, `…::test_selbsteinsicht_verschweigt_die_denkspur` | behalten | Die Schleife über `Sitzung.Status` benennt die Zustände, sie rechnet nichts nach. `test_sitzung.py` prüft die Selbsteinsicht nur abgeschlossen. | – |
+| `FremdeinsichtTabelleTests::test_beigetretene_ohne_sitzung_erscheinen_als_zeile`, `…::test_abgeschlossene_sitzung_ist_verlinkt`, `…::test_zeilen_sind_nach_namen_sortiert`, `…::test_training_ohne_beigetretene_zeigt_eine_leerzeile`, `…::test_leeres_training_zeigt_einen_hinweis_statt_der_tabelle` | behalten | – | – |
+| `FremdeinsichtTabelleTests::test_vignetten_des_trainings_sind_die_spalten`, `…::test_spalten_folgen_der_kuratierreihenfolge` | behalten | `title="…"` ist der Tooltip gekürzter Spaltenköpfe. Er ist auch der einzige Weg, den Spaltenkopf von der Vignettenliste derselben Seite zu unterscheiden. „Addition“ vor „Brüche addieren“ trennt Kuratier- von alphabetischer Reihenfolge. | – |
+| `FremdeinsichtTabelleTests::test_nicht_abgeschlossene_sitzung_ist_nicht_verlinkt` | behalten | Nach dem Umschreiben von `_kuratierseite`. Die Tabelle ruft die Regel selbst auf; das ist ihr einziger Statusfall. | – |
+| `FremdeinsichtTabelleTests::test_sitzung_in_einem_fremden_training_ist_nicht_verlinkt` | streichen | Besteht per Konstruktion: Die Zellen füllt die Tabelle nur über die Teilnahmen der Bindungen dieses Trainings. Die Sitzung im fremden Training hängt an einer anderen Teilnahme. | `SitzungAnsehenTests::test_sitzung_in_einem_fremden_training_bleibt_verborgen` |
+| `FremdeinsichtTabelleTests::test_sitzungen_sind_je_vignette_nummeriert_und_datiert` | umschreiben | Das erwartete Datum rechnet `timezone.localtime(…).strftime` nach, wie das Template. Beide Sitzungen tragen dasselbe Datum, also bleibt offen, ob die Nummern der zeitlichen Folge folgen. | Mit `time-machine` die erste Sitzung am 01.07.2026, die zweite am 02.07.2026 um 00:30 Europe/Berlin anlegen. Erwartet sind `aria-label="Sitzung vom 01.07.2026">1</a>` und `aria-label="Sitzung vom 02.07.2026">2</a>`. |
+| `FremdeinsichtTabelleTests::test_nummerierung_beginnt_je_vignette_neu` | behalten | `'">1</a>'` ist eng am Markup. Ohne Neubeginn stünde aber „3“ in der Zelle, und der Test schlüge fehl. | – |
+
+#### `training/tests/test_export.py`
+
+| Test | Urteil | Anti-Pattern / Grund | Deckender Ersatztest bzw. Zieltest |
+|---|---|---|---|
+| Import von `_abschrift`, `FremdeinsichtTestCase`, `_gespielte_sitzung` und `_konto` aus den Testmodulen `test_freigabe` und `test_fremdeinsicht` | umschreiben | Koppelt drei Testmodule. `FremdeinsichtTestCase` landet zusätzlich im Namensraum dieses Moduls. | aus dem gemeinsamen Aufbaumodul der Trainingstests bzw. aus #392 (siehe Querschnitt) |
+| Hilfsfunktionen `_export`, `_freigeben`, `_archiv`, `_ordner`; Mailadresse im `setUp` | behalten | `_archiv` prüft den Status. Der Trainingsexport ist keine Datenspur, der Export-Helfer aus #391 (ADR-0029) passt nicht. | – |
+| `ZugriffTests::test_kreis_laedt_ein_zip_herunter`, `…::test_administration_laedt_den_export`, `…::test_fremde_ausbilderin_bekommt_404`, `…::test_neues_kreismitglied_laedt_auch_aeltere_sitzungen`, `…::test_ausgetretenes_kreismitglied_bekommt_404`, `…::test_autorin_der_vignette_bekommt_404`, `…::test_teilnehmerin_bekommt_403`, `…::test_kuratierseite_bietet_den_export_an` | behalten | Zugriff über `_sichtbares_training` und die Rolle, eigene Fehlerfälle der Route | – |
+| `ZugriffTests::test_ko_eigentuemerin_laedt_den_export` | streichen | Wie in `test_fremdeinsicht.py`: derselbe Zustand wie beim neuen Kreismitglied, dort mit Inhalt geprüft | `test_neues_kreismitglied_laedt_auch_aeltere_sitzungen` |
+| `ZugriffTests::test_dateiname_nennt_training_und_zeitpunkt` | umschreiben | Die Erwartung rechnet `slugify` nach, wie `zip_download`. Den Zeitstempel prüft nur ein Regex, ob UTC und Abrufzeit stimmen, merkt der Test nicht. | Wie beim Erhebungsexport (`erhebungen-forschung.md`): `time-machine` auf 2026-07-01 10:00 Europe/Berlin, erwartet `filename="training-<pk>-bruchrechnung-20260701T080000Z.zip"` als Literal (#349). |
+| `InhaltTests::test_je_abgeschlossener_sitzung_eine_markdown_datei` | streichen | Vom Test zwei darunter mitbewiesen: Die Zählung läuft je Ordner. Lägen die Sitzungen in zwei Ordnern, hießen beide `01-…`. | `test_dateien_sind_gezaehlt_und_nach_der_vignette_benannt` |
+| `InhaltTests::test_je_person_ein_eigener_ordner`, `…::test_dateien_sind_gezaehlt_und_nach_der_vignette_benannt` | behalten | Literale Dateinamen | – |
+| `InhaltTests::test_ordner_heissen_nach_kennzeichen`, `…::test_zwei_exporte_ziehen_verschiedene_kennzeichen` | behalten | Das Kennzeichen ist Zufall. Die Form als Regex und die Verschiedenheit sind alles, was sich festlegen lässt. | – |
+| `InhaltTests::test_datei_enthaelt_vignette_ausgang_transkript_und_diagnose` | umschreiben | Prüft nur Bruchstücke per `assertIn`. Die Zeile „Datum“ belegt kein Test positiv. | Mit `time-machine` die Sitzung am 2026-07-02 00:30 Europe/Berlin anlegen. Die ganze Datei als Literal erwarten, mit `- Datum: 02.07.2026`. Das belegt Aufbau, Reihenfolge und Ortszeit. |
+| `InhaltTests::test_sitzung_ohne_zeitstempel_kommt_ohne_datum_hinaus` | behalten | Anders als `test_bestandsdaten_duerfen_ohne_entstehungszeitpunkt_bestehen` (oben gestrichen) prüft er keine Felddefinition, sondern eine Verzweigung des Exports. Bestandszeilen von vor `sitzungen.0007` sind weiter möglich. | – |
+| `InhaltTests::test_schritt_ohne_aeusserung_ist_als_solcher_markiert`, `…::test_sitzung_ohne_diagnose_ist_als_solche_markiert`, `…::test_transkript_wechselt_eingabe_und_aeusserung` | behalten | Grenzfälle der Datei, Literale | – |
+| `InhaltTests::test_nicht_abgeschlossene_sitzungen_fehlen`, `…::test_sitzung_in_einem_fremden_training_fehlt` | behalten | Der Export ruft die Regel selbst mit seinem Training auf. Ein falsches Argument fiele hier auf. | – |
+| `InhaltTests::test_kein_kontoname_und_keine_mailadresse`, `…::test_keine_denkspur_und_keine_fehlversuche` | behalten | Zusage „pseudonym“ aus ADR-0049 | – |
+| `AbschriftTests::test_freigegebene_abschrift_liegt_als_unterordner_bei_der_person`, `…::test_erhebungsname_bricht_nicht_aus_dem_ordner_aus`, `…::test_private_abschrift_fehlt`, `…::test_abschrift_ohne_einsehbare_sitzung_belegt_keinen_ordnernamen` | behalten | – | – |
+| `AbschriftTests::test_abschrift_geht_ohne_denkspur_hinaus` | streichen | Schichtdoppelung: `_markdown` schreibt jede Sitzung gleich, der Anlass geht nicht ein. | `InhaltTests::test_keine_denkspur_und_keine_fehlversuche` |
+| `AbschriftTests::test_widerrufene_abschrift_fehlt` | streichen | Besteht durch den Datenzustand: Widerrufen ist so privat wie nie freigegeben. | `test_private_abschrift_fehlt` und `test_freigabe.py::FreigebenTests::test_widerruf_beendet_die_fremdeinsicht_sofort` |
+| `AbschriftTests::test_nicht_abgeschlossene_sitzung_der_abschrift_fehlt` | streichen | `fremd_einsehbar` filtert den Status für beide Anlässe in einem Filter. Der Export kann ihn nicht je Anlass anders anwenden. | `InhaltTests::test_nicht_abgeschlossene_sitzungen_fehlen` und `test_abschrift_ohne_einsehbare_sitzung_belegt_keinen_ordnernamen`: Dessen abgebrochene Abschrift geht nicht hinaus. |
+| `AbschriftTests::test_zwei_abschriften_derselben_erhebung_bleiben_getrennt` | umschreiben | Prüft nur, dass es zwei Ordner gibt, nicht wie sie heißen | Literale Unterordner `<kennzeichen>/studie-bruchrechnung/` und `<kennzeichen>/studie-bruchrechnung-2/` |
+
 ## Querschnitt für die Umsetzung
 
 - **Gemeinsamer Helfer für Vignetten:** 15 Stellen in `training/tests/` legen Vignetten über `Vignette.objects._erstellen` an, zwölf finale und drei Entwürfe (`test_models.py` zweimal, `test_views.py` einmal); für die Entwürfe reicht `Vignette.objects.anlegen(konto)`. Deshalb stehen `test_katalog.py`, `test_models.py`, `test_sitzung.py`, `test_transkription.py` und `test_views.py` auf der SLF001-Übergangsliste. Das öffentliche Muster steht in `training/tests/test_abschriften.py::_finale_vignette_anlegen`. Ein geteilter Helfer, wie für #332 vorgeschlagen, ersetzt alle Stellen; danach fallen die fünf Dateien von der Liste.
 - **Session-Schlüssel sind privat:** Kein Test liest `session["probelauf"]`. Bei `training_sitzung_pk` bleibt eine begründete Ausnahme (Wettlauf in `test_abbrechen_setzt_den_gewollten_status_ohne_diagnose`).
 - **Zeilenlink-Tabellen:** Drei der vier Tests `*_verlinkt` (Katalog, Ausbilder-Liste, Historie) prüfen dasselbe Alpine-Template als Quelltext; der Abschriften-Test prüft gerendertes Markup samt Klassen. Nach dem Umschreiben prüft jeder nur seine Zeilendaten.
+- **Aufbaumodul der Trainingstests (Nachtrag #394):** `test_export.py` importiert `_abschrift` aus `test_freigabe.py` sowie `FremdeinsichtTestCase`, `_gespielte_sitzung` und `_konto` aus `test_fremdeinsicht.py`. `_abschrift`, `FremdeinsichtTestCase` und `_gespielte_sitzung` kommen nur im Training vor und gehören deshalb nicht in die app-übergreifenden Helfer aus #392. Sie ziehen in ein Modul neben den Tests, etwa `training/tests/aufbau.py`. Konto, aktive Modell-Konfiguration und finale Vignette kommen aus #392, auch für `_konto`. Danach fällt `test_beitritt.py` von der SLF001-Übergangsliste.
+- **`time-machine` (Nachtrag #394):** Drei Zieltests des Nachtrags brauchen eine feste Uhr, ohne heute etwas zu patchen: Importzeit der Abschriftenliste, Datum in der Tabelle und Datum in der Exportdatei. Wie bei `test_kopierte_sitzungen_tragen_die_importzeit` gehören sie in die Umsetzung (#404), nicht in #349. Der Dateiname des Exports folgt #349 wie beim Erhebungsexport. `time-machine` ist noch keine Abhängigkeit; das Ticket, das zuerst landet, nimmt sie auf.
 
 ## Lücken (kein Anti-Pattern, für die Umsetzung)
 
@@ -375,9 +559,12 @@ Zwischen Trainingssitzung und Training-Views liegt die Doppelung nicht in `test_
 - `training:katalog` für Ausbilder:innen: Eigene Entwürfe mit „Kuratieren“ statt „Öffnen“ sind ungetestet.
 - `abschrift_holen` kopiert `verbrauchte_zeit` und die Eingabemodi; keiner dieser Werte ist geprüft.
 - `abschrift_holen` normalisiert das Token (`strip().upper()`). Alle Tests benutzen ein Token aus Ziffern und Bindestrich ohne Leerraum, die Normalisierung ist deshalb ungeprüft. Zieltest: Ein Token mit Buchstaben, in Kleinschreibung und mit Leerraum eingegeben, holt die Abschrift.
+- Nachtrag #394: Die Datumszeile der Exportdatei belegt kein Test positiv; der Zieltest von `test_datei_enthaelt_vignette_ausgang_transkript_und_diagnose` schließt die Lücke.
+- Nachtrag #394: Dass der offene Trainings-Link Kreis und Administration bindet, prüft kein Test. Was dort gelten soll, entscheidet #410.
 
 ## Folge-Issues
 
 - #378 Zyklische Kante: `simulation/__init__.py` importiert `vignetten.models` entgegen ADR-0016. Blockiert das Zusammenlegen der Importgraph-Wächter.
+- #410 (Nachtrag #394) Der offene Trainings-Link legt auch für Kreis und Administration eine Trainingsbindung an. Danach stehen sie als Beigetretene in Band, Tabelle und Export. Der gesperrte Link bindet sie nicht, und `docs/verhalten.md` sagt „ohne Beitritt“.
 
-Weitere Probleme im Produktionscode hat das Review nicht gefunden. `ScratchSink` hat keine öffentliche Lesestelle für den Budgetstand. Das ist kein Mangel: Der Budgetstand wird über den `Ausgang` beobachtet, und die Zieltests oben tun das.
+Weitere Probleme im Produktionscode haben weder das Review noch sein Nachtrag gefunden. `ScratchSink` hat keine öffentliche Lesestelle für den Budgetstand. Das ist kein Mangel: Der Budgetstand wird über den `Ausgang` beobachtet, und die Zieltests oben tun das.
