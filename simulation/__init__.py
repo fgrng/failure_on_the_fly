@@ -72,10 +72,7 @@ class Antwortversuch:
 def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
     """Setzt die in der Vorlage benutzten Platzhalter ein; übrige Werte bleiben unbenutzt."""
 
-    vorlage: Template = Template(vorlage_text)
-    return vorlage.substitute(
-        {name: platzhalter[name] for name in vorlage.get_identifiers()}
-    )
+    return Template(vorlage_text).substitute(platzhalter)
 
 
 def antwort_versuchen(
