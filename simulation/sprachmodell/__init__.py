@@ -92,8 +92,6 @@ class Sprachmodell(Protocol):
 class FakeSprachmodell:
     """Spielt konfigurierte Antworten und maschinelle Fehler deterministisch ab."""
 
-    letzte_anfragen: list[tuple[list[dict[str, str]], Mapping[str, object]]] = []
-
     def __init__(self, skript: Sequence[Mapping[str, Any]]) -> None:
         """Übernimmt das Skript, dessen Einträge der Reihe nach verbraucht werden."""
 
@@ -113,12 +111,6 @@ class FakeSprachmodell:
         Der Fake antwortet sofort; `timeout` bleibt hier ohne Wirkung.
         """
 
-        type(self).letzte_anfragen.append(
-            (
-                nachrichten_bauen(system_prompt, user_prompt, verlauf, eingabe),
-                ausgabe_schema,
-            )
-        )
         eintrag: Mapping[str, Any] = self.skript.pop(0)
         if (fehler := eintrag.get("fehler")) == "formatbruch":
             raise Formatbruch(str(eintrag.get("rohantwort", "")))

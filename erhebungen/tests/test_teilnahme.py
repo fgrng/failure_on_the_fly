@@ -8,6 +8,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from config.tests.sprachmodell import anfragen_aufzeichnen
 from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
@@ -22,7 +23,6 @@ from erhebungen.models import (
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from simulation.sprachmodell import FakeSprachmodell
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -1710,17 +1710,17 @@ class ErhebungsteilnahmeTests(TestCase):
         self._fragebogen_item_nach_sitzung_anlegen()
         self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
-        anfragen_vorher: int = len(FakeSprachmodell.letzte_anfragen)
 
-        antwort: HttpResponse = self.client.post(
-            reverse("erhebungen:gespraech", args=[bindung.token]),
-            {"eingabe": "Wie rechnest du?"},
-        )
+        with anfragen_aufzeichnen() as anfragen:
+            antwort: HttpResponse = self.client.post(
+                reverse("erhebungen:gespraech", args=[bindung.token]),
+                {"eingabe": "Wie rechnest du?"},
+            )
 
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
         # Ein Gesprächsschritt je Anfrage: die drei Versuche aus ADR-0011, sonst nichts.
-        self.assertEqual(len(FakeSprachmodell.letzte_anfragen) - anfragen_vorher, 3)
+        self.assertEqual(len(anfragen), 3)
 
     def test_endgueltiger_fehlschlag_bewahrt_gespraechsschritt_ohne_antwort(
         self,
