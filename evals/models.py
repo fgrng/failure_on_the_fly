@@ -213,38 +213,26 @@ class Evallauf(models.Model):
         vorspult; das Finalisieren der Fassung zählt nicht.
         """
 
+        gruende: list[str] = []
+        if self.vignette.geaendert_am != self.vignette_geaendert_am:
+            gruende.append("Vignette bearbeitet")
+        if self.vignette.gepinnter_kern_id != self.kern_id:
+            gruende.append("Simulationskern gewechselt")
         aktive: dict[str, int] = ModellKonfiguration.objects.aktive_je_verwendung()
         festgehalten: dict[str, int] = {
             Verwendung.SCHUELERIN: self.schuelerin_konfiguration_id,
             Verwendung.LEHRPERSON: self.lehrperson_konfiguration_id,
             Verwendung.BEWERTER: self.bewerter_konfiguration_id,
         }
+        for verwendung, konfiguration_id in festgehalten.items():
+            if aktive.get(verwendung) != konfiguration_id:
+                gruende.append(
+                    f"Konfiguration {Verwendung(verwendung).label} gewechselt"
+                )
         finaler_katalog: Evalkatalog | None = Evalkatalog.objects.finale_fassung()
-        return [
-            grund
-            for grund, geaendert in [
-                (
-                    "Vignette bearbeitet",
-                    self.vignette.geaendert_am != self.vignette_geaendert_am,
-                ),
-                (
-                    "Simulationskern gewechselt",
-                    self.vignette.gepinnter_kern_id != self.kern_id,
-                ),
-                *(
-                    (
-                        f"Konfiguration {Verwendung(verwendung).label} gewechselt",
-                        aktive.get(verwendung) != konfiguration_id,
-                    )
-                    for verwendung, konfiguration_id in festgehalten.items()
-                ),
-                (
-                    "Evalkatalog gewechselt",
-                    finaler_katalog is None or finaler_katalog.pk != self.katalog_id,
-                ),
-            ]
-            if geaendert
-        ]
+        if finaler_katalog is None or finaler_katalog.pk != self.katalog_id:
+            gruende.append("Evalkatalog gewechselt")
+        return gruende
 
     @property
     def veraltet(self) -> bool:

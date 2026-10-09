@@ -1,5 +1,7 @@
 """HTTP-Tests für Auslösen und Ansicht eines Evallaufs."""
 
+from collections.abc import Callable
+
 import pytest
 from django.core.management import call_command
 from django.http import HttpResponse
@@ -895,6 +897,35 @@ def test_finalisieren_hinweis_nennt_ergebnis_und_quoten(ada: Konto) -> None:
 
 
 @pytest.mark.django_db
+def test_finalisieren_hinweis_nennt_bestanden(ada: Konto) -> None:
+    """Erfüllt jedes Urteil, nennt der Hinweis den Lauf bestanden."""
+
+    finaler_katalog(k=1)
+    drei_fakes(schuelerin=antworten(2), bewerter=urteile(True, True))
+    entwurf: Vignette = finale_vignette(ada).bearbeiten()
+    _starten(_client(ada), entwurf)
+    call_command("evallaeufe_abarbeiten", "--einmal")
+
+    seite: str = _detail(ada, entwurf)
+
+    assert "Vor dem Finalisieren: Evallauf Fertig · Bestanden." in seite
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("evals_bereit")
+def test_vignettenansicht_nennt_den_veralteten_lauf(ada: Konto) -> None:
+    """Auch die Zustandszeile der Vignette ergänzt den Zustand um veraltet."""
+
+    vignette: Vignette = vignetten_entwurf(ada)
+    _starten(_client(ada), vignette)
+    vignette.save()
+
+    seite: str = _detail(ada, vignette)
+
+    assert "Evallauf: Wartet · veraltet · Evals ansehen" in seite
+
+
+@pytest.mark.django_db
 @pytest.mark.usefixtures("evals_bereit")
 def test_finalisieren_hinweis_nennt_veraltet(ada: Konto) -> None:
     """Ein nach dem Start bearbeiteter Entwurf zeigt den veralteten Lauf."""
@@ -928,7 +959,9 @@ def test_finalisieren_hinweis_nennt_teil_und_fehlerzustaende(ada: Konto) -> None
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("ausgang", ["wartet", "veraltet", "fertig"])
+@pytest.mark.parametrize(
+    "ausgang", ["wartet", "laeuft", "abgebrochen", "veraltet", "fertig"]
+)
 @pytest.mark.usefixtures("evals_bereit")
 def test_finalisieren_bleibt_in_jedem_laufzustand_erlaubt(
     ada: Konto, ausgang: str
@@ -937,7 +970,12 @@ def test_finalisieren_bleibt_in_jedem_laufzustand_erlaubt(
 
     entwurf: Vignette = finale_vignette(ada).bearbeiten()
     _starten(_client(ada), entwurf)
-    if ausgang != "wartet":
+    if ausgang in ("laeuft", "abgebrochen"):
+        # Ein stehengebliebenes „Läuft“ bricht der nächste Prozessstart ab.
+        Evallauf.objects.filter(vignette=entwurf).update(
+            zustand=Evallauf.Zustand.LAEUFT
+        )
+    if ausgang in ("abgebrochen", "veraltet", "fertig"):
         call_command("evallaeufe_abarbeiten", "--einmal")
     if ausgang == "veraltet":
         entwurf.save()
@@ -949,13 +987,26 @@ def test_finalisieren_bleibt_in_jedem_laufzustand_erlaubt(
     assert lauf.veraltet == (ausgang == "veraltet")
 
 
-@pytest.mark.django_db
-def test_ohne_verwendung_fehlt_der_finalisieren_hinweis(ada: Konto) -> None:
-    """Ohne alle drei Verwendungen gibt es weder Evals noch Hinweis."""
+def _ohne_dritte_verwendung() -> None:
+    # Finaler Katalog, aber der Bewerter ist nicht belegt.
 
     finaler_katalog()
     fake_aktivieren(Verwendung.SCHUELERIN)
     fake_aktivieren(Verwendung.LEHRPERSON)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "einrichten",
+    [_ohne_dritte_verwendung, drei_fakes],
+    ids=["ohne_verwendung", "ohne_finalen_katalog"],
+)
+def test_ohne_evals_fehlt_der_finalisieren_hinweis(
+    ada: Konto, einrichten: Callable[[], object]
+) -> None:
+    """Ohne finalen Katalog oder alle drei Verwendungen fehlen Evals und Hinweis."""
+
+    einrichten()
 
     seite: str = _detail(ada, vignetten_entwurf(ada))
 

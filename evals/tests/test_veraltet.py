@@ -75,6 +75,17 @@ def test_eingeschraenkte_feldaktualisierung_macht_den_lauf_veraltet(
 
 
 @pytest.mark.django_db
+def test_leere_feldaktualisierung_laesst_den_lauf_aktuell(entwurf: Vignette) -> None:
+    """Ein Speichern ohne Felder schreibt nichts und ändert damit auch nichts."""
+
+    Evallauf.objects.ausloesen(entwurf)
+
+    entwurf.save(update_fields=[])
+
+    assert not _lauf(entwurf).veraltet
+
+
+@pytest.mark.django_db
 def test_vorspulen_macht_den_lauf_veraltet(entwurf: Vignette) -> None:
     """Ein neuer Kern-Pin nach dem Start zählt als geänderte Vignette und Kern."""
 

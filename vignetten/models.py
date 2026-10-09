@@ -476,10 +476,14 @@ class Vignette(models.Model):
             ):
                 raise ValidationError("Finale Fassungen sind unveränderlich.")
         # Der Zustand ist hier der gespeicherte; nur Entwürfe ändern sich.
-        if self.zustand == self.Zustand.ENTWURF:
+        # Leere update_fields schreiben nichts und bleiben daher leer.
+        update_fields = kwargs.get("update_fields")
+        if self.zustand == self.Zustand.ENTWURF and (
+            update_fields is None or update_fields
+        ):
             self.geaendert_am = timezone.now()
-            if kwargs.get("update_fields") is not None:
-                kwargs["update_fields"] = {*kwargs["update_fields"], "geaendert_am"}
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "geaendert_am"}
         super().save(*args, **kwargs)
 
     def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:

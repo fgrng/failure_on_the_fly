@@ -136,7 +136,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "vignette": vignette,
             "zustand_badge": _zustand_badge(vignette),
             "evals_verfuegbar": verfuegbar,
-            # Über den Reverse-Accessor, ohne Import von evals (ADR-0046).
+            # Über den Reverse-Accessor, ohne Import von evals (ADR-0016).
             "evallauf": getattr(vignette, "evallauf", None) if verfuegbar else None,
         },
     )
