@@ -94,7 +94,7 @@ Das Projekt läuft **vorerst auf SQLite**, nicht auf Postgres. Der Wechsel ist b
 
 ## Das simulationsseitige Interface kennt keine Datenbank
 
-`simulation.antwort_versuchen(vignette, kern, modell_konfiguration, verlauf, eingabe)` gibt einen **Antwortversuch** zurück und schreibt nichts. `sitzungen` persistiert ihn. Damit ist die Aussage aus ADR-0014 — der Probelauf ist eine schreibfreie Funktion über einem Tripel — strukturell wahr statt an einen `dry_run`-Parameter gebunden. Probelauf und Sitzung sind derselbe Aufruf mit verschiedenen Aufrufern.
+`simulation.antwort_versuchen(platzhalter, kern, modell_konfiguration, verlauf, eingabe)` gibt einen **Antwortversuch** zurück und schreibt nichts. `sitzungen` persistiert ihn. Die Prompt-Platzhalter (Name → Text) berechnet `sitzungen` aus der Vignette; nähme der Antwortversuch die Vignette selbst, zeigte `simulation` auf `vignetten` und der Graph hätte einen Zyklus (#378). Den Graphen hält `config/tests/test_importgraph.py` als Kantentabelle über alle Apps fest. Damit ist die Aussage aus ADR-0014 — der Probelauf ist eine schreibfreie Funktion über einem Tripel — strukturell wahr statt an einen `dry_run`-Parameter gebunden. Probelauf und Sitzung sind derselbe Aufruf mit verschiedenen Aufrufern.
 
 Der übergebene `verlauf` ist eine Liste sichtbarer Äußerungen. Die Denkspur hat in ihm keinen Platz, womit ADR-0005 („die Denkspur fließt nicht in den Kontext zurück") ebenfalls nicht mehr verletzbar ist.
 

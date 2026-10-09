@@ -15,7 +15,6 @@ from simulation.sprachmodell import (
     Formatbruch,
     LiteLLMSprachmodell,
 )
-from vignetten.models import Vignette
 
 
 def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
@@ -142,7 +141,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwortversuch = antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,
@@ -274,7 +273,7 @@ def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> N
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.INFOMANIAK,
@@ -299,7 +298,7 @@ def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,
@@ -326,7 +325,7 @@ def test_antwort_versuchen_fordert_die_denkspur_vor_der_aeusserung_an() -> None:
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,
@@ -348,7 +347,7 @@ def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> N
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwortversuch = antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.FAKE,
@@ -401,7 +400,7 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwortversuch = antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,
@@ -441,7 +440,7 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
 
     with patch("simulation.sprachmodell.litellm.completion", completion):
         antwort_versuchen(
-            Vignette(lernauftrag_text="Addiere zwei Brüche."),
+            {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,

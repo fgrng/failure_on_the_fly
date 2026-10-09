@@ -19,7 +19,6 @@ from simulation.sprachmodell import (
 
 if TYPE_CHECKING:
     from simulation.models import ModellKonfiguration, Simulationskern
-    from vignetten.models import Vignette
 
 
 MAX_VERSUCHE: int = 3
@@ -76,17 +75,18 @@ def vorlage_rendern(vorlage_text: str, platzhalter: Mapping[str, str]) -> str:
 
 
 def antwort_versuchen(
-    vignette: "Vignette",
+    platzhalter: Mapping[str, str],
     kern: "Simulationskern",
     modell_konfiguration: "ModellKonfiguration",
     verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> Antwortversuch:
-    """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in."""
+    """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in.
 
-    from vignetten.models import prompt_platzhalter
+    Die Prompt-Platzhalter (Name → Text) berechnet die Aufruferin aus ihrer
+    Vignette; `simulation` kennt keine Vignette (ADR-0016).
+    """
 
-    platzhalter: dict[str, str] = prompt_platzhalter(vignette)
     system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
     user_prompt: str = vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
     sprachmodell: Sprachmodell = _sprachmodell_aus(modell_konfiguration)

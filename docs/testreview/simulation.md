@@ -286,7 +286,7 @@ Beide gibt es noch nicht. Sie entstehen mit Spec #299 in einer eigenen App `eval
 | `…::test_text_mit_fehler_startet_offen` | behalten | `bearbeiten: true` ist Alpine-Startzustand, aber vom Server je Feld berechnet: nur das fehlerhafte Feld startet offen. Das ist View-Ausgabe, kein abgeschriebener Quelltext. | – |
 | `SimulationskernSeitennavigationTests::test_markiert_die_autorinnen_ansicht_gelb` | umschreiben | Doppelung mit der Bereichszuordnung, dazu Klassenstrings. | `simulation:kern` mit `authoring` als Zeile in `BereichszuordnungTests`. Die Badge-Zusicherung entfällt. |
 | `…::test_markiert_in_der_sidebar_nur_den_verwaltungslink`, `…::test_markiert_in_der_sidebar_nur_den_ansichtslink` | behalten | Eigenes Verhalten: Zwei Routen teilen den Namensraum, aber nicht den aktiven Link. Kein Test in `konten` prüft `aria-current`. | – |
-| `SimulationsschichtImportgraphTests::test_kern_verwaltung_importiert_die_vignetten_schicht_nicht` | umschreiben | Startbefund bestätigt: Er dupliziert die Hilfsfunktionen aus `sitzungen/tests/test_importgraph.py` und prüft nur `views.py`. Ein Wächter über die ganze App schlüge heute fehl, weil `antwort_versuchen` `vignetten.models` importiert (#378). | In `sitzungen/tests/test_importgraph.py` aufnehmen: `_verstoesse(_quellen("simulation", mit_tests=False), "vignetten")` ist leer. Voraussetzung ist #378. Bis dahin bleibt der Test hier. |
+| `SimulationsschichtImportgraphTests::test_kern_verwaltung_importiert_die_vignetten_schicht_nicht` | umschreiben | Startbefund bestätigt: Er dupliziert die Hilfsfunktionen aus `sitzungen/tests/test_importgraph.py` und prüft nur `views.py`. Ein Wächter über die ganze App schlüge heute fehl, weil `antwort_versuchen` `vignetten.models` importiert (#378). | In `sitzungen/tests/test_importgraph.py` aufnehmen: `_verstoesse(_quellen("simulation", mit_tests=False), "vignetten")` ist leer. Voraussetzung ist #378. Bis dahin bleibt der Test hier. **Umsetzung (#378):** Aufgegangen in `config/tests/test_importgraph.py::test_app_zeigt_nur_entlang_der_kantentabelle[simulation]`; `simulation` darf nur auf `konten` zeigen. |
 
 ### `simulation/tests/test_modell_konfiguration_view.py`
 
@@ -461,7 +461,7 @@ Für beide Dateien gilt eine Lesart. Der Editor zeigt einen Entwurf nur als Wert
 | Modelltest auf fehlendes Feld über `_meta` | bestätigt; gestrichen. |
 | `inspect.signature` für den fehlenden Default | als Typ- oder Lint-Regel verworfen (`ty` und ruff können einen Default nicht verbieten); umgeschrieben auf `TypeError` beim Aufruf ohne Verwendung. |
 | Migrationstests der Modell-Konfiguration | bestätigt; alle vier gestrichen (#325). Das spart die langsamen `MigrationExecutor`-Läufe mit `transaction=True`. |
-| Importgraph-Wächter doppelt | bestätigt; Zusammenlegen setzt #378 voraus. |
+| Importgraph-Wächter doppelt | bestätigt; mit #378 zu `config/tests/test_importgraph.py` zusammengelegt. |
 | Mocks von litellm, OpenAI-SDK, httpx | bestätigt in Ordnung. Die Aufruf-Assertions betreffen nur den Payload nach außen. Ausnahme sind Objektattribute der Transkriptions-Adapter (`client`, `modell`, `sprache`) und die erwarteten URLs aus Modulkonstanten; beides wird umgeschrieben. |
 
 ## Folge-Issues

@@ -2,23 +2,16 @@
 
 from simulation import antwort_versuchen
 from simulation.models import ModellKonfiguration, Simulationskern
-from vignetten.models import Vignette
 
 
 def test_antwort_versuchen_liefert_denkspur_und_aeusserung_des_fakes() -> None:
     """Ein geglückter Modellaufruf wird als Antwortversuch zurückgegeben."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(
-            fehlermuster_beschreibung="Brüche werden addiert.",
-            lernauftrag_text="Addiere zwei Brüche.",
-            arbeitsheft_bildbeschreibung="1/2 + 1/3 = 2/5",
-            schuelerin_name="Mia",
-            schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
-            fach="Mathematik",
-            thema="Brüche",
-            klassenstufe="5",
-        ),
+        {
+            "fehlermuster_beschreibung": "Brüche werden addiert.",
+            "lernauftrag": "Addiere zwei Brüche.",
+        },
         Simulationskern(
             system_prompt_vorlage="$fehlermuster_beschreibung",
             user_prompt_vorlage="$lernauftrag",
@@ -44,7 +37,7 @@ def test_antwort_versuchen_haelt_formatbruch_neben_der_antwort_fest() -> None:
     """Ein Formatbruch wird verworfen und der nächste Versuch wird genutzt."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        {"lernauftrag": "Addiere zwei Brüche."},
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
             sprachmodell="fake",
@@ -68,7 +61,7 @@ def test_antwort_versuchen_haelt_anbieterfehler_neben_der_antwort_fest() -> None
     """Ein Anbieterfehler wird verworfen und der nächste Versuch wird genutzt."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        {"lernauftrag": "Addiere zwei Brüche."},
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
             sprachmodell="fake",
@@ -91,7 +84,7 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     """Nach dem begrenzten Wiederholen bleibt kein halber Gesprächsschritt zurück."""
 
     antwortversuch = antwort_versuchen(
-        Vignette(lernauftrag_text="Addiere zwei Brüche."),
+        {"lernauftrag": "Addiere zwei Brüche."},
         Simulationskern(user_prompt_vorlage="$lernauftrag"),
         ModellKonfiguration(
             sprachmodell="fake",

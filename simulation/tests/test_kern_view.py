@@ -1,8 +1,5 @@
 """HTTP-Tests für die read-only Ansicht des Simulationskerns."""
 
-import ast
-from pathlib import Path
-
 from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -10,7 +7,6 @@ from django.urls import reverse
 from config.tests.aufbau import konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
-from simulation import views
 from simulation.models import (
     Anbieter,
     ModellKonfiguration,
@@ -790,22 +786,4 @@ class SimulationskernSeitennavigationTests(TestCase):
             response,
             '<a href="/system/kern/verwalten/">Simulationskern verwalten</a>',
             html=False,
-        )
-
-
-class SimulationsschichtImportgraphTests(TestCase):
-    """Die Kern-Verwaltung kennt die Vignetten-Schicht nicht (ADR-0016)."""
-
-    def test_kern_verwaltung_importiert_die_vignetten_schicht_nicht(self) -> None:
-        """Kein Import führt von der Systemansicht in die Vignetten-Schicht."""
-        baum: ast.Module = ast.parse(Path(views.__file__).read_text(encoding="utf-8"))
-        importierte_module: set[str] = set()
-        for knoten in ast.walk(baum):
-            if isinstance(knoten, ast.Import):
-                importierte_module.update(alias.name for alias in knoten.names)
-            elif isinstance(knoten, ast.ImportFrom):
-                importierte_module.add(knoten.module or "")
-
-        self.assertNotIn(
-            "vignetten", {modul.split(".", 1)[0] for modul in importierte_module}
         )
