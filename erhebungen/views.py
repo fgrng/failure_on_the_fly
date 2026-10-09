@@ -433,8 +433,12 @@ def stichprobe_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     if erhebung.status != Erhebung.Status.FINAL:
         return redirect("erhebungen:detail", pk=erhebung.pk)
-    beginn: datetime | None = parse_datetime(request.POST.get("beginn", ""))
-    ende: datetime | None = parse_datetime(request.POST.get("ende", ""))
+    try:
+        beginn: datetime | None = parse_datetime(request.POST.get("beginn", ""))
+        ende: datetime | None = parse_datetime(request.POST.get("ende", ""))
+    except ValueError:
+        # Wohlgeformt, aber unmöglich (etwa der 30. Februar).
+        beginn = ende = None
     if beginn is None or ende is None:
         messages.error(request, "Beginn und Ende müssen gültige Zeitpunkte sein.")
         return redirect("erhebungen:detail", pk=erhebung.pk)

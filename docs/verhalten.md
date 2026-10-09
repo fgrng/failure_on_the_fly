@@ -733,10 +733,10 @@ datentragende Stichprobe möglich. Finale Erhebungen lassen sich archivieren und
 wieder entarchivieren, sofern keine Stichprobe läuft und mindestens eine
 Eigentümerin eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung
 über die Detailansicht; auch bei finalen und laufenden Erhebungen bleibt dieser
-Kreis änderbar. Unter einer finalen Erhebung lassen sich
-Stichproben mit Beginn und Ende anlegen; ein fehlender oder ungültiger Zeitpunkt
-oder ein Ende vor dem Beginn führt zurück auf die Detailseite, die den Grund als
-Meldung zeigt, und die Eingabe bleibt nicht stehen. Die Detailseite zeigt ihren kopierbaren
+Kreis änderbar. Unter einer finalen Erhebung lassen sich Stichproben mit Beginn
+und Ende anlegen; ein fehlender oder ungültiger Zeitpunkt oder ein Ende vor dem
+Beginn führt zurück auf die Detailseite, die den Grund als Meldung zeigt, und die
+Eingabe bleibt nicht stehen. Die Detailseite zeigt ihren kopierbaren
 Teilnahme-Link, ihre aus dem Zeitraum abgeleitete Phase — geplant, läuft oder
 abgeschlossen — und die Zahl ihrer Teilnahmen. Daneben stehen, nach dem
 aktuellen Stand der Einwilligungen, die Zahl der Teilnahmen, die die Verarbeitung
