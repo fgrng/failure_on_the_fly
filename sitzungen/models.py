@@ -63,6 +63,13 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
 
+    def laufende_von(self, teilnahme: Teilnahme) -> "Sitzung | None":
+        """Liefert die laufende Sitzung der Teilnahme oder keine.
+
+        Es gibt höchstens eine; die Datenbank erzwingt das.
+        """
+        return self.filter(teilnahme=teilnahme, status=Sitzung.Status.LAUFEND).first()
+
     def in_gespielter_folge(self) -> "SitzungQuerySet":
         """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
         return self.order_by(
@@ -110,6 +117,17 @@ class Sitzung(models.Model):
     offene_spanne_seit: models.DateTimeField = models.DateTimeField(null=True)
 
     objects: models.Manager["Sitzung"] = SitzungQuerySet.as_manager()
+
+    class Meta:
+        """Hält je Teilnahme höchstens eine Sitzung laufend."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["teilnahme"],
+                condition=Q(status="laufend"),
+                name="sitzungen_hoechstens_eine_laufende_sitzung_je_teilnahme",
+            ),
+        ]
 
     @property
     def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:

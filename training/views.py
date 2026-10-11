@@ -5,7 +5,7 @@ from uuid import UUID
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, QuerySet
 from django.http import (
     Http404,
@@ -27,7 +27,7 @@ from konten.navigation import (
 )
 
 from .forms import TrainingForm
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     sitzung_abbrechen,
@@ -35,7 +35,7 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
     sitzung_starten,
 )
-from sitzungen.models import Eingabemodus, Sitzung
+from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
 from sitzungen.sink import DBSink
 from sitzungen.views import (
     persistierten_debrief_anzeigen,
@@ -631,19 +631,53 @@ def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpRespon
         request, training_pk, vignette_pk
     )
     if request.method == "POST":
-        bindung: Trainingsbindung = training.bindung_fuer(request.user)
-        if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
-            return render(
-                request,
-                "training/einwilligung.html",
-                {"training": training, "vignette": vignette},
-            )
-        return _sitzung_starten(request, bindung, vignette)
+        return _nach_einwilligung_starten(request, training, vignette)
     return render(
         request,
         "training/wahl.html",
         {"training": training, "vignette": vignette},
     )
+
+
+@login_required
+def neu_starten(
+    request: HttpRequest, training_pk: int, vignette_pk: int
+) -> HttpResponse:
+    """Bricht die abgewiesene laufende Sitzung ab und startet die gewählte Vignette.
+
+    Abgebrochen wird nur die Sitzung, die die Abweisung genannt hat; läuft
+    inzwischen eine andere, wird sie erneut genannt.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training, vignette = _zugaengliches_training_mit_finaler_vignette(
+        request, training_pk, vignette_pk
+    )
+    try:
+        abzubrechen: int = int(request.POST.get("laufende_sitzung", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Die laufende Sitzung fehlt.")
+    return _nach_einwilligung_starten(
+        request, training, vignette, abzubrechen=abzubrechen
+    )
+
+
+def _nach_einwilligung_starten(
+    request: HttpRequest,
+    training: Training,
+    vignette: Vignette,
+    *,
+    abzubrechen: int | None = None,
+) -> HttpResponse:
+    """Fragt zuerst die Audioverarbeitung ab und startet dann."""
+    bindung: Trainingsbindung = training.bindung_fuer(request.user)
+    if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
+        return render(
+            request,
+            "training/einwilligung.html",
+            {"training": training, "vignette": vignette},
+        )
+    return _sitzung_starten(request, bindung, vignette, abzubrechen=abzubrechen)
 
 
 @login_required
@@ -721,26 +755,59 @@ def _terminale_sitzung_anzeigen(
 
 
 def _sitzung_starten(
-    request: HttpRequest, bindung: Trainingsbindung, vignette: Vignette
+    request: HttpRequest,
+    bindung: Trainingsbindung,
+    vignette: Vignette,
+    *,
+    abzubrechen: int | None = None,
 ) -> HttpResponse:
-    """Bindet das Konto atomar und startet die Sitzung über den DB-Sink."""
+    """Startet die Sitzung über den DB-Sink, solange keine andere läuft.
 
-    with transaction.atomic():
-        sink: DBSink = DBSink(bindung.teilnahme)
-        sitzung_starten(
-            sink,
-            vignette,
-            ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
+    Die gesperrte Teilnahme serialisiert gleichzeitige Starts. Läuft eine
+    Sitzung, wird der Start abgewiesen, außer sie ist die ausdrücklich
+    abzubrechende. Verliert ein Start dennoch gegen den Constraint, sieht er
+    dieselbe Abweisung.
+    """
+
+    try:
+        with transaction.atomic():
+            teilnahme: Teilnahme = Teilnahme.objects.select_for_update().get(
+                pk=bindung.teilnahme_id
+            )
+            laufende: Sitzung | None = Sitzung.objects.laufende_von(teilnahme)
+            if laufende is not None and laufende.pk == abzubrechen:
+                sitzung_abbrechen(DBSink.fuer_sitzung(laufende))
+                laufende = None
+            if laufende is None:
+                sink: DBSink = DBSink(teilnahme)
+                sitzung_starten(
+                    sink,
+                    vignette,
+                    ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
+                )
+    except IntegrityError:
+        laufende = Sitzung.objects.laufende_von(bindung.teilnahme)
+        if laufende is None:
+            raise
+    if laufende is not None:
+        return render(
+            request,
+            "training/laufende_sitzung.html",
+            {
+                "training": bindung.training,
+                "vignette": vignette,
+                "laufende": laufende,
+            },
+            status=409,
         )
-        kern: Simulationskern = sink.sitzung.simulationskern
     return sitzung_anzeigen(
         request,
         vignette=vignette,
-        kern=kern,
+        kern=sink.sitzung.simulationskern,
         gespraechsschritte=[],
         ist_probelauf=False,
         navigation=_sitzungsnavigation(sink.sitzung.pk),
-        spracheingabe_verfuegbar=bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        spracheingabe_verfuegbar=teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sink.sitzung.pk,
     )
 

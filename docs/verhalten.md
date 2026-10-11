@@ -220,6 +220,22 @@ ansehen“ den Link „Fortsetzen“. Er führt mit dem bisherigen Gespräch zur
 die Sitzung, auch in einem anderen Tab, einem anderen Browser oder auf einem
 anderen Gerät.
 
+Je Training läuft höchstens eine eigene Sitzung. Wer eine Vignette startet,
+während noch eine Sitzung läuft, auch bei derselben Vignette und aus einem
+anderen Tab oder Gerät, sieht statt eines neuen Gesprächs die Seite „Es läuft
+noch eine Sitzung“. Sie nennt die laufende Vignette und ihren Beginn und bietet
+an:
+
+- **Fortsetzen**: zurück in die laufende Sitzung mit dem bisherigen Gespräch.
+- **Abbrechen und neu starten**: Die laufende Sitzung wird abgebrochen, und die
+  gewählte Vignette startet. Läuft inzwischen eine andere Sitzung als die
+  genannte, wird nichts abgebrochen und die Seite nennt die aktuelle.
+
+Die Abfrage zur Audioverarbeitung kommt wie bisher vor dieser Seite. In
+verschiedenen Trainings darf gleichzeitig je eine Sitzung laufen. Liegen
+gebliebene ältere laufende Sitzungen aus der Zeit vor dieser Regel stehen als
+abgebrochen in der Liste; die jüngste ist fortsetzbar.
+
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite

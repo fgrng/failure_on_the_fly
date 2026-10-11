@@ -76,6 +76,11 @@ urlpatterns: list[URLPattern] = [
         name="einwilligung",
     ),
     path("<int:training_pk>/vignetten/<int:vignette_pk>/", views.wahl, name="wahl"),
+    path(
+        "<int:training_pk>/vignetten/<int:vignette_pk>/neu-starten/",
+        views.neu_starten,
+        name="neu_starten",
+    ),
     path("sitzung/<int:pk>/gespraech/", views.gespraech, name="gespraech"),
     path(
         "sitzung/<int:pk>/gespraech/beenden/",
