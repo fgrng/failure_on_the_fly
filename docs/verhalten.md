@@ -233,28 +233,36 @@ Danach ist die Person keine Trainingsteilnehmer:in mehr:
   Abbrechen, Debrief und Transkription antworten auch aus einem noch offenen Tab
   mit 404 und verändern nichts.
 
-Der Zugang von Kreis und Administration zum Training ändert sich durch den
-Austritt von Teilnehmenden nicht.
+Für Kreis und Administration verschwindet die Person rückwirkend und spurlos aus
+diesem Training: keine Zeile mehr in der Fremdeinsicht, kein Mitzählen in der
+Zahl der Beigetretenen, keine Sitzungen in einem danach gezogenen
+Trainingsexport, und jede ihrer Sitzungen dieses Trainings antwortet mit 404,
+auch eine, die vorher lesbar war. Ein vorher gezogener Export bleibt, wo er ist.
+In anderen Trainings, denen die Person weiter angehört, bleibt sie für deren
+Kreise einsehbar. Der Zugang von Kreis und Administration zum Training selbst
+ändert sich durch den Austritt von Teilnehmenden nicht.
 
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite
-die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen als Zeilen,
-nach Namen sortiert, und den Vignetten des Trainings in Kuratierreihenfolge als
-Spalten. Wer noch keine abgeschlossene Sitzung hat, steht mit gedämpfter Schrift
-trotzdem in der Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer Zelle
-als runder Kreis mit ihrer laufenden Nummer zu dieser Vignette; beim Zeigen oder
-Fokussieren erscheint sofort ihr Datum. Eine leere Zelle trägt einen blassen
-Strich. Ein Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
+die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen, die nicht
+aus dem Training ausgetreten sind, als Zeilen, nach Namen sortiert, und den
+Vignetten des Trainings in Kuratierreihenfolge als Spalten. Wer noch keine
+abgeschlossene Sitzung hat, steht mit gedämpfter Schrift trotzdem in der
+Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer Zelle als runder Kreis
+mit ihrer laufenden Nummer zu dieser Vignette; beim Zeigen oder Fokussieren
+erscheint sofort ihr Datum. Eine leere Zelle trägt einen blassen Strich. Ein
+Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
 
 Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
 Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
 alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor ihrer
 Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
-Sitzungen, Sitzungen derselben Person in einem fremden Training und jede Sitzung
-für aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in
-der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die
-Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
+Sitzungen, Sitzungen derselben Person in einem fremden Training, jede Sitzung
+einer aus dem Training Ausgetretenen und jede Sitzung für aus dem Kreis
+ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der Vignette
+antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
+Status lesbar, ebenfalls ohne Denkspur.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
@@ -281,12 +289,14 @@ Markdown-Datei je abgeschlossener Sitzung (`01-brüche-addieren.md`) mit
 Vignettenname, Ausgang, Datum, dem Transkript als Wechsel von Eingabe und
 Äußerung und der Diagnose. Freigegebene Abschriften liegen als Unterordner mit
 dem Erhebungsnamen im Ordner der Person; private und widerrufene fehlen, ebenso
-laufende, abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine
-Kontodaten, keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und
-keinen Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen
-dürfen der Kreis und die Administration; fremde Ausbilder:innen bekommen 404,
-Konten ohne Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur
-und unterliegt nicht dem Exportkontrakt aus ADR-0029.
+laufende, abgebrochene und gescheiterte Sitzungen. Wer aus dem Training
+ausgetreten ist, hat in einem danach gezogenen Export weder Ordner noch Dateien.
+Das Archiv enthält keine Kontodaten, keine Denkspur, keine Fehlversuche, keine
+Modell-Konfiguration und keinen Kern; zwei Exporte vergeben verschiedene
+Kennzeichen. Herunterladen dürfen der Kreis und die Administration; fremde
+Ausbilder:innen bekommen 404, Konten ohne Ausbilder:innen-Rolle 403. Der
+Trainingsexport ist keine Datenspur und unterliegt nicht dem Exportkontrakt aus
+ADR-0029.
 
 ## Simulationskern
 

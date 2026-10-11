@@ -74,7 +74,7 @@ def _ordner_je_teilnahme(training: Training, teilnahmen: set[int]) -> dict[int, 
     """
 
     konto_je_teilnahme: dict[int, int] = dict(
-        training.trainingsbindung_set.values_list("teilnahme_id", "konto_id")
+        training.trainingsbindung_set.aktiv().values_list("teilnahme_id", "konto_id")
     )
     abschriften: list[Abschrift] = list(
         training.freigegebene_abschriften.filter(teilnahme_id__in=teilnahmen).order_by(

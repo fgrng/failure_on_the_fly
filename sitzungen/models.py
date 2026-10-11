@@ -50,15 +50,20 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
         """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf.
 
         Einsicht folgt dem Anlass, nie der Vignette (ADR-0049): abgeschlossene
-        Sitzungen, deren Teilnahme an einer Trainingsbindung eines der
+        Sitzungen, deren Teilnahme an einer aktiven Trainingsbindung eines der
         Trainings hängt oder an einer Abschrift, die für eines von ihnen
-        freigegeben ist. Wer die Trainings sieht, entscheidet der Aufrufer über
-        `Training.objects.sichtbar_fuer`; `sitzungen` kennt das Training nur
+        freigegeben ist; nach dem Austritt aus dem Training verschwinden so
+        auch ältere Sitzungen. Wer die Trainings sieht, entscheidet der
+        Aufrufer über `Training.objects.sichtbar_fuer`; `sitzungen` kennt das Training nur
         über den Rückwärtszugriff der Bindungen (ADR-0016).
         """
         trainings_pks: models.QuerySet = trainings.values("pk")
         return self.filter(
-            Q(teilnahme__trainingsbindung__training__in=trainings_pks)
+            Q(
+                teilnahme__trainingsbindung__training__in=trainings_pks,
+                # Trainingsbindung.Zustand.AKTIV, ohne training zu importieren.
+                teilnahme__trainingsbindung__zustand="aktiv",
+            )
             | Q(teilnahme__abschrift__freigegeben_fuer__in=trainings_pks),
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()

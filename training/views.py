@@ -468,7 +468,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
             "trainings_link_url": request.build_absolute_uri(
                 reverse("training:beitreten", args=[training.trainings_link])
             ),
-            "beigetretene": training.trainingsbindung_set.count(),
+            "beigetretene": training.trainingsbindung_set.aktiv().count(),
             "fremdeinsicht": _fremdeinsicht(request.user, training),
             "freigegebene_abschriften": _freigegebene_abschriften(
                 request.user, training
@@ -482,8 +482,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
     # Baut die Tabelle der Fremdeinsicht: die Vignetten in Kuratierreihenfolge
-    # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
-    # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
+    # als Spalten, alle aktiven Trainingsteilnehmenden nach Namen als Zeilen. Eine
+    # Zelle hält die abgeschlossenen Sitzungen der Person zu der Vignette,
+    # nummeriert je Zelle.
 
     vignetten: list[Vignette] = [
         eintrag.vignette
@@ -502,7 +503,7 @@ def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
         ).append(sitzung)
 
     zeilen: list[dict[str, object]] = []
-    for bindung in training.trainingsbindung_set.select_related("konto"):
+    for bindung in training.trainingsbindung_set.aktiv().select_related("konto"):
         zellen: list[list[dict[str, object]]] = [
             [
                 {

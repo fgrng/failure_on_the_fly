@@ -1,5 +1,8 @@
 """HTTP-Tests für den Austritt aus dem Training (ADR-0049)."""
 
+from io import BytesIO
+from zipfile import ZipFile
+
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -15,8 +18,12 @@ from simulation.models import Verwendung
 from sitzungen.models import Sitzung
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
-from training.tests.aufbau import ansehen_url, gespielte_sitzung
-from training.tests.seite import tabellenzeilen
+from training.tests.aufbau import (
+    FremdeinsichtTestCase,
+    ansehen_url,
+    gespielte_sitzung,
+)
+from training.tests.seite import kuratierseite, tabellenzeilen
 from vignetten.models import Vignette
 
 HINWEIS_AUSGETRETEN: str = "Sie sind nicht mehr Teilnehmer:in dieses Trainings"
@@ -318,3 +325,104 @@ class LaufendeSitzungNachAustrittTests(TestCase):
         sitzung: HttpResponse = self.client.get(self.sitzung_url)
         self.assertNotContains(sitzung, "Wie rechnest du?")
         self.assertNotContains(sitzung, "Zähler addiert.")
+
+
+class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):
+    """Nach dem Austritt verschwindet die Person für Kreis und Administration."""
+
+    def _austreten(self, training: Training | None = None) -> None:
+        # Tritt als Teilnehmerin über die Trainingsseite aus.
+        self.client.force_login(self.teilnehmerin)
+        self.client.post(
+            reverse("training:austreten", args=[(training or self.training).pk])
+        )
+
+    def _export_dateien(self) -> list[str]:
+        # Die Dateinamen eines frisch gezogenen Trainingsexports des Kreises.
+        self.client.force_login(self.ausbilderin)
+        antwort: HttpResponse = self.client.get(
+            reverse("training:trainingsexport", args=[self.training.pk])
+        )
+        self.assertEqual(antwort.status_code, 200)
+        with ZipFile(BytesIO(antwort.content)) as archiv:
+            return archiv.namelist()
+
+    def test_fremdeinsicht_zeigt_keine_zeile_mehr(self) -> None:
+        """Die Tabelle auf der Kuratierseite nennt die Ausgetretene nicht."""
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        self._austreten()
+
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
+
+        self.assertNotIn("Grace Hopper", seite)
+        self.assertIn("Noch niemand ist beigetreten.", seite)
+
+    def test_beigetretenen_zahl_zaehlt_nur_aktive(self) -> None:
+        """Wer ausgetreten ist, zählt nicht mehr mit."""
+        self.training.beitreten(Konto.objects.create_user(username="margaret"))
+        self._austreten()
+
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
+
+        self.assertIn("1 Person beigetreten", seite)
+
+    def test_auch_aeltere_sitzungen_sind_fuer_kreis_und_administration_unbekannt(
+        self,
+    ) -> None:
+        """Was vorher lesbar war, antwortet nach dem Austritt mit 404."""
+        sitzung: Sitzung = gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        self.client.force_login(self.ausbilderin)
+        self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 200)
+        self._austreten()
+
+        for konto in (
+            self.ausbilderin,
+            konto_mit_rollen("root", is_superuser=True),
+        ):
+            with self.subTest(konto=konto.username):
+                self.client.force_login(konto)
+                self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 404)
+
+    def test_ausgetretene_sieht_ihre_sitzung_weiter(self) -> None:
+        """Die Selbsteinsicht bleibt unverändert."""
+        sitzung: Sitzung = gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette
+        )
+        self._austreten()
+
+        self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 200)
+
+    def test_export_enthaelt_nichts_der_ausgetretenen(self) -> None:
+        """Ein danach gezogener Export kennt weder Ordner noch Dateien von ihr."""
+        bleibende: Konto = Konto.objects.create_user(username="margaret")
+        self.training.beitreten(bleibende)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, bleibende, self.vignette)
+        self.assertEqual(
+            len({name.split("/")[0] for name in self._export_dateien()}), 2
+        )
+        self._austreten()
+
+        dateien: list[str] = self._export_dateien()
+
+        self.assertEqual(len(dateien), 1)
+
+    def test_sitzungen_in_anderen_trainings_bleiben_einsehbar(self) -> None:
+        """Der Austritt aus einem Training ändert nichts an einem anderen."""
+        anderes: Training = Training.objects.anlegen(
+            self.ausbilderin, name="Dezimalzahlen"
+        )
+        anderes.vignetten.add(self.vignette)
+        anderes.veroeffentlichen()
+        anderes.beitreten(self.teilnehmerin)
+        sitzung: Sitzung = gespielte_sitzung(anderes, self.teilnehmerin, self.vignette)
+        self._austreten()
+
+        self.client.force_login(self.ausbilderin)
+
+        self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 200)
+        self.assertIn(
+            "Grace Hopper", kuratierseite(self.client, anderes, self.ausbilderin)
+        )
