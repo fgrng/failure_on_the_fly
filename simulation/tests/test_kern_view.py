@@ -16,6 +16,21 @@ from simulation.models import (
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
+def _kern_daten(kern: Simulationskern, **werte: str) -> dict[str, str]:
+    # POST-Daten mit den gespeicherten Texten ohne User-Prompt-Vorlage,
+    # überschrieben durch werte.
+    daten: dict[str, str] = {
+        feld: getattr(kern, feld)
+        for feld in (
+            "rahmenhandlung_einleitung",
+            "rahmenhandlung_gespraechseinleitung",
+            "rahmenhandlung_debrief",
+            "system_prompt_vorlage",
+        )
+    }
+    return {**daten, **werte}
+
+
 class SimulationskernAnsichtLeereRahmenhandlungTests(TestCase):
     """Leere Abschnitte der Rahmenhandlung zeigen den gewohnten Platzhalter."""
 
@@ -677,20 +692,6 @@ class SimulationskernLangeTexteTests(TestCase):
         self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
-    def _daten(self, **werte: str) -> dict[str, str]:
-        # POST-Daten mit den gespeicherten Texten, überschrieben durch werte.
-        daten: dict[str, str] = {
-            feld: getattr(self.entwurf, feld)
-            for feld in (
-                "rahmenhandlung_einleitung",
-                "rahmenhandlung_gespraechseinleitung",
-                "rahmenhandlung_debrief",
-                "system_prompt_vorlage",
-                "user_prompt_vorlage",
-            )
-        }
-        return {**daten, **werte}
-
     def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
         self,
     ) -> None:
@@ -718,7 +719,8 @@ class SimulationskernLangeTexteTests(TestCase):
 
         self.client.post(
             self.url,
-            self._daten(
+            _kern_daten(
+                self.entwurf,
                 rahmenhandlung_debrief="Neuer Debrief",
                 user_prompt_vorlage="Neue Eingabe",
             ),
@@ -733,7 +735,7 @@ class SimulationskernLangeTexteTests(TestCase):
     def test_text_mit_fehler_startet_offen(self) -> None:
         """Nach einem Platzhalterfehler steht nur der betroffene Text offen."""
         response: HttpResponse = self.client.post(
-            self.url, self._daten(system_prompt_vorlage="$unbekannt")
+            self.url, _kern_daten(self.entwurf, system_prompt_vorlage="$unbekannt")
         )
 
         self.assertContains(response, "bearbeiten: true", count=1)
@@ -799,19 +801,6 @@ class SimulationskernLeereUserPromptVorlageTests(TestCase):
         self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
-    def _daten(self, **werte: str) -> dict[str, str]:
-        # POST-Daten ohne User-Prompt-Vorlage, überschrieben durch werte.
-        daten: dict[str, str] = {
-            feld: getattr(self.entwurf, feld)
-            for feld in (
-                "rahmenhandlung_einleitung",
-                "rahmenhandlung_gespraechseinleitung",
-                "rahmenhandlung_debrief",
-                "system_prompt_vorlage",
-            )
-        }
-        return {**daten, **werte}
-
     def _user_prompt_fuellen(self, text: str) -> None:
         # Füllt das Altfeld wie bei einer überholten Fassung.
         self.entwurf.user_prompt_vorlage = text
@@ -838,18 +827,21 @@ class SimulationskernLeereUserPromptVorlageTests(TestCase):
         self._user_prompt_fuellen("Alte Eingabe")
 
         response: HttpResponse = self.client.post(
-            self.url, self._daten(user_prompt_vorlage="")
+            self.url, _kern_daten(self.entwurf, user_prompt_vorlage="")
         )
         self.assertRedirects(response, reverse("simulation:kern_verwalten"))
 
         self.entwurf.refresh_from_db()
         self.assertEqual(self.entwurf.user_prompt_vorlage, "")
-        self.assertNotContains(self.client.get(self.url), "user_prompt_vorlage")
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "user_prompt_vorlage")
+        self.assertNotContains(response, "User-Prompt-Vorlage")
 
     def test_speichern_ohne_feld_laesst_die_vorlage_unberuehrt(self) -> None:
         """Fehlt das Feld in den Daten, bleibt die Vorlage und es gibt keinen Fehler."""
         response: HttpResponse = self.client.post(
-            self.url, self._daten(system_prompt_vorlage="Neuer System-Prompt")
+            self.url,
+            _kern_daten(self.entwurf, system_prompt_vorlage="Neuer System-Prompt"),
         )
 
         self.assertRedirects(response, reverse("simulation:kern_verwalten"))
@@ -863,7 +855,8 @@ class SimulationskernLeereUserPromptVorlageTests(TestCase):
         """Abgeschickte Daten halten das Feld sichtbar, auch bei einem Fehler."""
         response: HttpResponse = self.client.post(
             self.url,
-            self._daten(
+            _kern_daten(
+                self.entwurf,
                 system_prompt_vorlage="$unbekannt",
                 user_prompt_vorlage="Neue Eingabe",
             ),
