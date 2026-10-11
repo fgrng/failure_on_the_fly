@@ -472,23 +472,33 @@ class TrainingsreihenfolgeTests(TestCase):
             ["1. Kürzen", "2. Erweitern"],
         )
 
-    def test_teilnehmende_sehen_nummerierte_vignetten_und_starten_jede(self) -> None:
-        """Die Detailseite folgt der Reihenfolge und verlinkt jede Vignette."""
+    def _detailseite_der_teilnehmerin(self) -> HttpResponse:
+        # Veröffentlicht das Training mit Addieren, Erweitern, Kürzen in dieser
+        # Reihenfolge und ruft seine Detailseite als Beigetretene auf.
+
         for vignette in (self.dritte, self.erste, self.zweite):
             self.training.vignette_aufnehmen(vignette)
         self.training.veroeffentlichen()
         grace: Konto = get_user_model().objects.create_user(username="grace")
         self.training.beitreten(grace)
         self.client.force_login(grace)
+        return self.client.get(reverse("training:detail", args=[self.training.pk]))
 
-        detail: HttpResponse = self.client.get(
-            reverse("training:detail", args=[self.training.pk])
-        )
+    def test_teilnehmende_sehen_die_vignetten_nummeriert(self) -> None:
+        """Die Detailseite folgt der empfohlenen Reihenfolge."""
+        detail: HttpResponse = self._detailseite_der_teilnehmerin()
 
         self.assertEqual(
             nummerierte_vignetten(detail.content.decode()),
             ["1. Addieren", "2. Erweitern", "3. Kürzen"],
         )
+
+    def test_teilnehmende_starten_jede_vignette_unabhaengig_von_ihrer_nummer(
+        self,
+    ) -> None:
+        """Jede Vignette bleibt startbar, nicht nur die erste."""
+        detail: HttpResponse = self._detailseite_der_teilnehmerin()
+
         for vignette in (self.dritte, self.erste, self.zweite):
             self.assertContains(
                 detail, reverse("training:wahl", args=[self.training.pk, vignette.pk])

@@ -231,7 +231,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             kuratierseite(self.client, self.training, self.ausbilderin),
         )
 
-    def test_spalten_folgen_der_kuratierreihenfolge(self) -> None:
+    def test_spalten_folgen_der_empfohlenen_reihenfolge(self) -> None:
         """Eine später aufgenommene Vignette steht rechts, nicht alphabetisch."""
         self.training.vignette_aufnehmen(finale_vignette(self.autorin, name="Addition"))
 

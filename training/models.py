@@ -135,11 +135,10 @@ class Training(EigentuemerKreis):
         )
         if zugehoerigkeiten.filter(vignette=vignette).exists():
             return
-        hoechste: int | None = zugehoerigkeiten.aggregate(Max("position"))[
-            "position__max"
-        ]
         Trainingsvignette.objects.create(
-            training=self, vignette=vignette, position=(hoechste or 0) + 1
+            training=self,
+            vignette=vignette,
+            position=_hoechste_position(zugehoerigkeiten) + 1,
         )
 
     @transaction.atomic
@@ -154,7 +153,9 @@ class Training(EigentuemerKreis):
         )
         # Erst hinter die höchste Position rücken, damit kein Zwischenstand
         # die eindeutigen Positionen kreuzt.
-        zugehoerigkeiten.update(position=F("position") + len(ids) + 1)
+        zugehoerigkeiten.update(
+            position=F("position") + _hoechste_position(zugehoerigkeiten)
+        )
         for position, zugehoerigkeit_id in enumerate(ids, start=1):
             zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
 
@@ -199,6 +200,11 @@ class Training(EigentuemerKreis):
                 return Trainingsbindung.objects.select_related("teilnahme").get(
                     training=self, konto=konto
                 )
+
+
+def _hoechste_position(zugehoerigkeiten: models.QuerySet["Trainingsvignette"]) -> int:
+    """Liefert die höchste belegte Position eines Trainings, für ein leeres 0."""
+    return zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
 
 
 class Trainingsvignette(models.Model):

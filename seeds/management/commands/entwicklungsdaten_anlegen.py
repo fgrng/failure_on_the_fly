@@ -143,7 +143,10 @@ VIGNETTEN: list[dict[str, object]] = [
 
 
 def _vignetten_setzen(training: Training, vignetten: list[Vignette]) -> None:
-    """Stellt die Vignetten eines Trainings in der angegebenen Reihenfolge ein."""
+    """Stellt die Vignetten eines Trainings ein; Neue kommen in Listenfolge ans Ende.
+
+    Bereits aufgenommene Vignetten behalten ihre Position.
+    """
     for ueberzaehlige in training.vignetten_in_reihenfolge().exclude(
         pk__in=[vignette.pk for vignette in vignetten]
     ):

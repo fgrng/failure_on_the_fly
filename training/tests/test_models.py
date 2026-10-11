@@ -284,3 +284,24 @@ def test_vignette_steht_hoechstens_einmal_im_training() -> None:
         Trainingsvignette.objects.create(
             training=training, vignette=vignette, position=2
         )
+
+
+@pytest.mark.django_db
+def test_entfernen_schliesst_auch_vorhandene_luecken() -> None:
+    """Auch eine Reihenfolge mit Lücken wird beim Entfernen wieder lückenlos."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    vignetten: list[Vignette] = [
+        finale_vignette(ada, name=name) for name in ("Erste", "Zweite", "Dritte")
+    ]
+    for position, vignette in zip((1, 4, 7), vignetten, strict=True):
+        Trainingsvignette.objects.create(
+            training=training, vignette=vignette, position=position
+        )
+
+    training.vignette_entfernen(vignetten[2])
+
+    assert list(
+        training.vignettenzugehoerigkeiten.values_list("vignette", "position")
+    ) == [(vignetten[0].pk, 1), (vignetten[1].pk, 2)]
