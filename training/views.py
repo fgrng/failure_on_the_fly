@@ -97,11 +97,39 @@ def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
     )
 
 
+def _lesbares_training(request: HttpRequest, pk: int) -> Training:
+    """Lädt ein veröffentlichtes Training, das zugänglich ist oder dem die Person je angehörte.
+
+    Nach dem Austritt bleibt die Trainingsseite so lesend erreichbar.
+    """
+    return get_object_or_404(
+        Training.objects.veroeffentlicht().filter(
+            Q(pk__in=Training.objects.zugaenglich_fuer(request.user).values("pk"))
+            | Q(
+                pk__in=Trainingsbindung.objects.filter(konto=request.user).values(
+                    "training"
+                )
+            )
+        ),
+        pk=pk,
+    )
+
+
 def _zugaengliches_training_mit_finaler_vignette(
     request: HttpRequest, training_pk: int, vignette_pk: int
 ) -> tuple[Training, Vignette]:
-    """Lädt eine finale Vignette aus einem zugänglichen Training."""
+    """Lädt eine finale Vignette aus einem zugänglichen Training.
+
+    Wer aus dem Training ausgetreten ist, wählt dort nichts mehr, auch wenn der
+    Kreiszugang das Training sonst öffnet.
+    """
     training: Training = _zugaengliches_training(request, training_pk)
+    if (
+        Trainingsbindung.objects.ausgetreten()
+        .filter(training=training, konto=request.user)
+        .exists()
+    ):
+        raise Http404
     vignette: Vignette = get_object_or_404(
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
@@ -355,17 +383,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     Eine Ausgetretene sieht die Seite nur lesend: ihre Sitzungen, aber weder
     Wahl noch Start noch den Austritt.
     """
-    training: Training = get_object_or_404(
-        Training.objects.veroeffentlicht().filter(
-            Q(pk__in=Training.objects.zugaenglich_fuer(request.user).values("pk"))
-            | Q(
-                pk__in=Trainingsbindung.objects.filter(konto=request.user).values(
-                    "training"
-                )
-            )
-        ),
-        pk=pk,
-    )
+    training: Training = _lesbares_training(request, pk)
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )

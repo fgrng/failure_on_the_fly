@@ -12,7 +12,7 @@ from config.tests.aufbau import (
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import Verwendung
-from sitzungen.models import Gespraechsschritt, Sitzung
+from sitzungen.models import Sitzung
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
 from training.tests.aufbau import ansehen_url, gespielte_sitzung
@@ -43,12 +43,18 @@ class AustrittTests(TestCase):
         )
 
     def _detail(self) -> HttpResponse:
+        # Ruft die Trainingsseite aus Sicht des angemeldeten Kontos auf.
         return self.client.get(reverse("training:detail", args=[self.training.pk]))
 
     def _austreten(self) -> HttpResponse:
+        # Tritt aus dem Training aus und folgt der Weiterleitung.
         return self.client.post(
             reverse("training:austreten", args=[self.training.pk]), follow=True
         )
+
+    def _historie(self) -> list[dict[str, object]]:
+        # Liest die Zeilen von „Meine Trainings“ des angemeldeten Kontos.
+        return tabellenzeilen(self.client.get(reverse("training:historie")))
 
     def test_trainingsseite_bietet_den_austritt_mit_erklaerung_an(self) -> None:
         """Vor dem Austritt erklärt die Seite seine Folgen."""
@@ -182,8 +188,23 @@ class AustrittTests(TestCase):
         ]
 
         self.assertEqual([a.status_code for a in antworten], [404, 404, 404])
-        self.assertFalse(Sitzung.objects.exists())
-        self.assertContains(self._detail(), HINWEIS_AUSGETRETEN)
+        self.assertEqual(
+            [
+                (zeile["ausgetreten"], zeile["sitzungen_nach_status"])
+                for zeile in self._historie()
+            ],
+            [
+                (
+                    True,
+                    {
+                        "laufend": 0,
+                        "abgeschlossen": 0,
+                        "abgebrochen": 0,
+                        "gescheitert": 0,
+                    },
+                )
+            ],
+        )
 
     def test_eigene_sitzung_bleibt_lesbar_ohne_denkspur(self) -> None:
         """Auch eine laufende Sitzung öffnet sich lesend, ohne Denkspur."""
@@ -222,14 +243,26 @@ class AustrittTests(TestCase):
         gespielte_sitzung(self.training, self.ausbilderin, self.vignette)
         self.client.force_login(self.ausbilderin)
         self._austreten()
-        sitzungen_vorher: int = Sitzung.objects.count()
+        historie_vorher: list[dict[str, object]] = self._historie()
 
         start: HttpResponse = self.client.post(
             reverse("training:wahl", args=[self.training.pk, self.vignette.pk])
         )
 
         self.assertEqual(start.status_code, 404)
-        self.assertEqual(Sitzung.objects.count(), sitzungen_vorher)
+        self.assertEqual(self._historie(), historie_vorher)
+
+    def test_ausgetretene_eigentuemerin_sieht_keine_wahl(self) -> None:
+        """Auch die Bestätigung der Wahl bleibt der ausgetretenen Eigentümerin verschlossen."""
+        self.client.force_login(self.ausbilderin)
+        gespielte_sitzung(self.training, self.ausbilderin, self.vignette)
+        self._austreten()
+
+        wahl: HttpResponse = self.client.get(
+            reverse("training:wahl", args=[self.training.pk, self.vignette.pk])
+        )
+
+        self.assertEqual(wahl.status_code, 404)
 
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
@@ -250,9 +283,12 @@ class LaufendeSitzungNachAustrittTests(TestCase):
             reverse("training:beitreten", args=[self.training.trainings_link])
         )
         self.client.post(reverse("training:wahl", args=[self.training.pk, vignette.pk]))
-        self.client.post(
+        start: HttpResponse = self.client.post(
             reverse("training:einwilligung", args=[self.training.pk, vignette.pk]),
             {"audioverarbeitung_eingewilligt": "ja"},
+        )
+        self.sitzung_url: str = reverse(
+            "training:sitzung_ansehen", args=[start.context["sitzung_pk"]]
         )
         self.client.post(reverse("training:austreten", args=[self.training.pk]))
 
@@ -270,5 +306,15 @@ class LaufendeSitzungNachAustrittTests(TestCase):
             with self.subTest(ablauf=ablauf):
                 antwort: HttpResponse = self.client.post(reverse(name), daten)
                 self.assertEqual(antwort.status_code, 404)
-        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
-        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertEqual(
+            [
+                zeile["sitzungen_nach_status"]
+                for zeile in tabellenzeilen(
+                    self.client.get(reverse("training:historie"))
+                )
+            ],
+            [{"laufend": 1, "abgeschlossen": 0, "abgebrochen": 0, "gescheitert": 0}],
+        )
+        sitzung: HttpResponse = self.client.get(self.sitzung_url)
+        self.assertNotContains(sitzung, "Wie rechnest du?")
+        self.assertNotContains(sitzung, "Zähler addiert.")

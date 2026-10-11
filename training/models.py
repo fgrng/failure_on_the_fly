@@ -164,6 +164,10 @@ class TrainingsbindungQuerySet(BindungQuerySet):
         """Liefert die Bindungen, die Teilnahme am Training bedeuten."""
         return self.filter(zustand=Trainingsbindung.Zustand.AKTIV)
 
+    def ausgetreten(self) -> models.QuerySet["Trainingsbindung"]:
+        """Liefert die Bindungen, deren Konto aus dem Training ausgetreten ist."""
+        return self.filter(zustand=Trainingsbindung.Zustand.AUSGETRETEN)
+
 
 class Trainingsbindung(Bindung):
     """Verbindet eine Teilnahme mit Training und Nutzerkonto.
@@ -211,8 +215,7 @@ class Trainingsbindung(Bindung):
     def austreten(self) -> None:
         """Beendet die Teilnahme am Training; ein zweiter Austritt ändert nichts.
 
-        Austritt und Entfernen teilen diesen Weg. Teilnahme und Sitzungen
-        bleiben bestehen.
+        Teilnahme und Sitzungen bleiben bestehen.
         """
         self.zustand = self.Zustand.AUSGETRETEN
         self.save(update_fields=["zustand"])
