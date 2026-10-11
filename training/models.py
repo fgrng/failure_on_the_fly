@@ -9,7 +9,7 @@ from django.db.models.signals import m2m_changed, post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
-from sitzungen.bindungen import Bindung
+from sitzungen.bindungen import Bindung, BindungQuerySet
 from vignetten.models import vignette_archiviert
 
 if TYPE_CHECKING:
@@ -43,12 +43,14 @@ class TrainingQuerySet(
     def zugaenglich_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
         """Liefert die Trainings, die das Konto betreten darf (ADR-0049).
 
-        Teilnehmende erreichen ein Training nur über ihre Trainingsbindung;
-        Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
+        Teilnehmende erreichen ein Training nur über ihre aktive
+        Trainingsbindung; Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
         """
         return self.filter(
             models.Q(
-                pk__in=Trainingsbindung.objects.filter(konto=konto).values("training")
+                pk__in=Trainingsbindung.objects.aktiv()
+                .filter(konto=konto)
+                .values("training")
             )
             | models.Q(pk__in=Training.objects.sichtbar_fuer(konto).values("pk"))
         )
@@ -155,10 +157,28 @@ class Training(EigentuemerKreis):
                 )
 
 
+class TrainingsbindungQuerySet(BindungQuerySet):
+    """Abfragen über Trainingsbindungen."""
+
+    def aktiv(self) -> models.QuerySet["Trainingsbindung"]:
+        """Liefert die Bindungen, die Teilnahme am Training bedeuten."""
+        return self.filter(zustand=Trainingsbindung.Zustand.AKTIV)
+
+
 class Trainingsbindung(Bindung):
-    """Verbindet eine Teilnahme mit Training und Nutzerkonto."""
+    """Verbindet eine Teilnahme mit Training und Nutzerkonto.
+
+    Ein Austritt löscht die Bindung nicht, sondern setzt ihren Zustand; wer ihn
+    ausgelöst hat, hält sie nicht fest (ADR-0049).
+    """
 
     KONTO_TRAGEND: bool = True
+
+    class Zustand(models.TextChoices):
+        """Die Zustände einer Trainingsbindung."""
+
+        AKTIV = "aktiv", "Aktiv"
+        AUSGETRETEN = "ausgetreten", "Ausgetreten"
 
     teilnahme: models.OneToOneField = models.OneToOneField(
         "sitzungen.Teilnahme", on_delete=models.CASCADE
@@ -167,6 +187,11 @@ class Trainingsbindung(Bindung):
     konto: models.ForeignKey = models.ForeignKey(
         "konten.Konto", on_delete=models.PROTECT
     )
+    zustand: models.CharField = models.CharField(
+        max_length=11, choices=Zustand, default=Zustand.AKTIV
+    )
+
+    objects: models.Manager["Trainingsbindung"] = TrainingsbindungQuerySet.as_manager()
 
     class Meta:
         """Erlaubt je Training und Konto höchstens eine Bindung."""
@@ -177,6 +202,20 @@ class Trainingsbindung(Bindung):
                 name="training_bindung_ist_je_konto_eindeutig",
             )
         ]
+
+    @property
+    def ist_aktiv(self) -> bool:
+        """Sagt, ob das Konto noch Trainingsteilnehmer:in ist."""
+        return self.zustand == self.Zustand.AKTIV
+
+    def austreten(self) -> None:
+        """Beendet die Teilnahme am Training; ein zweiter Austritt ändert nichts.
+
+        Austritt und Entfernen teilen diesen Weg. Teilnahme und Sitzungen
+        bleiben bestehen.
+        """
+        self.zustand = self.Zustand.AUSGETRETEN
+        self.save(update_fields=["zustand"])
 
 
 class Abschrift(Bindung):

@@ -206,6 +206,36 @@ ohne Vignetten lässt sich veröffentlichen und beitreten.
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
 
+## Austritt aus dem Training
+
+Am Ende der Trainingsseite steht für Trainingsteilnehmer:innen der Abschnitt
+„Austritt“. „Aus dem Training austreten“ klappt eine Erklärung auf: Der Kreis
+sieht die eigenen Sitzungen danach nicht mehr, Freigaben von Abschriften für
+dieses Training ruhen, nichts wird gelöscht, und über den Trainings-Link ist ein
+Wiederbeitritt möglich, solange der Beitritt offen ist. Erst „Austritt
+bestätigen“ tritt aus (nur per POST, sonst 405) und führt mit der Meldung „Sie
+sind aus dem Training … ausgetreten.“ zurück auf die Trainingsseite. Ein zweiter
+Austritt ändert nichts und führt ebenso dorthin; ein Austritt aus einem
+Training, dem das Konto nie beigetreten ist, antwortet mit 404.
+
+Danach ist die Person keine Trainingsteilnehmer:in mehr:
+
+- Der Trainingskatalog zeigt das Training nicht mehr. „Meine Trainings“ führt es
+  weiter, mit dem Kennzeichen „ausgetreten“.
+- Die Trainingsseite bleibt erreichbar, zeigt statt der Einleitung und des
+  Hinweises zur Fremdeinsicht „Sie sind nicht mehr Teilnehmer:in dieses
+  Trainings.“ und listet die eigenen Sitzungen in jedem Status, aber weder „Neu
+  starten“ noch den Austritt. Eigene Sitzungen öffnen sich weiter lesend, auch
+  laufende, ohne Denkspur.
+- Vignettenwahl, Einwilligung und Sitzungsstart antworten mit 404; es entsteht
+  keine Sitzung. Das gilt auch, wenn die Person zum Kreis gehört.
+- Eine beim Austritt laufende Sitzung bleibt laufend liegen. Gespräch, Beenden,
+  Abbrechen, Debrief und Transkription antworten auch aus einem noch offenen Tab
+  mit 404 und verändern nichts.
+
+Der Zugang von Kreis und Administration zum Training ändert sich durch den
+Austritt von Teilnehmenden nicht.
+
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite

@@ -200,6 +200,7 @@ def historie(request: HttpRequest) -> HttpResponse:
                 "sort_progress": abgeschlossene_vignetten
                 / (vignetten_gesamt if vignetten_gesamt else 1),
                 "sitzungen_nach_status": sitzungen_nach_status,
+                "ausgetreten": not bindung.ist_aktiv,
             }
         )
 
@@ -349,8 +350,22 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen."""
-    training: Training = _zugaengliches_training(request, pk)
+    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen.
+
+    Eine Ausgetretene sieht die Seite nur lesend: ihre Sitzungen, aber weder
+    Wahl noch Start noch den Austritt.
+    """
+    training: Training = get_object_or_404(
+        Training.objects.veroeffentlicht().filter(
+            Q(pk__in=Training.objects.zugaenglich_fuer(request.user).values("pk"))
+            | Q(
+                pk__in=Trainingsbindung.objects.filter(konto=request.user).values(
+                    "training"
+                )
+            )
+        ),
+        pk=pk,
+    )
     vignetten: QuerySet[Vignette] = training.vignetten.filter(
         zustand=Vignette.Zustand.FINAL
     )
@@ -395,8 +410,30 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "training/detail.html",
-        {"training": training, "vignetten_daten": vignetten_daten},
+        {
+            "training": training,
+            "vignetten_daten": vignetten_daten,
+            "ist_teilnehmerin": bindung is not None and bindung.ist_aktiv,
+            "ist_ausgetreten": bindung is not None and not bindung.ist_aktiv,
+        },
     )
+
+
+@login_required
+def austreten(request: HttpRequest, pk: int) -> HttpResponse:
+    """Tritt aus einem Training aus, dem das Konto angehört (ADR-0049)."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    bindung: Trainingsbindung = get_object_or_404(
+        Trainingsbindung.objects.select_related("training"),
+        training_id=pk,
+        konto=request.user,
+    )
+    bindung.austreten()
+    messages.success(
+        request, f"Sie sind aus dem Training „{bindung.training.name}“ ausgetreten."
+    )
+    return redirect("training:detail", pk=pk)
 
 
 @login_required
@@ -623,6 +660,17 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     return redirect("training:detail", pk=training.pk)
 
 
+def _aktive_bindung(training: Training, konto: Konto) -> Trainingsbindung:
+    """Lädt die Bindung für einen Sitzungsstart; eine ausgetretene ist unbekannt.
+
+    Reaktiviert wird nur über den Beitritt, nie über den Start.
+    """
+    bindung: Trainingsbindung = training.bindung_fuer(konto)
+    if not bindung.ist_aktiv:
+        raise Http404
+    return bindung
+
+
 @login_required
 def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpResponse:
     """Bestätigt oder startet die Wahl einer Vignette aus einem Training."""
@@ -630,7 +678,7 @@ def wahl(request: HttpRequest, training_pk: int, vignette_pk: int) -> HttpRespon
         request, training_pk, vignette_pk
     )
     if request.method == "POST":
-        bindung: Trainingsbindung = training.bindung_fuer(request.user)
+        bindung: Trainingsbindung = _aktive_bindung(training, request.user)
         if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
             return render(
                 request,
@@ -655,7 +703,7 @@ def einwilligung(
     training, vignette = _zugaengliches_training_mit_finaler_vignette(
         request, training_pk, vignette_pk
     )
-    bindung: Trainingsbindung = training.bindung_fuer(request.user)
+    bindung: Trainingsbindung = _aktive_bindung(training, request.user)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
         return HttpResponseBadRequest("Die Einwilligung wurde bereits festgehalten.")
     entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
@@ -680,7 +728,11 @@ def _sitzungsnavigation() -> Sitzungsnavigation:
 
 
 def training_sitzung(request: HttpRequest) -> Sitzung:
-    """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto."""
+    """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto.
+
+    Nach einem Austritt bleibt die Sitzung laufend liegen und ist für die
+    Gesprächsabläufe unbekannt, bis die Bindung wieder aktiv ist.
+    """
 
     sitzung_pk: int | None = request.session.get("training_sitzung_pk")
     if sitzung_pk is None:
@@ -690,7 +742,8 @@ def training_sitzung(request: HttpRequest) -> Sitzung:
         pk=sitzung_pk,
     )
     get_object_or_404(
-        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
+        Trainingsbindung.objects.aktiv().filter(konto=request.user),
+        teilnahme=sitzung.teilnahme,
     )
     return sitzung
 

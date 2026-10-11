@@ -69,6 +69,7 @@ urlpatterns: list[URLPattern] = [
         name="vignette_entfernen",
     ),
     path("<int:pk>/", views.detail, name="detail"),
+    path("<int:pk>/austreten/", views.austreten, name="austreten"),
     path("beitreten/<uuid:trainings_link>/", views.beitreten, name="beitreten"),
     path(
         "<int:training_pk>/vignetten/<int:vignette_pk>/einwilligung/",

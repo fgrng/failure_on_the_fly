@@ -70,7 +70,12 @@
                 <tbody>
                     <template x-for="(r, i) in sichtbar" :key="i">
                         <tr>
-                            <td><a class="zeilenlink" :href="r.url" x-text="r.name"></a></td>
+                            <td>
+                                <a class="zeilenlink" :href="r.url" x-text="r.name"></a>
+                                <template x-if="r.ausgetreten">
+                                    <span class="badge badge--archived">ausgetreten</span>
+                                </template>
+                            </td>
                             <td x-text="r.fortschritt"></td>
                             <td>
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
