@@ -18,7 +18,7 @@ from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import Verwendung
 from sitzungen.models import Sitzung
-from training.models import Abschrift, Training
+from training.models import Abschrift, Training, Trainingsbindung
 from training.tests.aufbau import abschrift_mit_sitzung, ansehen_url
 from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
@@ -453,9 +453,11 @@ class RuhendeFreigabeTests(FreigabeTestCase):
             reverse("training:austreten", args=[(training or self.training).pk])
         )
 
-    def _widerrufen(self, training: Training) -> HttpResponse:
+    def _widerrufen(
+        self, training: Training, konto: Konto | None = None
+    ) -> HttpResponse:
         # Widerruft die ruhende Freigabe für das Training und folgt der Weiterleitung.
-        self.client.force_login(self.teilnehmerin)
+        self.client.force_login(konto or self.teilnehmerin)
         return self.client.post(
             reverse(
                 "training:abschrift_ruhende_freigabe_widerrufen",
@@ -547,7 +549,7 @@ class RuhendeFreigabeTests(FreigabeTestCase):
         )
         self.assertNotContains(response, "ruht (ausgetreten)")
 
-    def test_widerrufene_ruhende_freigabe_wirkt_nach_wiederbeitritt_nicht(
+    def test_widerrufene_ruhende_freigabe_wirkt_bei_aktiver_bindung_nicht(
         self,
     ) -> None:
         """Was widerrufen ist, ist weg, nicht nur ruhend."""
@@ -555,10 +557,11 @@ class RuhendeFreigabeTests(FreigabeTestCase):
         self._austreten()
         self._widerrufen(self.training)
 
-        self.client.force_login(self.teilnehmerin)
-        self.client.get(
-            reverse("training:beitreten", args=[self.training.trainings_link])
-        )
+        # Den Wiederbeitritt (#428) gibt es noch nicht; die Bindung wird direkt
+        # wieder aktiv, damit nur der Widerruf die Freigabe fernhalten kann.
+        Trainingsbindung.objects.filter(
+            training=self.training, konto=self.teilnehmerin
+        ).update(zustand=Trainingsbindung.Zustand.AKTIV)
 
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
 
@@ -591,9 +594,9 @@ class RuhendeFreigabeTests(FreigabeTestCase):
         """Widerrufen kann nur, wem die Abschrift gehört."""
         self._freigeben(self.training)
         self._austreten()
-        self.teilnehmerin = Konto.objects.create_user(username="linus")
+        fremde: Konto = Konto.objects.create_user(username="linus")
 
-        self.assertEqual(self._widerrufen(self.training).status_code, 404)
+        self.assertEqual(self._widerrufen(self.training, fremde).status_code, 404)
 
     def test_speichern_der_auswahl_laesst_ruhende_freigaben_stehen(self) -> None:
         """Die Auswahl für aktive Trainings rührt ruhende Freigaben nicht an."""

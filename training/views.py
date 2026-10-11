@@ -50,6 +50,7 @@ from .abschriften import (
     abschrift_holen,
     abschrift_loeschen,
     ruhende_freigaben,
+    wirksame_freigaben,
 )
 from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
@@ -302,12 +303,7 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
-    beigetreten: QuerySet[Training] = Training.objects.beigetreten_von(request.user)
-    freigegeben: list[Training] = list(
-        abschrift.freigegeben_fuer.filter(pk__in=beigetreten.values("pk")).order_by(
-            "name"
-        )
-    )
+    freigegeben: list[Training] = list(wirksame_freigaben(abschrift).order_by("name"))
     return render(
         request,
         "training/abschrift.html",
@@ -316,7 +312,9 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
             "sitzungen": _gelesene_sitzungen(abschrift),
             "freigegeben": [training.name for training in freigegeben],
             "freigegebene_pks": {training.pk for training in freigegeben},
-            "beigetretene_trainings": beigetreten.order_by("name"),
+            "beigetretene_trainings": Training.objects.beigetreten_von(
+                request.user
+            ).order_by("name"),
             "ruhende_freigaben": ruhende_freigaben(abschrift).order_by("name"),
         },
     )

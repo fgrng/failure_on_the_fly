@@ -80,6 +80,14 @@ def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
     abschrift.freigegeben_fuer.set([*gewaehlt, *ruhende_freigaben(abschrift)])
 
 
+def wirksame_freigaben(abschrift: Abschrift) -> QuerySet[Training]:
+    """Die Freigaben für Trainings, denen das Konto aktiv angehört."""
+
+    return abschrift.freigegeben_fuer.filter(
+        pk__in=Training.objects.beigetreten_von(abschrift.konto).values("pk")
+    )
+
+
 def ruhende_freigaben(abschrift: Abschrift) -> QuerySet[Training]:
     """Die Freigaben für Trainings, aus denen das Konto ausgetreten ist.
 
@@ -88,7 +96,7 @@ def ruhende_freigaben(abschrift: Abschrift) -> QuerySet[Training]:
     """
 
     return abschrift.freigegeben_fuer.exclude(
-        pk__in=Training.objects.beigetreten_von(abschrift.konto).values("pk")
+        pk__in=wirksame_freigaben(abschrift).values("pk")
     )
 
 
