@@ -18,7 +18,7 @@ from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import Verwendung
 from sitzungen.models import Sitzung
-from training.models import Abschrift, Training, Trainingsbindung
+from training.models import Abschrift, Training
 from training.tests.aufbau import abschrift_mit_sitzung, ansehen_url
 from training.tests.seite import kuratierseite
 from vignetten.models import Vignette
@@ -466,6 +466,13 @@ class RuhendeFreigabeTests(FreigabeTestCase):
             follow=True,
         )
 
+    def _wiederbeitreten(self) -> None:
+        # Tritt als Teilnehmerin über den Trainings-Link wieder bei.
+        self.client.force_login(self.teilnehmerin)
+        self.client.get(
+            reverse("training:beitreten", args=[self.training.trainings_link])
+        )
+
     def _zweites_training(self) -> tuple[Konto, Training]:
         # Ein weiteres Training eines anderen Kreises, dem die Teilnehmerin beitritt.
         kreis: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
@@ -557,13 +564,29 @@ class RuhendeFreigabeTests(FreigabeTestCase):
         self._austreten()
         self._widerrufen(self.training)
 
-        # Den Wiederbeitritt (#428) gibt es noch nicht; die Bindung wird direkt
-        # wieder aktiv, damit nur der Widerruf die Freigabe fernhalten kann.
-        Trainingsbindung.objects.filter(
-            training=self.training, konto=self.teilnehmerin
-        ).update(zustand=Trainingsbindung.Zustand.AKTIV)
+        self._wiederbeitreten()
 
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
+        self.assertNotIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
+
+    def test_ruhende_freigabe_wirkt_nach_dem_wiederbeitritt(self) -> None:
+        """Die Freigabe muss nicht neu erteilt werden."""
+        self._freigeben(self.training)
+        self._austreten()
+
+        self._wiederbeitreten()
+
+        self.assertEqual(self._status_fuer(self.ausbilderin), 200)
+        self.assertIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
+        seite: str = self._abschriftseite()
+        self.assertNotIn("ruht (ausgetreten)", seite)
+        self.assertIn("Freigegeben für Bruchrechnung.", seite)
 
     def test_widerruf_der_ruhenden_freigabe_nur_per_post(self) -> None:
         """Ein GET widerruft nichts."""

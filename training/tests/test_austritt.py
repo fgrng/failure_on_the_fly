@@ -11,7 +11,7 @@ from config.tests.aufbau import (
 )
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
-from simulation.models import Verwendung
+from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.models import Sitzung
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
@@ -274,7 +274,18 @@ class LaufendeSitzungNachAustrittTests(TestCase):
     """Eine beim Austritt laufende Sitzung bleibt liegen."""
 
     def setUp(self) -> None:
-        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(
+                bezeichnung="Test",
+                sprachmodell="fake",
+                parameter={
+                    "skript": [
+                        {"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}
+                    ]
+                },
+            ),
+            Verwendung.SCHUELERIN,
+        )
         ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
         vignette: Vignette = finale_vignette(ausbilderin)
         self.training: Training = Training.objects.anlegen(
@@ -322,6 +333,19 @@ class LaufendeSitzungNachAustrittTests(TestCase):
         sitzung: HttpResponse = self.client.get(self.sitzung_url)
         self.assertNotContains(sitzung, "Wie rechnest du?")
         self.assertNotContains(sitzung, "Zähler addiert.")
+
+    def test_nach_dem_wiederbeitritt_laesst_sie_sich_fortsetzen(self) -> None:
+        """Der Fortschrittsmarker der Browser-Session trägt wieder."""
+        self.client.get(
+            reverse("training:beitreten", args=[self.training.trainings_link])
+        )
+
+        antwort: HttpResponse = self.client.post(
+            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+
+        self.assertEqual(antwort.status_code, 200)
+        self.assertContains(self.client.get(self.sitzung_url), "Wie rechnest du?")
 
 
 class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):

@@ -192,16 +192,16 @@ Wer den Link eingeloggt ohne Kreis- oder Administrationszugang öffnet, tritt be
 und landet auf der Trainingsseite; auch eine Ausbilderrolle allein begründet
 keinen Kreiszugang. Erneutes Öffnen führt ohne zusätzlichen Beitritt direkt
 dorthin. Ohne Anmeldung führt der Link über den Login zurück zum Beitritt. Bei
-gesperrtem Beitritt sehen neue Konten die Meldung „Beitritt gesperrt“ mit der
-Bitte, sich an die Ausbilder:in zu wenden; Beigetretene kommen weiter ins
-Training. Der aktuelle Eigentümer-Kreis und die Administration gelangen über
-offene wie gesperrte Trainings-Links direkt zur Trainingsseite, ohne
-beizutreten: Auch wiederholte Aufrufe erzeugen weder Trainingsbindung noch
-Teilnahme und erhöhen die Zahl der Beigetretenen nicht. Erst ein tatsächlicher
-Sitzungsstart legt bei Bedarf die erforderliche Bindung und Teilnahme an.
-Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf unverändert erhalten.
-Der Link eines Entwurfs bleibt für alle Konten unbekannt (404). Ein Training
-ohne Vignetten lässt sich veröffentlichen und beitreten.
+gesperrtem Beitritt sehen neue und ausgetretene Konten die Meldung „Beitritt
+gesperrt“ (403) mit der Bitte, sich an die Ausbilder:in zu wenden; aktive
+Trainingsteilnehmende kommen weiter ins Training. Der aktuelle Eigentümer-Kreis
+und die Administration gelangen über offene wie gesperrte Trainings-Links direkt
+zur Trainingsseite, ohne beizutreten: Auch wiederholte Aufrufe erzeugen weder
+Trainingsbindung noch Teilnahme und erhöhen die Zahl der Beigetretenen nicht.
+Erst ein tatsächlicher Sitzungsstart legt bei Bedarf die erforderliche Bindung
+und Teilnahme an. Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf
+unverändert erhalten. Der Link eines Entwurfs bleibt für alle Konten unbekannt
+(404). Ein Training ohne Vignetten lässt sich veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
@@ -263,6 +263,23 @@ Person verschwindet für Kreis und Administration rückwirkend aus Fremdeinsicht
 Beigetretenen-Zahl und Trainingsexport, und sie selbst sieht genau das, was sie
 nach einem eigenen Austritt sähe. Wer entfernt hat, wird nicht gespeichert und
 nirgends angezeigt.
+
+## Wiederbeitritt
+
+Wer ausgetreten ist oder entfernt wurde, tritt über den offenen Trainings-Link
+wieder bei. Dieselbe Trainingsbindung lebt wieder auf; es entsteht weder eine
+zweite Bindung noch eine zweite Teilnahme. Das Training steht wieder im Katalog,
+die Trainingsseite bietet wieder Wahl, Start und Austritt, und „Meine Trainings“
+kennzeichnet es nicht mehr als ausgetreten. Die Person erscheint wieder in der
+Fremdeinsicht und in der Zahl der Beigetretenen, ihre früheren Sitzungen sind
+für Kreis und Administration wieder lesbar. Ruhende Freigaben wirken wieder,
+ohne neu erteilt zu werden; widerrufene bleiben widerrufen. Eine beim Austritt
+liegengebliebene laufende Sitzung lässt sich fortsetzen, solange sie noch in der
+Browser-Session steht.
+
+Ist der Beitritt gesperrt, bekommt die Ausgetretene die Meldung „Beitritt
+gesperrt“ (403) und bleibt ausgetreten. Ein Sitzungsstart belebt die Bindung
+nicht; das geht nur über den Trainings-Link.
 
 ## Fremdeinsicht im Training
 

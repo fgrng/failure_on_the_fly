@@ -120,15 +120,16 @@ class Training(EigentuemerKreis):
     def beitreten(self, konto: "Konto") -> bool:
         """Tritt dem Training über den Trainings-Link bei.
 
-        Liefert, ob das Konto danach dabei ist. Die Sperre hält nur Neue
-        fern; wer schon eine Bindung hat, bleibt dabei.
+        Liefert, ob das Konto danach dabei ist. Eine ausgetretene Bindung
+        lebt wieder auf. Die Sperre hält Neue und Ausgetretene fern; wer
+        aktiv dabei ist, bleibt dabei.
         """
         if (
             self.beitritt_gesperrt
-            and not self.trainingsbindung_set.filter(konto=konto).exists()
+            and not self.trainingsbindung_set.aktiv().filter(konto=konto).exists()
         ):
             return False
-        self.bindung_fuer(konto)
+        self.bindung_fuer(konto).wieder_beitreten()
         return True
 
     def bindung_fuer(self, konto: "Konto") -> "Trainingsbindung":
@@ -136,6 +137,7 @@ class Training(EigentuemerKreis):
 
         Beitritt und Sitzungsstart teilen sich diesen Weg; ein paralleler
         zweiter Aufruf scheitert an der Eindeutigkeit und lädt die erste.
+        Eine ausgetretene Bindung kommt unverändert zurück.
         """
         from sitzungen.models import Teilnahme
 
@@ -222,6 +224,15 @@ class Trainingsbindung(Bindung):
         """
         self.zustand = self.Zustand.AUSGETRETEN
         self.save(update_fields=["zustand"])
+
+    def wieder_beitreten(self) -> None:
+        """Belebt eine ausgetretene Bindung wieder; eine aktive bleibt, wie sie ist.
+
+        Nur der Beitritt über den Trainings-Link ruft diesen Weg (ADR-0049).
+        """
+        if not self.ist_aktiv:
+            self.zustand = self.Zustand.AKTIV
+            self.save(update_fields=["zustand"])
 
 
 class Abschrift(Bindung):
