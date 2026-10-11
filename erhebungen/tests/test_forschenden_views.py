@@ -2591,7 +2591,7 @@ class ErhebungsExportTests(TestCase):
             sitzung=sitzung, text="Bruchfehler", eingabemodus=Eingabemodus.GEMISCHT
         )
         training: Training = Training.objects.anlegen(ada, name="Nicht exportieren")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         trainingsteilnahme: Teilnahme = Teilnahme.objects.create()
         Trainingsbindung.objects.create(
             training=training,

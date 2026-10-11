@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from config.tests.aufbau import finale_vignette, vignetten_entwurf
 from konten.models import Konto
 from sitzungen.models import Teilnahme
-from training.models import Training, Trainingsbindung
+from training.models import Training, Trainingsbindung, Trainingsvignette
 from vignetten.models import Vignette
 
 
@@ -99,34 +99,38 @@ def test_training_bindet_nur_finale_vignetten_und_bleibt_austauschbar() -> None:
     finale: Vignette = finale_vignette(ada)
 
     with pytest.raises(ValidationError, match="finale"), transaction.atomic():
-        training.vignetten.add(entwurf)
+        training.vignette_aufnehmen(entwurf)
     with pytest.raises(IntegrityError, match="finale"), transaction.atomic():
-        training.vignetten.through.objects.create(
-            training=training,
-            vignette=entwurf,
+        Trainingsvignette.objects.bulk_create(
+            [Trainingsvignette(training=training, vignette=entwurf, position=1)]
         )
 
-    training.vignetten.add(finale)
+    training.vignette_aufnehmen(finale)
     training.veroeffentlichen()
-    training.vignetten.remove(finale)
+    training.vignette_entfernen(finale)
 
-    assert list(training.vignetten.all()) == []
+    assert list(training.vignetten_in_reihenfolge()) == []
 
 
 @pytest.mark.django_db
-def test_finale_vignette_kann_rueckwaerts_eingebunden_und_archiviert_werden() -> None:
-    """Die Rückwärtsrelation akzeptiert finale Fassungen und Archivieren entfernt sie."""
+def test_archivieren_entfernt_die_vignette_aus_allen_trainings() -> None:
+    """Eine archivierte Fassung verschwindet aus den Trainings, die sie enthielten."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    zweites: Training = Training.objects.anlegen(ada, name="Addition")
     finale: Vignette = finale_vignette(ada)
-
-    finale.training_set.add(training)
-    assert list(training.vignetten.all()) == [finale]
+    bleibende: Vignette = finale_vignette(ada, name="Bleibt")
+    training.vignette_aufnehmen(finale)
+    training.vignette_aufnehmen(bleibende)
+    zweites.vignette_aufnehmen(finale)
 
     finale.archivieren()
 
-    assert list(training.vignetten.all()) == []
+    assert [
+        list(training.vignetten_in_reihenfolge()),
+        list(zweites.vignetten_in_reihenfolge()),
+    ] == [[bleibende], []]
 
 
 @pytest.mark.django_db
@@ -163,4 +167,120 @@ def test_konto_hat_je_training_hoechstens_eine_trainingsbindung() -> None:
     with pytest.raises(IntegrityError), transaction.atomic():
         Trainingsbindung.objects.create(
             teilnahme=Teilnahme.objects.create(), training=training, konto=ada
+        )
+
+
+@pytest.mark.django_db
+def test_neu_aufgenommene_vignette_steht_am_ende() -> None:
+    """Die Vignetten eines Trainings folgen der Reihenfolge ihrer Aufnahme."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    erste: Vignette = finale_vignette(ada, name="Erste")
+    zweite: Vignette = finale_vignette(ada, name="Zweite")
+    dritte: Vignette = finale_vignette(ada, name="Dritte")
+
+    training.vignette_aufnehmen(zweite)
+    training.vignette_aufnehmen(dritte)
+    training.vignette_aufnehmen(erste)
+
+    assert list(training.vignetten_in_reihenfolge()) == [zweite, dritte, erste]
+
+
+@pytest.mark.django_db
+def test_entfernen_laesst_die_nachfolgenden_lueckenlos_nachruecken() -> None:
+    """Nach dem Entfernen tragen die übrigen Vignetten wieder die Positionen 1..n."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    vignetten: list[Vignette] = [
+        finale_vignette(ada, name=name) for name in ("Erste", "Zweite", "Dritte")
+    ]
+    for vignette in vignetten:
+        training.vignette_aufnehmen(vignette)
+
+    training.vignette_entfernen(vignetten[0])
+
+    assert list(
+        training.vignettenzugehoerigkeiten.values_list("vignette", "position")
+    ) == [(vignetten[1].pk, 1), (vignetten[2].pk, 2)]
+
+
+@pytest.mark.django_db
+def test_erneutes_aufnehmen_laesst_die_position_unveraendert() -> None:
+    """Eine Vignette steht höchstens einmal im Training."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    erste: Vignette = finale_vignette(ada, name="Erste")
+    zweite: Vignette = finale_vignette(ada, name="Zweite")
+    training.vignette_aufnehmen(erste)
+    training.vignette_aufnehmen(zweite)
+
+    training.vignette_aufnehmen(erste)
+
+    assert list(training.vignetten_in_reihenfolge()) == [erste, zweite]
+
+
+@pytest.mark.django_db
+def test_reihenfolge_gilt_je_training() -> None:
+    """Dieselbe Vignette steht in zwei Trainings an unterschiedlichen Stellen."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    zweites: Training = Training.objects.anlegen(ada, name="Addition")
+    erste: Vignette = finale_vignette(ada, name="Erste")
+    zweite: Vignette = finale_vignette(ada, name="Zweite")
+    training.vignette_aufnehmen(erste)
+    training.vignette_aufnehmen(zweite)
+    zweites.vignette_aufnehmen(zweite)
+    zweites.vignette_aufnehmen(erste)
+
+    assert [
+        list(training.vignetten_in_reihenfolge()),
+        list(zweites.vignetten_in_reihenfolge()),
+    ] == [[erste, zweite], [zweite, erste]]
+
+
+@pytest.mark.django_db
+def test_trainingsvignette_braucht_eine_position() -> None:
+    """Ohne Position lässt sich keine Vignette in ein Training einbinden."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Trainingsvignette.objects.create(
+            training=training, vignette=finale_vignette(ada), position=None
+        )
+
+
+@pytest.mark.django_db
+def test_position_ist_je_training_eindeutig() -> None:
+    """Zwei Vignetten eines Trainings teilen sich keine Position."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    Trainingsvignette.objects.create(
+        training=training, vignette=finale_vignette(ada, name="Erste"), position=1
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Trainingsvignette.objects.create(
+            training=training, vignette=finale_vignette(ada, name="Zweite"), position=1
+        )
+
+
+@pytest.mark.django_db
+def test_vignette_steht_hoechstens_einmal_im_training() -> None:
+    """Das Paar aus Training und Vignette gibt es nur einmal."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    vignette: Vignette = finale_vignette(ada)
+    Trainingsvignette.objects.create(training=training, vignette=vignette, position=1)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Trainingsvignette.objects.create(
+            training=training, vignette=vignette, position=2
         )

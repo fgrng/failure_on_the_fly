@@ -9,7 +9,7 @@ from django.urls import reverse
 from config.tests.aufbau import finale_vignette, vignetten_entwurf
 from konten.models import Konto
 from training.models import Training
-from training.tests.seite import tabellenzeilen
+from training.tests.seite import kuratierseite, nummerierte_vignetten, tabellenzeilen
 from vignetten.models import Vignette
 
 
@@ -439,3 +439,57 @@ class TrainingSichtbarkeitTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+class TrainingsreihenfolgeTests(TestCase):
+    """Die Vignetten eines Trainings erscheinen nummeriert in ihrer Reihenfolge."""
+
+    def setUp(self) -> None:
+        self.ada: Konto = get_user_model().objects.create_user(username="ada")
+        self.ada.groups.add(Group.objects.get(name="Ausbilder:in"))
+        self.training: Training = Training.objects.anlegen(self.ada, name="Brüche")
+        self.erste: Vignette = finale_vignette(self.ada, name="Erweitern")
+        self.zweite: Vignette = finale_vignette(self.ada, name="Kürzen")
+        self.dritte: Vignette = finale_vignette(self.ada, name="Addieren")
+
+    def _post(self, aktion: str, vignette: Vignette) -> None:
+        # Löst eine Kuratier-Aktion für die Vignette in diesem Training aus.
+
+        self.client.force_login(self.ada)
+        self.client.post(
+            reverse(f"training:vignette_{aktion}", args=[self.training.pk, vignette.pk])
+        )
+
+    def test_kuratieren_zeigt_die_vignetten_in_aufnahmereihenfolge(self) -> None:
+        """Neu Aufgenommenes steht am Ende, Entferntes lässt nachrücken."""
+        self._post("hinzufuegen", self.zweite)
+        self._post("hinzufuegen", self.dritte)
+        self._post("hinzufuegen", self.erste)
+        self._post("entfernen", self.dritte)
+
+        self.assertEqual(
+            nummerierte_vignetten(kuratierseite(self.client, self.training, self.ada)),
+            ["1. Kürzen", "2. Erweitern"],
+        )
+
+    def test_teilnehmende_sehen_nummerierte_vignetten_und_starten_jede(self) -> None:
+        """Die Detailseite folgt der Reihenfolge und verlinkt jede Vignette."""
+        for vignette in (self.dritte, self.erste, self.zweite):
+            self.training.vignette_aufnehmen(vignette)
+        self.training.veroeffentlichen()
+        grace: Konto = get_user_model().objects.create_user(username="grace")
+        self.training.beitreten(grace)
+        self.client.force_login(grace)
+
+        detail: HttpResponse = self.client.get(
+            reverse("training:detail", args=[self.training.pk])
+        )
+
+        self.assertEqual(
+            nummerierte_vignetten(detail.content.decode()),
+            ["1. Addieren", "2. Erweitern", "3. Kürzen"],
+        )
+        for vignette in (self.dritte, self.erste, self.zweite):
+            self.assertContains(
+                detail, reverse("training:wahl", args=[self.training.pk, vignette.pk])
+            )

@@ -172,6 +172,15 @@ vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
 Eigentümer:innen.
 
+Die Vignetten eines Trainings stehen in einer empfohlenen Reihenfolge. Eine neu
+aufgenommene Vignette steht am Ende; beim Entfernen rücken die übrigen lückenlos
+nach. Kuratierseite und Trainingsseite der Teilnehmenden zeigen die Vignetten in
+dieser Reihenfolge und nummeriert (1., 2., …); auf der Trainingsseite laufen die
+Nummern über die angezeigten finalen Vignetten. Die Reihenfolge ist nur ein
+Vorschlag: Jede Vignette bleibt frei und beliebig oft startbar, der Spielstand
+je Vignette bleibt sichtbar. Trainingssitzungen halten keine Vignettenposition
+fest, und der Trainingsexport bleibt unverändert.
+
 ## Geschlossenes Training und Beitritt
 
 Ein Training ist geschlossen (ADR-0049). Teilnehmende sehen im Trainingskatalog
@@ -210,12 +219,13 @@ dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite
 die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen als Zeilen,
-nach Namen sortiert, und den Vignetten des Trainings in Kuratierreihenfolge als
-Spalten. Wer noch keine abgeschlossene Sitzung hat, steht mit gedämpfter Schrift
-trotzdem in der Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer Zelle
-als runder Kreis mit ihrer laufenden Nummer zu dieser Vignette; beim Zeigen oder
-Fokussieren erscheint sofort ihr Datum. Eine leere Zelle trägt einen blassen
-Strich. Ein Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
+nach Namen sortiert, und den Vignetten des Trainings in empfohlener Reihenfolge
+als Spalten. Wer noch keine abgeschlossene Sitzung hat, steht mit gedämpfter
+Schrift trotzdem in der Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer
+Zelle als runder Kreis mit ihrer laufenden Nummer zu dieser Vignette; beim
+Zeigen oder Fokussieren erscheint sofort ihr Datum. Eine leere Zelle trägt einen
+blassen Strich. Ein Training ohne Vignetten zeigt statt der Tabelle einen
+Hinweis.
 
 Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
 Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen

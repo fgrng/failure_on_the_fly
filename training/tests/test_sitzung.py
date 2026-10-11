@@ -61,7 +61,7 @@ class TrainingssitzungTests(TestCase):
         )
         if kern_ueberholen:
             kern.bearbeiten().finalisieren()
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))

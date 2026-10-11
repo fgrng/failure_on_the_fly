@@ -148,9 +148,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for vignette in training.vignetten.all %}
+                    {% for vignette in vignetten %}
                         <tr>
-                            <td>{{ vignette.anzeigename }}</td>
+                            <td>{{ forloop.counter }}. {{ vignette.anzeigename }}</td>
                             <td>
                                 <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}" style="margin: 0;">
                                     {% csrf_token %}

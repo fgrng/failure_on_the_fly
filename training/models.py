@@ -5,7 +5,8 @@ from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
-from django.db.models.signals import m2m_changed, post_delete
+from django.db.models import F, Max
+from django.db.models.signals import post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
@@ -14,6 +15,7 @@ from vignetten.models import vignette_archiviert
 
 if TYPE_CHECKING:
     from konten.models import Konto
+    from vignetten.models import Vignette
 
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
@@ -75,7 +77,9 @@ class Training(EigentuemerKreis):
         choices=Zustand,
         default=Zustand.ENTWURF,
     )
-    vignetten: models.ManyToManyField = models.ManyToManyField("vignetten.Vignette")
+    vignetten: models.ManyToManyField = models.ManyToManyField(
+        "vignetten.Vignette", through="Trainingsvignette"
+    )
     trainings_link: models.UUIDField = models.UUIDField(
         default=uuid4,
         unique=True,
@@ -111,6 +115,48 @@ class Training(EigentuemerKreis):
             self.save(update_fields=["zustand"])
         finally:
             del self._wechselt_zustand
+
+    def vignetten_in_reihenfolge(self) -> models.QuerySet["Vignette"]:
+        """Liefert die Vignetten des Trainings in empfohlener Reihenfolge."""
+        from vignetten.models import Vignette
+
+        return Vignette.objects.filter(trainingsvignette__training=self).order_by(
+            "trainingsvignette__position"
+        )
+
+    @transaction.atomic
+    def vignette_aufnehmen(self, vignette: "Vignette") -> None:
+        """Hängt eine finale Vignette ans Ende der Reihenfolge an.
+
+        Eine bereits aufgenommene Vignette behält ihre Position.
+        """
+        zugehoerigkeiten: models.QuerySet[Trainingsvignette] = (
+            self.vignettenzugehoerigkeiten.select_for_update()
+        )
+        if zugehoerigkeiten.filter(vignette=vignette).exists():
+            return
+        hoechste: int | None = zugehoerigkeiten.aggregate(Max("position"))[
+            "position__max"
+        ]
+        Trainingsvignette.objects.create(
+            training=self, vignette=vignette, position=(hoechste or 0) + 1
+        )
+
+    @transaction.atomic
+    def vignette_entfernen(self, vignette: "Vignette") -> None:
+        """Entfernt eine Vignette; die nachfolgenden rücken lückenlos nach."""
+        zugehoerigkeiten: models.QuerySet[Trainingsvignette] = (
+            self.vignettenzugehoerigkeiten.select_for_update()
+        )
+        zugehoerigkeiten.filter(vignette=vignette).delete()
+        ids: list[int] = list(
+            zugehoerigkeiten.order_by("position").values_list("pk", flat=True)
+        )
+        # Erst hinter die höchste Position rücken, damit kein Zwischenstand
+        # die eindeutigen Positionen kreuzt.
+        zugehoerigkeiten.update(position=F("position") + len(ids) + 1)
+        for position, zugehoerigkeit_id in enumerate(ids, start=1):
+            zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
 
     def beitreten(self, konto: "Konto") -> bool:
         """Tritt dem Training über den Trainings-Link bei.
@@ -153,6 +199,47 @@ class Training(EigentuemerKreis):
                 return Trainingsbindung.objects.select_related("teilnahme").get(
                     training=self, konto=konto
                 )
+
+
+class Trainingsvignette(models.Model):
+    """Eine finale Vignette eines Trainings an ihrer empfohlenen Position.
+
+    Anders als die Erhebungsvignette friert sie nicht ein: Ein Training lässt
+    sich auch nach dem Veröffentlichen umstellen.
+    """
+
+    training: models.ForeignKey = models.ForeignKey(
+        Training,
+        on_delete=models.CASCADE,
+        related_name="vignettenzugehoerigkeiten",
+    )
+    vignette: models.ForeignKey = models.ForeignKey(
+        "vignetten.Vignette", on_delete=models.CASCADE
+    )
+    position: models.PositiveIntegerField = models.PositiveIntegerField()
+
+    class Meta:
+        """Macht Mitgliedschaft und Position je Training eindeutig."""
+
+        ordering: list[str] = ["position"]
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["training", "vignette"],
+                name="training_vignette_ist_je_training_eindeutig",
+            ),
+            models.UniqueConstraint(
+                fields=["training", "position"],
+                name="training_vignettenposition_ist_eindeutig",
+            ),
+        ]
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Bindet nur finale Vignetten ein."""
+        from vignetten.models import Vignette
+
+        if self.vignette.zustand != Vignette.Zustand.FINAL:
+            raise ValidationError("Trainings können nur finale Vignetten einbinden.")
+        super().save(*args, **kwargs)
 
 
 class Trainingsbindung(Bindung):
@@ -201,45 +288,14 @@ class Abschrift(Bindung):
     )
 
 
-def _pruefe_finale_vignetten(
-    sender: type[models.Model],
-    instance: models.Model,
-    action: str,
-    reverse: bool,
-    pk_set: set[int] | None,
-    **kwargs: object,
-) -> None:
-    """Hält nicht-finale Vignetten aus Trainings heraus."""
-    if action != "pre_add" or not pk_set:
-        return
-    from vignetten.models import Vignette
-
-    if reverse:
-        if instance.zustand != Vignette.Zustand.FINAL:
-            raise ValidationError("Trainings können nur finale Vignetten einbinden.")
-        return
-    if (
-        Vignette.objects.filter(pk__in=pk_set)
-        .exclude(zustand=Vignette.Zustand.FINAL)
-        .exists()
-    ):
-        raise ValidationError("Trainings können nur finale Vignetten einbinden.")
-
-
-m2m_changed.connect(
-    _pruefe_finale_vignetten,
-    sender=Training.vignetten.through,
-    dispatch_uid="training.pruefe_finale_vignetten",
-)
-
-
 def _archivierte_vignette_aus_trainings_entfernen(
     sender: type[models.Model],
     instance: models.Model,
     **kwargs: object,
 ) -> None:
     """Entfernt eine gerade archivierte Vignette aus allen Trainings."""
-    Training.vignetten.through.objects.filter(vignette_id=instance.pk).delete()
+    for training in Training.objects.filter(vignetten=instance):
+        training.vignette_entfernen(instance)
 
 
 vignette_archiviert.connect(

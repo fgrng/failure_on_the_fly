@@ -33,7 +33,7 @@ class SeitenvokabularTests(TestCase):
             lernauftrag_text="Vergleiche Brüche.",
             arbeitsheft_text="3/4 ist größer als 2/3.",
         )
-        self.veroeffentlicht.vignetten.add(self.finale)
+        self.veroeffentlicht.vignette_aufnehmen(self.finale)
         self.veroeffentlicht.veroeffentlichen()
         self.erhebung: Erhebung = Erhebung.objects.anlegen(self.linus, name="Pilot")
         self.item: FragebogenItem = FragebogenItem.objects.anlegen(self.linus)
