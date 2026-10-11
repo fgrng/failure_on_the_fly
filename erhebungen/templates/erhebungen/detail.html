@@ -48,6 +48,7 @@
     {% if stichproben %}
         <div class="vignette-detail-actions">
             <a class="button" href="{% url 'erhebungen:export' erhebung.pk %}">Datenspur herunterladen</a>
+            {% if hat_teilnahmen %}<a class="button button--secondary" href="{% url 'erhebungen:einsicht' erhebung.pk %}">Einsicht</a>{% endif %}
         </div>
     {% endif %}
 

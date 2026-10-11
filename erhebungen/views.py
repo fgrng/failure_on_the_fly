@@ -57,6 +57,7 @@ from .models import (
     Erhebungsvignette,
     Itemblock,
     Stichprobe,
+    Vignettenziehung,
 )
 from .teilnahme_session import (
     token_aus_session,
@@ -438,6 +439,9 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
             "stichproben": stichproben,
+            "hat_teilnahmen": any(
+                stichprobe.teilnahmezahl for stichprobe in stichproben
+            ),
         },
     )
 
@@ -463,6 +467,96 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     return zip_download("erhebung", erhebung.pk, erhebung.name, datenspur_zip(erhebung))
+
+
+def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
+    """Die Darstellung einer Sitzung im Raster der Einsicht."""
+
+    if fluechtig:
+        return "fluechtig"
+    if sitzung.status in (Sitzung.Status.ABGEBROCHEN, Sitzung.Status.GESCHEITERT):
+        return "warnung"
+    if sitzung.status == Sitzung.Status.LAUFEND:
+        return "laufend"
+    return ""
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt die Übersicht der Fremdeinsicht einer sichtbaren Erhebung (ADR-0049)."""
+
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    vignetten: list[Vignette] = [
+        zugehoerigkeit.vignette
+        for zugehoerigkeit in erhebung.vignettenzugehoerigkeiten.select_related(
+            "vignette__historie"
+        )
+    ]
+    sitzungen: dict[tuple[int, int], Sitzung] = {
+        (sitzung.teilnahme_id, sitzung.vignette_id): sitzung
+        for sitzung in Sitzung.objects.in_erhebungen_einsehbar(
+            Erhebung.objects.sichtbar_fuer(request.user)
+        ).filter(teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung)
+    }
+    positionen: dict[tuple[int, int], int] = {
+        (ziehung.erhebungsbindung.teilnahme_id, ziehung.vignette_id): ziehung.position
+        for ziehung in Vignettenziehung.objects.filter(
+            erhebungsbindung__stichprobe__erhebung=erhebung
+        ).select_related("erhebungsbindung")
+    }
+    # Zeilen sind die Teilnahmen mit Ziehung oder Einwilligung a; wer sie
+    # abgelehnt hat, hat weder Ziehung noch Sitzung.
+    bindungen: QuerySet[Erhebungsbindung] = (
+        Erhebungsbindung.objects.filter(stichprobe__erhebung=erhebung)
+        .filter(
+            Q(vignettenziehungen__isnull=False)
+            | Q(teilnahme__sprachmodell_eingewilligt=True)
+        )
+        .distinct()
+        .select_related("teilnahme")
+        .order_by("erstellt_am", "pk")
+    )
+    zeilen_je_stichprobe: dict[int, list[dict[str, object]]] = {}
+    for bindung in bindungen:
+        fluechtig: bool = bindung.teilnahme.ist_fluechtig
+        zellen: list[dict[str, object] | None] = []
+        for vignette in vignetten:
+            schluessel: tuple[int, int] = (bindung.teilnahme_id, vignette.pk)
+            sitzung: Sitzung | None = sitzungen.get(schluessel)
+            zellen.append(
+                None
+                if sitzung is None
+                else {
+                    "position": positionen.get(schluessel),
+                    "status": sitzung.get_status_display(),
+                    "variante": _bubble_variante(sitzung, fluechtig),
+                }
+            )
+        zeilen_je_stichprobe.setdefault(bindung.stichprobe_id, []).append(
+            {
+                "kennung": bindung.teilnahme.kennung,
+                "fluechtig": fluechtig,
+                "ohne_sitzung": not any(zellen),
+                "zellen": zellen,
+            }
+        )
+
+    return render(
+        request,
+        "erhebungen/einsicht.html",
+        {
+            "erhebung": erhebung,
+            "vignetten": vignetten,
+            "stichproben": [
+                {
+                    "stichprobe": stichprobe,
+                    "zeilen": zeilen_je_stichprobe.get(stichprobe.pk, []),
+                }
+                for stichprobe in erhebung.stichprobe_set.order_by("beginn", "pk")
+            ],
+        },
+    )
 
 
 @login_required

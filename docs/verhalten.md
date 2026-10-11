@@ -991,6 +991,28 @@ Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen�
 von »nie gesehen«. Flüchtige Teilnahmen haben Itemblöcke, aber keine
 Antwortzeilen.
 
+## Einsicht in die Erhebung
+
+Hat eine Erhebung Teilnahmen, steht auf ihrer Detailseite neben dem Export der
+Link „Einsicht“ (ADR-0049). Die Übersicht ist rein lesend und für den Kreis der
+Erhebung und die Administration erreichbar, auch für Teilnahmen von vor der
+Aufnahme in den Kreis und nach dem Archivieren von Stichprobe oder Erhebung. Wer
+aus dem Kreis ausgetreten ist und fremde Forschende bekommen 404, Konten ohne
+Forschungsrolle 403.
+
+Je Stichprobe zeigt sie ein Raster wie die Fremdeinsicht im Training: eine Zeile
+je Teilnahme, beschriftet mit ihrer Teilnahmekennung und nach Beginn sortiert,
+die älteste oben, und eine Spalte je Vignette in der Reihenfolge der Erhebung.
+Jede Zelle hält höchstens eine Sitzung als runde Bubble mit der gespielten
+Position aus der Vignettenziehung; Tooltip und Screenreader nennen ihren Status.
+Abgeschlossene Sitzungen erscheinen normal, abgebrochene und gescheiterte in
+Warnfarbe, laufende gedimmt. Flüchtige Teilnahmen zeigen nur umrandete Bubbles,
+und ihre Zeile trägt den Hinweis „flüchtig, nur Ablaufgerüst“. Eingewilligte
+Teilnahmen ohne Sitzung stehen mit „noch keine Sitzung“ in der Liste;
+Teilnahmen, die Einwilligung a abgelehnt oder noch nicht gegeben haben, fehlen.
+Das Teilnahme-Token steht nirgends auf der Seite. Die Bubbles öffnen noch keine
+Sitzung.
+
 ## Fragebogen-Items verwalten
 
 Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die

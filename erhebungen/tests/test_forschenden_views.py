@@ -148,7 +148,7 @@ def _forschenden_routen() -> list[tuple[str, dict[str, object]]]:
 
 _FORSCHENDEN_ROUTEN: list[tuple[str, dict[str, object]]] = _forschenden_routen()
 # Routen unter ``eigene/``, die GET annehmen; jede andere muss POST verlangen.
-_LESEROUTEN: set[str] = {"liste", "anlegen", "detail", "export"}
+_LESEROUTEN: set[str] = {"liste", "anlegen", "detail", "export", "einsicht"}
 
 
 @pytest.mark.django_db
