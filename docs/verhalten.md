@@ -222,9 +222,9 @@ Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
 alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor ihrer
 Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
 Sitzungen, Sitzungen derselben Person in einem fremden Training und jede Sitzung
-für ausgetretene Kreismitglieder, fremde Konten oder die Autor:in der Vignette
-antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
-Status lesbar, ebenfalls ohne Denkspur.
+für aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in
+der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die
+Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt

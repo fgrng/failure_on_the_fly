@@ -199,15 +199,19 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, gena
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Abschrift**:
-Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar.
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
 _Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
-Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem eine Gruppe ihre Abschriften freigibt. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
-_Avoid_: Übung, Kurs, Übungsmodus
+Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem die Trainingsteilnehmenden ihre Abschriften freigeben. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
+_Avoid_: Übung, Kurs, Übungsmodus; Gruppe, Mitglieder (für die Trainingsteilnehmenden)
+
+**Austritt aus dem Training**:
+Das Ende der Trainingsteilnahme eines Kontos, selbst gewählt oder durch **Entfernen** seitens des Kreises; beide Wege führen in denselben Zustand. Er ist kein Löschen und umkehrbar: Die eigenen Sitzungen bleiben in der Selbsteinsicht, verschwinden aber samt den Freigaben vollständig aus Fremdeinsicht und Trainingsexport und kehren mit dem Wiederbeitritt über den Trainings-Link zurück. Entfernen ist deshalb kein Ausschluss.
+_Avoid_: Austritt (unqualifiziert), Verlassen, Abmelden, Ausschluss
 
 **Trainings-Link**:
-Der stabile Zugangsweg, über den ein Konto einem Training beitritt. Der Kreis verteilt ihn an seine Gruppe und kann den Beitritt sperren und wieder öffnen. Anders als der Teilnahme-Link setzt er ein Nutzerkonto voraus und erzeugt kein Teilnahme-Token.
+Der stabile Zugangsweg, über den ein Konto einem Training beitritt. Der Kreis verteilt ihn an die künftigen Trainingsteilnehmenden und kann den Beitritt sperren und wieder öffnen; die Sperre hält auch Ausgetretene vom Wiederbeitritt ab. Anders als der Teilnahme-Link setzt er ein Nutzerkonto voraus und erzeugt kein Teilnahme-Token.
 _Avoid_: Teilnahme-Link, Einladungslink, Beitrittscode
 
 **Erhebung**:
@@ -247,7 +251,7 @@ Das nachträgliche, rein lesende Ansehen der eigenen persistierten Sitzungen dur
 _Avoid_: Sitzungsansicht, Review, Rückblick
 
 **Fremdeinsicht**:
-Das nachträgliche, rein lesende Ansehen fremder persistierter Sitzungen. Sie entsteht allein aus dem Anlass, unter dem die Sitzung gespielt wurde, nie aus der Vignette: Die Ausbilder:innen eines Trainings sehen die abgeschlossenen Sitzungen, die in diesem Training gespielt oder als Abschrift für es freigegeben wurden, namentlich und genau so, wie die Teilnehmer:in sie sieht — also ohne Denkspur. Die Forschenden einer Erhebung dürfen deren Sitzungen pseudonym und samt Denkspur einsehen. Die Autor:in einer Vignette hat aus ihr keine Fremdeinsicht.
+Das nachträgliche, rein lesende Ansehen fremder persistierter Sitzungen. Sie entsteht allein aus dem Anlass, unter dem die Sitzung gespielt wurde, nie aus der Vignette: Die Ausbilder:innen eines Trainings sehen die abgeschlossenen Sitzungen seiner Trainingsteilnehmenden, die in diesem Training gespielt oder als Abschrift für es freigegeben wurden, namentlich und genau so, wie die Teilnehmer:in sie sieht — also ohne Denkspur. Die Forschenden einer Erhebung dürfen deren Sitzungen pseudonym und samt Denkspur einsehen. Die Autor:in einer Vignette hat aus ihr keine Fremdeinsicht.
 _Avoid_: Trainingsdaten, Sitzungseinsicht, Monitoring
 
 **Trainingsexport**:
@@ -320,11 +324,11 @@ _Avoid_: Fragebogenseite, Block, Formular
 ## Rollen
 
 **Eigentümer-Kreis**:
-Die Menge gleichrangiger Konten, denen ein fachlicher Bestand gehört: eine Vignettenhistorie, eine Fragebogen-Item-Historie, ein Training oder eine Erhebung. Eigentümerschaft ist uniform und alles-oder-nichts je Objekt; bei Vignette und Fragebogen-Item hängt der Kreis an der Historie, bei Training und Erhebung am Objekt selbst (ADR-0032, ADR-0037). Ein Bestand ist sichtbar für seinen Kreis und die Administration, für niemanden sonst. Ein aktiver Bestand hat mindestens ein Mitglied; **Austritt** ist das Verlassen des Kreises und für das letzte Mitglied gesperrt. Eine Übertragung gibt es nicht, nur Aufnehmen und Austreten. **Ko-Autorschaft** ist der Weg in den Kreis, kein Synonym: Wer aufgenommen wird, ist Ko-Autor:in und damit Mitglied (ADR-0022).
-_Avoid_: Ko-Eigentümerin, Besitzerin, Inhaberin, Owner
+Die Menge gleichrangiger Konten, denen ein fachlicher Bestand gehört: eine Vignettenhistorie, eine Fragebogen-Item-Historie, ein Training oder eine Erhebung. Eigentümerschaft ist uniform und alles-oder-nichts je Objekt; bei Vignette und Fragebogen-Item hängt der Kreis an der Historie, bei Training und Erhebung am Objekt selbst (ADR-0032, ADR-0037). Ein Bestand ist sichtbar für seinen Kreis und die Administration, für niemanden sonst. Die Konten im Kreis heißen **Eigentümer:innen**. Ein aktiver Bestand hat mindestens eine Eigentümer:in; der **Austritt aus dem Kreis** ist für die letzte gesperrt. Eine Übertragung gibt es nicht, nur Aufnehmen und Austreten. **Ko-Autorschaft** ist der Weg in den Kreis, kein Synonym: Wer aufgenommen wird, ist Ko-Autor:in und damit Eigentümer:in (ADR-0022).
+_Avoid_: Ko-Eigentümerin, Besitzerin, Inhaberin, Owner; Mitglied, Kreismitglied; Austritt (unqualifiziert)
 
 **Teilnehmer:in**:
-Wer Sitzungen führt und diagnostiziert. In einer Erhebung pseudonym über ein Teilnahme-Token, im Training über ein Nutzerkonto.
+Wer Sitzungen führt und diagnostiziert. Als **Erhebungsteilnehmer:in** pseudonym über ein Teilnahme-Token; als **Trainingsteilnehmer:in** über ein Nutzerkonto, das dem Training beigetreten und nicht ausgetreten ist.
 _Avoid_: Proband, Nutzer, Studierende
 
 **Autor:in**:
