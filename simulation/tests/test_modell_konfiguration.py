@@ -348,3 +348,17 @@ def test_die_verwendung_hat_keinen_default() -> None:
         ModellKonfiguration.objects.aktivieren(  # ty: ignore[missing-argument]
             ModellKonfiguration(bezeichnung="Test", sprachmodell="fake")
         )
+
+
+@pytest.mark.django_db
+def test_erlaubt_fortlesen_des_skripts_nur_beim_anbieter_fake() -> None:
+    """Das Fortlesen über Aufrufe ist ein opt-in des Fakes, kein Modellparameter."""
+
+    ModellKonfiguration.objects.create(
+        bezeichnung="Test",
+        sprachmodell="fake",
+        parameter={"skript": [], "skript_fortlesen": True},
+    )
+
+    with pytest.raises(ValidationError, match="skript_fortlesen"):
+        _openrouter(parameter={"skript_fortlesen": True})

@@ -226,6 +226,14 @@ läuft deshalb mit Thread-Workern, ausgelegt auf 150 gleichzeitige Sitzungen
 selbst: ein Gesprächsschritt auf höchstens 90 s über alle Versuche, eine
 Transkription auf höchstens 120 s.
 
+Daneben läuft ein zweiter supervisord-Dienst, `manage.py evallaeufe_abarbeiten`.
+Er arbeitet die Evalläufe ab, die Autor:innen an ihren Vignetten starten, einen
+nach dem anderen und ohne Web-Thread; er teilt sich `.env` und SQLite-Datei mit
+gunicorn. Einrichtung, Start/Stop/Neustart, Logs, Update und Wiederherstellung
+beider Dienste stehen im Walkthrough. Lokal lässt sich der Dienst ohne
+Zugangsdaten durchspielen:
+[docs/evallauf-durchspielprobe.md](docs/evallauf-durchspielprobe.md).
+
 ## Weitere Dokumentation
 
 - [GLOSSARY.md](GLOSSARY.md) — Glossar der verwendeten Domänensprache

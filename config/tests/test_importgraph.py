@@ -26,6 +26,9 @@ _KANTEN: dict[str, frozenset[str]] = {
     "simulation": frozenset({"konten"}),
     "vignetten": frozenset({"konten", "simulation"}),
     "sitzungen": frozenset({"konten", "texte", "simulation", "vignetten"}),
+    # Nichts zeigt auf `evals`; `vignetten` liest den Evallauf allein über den
+    # Reverse-Accessor und verlinkt per URL-Name (ADR-0046).
+    "evals": frozenset({"konten", "simulation", "vignetten"}),
     "erhebungen": frozenset(
         {
             "config",

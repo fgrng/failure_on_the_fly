@@ -1,0 +1,87 @@
+/* Evallauf: links Evalinputs mit Kriterienquoten, rechts das gewählte
+   Evalgespräch. Spalten, Trennlinie und Auswahl kommen aus evalkatalog.css,
+   Felder aus vignette-form.css. */
+
+.evallauf-auswahl {
+    grid-template-columns: minmax(190px, 1fr) minmax(0, 2fr);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+}
+
+.evallauf-auswahl > * { min-width: 0; }
+/* Hält die Trennlinie rechts, bis der Hauptbereich schmal wird. */
+.evallauf-auswahl .evallauf-inputs { padding: 0 var(--space-3) 0 0; border-right: 1px solid var(--color-border); border-bottom: 0; }
+.evallauf-inputs h2 { margin: 0; font-size: 1.05rem; }
+
+.evallauf-inputs a {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+    overflow-wrap: anywhere;
+}
+
+.evallauf-inputs a[aria-current="page"] { border-color: var(--area-solid); font-weight: 400; }
+.evallauf-inputs a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.evallauf-quote { display: block; margin-top: var(--space-1); font-size: .8rem; }
+.evallauf-quote > span, .evallauf-quote small { display: block; }
+
+.evallauf--erfuellt { color: var(--color-success); }
+.evallauf--nicht-erfuellt { color: var(--color-danger); }
+.evallauf--offen { color: var(--color-info); }
+
+.evallauf-gespraech header p { margin: 0 0 var(--space-1); }
+.evallauf-gespraech h3 { margin: 0; }
+
+.evallauf-wiederholung { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.evallauf-wiederholung .vignette-field { flex: 0 1 16rem; }
+
+.evallauf-verlauf, .evallauf-urteile { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.evallauf-blase {
+    padding: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+    overflow-wrap: anywhere;
+}
+
+.evallauf-blase--lehrperson { border-left: 3px solid var(--area-solid); }
+.evallauf-blase--schuelerin { border-left: 3px solid var(--color-accent); }
+.evallauf-blase p { margin: var(--space-1) 0; white-space: pre-line; }
+.evallauf-blase small { color: var(--color-text-muted); }
+
+.evallauf-blase details {
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: .9rem;
+}
+
+.evallauf-blase summary, .evallauf-angaben summary { width: fit-content; cursor: pointer; }
+.evallauf-blase pre { margin: var(--space-1) 0 0; white-space: pre-wrap; font-size: .8rem; }
+
+/* Die manuelle Korrektur eines Urteils: Begründung und Aktionen untereinander. */
+.evallauf-korrektur form { display: grid; gap: var(--space-2); justify-items: start; margin-top: var(--space-2); }
+.evallauf-korrektur .vignette-field { width: 100%; }
+.evallauf-korrektur textarea { width: 100%; }
+
+/* Der Zustand: oben ohne Lauf oder bei offenem Lauf, sonst als Fußzeile. */
+.evallauf-kopf, .evallauf-fuss { display: grid; gap: var(--space-2); padding: var(--space-3) 0; }
+.evallauf-kopf { border-top: 1px solid var(--color-border); }
+.evallauf-fuss { margin-top: var(--space-4); border-top: 1px solid var(--color-border); }
+
+.evallauf-zeile { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; justify-content: space-between; }
+.evallauf-zeile p { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: baseline; margin: 0; font-size: .86rem; }
+.evallauf-zeile form { margin: 0; }
+.evallauf-zeile small, .evallauf-zeile__marke { color: var(--color-text-muted); }
+.evallauf-zeile__hinweis { margin: 0; color: var(--color-info); font-size: .86rem; }
+
+.evallauf-angaben { color: var(--color-text-muted); font-size: .8rem; }
+.evallauf-angaben .field-grid { margin-top: var(--space-2); }
+
+/* Erst auf schmalem Hauptbereich stehen die Spalten untereinander. */
+@container hauptbereich (max-width: 560px) {
+    .evallauf-auswahl { grid-template-columns: minmax(0, 1fr); }
+    .evallauf-auswahl .evallauf-inputs { padding: 0 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
+    .evallauf-zeile { flex-direction: column; align-items: start; }
+}
