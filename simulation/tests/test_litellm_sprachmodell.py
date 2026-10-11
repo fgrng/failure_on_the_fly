@@ -411,15 +411,11 @@ def test_antwort_versuchen_haengt_eine_leere_user_prompt_vorlage_nicht_an() -> N
         Simulationskern(system_prompt_vorlage="Rolle: $fehlermuster")
     )
 
-    assert nachrichten[0] == {
-        "role": "system",
-        "content": "Rolle: Brüche werden addiert.",
-    }
-    assert [nachricht["role"] for nachricht in nachrichten] == [
-        "system",
-        "user",
-        "assistant",
-        "user",
+    assert nachrichten == [
+        {"role": "system", "content": "Rolle: Brüche werden addiert."},
+        {"role": "user", "content": "Wie rechnest du?"},
+        {"role": "assistant", "content": "Ich addiere."},
+        {"role": "user", "content": "Warum so?"},
     ]
 
 

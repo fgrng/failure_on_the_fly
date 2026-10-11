@@ -68,7 +68,7 @@ der Vignette gar nicht vorkommen. Kriterien: `03-fehlermuster-leitfaden.md`.
 
 **Lernauftrag** `[Prompt + sichtbar]` — der Aufgabentext, den die simulierte
 Schüler:in bearbeitet hat. Steht der Teilnehmer:in während der ganzen Sitzung im
-Aufgabenkontext und geht wörtlich in den User-Prompt.
+Aufgabenkontext und geht wörtlich in den Arbeitskontext.
 
 **Arbeitsheft Beschreibung** `[Prompt]` — die textuelle Beschreibung dessen, was
 im Arbeitsheft zu sehen ist. Sie existiert für die Simulation; der Arbeitsheft-
@@ -115,9 +115,10 @@ simulierten Schüler:in unbekannt.
 steuert Anrede, Pronomen und Illustration.
 
 **Fach**, **Thema**, **Klassenstufe** `[Prompt + sichtbar]` — der
-Unterrichtskontext. Alle drei stehen im System-Prompt, im User-Prompt und in der
-Rahmenhandlung. Fach und Thema haben im Editor eine Autovervollständigung über
-die bereits vergebenen Werte; bestehende Schreibweisen möglichst übernehmen.
+Unterrichtskontext. Alle drei stehen im System-Prompt, im Arbeitskontext und in
+der Rahmenhandlung. Fach und Thema haben im Editor eine Autovervollständigung
+über die bereits vergebenen Werte; bestehende Schreibweisen möglichst
+übernehmen.
 
 **Referenzdiagnose** `[Interne Notiz]` — die fachdidaktische Notiz der Autor:in
 zum Fehlermuster. Optional und ohne jede Wirkung auf Simulation und Ablauf; sie
