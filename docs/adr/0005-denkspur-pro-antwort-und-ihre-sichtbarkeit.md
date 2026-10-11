@@ -24,6 +24,8 @@ Der Gesprächsverlauf, der bei jedem Zug an das Modell zurückgeht, enthält die
 
 Der Verlauf reist als **native Konversationsnachrichten** des Anbieters, nicht als nacherzählter Verlaufsblock im User-Prompt. Die Einträge der simulierten Schüler:in tragen ausschließlich ihre sichtbare Äußerung als Klartext — die Denkspur bleibt also auch dann draußen, wenn die Antwort, aus der sie stammt, wieder im Kontext steht.
 
+> **Nachgeführt durch ADR-0052 (Nachrichtenrollen):** Der Arbeitskontext steht im System-Prompt; jede `user`-Nachricht an die simulierte Schüler:in ist eine Ansprache der Teilnehmer:in.
+
 ## Sichtbarkeit
 
 Die Sichtbarkeit ist bewusst gestaffelt:
