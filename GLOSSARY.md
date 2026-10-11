@@ -140,8 +140,12 @@ Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Mo
 _Avoid_: Autovervollständigung, Autocomplete, Typeahead, Modellpicker, Modellauswahl — eine Auswahl schlösse aus, was hier nur vorgeschlagen wird.
 
 **Simulationskern**:
-Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Prompt-Vorlage, User-Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
+Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
 _Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
+
+**Arbeitskontext**:
+Der Aufgabenkontext, wie ihn die simulierte Schüler:in kennt: Lernauftrag, Arbeitsheft und deren Simulationshinweise. Er gehört zu ihrer Rolle, nicht zum Gespräch; was im Diagnosegespräch gesagt wurde, weiß sie zusätzlich.
+_Avoid_: User-Prompt, Kontext-Prompt, Aufgabenkontext (meint die Vignettenfelder, nicht das Wissen der Schüler:in)
 
 **Standardkern**:
 Die im Code mitgeführte kanonische Erstfassung der fünf Inhaltsfelder des Simulationskerns. Er ist selbst keine Fassung und kein Zustand, sondern der Ausgangspunkt, aus dem eine frische Instanz ihre erste Kern-Fassung zieht — über die Verwaltungsseite als Entwurf, über `manage.py kern_initialisieren` als sofort spielbare finale Fassung. Danach spielt er keine Rolle mehr: Jede spätere Fassung entsteht aus ihrer Vorgängerin, nie erneut aus ihm.
@@ -234,6 +238,10 @@ _Avoid_: Einladungslink, Studienlink, Erhebungslink, Stichprobenlink
 Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0043).
 _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 
+**Teilnahmekennung**:
+Der kurze, stabile Name, unter dem eine Teilnahme pseudonym erscheint: eine Erhebungsteilnahme in der Fremdeinsicht und im Export ihrer Erhebung, eine Trainingsteilnahme im Trainingsexport. Er wird bei Entstehung der Teilnahme zufällig vergeben und trägt daher nichts in sich: Bei der Erhebung führt er nicht auf das Teilnahme-Token und öffnet weder die Teilnahme noch eine Abschrift; die Abschrift erhält einen eigenen, nicht den der Erhebungsteilnahme. Beim Training führt er nicht auf das Konto, bleibt über Austritt und Wiederbeitritt gleich und unterscheidet sich zwischen Trainings, sodass Exporte verschiedener Trainings nicht zu verknüpfen sind. Weil er überall gleich lautet, lassen sich Einsicht und Exporte eines Anlasses aufeinander beziehen.
+_Avoid_: Kennzeichen, Token, Pseudonym, Teilnehmer-ID
+
 **Einwilligungen**:
 Die drei Entscheidungen, die eine Teilnehmer:in am Einwilligungstor einer Erhebung getrennt trifft: **a) Verarbeitung durch Sprachmodelle**, **b) Spracherkennung** und **c) Speicherung und Verwendung für Forschungszwecke**. Jede ist eine Pflichtwahl ohne Vorauswahl unter einem festen, nicht abschaltbaren Systemtext; b wird nur angeboten, wenn die Instanz transkribiert. Sie stehen dreiwertig an der Teilnahme — ja, nein oder leer für „nicht entschieden oder nicht angeboten“ — und gehen in den Export (ADR-0029). Allein a entscheidet über den Zutritt: Ohne sie führt jeder Teilnahmeweg auf die **Abbruchseite**, und es entstehen weder Ziehung noch Sitzung. Bis a erteilt ist, lassen sich die Entscheidungen neu treffen, danach stehen alle drei fest. Im Code heißt b weiterhin Audioverarbeitung.
 _Avoid_: Einwilligung erteilt, Teilnahmeeinwilligung, Zustimmung, Consent
@@ -251,11 +259,11 @@ Das nachträgliche, rein lesende Ansehen der eigenen persistierten Sitzungen dur
 _Avoid_: Sitzungsansicht, Review, Rückblick
 
 **Fremdeinsicht**:
-Das nachträgliche, rein lesende Ansehen fremder persistierter Sitzungen. Sie entsteht allein aus dem Anlass, unter dem die Sitzung gespielt wurde, nie aus der Vignette: Die Ausbilder:innen eines Trainings sehen die abgeschlossenen Sitzungen seiner Trainingsteilnehmenden, die in diesem Training gespielt oder als Abschrift für es freigegeben wurden, namentlich und genau so, wie die Teilnehmer:in sie sieht — also ohne Denkspur. Die Forschenden einer Erhebung dürfen deren Sitzungen pseudonym und samt Denkspur einsehen. Die Autor:in einer Vignette hat aus ihr keine Fremdeinsicht.
+Das nachträgliche, rein lesende Ansehen fremder persistierter Sitzungen. Sie entsteht allein aus dem Anlass, unter dem die Sitzung gespielt wurde, nie aus der Vignette: Die Ausbilder:innen eines Trainings sehen die abgeschlossenen Sitzungen seiner Trainingsteilnehmenden, die in diesem Training gespielt oder als Abschrift für es freigegeben wurden, namentlich und genau so, wie die Teilnehmer:in sie sieht — also ohne Denkspur. Die Forschenden einer Erhebung sehen deren beendete Sitzungen unter ihrer Teilnahmekennung, samt Denkspur und Item-Antworten; schon während die Stichprobe läuft, auch nach ihrer Archivierung. Laufende Sitzungen erscheinen dort nur mit ihrem Status, flüchtige Teilnahmen nur mit ihrem Ablaufgerüst. Die Autor:in einer Vignette hat aus ihr keine Fremdeinsicht.
 _Avoid_: Trainingsdaten, Sitzungseinsicht, Monitoring
 
 **Trainingsexport**:
-Die Fremdeinsicht eines Trainings als pseudonymes Archiv menschenlesbarer Dateien, eine je abgeschlossener Sitzung, gegliedert nach Teilnehmenden mit bei jedem Export neu gezogenen Kennzeichen. Er enthält keine Kontodaten und keine Denkspur und ist kein Forschungsdatum.
+Die Fremdeinsicht eines Trainings als pseudonymes Archiv menschenlesbarer Dateien, eine je abgeschlossener Sitzung, gegliedert nach Teilnehmenden unter ihrer Teilnahmekennung. Er enthält keine Kontodaten und keine Denkspur und ist kein Forschungsdatum.
 _Avoid_: Datenspur, Trainingsdaten, Protokoll
 
 ## Evals

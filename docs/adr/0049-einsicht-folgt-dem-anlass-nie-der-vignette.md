@@ -24,7 +24,7 @@ Erhebungssitzungen und private Abschriften mit herein.
 | ------------- | ------------------------------------- | --------------------------------------------------------------------------------- |
 | **Training**  | alle eigenen Sitzungen, ohne Denkspur | Kreis und Administration, namentlich, nur abgeschlossene Sitzungen, ohne Denkspur |
 | **Abschrift** | nur das eigene Konto                  | nur nach Freigabe für ein Training, dem die Teilnehmer:in beigetreten ist         |
-| **Erhebung**  | nur über die Abschrift                | Kreis der Erhebung, pseudonym, mit Denkspur — erlaubt, noch nicht gebaut          |
+| **Erhebung**  | nur über die Abschrift                | Kreis und Administration, unter Teilnahmekennung, mit Denkspur                    |
 
 - **Ausbilder:innen sehen, was die Teilnehmer:in sieht.** Die Denkspur bleibt
   der Forschenden und dem Probelauf vorbehalten.
@@ -79,13 +79,43 @@ Entfernen ist damit **kein Ausschluss**, sondern Aufräumen der Liste. Wer
 jemanden fernhalten will, sperrt den Beitritt; eine Sperre gegen Einzelne wäre
 eine neue Anfrage.
 
+## Fremdeinsicht in die Erhebung
+
+Der Kreis einer Erhebung und die Administration sehen deren Sitzungen schon
+während eine Stichprobe läuft, zur Qualitätskontrolle im echten Einsatz (#356),
+und weiterhin nach dem Archivieren.
+
+- **Beendete Sitzungen mit Inhalt**: abgeschlossene, abgebrochene und
+  gescheiterte, samt Denkspur und den Item-Antworten der Sitzung; der Block am
+  Ende erscheint je Teilnahme für sich. Laufende Sitzungen erscheinen nur mit
+  ihrem Status; mitzulesen, was gerade gespielt wird, wäre Überwachung.
+- **Keine Fehlversuche.** Sie bleiben Sache des Exports.
+- **Flüchtige Teilnahmen** erscheinen nur mit ihrem Ablaufgerüst (ADR-0045),
+  Teilnahmen ohne Einwilligung a gar nicht.
+
+## Teilnahmekennung
+
+Pseudonym erscheint eine Teilnahme unter ihrer **Teilnahmekennung**, einem
+kurzen Zufallswert, der beim Anlegen der Teilnahme vergeben und gespeichert
+wird. Sie gilt in der Fremdeinsicht der Erhebung, im Datenspur-Export neben dem
+Token und im Trainingsexport.
+
+- **Nicht das Token.** Das Teilnahme-Token öffnet die laufende Teilnahme und
+  später die Abschrift; die Einsicht soll keine weitere Stelle sein, an der es
+  offen liegt.
+- **Stabil je Teilnahme.** Einsicht und Exporte eines Anlasses lassen sich
+  aufeinander beziehen. Im Training überdauert sie Austritt und Wiederbeitritt,
+  weil die Bindung bleibt, und unterscheidet sich zwischen Trainings.
+- **Die Abschrift erhält eine eigene Kennung**, nie die der
+  Erhebungsteilnahme; sonst verbände sie Konto und Forschungsdaten (ADR-0043).
+
 ## Trainingsexport
 
 Der Kreis kann die Fremdeinsicht eines Trainings als Archiv menschenlesbarer
 Markdown-Dateien ziehen, eine je abgeschlossener Sitzung. Er ist pseudonym,
-nicht anonym: Kennzeichen werden je Export neu gezogen, Kontodaten fehlen,
-Freitext wird nicht geschwärzt. Er ist keine Datenspur; deren Definition bleibt
-Erhebungssache.
+nicht anonym: Teilnehmende erscheinen unter ihrer Teilnahmekennung, Kontodaten
+fehlen, Freitext wird nicht geschwärzt. Er ist keine Datenspur; deren
+Definition bleibt Erhebungssache.
 
 ## Considered Options
 
@@ -96,6 +126,17 @@ Erhebungssache.
   Freigabe-Kante umzubauen.
 - **Freigabe direkt an einzelne Ausbilder:innen** — verworfen: Der Anlass ginge
   verloren; niemand wüsste mehr, warum Trainingsteilnehmende teilen.
+- **Kennzeichen je Trainingsexport neu ziehen** — so bis #356; abgelöst, weil
+  sich aufeinanderfolgende Exporte desselben Trainings nicht aufeinander
+  beziehen ließen.
+- **Kennung aus Konto oder Token ableiten** (Hash aus Username mit
+  Trainings-Link oder Training-pk) — verworfen: Usernamen, Link und pk kennt
+  der Kreis, die Kennung wäre durch Durchprobieren umkehrbar und über Trainings
+  hinweg verknüpfbar. Ein eigenes Server-Geheimnis hätte das behoben, aber
+  Konfiguration verlangt, die gespeicherter Zufall nicht braucht.
+- **Token in der Einsicht zeigen** — verworfen: siehe Teilnahmekennung.
+- **Fehlversuche in der Einsicht** — verworfen für jetzt: Für die
+  Qualitätskontrolle reichen Transkript und Denkspur; der Export trägt sie.
 - **Freigabe nur für Abschriften mit Vignetten des Trainings** — verworfen: Die
   Abschrift kennt ihre Erhebung bewusst nicht (ADR-0043), und fremde
   Erhebungsvignetten kann kein Kreis in sein Training aufnehmen (ADR-0015).
