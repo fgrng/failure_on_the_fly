@@ -19,7 +19,7 @@ from erhebungen.models import (
 )
 from erhebungen.tests.aufbau import finale_erhebung, forschende
 from konten.models import Konto
-from konten.navigation import AUSBILDERIN_GRUPPE
+from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.models import Sitzung
 from vignetten.models import Vignette
@@ -140,9 +140,15 @@ class EinsichtZugangTests(EinsichtTestCase):
     def test_andere_rollen_werden_abgewiesen(self) -> None:
         """Ohne Forschungsrolle gibt es keine Einsicht."""
 
-        ausbilderin: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+        for username, rollen in (
+            ("hedy", (AUSBILDERIN_GRUPPE,)),
+            ("lin", (AUTORIN_GRUPPE,)),
+            ("mo", ()),
+        ):
+            with self.subTest(username=username):
+                konto: Konto = konto_mit_rollen(username, *rollen)
 
-        self.assertEqual(self._einsicht(ausbilderin).status_code, 403)
+                self.assertEqual(self._einsicht(konto).status_code, 403)
 
     def test_neues_kreismitglied_sieht_aeltere_teilnahmen(self) -> None:
         """Einsicht folgt der aktuellen Eigentümerschaft, auch rückwirkend."""
@@ -176,13 +182,15 @@ class EinsichtZugangTests(EinsichtTestCase):
     def test_archivierte_stichprobe_bleibt_lesbar(self) -> None:
         """Eine archivierte Stichprobe steht weiter in der Übersicht."""
 
-        archivierte: Stichprobe = self._stichprobe(self.erhebung)
+        # Archivieren lassen sich nur Stichproben ohne Daten.
+        archivierte: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=datetime(2027, 3, 1, tzinfo=_BERLIN),
+            ende=datetime(2027, 3, 31, tzinfo=_BERLIN),
+        )
         archivierte.archivieren()
 
-        antwort: HttpResponse = self._einsicht()
-
-        self.assertContains(antwort, "Archiviert")
-        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+        self.assertContains(self._einsicht(), "Stichprobe 01.03.2027 – 31.03.2027")
 
 
 class EinsichtLinkTests(EinsichtTestCase):
@@ -211,11 +219,13 @@ class EinsichtRasterTests(EinsichtTestCase):
     def test_spalten_folgen_der_erhebungsreihenfolge(self) -> None:
         """Die Vignetten stehen in der Reihenfolge der Erhebung."""
 
-        self._teilnahme()
+        # Umgekehrt zur Anlagereihenfolge der Vignetten.
+        self.erhebung = finale_erhebung(self.ada, vignetten=[self.zinsen, self.brueche])
+        self._stichprobe(self.erhebung)
 
         inhalt: str = self._einsicht().content.decode()
 
-        self.assertLess(inhalt.index("Brüche addieren"), inhalt.index("Zinsen rechnen"))
+        self.assertLess(inhalt.index("Zinsen rechnen"), inhalt.index("Brüche addieren"))
 
     def test_zeilen_sind_nach_beginn_sortiert(self) -> None:
         """Die älteste Teilnahme steht oben."""
@@ -308,8 +318,18 @@ class EinsichtRasterTests(EinsichtTestCase):
 
         self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
 
-    def test_fluechtige_zeile_ist_umrandet_und_traegt_den_hinweis(self) -> None:
+    def test_fluechtige_zeile_traegt_den_hinweis(self) -> None:
         """Von flüchtigen Teilnahmen gibt es nur das Ablaufgerüst."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(bindung, self.brueche)
+
+        self.assertIn(
+            "flüchtig, nur Ablaufgerüst", self._zeile(self._einsicht(), bindung)
+        )
+
+    def test_fluechtige_bubbles_sind_in_jedem_status_umrandet(self) -> None:
+        """Auch eine gescheiterte flüchtige Sitzung ist nur umrandet."""
 
         bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
         self._sitzung(bindung, self.brueche)
@@ -317,7 +337,6 @@ class EinsichtRasterTests(EinsichtTestCase):
 
         zeile: str = self._zeile(self._einsicht(), bindung)
 
-        self.assertIn("flüchtig, nur Ablaufgerüst", zeile)
         self.assertEqual(zeile.count("fremdeinsicht__sitzung--fluechtig"), 2)
 
     def test_eingewilligte_teilnahme_ohne_sitzung(self) -> None:
@@ -346,8 +365,8 @@ class EinsichtRasterTests(EinsichtTestCase):
 
         self.assertNotContains(self._einsicht(), bindung.token)
 
-    def test_sitzungen_anderer_erhebungen_fehlen(self) -> None:
-        """Eine fremde Erhebung derselben Vignette steuert nichts bei."""
+    def test_teilnahmen_anderer_erhebungen_fehlen(self) -> None:
+        """Eine fremde Erhebung derselben Vignette steuert keine Zeile bei."""
 
         andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
         fremde: Erhebungsbindung = self._teilnahme(

@@ -27,6 +27,7 @@ from django.utils.dateparse import parse_datetime
 
 from config.downloads import zip_download
 from konten.eigentuemer_views import eigentuemer_views
+from konten.models import Konto
 from konten.navigation import (
     ist_forschende,
     rolle_erforderlich,
@@ -481,12 +482,11 @@ def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
     return ""
 
 
-@login_required
-@_forschende_oder_administratorin_erforderlich
-def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die Übersicht der Fremdeinsicht einer sichtbaren Erhebung (ADR-0049)."""
+def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
+    # Baut das Raster der Einsicht: die Vignetten in Erhebungsreihenfolge als
+    # Spalten, je Stichprobe die Teilnahmen nach Beginn als Zeilen. Eine Zelle
+    # hält höchstens eine Sitzung mit ihrer Position aus der Ziehung.
 
-    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     vignetten: list[Vignette] = [
         zugehoerigkeit.vignette
         for zugehoerigkeit in erhebung.vignettenzugehoerigkeiten.select_related(
@@ -496,7 +496,7 @@ def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
     sitzungen: dict[tuple[int, int], Sitzung] = {
         (sitzung.teilnahme_id, sitzung.vignette_id): sitzung
         for sitzung in Sitzung.objects.in_erhebungen_einsehbar(
-            Erhebung.objects.sichtbar_fuer(request.user)
+            Erhebung.objects.sichtbar_fuer(konto)
         ).filter(teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung)
     }
     positionen: dict[tuple[int, int], int] = {
@@ -542,20 +542,28 @@ def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
             }
         )
 
+    return {
+        "vignetten": vignetten,
+        "stichproben": [
+            {
+                "stichprobe": stichprobe,
+                "zeilen": zeilen_je_stichprobe.get(stichprobe.pk, []),
+            }
+            for stichprobe in erhebung.stichprobe_set.order_by("beginn", "pk")
+        ],
+    }
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
+    """Zeigt die Übersicht der Fremdeinsicht einer sichtbaren Erhebung (ADR-0049)."""
+
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     return render(
         request,
         "erhebungen/einsicht.html",
-        {
-            "erhebung": erhebung,
-            "vignetten": vignetten,
-            "stichproben": [
-                {
-                    "stichprobe": stichprobe,
-                    "zeilen": zeilen_je_stichprobe.get(stichprobe.pk, []),
-                }
-                for stichprobe in erhebung.stichprobe_set.order_by("beginn", "pk")
-            ],
-        },
+        {"erhebung": erhebung, **_einsicht_raster(request.user, erhebung)},
     )
 
 
