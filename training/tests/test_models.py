@@ -305,3 +305,43 @@ def test_entfernen_schliesst_auch_vorhandene_luecken() -> None:
     assert list(
         training.vignettenzugehoerigkeiten.values_list("vignette", "position")
     ) == [(vignetten[0].pk, 1), (vignetten[1].pk, 2)]
+
+
+@pytest.mark.django_db
+def test_verschieben_reiht_die_uebrigen_neu_ein() -> None:
+    """Die verschobene Vignette steht an der Zielposition, die übrigen rücken."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    erste, zweite, dritte = (
+        finale_vignette(ada, name=name) for name in ("Erste", "Zweite", "Dritte")
+    )
+    for vignette in (erste, zweite, dritte):
+        training.vignette_aufnehmen(vignette)
+
+    training.vignette_verschieben(dritte, 1)
+
+    assert list(
+        training.vignettenzugehoerigkeiten.values_list("vignette", "position")
+    ) == [(dritte.pk, 1), (erste.pk, 2), (zweite.pk, 3)]
+
+
+@pytest.mark.django_db
+def test_verschieben_begrenzt_die_zielposition_auf_die_liste() -> None:
+    """Eine Zielposition außerhalb der Liste setzt an Anfang oder Ende."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    erste: Vignette = finale_vignette(ada, name="Erste")
+    zweite: Vignette = finale_vignette(ada, name="Zweite")
+    training.vignette_aufnehmen(erste)
+    training.vignette_aufnehmen(zweite)
+
+    training.vignette_verschieben(erste, 9)
+    nach_hinten: list[Vignette] = list(training.vignetten_in_reihenfolge())
+    training.vignette_verschieben(erste, 0)
+
+    assert [nach_hinten, list(training.vignetten_in_reihenfolge())] == [
+        [zweite, erste],
+        [erste, zweite],
+    ]

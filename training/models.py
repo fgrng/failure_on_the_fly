@@ -148,16 +148,28 @@ class Training(EigentuemerKreis):
             self.vignettenzugehoerigkeiten.select_for_update()
         )
         zugehoerigkeiten.filter(vignette=vignette).delete()
-        ids: list[int] = list(
-            zugehoerigkeiten.order_by("position").values_list("pk", flat=True)
+        _reihenfolge_schreiben(
+            zugehoerigkeiten,
+            list(zugehoerigkeiten.order_by("position").values_list("pk", flat=True)),
         )
-        # Erst hinter die höchste Position rücken, damit kein Zwischenstand
-        # die eindeutigen Positionen kreuzt.
-        zugehoerigkeiten.update(
-            position=F("position") + _hoechste_position(zugehoerigkeiten)
+
+    @transaction.atomic
+    def vignette_verschieben(self, vignette: "Vignette", position: int) -> None:
+        """Setzt eine Vignette an eine 1-basierte Position; die übrigen rücken.
+
+        Eine Position außerhalb der Liste setzt an den Anfang bzw. ans Ende.
+        """
+        zugehoerigkeiten: models.QuerySet[Trainingsvignette] = (
+            self.vignettenzugehoerigkeiten.select_for_update()
         )
-        for position, zugehoerigkeit_id in enumerate(ids, start=1):
-            zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
+        verschobene: int = zugehoerigkeiten.get(vignette=vignette).pk
+        ids: list[int] = [
+            pk
+            for pk in zugehoerigkeiten.order_by("position").values_list("pk", flat=True)
+            if pk != verschobene
+        ]
+        ids.insert(min(max(position - 1, 0), len(ids)), verschobene)
+        _reihenfolge_schreiben(zugehoerigkeiten, ids)
 
     def beitreten(self, konto: "Konto") -> bool:
         """Tritt dem Training über den Trainings-Link bei.
@@ -205,6 +217,19 @@ class Training(EigentuemerKreis):
 def _hoechste_position(zugehoerigkeiten: models.QuerySet["Trainingsvignette"]) -> int:
     """Liefert die höchste belegte Position eines Trainings, für ein leeres 0."""
     return zugehoerigkeiten.aggregate(Max("position"))["position__max"] or 0
+
+
+def _reihenfolge_schreiben(
+    zugehoerigkeiten: models.QuerySet["Trainingsvignette"], ids: list[int]
+) -> None:
+    """Vergibt den Trainingsvignetten in der Folge der ids die Positionen 1..n."""
+    # Erst hinter die höchste Position rücken, damit kein Zwischenstand
+    # die eindeutigen Positionen kreuzt.
+    zugehoerigkeiten.update(
+        position=F("position") + _hoechste_position(zugehoerigkeiten)
+    )
+    for position, zugehoerigkeit_id in enumerate(ids, start=1):
+        zugehoerigkeiten.filter(pk=zugehoerigkeit_id).update(position=position)
 
 
 class Trainingsvignette(models.Model):

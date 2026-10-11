@@ -566,6 +566,24 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
 
 @login_required
 @_ausbilderin_erforderlich
+def vignette_verschieben(
+    request: HttpRequest, pk: int, vignette_pk: int
+) -> HttpResponse:
+    """Setzt eine gebundene Vignette an eine neue Position, auch veröffentlicht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    vignette: Vignette = get_object_or_404(training.vignetten, pk=vignette_pk)
+    try:
+        position: int = int(request.POST["position"])
+    except KeyError, ValueError:
+        return HttpResponseBadRequest("Position fehlt.")
+    training.vignette_verschieben(vignette, position)
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+@_ausbilderin_erforderlich
 def veroeffentlichen(request: HttpRequest, pk: int) -> HttpResponse:
     """Veröffentlicht einen sichtbaren Trainingsentwurf."""
     if request.method != "POST":

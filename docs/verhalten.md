@@ -174,12 +174,17 @@ Eigentümer:innen.
 
 Die Vignetten eines Trainings stehen in einer empfohlenen Reihenfolge. Eine neu
 aufgenommene Vignette steht am Ende; beim Entfernen rücken die übrigen lückenlos
-nach. Kuratierseite und Trainingsseite der Teilnehmenden zeigen die Vignetten in
-dieser Reihenfolge und nummeriert (1., 2., …); auf der Trainingsseite laufen die
-Nummern über die angezeigten finalen Vignetten. Die Reihenfolge ist nur ein
-Vorschlag: Jede Vignette bleibt frei und beliebig oft startbar, der Spielstand
-je Vignette bleibt sichtbar. Trainingssitzungen halten keine Vignettenposition
-fest, und der Trainingsexport bleibt unverändert.
+nach. Auf der Kuratierseite verschieben »Hoch« und »Runter« eine Vignette um
+eine Stelle, im Entwurf wie nach dem Veröffentlichen; die erste Vignette hat
+keinen Hoch-, die letzte keinen Runter-Knopf. Verschieben darf, wer aufnehmen
+und entfernen darf. Teilnehmende sehen die neue Reihenfolge sofort, ihre
+bisherigen Sitzungen bleiben unberührt. Kuratierseite und Trainingsseite der
+Teilnehmenden zeigen die Vignetten in dieser Reihenfolge und nummeriert (1., 2.,
+…); auf der Trainingsseite laufen die Nummern über die angezeigten finalen
+Vignetten. Die Reihenfolge ist nur ein Vorschlag: Jede Vignette bleibt frei und
+beliebig oft startbar, der Spielstand je Vignette bleibt sichtbar.
+Trainingssitzungen halten keine Vignettenposition fest, und der Trainingsexport
+bleibt unverändert.
 
 ## Geschlossenes Training und Beitritt
 

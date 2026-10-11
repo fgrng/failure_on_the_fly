@@ -152,10 +152,26 @@
                         <tr>
                             <td>{{ forloop.counter }}. {{ vignette.anzeigename }}</td>
                             <td>
-                                <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}" style="margin: 0;">
-                                    {% csrf_token %}
-                                    <button class="button button--danger" type="submit">Entfernen</button>
-                                </form>
+                                <div class="reihenfolge-aktionen">
+                                    {% if not forloop.first %}
+                                        <form method="post" action="{% url 'training:vignette_verschieben' training.pk vignette.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="position" value="{{ forloop.counter|add:-1 }}">
+                                            <button class="button button--secondary button--bereich" type="submit" aria-label="{{ vignette.anzeigename }} nach oben">Hoch</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if not forloop.last %}
+                                        <form method="post" action="{% url 'training:vignette_verschieben' training.pk vignette.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="position" value="{{ forloop.counter|add:1 }}">
+                                            <button class="button button--secondary button--bereich" type="submit" aria-label="{{ vignette.anzeigename }} nach unten">Runter</button>
+                                        </form>
+                                    {% endif %}
+                                    <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button button--danger" type="submit">Entfernen</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
