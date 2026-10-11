@@ -23,6 +23,11 @@ from training.tests.seite import tabellenzeilen
 from vignetten.models import Vignette
 
 
+def _route(name: str) -> str:
+    # Adressiert die zuletzt gestartete Trainingssitzung über ihre pk.
+    return reverse(f"training:{name}", args=[Sitzung.objects.latest("pk").pk])
+
+
 def _katalogzeilen(response: HttpResponse) -> list[tuple[object, object, object]]:
     # Liest je Katalogzeile Name, Ziel und Aktion.
 
@@ -199,19 +204,19 @@ class TrainingskatalogTests(TestCase):
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.count(), 1)
         gespraech: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            _route("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(gespraech, "Ich addiere einfach alles.")
         self.assertNotContains(gespraech, "Mia addiert Zähler und Nenner.")
         schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
         self.assertEqual(schritt.denkspur, "Mia addiert Zähler und Nenner.")
-        debrief: HttpResponse = self.client.post(reverse("training:gespraech_beenden"))
+        debrief: HttpResponse = self.client.post(_route("gespraech_beenden"))
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertContains(debrief, "Diagnose aufnehmen")
         fertig: HttpResponse = self.client.post(
-            reverse("training:debrief"),
+            _route("debrief"),
             {"diagnose": "Mia addiert Zähler und Nenner."},
         )
 
@@ -301,14 +306,14 @@ class TrainingshistorieTests(TestCase):
             reverse("training:einwilligung", args=[training.pk, erste.pk]),
             {"audioverarbeitung_eingewilligt": "nein"},
         )
-        self.client.post(reverse("training:gespraech_beenden"))
-        self.client.post(reverse("training:debrief"), {"diagnose": "Bruch"})
+        self.client.post(_route("gespraech_beenden"))
+        self.client.post(_route("debrief"), {"diagnose": "Bruch"})
         self.client.post(reverse("training:wahl", args=[training.pk, zweite.pk]))
         self.client.post(
             reverse("training:einwilligung", args=[training.pk, zweite.pk]),
             {"audioverarbeitung_eingewilligt": "nein"},
         )
-        self.client.post(reverse("training:abbrechen"))
+        self.client.post(_route("abbrechen"))
 
         response: HttpResponse = self.client.get(reverse("training:historie"))
 
@@ -367,7 +372,7 @@ class TrainingsabbruchTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            _route("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(response, "Ich addiere alles.")
@@ -377,7 +382,7 @@ class TrainingsabbruchTests(TestCase):
         """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""
         training: Training = self._sitzung_starten()
 
-        response: HttpResponse = self.client.post(reverse("training:abbrechen"))
+        response: HttpResponse = self.client.post(_route("abbrechen"))
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()

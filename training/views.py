@@ -381,6 +381,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
                     "status": sitzung.get_status_display(),
                     "status_badge": _sitzung_status_badge(sitzung.status),
                     "url": reverse("training:sitzung_ansehen", args=[sitzung.pk]),
+                    "fortsetzen_url": reverse("training:gespraech", args=[sitzung.pk]),
                 }
             )
 
@@ -666,42 +667,44 @@ def einwilligung(
     return _sitzung_starten(request, bindung, vignette)
 
 
-def _sitzungsnavigation() -> Sitzungsnavigation:
-    # Bündelt die modusspezifischen Routen für die Trainingssitzungsansicht.
+def _sitzungsnavigation(sitzung_pk: int) -> Sitzungsnavigation:
+    # Bündelt die modusspezifischen Routen einer Trainingssitzung.
 
     return Sitzungsnavigation(
         bezeichnung="Training",
-        gespraech_url=reverse("training:gespraech"),
-        beenden_url=reverse("training:gespraech_beenden"),
-        debrief_url=reverse("training:debrief"),
-        abbrechen_url=reverse("training:abbrechen"),
-        transkription_url=reverse("training:transkription"),
+        gespraech_url=reverse("training:gespraech", args=[sitzung_pk]),
+        beenden_url=reverse("training:gespraech_beenden", args=[sitzung_pk]),
+        debrief_url=reverse("training:debrief", args=[sitzung_pk]),
+        abbrechen_url=reverse("training:abbrechen", args=[sitzung_pk]),
+        transkription_url=reverse("training:transkription", args=[sitzung_pk]),
     )
 
 
-def training_sitzung(request: HttpRequest) -> Sitzung:
-    """Lädt die aktuelle Sitzung nur für das zugehörige Trainingskonto."""
+def training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
+    """Lädt eine Sitzung nur über eine eigene Trainingsbindung, sonst 404."""
 
-    sitzung_pk: int | None = request.session.get("training_sitzung_pk")
-    if sitzung_pk is None:
-        raise PermissionDenied
-    sitzung: Sitzung = get_object_or_404(
+    return get_object_or_404(
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
-        pk=sitzung_pk,
+        pk=pk,
+        teilnahme__trainingsbindung__konto=request.user,
     )
-    get_object_or_404(
-        Trainingsbindung.objects.filter(konto=request.user), teilnahme=sitzung.teilnahme
-    )
+
+
+def laufende_training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
+    """Lässt nur eine eigene laufende Trainingssitzung transkribieren."""
+
+    sitzung: Sitzung = training_sitzung(request, pk)
+    if sitzung.status != Sitzung.Status.LAUFEND:
+        raise PermissionDenied
     return sitzung
 
 
-def _zur_auswahl_zurueckkehren(request: HttpRequest, sitzung: Sitzung) -> HttpResponse:
-    """Löst die aktive Sitzung und kehrt zur Auswahl ihres Trainings zurück."""
+def _zur_auswahl_zurueckkehren(sitzung: Sitzung) -> HttpResponse:
+    """Kehrt zur Auswahl des Trainings der Sitzung zurück."""
 
     training_pk: int = get_object_or_404(
         Trainingsbindung, teilnahme=sitzung.teilnahme
     ).training_id
-    request.session.pop("training_sitzung_pk", None)
     return redirect("training:detail", pk=training_pk)
 
 
@@ -718,36 +721,35 @@ def _sitzung_starten(
             ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
         )
         kern: Simulationskern = sink.sitzung.simulationskern
-    request.session["training_sitzung_pk"] = sink.sitzung.pk
     return sitzung_anzeigen(
         request,
         vignette=vignette,
         kern=kern,
         gespraechsschritte=[],
         ist_probelauf=False,
-        navigation=_sitzungsnavigation(),
+        navigation=_sitzungsnavigation(sink.sitzung.pk),
         spracheingabe_verfuegbar=bindung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
         sitzung_pk=sink.sitzung.pk,
     )
 
 
 @login_required
-def gespraech(request: HttpRequest) -> HttpResponse:
+def gespraech(request: HttpRequest, pk: int) -> HttpResponse:
     """Führt den nächsten persistierten Gesprächsschritt einer Trainingssitzung aus."""
 
     return persistiertes_gespraech(
-        request, training_sitzung(request), _sitzungsnavigation()
+        request, training_sitzung(request, pk), _sitzungsnavigation(pk)
     )
 
 
 @login_required
-def gespraech_beenden(request: HttpRequest) -> HttpResponse:
+def gespraech_beenden(request: HttpRequest, pk: int) -> HttpResponse:
     """Beendet das Diagnosegespräch vorzeitig und zeigt seinen Debrief."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = training_sitzung(request)
-    navigation: Sitzungsnavigation = _sitzungsnavigation()
+    sitzung: Sitzung = training_sitzung(request, pk)
+    navigation: Sitzungsnavigation = _sitzungsnavigation(pk)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation)
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
@@ -756,44 +758,44 @@ def gespraech_beenden(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def abbrechen(request: HttpRequest) -> HttpResponse:
+def abbrechen(request: HttpRequest, pk: int) -> HttpResponse:
     """Bricht eine Trainingssitzung ohne Diagnose gewollt ab."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = training_sitzung(request)
-    navigation: Sitzungsnavigation = _sitzungsnavigation()
+    sitzung: Sitzung = training_sitzung(request, pk)
+    navigation: Sitzungsnavigation = _sitzungsnavigation(pk)
     if sitzung.status == Sitzung.Status.GESCHEITERT:
         return persistierten_fehler_anzeigen(request, sitzung, navigation)
     if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     if sitzung.status == Sitzung.Status.ABGEBROCHEN:
-        return _zur_auswahl_zurueckkehren(request, sitzung)
+        return _zur_auswahl_zurueckkehren(sitzung)
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_abbrechen(sink)
-    return _zur_auswahl_zurueckkehren(request, sitzung)
+    return _zur_auswahl_zurueckkehren(sitzung)
 
 
 @login_required
-def debrief(request: HttpRequest) -> HttpResponse:
+def debrief(request: HttpRequest, pk: int) -> HttpResponse:
     """Speichert die Diagnose und kehrt zur freien Trainingswahl zurück."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sitzung: Sitzung = training_sitzung(request)
+    sitzung: Sitzung = training_sitzung(request, pk)
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status == Sitzung.Status.GESCHEITERT:
             return persistierten_fehler_anzeigen(
-                request, sitzung, _sitzungsnavigation()
+                request, sitzung, _sitzungsnavigation(pk)
             )
         if sitzung.status != Sitzung.Status.LAUFEND:
-            return _zur_auswahl_zurueckkehren(request, sitzung)
+            return _zur_auswahl_zurueckkehren(sitzung)
         DBSink.fuer_sitzung(sitzung).diagnose_setzen(
             request.POST["diagnose"],
             eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
         )
-    return _zur_auswahl_zurueckkehren(request, sitzung)
+    return _zur_auswahl_zurueckkehren(sitzung)
 
 
 @login_required
@@ -818,7 +820,7 @@ def sitzung_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
         kern=sitzung.simulationskern,
         gespraechsschritte=sitzung.gespraechsschritte,
         ist_probelauf=False,
-        navigation=_sitzungsnavigation(),
+        navigation=_sitzungsnavigation(sitzung.pk),
         zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
         ist_lesend=True,
         abgegebene_diagnose=DBSink.fuer_sitzung(sitzung).abgegebene_diagnose,

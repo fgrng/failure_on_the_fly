@@ -18,7 +18,7 @@ from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.views import transkriptions_endpunkt
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
-from training.views import training_sitzung
+from training.views import laufende_training_sitzung
 from vignetten.models import Vignette
 
 
@@ -42,16 +42,20 @@ class TranskriptionsEndpointTests(TestCase):
             reverse("training:einwilligung", args=[training.pk, vignette.pk]),
             {"audioverarbeitung_eingewilligt": "ja"},
         )
-        return Sitzung.objects.get()
+        self.sitzung: Sitzung = Sitzung.objects.get()
+        return self.sitzung
 
     def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
         request: HttpRequest = RequestFactory().post(
-            "/training/sitzung/transkription/", {"audio": audioaufnahme()}
+            reverse("training:transkription", args=[self.sitzung.pk]),
+            {"audio": audioaufnahme()},
         )
         request.user = get_user_model().objects.get(username="grace")
         request.session = self.client.session
         try:
-            return transkriptions_endpunkt(lambda: anbieter, training_sitzung)(request)
+            return transkriptions_endpunkt(lambda: anbieter, laufende_training_sitzung)(
+                request, pk=self.sitzung.pk
+            )
         finally:
             request.close()
 
@@ -83,7 +87,7 @@ class TranskriptionsEndpointTests(TestCase):
     def test_ohne_laufende_sitzung_bleibt_der_endpunkt_verschlossen(self) -> None:
         """Ein Trainingskonto allein berechtigt nicht zur Transkription."""
         self._sitzung_starten()
-        self.client.post(reverse("training:abbrechen"))
+        self.client.post(reverse("training:abbrechen", args=[self.sitzung.pk]))
         anbieter = FakeTranskription(["Text"])
 
         with self.assertRaises(PermissionDenied):

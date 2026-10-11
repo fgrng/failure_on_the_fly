@@ -206,6 +206,20 @@ ohne Vignetten lässt sich veröffentlichen und beitreten.
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
 
+## Trainingssitzung fortsetzen
+
+Eine Trainingssitzung ist über ihre eigene Adresse erreichbar; der Browser merkt
+sich keine aktuelle Sitzung. Gespräch, Gespräch beenden, Abbrechen, Debrief und
+Spracheingabe tragen die Sitzung in der Adresse. Erreichbar ist sie nur für das
+Konto, dessen Trainingsbindung sie gehört; jede andere Sitzungsadresse antwortet
+mit 404. Beendete, abgebrochene und gescheiterte Sitzungen lassen sich über
+diese Adressen nicht weiterspielen.
+
+Auf der Trainingsseite trägt jede eigene laufende Sitzung neben „Sitzung #…
+ansehen“ den Link „Fortsetzen“. Er führt mit dem bisherigen Gespräch zurück in
+die Sitzung, auch in einem anderen Tab, einem anderen Browser oder auf einem
+anderen Gerät.
+
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite

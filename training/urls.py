@@ -76,18 +76,20 @@ urlpatterns: list[URLPattern] = [
         name="einwilligung",
     ),
     path("<int:training_pk>/vignetten/<int:vignette_pk>/", views.wahl, name="wahl"),
-    path("sitzung/gespraech/", views.gespraech, name="gespraech"),
+    path("sitzung/<int:pk>/gespraech/", views.gespraech, name="gespraech"),
     path(
-        "sitzung/gespraech/beenden/",
+        "sitzung/<int:pk>/gespraech/beenden/",
         views.gespraech_beenden,
         name="gespraech_beenden",
     ),
-    path("sitzung/abbrechen/", views.abbrechen, name="abbrechen"),
-    path("sitzung/debrief/", views.debrief, name="debrief"),
+    path("sitzung/<int:pk>/abbrechen/", views.abbrechen, name="abbrechen"),
+    path("sitzung/<int:pk>/debrief/", views.debrief, name="debrief"),
     path("sitzung/<int:pk>/ansehen/", views.sitzung_ansehen, name="sitzung_ansehen"),
     path(
-        "sitzung/transkription/",
-        transkriptions_endpunkt(transkriptions_anbieter, views.training_sitzung),
+        "sitzung/<int:pk>/transkription/",
+        transkriptions_endpunkt(
+            transkriptions_anbieter, views.laufende_training_sitzung
+        ),
         name="transkription",
     ),
 ]
