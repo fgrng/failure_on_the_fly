@@ -299,6 +299,15 @@ ganzen Entwurf; »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein T
 mit ungültigem Platzhalter steht nach dem Speichern offen. Wer die Seite mit
 ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
 
+Der Arbeitskontext steht in der System-Prompt-Vorlage; die User-Prompt-Vorlage
+ist ein Altfeld (ADR-0052). Die Bearbeitungsseite zeigt sie nur, solange der
+Entwurf oder die abgeschickten Daten sie füllen, auch nach einem
+Validierungsfehler. So lässt sich der Arbeitskontext einer Altfassung in die
+System-Prompt-Vorlage verschieben und das Feld leeren; danach erscheint es nicht
+mehr. Ohne das Feld lässt das Speichern die Vorlage unberührt. Die Leseansichten
+zeigen den Abschnitt je Fassung nur bei gefüllter Vorlage, auch bei archivierten
+Fassungen.
+
 ## Modell-Konfiguration
 
 Administrator:innen setzen das Sprachmodell unter

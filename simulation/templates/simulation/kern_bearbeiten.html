@@ -45,7 +45,9 @@
             <div class="system-page-fields">
                 <div class="system-page-field-list">
                     {% include "texte/includes/lesefeld_formularfeld.html" with field=form.system_prompt_vorlage %}
-                    {% include "texte/includes/lesefeld_formularfeld.html" with field=form.user_prompt_vorlage %}
+                    {% if "user_prompt_vorlage" in form.fields %}
+                        {% include "texte/includes/lesefeld_formularfeld.html" with field=form.user_prompt_vorlage %}
+                    {% endif %}
                 </div>
                 {% include "simulation/includes/prompt_platzhalter.html" %}
             </div>
