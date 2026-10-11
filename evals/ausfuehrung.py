@@ -130,24 +130,30 @@ def _lehrperson_fragen(
     ausfuehrung: Ausfuehrung,
 ) -> Ausgabeversuch:
     # Lässt die Lehrperson nach der Strategie formulieren, einschließlich
-    # ihrer Fehlversuche. Sie führt das Gespräch nativ (ADR-0052): Ihre
-    # Äußerungen, auch die fester Schritte, reisen als `assistant`, die der
-    # Schüler:in ohne Denkspur als `user`, vorn die Einstiegsnachricht. Die
-    # Strategie steht allein im System-Prompt; `$verlauf` bleibt für
+    # ihrer Fehlversuche. Sie führt das Gespräch nativ (ADR-0052): Auf die
+    # Einstiegsnachricht und jede Äußerung der Schüler:in ohne Denkspur folgt
+    # ihre eigene, auch die fester Schritte. `$verlauf` bleibt für
     # finalisierte Altvorlagen leer.
 
-    schuelerin: list[str] = [
+    an_lehrperson: list[str] = [
         EINSTIEGSNACHRICHT,
         *(zeile.aeusserung for zeile in protokoll),
     ]
+    verlauf: list[tuple[str, str]] = list(
+        zip(
+            an_lehrperson[:-1],
+            (zeile.lehrperson for zeile in protokoll),
+            strict=True,
+        )
+    )
     return _rolle_fragen(
         evallauf,
         evallauf.katalog.lehrperson_vorlage,
         evallauf.lehrperson_konfiguration,
         LEHRPERSON_SCHEMA,
         {"inputstrategie": inputstrategie, "verlauf": ""},
-        list(zip(schuelerin, (zeile.lehrperson for zeile in protokoll))),
-        schuelerin[-1],
+        verlauf,
+        an_lehrperson[-1],
         ausfuehrung,
     )
 
@@ -204,9 +210,10 @@ def _rolle_fragen(
     ausfuehrung: Ausfuehrung,
 ) -> Ausgabeversuch:
     # Belegt Lehrperson und Bewerter gleich: Der System-Prompt ist die
-    # gerenderte Vorlage mit den Evalwerten der Rolle. Eingesetzte Werte
-    # werden nicht selbst als Vorlage gerendert. Der Ausgabeversuch erhält
-    # auch Fehler vor einer gültigen Ausgabe.
+    # gerenderte Vorlage mit den Evalwerten der Rolle, die letzte
+    # `user`-Nachricht die Eingabe (ADR-0052). Eingesetzte Werte werden nicht
+    # selbst als Vorlage gerendert. Der Ausgabeversuch erhält auch Fehler vor
+    # einer gültigen Ausgabe.
 
     return ausgabe_versuchen(
         system_prompt=vorlage_rendern(vorlage, {**evallauf.platzhalter, **evalwerte}),

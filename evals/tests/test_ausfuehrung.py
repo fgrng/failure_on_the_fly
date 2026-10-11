@@ -10,7 +10,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from config.tests.sprachmodell import anfragen_aufzeichnen
-from evals.ausfuehrung import EINSTIEGSNACHRICHT, evallauf_ausfuehren
+from evals.ausfuehrung import evallauf_ausfuehren
 from evals.models import Evallauf, Zelle
 from evals.tests.aufbau import (
     aeusserungen,
@@ -291,7 +291,7 @@ def test_lehrperson_beginnt_mit_der_einstiegsnachricht() -> None:
 
     erste_lehrperson, *_ = _anfragen(vignette)
 
-    assert _gesprochen(erste_lehrperson) == [("user", EINSTIEGSNACHRICHT)]
+    assert _gesprochen(erste_lehrperson) == [("user", "Beginnen Sie das Gespräch.")]
 
 
 @pytest.mark.django_db
@@ -304,7 +304,7 @@ def test_lehrperson_fuehrt_das_gespraech_nativ_ohne_denkspur() -> None:
     _, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
 
     assert _gesprochen(zweite_lehrperson) == [
-        ("user", EINSTIEGSNACHRICHT),
+        ("user", "Beginnen Sie das Gespräch."),
         ("assistant", "Gelenkte Frage 1"),
         ("user", "Antwort 1"),
         ("assistant", "Wie hast du gerechnet?"),
@@ -337,13 +337,12 @@ def test_finalisierte_altvorlage_mit_verlauf_setzt_dort_nichts_ein() -> None:
     )
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
-    anfragen = _anfragen(vignette)
+    erste_lehrperson, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
 
-    assert [anfragen[0][0]["content"], anfragen[3][0]["content"]] == [
+    assert [erste_lehrperson[0]["content"], zweite_lehrperson[0]["content"]] == [
         "Nach Begrüße. Bisher:[]",
         "Nach Frag nach. Bisher:[]",
     ]
-    assert len(anfragen) == 6
 
 
 @pytest.mark.django_db
