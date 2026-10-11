@@ -54,8 +54,8 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
         Trainings hängt oder an einer Abschrift, die für eines von ihnen
         freigegeben ist; nach dem Austritt aus dem Training verschwinden so
         auch ältere Sitzungen. Wer die Trainings sieht, entscheidet der
-        Aufrufer über `Training.objects.sichtbar_fuer`; `sitzungen` kennt das Training nur
-        über den Rückwärtszugriff der Bindungen (ADR-0016).
+        Aufrufer über `Training.objects.sichtbar_fuer`; `sitzungen` kennt das
+        Training nur über den Rückwärtszugriff der Bindungen (ADR-0016).
         """
         trainings_pks: models.QuerySet = trainings.values("pk")
         return self.filter(

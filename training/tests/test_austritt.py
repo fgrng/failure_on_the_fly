@@ -1,8 +1,5 @@
 """HTTP-Tests für den Austritt aus dem Training (ADR-0049)."""
 
-from io import BytesIO
-from zipfile import ZipFile
-
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -330,22 +327,10 @@ class LaufendeSitzungNachAustrittTests(TestCase):
 class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):
     """Nach dem Austritt verschwindet die Person für Kreis und Administration."""
 
-    def _austreten(self, training: Training | None = None) -> None:
+    def _austreten(self) -> None:
         # Tritt als Teilnehmerin über die Trainingsseite aus.
         self.client.force_login(self.teilnehmerin)
-        self.client.post(
-            reverse("training:austreten", args=[(training or self.training).pk])
-        )
-
-    def _export_dateien(self) -> list[str]:
-        # Die Dateinamen eines frisch gezogenen Trainingsexports des Kreises.
-        self.client.force_login(self.ausbilderin)
-        antwort: HttpResponse = self.client.get(
-            reverse("training:trainingsexport", args=[self.training.pk])
-        )
-        self.assertEqual(antwort.status_code, 200)
-        with ZipFile(BytesIO(antwort.content)) as archiv:
-            return archiv.namelist()
+        self.client.post(reverse("training:austreten", args=[self.training.pk]))
 
     def test_fremdeinsicht_zeigt_keine_zeile_mehr(self) -> None:
         """Die Tabelle auf der Kuratierseite nennt die Ausgetretene nicht."""
@@ -393,21 +378,6 @@ class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):
         self._austreten()
 
         self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 200)
-
-    def test_export_enthaelt_nichts_der_ausgetretenen(self) -> None:
-        """Ein danach gezogener Export kennt weder Ordner noch Dateien von ihr."""
-        bleibende: Konto = Konto.objects.create_user(username="margaret")
-        self.training.beitreten(bleibende)
-        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        gespielte_sitzung(self.training, bleibende, self.vignette)
-        self.assertEqual(
-            len({name.split("/")[0] for name in self._export_dateien()}), 2
-        )
-        self._austreten()
-
-        dateien: list[str] = self._export_dateien()
-
-        self.assertEqual(len(dateien), 1)
 
     def test_sitzungen_in_anderen_trainings_bleiben_einsehbar(self) -> None:
         """Der Austritt aus einem Training ändert nichts an einem anderen."""

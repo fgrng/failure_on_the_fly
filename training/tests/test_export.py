@@ -292,6 +292,17 @@ class InhaltTests(TrainingsexportTestCase):
 
         self.assertEqual(self._archiv(), {})
 
+    def test_ausgetretene_hat_weder_ordner_noch_dateien(self) -> None:
+        """Ein nach dem Austritt gezogener Export kennt die Person nicht mehr."""
+        bleibende: Konto = Konto.objects.create_user(username="margaret")
+        self.training.beitreten(bleibende)
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, bleibende, self.vignette)
+        self.client.force_login(self.teilnehmerin)
+        self.client.post(reverse("training:austreten", args=[self.training.pk]))
+
+        self.assertEqual(len(self._archiv()), 1)
+
     def test_kein_kontoname_und_keine_mailadresse(self) -> None:
         """Weder Name, Benutzername noch Mailadresse stehen im Archiv."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
