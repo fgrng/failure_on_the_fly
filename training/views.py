@@ -708,6 +708,18 @@ def _zur_auswahl_zurueckkehren(sitzung: Sitzung) -> HttpResponse:
     return redirect("training:detail", pk=training_pk)
 
 
+def _terminale_sitzung_anzeigen(
+    request: HttpRequest, sitzung: Sitzung, navigation: Sitzungsnavigation
+) -> HttpResponse:
+    """Antwortet auf eine Sitzung, die nicht mehr bespielbar ist."""
+
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return persistierten_fehler_anzeigen(request, sitzung, navigation)
+    if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
+        return persistierten_debrief_anzeigen(request, sitzung, navigation)
+    return _zur_auswahl_zurueckkehren(sitzung)
+
+
 def _sitzung_starten(
     request: HttpRequest, bindung: Trainingsbindung, vignette: Vignette
 ) -> HttpResponse:
@@ -750,8 +762,8 @@ def gespraech_beenden(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = training_sitzung(request, pk)
     navigation: Sitzungsnavigation = _sitzungsnavigation(pk)
-    if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return persistierten_fehler_anzeigen(request, sitzung, navigation)
+    if sitzung.status != Sitzung.Status.LAUFEND:
+        return _terminale_sitzung_anzeigen(request, sitzung, navigation)
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, navigation)
@@ -764,13 +776,8 @@ def abbrechen(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = training_sitzung(request, pk)
-    navigation: Sitzungsnavigation = _sitzungsnavigation(pk)
-    if sitzung.status == Sitzung.Status.GESCHEITERT:
-        return persistierten_fehler_anzeigen(request, sitzung, navigation)
-    if sitzung.status == Sitzung.Status.ABGESCHLOSSEN:
-        return persistierten_debrief_anzeigen(request, sitzung, navigation)
-    if sitzung.status == Sitzung.Status.ABGEBROCHEN:
-        return _zur_auswahl_zurueckkehren(sitzung)
+    if sitzung.status != Sitzung.Status.LAUFEND:
+        return _terminale_sitzung_anzeigen(request, sitzung, _sitzungsnavigation(pk))
     sink: DBSink = DBSink.fuer_sitzung(sitzung)
     sitzung_abbrechen(sink)
     return _zur_auswahl_zurueckkehren(sitzung)

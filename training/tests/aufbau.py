@@ -29,6 +29,12 @@ def ansehen_url(sitzung: Sitzung) -> str:
     return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
+def route_der_letzten_sitzung(name: str) -> str:
+    """Adresse einer Sitzungsroute der zuletzt gestarteten Sitzung."""
+
+    return reverse(f"training:{name}", args=[Sitzung.objects.latest("pk").pk])
+
+
 def _sitzung_mit_verlauf(
     teilnahme: Teilnahme,
     vignette: Vignette,
