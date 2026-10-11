@@ -89,6 +89,7 @@ def _ordner_je_teilnahme(training: Training, teilnahmen: set[int]) -> dict[int, 
             "importiert_am", "pk"
         )
     )
+    # Freigeben setzt eine Trainingsbindung voraus, das Konto hat also einen Ordner.
     for abschrift in abschriften:
         ordner[abschrift.teilnahme_id] = _freier_name(
             f"{ordner_je_konto[abschrift.konto_id]}/"

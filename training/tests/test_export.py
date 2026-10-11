@@ -58,6 +58,12 @@ class TrainingsexportTestCase(FremdeinsichtTestCase):
         # Die Namen der obersten Ordner.
         return {name.split("/")[0] for name in archiv}
 
+    def _kennung_setzen(self, konto: Konto, kennung: str) -> None:
+        # Gibt der Trainingsbindung des Kontos eine bekannte Kennung.
+        teilnahme: Teilnahme = self.training.bindung_fuer(konto).teilnahme
+        teilnahme.kennung = kennung
+        teilnahme.save(update_fields=["kennung"])
+
 
 class ZugriffTests(TrainingsexportTestCase):
     """Wer den Export ziehen darf."""
@@ -168,11 +174,11 @@ class InhaltTests(TrainingsexportTestCase):
     def test_ordner_heissen_nach_der_teilnahmekennung(self) -> None:
         """Der Ordner trägt die Teilnahmekennung der Trainingsbindung."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
-        kennung: str = self.training.bindung_fuer(self.teilnehmerin).teilnahme.kennung
+        self._kennung_setzen(self.teilnehmerin, "3f9a01c2")
 
         (ordner,) = self._ordner(self._archiv())
 
-        self.assertEqual(ordner, f"teilnehmer-{kennung}")
+        self.assertEqual(ordner, "teilnehmer-3f9a01c2")
 
     def test_datei_enthaelt_vignette_ausgang_transkript_und_diagnose(self) -> None:
         """Dasselbe wie in der Fremdeinsicht, als Markdown, datiert in Ortszeit."""
@@ -352,21 +358,24 @@ class InhaltTests(TrainingsexportTestCase):
         self.assertNotEqual(self._ordner(self._archiv()), erstes_archiv)
 
     def test_gleiche_kennungen_ergeben_getrennte_ordner(self) -> None:
-        """Kollidieren zwei Kennungen, bleiben die Personen unterscheidbar."""
+        """Kollidieren zwei Kennungen, zählt die später Beigetretene weiter."""
         zweite: Konto = Konto.objects.create_user(username="margaret")
         self.training.beitreten(zweite)
-        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        for _ in range(2):
+            gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         gespielte_sitzung(self.training, zweite, self.vignette)
         for konto in (self.teilnehmerin, zweite):
-            teilnahme: Teilnahme = self.training.bindung_fuer(konto).teilnahme
-            teilnahme.kennung = "0badcafe"
-            teilnahme.save(update_fields=["kennung"])
+            self._kennung_setzen(konto, "0badcafe")
 
         archiv: dict[str, str] = self._archiv()
 
-        self.assertEqual(len(archiv), 2)
         self.assertEqual(
-            self._ordner(archiv), {"teilnehmer-0badcafe", "teilnehmer-0badcafe-2"}
+            sorted(archiv),
+            [
+                "teilnehmer-0badcafe-2/01-brüche-addieren.md",
+                "teilnehmer-0badcafe/01-brüche-addieren.md",
+                "teilnehmer-0badcafe/02-brüche-addieren.md",
+            ],
         )
 
 
@@ -378,17 +387,17 @@ class AbschriftTests(TrainingsexportTestCase):
     ) -> None:
         """Sie liegt im Ordner der Person, benannt nach der Erhebung."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        self._kennung_setzen(self.teilnehmerin, "3f9a01c2")
         kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
         self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
-        (ordner,) = self._ordner(archiv)
         abschriftdateien: list[str] = [name for name in archiv if name.count("/") == 2]
         self.assertEqual(len(archiv), 2)
         self.assertEqual(len(abschriftdateien), 1)
         self.assertTrue(
-            abschriftdateien[0].startswith(f"{ordner}/studie-bruchrechnung/")
+            abschriftdateien[0].startswith("teilnehmer-3f9a01c2/studie-bruchrechnung/")
         )
         self.assertIn("Nur den Zähler gekürzt.", archiv[abschriftdateien[0]])
 
