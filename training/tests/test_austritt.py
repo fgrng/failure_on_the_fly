@@ -1,4 +1,4 @@
-"""HTTP-Tests für den Austritt aus dem Training (ADR-0049)."""
+"""HTTP-Tests für Austritt und Entfernen aus dem Training (ADR-0049)."""
 
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
@@ -413,6 +413,18 @@ class EntfernenTests(FremdeinsichtTestCase):
         self.client.force_login(konto)
         return self.client.post(self._entfernen_url(), follow=True)
 
+    def _entfernen_bestaetigt(self, konto: Konto) -> None:
+        # Das Entfernen landet auf der Kuratierseite, die Teilnehmerin fehlt dort.
+        antwort: HttpResponse = self._entfernen(konto)
+
+        self.assertRedirects(
+            antwort, reverse("training:kuratieren", args=[self.training.pk])
+        )
+        self.assertNotIn(
+            "Grace Hopper",
+            kuratierseite(self.client, self.training, self.ausbilderin),
+        )
+
     def _sicht(self, konto: Konto) -> tuple[str, list[dict[str, object]]]:
         # Trainingsseite und Historie aus Sicht des Kontos.
         self.client.force_login(konto)
@@ -457,6 +469,9 @@ class EntfernenTests(FremdeinsichtTestCase):
         sitzung: Sitzung = gespielte_sitzung(
             self.training, self.teilnehmerin, self.vignette
         )
+        self.client.force_login(self.ausbilderin)
+        self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 200)
+
         self._entfernen(self.ausbilderin)
 
         self.assertEqual(self.client.get(ansehen_url(sitzung)).status_code, 404)
@@ -471,26 +486,23 @@ class EntfernenTests(FremdeinsichtTestCase):
         self.client.force_login(margaret)
         self.client.post(reverse("training:austreten", args=[self.training.pk]))
 
-        entfernt: tuple[str, list[dict[str, object]]] = self._sicht(self.teilnehmerin)
-        ausgetreten: tuple[str, list[dict[str, object]]] = self._sicht(margaret)
+        detail_entfernt, historie_entfernt = self._sicht(self.teilnehmerin)
+        _, historie_ausgetreten = self._sicht(margaret)
 
-        self.assertIn(HINWEIS_AUSGETRETEN, entfernt[0])
-        self.assertNotIn("entfernt", entfernt[0])
-        self.assertEqual(entfernt[1], ausgetreten[1])
+        self.assertIn(HINWEIS_AUSGETRETEN, detail_entfernt)
+        self.assertNotIn("entfernt", detail_entfernt)
+        self.assertEqual(historie_entfernt, historie_ausgetreten)
+
+    def test_jede_eigentuemerin_entfernt(self) -> None:
+        """Nicht nur, wer das Training angelegt hat."""
+        mitglied: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+        self.training.eigentuemerinnen.add(mitglied)
+
+        self._entfernen_bestaetigt(mitglied)
 
     def test_administration_entfernt_in_jedem_training(self) -> None:
         """Wie bei jeder anderen Kreisaktion."""
-        antwort: HttpResponse = self._entfernen(
-            konto_mit_rollen("root", is_superuser=True)
-        )
-
-        self.assertRedirects(
-            antwort, reverse("training:kuratieren", args=[self.training.pk])
-        )
-        self.assertNotIn(
-            "Grace Hopper",
-            kuratierseite(self.client, self.training, self.ausbilderin),
-        )
+        self._entfernen_bestaetigt(konto_mit_rollen("root", is_superuser=True))
 
     def test_kreisfremde_und_teilnehmende_koennen_nicht_entfernen(self) -> None:
         """Nur der Kreis entscheidet über seine Liste."""
