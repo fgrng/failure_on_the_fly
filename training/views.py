@@ -653,13 +653,20 @@ def neu_starten(
     training, vignette = _zugaengliches_training_mit_finaler_vignette(
         request, training_pk, vignette_pk
     )
-    try:
-        abzubrechen: int = int(request.POST.get("laufende_sitzung", ""))
-    except ValueError:
+    abzubrechen: int | None = _abzubrechende_sitzung(request)
+    if abzubrechen is None:
         return HttpResponseBadRequest("Die laufende Sitzung fehlt.")
     return _nach_einwilligung_starten(
         request, training, vignette, abzubrechen=abzubrechen
     )
+
+
+def _abzubrechende_sitzung(request: HttpRequest) -> int | None:
+    """Liest die abzubrechende laufende Sitzung aus dem Formular, sonst keine."""
+    try:
+        return int(request.POST.get("laufende_sitzung", ""))
+    except ValueError:
+        return None
 
 
 def _nach_einwilligung_starten(
@@ -675,7 +682,11 @@ def _nach_einwilligung_starten(
         return render(
             request,
             "training/einwilligung.html",
-            {"training": training, "vignette": vignette},
+            {
+                "training": training,
+                "vignette": vignette,
+                "laufende_sitzung": abzubrechen,
+            },
         )
     return _sitzung_starten(request, bindung, vignette, abzubrechen=abzubrechen)
 
@@ -698,7 +709,9 @@ def einwilligung(
         return HttpResponseBadRequest("Bitte stimmen Sie zu oder lehnen Sie ab.")
     bindung.teilnahme.audioverarbeitung_eingewilligt = entscheidung == "ja"
     bindung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
-    return _sitzung_starten(request, bindung, vignette)
+    return _sitzung_starten(
+        request, bindung, vignette, abzubrechen=_abzubrechende_sitzung(request)
+    )
 
 
 def _sitzungsnavigation(sitzung_pk: int) -> Sitzungsnavigation:
@@ -754,6 +767,18 @@ def _terminale_sitzung_anzeigen(
     return _zur_auswahl_zurueckkehren(sitzung)
 
 
+def _verletzt_hoechstens_eine_laufende(fehler: IntegrityError) -> bool:
+    """Erkennt die Verletzung von höchstens einer laufenden Sitzung je Teilnahme.
+
+    PostgreSQL nennt den Constraint, SQLite nur die Spalte des Teilindex.
+    """
+    meldung: str = str(fehler)
+    return (
+        "sitzungen_hoechstens_eine_laufende_sitzung_je_teilnahme" in meldung
+        or "UNIQUE constraint failed: sitzungen_sitzung.teilnahme_id" in meldung
+    )
+
+
 def _sitzung_starten(
     request: HttpRequest,
     bindung: Trainingsbindung,
@@ -787,7 +812,9 @@ def _sitzung_starten(
                     vignette,
                     ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
                 )
-    except IntegrityError:
+    except IntegrityError as fehler:
+        if not _verletzt_hoechstens_eine_laufende(fehler):
+            raise
         laufende = Sitzung.objects.laufende_von(bindung.teilnahme)
         if laufende is None:
             raise
