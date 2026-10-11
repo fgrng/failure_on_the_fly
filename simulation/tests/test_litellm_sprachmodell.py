@@ -41,7 +41,6 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
         "anthropic/claude-opus-4-8", {"temperature": 0.2}, completion
     ).antworten(
         "System",
-        "Kontext",
         [],
         "Eingabe",
         SCHUELERIN_SCHEMA,
@@ -53,7 +52,6 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
         model="anthropic/claude-opus-4-8",
         messages=[
             {"role": "system", "content": "System"},
-            {"role": "user", "content": "Kontext"},
             {"role": "user", "content": "Eingabe"},
         ],
         response_format={
@@ -86,7 +84,6 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
 
     LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
         "System",
-        "Kontext",
         [
             ("Wie rechnest du?", "Ich addiere alles."),
             ("Und warum so?", "Weil es so passt."),
@@ -98,7 +95,6 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
 
     assert completion.call_args.kwargs["messages"] == [
         {"role": "system", "content": "System"},
-        {"role": "user", "content": "Kontext"},
         {"role": "user", "content": "Wie rechnest du?"},
         {"role": "assistant", "content": "Ich addiere alles."},
         {"role": "user", "content": "Und warum so?"},
@@ -128,7 +124,6 @@ def test_litellm_adapter_reicht_native_reasoning_felder_nicht_durch(
 
     antwort = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
         "System",
-        "Kontext",
         [],
         "Eingabe",
         SCHUELERIN_SCHEMA,
@@ -189,7 +184,6 @@ def test_litellm_adapter_kennzeichnet_content_filter() -> None:
     with pytest.raises(ContentFilter) as exc_info:
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             SCHUELERIN_SCHEMA,
@@ -211,7 +205,6 @@ def test_litellm_adapter_kennzeichnet_content_policy_exception_als_filter() -> N
     with pytest.raises(ContentFilter):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             SCHUELERIN_SCHEMA,
@@ -227,7 +220,6 @@ def test_litellm_adapter_kennzeichnet_fehlende_antworthuelle_als_formatbruch() -
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             SCHUELERIN_SCHEMA,
@@ -256,7 +248,6 @@ def test_litellm_adapter_kennzeichnet_zusaetzliches_feld_als_formatbruch() -> No
     with pytest.raises(Formatbruch):
         LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             SCHUELERIN_SCHEMA,
@@ -293,7 +284,7 @@ def test_litellm_adapter_liefert_das_objekt_des_uebergebenen_schemas(
     completion: Mock = _completion_mit(inhalt)
 
     ausgabe = LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-        "System", "Kontext", [], "Eingabe", ausgabe_schema, SPRACHMODELL_FRIST_SEKUNDEN
+        "System", [], "Eingabe", ausgabe_schema, SPRACHMODELL_FRIST_SEKUNDEN
     )
 
     assert ausgabe == erwartet
@@ -309,7 +300,7 @@ def test_bewerter_anfrage_fordert_die_begruendung_vor_dem_urteil_an() -> None:
     )
 
     LiteLLMSprachmodell("openai/gpt-test", {}, completion).antworten(
-        "System", "Kontext", [], "Eingabe", BEWERTER_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+        "System", [], "Eingabe", BEWERTER_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
     )
 
     schema = completion.call_args.kwargs["response_format"]["json_schema"]["schema"]
@@ -333,7 +324,6 @@ def test_litellm_adapter_verwirft_ausgabe_neben_dem_bewerter_schema(
     with pytest.raises(Formatbruch) as exc_info:
         LiteLLMSprachmodell("openai/gpt-test", {}, _completion_mit(inhalt)).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             BEWERTER_SCHEMA,
@@ -351,7 +341,6 @@ def test_litellm_adapter_verwirft_falsch_typisierte_aeusserung() -> None:
             "openai/gpt-test", {}, _completion_mit('{"aeusserung": ["Warum?"]}')
         ).antworten(
             "System",
-            "Kontext",
             [],
             "Eingabe",
             LEHRPERSON_SCHEMA,
@@ -373,6 +362,61 @@ def _geglueckte_completion() -> Mock:
             ]
         )
     )
+
+
+def _gesendete_nachrichten(kern: Simulationskern) -> list[dict[str, str]]:
+    # Die Nachrichten eines Antwortversuchs nach einem Gesprächswechsel.
+
+    completion: Mock = _geglueckte_completion()
+    with patch("simulation.sprachmodell.litellm.completion", completion):
+        antwort_versuchen(
+            {"fehlermuster": "Brüche werden addiert.", "lernauftrag": "Addiere."},
+            kern,
+            ModellKonfiguration(
+                anbieter=Anbieter.OPENROUTER,
+                sprachmodell="openrouter/openai/gpt-test",
+                anbieter_token="sk-or-geheim",
+            ),
+            verlauf=[("Wie rechnest du?", "Ich addiere.")],
+            eingabe="Warum so?",
+        )
+    return completion.call_args.kwargs["messages"]
+
+
+def test_antwort_versuchen_haengt_die_gefuellte_user_prompt_vorlage_an() -> None:
+    """Der Arbeitskontext einer Altfassung steht am Ende des System-Prompts."""
+
+    nachrichten = _gesendete_nachrichten(
+        Simulationskern(
+            system_prompt_vorlage="Rolle: $fehlermuster",
+            user_prompt_vorlage="Auftrag: $lernauftrag",
+        )
+    )
+
+    assert nachrichten == [
+        {
+            "role": "system",
+            "content": "Rolle: Brüche werden addiert.\n\nAuftrag: Addiere.",
+        },
+        {"role": "user", "content": "Wie rechnest du?"},
+        {"role": "assistant", "content": "Ich addiere."},
+        {"role": "user", "content": "Warum so?"},
+    ]
+
+
+def test_antwort_versuchen_haengt_eine_leere_user_prompt_vorlage_nicht_an() -> None:
+    """Ohne User-Prompt-Vorlage ist der System-Prompt genau die gerenderte Vorlage."""
+
+    nachrichten = _gesendete_nachrichten(
+        Simulationskern(system_prompt_vorlage="Rolle: $fehlermuster")
+    )
+
+    assert nachrichten == [
+        {"role": "system", "content": "Rolle: Brüche werden addiert."},
+        {"role": "user", "content": "Wie rechnest du?"},
+        {"role": "assistant", "content": "Ich addiere."},
+        {"role": "user", "content": "Warum so?"},
+    ]
 
 
 def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> None:
@@ -548,7 +592,6 @@ def test_ausgabe_versuchen_teilt_die_frist_auch_fuer_den_bewerter(
     with patch("simulation.sprachmodell.litellm.completion", completion):
         ausgabeversuch = ausgabe_versuchen(
             "Du bewertest.",
-            "Kriterium",
             ModellKonfiguration(
                 anbieter=Anbieter.OPENROUTER,
                 sprachmodell="openrouter/openai/gpt-test",
@@ -556,7 +599,7 @@ def test_ausgabe_versuchen_teilt_die_frist_auch_fuer_den_bewerter(
                 parameter={},
             ),
             verlauf=[],
-            eingabe="Verlauf",
+            eingabe="Kriterium",
             ausgabe_schema=BEWERTER_SCHEMA,
         )
 

@@ -308,6 +308,14 @@ mehr. Ohne das Feld lässt das Speichern die Vorlage unberührt. Die Leseansicht
 zeigen den Abschnitt je Fassung nur bei gefüllter Vorlage, auch bei archivierten
 Fassungen.
 
+Die simulierte Schüler:in erhält ihren Arbeitskontext im System-Prompt, in
+Sitzung, Probelauf und Evalgespräch gleich: Der System-Prompt ist die gerenderte
+System-Prompt-Vorlage. Ist die User-Prompt-Vorlage der Kern-Fassung gefüllt,
+wird sie gerendert und mit einer Leerzeile angehängt; ist sie leer, hängt nichts
+an. Danach wechseln sich die Ansprachen der Teilnehmer:in (`user`) und die
+Äußerungen der Schüler:in (`assistant`) ab, die erste `user`-Nachricht ist die
+erste Ansprache. Jede `user`-Nachricht stammt von der Teilnehmer:in (ADR-0052).
+
 ## Modell-Konfiguration
 
 Administrator:innen setzen das Sprachmodell unter
@@ -604,13 +612,14 @@ Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei ein
 gelenkten formuliert die simulierte Lehrperson sie mit der festgehaltenen
 Lehrpersonen-Konfiguration: Ihr System-Prompt ist die gerenderte
 Lehrperson-Vorlage des festgehaltenen Katalogs mit `$inputstrategie` (Text des
-Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), der User-Prompt
-dieser Verlauf, die Eingabe die Inputstrategie. Die Schüler:in antwortet in
-beiden Fällen über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
-Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
-Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
-Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
-User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Inputstrategie und
+Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), ihre einzige
+`user`-Nachricht die Inputstrategie. Die Schüler:in antwortet in beiden Fällen
+über denselben Antwortversuch wie in der Sitzung, mit derselben
+Nachrichtenordnung und ohne Denkspur im Kontext. Danach beurteilt der Bewerter
+das Gespräch nach jedem Evalkriterium des Evals und jedem übergreifenden
+Kriterium. Sein System-Prompt ist die gerenderte Bewerter-Vorlage mit
+`$kriterium` und `$verlauf` (Verlauf samt Denkspur); den Verlauf erhält er nur
+dort. Seine einzige `user`-Nachricht ist der Kriteriumstext. Inputstrategie und
 Kriterium werden als reiner Text eingesetzt und nicht selbst als Vorlage
 ausgewertet; Anweisungen stehen allein in den Vorlagen des Katalogs. Jedes
 Gespräch, jeder Wechsel und jedes Urteil wird sofort geschrieben; kein

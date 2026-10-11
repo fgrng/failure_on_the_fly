@@ -21,9 +21,9 @@ def test_fake_begrenzt_seine_verzoegerung_auf_die_anfragefrist(
     with patch("time.sleep", gewartet.append):
         if abgelaufen:
             with pytest.raises(Anbieterfehler, match="Frist des Fake-Aufrufs"):
-                fake.antworten("", "", [], "", LEHRPERSON_SCHEMA, timeout=3.0)
+                fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=3.0)
         else:
-            assert fake.antworten("", "", [], "", LEHRPERSON_SCHEMA, timeout=3.0) == {
+            assert fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=3.0) == {
                 "aeusserung": "Erste"
             }
 
@@ -37,8 +37,8 @@ def test_timeout_verbraucht_den_skripteintrag() -> None:
 
     with patch("time.sleep"):
         with pytest.raises(Anbieterfehler):
-            fake.antworten("", "", [], "", LEHRPERSON_SCHEMA, timeout=1.0)
-        assert fake.antworten("", "", [], "", LEHRPERSON_SCHEMA, timeout=3.0) == {
+            fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=1.0)
+        assert fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=3.0) == {
             "aeusserung": "Zweite"
         }
 
@@ -70,10 +70,10 @@ def test_fake_timeout_nutzt_das_gemeinsame_budget_und_beginnt_naechsten_aufruf_f
 
     with patch("time.monotonic", lambda: vergangen), patch("time.sleep", warten):
         erster = ausgabe_versuchen(
-            "", "", konfiguration, [], "", LEHRPERSON_SCHEMA, ausfuehrung
+            "", konfiguration, [], "", LEHRPERSON_SCHEMA, ausfuehrung
         )
         zweiter = ausgabe_versuchen(
-            "", "", konfiguration, [], "", LEHRPERSON_SCHEMA, ausfuehrung
+            "", konfiguration, [], "", LEHRPERSON_SCHEMA, ausfuehrung
         )
 
     assert erster.ausgabe is None

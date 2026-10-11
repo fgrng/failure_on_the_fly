@@ -135,12 +135,16 @@ def antwort_versuchen(
     """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in.
 
     Die Prompt-Platzhalter (Name → Text) berechnet die Aufruferin aus ihrer
-    Vignette; `simulation` kennt keine Vignette (ADR-0016).
+    Vignette; `simulation` kennt keine Vignette (ADR-0016). Der Arbeitskontext
+    steht im System-Prompt: Eine gefüllte User-Prompt-Vorlage (Altbestand)
+    wird gerendert mit einer Leerzeile angehängt (ADR-0052).
     """
 
+    system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
+    if kern.user_prompt_vorlage:
+        system_prompt += "\n\n" + vorlage_rendern(kern.user_prompt_vorlage, platzhalter)
     ausgabeversuch: Ausgabeversuch = ausgabe_versuchen(
-        vorlage_rendern(kern.system_prompt_vorlage, platzhalter),
-        vorlage_rendern(kern.user_prompt_vorlage, platzhalter),
+        system_prompt,
         modell_konfiguration,
         verlauf,
         eingabe,
@@ -158,7 +162,6 @@ def antwort_versuchen(
 
 def ausgabe_versuchen(
     system_prompt: str,
-    user_prompt: str,
     modell_konfiguration: "ModellKonfiguration",
     verlauf: Sequence[tuple[str, str]],
     eingabe: str,
@@ -190,7 +193,6 @@ def ausgabe_versuchen(
         try:
             ausgabe: dict[str, object] = sprachmodell.antworten(
                 system_prompt,
-                user_prompt,
                 verlauf,
                 eingabe,
                 ausgabe_schema,

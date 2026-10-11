@@ -79,13 +79,20 @@ def test_je_wiederholung_ein_gespraech_mit_einem_wechsel_je_inputschritt() -> No
     ] == [(1, ["Eins", "Zwei", "Drei"]), (2, ["Eins", "Zwei", "Drei"])]
 
 
-def _anfragetexte(vignette: Vignette) -> list[str]:
-    # Führt einen Lauf aus; je Anbieter-Anfrage alle Nachrichten als ein Text.
+def _anfragen(vignette: Vignette) -> list[list[dict[str, str]]]:
+    # Führt einen Lauf aus; je Anbieter-Anfrage ihre gesendeten Nachrichten.
 
     with anfragen_aufzeichnen() as anfragen:
         _ausgefuehrter_lauf(vignette)
+    return anfragen
+
+
+def _anfragetexte(vignette: Vignette) -> list[str]:
+    # Führt einen Lauf aus; je Anbieter-Anfrage alle Nachrichten als ein Text.
+
     return [
-        " ".join(nachricht["content"] for nachricht in anfrage) for anfrage in anfragen
+        " ".join(nachricht["content"] for nachricht in anfrage)
+        for anfrage in _anfragen(vignette)
     ]
 
 
@@ -124,6 +131,54 @@ def test_bewerter_sieht_verlauf_samt_denkspur_und_kriterium() -> None:
     assert all(
         text in bewerter for text in ("Denkspur 1", "Denkspur 2", "Muster gezeigt")
     )
+
+
+def _gesprochen(anfrage: list[dict[str, str]]) -> list[tuple[str, str]]:
+    # Die Nachrichten einer Anfrage nach dem System-Prompt, als (Rolle, Text).
+
+    system, *gespraech = anfrage
+    assert system["role"] == "system"
+    return [(nachricht["role"], nachricht["content"]) for nachricht in gespraech]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_schuelerin_erhaelt_dieselbe_nachrichtenordnung_wie_in_der_sitzung() -> None:
+    """Jede user-Nachricht an die Schüler:in ist eine Äußerung der Lehrperson."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert _gesprochen(anfragen[1]) == [
+        ("user", "Wie hast du gerechnet?"),
+        ("assistant", "Antwort 1"),
+        ("user", "Warum so?"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_bewerter_erhaelt_allein_das_kriterium_als_user_nachricht() -> None:
+    """Der Verlauf steht nur im System-Prompt des Bewerters (ADR-0052)."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert _gesprochen(anfragen[-1]) == [("user", "Muster gezeigt")]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_lehrperson_erhaelt_allein_die_inputstrategie_als_user_nachricht() -> None:
+    """Neben der Inputstrategie erhält die Lehrperson keine user-Nachricht."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert _gesprochen(anfragen[1]) == [("user", "Frag nach $schuelerin_name")]
 
 
 @pytest.mark.django_db
