@@ -1,13 +1,28 @@
 """Persistenzmodelle einer Sitzung."""
 
+import secrets
+
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import F, Q
 
 
+def neue_teilnahmekennung() -> str:
+    """Zieht eine Teilnahmekennung, die nichts in sich trägt (ADR-0049)."""
+
+    return secrets.token_hex(4)
+
+
 class Teilnahme(models.Model):
     """Die anonyme Klammer für Sitzungen eines Aufrufers."""
 
+    # Der pseudonyme Name der Teilnahme in Einsicht und Exporten; nie das
+    # Token, und die Abschrift bekommt mit ihrer Teilnahme eine eigene.
+    kennung: models.CharField = models.CharField(
+        max_length=8,
+        default=neue_teilnahmekennung,
+        editable=False,
+    )
     # Die drei Einwilligungen einer Erhebungsteilnahme; `None` heißt nicht
     # entschieden oder nicht angeboten. Die Audioverarbeitung heißt in der
     # Oberfläche Spracherkennung und wird auch im Training eingeholt.

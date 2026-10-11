@@ -902,6 +902,24 @@ def test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens() -> None:
 
 
 @pytest.mark.django_db
+def test_anlegen_vergibt_eine_teilnahmekennung_aus_acht_hexzeichen() -> None:
+    """Die Kennung ist ein eigener Zufallswert, nicht aus dem Token gebildet."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    stichprobe: Stichprobe = Stichprobe.objects.create(
+        erhebung=erhebung,
+        beginn=timezone.now(),
+        ende=timezone.now(),
+    )
+
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(stichprobe)
+
+    assert re.fullmatch(r"[0-9a-f]{8}", bindung.teilnahme.kennung)
+
+
+@pytest.mark.django_db
 def test_anlegen_wiederholt_token_nach_kollision() -> None:
     """Eine vorhandene Tokenfolge wird nie einer zweiten Teilnahme zugeordnet."""
 

@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime
 
+import re
+
 import pytest
 import time_machine
 from django.core.exceptions import ValidationError
@@ -182,6 +184,20 @@ def test_laesst_die_erhebungsseite_unberuehrt() -> None:
         == 1
     )
     assert abschrift.teilnahme.pk != bindung.teilnahme.pk
+
+
+@pytest.mark.django_db
+def test_abschrift_erhaelt_eine_eigene_teilnahmekennung() -> None:
+    """Die Kennung der Erhebungsteilnahme verbände Konto und Forschungsdaten."""
+
+    forschende: Konto = Konto.objects.create_user(username="ada")
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    bindung: Erhebungsbindung = _gespielte_teilnahme(_erhebung_anlegen(forschende))
+
+    abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+
+    assert re.fullmatch(r"[0-9a-f]{8}", abschrift.teilnahme.kennung)
+    assert abschrift.teilnahme.kennung != bindung.teilnahme.kennung
 
 
 @pytest.mark.django_db

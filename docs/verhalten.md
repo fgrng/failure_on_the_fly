@@ -965,12 +965,15 @@ Detailseite. Eine fremde Erhebung bleibt dabei unauffindbar. Sobald eine
 Stichprobe besteht, lässt sich an der Erhebung die Datenspur als ZIP mit
 relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
-dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
-zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
-ist damit eine Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile
-nennt die verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem
-Budget bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
+Fehlversuche und Diagnosen. Jede Tabelle, die eine Teilnahme über ihr Token
+ausweist, nennt daneben in der Spalte `teilnahmekennung` deren Teilnahmekennung:
+acht Hexzeichen, beim Anlegen der Teilnahme zufällig gezogen und danach
+unveränderlich. Jeder Gesprächsschritt und jede Diagnose vermerken dabei den
+Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem zusammengesetzt
+wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und ist damit eine
+Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile nennt die
+verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem Budget
+bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
 Vignettenfassung zu lesen. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem
 vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne

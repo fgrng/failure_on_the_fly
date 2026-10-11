@@ -89,14 +89,14 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
     sitzung_ids: QuerySet[Vignettenposition] = positionen.values("sitzung_id")
     itembloecke: QuerySet[Itemblock] = (
         Itemblock.objects.filter(erhebungsbindung__stichprobe__erhebung=erhebung)
-        .select_related("erhebungsbindung")
+        .select_related("erhebungsbindung__teilnahme")
         .order_by("erhebungsbindung_id", "pk")
     )
     # Antwortzeilen ohne Werte werden nicht herausgefiltert: erst sie
     # trennen »vorgelegt, nicht beantwortet« von »nie vorgelegt« (ADR-0041).
     antworten: QuerySet[ItemAntwort] = (
         ItemAntwort.objects.filter(erhebungsbindung__stichprobe__erhebung=erhebung)
-        .select_related("erhebungsbindung", "erhebungsitem__item")
+        .select_related("erhebungsbindung__teilnahme", "erhebungsitem__item")
         .order_by("itemblock_id", "erhebungsitem__position", "pk")
     )
     vignetten: QuerySet[Vignette] = Vignette.objects.filter(
@@ -135,6 +135,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             bindungen,
             (
                 "token",
+                "teilnahmekennung",
                 "stichprobe_id",
                 "sprachmodell_eingewilligt",
                 "audioverarbeitung_eingewilligt",
@@ -147,17 +148,20 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "teilnahme.audioverarbeitung_eingewilligt"
             ),
             speicherung_eingewilligt=attrgetter("teilnahme.speicherung_eingewilligt"),
+            teilnahmekennung=attrgetter("teilnahme.kennung"),
         ),
         "vignettenziehungen.csv": _csv_aus_objekten(
-            ziehungen.select_related("erhebungsbindung"),
-            ("token", "vignette_id", "position"),
+            ziehungen.select_related("erhebungsbindung__teilnahme"),
+            ("token", "teilnahmekennung", "vignette_id", "position"),
             token=attrgetter("erhebungsbindung.token"),
+            teilnahmekennung=attrgetter("erhebungsbindung.teilnahme.kennung"),
         ),
         "sitzungen.csv": _csv_aus_objekten(
             positionen.select_related("teilnahme__erhebungsbindung", "sitzung"),
             (
                 "id",
                 "token",
+                "teilnahmekennung",
                 "position",
                 "status",
                 "vignette_id",
@@ -168,6 +172,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             ),
             id=attrgetter("sitzung_id"),
             token=attrgetter("teilnahme.erhebungsbindung.token"),
+            teilnahmekennung=attrgetter("teilnahme.kennung"),
             status=attrgetter("sitzung.status"),
             vignette_id=attrgetter("sitzung.vignette_id"),
             simulationskern_id=attrgetter("sitzung.simulationskern_id"),
@@ -205,18 +210,21 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             (
                 "id",
                 "teilnahme_token",
+                "teilnahmekennung",
                 "andockpunkt",
                 "sitzung_id",
                 "vorgelegt_am",
                 "erledigt_am",
             ),
             teilnahme_token=attrgetter("erhebungsbindung.token"),
+            teilnahmekennung=attrgetter("erhebungsbindung.teilnahme.kennung"),
         ),
         "item_antworten.csv": _csv_aus_objekten(
             antworten,
             (
                 "itemblock_id",
                 "teilnahme_token",
+                "teilnahmekennung",
                 "item_id",
                 "item_typ",
                 "andockpunkt",
@@ -226,6 +234,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "likert_stufe",
             ),
             teilnahme_token=attrgetter("erhebungsbindung.token"),
+            teilnahmekennung=attrgetter("erhebungsbindung.teilnahme.kennung"),
             item_id=attrgetter("erhebungsitem.item_id"),
             item_typ=attrgetter("erhebungsitem.item.typ"),
             andockpunkt=attrgetter("erhebungsitem.andockpunkt"),
