@@ -69,10 +69,11 @@ from fragebogen_items.models import FragebogenItem
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     sitzung_abbrechen,
+    sitzung_anzeigen,
     sitzung_beenden,
 )
 from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
-from sitzungen.sink import GeruestSink, sink_fuer_sitzung
+from sitzungen.sink import DBSink, GeruestSink, sink_fuer_sitzung
 from sitzungen.views import (
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
@@ -470,6 +471,14 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     return zip_download("erhebung", erhebung.pk, erhebung.name, datenspur_zip(erhebung))
 
 
+# Inhaltlich lesbar sind nur beendete Sitzungen nicht flüchtiger Teilnahmen.
+_BEENDET: tuple[str, ...] = (
+    Sitzung.Status.ABGESCHLOSSEN,
+    Sitzung.Status.ABGEBROCHEN,
+    Sitzung.Status.GESCHEITERT,
+)
+
+
 def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
     """Die Darstellung einer Sitzung im Raster der Einsicht."""
 
@@ -531,6 +540,14 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
                     "position": positionen.get(schluessel),
                     "status": sitzung.get_status_display(),
                     "variante": _bubble_variante(sitzung, fluechtig),
+                    "url": (
+                        None
+                        if fluechtig or sitzung.status not in _BEENDET
+                        else reverse(
+                            "erhebungen:einsicht_sitzung",
+                            args=[erhebung.pk, sitzung.pk],
+                        )
+                    ),
                 }
             )
         zeilen_je_stichprobe.setdefault(bindung.stichprobe_id, []).append(
@@ -564,6 +581,63 @@ def einsicht(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         "erhebungen/einsicht.html",
         {"erhebung": erhebung, **_einsicht_raster(request.user, erhebung)},
+    )
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+def einsicht_sitzung(request: HttpRequest, pk: int, sitzung_pk: int) -> HttpResponse:
+    """Zeigt eine beendete Sitzung der Erhebung rein lesend (ADR-0049).
+
+    Anders als die Teilnehmer:in sieht der Kreis die Denkspur und darunter
+    die Antworten auf den Item-Block nach der Sitzung; Fehlversuche nicht.
+    """
+
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    sitzung: Sitzung = get_object_or_404(
+        Sitzung.objects.in_erhebungen_einsehbar(
+            Erhebung.objects.sichtbar_fuer(request.user)
+        )
+        .filter(
+            teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung,
+            status__in=_BEENDET,
+        )
+        .exclude(Teilnahme.fluechtig_q("teilnahme__"))
+        .select_related(
+            "vignette",
+            "simulationskern",
+            "teilnahme__erhebungsbindung__stichprobe",
+        ),
+        pk=sitzung_pk,
+    )
+    block: Itemblock | None = Itemblock.objects.filter(sitzung=sitzung).first()
+    uebersicht_url: str = reverse("erhebungen:einsicht", args=[erhebung.pk])
+    return sitzung_anzeigen(
+        request,
+        vignette=sitzung.vignette,
+        kern=sitzung.simulationskern,
+        gespraechsschritte=sitzung.gespraechsschritte,
+        zeigt_denkspur=True,
+        # Die Ansicht hat keine Formulare; alle Wege führen zur Übersicht.
+        navigation=Sitzungsnavigation(
+            bezeichnung="Einsicht",
+            gespraech_url=uebersicht_url,
+            beenden_url=uebersicht_url,
+            debrief_url=uebersicht_url,
+            abbrechen_url=None,
+            transkription_url=uebersicht_url,
+        ),
+        zeigt_debrief=(sitzung.status == Sitzung.Status.ABGESCHLOSSEN),
+        ist_lesend=True,
+        abgegebene_diagnose=DBSink.fuer_sitzung(sitzung).abgegebene_diagnose,
+        seitenvorlage="erhebungen/einsicht_sitzung.html",
+        seitenkontext={
+            "erhebung": erhebung,
+            "sitzung": sitzung,
+            "stichprobe": sitzung.teilnahme.erhebungsbindung.stichprobe,
+            "uebersicht_url": uebersicht_url,
+            "antworten": block.antwortzeilen() if block else [],
+        },
     )
 
 

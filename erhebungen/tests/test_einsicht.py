@@ -14,14 +14,24 @@ from config.tests.aufbau import finale_vignette, finaler_kern, konto_mit_rollen
 from erhebungen.models import (
     Erhebung,
     Erhebungsbindung,
+    Erhebungsitem,
+    ItemAntwort,
+    Itemblock,
     Stichprobe,
     Vignettenziehung,
 )
 from erhebungen.tests.aufbau import finale_erhebung, forschende
+from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
 from simulation.models import ModellKonfiguration, Verwendung
-from sitzungen.models import Sitzung
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
 from vignetten.models import Vignette
 
 _BERLIN: ZoneInfo = ZoneInfo("Europe/Berlin")
@@ -29,6 +39,10 @@ _BERLIN: ZoneInfo = ZoneInfo("Europe/Berlin")
 
 def _einsicht_url(erhebung: Erhebung) -> str:
     return reverse("erhebungen:einsicht", args=[erhebung.pk])
+
+
+def _sitzung_url(erhebung: Erhebung, sitzung: Sitzung) -> str:
+    return reverse("erhebungen:einsicht_sitzung", args=[erhebung.pk, sitzung.pk])
 
 
 class EinsichtTestCase(TestCase):
@@ -295,7 +309,7 @@ class EinsichtRasterTests(EinsichtTestCase):
                 zeile,
                 r'class="fremdeinsicht__sitzung fremdeinsicht__sitzung--warnung"'
                 rf' title="{status}" aria-label="Position {position}, {status}"'
-                rf">{position}<",
+                rf"[^>]*>{position}<",
             )
 
     def test_laufende_sitzung_ist_gedimmt(self) -> None:
@@ -310,13 +324,32 @@ class EinsichtRasterTests(EinsichtTestCase):
             'class="fremdeinsicht__sitzung fremdeinsicht__sitzung--laufend"', zeile
         )
 
-    def test_bubbles_sind_noch_nicht_verlinkt(self) -> None:
-        """Die Sitzungsansicht kommt erst später; keine Bubble ist ein Link."""
+    def test_bubbles_beendeter_sitzungen_sind_verlinkt(self) -> None:
+        """Abgeschlossene, abgebrochene und gescheiterte Sitzungen öffnen sich."""
 
         bindung: Erhebungsbindung = self._teilnahme()
-        self._sitzung(bindung, self.brueche)
+        abgeschlossen: Sitzung = self._sitzung(bindung, self.brueche)
+        gescheitert: Sitzung = self._sitzung(
+            bindung, self.zinsen, Sitzung.Status.GESCHEITERT
+        )
 
-        self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        for sitzung in (abgeschlossen, gescheitert):
+            self.assertIn(f'href="{_sitzung_url(self.erhebung, sitzung)}"', zeile)
+
+    def test_laufende_und_fluechtige_bubbles_sind_nicht_verlinkt(self) -> None:
+        """Wer nichts lesen kann, bekommt keinen Link."""
+
+        laufend: Erhebungsbindung = self._teilnahme()
+        self._sitzung(laufend, self.brueche, Sitzung.Status.LAUFEND)
+        fluechtig: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(fluechtig, self.brueche)
+
+        antwort: HttpResponse = self._einsicht()
+
+        self.assertNotIn("<a ", self._zeile(antwort, laufend))
+        self.assertNotIn("<a ", self._zeile(antwort, fluechtig))
 
     def test_fluechtige_zeile_traegt_den_hinweis(self) -> None:
         """Von flüchtigen Teilnahmen gibt es nur das Ablaufgerüst."""
@@ -375,3 +408,208 @@ class EinsichtRasterTests(EinsichtTestCase):
         self._sitzung(fremde, self.brueche)
 
         self.assertNotContains(self._einsicht(), fremde.teilnahme.kennung)
+
+
+class EinsichtSitzungTests(EinsichtTestCase):
+    """Die lesende Sitzungsansicht der Einsicht."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.bindung: Erhebungsbindung = self._teilnahme()
+
+    def _gespielte_sitzung(
+        self,
+        status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
+        bindung: Erhebungsbindung | None = None,
+    ) -> Sitzung:
+        # Eine Sitzung mit einem Gesprächsschritt samt Denkspur und
+        # Fehlversuch und einer abgegebenen Diagnose.
+        sitzung: Sitzung = self._sitzung(bindung or self.bindung, self.brueche, status)
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=sitzung,
+            eingabe="Wie hast du gerechnet?",
+            denkspur="Mia addiert Zähler und Nenner.",
+            aeusserung="Ich habe oben und unten zusammengezählt.",
+            reihenfolge=1,
+        )
+        Fehlversuch.objects.create(
+            gespraechsschritt=schritt,
+            grund="kein JSON",
+            rohantwort="Verworfene Rohantwort des Modells.",
+        )
+        Diagnose.objects.create(sitzung=sitzung, text="Zähler und Nenner addiert.")
+        return sitzung
+
+    def _ansicht(self, sitzung: Sitzung, konto: Konto | None = None) -> HttpResponse:
+        self.client.force_login(konto or self.ada)
+        return self.client.get(_sitzung_url(self.erhebung, sitzung))
+
+    def _seite(self, antwort: HttpResponse) -> str:
+        # Der Seiteninhalt ohne die Navigation, deren Abmelden ein Formular ist.
+        inhalt: str = antwort.content.decode()
+        return inhalt[inhalt.index('<article class="sitzung-seite"') :]
+
+    def test_kreis_liest_transkript_denkspur_und_diagnose(self) -> None:
+        """Die abgeschlossene Sitzung zeigt, was die Teilnehmerin sah, und mehr."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "Wie hast du gerechnet?")
+        self.assertContains(antwort, "Ich habe oben und unten zusammengezählt.")
+        self.assertContains(antwort, "Denkspur ansehen")
+        self.assertContains(antwort, "Mia addiert Zähler und Nenner.")
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+
+    def test_administration_liest_jede_sitzung(self) -> None:
+        """Die Administration öffnet die Sitzung einer fremden Erhebung."""
+
+        admin: Konto = konto_mit_rollen("root", is_superuser=True)
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung(), admin)
+
+        self.assertContains(antwort, "Mia addiert Zähler und Nenner.")
+
+    def test_abgebrochene_sitzung_zeigt_keine_diagnose(self) -> None:
+        """Nur abgeschlossene Sitzungen haben einen Debrief."""
+
+        for status in (Sitzung.Status.ABGEBROCHEN, Sitzung.Status.GESCHEITERT):
+            with self.subTest(status=status):
+                antwort: HttpResponse = self._ansicht(
+                    self._gespielte_sitzung(status, self._teilnahme())
+                )
+
+                self.assertContains(antwort, "Ich habe oben und unten zusammengezählt.")
+                self.assertNotContains(antwort, "Zähler und Nenner addiert.")
+
+    def test_kopf_nennt_kennung_stichprobe_vignette_und_status(self) -> None:
+        """Wer liest, weiß, was er liest, und findet zurück zur Übersicht."""
+
+        antwort: HttpResponse = self._ansicht(
+            self._gespielte_sitzung(Sitzung.Status.GESCHEITERT)
+        )
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+        self.assertContains(
+            antwort,
+            f"Stichprobe {self.stichprobe.beginn:%d.%m.%Y} – "
+            f"{self.stichprobe.ende:%d.%m.%Y}",
+        )
+        self.assertContains(antwort, "Brüche addieren")
+        self.assertContains(antwort, "Gescheitert")
+        self.assertContains(antwort, f'href="{_einsicht_url(self.erhebung)}"')
+
+    def test_item_antworten_nach_der_sitzung_stehen_darunter(self) -> None:
+        """Die Antworten auf den Block dieser Sitzung erscheinen lesend."""
+
+        likert: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada,
+            typ=FragebogenItem.Typ.LIKERT,
+            wortlaut="Wie sicher fühlten Sie sich?",
+        )
+        freitext: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Was war schwierig?"
+        )
+        for item in (likert, freitext):
+            item.finalisieren()
+        self.erhebung = finale_erhebung(
+            self.ada, vignetten=[self.brueche], items_nach_sitzung=[likert, freitext]
+        )
+        bindung: Erhebungsbindung = self._teilnahme(
+            self._stichprobe(self.erhebung), ziehung=(self.brueche,)
+        )
+        sitzung: Sitzung = self._gespielte_sitzung(bindung=bindung)
+        block: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung,
+            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            sitzung=sitzung,
+        )
+        for erhebungsitem, werte in zip(
+            self.erhebung.itemzugehoerigkeiten.order_by("position"),
+            ({"likert_stufe": 5}, {"freitext": "Das Kürzen."}),
+        ):
+            ItemAntwort.objects.create(
+                itemblock=block,
+                erhebungsbindung=bindung,
+                erhebungsitem=erhebungsitem,
+                sitzung=sitzung,
+                **werte,
+            )
+
+        inhalt: str = self._ansicht(sitzung).content.decode()
+
+        self.assertIn("Wie sicher fühlten Sie sich?", inhalt)
+        self.assertIn("Stimme zu", inhalt)
+        self.assertIn("Das Kürzen.", inhalt)
+        self.assertLess(
+            inhalt.index("Zähler und Nenner addiert."),
+            inhalt.index("Wie sicher fühlten Sie sich?"),
+        )
+
+    def test_keine_fehlversuche_kein_token_keine_formulare(self) -> None:
+        """Die Ansicht ist rein lesend und führt in keine Teilnahme zurück."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+        seite: str = self._seite(antwort)
+
+        self.assertNotContains(antwort, "Verworfene Rohantwort des Modells.")
+        self.assertNotContains(antwort, self.bindung.token)
+        self.assertNotIn("<form", seite)
+        self.assertNotIn("<textarea", seite)
+        self.assertNotIn("<button", seite)
+
+    def test_laufende_sitzung_bekommt_404(self) -> None:
+        """Live-Mitlesen gibt es nicht."""
+
+        sitzung: Sitzung = self._gespielte_sitzung(Sitzung.Status.LAUFEND)
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+    def test_fluechtige_sitzung_bekommt_404(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es nur das Gerüst."""
+
+        sitzung: Sitzung = self._gespielte_sitzung(
+            bindung=self._teilnahme(fluechtig=True)
+        )
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+    def test_sitzung_einer_anderen_erhebung_bekommt_404(self) -> None:
+        """Die Sitzung wird gegen die Erhebung aus der URL geprüft."""
+
+        andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        fremde: Sitzung = self._gespielte_sitzung(
+            bindung=self._teilnahme(self._stichprobe(andere), ziehung=(self.brueche,))
+        )
+
+        self.assertEqual(self._ansicht(fremde).status_code, 404)
+
+    def test_fremder_kreis_bekommt_404(self) -> None:
+        """Außerhalb des Kreises bleibt die Sitzung unauffindbar."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+
+        self.assertEqual(self._ansicht(sitzung, forschende("grace")).status_code, 404)
+
+    def test_andere_rollen_werden_abgewiesen(self) -> None:
+        """Ohne Forschungsrolle gibt es keine Sitzungsansicht."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+
+        konto: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+
+        self.assertEqual(self._ansicht(sitzung, konto).status_code, 403)
+
+    def test_trainingssitzung_bekommt_404(self) -> None:
+        """Eine Sitzung ohne Erhebungsbindung ist hier unbekannt."""
+
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=Teilnahme.objects.create(),
+            vignette=self.brueche,
+            simulationskern=finaler_kern(),
+            modell_konfiguration=ModellKonfiguration.objects.belegte(
+                Verwendung.SCHUELERIN
+            ),
+            status=Sitzung.Status.ABGESCHLOSSEN,
+        )
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)

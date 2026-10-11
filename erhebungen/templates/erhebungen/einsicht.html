@@ -40,7 +40,7 @@
                                 </th>
                                 {% for zelle in zeile.zellen %}
                                     <td class="fremdeinsicht__zelle">
-                                        {% if zelle %}<span class="fremdeinsicht__sitzung{% if zelle.variante %} fremdeinsicht__sitzung--{{ zelle.variante }}{% endif %}" title="{{ zelle.status }}" aria-label="Position {{ zelle.position }}, {{ zelle.status }}">{{ zelle.position }}</span>{% else %}<span class="fremdeinsicht__leer">–</span>{% endif %}
+                                        {% if zelle.url %}<a class="fremdeinsicht__sitzung{% if zelle.variante %} fremdeinsicht__sitzung--{{ zelle.variante }}{% endif %}" title="{{ zelle.status }}" aria-label="Position {{ zelle.position }}, {{ zelle.status }}" href="{{ zelle.url }}">{{ zelle.position }}</a>{% elif zelle %}<span class="fremdeinsicht__sitzung{% if zelle.variante %} fremdeinsicht__sitzung--{{ zelle.variante }}{% endif %}" title="{{ zelle.status }}" aria-label="Position {{ zelle.position }}, {{ zelle.status }}">{{ zelle.position }}</span>{% else %}<span class="fremdeinsicht__leer">–</span>{% endif %}
                                     </td>
                                 {% endfor %}
                             </tr>

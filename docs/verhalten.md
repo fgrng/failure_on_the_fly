@@ -224,7 +224,8 @@ Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
 Sitzungen, Sitzungen derselben Person in einem fremden Training und jede Sitzung
 für aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in
 der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die
-Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
+Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur. Die lesende
+Ansicht zeigt die Diagnose als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
@@ -1016,8 +1017,22 @@ Warnfarbe, laufende gedimmt. Flüchtige Teilnahmen zeigen nur umrandete Bubbles,
 und ihre Zeile trägt den Hinweis „flüchtig, nur Ablaufgerüst“. Eingewilligte
 Teilnahmen ohne Sitzung stehen mit „noch keine Sitzung“ in der Liste;
 Teilnahmen, die Einwilligung a abgelehnt oder noch nicht gegeben haben, fehlen.
-Das Teilnahme-Token steht nirgends auf der Seite. Die Bubbles öffnen noch keine
-Sitzung.
+Das Teilnahme-Token steht nirgends auf der Seite.
+
+Die Bubbles abgeschlossener, abgebrochener und gescheiterter Sitzungen nicht
+flüchtiger Teilnahmen sind Links auf die Sitzungsansicht unter
+`eigene/<pk>/einsicht/sitzungen/<sitzung_pk>/`; laufende und flüchtige Bubbles
+sind es nicht. Die Sitzungsansicht zeigt im Kopf Teilnahmekennung, Stichprobe,
+Vignette und Status und führt zurück zur Übersicht. Darunter steht die Sitzung
+rein lesend so, wie die Teilnehmer:in sie gesehen hat: Rahmenhandlung,
+Transkript in gespielter Reihenfolge und bei abgeschlossenen Sitzungen Debrief
+und abgegebene Diagnose. Anders als für die Teilnehmer:in liegt unter jedem
+Gesprächsschritt die Denkspur, eingeklappt unter „Denkspur ansehen“ wie im
+Probelauf, und unter der Sitzung stehen die Antworten auf den Item-Block nach
+dieser Sitzung, mit Skalenpol oder Freitext und einem Strich für unbeantwortete
+Items. Fehlversuche, das Teilnahme-Token, Formulare und Aktionen erscheinen
+nicht. Laufende Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die
+nicht zur Erhebung aus der URL gehören, antworten mit 404.
 
 ## Fragebogen-Items verwalten
 
