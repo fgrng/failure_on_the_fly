@@ -25,11 +25,6 @@ class WiederbeitrittTests(FremdeinsichtTestCase):
             self.training, self.teilnehmerin, self.vignette
         )
 
-    def _austreten(self) -> None:
-        # Tritt als Teilnehmerin über die Trainingsseite aus.
-        self.client.force_login(self.teilnehmerin)
-        self.client.post(reverse("training:austreten", args=[self.training.pk]))
-
     def _entfernen(self) -> None:
         # Entfernt die Teilnehmerin als Eigentümerin über die Kuratierseite.
         self.client.force_login(self.ausbilderin)
@@ -167,7 +162,7 @@ class WiederbeitrittTests(FremdeinsichtTestCase):
         self.client.force_login(self.ausbilderin)
         self.assertEqual(self.client.get(ansehen_url(self.sitzung)).status_code, 404)
 
-    def test_wiederbeitritt_legt_fuer_andere_keine_bindung_an(self) -> None:
+    def test_neues_konto_tritt_wie_bisher_bei(self) -> None:
         """Ein Konto ohne Bindung tritt beim offenen Link wie bisher neu bei."""
         neue: Konto = konto_mit_rollen("margaret")
         self.client.force_login(neue)

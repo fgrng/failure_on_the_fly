@@ -124,3 +124,8 @@ class FremdeinsichtTestCase(TestCase):
         self.training.vignetten.add(self.vignette)
         self.training.veroeffentlichen()
         self.training.beitreten(self.teilnehmerin)
+
+    def _austreten(self) -> None:
+        # Tritt als Teilnehmerin über die Trainingsseite aus.
+        self.client.force_login(self.teilnehmerin)
+        self.client.post(reverse("training:austreten", args=[self.training.pk]))

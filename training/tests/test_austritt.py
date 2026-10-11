@@ -11,7 +11,7 @@ from config.tests.aufbau import (
 )
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
-from simulation.models import ModellKonfiguration, Verwendung
+from simulation.models import Verwendung
 from sitzungen.models import Sitzung
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
@@ -274,17 +274,9 @@ class LaufendeSitzungNachAustrittTests(TestCase):
     """Eine beim Austritt laufende Sitzung bleibt liegen."""
 
     def setUp(self) -> None:
-        ModellKonfiguration.objects.aktivieren(
-            ModellKonfiguration.objects.create(
-                bezeichnung="Test",
-                sprachmodell="fake",
-                parameter={
-                    "skript": [
-                        {"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}
-                    ]
-                },
-            ),
+        aktive_modell_konfiguration(
             Verwendung.SCHUELERIN,
+            skript=[{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],
         )
         ausbilderin: Konto = konto_mit_rollen("ada", AUSBILDERIN_GRUPPE)
         vignette: Vignette = finale_vignette(ausbilderin)
@@ -350,11 +342,6 @@ class LaufendeSitzungNachAustrittTests(TestCase):
 
 class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):
     """Nach dem Austritt verschwindet die Person für Kreis und Administration."""
-
-    def _austreten(self) -> None:
-        # Tritt als Teilnehmerin über die Trainingsseite aus.
-        self.client.force_login(self.teilnehmerin)
-        self.client.post(reverse("training:austreten", args=[self.training.pk]))
 
     def test_fremdeinsicht_zeigt_keine_zeile_mehr(self) -> None:
         """Die Tabelle auf der Kuratierseite nennt die Ausgetretene nicht."""

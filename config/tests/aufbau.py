@@ -25,11 +25,20 @@ def konto_mit_rollen(username: str, *rollen: str, is_superuser: bool = False) ->
     return angelegt
 
 
-def aktive_modell_konfiguration(verwendung: Verwendung) -> ModellKonfiguration:
-    """Legt eine Konfiguration des Fake-Anbieters an und aktiviert sie."""
+def aktive_modell_konfiguration(
+    verwendung: Verwendung, skript: list[dict[str, str]] | None = None
+) -> ModellKonfiguration:
+    """Legt eine Konfiguration des Fake-Anbieters an und aktiviert sie.
+
+    Ein Skript gibt dem Fake-Anbieter seine Antworten vor.
+    """
 
     return ModellKonfiguration.objects.aktivieren(
-        ModellKonfiguration.objects.create(bezeichnung="Test", sprachmodell="fake"),
+        ModellKonfiguration.objects.create(
+            bezeichnung="Test",
+            sprachmodell="fake",
+            parameter={"skript": skript} if skript is not None else {},
+        ),
         verwendung,
     )
 
