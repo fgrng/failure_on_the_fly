@@ -491,10 +491,21 @@ def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
     return ""
 
 
+def _einsehbare_abschlussbloecke(erhebung: Erhebung) -> QuerySet[Itemblock]:
+    # Die abgeschickten Blöcke am Ende nicht flüchtiger Teilnahmen der Erhebung.
+
+    return Itemblock.objects.filter(
+        andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        erledigt_am__isnull=False,
+        erhebungsbindung__stichprobe__erhebung=erhebung,
+    ).exclude(Teilnahme.fluechtig_q("erhebungsbindung__teilnahme__"))
+
+
 def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
     # Baut das Raster der Einsicht: die Vignetten in Erhebungsreihenfolge als
     # Spalten, je Stichprobe die Teilnahmen nach Beginn als Zeilen. Eine Zelle
-    # hält höchstens eine Sitzung mit ihrer Position aus der Ziehung.
+    # hält höchstens eine Sitzung mit ihrer Position aus der Ziehung; die
+    # letzte Spalte verlinkt den abgeschickten Block am Ende.
 
     vignetten: list[Vignette] = [
         zugehoerigkeit.vignette
@@ -514,6 +525,11 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
             erhebungsbindung__stichprobe__erhebung=erhebung
         ).select_related("erhebungsbindung")
     }
+    mit_abschluss: set[int] = set(
+        _einsehbare_abschlussbloecke(erhebung).values_list(
+            "erhebungsbindung__teilnahme_id", flat=True
+        )
+    )
     # Zeilen sind die Teilnahmen mit Ziehung oder Einwilligung a; wer sie
     # abgelehnt hat, hat weder Ziehung noch Sitzung.
     bindungen: QuerySet[Erhebungsbindung] = (
@@ -556,6 +572,14 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
                 "fluechtig": fluechtig,
                 "ohne_sitzung": not any(zellen),
                 "zellen": zellen,
+                "abschluss_url": (
+                    reverse(
+                        "erhebungen:einsicht_abschluss",
+                        args=[erhebung.pk, bindung.teilnahme_id],
+                    )
+                    if bindung.teilnahme_id in mit_abschluss
+                    else None
+                ),
             }
         )
 
@@ -632,6 +656,32 @@ def einsicht_sitzung(request: HttpRequest, pk: int, sitzung_pk: int) -> HttpResp
             "stichprobe": sitzung.teilnahme.erhebungsbindung.stichprobe,
             "uebersicht_url": uebersicht_url,
             "antworten": block.antwortzeilen() if block else [],
+        },
+    )
+
+
+@login_required
+@_forschende_oder_administratorin_erforderlich
+def einsicht_abschluss(
+    request: HttpRequest, pk: int, teilnahme_pk: int
+) -> HttpResponse:
+    """Zeigt den abgeschickten Item-Block am Ende einer Teilnahme lesend (ADR-0049)."""
+
+    erhebung: Erhebung = _sichtbare_erhebung(request, pk)
+    block: Itemblock = get_object_or_404(
+        _einsehbare_abschlussbloecke(erhebung).select_related(
+            "erhebungsbindung__teilnahme", "erhebungsbindung__stichprobe"
+        ),
+        erhebungsbindung__teilnahme_id=teilnahme_pk,
+    )
+    return render(
+        request,
+        "erhebungen/einsicht_abschluss.html",
+        {
+            "erhebung": erhebung,
+            "teilnahme": block.erhebungsbindung.teilnahme,
+            "stichprobe": block.erhebungsbindung.stichprobe,
+            "antworten": block.antwortzeilen(),
         },
     )
 

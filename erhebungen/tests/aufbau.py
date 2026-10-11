@@ -21,12 +21,13 @@ def finale_erhebung(
     name: str = "Brüche",
     vignetten: Iterable[Vignette] = (),
     items_nach_sitzung: Iterable[FragebogenItem] = (),
+    items_am_ende: Iterable[FragebogenItem] = (),
     **felder: object,
 ) -> Erhebung:
     """Legt eine Erhebung des Kontos an, nimmt Vignetten und Items auf und finalisiert.
 
     Die Items müssen final sein und dem Konto gehören; sie docken nach jeder
-    Sitzung an.
+    Sitzung bzw. am Ende an.
 
     Ist für die Schüler:in noch keine Konfiguration aktiv, aktiviert der Helfer
     eine des Fake-Anbieters; eine schon aktive wird gepinnt.
@@ -44,6 +45,13 @@ def finale_erhebung(
             erhebung=erhebung,
             item=item,
             andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            position=position,
+        )
+    for position, item in enumerate(items_am_ende, start=1):
+        Erhebungsitem.objects.create(
+            erhebung=erhebung,
+            item=item,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
             position=position,
         )
     erhebung.finalisieren()

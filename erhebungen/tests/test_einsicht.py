@@ -45,6 +45,12 @@ def _sitzung_url(erhebung: Erhebung, sitzung: Sitzung) -> str:
     return reverse("erhebungen:einsicht_sitzung", args=[erhebung.pk, sitzung.pk])
 
 
+def _abschluss_url(erhebung: Erhebung, bindung: Erhebungsbindung) -> str:
+    return reverse(
+        "erhebungen:einsicht_abschluss", args=[erhebung.pk, bindung.teilnahme_id]
+    )
+
+
 class EinsichtTestCase(TestCase):
     """Eine finale Erhebung von ada mit zwei Vignetten und einer Stichprobe."""
 
@@ -705,3 +711,233 @@ class EinsichtSitzungTests(EinsichtTestCase):
         )
 
         self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+
+class EinsichtAbschlussTests(EinsichtTestCase):
+    """Die Spalte „Abschluss“ und die Seite mit dem Item-Block am Ende."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        likert: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada,
+            typ=FragebogenItem.Typ.LIKERT,
+            wortlaut="Wie realistisch wirkten die Gespräche?",
+        )
+        offen: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Was nehmen Sie mit?"
+        )
+        for item in (likert, offen):
+            item.finalisieren()
+        self.erhebung = finale_erhebung(
+            self.ada,
+            vignetten=[self.brueche, self.zinsen],
+            items_am_ende=[likert, offen],
+        )
+        self.stichprobe = self._stichprobe(self.erhebung)
+        self.bindung: Erhebungsbindung = self._teilnahme()
+
+    def _abschlussblock(
+        self,
+        bindung: Erhebungsbindung | None = None,
+        *,
+        erledigt: bool = True,
+        freitext: str | None = "Mehr Geduld beim Nachfragen.",
+    ) -> Itemblock:
+        # Der Block am Ende mit Stufe 2 auf dem Likert-Item und dem Freitext;
+        # erledigt heißt, die Teilnehmerin hat ihn abgeschickt.
+        bindung = bindung or self.bindung
+        block: Itemblock = Itemblock.objects.create(
+            erhebungsbindung=bindung,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            erledigt_am=timezone.now() if erledigt else None,
+        )
+        for erhebungsitem, werte in zip(
+            self.erhebung.itemzugehoerigkeiten.order_by("position"),
+            ({"likert_stufe": 2}, {"freitext": freitext}),
+        ):
+            ItemAntwort.objects.create(
+                itemblock=block,
+                erhebungsbindung=bindung,
+                erhebungsitem=erhebungsitem,
+                **werte,
+            )
+        return block
+
+    def _abschluss(
+        self, bindung: Erhebungsbindung | None = None, konto: Konto | None = None
+    ) -> HttpResponse:
+        self.client.force_login(konto or self.ada)
+        return self.client.get(_abschluss_url(self.erhebung, bindung or self.bindung))
+
+    def test_raster_hat_eine_spalte_abschluss(self) -> None:
+        """Hinter den Vignetten steht die Spalte für den Block am Ende."""
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(inhalt.index("Zinsen rechnen"), inhalt.index(">Abschluss<"))
+
+    def test_beantworteter_block_ist_eine_verlinkte_bubble(self) -> None:
+        """Wer den Block am Ende abgeschickt hat, hat eine Abschlussseite."""
+
+        self._abschlussblock()
+
+        self.assertIn(
+            f'href="{_abschluss_url(self.erhebung, self.bindung)}"',
+            self._zeile(self._einsicht(), self.bindung),
+        )
+
+    def test_unbeantworteter_block_hat_keine_bubble(self) -> None:
+        """Ein vorgelegter, nicht abgeschickter Block zeigt nichts."""
+
+        self._abschlussblock(erledigt=False)
+
+        zeile: str = self._zeile(self._einsicht(), self.bindung)
+
+        self.assertNotIn("fremdeinsicht__sitzung", zeile)
+
+    def test_fluechtige_teilnahme_hat_keine_bubble(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es keine Antworten zu lesen."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._abschlussblock(bindung)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        self.assertNotIn("fremdeinsicht__sitzung", zeile)
+
+    def test_seite_zeigt_die_likert_antwort_als_skalenpol(self) -> None:
+        """Die Stufe erscheint als der Pol, den die Teilnehmerin wählte."""
+
+        self._abschlussblock()
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Wie realistisch wirkten die Gespräche\?</dt>\s*"
+            r"<dd>Stimme nicht zu</dd>",
+        )
+
+    def test_seite_zeigt_die_freitext_antwort(self) -> None:
+        """Der Freitext erscheint unter seinem Item."""
+
+        self._abschlussblock()
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Was nehmen Sie mit\?</dt>\s*<dd>Mehr Geduld beim Nachfragen.</dd>",
+        )
+
+    def test_unbeantwortetes_item_zeigt_einen_strich(self) -> None:
+        """Antworten sind freiwillig; ein leeres Item bleibt sichtbar."""
+
+        self._abschlussblock(freitext=None)
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Was nehmen Sie mit\?</dt>\s*<dd>–</dd>",
+        )
+
+    def test_seite_nennt_die_teilnahmekennung(self) -> None:
+        """Wer liest, weiß, wessen Antworten er liest."""
+
+        self._abschlussblock()
+
+        self.assertContains(self._abschluss(), self.bindung.teilnahme.kennung)
+
+    def test_seite_nennt_die_stichprobe(self) -> None:
+        """Die Stichprobe steht mit ihrem Zeitraum im Kopf."""
+
+        self._abschlussblock()
+
+        self.assertContains(
+            self._abschluss(),
+            f"Stichprobe {self.stichprobe.beginn:%d.%m.%Y} – "
+            f"{self.stichprobe.ende:%d.%m.%Y}",
+        )
+
+    def test_ein_weg_fuehrt_zurueck_zur_uebersicht(self) -> None:
+        """Die Seite verlinkt die Übersicht der Einsicht."""
+
+        self._abschlussblock()
+
+        self.assertContains(self._abschluss(), f'href="{_einsicht_url(self.erhebung)}"')
+
+    def test_token_erscheint_nicht(self) -> None:
+        """Die Seite führt in keine Teilnahme zurück."""
+
+        self._abschlussblock()
+
+        self.assertNotContains(self._abschluss(), self.bindung.token)
+
+    def test_seite_hat_kein_formular(self) -> None:
+        """Die Seite ist rein lesend."""
+
+        self._abschlussblock()
+
+        inhalt: str = self._abschluss().content.decode()
+        seite: str = inhalt[inhalt.index("<main") :]
+
+        self.assertNotIn("<form", seite)
+
+    def test_administration_liest_jede_abschlussseite(self) -> None:
+        """Die Administration öffnet die Seite einer fremden Erhebung."""
+
+        self._abschlussblock()
+        admin: Konto = konto_mit_rollen("root", is_superuser=True)
+
+        self.assertContains(
+            self._abschluss(konto=admin), "Mehr Geduld beim Nachfragen."
+        )
+
+    def test_unbeantworteter_block_bekommt_404(self) -> None:
+        """Ohne abgeschickten Block gibt es keine Seite."""
+
+        self._abschlussblock(erledigt=False)
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_ohne_block_bekommt_404(self) -> None:
+        """Wer noch nicht am Ende ist, hat keine Abschlussseite."""
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_fluechtige_teilnahme_bekommt_404(self) -> None:
+        """Auch über eine geratene URL gibt es nichts Flüchtiges zu lesen."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._abschlussblock(bindung)
+
+        self.assertEqual(self._abschluss(bindung).status_code, 404)
+
+    def test_teilnahme_einer_anderen_erhebung_bekommt_404(self) -> None:
+        """Die Teilnahme wird gegen die Erhebung aus der URL geprüft."""
+
+        eigene: Erhebung = self.erhebung
+        self.erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        fremde: Erhebungsbindung = self._teilnahme(
+            self._stichprobe(self.erhebung), ziehung=(self.brueche,)
+        )
+        Itemblock.objects.create(
+            erhebungsbindung=fremde,
+            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+            erledigt_am=timezone.now(),
+        )
+        self.client.force_login(self.ada)
+
+        antwort: HttpResponse = self.client.get(_abschluss_url(eigene, fremde))
+
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_fremder_kreis_bekommt_404(self) -> None:
+        """Außerhalb des Kreises bleibt die Seite unauffindbar."""
+
+        self._abschlussblock()
+
+        self.assertEqual(self._abschluss(konto=forschende("grace")).status_code, 404)
+
+    def test_andere_rollen_werden_abgewiesen(self) -> None:
+        """Ohne Forschungsrolle gibt es keine Abschlussseite."""
+
+        self._abschlussblock()
+        konto: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+
+        self.assertEqual(self._abschluss(konto=konto).status_code, 403)

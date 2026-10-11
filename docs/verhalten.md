@@ -1034,6 +1034,16 @@ Items. Fehlversuche, das Teilnahme-Token, Formulare und Aktionen erscheinen
 nicht. Laufende Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die
 nicht zur Erhebung aus der URL gehören, antworten mit 404.
 
+Hinter den Vignetten steht die Spalte „Abschluss“. Hat eine nicht flüchtige
+Teilnahme ihren Item-Block am Ende abgeschickt, steht dort eine verlinkte
+Bubble; sonst ein Strich. Sie führt auf die Abschlussseite unter
+`eigene/<pk>/einsicht/teilnahmen/<teilnahme_pk>/abschluss/`. Die Seite nennt
+Teilnahmekennung und Stichprobe, zeigt die Antworten des Blocks rein lesend mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items und führt
+zurück zur Übersicht. Das Teilnahme-Token erscheint auch hier nicht. Flüchtige
+Teilnahmen, nicht abgeschickte Blöcke und Teilnahmen, die nicht zur Erhebung aus
+der URL gehören, antworten mit 404.
+
 ## Fragebogen-Items verwalten
 
 Forschende und Administrator:innen erreichen unter `/fragebogen-items/` die

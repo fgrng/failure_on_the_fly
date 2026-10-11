@@ -32,6 +32,11 @@ urlpatterns: list[URLPattern] = [
         name="einsicht_sitzung",
     ),
     path(
+        "eigene/<int:pk>/einsicht/teilnahmen/<int:teilnahme_pk>/abschluss/",
+        views.einsicht_abschluss,
+        name="einsicht_abschluss",
+    ),
+    path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,
         name="vignette_hinzufuegen",

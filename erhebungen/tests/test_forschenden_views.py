@@ -155,6 +155,7 @@ _LESEROUTEN: set[str] = {
     "export",
     "einsicht",
     "einsicht_sitzung",
+    "einsicht_abschluss",
 }
 
 
