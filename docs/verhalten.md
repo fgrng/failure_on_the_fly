@@ -411,9 +411,9 @@ darunter jedes Eval als eigenen Knoten in seiner Reihenfolge, unter jedem Eval
 seine Evalinputs. „Durchlauf und Vorlagen“ trägt *k*, die Zahl der
 Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
 Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
-Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
-und `$verlauf`, in der Bewerter-Vorlage die des Promptvertrags sowie
-`$kriterium` und `$verlauf`. Hervorgehoben und vorn steht der Platzhalter, den
+Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie
+`$inputstrategie`, in der Bewerter-Vorlage die des Promptvertrags sowie
+`$kriterium` und `$verlauf`. Hervorgehoben und vorn stehen die Platzhalter, die
 nur diese Vorlage kennt. Ein Klick fügt ihn an der Schreibmarke ein. Geprüft
 werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernimmt die
 Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
@@ -612,18 +612,24 @@ Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei ein
 gelenkten formuliert die simulierte Lehrperson sie mit der festgehaltenen
 Lehrpersonen-Konfiguration: Ihr System-Prompt ist die gerenderte
 Lehrperson-Vorlage des festgehaltenen Katalogs mit `$inputstrategie` (Text des
-Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), ihre einzige
-`user`-Nachricht die Inputstrategie. Die Schüler:in antwortet in beiden Fällen
-über denselben Antwortversuch wie in der Sitzung, mit derselben
-Nachrichtenordnung und ohne Denkspur im Kontext. Danach beurteilt der Bewerter
-das Gespräch nach jedem Evalkriterium des Evals und jedem übergreifenden
-Kriterium. Sein System-Prompt ist die gerenderte Bewerter-Vorlage mit
-`$kriterium` und `$verlauf` (Verlauf samt Denkspur); den Verlauf erhält er nur
-dort. Seine einzige `user`-Nachricht ist der Kriteriumstext. Inputstrategie und
-Kriterium werden als reiner Text eingesetzt und nicht selbst als Vorlage
-ausgewertet; Anweisungen stehen allein in den Vorlagen des Katalogs. Jedes
-Gespräch, jeder Wechsel und jedes Urteil wird sofort geschrieben; kein
-Modellaufruf hält eine Schreibtransaktion offen.
+Schritts); die Inputstrategie steht nur dort, nie als Nachricht. Das Gespräch
+führt die Lehrperson nativ, spiegelbildlich zur Schüler:in: Ihr Verlauf beginnt
+mit der festen Einstiegsnachricht „Beginnen Sie das Gespräch.“ als `user`,
+danach stehen ihre eigenen Äußerungen, auch die wörtlichen fester Schritte, als
+`assistant` und die Äußerungen der Schüler:in ohne Denkspur als `user`. Die
+letzte Nachricht ist die jüngste Äußerung der Schüler:in, im ersten Zug die
+Einstiegsnachricht. Eine Lehrperson-Vorlage mit `$verlauf` wird beim
+Finalisieren abgelehnt; in einer schon finalisierten Altvorlage bleibt
+`$verlauf` leer. Die Schüler:in antwortet in beiden Fällen über denselben
+Antwortversuch wie in der Sitzung, mit derselben Nachrichtenordnung und ohne
+Denkspur im Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem
+Evalkriterium des Evals und jedem übergreifenden Kriterium. Sein System-Prompt
+ist die gerenderte Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf
+samt Denkspur); den Verlauf erhält er nur dort. Seine einzige `user`-Nachricht
+ist der Kriteriumstext. Inputstrategie und Kriterium werden als reiner Text
+eingesetzt und nicht selbst als Vorlage ausgewertet; Anweisungen stehen allein
+in den Vorlagen des Katalogs. Jedes Gespräch, jeder Wechsel und jedes Urteil
+wird sofort geschrieben; kein Modellaufruf hält eine Schreibtransaktion offen.
 
 Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
 einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist

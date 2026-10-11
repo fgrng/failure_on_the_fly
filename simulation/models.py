@@ -46,7 +46,7 @@ VERTRAG_EVAL: frozenset[str] = VERTRAG_PROMPT | {
     "kriterium",
     "verlauf",
 }
-VERTRAG_LEHRPERSON: frozenset[str] = VERTRAG_PROMPT | {"inputstrategie", "verlauf"}
+VERTRAG_LEHRPERSON: frozenset[str] = VERTRAG_PROMPT | {"inputstrategie"}
 VERTRAG_BEWERTER: frozenset[str] = VERTRAG_PROMPT | {"kriterium", "verlauf"}
 VERTRAG_RAHMEN: frozenset[str] = frozenset(
     {

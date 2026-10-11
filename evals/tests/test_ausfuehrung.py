@@ -1,6 +1,7 @@
 """Die Einstiegsfunktion „Evallauf ausführen“ mit drei Fake-Konfigurationen."""
 
 import pytest
+from django.db import models
 
 from config.tests.aufbau import (
     finale_vignette,
@@ -9,7 +10,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from config.tests.sprachmodell import anfragen_aufzeichnen
-from evals.ausfuehrung import evallauf_ausfuehren
+from evals.ausfuehrung import EINSTIEGSNACHRICHT, evallauf_ausfuehren
 from evals.models import Evallauf, Zelle
 from evals.tests.aufbau import (
     aeusserungen,
@@ -19,6 +20,7 @@ from evals.tests.aufbau import (
     gelenkt,
     urteile,
 )
+from simulation.models import Evalkatalog
 from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -170,18 +172,6 @@ def test_bewerter_erhaelt_allein_das_kriterium_als_user_nachricht() -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
-def test_lehrperson_erhaelt_allein_die_inputstrategie_als_user_nachricht() -> None:
-    """Neben der Inputstrategie erhält die Lehrperson keine user-Nachricht."""
-
-    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
-
-    anfragen = _anfragen(vignette)
-
-    assert _gesprochen(anfragen[1]) == [("user", "Frag nach $schuelerin_name")]
-
-
-@pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
 def test_referenzdiagnose_erreicht_keinen_modellaufruf() -> None:
     """Weder Schüler:in noch Bewerter sehen die Referenzdiagnose."""
@@ -278,20 +268,82 @@ def gelenkt_nach_festem_schritt() -> None:
     )
 
 
+@pytest.fixture
+def gelenkt_fest_gelenkt() -> None:
+    """Gelenkt, fest, gelenkt: die Lehrperson spricht zweimal selbst."""
+
+    finaler_katalog(
+        k=1,
+        schritte=(gelenkt("Begrüße"), "Wie hast du gerechnet?", gelenkt("Frag nach")),
+        uebergreifende=(),
+    )
+    drei_fakes(
+        schuelerin=antworten(3), bewerter=urteile(True), lehrperson=aeusserungen(2)
+    )
+
+
 @pytest.mark.django_db
-@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
-def test_lehrperson_sieht_den_bisherigen_verlauf_ohne_denkspur() -> None:
-    """Die Lehrperson kennt Frage und Antwort, nicht die Denkspur."""
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_lehrperson_beginnt_mit_der_einstiegsnachricht() -> None:
+    """Im ersten Zug ist die Einstiegsnachricht die einzige user-Nachricht."""
 
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
-    _, lehrperson, _, _ = _anfragetexte(vignette)
+    erste_lehrperson, *_ = _anfragen(vignette)
 
-    assert (
-        "Wie hast du gerechnet?" in lehrperson,
-        "Antwort 1" in lehrperson,
-        "Denkspur 1" in lehrperson,
-    ) == (True, True, False)
+    assert _gesprochen(erste_lehrperson) == [("user", EINSTIEGSNACHRICHT)]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_lehrperson_fuehrt_das_gespraech_nativ_ohne_denkspur() -> None:
+    """Eigene Äußerungen, auch feste, als assistant; die der Schüler:in als user."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
+
+    assert _gesprochen(zweite_lehrperson) == [
+        ("user", EINSTIEGSNACHRICHT),
+        ("assistant", "Gelenkte Frage 1"),
+        ("user", "Antwort 1"),
+        ("assistant", "Wie hast du gerechnet?"),
+        ("user", "Antwort 2"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_inputstrategie_steht_nur_im_system_prompt_der_lehrperson() -> None:
+    """Die Strategie des Schritts ist Arbeitskontext, keine Äußerung (ADR-0052)."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
+
+    system, *gespraech = zweite_lehrperson
+    assert "Sprich mit Lea nach Frag nach." in system["content"]
+    assert all("Frag nach" not in nachricht["content"] for nachricht in gespraech)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_finalisierte_altvorlage_mit_verlauf_setzt_dort_nichts_ein() -> None:
+    """`$verlauf` gehört nicht mehr zum Vertrag, alte Fassungen laufen weiter."""
+
+    # Am Lebenszyklus vorbei, wie eine vor diesem Vertrag finalisierte Fassung.
+    models.QuerySet(model=Evalkatalog).filter(zustand=Evalkatalog.Zustand.FINAL).update(
+        lehrperson_vorlage="Nach $inputstrategie. Bisher:[$verlauf]"
+    )
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert [anfragen[0][0]["content"], anfragen[3][0]["content"]] == [
+        "Nach Begrüße. Bisher:[]",
+        "Nach Frag nach. Bisher:[]",
+    ]
+    assert len(anfragen) == 6
 
 
 @pytest.mark.django_db

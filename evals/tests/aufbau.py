@@ -14,9 +14,7 @@ from simulation.models import (
     Verwendung,
 )
 
-LEHRPERSON_VORLAGE: str = (
-    "Sprich mit $schuelerin_name nach $inputstrategie. Bisher: $verlauf"
-)
+LEHRPERSON_VORLAGE: str = "Sprich mit $schuelerin_name nach $inputstrategie."
 BEWERTER_VORLAGE: str = (
     "Prüfe $kriterium für $schuelerin_name mit $fehlermuster_beschreibung "
     "am Verlauf $verlauf."
