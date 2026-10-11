@@ -241,6 +241,17 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             seite.index('title="Brüche addieren"'), seite.index('title="Addition"')
         )
 
+    def test_spalten_folgen_einer_verschobenen_vignette(self) -> None:
+        """Nach dem Verschieben stehen die Spalten in der neuen Reihenfolge."""
+        self.training.vignette_aufnehmen(finale_vignette(self.autorin, name="Addition"))
+        self.training.vignette_verschieben(self.vignette, 2)
+
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
+
+        self.assertLess(
+            seite.index('title="Addition"'), seite.index('title="Brüche addieren"')
+        )
+
     def test_abgeschlossene_sitzung_ist_verlinkt(self) -> None:
         """Eine abgeschlossene Sitzung öffnet die lesende Sitzungsansicht."""
         sitzung: Sitzung = gespielte_sitzung(

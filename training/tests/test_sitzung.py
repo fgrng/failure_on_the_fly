@@ -11,7 +11,13 @@ from config.tests.aufbau import finale_vignette, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
+from sitzungen.models import (
+    Diagnose,
+    Eingabemodus,
+    Gespraechsschritt,
+    Sitzung,
+    Vignettenposition,
+)
 from training.models import Training
 from vignetten.models import Vignette
 
@@ -237,6 +243,19 @@ class TrainingssitzungTests(TestCase):
         )
 
         self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GEMISCHT)
+
+    def test_trainingssitzung_schreibt_keine_vignettenposition(self) -> None:
+        """Die Position gehört der Erhebung; Training hält sie im Training (#442)."""
+
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
+        )
+        self.client.post(reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"})
+        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(reverse("training:debrief"), {"diagnose": "Bruchfehler"})
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertFalse(Vignettenposition.objects.exists())
 
     def test_schrittbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
         """Auch ein ausgeschöpftes Schrittbudget schließt erst mit Diagnose ab."""

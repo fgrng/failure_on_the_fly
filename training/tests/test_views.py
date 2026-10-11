@@ -649,6 +649,22 @@ class VignettenVerschiebenTests(TestCase):
             [405, 400, 400],
         )
 
+    def test_ungueltige_position_nennt_fehlen_und_keine_zahl(self) -> None:
+        """Die Fehlermeldung passt auch, wenn die Position keine Zahl ist."""
+        url: str = reverse(
+            "training:vignette_verschieben",
+            args=[self.training.pk, self.vignetten[0].pk],
+        )
+        self.client.force_login(self.ada)
+
+        self.assertEqual(
+            [
+                self.client.post(url).content.decode(),
+                self.client.post(url, {"position": "oben"}).content.decode(),
+            ],
+            ["Position fehlt oder ist keine Zahl."] * 2,
+        )
+
     def test_nicht_aufgenommene_vignette_gibt_404(self) -> None:
         """Verschieben lässt sich nur, was im Training steht."""
         fehlende: Vignette = finale_vignette(self.ada, name="Dividieren")

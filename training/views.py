@@ -577,7 +577,7 @@ def vignette_verschieben(
     try:
         position: int = int(request.POST["position"])
     except KeyError, ValueError:
-        return HttpResponseBadRequest("Position fehlt.")
+        return HttpResponseBadRequest("Position fehlt oder ist keine Zahl.")
     training.vignette_verschieben(vignette, position)
     return redirect("training:kuratieren", pk=training.pk)
 
