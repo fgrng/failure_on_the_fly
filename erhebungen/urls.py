@@ -25,6 +25,7 @@ urlpatterns: list[URLPattern] = [
         name="eigentuemerin_entfernen",
     ),
     path("eigene/<int:pk>/export/", views.export, name="export"),
+    path("eigene/<int:pk>/einsicht/", views.einsicht, name="einsicht"),
     path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,

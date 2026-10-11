@@ -78,6 +78,22 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
 
+    def in_erhebungen_einsehbar(self, erhebungen: models.QuerySet) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Erhebungen sieht.
+
+        Einsicht folgt dem Anlass (ADR-0049): die Sitzungen, deren Teilnahme an
+        einer Erhebungsbindung einer Stichprobe der Erhebungen hängt, in jedem
+        Status und auch flüchtige Gerüste. Inhaltlich lesbar sind davon nur
+        beendete Sitzungen nicht flüchtiger Teilnahmen; die Übersicht zeigt
+        von den übrigen allein Status und Position. Wer die Erhebungen sieht,
+        entscheidet der Aufrufer über `Erhebung.objects.sichtbar_fuer`.
+        """
+        return self.filter(
+            teilnahme__erhebungsbindung__stichprobe__erhebung__in=erhebungen.values(
+                "pk"
+            )
+        )
+
     def in_gespielter_folge(self) -> "SitzungQuerySet":
         """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
         return self.order_by(

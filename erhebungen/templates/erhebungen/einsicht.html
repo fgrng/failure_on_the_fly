@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Einsicht · {{ erhebung.name }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen / <a href="{% url 'erhebungen:detail' erhebung.pk %}">{{ erhebung.name }}</a></p>
+            <h1>Einsicht</h1>
+        </div>
+    </header>
+
+    {% for eintrag in stichproben %}
+        <section class="page-section page-section--gestapelt" aria-labelledby="stichprobe-{{ eintrag.stichprobe.pk }}">
+            <header class="page-section__head">
+                <b>{{ forloop.counter|stringformat:"02d" }}</b><span><h2 id="stichprobe-{{ eintrag.stichprobe.pk }}">Stichprobe {{ eintrag.stichprobe.beginn|date:"d.m.Y" }} – {{ eintrag.stichprobe.ende|date:"d.m.Y" }}</h2><small>{{ eintrag.stichprobe.phase.label }}{% if eintrag.stichprobe.archiviert %} <span class="badge badge--archived">Archiviert</span>{% endif %}</small></span>
+            </header>
+            <div class="table-wrap fremdeinsicht">
+                <table class="table fremdeinsicht__matrix" style="--spalten: {{ vignetten|length }}">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="fremdeinsicht__name">Teilnahme</th>
+                            {% for vignette in vignetten %}
+                                <th scope="col" class="fremdeinsicht__vignette" title="{{ vignette.anzeigename }}"><span>{{ vignette.anzeigename }}</span></th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for zeile in eintrag.zeilen %}
+                            <tr{% if zeile.ohne_sitzung %} class="fremdeinsicht__ohne-sitzung"{% endif %}>
+                                <th scope="row" class="fremdeinsicht__name">
+                                    <code>{{ zeile.kennung }}</code>
+                                    {% if zeile.fluechtig %}<small class="fremdeinsicht__hinweis">flüchtig, nur Ablaufgerüst</small>{% elif zeile.ohne_sitzung %}<small class="fremdeinsicht__hinweis">noch keine Sitzung</small>{% endif %}
+                                </th>
+                                {% for zelle in zeile.zellen %}
+                                    <td class="fremdeinsicht__zelle">
+                                        {% if zelle %}<span class="fremdeinsicht__sitzung{% if zelle.variante %} fremdeinsicht__sitzung--{{ zelle.variante }}{% endif %}" title="{{ zelle.status }}" aria-label="Position {{ zelle.position }}, {{ zelle.status }}">{{ zelle.position }}</span>{% else %}<span class="fremdeinsicht__leer">–</span>{% endif %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="{{ vignetten|length|add:1 }}" class="table__empty">Noch keine Teilnahme mit Einwilligung.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% endfor %}
+</section>
+{% endblock %}
