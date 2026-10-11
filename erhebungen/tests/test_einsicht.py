@@ -1,6 +1,7 @@
 """HTTP-Tests der Übersicht in der Fremdeinsicht einer Erhebung (ADR-0049)."""
 
 import re
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -49,6 +50,38 @@ def _abschluss_url(erhebung: Erhebung, bindung: Erhebungsbindung) -> str:
     return reverse(
         "erhebungen:einsicht_abschluss", args=[erhebung.pk, bindung.teilnahme_id]
     )
+
+
+def _block_mit_antworten(
+    bindung: Erhebungsbindung,
+    andockpunkt: Erhebungsitem.Andockpunkt,
+    antworten: Iterable[dict[str, object]],
+    *,
+    sitzung: Sitzung | None = None,
+    erledigt_am: datetime | None = None,
+) -> Itemblock:
+    # Ein Item-Block der Teilnahme; die Antworten gehen der Reihe nach an die
+    # Items der Erhebung an diesem Andockpunkt.
+    block: Itemblock = Itemblock.objects.create(
+        erhebungsbindung=bindung,
+        andockpunkt=andockpunkt,
+        sitzung=sitzung,
+        erledigt_am=erledigt_am,
+    )
+    for erhebungsitem, werte in zip(
+        bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
+            andockpunkt=andockpunkt
+        ).order_by("position"),
+        antworten,
+    ):
+        ItemAntwort.objects.create(
+            itemblock=block,
+            erhebungsbindung=bindung,
+            erhebungsitem=erhebungsitem,
+            sitzung=sitzung,
+            **werte,
+        )
+    return block
 
 
 class EinsichtTestCase(TestCase):
@@ -572,22 +605,12 @@ class EinsichtSitzungTests(EinsichtTestCase):
             self._stichprobe(self.erhebung), ziehung=(self.brueche,)
         )
         sitzung: Sitzung = self._gespielte_sitzung(bindung=bindung)
-        block: Itemblock = Itemblock.objects.create(
-            erhebungsbindung=bindung,
-            andockpunkt=Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+        _block_mit_antworten(
+            bindung,
+            Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            ({"likert_stufe": 5}, {"freitext": freitext}),
             sitzung=sitzung,
         )
-        for erhebungsitem, werte in zip(
-            self.erhebung.itemzugehoerigkeiten.order_by("position"),
-            ({"likert_stufe": 5}, {"freitext": freitext}),
-        ):
-            ItemAntwort.objects.create(
-                itemblock=block,
-                erhebungsbindung=bindung,
-                erhebungsitem=erhebungsitem,
-                sitzung=sitzung,
-                **werte,
-            )
         return sitzung
 
     def test_likert_antwort_steht_als_skalenpol(self) -> None:
@@ -745,23 +768,12 @@ class EinsichtAbschlussTests(EinsichtTestCase):
     ) -> Itemblock:
         # Der Block am Ende mit Stufe 2 auf dem Likert-Item und dem Freitext;
         # erledigt heißt, die Teilnehmerin hat ihn abgeschickt.
-        bindung = bindung or self.bindung
-        block: Itemblock = Itemblock.objects.create(
-            erhebungsbindung=bindung,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        return _block_mit_antworten(
+            bindung or self.bindung,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+            ({"likert_stufe": 2}, {"freitext": freitext}),
             erledigt_am=timezone.now() if erledigt else None,
         )
-        for erhebungsitem, werte in zip(
-            self.erhebung.itemzugehoerigkeiten.order_by("position"),
-            ({"likert_stufe": 2}, {"freitext": freitext}),
-        ):
-            ItemAntwort.objects.create(
-                itemblock=block,
-                erhebungsbindung=bindung,
-                erhebungsitem=erhebungsitem,
-                **werte,
-            )
-        return block
 
     def _abschluss(
         self, bindung: Erhebungsbindung | None = None, konto: Konto | None = None
@@ -911,21 +923,37 @@ class EinsichtAbschlussTests(EinsichtTestCase):
     def test_teilnahme_einer_anderen_erhebung_bekommt_404(self) -> None:
         """Die Teilnahme wird gegen die Erhebung aus der URL geprüft."""
 
-        eigene: Erhebung = self.erhebung
-        self.erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
         fremde: Erhebungsbindung = self._teilnahme(
-            self._stichprobe(self.erhebung), ziehung=(self.brueche,)
+            self._stichprobe(andere), ziehung=(self.brueche,)
         )
-        Itemblock.objects.create(
-            erhebungsbindung=fremde,
-            andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+        _block_mit_antworten(
+            fremde,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+            (),
             erledigt_am=timezone.now(),
         )
-        self.client.force_login(self.ada)
 
-        antwort: HttpResponse = self.client.get(_abschluss_url(eigene, fremde))
+        self.assertEqual(self._abschluss(fremde).status_code, 404)
 
-        self.assertEqual(antwort.status_code, 404)
+    def test_ausgetretenes_kreismitglied_bekommt_404(self) -> None:
+        """Wer den Kreis verlässt, liest keine Antworten mehr."""
+
+        self._abschlussblock()
+        self.erhebung.eigentuemerinnen.add(forschende("hedy"))
+        self.erhebung.austreten(self.ada.pk)
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_bleibt_nach_dem_archivieren_der_erhebung_lesbar(self) -> None:
+        """Eine archivierte Erhebung zeigt ihre Abschlussseiten weiter."""
+
+        self._abschlussblock()
+        self.stichprobe.ende = timezone.now() - timedelta(days=1)
+        self.stichprobe.save(update_fields=["ende"])
+        self.erhebung.archivieren()
+
+        self.assertContains(self._abschluss(), "Mehr Geduld beim Nachfragen.")
 
     def test_fremder_kreis_bekommt_404(self) -> None:
         """Außerhalb des Kreises bleibt die Seite unauffindbar."""

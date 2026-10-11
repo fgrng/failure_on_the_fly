@@ -45,7 +45,7 @@
                                     </td>
                                 {% endfor %}
                                 <td class="fremdeinsicht__zelle">
-                                    {% if zeile.abschluss_url %}<a class="fremdeinsicht__sitzung" title="Beantwortet" aria-label="Abschluss, beantwortet" href="{{ zeile.abschluss_url }}">✓</a>{% else %}<span class="fremdeinsicht__leer">–</span>{% endif %}
+                                    {% if zeile.abschluss_url %}<a class="fremdeinsicht__sitzung" title="Beantwortet" aria-label="Abschluss, beantwortet" href="{{ zeile.abschluss_url }}">A</a>{% else %}<span class="fremdeinsicht__leer">–</span>{% endif %}
                                 </td>
                             </tr>
                         {% empty %}
