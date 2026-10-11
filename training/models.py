@@ -158,11 +158,18 @@ class Training(EigentuemerKreis):
         """Setzt eine Vignette an eine 1-basierte Position; die übrigen rücken.
 
         Eine Position außerhalb der Liste setzt an den Anfang bzw. ans Ende.
+        Eine inzwischen entfernte Vignette lässt die Reihenfolge unverändert.
         """
         zugehoerigkeiten: models.QuerySet[Trainingsvignette] = (
             self.vignettenzugehoerigkeiten.select_for_update()
         )
-        verschobene: int = zugehoerigkeiten.get(vignette=vignette).pk
+        verschobene: int | None = (
+            zugehoerigkeiten.filter(vignette=vignette)
+            .values_list("pk", flat=True)
+            .first()
+        )
+        if verschobene is None:
+            return
         ids: list[int] = [
             pk
             for pk in zugehoerigkeiten.order_by("position").values_list("pk", flat=True)

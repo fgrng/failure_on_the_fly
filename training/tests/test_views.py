@@ -1,5 +1,7 @@
 """HTTP-Tests für die Ausbilder-UI der Trainings."""
 
+import re
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.http import HttpResponse
@@ -533,6 +535,21 @@ class VignettenVerschiebenTests(TestCase):
             {"position": position},
         )
 
+    def _knopf_druecken(self, vignette: Vignette, richtung: str) -> None:
+        # Sendet das Formular des Knopfs, wie die Kuratierseite es ausliefert.
+
+        seite: str = kuratierseite(self.client, self.training, self.ada)
+        formular: re.Match[str] | None = re.search(
+            r'<form method="post" action="([^"]+)">(?:(?!</form>).)*'
+            r'name="position" value="(-?\d+)"(?:(?!</form>).)*'
+            rf'aria-label="{re.escape(vignette.anzeigename)} {richtung}"',
+            seite,
+            re.DOTALL,
+        )
+        if formular is None:
+            raise AssertionError(f"Kein Knopf »{richtung}« für {vignette}.")
+        self.client.post(formular.group(1), {"position": formular.group(2)})
+
     def _reihenfolge(self) -> list[str]:
         # Die nummerierte Reihenfolge, wie die Kuratierseite sie zeigt.
 
@@ -549,6 +566,22 @@ class VignettenVerschiebenTests(TestCase):
         )
         self.assertEqual(
             self._reihenfolge(), ["1. Addieren", "2. Erweitern", "3. Kürzen"]
+        )
+
+    def test_hoch_tauscht_mit_der_vorigen_vignette(self) -> None:
+        """Hoch rückt eine Vignette genau eine Stelle nach vorn."""
+        self._knopf_druecken(self.vignetten[2], "nach oben")
+
+        self.assertEqual(
+            self._reihenfolge(), ["1. Erweitern", "2. Addieren", "3. Kürzen"]
+        )
+
+    def test_runter_tauscht_mit_der_naechsten_vignette(self) -> None:
+        """Runter rückt eine Vignette genau eine Stelle nach hinten."""
+        self._knopf_druecken(self.vignetten[0], "nach unten")
+
+        self.assertEqual(
+            self._reihenfolge(), ["1. Kürzen", "2. Erweitern", "3. Addieren"]
         )
 
     def test_verschieben_nach_dem_veroeffentlichen_zeigt_die_detailseite(

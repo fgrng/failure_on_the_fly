@@ -321,9 +321,7 @@ def test_verschieben_reiht_die_uebrigen_neu_ein() -> None:
 
     training.vignette_verschieben(dritte, 1)
 
-    assert list(
-        training.vignettenzugehoerigkeiten.values_list("vignette", "position")
-    ) == [(dritte.pk, 1), (erste.pk, 2), (zweite.pk, 3)]
+    assert list(training.vignetten_in_reihenfolge()) == [dritte, erste, zweite]
 
 
 @pytest.mark.django_db
@@ -345,3 +343,20 @@ def test_verschieben_begrenzt_die_zielposition_auf_die_liste() -> None:
         [zweite, erste],
         [erste, zweite],
     ]
+
+
+@pytest.mark.django_db
+def test_verschieben_einer_entfernten_vignette_aendert_nichts() -> None:
+    """Wer eine inzwischen entfernte Vignette verschiebt, lässt die Liste stehen."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+    erste: Vignette = finale_vignette(ada, name="Erste")
+    zweite: Vignette = finale_vignette(ada, name="Zweite")
+    training.vignette_aufnehmen(erste)
+    training.vignette_aufnehmen(zweite)
+    training.vignette_entfernen(erste)
+
+    training.vignette_verschieben(erste, 2)
+
+    assert list(training.vignetten_in_reihenfolge()) == [zweite]
