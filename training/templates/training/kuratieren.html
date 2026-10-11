@@ -61,7 +61,7 @@
         <div class="table-toolbar fremdeinsicht__toolbar">
             <span class="table-toolbar__count">{{ fremdeinsicht.zeilen|length }} Teilnehmende · {{ fremdeinsicht.vignetten|length }} Vignette{{ fremdeinsicht.vignetten|length|pluralize:"n" }}</span>
             <span class="fremdeinsicht__export">
-                <small class="fremdeinsicht__exporthinweis" tabindex="0" title="Kennzeichen statt Namen, je Export neu gezogen. Freitext wird nicht geschwärzt.">pseudonym, nicht anonym</small>
+                <small class="fremdeinsicht__exporthinweis" tabindex="0" title="Teilnahmekennung statt Namen, gleich in jedem Export dieses Trainings. Freitext wird nicht geschwärzt.">pseudonym, nicht anonym</small>
                 <a class="button button--secondary" href="{% url 'training:trainingsexport' training.pk %}">Trainingsexport (ZIP)</a>
             </span>
         </div>

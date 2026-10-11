@@ -243,20 +243,26 @@ antwortet auch eine gemerkte Adresse mit 404.
 
 In der Werkzeugleiste über der Tabelle steht rechts der Knopf „Trainingsexport
 (ZIP)“, davor der gedämpfte Hinweis „pseudonym, nicht anonym“; sein Tooltip
-sagt, dass Kennzeichen je Export neu gezogen werden und Freitext nicht
-geschwärzt wird. Der Download heißt `training-<id>-<name>-<UTC-Zeitstempel>.zip`
-und enthält genau die Sitzungen der Fremdeinsicht (ADR-0049): je Person einen
-Ordner mit einem zufälligen Kennzeichen wie `teilnehmer-3f9a01c2`, darin eine
-Markdown-Datei je abgeschlossener Sitzung (`01-brüche-addieren.md`) mit
-Vignettenname, Ausgang, Datum, dem Transkript als Wechsel von Eingabe und
-Äußerung und der Diagnose. Freigegebene Abschriften liegen als Unterordner mit
-dem Erhebungsnamen im Ordner der Person; private und widerrufene fehlen, ebenso
-laufende, abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine
-Kontodaten, keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und
-keinen Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen
-dürfen der Kreis und die Administration; fremde Ausbilder:innen bekommen 404,
-Konten ohne Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur
-und unterliegt nicht dem Exportkontrakt aus ADR-0029.
+sagt, dass die Teilnahmekennung statt Namen erscheint, gleich in jedem Export
+dieses Trainings, und Freitext nicht geschwärzt wird. Der Download heißt
+`training-<id>-<name>-<UTC-Zeitstempel>.zip` und enthält genau die Sitzungen der
+Fremdeinsicht (ADR-0049): je Person einen Ordner mit der Teilnahmekennung ihrer
+Trainingsbindung wie `teilnehmer-3f9a01c2`, darin eine Markdown-Datei je
+abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
+Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
+Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im Ordner
+der Person; private und widerrufene fehlen, ebenso laufende, abgebrochene und
+gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten, keine Denkspur,
+keine Fehlversuche, keine Modell-Konfiguration und keinen Kern. Zwei Exporte
+desselben Trainings tragen für dieselbe Person denselben Ordnernamen, auch nach
+Austritt und Wiederbeitritt, weil die Bindung bleibt; in einem anderen Training
+trägt dieselbe Person eine andere Kennung. Die Ordner stehen nach Kennung
+sortiert im Archiv, die Reihenfolge verrät also keine Namen. Tragen zwei
+Personen zufällig dieselbe Kennung, bekommt die später beigetretene eine Zählung
+(`teilnehmer-3f9a01c2-2`). Herunterladen dürfen der Kreis und die
+Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
+unterliegt nicht dem Exportkontrakt aus ADR-0029.
 
 ## Simulationskern
 
