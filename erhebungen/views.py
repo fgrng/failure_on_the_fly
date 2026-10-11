@@ -595,16 +595,11 @@ def einsicht_sitzung(request: HttpRequest, pk: int, sitzung_pk: int) -> HttpResp
 
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     sitzung: Sitzung = get_object_or_404(
-        Sitzung.objects.in_erhebungen_einsehbar(
-            Erhebung.objects.sichtbar_fuer(request.user)
-        )
-        .filter(
-            teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung,
-            status__in=_BEENDET,
-        )
+        Sitzung.objects.in_erhebungen_einsehbar(Erhebung.objects.filter(pk=erhebung.pk))
+        .filter(status__in=_BEENDET)
         .exclude(Teilnahme.fluechtig_q("teilnahme__"))
         .select_related(
-            "vignette",
+            "vignette__historie",
             "simulationskern",
             "teilnahme__erhebungsbindung__stichprobe",
         ),

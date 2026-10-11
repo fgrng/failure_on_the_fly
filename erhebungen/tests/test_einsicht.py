@@ -327,29 +327,35 @@ class EinsichtRasterTests(EinsichtTestCase):
     def test_bubbles_beendeter_sitzungen_sind_verlinkt(self) -> None:
         """Abgeschlossene, abgebrochene und gescheiterte Sitzungen öffnen sich."""
 
+        for status in (
+            Sitzung.Status.ABGESCHLOSSEN,
+            Sitzung.Status.ABGEBROCHEN,
+            Sitzung.Status.GESCHEITERT,
+        ):
+            with self.subTest(status=status):
+                bindung: Erhebungsbindung = self._teilnahme()
+                sitzung: Sitzung = self._sitzung(bindung, self.brueche, status)
+
+                self.assertIn(
+                    f'href="{_sitzung_url(self.erhebung, sitzung)}"',
+                    self._zeile(self._einsicht(), bindung),
+                )
+
+    def test_laufende_bubble_ist_nicht_verlinkt(self) -> None:
+        """Live-Mitlesen gibt es nicht, also auch keinen Link."""
+
         bindung: Erhebungsbindung = self._teilnahme()
-        abgeschlossen: Sitzung = self._sitzung(bindung, self.brueche)
-        gescheitert: Sitzung = self._sitzung(
-            bindung, self.zinsen, Sitzung.Status.GESCHEITERT
-        )
+        self._sitzung(bindung, self.brueche, Sitzung.Status.LAUFEND)
 
-        zeile: str = self._zeile(self._einsicht(), bindung)
+        self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
 
-        for sitzung in (abgeschlossen, gescheitert):
-            self.assertIn(f'href="{_sitzung_url(self.erhebung, sitzung)}"', zeile)
+    def test_fluechtige_bubble_ist_nicht_verlinkt(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es nichts zu lesen."""
 
-    def test_laufende_und_fluechtige_bubbles_sind_nicht_verlinkt(self) -> None:
-        """Wer nichts lesen kann, bekommt keinen Link."""
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(bindung, self.brueche)
 
-        laufend: Erhebungsbindung = self._teilnahme()
-        self._sitzung(laufend, self.brueche, Sitzung.Status.LAUFEND)
-        fluechtig: Erhebungsbindung = self._teilnahme(fluechtig=True)
-        self._sitzung(fluechtig, self.brueche)
-
-        antwort: HttpResponse = self._einsicht()
-
-        self.assertNotIn("<a ", self._zeile(antwort, laufend))
-        self.assertNotIn("<a ", self._zeile(antwort, fluechtig))
+        self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
 
     def test_fluechtige_zeile_traegt_den_hinweis(self) -> None:
         """Von flüchtigen Teilnahmen gibt es nur das Ablaufgerüst."""
@@ -449,15 +455,32 @@ class EinsichtSitzungTests(EinsichtTestCase):
         inhalt: str = antwort.content.decode()
         return inhalt[inhalt.index('<article class="sitzung-seite"') :]
 
-    def test_kreis_liest_transkript_denkspur_und_diagnose(self) -> None:
-        """Die abgeschlossene Sitzung zeigt, was die Teilnehmerin sah, und mehr."""
+    def test_kreis_liest_das_transkript(self) -> None:
+        """Eingabe und Äußerung stehen so da, wie die Teilnehmerin sie sah."""
+
+        inhalt: str = self._ansicht(self._gespielte_sitzung()).content.decode()
+
+        self.assertLess(
+            inhalt.index("Wie hast du gerechnet?"),
+            inhalt.index("Ich habe oben und unten zusammengezählt."),
+        )
+
+    def test_kreis_liest_die_denkspur_eingeklappt(self) -> None:
+        """Die Denkspur liegt unter „Denkspur ansehen“ wie im Probelauf."""
+
+        inhalt: str = self._ansicht(self._gespielte_sitzung()).content.decode()
+
+        self.assertRegex(
+            inhalt,
+            r"<details[^>]*>\s*<summary>Denkspur ansehen</summary>"
+            r"\s*<p>Mia addiert Zähler und Nenner.</p>",
+        )
+
+    def test_kreis_liest_die_diagnose(self) -> None:
+        """Die abgeschlossene Sitzung zeigt die abgegebene Diagnose."""
 
         antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
 
-        self.assertContains(antwort, "Wie hast du gerechnet?")
-        self.assertContains(antwort, "Ich habe oben und unten zusammengezählt.")
-        self.assertContains(antwort, "Denkspur ansehen")
-        self.assertContains(antwort, "Mia addiert Zähler und Nenner.")
         self.assertContains(antwort, "Zähler und Nenner addiert.")
 
     def test_administration_liest_jede_sitzung(self) -> None:
@@ -481,38 +504,63 @@ class EinsichtSitzungTests(EinsichtTestCase):
                 self.assertContains(antwort, "Ich habe oben und unten zusammengezählt.")
                 self.assertNotContains(antwort, "Zähler und Nenner addiert.")
 
-    def test_kopf_nennt_kennung_stichprobe_vignette_und_status(self) -> None:
-        """Wer liest, weiß, was er liest, und findet zurück zur Übersicht."""
+    def test_kopf_nennt_die_teilnahmekennung(self) -> None:
+        """Wer liest, weiß, wessen Sitzung er liest."""
 
-        antwort: HttpResponse = self._ansicht(
-            self._gespielte_sitzung(Sitzung.Status.GESCHEITERT)
-        )
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
 
         self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_kopf_nennt_die_stichprobe(self) -> None:
+        """Die Stichprobe steht mit ihrem Zeitraum im Kopf."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
         self.assertContains(
             antwort,
             f"Stichprobe {self.stichprobe.beginn:%d.%m.%Y} – "
             f"{self.stichprobe.ende:%d.%m.%Y}",
         )
-        self.assertContains(antwort, "Brüche addieren")
+
+    def test_kopf_nennt_die_vignette(self) -> None:
+        """Die gespielte Vignette ist die Überschrift der Ansicht."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "<h1>Brüche addieren</h1>", html=True)
+
+    def test_kopf_nennt_den_status(self) -> None:
+        """Auch eine gescheiterte Sitzung sagt, wie sie endete."""
+
+        antwort: HttpResponse = self._ansicht(
+            self._gespielte_sitzung(Sitzung.Status.GESCHEITERT)
+        )
+
         self.assertContains(antwort, "Gescheitert")
+
+    def test_ein_weg_fuehrt_zurueck_zur_uebersicht(self) -> None:
+        """Die Ansicht verlinkt die Übersicht der Einsicht."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
         self.assertContains(antwort, f'href="{_einsicht_url(self.erhebung)}"')
 
-    def test_item_antworten_nach_der_sitzung_stehen_darunter(self) -> None:
-        """Die Antworten auf den Block dieser Sitzung erscheinen lesend."""
-
+    def _sitzung_mit_itemblock(self, freitext: str | None) -> Sitzung:
+        # Eine abgeschlossene Sitzung einer Erhebung mit einem Likert- und
+        # einem Freitext-Item nach der Sitzung; Likert ist mit Stufe 5
+        # beantwortet, Freitext mit dem übergebenen Text.
         likert: FragebogenItem = FragebogenItem.objects.anlegen(
             self.ada,
             typ=FragebogenItem.Typ.LIKERT,
             wortlaut="Wie sicher fühlten Sie sich?",
         )
-        freitext: FragebogenItem = FragebogenItem.objects.anlegen(
+        offen: FragebogenItem = FragebogenItem.objects.anlegen(
             self.ada, wortlaut="Was war schwierig?"
         )
-        for item in (likert, freitext):
+        for item in (likert, offen):
             item.finalisieren()
         self.erhebung = finale_erhebung(
-            self.ada, vignetten=[self.brueche], items_nach_sitzung=[likert, freitext]
+            self.ada, vignetten=[self.brueche], items_nach_sitzung=[likert, offen]
         )
         bindung: Erhebungsbindung = self._teilnahme(
             self._stichprobe(self.erhebung), ziehung=(self.brueche,)
@@ -525,7 +573,7 @@ class EinsichtSitzungTests(EinsichtTestCase):
         )
         for erhebungsitem, werte in zip(
             self.erhebung.itemzugehoerigkeiten.order_by("position"),
-            ({"likert_stufe": 5}, {"freitext": "Das Kürzen."}),
+            ({"likert_stufe": 5}, {"freitext": freitext}),
         ):
             ItemAntwort.objects.create(
                 itemblock=block,
@@ -534,28 +582,72 @@ class EinsichtSitzungTests(EinsichtTestCase):
                 sitzung=sitzung,
                 **werte,
             )
+        return sitzung
+
+    def test_likert_antwort_steht_als_skalenpol(self) -> None:
+        """Die Stufe erscheint als der Pol, den die Teilnehmerin wählte."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Wie sicher fühlten Sie sich\?</dt>\s*<dd>Stimme zu</dd>",
+        )
+
+    def test_freitext_antwort_steht_als_text(self) -> None:
+        """Der Freitext erscheint unter seinem Item."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Was war schwierig\?</dt>\s*<dd>Das Kürzen.</dd>",
+        )
+
+    def test_unbeantwortetes_item_zeigt_einen_strich(self) -> None:
+        """Antworten sind freiwillig; ein leeres Item bleibt sichtbar."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock(None)
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Was war schwierig\?</dt>\s*<dd>–</dd>",
+        )
+
+    def test_item_antworten_stehen_unter_der_sitzung(self) -> None:
+        """Der Item-Block folgt auf Debrief und Diagnose."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
 
         inhalt: str = self._ansicht(sitzung).content.decode()
 
-        self.assertIn("Wie sicher fühlten Sie sich?", inhalt)
-        self.assertIn("Stimme zu", inhalt)
-        self.assertIn("Das Kürzen.", inhalt)
         self.assertLess(
             inhalt.index("Zähler und Nenner addiert."),
             inhalt.index("Wie sicher fühlten Sie sich?"),
         )
 
-    def test_keine_fehlversuche_kein_token_keine_formulare(self) -> None:
-        """Die Ansicht ist rein lesend und führt in keine Teilnahme zurück."""
+    def test_fehlversuche_erscheinen_nicht(self) -> None:
+        """Verworfene Rohantworten des Modells bleiben verborgen."""
 
         antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
-        seite: str = self._seite(antwort)
 
         self.assertNotContains(antwort, "Verworfene Rohantwort des Modells.")
+
+    def test_token_erscheint_nicht(self) -> None:
+        """Die Ansicht führt in keine Teilnahme zurück."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
         self.assertNotContains(antwort, self.bindung.token)
-        self.assertNotIn("<form", seite)
-        self.assertNotIn("<textarea", seite)
-        self.assertNotIn("<button", seite)
+
+    def test_keine_formulare_und_aktionen(self) -> None:
+        """Die Ansicht ist rein lesend."""
+
+        seite: str = self._seite(self._ansicht(self._gespielte_sitzung()))
+
+        for element in ("<form", "<textarea", "<button"):
+            with self.subTest(element=element):
+                self.assertNotIn(element, seite)
 
     def test_laufende_sitzung_bekommt_404(self) -> None:
         """Live-Mitlesen gibt es nicht."""
