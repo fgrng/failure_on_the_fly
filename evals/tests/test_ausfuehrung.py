@@ -126,6 +126,57 @@ def test_bewerter_sieht_verlauf_samt_denkspur_und_kriterium() -> None:
     )
 
 
+def _gesprochen(anfrage: list[dict[str, str]]) -> list[tuple[str, str]]:
+    # Die Nachrichten einer Anfrage nach dem System-Prompt, als (Rolle, Text).
+
+    system, *gespraech = anfrage
+    assert system["role"] == "system"
+    return [(nachricht["role"], nachricht["content"]) for nachricht in gespraech]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_schuelerin_erhaelt_dieselbe_nachrichtenordnung_wie_in_der_sitzung() -> None:
+    """Jede user-Nachricht an die Schüler:in ist eine Äußerung der Lehrperson."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    with anfragen_aufzeichnen() as anfragen:
+        _ausgefuehrter_lauf(vignette)
+
+    assert _gesprochen(anfragen[1]) == [
+        ("user", "Wie hast du gerechnet?"),
+        ("assistant", "Antwort 1"),
+        ("user", "Warum so?"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_bewerter_erhaelt_allein_das_kriterium_als_user_nachricht() -> None:
+    """Der Verlauf steht nur im System-Prompt des Bewerters (ADR-0052)."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    with anfragen_aufzeichnen() as anfragen:
+        _ausgefuehrter_lauf(vignette)
+
+    assert _gesprochen(anfragen[-1]) == [("user", "Muster gezeigt")]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
+def test_lehrperson_erhaelt_allein_die_inputstrategie_als_user_nachricht() -> None:
+    """Der Verlauf reist nicht mehr als zusätzliche Nachricht zur Lehrperson."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    with anfragen_aufzeichnen() as anfragen:
+        _ausgefuehrter_lauf(vignette)
+
+    assert _gesprochen(anfragen[1]) == [("user", "Frag nach $schuelerin_name")]
+
+
 @pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
 def test_referenzdiagnose_erreicht_keinen_modellaufruf() -> None:

@@ -199,8 +199,8 @@ def _rolle_fragen(
     # Belegt Lehrperson und Bewerter gleich: Die gerenderte Vorlage ist der
     # System-Prompt und setzt die Eingabe unter ihrem Platzhalter
     # (`$inputstrategie` oder `$kriterium`) und den Verlauf über `$verlauf`
-    # ein; der User-Prompt trägt noch einmal den Verlauf, die Eingabe ihren
-    # Text. Eingesetzte Werte werden nicht selbst als Vorlage gerendert.
+    # ein; die einzige `user`-Nachricht ist der Text der Eingabe (ADR-0052).
+    # Eingesetzte Werte werden nicht selbst als Vorlage gerendert.
     # Der Ausgabeversuch erhält auch Fehler vor einer gültigen Ausgabe.
 
     return ausgabe_versuchen(
@@ -212,7 +212,6 @@ def _rolle_fragen(
                 "verlauf": verlauf,
             },
         ),
-        user_prompt=verlauf,
         modell_konfiguration=konfiguration,
         verlauf=[],
         eingabe=eingabe.text,

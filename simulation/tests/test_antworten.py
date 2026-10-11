@@ -130,10 +130,9 @@ def _lehrperson_versuchen(
 
     return ausgabe_versuchen(
         "Du bist Lehrperson.",
-        "Frag nach.",
         modell_konfiguration,
         verlauf=[],
-        eingabe="Weiter.",
+        eingabe="Frag nach.",
         ausgabe_schema=LEHRPERSON_SCHEMA,
         ausfuehrung=ausfuehrung,
     )
@@ -155,10 +154,9 @@ def test_ausgabe_versuchen_liefert_die_ausgabe_des_bewerters() -> None:
 
     ausgabeversuch = ausgabe_versuchen(
         "Du bewertest.",
-        "Kriterium",
         _fake_konfiguration([{"begruendung": "Muster gezeigt.", "erfuellt": True}]),
         verlauf=[],
-        eingabe="Verlauf",
+        eingabe="Kriterium",
         ausgabe_schema=BEWERTER_SCHEMA,
     )
 
@@ -184,10 +182,9 @@ def test_ausgabe_versuchen_verwirft_eine_ausgabe_neben_dem_schema(
 
     ausgabeversuch = ausgabe_versuchen(
         "Du bewertest.",
-        "Kriterium",
         _fake_konfiguration([eintrag] * 3),
         verlauf=[],
-        eingabe="Verlauf",
+        eingabe="Kriterium",
         ausgabe_schema=BEWERTER_SCHEMA,
     )
 
