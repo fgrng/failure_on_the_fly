@@ -65,9 +65,10 @@ def abschrift_loeschen(abschrift: Abschrift) -> None:
 def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
     """Gibt die ganze Abschrift genau für diese Trainings frei (ADR-0049).
 
-    Freigeben lässt sie sich nur für Trainings, denen ihr Konto beigetreten
-    ist; die Vignetten des Trainings spielen keine Rolle. Was nicht genannt
-    ist, ist widerrufen. Nennt die Auswahl ein anderes Training, bleibt alles,
+    Freigeben lässt sie sich nur für Trainings, denen ihr Konto aktiv
+    beigetreten ist; die Vignetten des Trainings spielen keine Rolle. Was nicht
+    genannt ist, ist widerrufen; ruhende Freigaben für verlassene Trainings
+    bleiben unberührt. Nennt die Auswahl ein anderes Training, bleibt alles,
     wie es war.
     """
 
@@ -76,7 +77,19 @@ def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
     ).filter(pk__in=trainings)
     if gewaehlt.count() != len(set(trainings)):
         raise ValidationError(FREIGABE_ABGEWIESEN)
-    abschrift.freigegeben_fuer.set(gewaehlt)
+    abschrift.freigegeben_fuer.set([*gewaehlt, *ruhende_freigaben(abschrift)])
+
+
+def ruhende_freigaben(abschrift: Abschrift) -> QuerySet[Training]:
+    """Die Freigaben für Trainings, aus denen das Konto ausgetreten ist.
+
+    Sie wirken nicht, bleiben aber bestehen, bis sie widerrufen werden oder ein
+    Wiederbeitritt sie weckt (ADR-0049).
+    """
+
+    return abschrift.freigegeben_fuer.exclude(
+        pk__in=Training.objects.beigetreten_von(abschrift.konto).values("pk")
+    )
 
 
 def teilnahme_einer_abschrift_raeumen(teilnahme: Teilnahme) -> None:

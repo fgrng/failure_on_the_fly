@@ -238,9 +238,13 @@ diesem Training: keine Zeile mehr in der Fremdeinsicht, kein Mitzählen in der
 Zahl der Beigetretenen, keine Sitzungen in einem danach gezogenen
 Trainingsexport, und jede ihrer Sitzungen dieses Trainings antwortet mit 404,
 auch eine, die vorher lesbar war. Ein vorher gezogener Export bleibt, wo er ist.
-In anderen Trainings, denen die Person weiter angehört, bleibt sie für deren
-Kreise einsehbar. Der Zugang von Kreis und Administration zum Training selbst
-ändert sich durch den Austritt von Teilnehmenden nicht.
+Ihre für dieses Training freigegebenen Abschriften ruhen (siehe „Abschriften
+holen“): Sie stehen nicht mehr unter „Freigegebene Abschriften“, ihre Sitzungen
+antworten mit 404, und ein danach gezogener Export enthält sie nicht. In anderen
+Trainings, denen die Person weiter angehört, bleibt sie für deren Kreise
+einsehbar, auch mit dort wirksamen Freigaben derselben Abschrift. Der Zugang von
+Kreis und Administration zum Training selbst ändert sich durch den Austritt von
+Teilnehmenden nicht.
 
 ## Entfernen aus dem Training
 
@@ -285,15 +289,16 @@ Status lesbar, ebenfalls ohne Denkspur.
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
 jede Abschrift, die eine Beigetretene für dieses Training freigegeben hat,
-beschriftet mit Erhebungsname und Importzeitpunkt, und verlinkt ihre
-abgeschlossenen Sitzungen untereinander. Ohne Freigaben steht dort „Niemand hat
-eine Abschrift freigegeben.“ Eine solche Sitzung öffnet sich lesend wie eine
-Trainingssitzung, ohne Denkspur und samt der gespielten Szene ihrer Vignette,
-auch wenn die Vignette dem Kreis nicht gehört (dritte Ausnahme in ADR-0015). Im
-Vignettenbestand des Kreises erscheint sie nicht, und aufnehmen lässt sie sich
-nicht. Eine nicht freigegebene Abschrift erscheint in keiner Fremdeinsicht, auch
-nicht für die Administration; nach dem Widerruf oder dem Löschen der Abschrift
-antwortet auch eine gemerkte Adresse mit 404.
+solange sie dem Training noch angehört, beschriftet mit Erhebungsname und
+Importzeitpunkt, und verlinkt ihre abgeschlossenen Sitzungen untereinander. Ohne
+Freigaben steht dort „Niemand hat eine Abschrift freigegeben.“ Eine solche
+Sitzung öffnet sich lesend wie eine Trainingssitzung, ohne Denkspur und samt der
+gespielten Szene ihrer Vignette, auch wenn die Vignette dem Kreis nicht gehört
+(dritte Ausnahme in ADR-0015). Im Vignettenbestand des Kreises erscheint sie
+nicht, und aufnehmen lässt sie sich nicht. Eine nicht freigegebene Abschrift
+erscheint in keiner Fremdeinsicht, auch nicht für die Administration; nach dem
+Widerruf oder dem Löschen der Abschrift antwortet auch eine gemerkte Adresse mit
+dem Status 404.
 
 ## Trainingsexport
 
@@ -934,16 +939,28 @@ Abschrift löschen; dabei verschwinden ihre Teilnahme, die kopierten Sitzungen
 und alle Freigaben, während die Daten der Erhebung unberührt bleiben.
 
 Vor dem Löschknopf steht die Sektion „Freigabe“: eine Checkbox-Liste aller
-Trainings, denen das Konto beigetreten ist, angehakt heißt freigegeben, und der
-Knopf „Freigaben speichern“. Freigegeben wird immer die ganze Abschrift, für
-beliebig viele Trainings und unabhängig davon, ob ihre Vignetten zum Training
-gehören (ADR-0049). Ein abgewählter Haken widerruft die Freigabe sofort. Ein
-Training ohne eigene Trainingsbindung wird mit 404 abgewiesen. Der Seitenkopf
-nennt die Trainings, für die die Abschrift freigegeben ist; ohne Freigabe heißt
-es dort „Ihre Abschrift — nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene
-Trainingsexporte oder zur Wiedererkennung durch Forschende gibt es bewusst
-nicht. Wer noch keinem Training beigetreten ist, liest statt der Liste einen
-Hinweis.
+Trainings, denen das Konto beigetreten und aus denen es nicht ausgetreten ist,
+angehakt heißt freigegeben, und der Knopf „Freigaben speichern“. Freigegeben
+wird immer die ganze Abschrift, für beliebig viele Trainings und unabhängig
+davon, ob ihre Vignetten zum Training gehören (ADR-0049). Ein abgewählter Haken
+widerruft die Freigabe sofort. Ein Training ohne eigene Trainingsbindung oder
+mit ausgetretener wird mit 404 abgewiesen; für ein verlassenes Training entsteht
+so keine neue Freigabe. Der Seitenkopf nennt die Trainings, für die die
+Abschrift wirksam freigegeben ist; ohne Freigabe heißt es dort „Ihre Abschrift —
+nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene Trainingsexporte oder zur
+Wiedererkennung durch Forschende gibt es bewusst nicht. Wer noch keinem Training
+beigetreten ist, liest statt der Liste einen Hinweis.
+
+Nach dem Austritt aus einem Training ruht die Freigabe der Abschrift dafür
+(ADR-0049): Sie wirkt nicht, bleibt aber bestehen und lebt mit einem
+Wiederbeitritt wieder auf. Fremdeinsicht in eine Abschrift gibt es nur, solange
+ihr Konto genau dem Training, für das freigegeben ist, aktiv angehört. Unter der
+Checkbox-Liste stehen ruhende Freigaben getrennt unter „Ruhende Freigaben“, je
+Training mit „ruht (ausgetreten)“ und dem Knopf „Freigabe widerrufen“. Er
+widerruft nur diese eine Freigabe (nur per POST, sonst 405) und führt mit der
+Meldung „Die ruhende Freigabe für … ist widerrufen.“ zurück auf die Abschrift;
+für ein Training ohne ruhende Freigabe antwortet er mit 404. „Freigaben
+speichern“ lässt ruhende Freigaben unverändert.
 
 ## Erhebungen verwalten
 

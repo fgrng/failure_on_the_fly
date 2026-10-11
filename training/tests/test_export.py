@@ -381,6 +381,15 @@ class AbschriftTests(TrainingsexportTestCase):
 
         self.assertEqual(self._archiv(), {})
 
+    def test_ruhende_abschrift_fehlt(self) -> None:
+        """Nach dem Austritt geht auch die freigegebene Abschrift nicht hinaus."""
+        self._freigeben(
+            abschrift_mit_sitzung(self.teilnehmerin, self.vignette), self.training
+        )
+        self.client.post(reverse("training:austreten", args=[self.training.pk]))
+
+        self.assertEqual(self._archiv(), {})
+
     def test_zwei_abschriften_derselben_erhebung_bleiben_getrennt(self) -> None:
         """Gleiche Erhebungsnamen überschreiben einander nicht."""
         for _ in range(2):

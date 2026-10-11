@@ -87,8 +87,23 @@
                 </fieldset>
                 <button class="button button--secondary" type="submit">Freigaben speichern</button>
             </form>
-        {% else %}
+        {% elif not ruhende_freigaben %}
             <p class="message--info">Sie sind noch keinem Training beigetreten. Freigeben lässt sich eine Abschrift nur für ein Training, dem Sie beigetreten sind.</p>
+        {% endif %}
+        {% if ruhende_freigaben %}
+            <h3>Ruhende Freigaben</h3>
+            <p>Aus diesen Trainings sind Sie ausgetreten. Die Freigabe wirkt nicht, bis Sie über den Trainings-Link wieder beitreten.</p>
+            <ul>
+                {% for training in ruhende_freigaben %}
+                    <li>
+                        {{ training.name }} <span class="badge badge--archived">ruht (ausgetreten)</span>
+                        <form method="post" action="{% url 'training:abschrift_ruhende_freigabe_widerrufen' abschrift.pk training.pk %}">
+                            {% csrf_token %}
+                            <button class="button button--secondary" type="submit">Freigabe widerrufen</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
         {% endif %}
     </section>
 

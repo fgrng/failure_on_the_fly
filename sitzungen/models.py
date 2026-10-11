@@ -52,8 +52,9 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
         Einsicht folgt dem Anlass, nie der Vignette (ADR-0049): abgeschlossene
         Sitzungen, deren Teilnahme an einer aktiven Trainingsbindung eines der
         Trainings hängt oder an einer Abschrift, die für eines von ihnen
-        freigegeben ist; nach dem Austritt aus dem Training verschwinden so
-        auch ältere Sitzungen. Wer die Trainings sieht, entscheidet der
+        freigegeben ist, solange ihr Konto genau diesem Training aktiv angehört;
+        nach dem Austritt aus dem Training verschwinden so auch ältere Sitzungen,
+        und die Freigaben ruhen. Wer die Trainings sieht, entscheidet der
         Aufrufer über `Training.objects.sichtbar_fuer`; `sitzungen` kennt das
         Training nur über den Rückwärtszugriff der Bindungen (ADR-0016).
         """
@@ -64,7 +65,15 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
                 # Trainingsbindung.Zustand.AKTIV, ohne training zu importieren.
                 teilnahme__trainingsbindung__zustand="aktiv",
             )
-            | Q(teilnahme__abschrift__freigegeben_fuer__in=trainings_pks),
+            | Q(
+                # Freigaben wirken nur, solange das Konto der Abschrift genau
+                # diesem Training aktiv angehört; sonst ruhen sie.
+                teilnahme__abschrift__freigegeben_fuer__in=trainings_pks,
+                teilnahme__abschrift__freigegeben_fuer__trainingsbindung__konto=F(
+                    "teilnahme__abschrift__konto"
+                ),
+                teilnahme__abschrift__freigegeben_fuer__trainingsbindung__zustand="aktiv",
+            ),
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
 

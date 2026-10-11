@@ -22,6 +22,11 @@ urlpatterns: list[URLPattern] = [
         name="abschrift_freigaben",
     ),
     path(
+        "abschriften/<int:pk>/freigaben/<int:training_pk>/widerrufen/",
+        views.ruhende_freigabe_widerrufen,
+        name="abschrift_ruhende_freigabe_widerrufen",
+    ),
+    path(
         "abschriften/<int:pk>/loeschen/",
         views.abschrift_entfernen,
         name="abschrift_loeschen",

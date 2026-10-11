@@ -45,7 +45,12 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
+from .abschriften import (
+    abschrift_freigeben,
+    abschrift_holen,
+    abschrift_loeschen,
+    ruhende_freigaben,
+)
 from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
 
@@ -297,7 +302,12 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
-    freigegeben: list[Training] = list(abschrift.freigegeben_fuer.order_by("name"))
+    beigetreten: QuerySet[Training] = Training.objects.beigetreten_von(request.user)
+    freigegeben: list[Training] = list(
+        abschrift.freigegeben_fuer.filter(pk__in=beigetreten.values("pk")).order_by(
+            "name"
+        )
+    )
     return render(
         request,
         "training/abschrift.html",
@@ -306,9 +316,8 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
             "sitzungen": _gelesene_sitzungen(abschrift),
             "freigegeben": [training.name for training in freigegeben],
             "freigegebene_pks": {training.pk for training in freigegeben},
-            "beigetretene_trainings": Training.objects.beigetreten_von(
-                request.user
-            ).order_by("name"),
+            "beigetretene_trainings": beigetreten.order_by("name"),
+            "ruhende_freigaben": ruhende_freigaben(abschrift).order_by("name"),
         },
     )
 
@@ -331,6 +340,26 @@ def abschrift_freigaben(request: HttpRequest, pk: int) -> HttpResponse:
         abschrift_freigeben(abschrift, auswahl)
     except ValidationError:
         raise Http404
+    return redirect("training:abschrift", pk=abschrift.pk)
+
+
+@login_required
+def ruhende_freigabe_widerrufen(
+    request: HttpRequest, pk: int, training_pk: int
+) -> HttpResponse:
+    """Widerruft die ruhende Freigabe einer eigenen Abschrift für ein Training.
+
+    Eine wirksame Freigabe widerruft nur die Auswahl; hier ist sie unbekannt.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    abschrift: Abschrift = _eigene_abschrift(request, pk)
+    training: Training = get_object_or_404(ruhende_freigaben(abschrift), pk=training_pk)
+    abschrift.freigegeben_fuer.remove(training)
+    messages.success(
+        request, f"Die ruhende Freigabe für „{training.name}“ ist widerrufen."
+    )
     return redirect("training:abschrift", pk=abschrift.pk)
 
 
@@ -590,9 +619,12 @@ def _freigegebene_abschriften(
                 for sitzung in sitzungen_nach_teilnahme.get(abschrift.teilnahme_id, [])
             ],
         }
-        for abschrift in training.freigegebene_abschriften.select_related(
-            "konto"
-        ).order_by("importiert_am", "pk")
+        for abschrift in training.freigegebene_abschriften.filter(
+            # Freigaben Ausgetretener ruhen (ADR-0049).
+            konto__in=training.trainingsbindung_set.aktiv().values("konto")
+        )
+        .select_related("konto")
+        .order_by("importiert_am", "pk")
     ]
     abschriften.sort(key=lambda abschrift: str(abschrift["name"]).casefold())
     return abschriften

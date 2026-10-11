@@ -441,3 +441,177 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self._freigeben(self.training)
 
         self.assertEqual(self._status_fuer(self.teilnehmerin), 404)
+
+
+class RuhendeFreigabeTests(FreigabeTestCase):
+    """Freigaben für ein verlassenes Training ruhen (ADR-0049)."""
+
+    def _austreten(self, training: Training | None = None) -> None:
+        # Tritt als Teilnehmerin über die Trainingsseite aus.
+        self.client.force_login(self.teilnehmerin)
+        self.client.post(
+            reverse("training:austreten", args=[(training or self.training).pk])
+        )
+
+    def _widerrufen(self, training: Training) -> HttpResponse:
+        # Widerruft die ruhende Freigabe für das Training und folgt der Weiterleitung.
+        self.client.force_login(self.teilnehmerin)
+        return self.client.post(
+            reverse(
+                "training:abschrift_ruhende_freigabe_widerrufen",
+                args=[self.abschrift.pk, training.pk],
+            ),
+            follow=True,
+        )
+
+    def _zweites_training(self) -> tuple[Konto, Training]:
+        # Ein weiteres Training eines anderen Kreises, dem die Teilnehmerin beitritt.
+        kreis: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+        training: Training = Training.objects.anlegen(kreis, name="Zweites Seminar")
+        training.veroeffentlichen()
+        training.beitreten(self.teilnehmerin)
+        return kreis, training
+
+    def test_ruhende_abschrift_fehlt_auf_der_kuratierseite(self) -> None:
+        """„Freigegebene Abschriften“ nennt die Ausgetretene nicht mehr."""
+        self._freigeben(self.training)
+        self._austreten()
+
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
+
+        self.assertNotIn("Studie Bruchrechnung", seite)
+        self.assertIn("Niemand hat eine Abschrift freigegeben.", seite)
+
+    def test_ruhende_abschrift_ist_fuer_kreis_und_administration_unbekannt(
+        self,
+    ) -> None:
+        """Ihre Sitzung antwortet nach dem Austritt mit 404."""
+        self._freigeben(self.training)
+        self._austreten()
+
+        self.assertEqual(self._status_fuer(self.ausbilderin), 404)
+        self.assertEqual(
+            self._status_fuer(konto_mit_rollen("root", is_superuser=True)), 404
+        )
+
+    def test_freigabe_fuer_ein_anderes_aktives_training_wirkt_weiter(self) -> None:
+        """Der Austritt aus einem Training lässt die Freigabe für ein anderes."""
+        zweiter_kreis, zweites_training = self._zweites_training()
+        self._freigeben(self.training, zweites_training)
+        self._austreten()
+
+        self.assertEqual(self._status_fuer(zweiter_kreis), 200)
+        self.assertIn(
+            "Studie Bruchrechnung",
+            kuratierseite(self.client, zweites_training, zweiter_kreis),
+        )
+
+    def test_freigabe_wirkt_nur_fuer_das_eigene_training_der_bindung(self) -> None:
+        """Eine aktive Bindung an ein anderes Training weckt die ruhende nicht."""
+        self._zweites_training()
+        self._freigeben(self.training)
+        self._austreten()
+
+        self.assertEqual(self._status_fuer(self.ausbilderin), 404)
+
+    def test_abschriftseite_zeigt_ruhende_freigabe_getrennt(self) -> None:
+        """Das verlassene Training steht als ruhend, nicht in der Auswahl."""
+        self._freigeben(self.training)
+        self._austreten()
+
+        seite: str = self._abschriftseite()
+
+        self.assertIn("ruht (ausgetreten)", seite)
+        self.assertNotIn('name="training"', seite)
+        self.assertNotIn("Freigegeben für Bruchrechnung.", seite)
+        self.assertIn(
+            reverse(
+                "training:abschrift_ruhende_freigabe_widerrufen",
+                args=[self.abschrift.pk, self.training.pk],
+            ),
+            seite,
+        )
+
+    def test_widerruf_der_ruhenden_freigabe_leitet_mit_meldung_zurueck(self) -> None:
+        """Danach steht die Teilnehmerin wieder bei ihrer Abschrift."""
+        self._freigeben(self.training)
+        self._austreten()
+
+        response: HttpResponse = self._widerrufen(self.training)
+
+        self.assertRedirects(
+            response, reverse("training:abschrift", args=[self.abschrift.pk])
+        )
+        self.assertContains(
+            response, "Die ruhende Freigabe für „Bruchrechnung“ ist widerrufen."
+        )
+        self.assertNotContains(response, "ruht (ausgetreten)")
+
+    def test_widerrufene_ruhende_freigabe_wirkt_nach_wiederbeitritt_nicht(
+        self,
+    ) -> None:
+        """Was widerrufen ist, ist weg, nicht nur ruhend."""
+        self._freigeben(self.training)
+        self._austreten()
+        self._widerrufen(self.training)
+
+        self.client.force_login(self.teilnehmerin)
+        self.client.get(
+            reverse("training:beitreten", args=[self.training.trainings_link])
+        )
+
+        self.assertEqual(self._status_fuer(self.ausbilderin), 404)
+
+    def test_widerruf_der_ruhenden_freigabe_nur_per_post(self) -> None:
+        """Ein GET widerruft nichts."""
+        self._freigeben(self.training)
+        self._austreten()
+        self.client.force_login(self.teilnehmerin)
+
+        response: HttpResponse = self.client.get(
+            reverse(
+                "training:abschrift_ruhende_freigabe_widerrufen",
+                args=[self.abschrift.pk, self.training.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 405)
+        self.assertIn("ruht (ausgetreten)", self._abschriftseite())
+
+    def test_widerruf_ohne_ruhende_freigabe_ist_unbekannt(self) -> None:
+        """Eine wirksame Freigabe widerruft nur die Auswahl, nicht dieser Weg."""
+        self._freigeben(self.training)
+
+        response: HttpResponse = self._widerrufen(self.training)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self._status_fuer(self.ausbilderin), 200)
+
+    def test_fremde_abschrift_laesst_sich_nicht_widerrufen(self) -> None:
+        """Widerrufen kann nur, wem die Abschrift gehört."""
+        self._freigeben(self.training)
+        self._austreten()
+        self.teilnehmerin = Konto.objects.create_user(username="linus")
+
+        self.assertEqual(self._widerrufen(self.training).status_code, 404)
+
+    def test_speichern_der_auswahl_laesst_ruhende_freigaben_stehen(self) -> None:
+        """Die Auswahl für aktive Trainings rührt ruhende Freigaben nicht an."""
+        _, zweites_training = self._zweites_training()
+        self._freigeben(self.training, zweites_training)
+        self._austreten()
+
+        self._freigeben()
+
+        self.assertIn("ruht (ausgetreten)", self._abschriftseite())
+
+    def test_fuer_ein_verlassenes_training_entsteht_keine_neue_freigabe(
+        self,
+    ) -> None:
+        """Auch ein manipulierter Formularwert gibt nicht frei."""
+        self._austreten()
+
+        response: HttpResponse = self._freigeben(self.training)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("ruht (ausgetreten)", self._abschriftseite())

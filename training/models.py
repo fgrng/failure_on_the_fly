@@ -37,8 +37,11 @@ class TrainingQuerySet(
         return self.filter(zustand=Training.Zustand.VEROEFFENTLICHT)
 
     def beigetreten_von(self, konto: "Konto") -> models.QuerySet["Training"]:
-        """Liefert die Trainings, an denen das Konto eine Trainingsbindung hat."""
-        return self.filter(trainingsbindung__konto=konto)
+        """Liefert die Trainings, an denen das Konto eine aktive Trainingsbindung hat."""
+        return self.filter(
+            trainingsbindung__konto=konto,
+            trainingsbindung__zustand=Trainingsbindung.Zustand.AKTIV,
+        )
 
     def zugaenglich_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
         """Liefert die Trainings, die das Konto betreten darf (ADR-0049).
