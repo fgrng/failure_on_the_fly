@@ -20,15 +20,15 @@ from vignetten.models import Vignette
 def _sitzung_anlegen() -> Sitzung:
     """Legt die minimale, vollständig gepinnte Sitzung für Constraint-Tests an."""
 
-    return _sitzungen_anlegen(Teilnahme.objects.create(), 1)[0]
+    return sitzungen_anlegen(Teilnahme.objects.create(), 1)[0]
 
 
-def _sitzungen_anlegen(
+def sitzungen_anlegen(
     teilnahme: Teilnahme,
     anzahl: int,
     status: Sitzung.Status = Sitzung.Status.LAUFEND,
 ) -> list[Sitzung]:
-    # Legt gepinnte Sitzungen einer Teilnahme an, jede mit eigener Vignette.
+    """Legt gepinnte Sitzungen einer Teilnahme an, jede mit eigener Vignette."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
@@ -175,7 +175,7 @@ def test_vignettenpositionen_einer_teilnahme_sind_nach_position_geordnet() -> No
     """Die Datenspur bewahrt die gespielte Vignetten-Reihenfolge je Teilnahme."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    erste_sitzung, zweite_sitzung = _sitzungen_anlegen(
+    erste_sitzung, zweite_sitzung = sitzungen_anlegen(
         teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
     )
 
@@ -220,7 +220,7 @@ def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None
     """Die Datenspur bewahrt die tatsächlich in der Sitzung gespielte Fassung."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    sitzung, andere_sitzung = _sitzungen_anlegen(
+    sitzung, andere_sitzung = sitzungen_anlegen(
         teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
     )
 
@@ -238,7 +238,7 @@ def test_position_ist_je_teilnahme_eindeutig() -> None:
     """Zwei Sitzungen derselben Teilnahme teilen sich keine Position."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    erste_sitzung, zweite_sitzung = _sitzungen_anlegen(
+    erste_sitzung, zweite_sitzung = sitzungen_anlegen(
         teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
     )
     Vignettenposition.objects.create(
@@ -261,33 +261,22 @@ def test_position_ist_je_teilnahme_eindeutig() -> None:
 def test_zweite_laufende_sitzung_derselben_teilnahme_scheitert() -> None:
     """Je Teilnahme läuft höchstens eine Sitzung, auch ohne View davor."""
 
-    laufende: Sitzung = _sitzung_anlegen()
+    teilnahme: Teilnahme = Teilnahme.objects.create()
 
     with pytest.raises(IntegrityError), transaction.atomic():
-        Sitzung.objects.create(
-            teilnahme=laufende.teilnahme,
-            vignette=laufende.vignette,
-            simulationskern=laufende.simulationskern,
-            modell_konfiguration=laufende.modell_konfiguration,
-        )
+        sitzungen_anlegen(teilnahme, 2)
 
 
 @pytest.mark.django_db
 def test_laufende_sitzung_neben_abgeschlossener_ist_erlaubt() -> None:
     """Die Regel trifft nur laufende Sitzungen."""
 
-    abgeschlossene: Sitzung = _sitzung_anlegen()
-    abgeschlossene.status = Sitzung.Status.ABGESCHLOSSEN
-    abgeschlossene.save()
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    _, laufende = sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN)
+    laufende.status = Sitzung.Status.LAUFEND
+    laufende.save()
 
-    laufende: Sitzung = Sitzung.objects.create(
-        teilnahme=abgeschlossene.teilnahme,
-        vignette=abgeschlossene.vignette,
-        simulationskern=abgeschlossene.simulationskern,
-        modell_konfiguration=abgeschlossene.modell_konfiguration,
-    )
-
-    assert Sitzung.objects.laufende_von(abgeschlossene.teilnahme) == laufende
+    assert Sitzung.objects.laufende_von(teilnahme) == laufende
 
 
 @pytest.mark.django_db
@@ -295,6 +284,6 @@ def test_teilnahme_ohne_laufende_sitzung_hat_keine() -> None:
     """Die Abfrage antwortet ohne laufende Sitzung mit keiner."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    _sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGEBROCHEN)
+    sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGEBROCHEN)
 
     assert Sitzung.objects.laufende_von(teilnahme) is None

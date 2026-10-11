@@ -763,10 +763,12 @@ def _sitzung_starten(
 ) -> HttpResponse:
     """Startet die Sitzung über den DB-Sink, solange keine andere läuft.
 
-    Die gesperrte Teilnahme serialisiert gleichzeitige Starts. Läuft eine
-    Sitzung, wird der Start abgewiesen, außer sie ist die ausdrücklich
-    abzubrechende. Verliert ein Start dennoch gegen den Constraint, sieht er
-    dieselbe Abweisung.
+    Gleichzeitige Starts serialisiert das `atomic()`: Die Verbindungsoption
+    `transaction_mode: IMMEDIATE` nimmt die Schreibsperre schon beim BEGIN;
+    die Sperre der Teilnahme greift erst auf Backends mit `select_for_update`.
+    Läuft eine Sitzung, wird der Start abgewiesen, außer sie ist die
+    ausdrücklich abzubrechende. Verliert ein Start dennoch gegen den
+    Constraint, sieht er dieselbe Abweisung.
     """
 
     try:

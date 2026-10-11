@@ -6,7 +6,7 @@ import pytest
 from django.db import connection
 
 from sitzungen.models import Sitzung, Teilnahme
-from sitzungen.tests.test_models import _sitzungen_anlegen
+from sitzungen.tests.test_models import sitzungen_anlegen
 from sitzungen.waisen import waisen_aufloesen
 
 
@@ -33,6 +33,8 @@ def _erstellt_am(sitzung: Sitzung, stunde: int) -> None:
 
 
 def _status(*sitzungen: Sitzung) -> list[str]:
+    # Liest den gespeicherten Status der Sitzungen in ihrer Reihenfolge.
+
     return [Sitzung.objects.get(pk=sitzung.pk).status for sitzung in sitzungen]
 
 
@@ -41,7 +43,7 @@ def test_nur_die_juengste_laufende_sitzung_bleibt_laufend() -> None:
     """Mehrere Waisen einer Teilnahme: alle älteren werden abgebrochen."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    aelteste, juengste, mittlere = _sitzungen_anlegen(teilnahme, 3)
+    aelteste, juengste, mittlere = sitzungen_anlegen(teilnahme, 3)
     _erstellt_am(aelteste, 8)
     _erstellt_am(juengste, 12)
     _erstellt_am(mittlere, 10)
@@ -60,7 +62,7 @@ def test_bei_gleichem_beginn_bleibt_die_hoechste_pk_laufend() -> None:
     """Gleichstand bei `erstellt_am` entscheidet die pk."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    erste, zweite = _sitzungen_anlegen(teilnahme, 2)
+    erste, zweite = sitzungen_anlegen(teilnahme, 2)
     _erstellt_am(erste, 9)
     _erstellt_am(zweite, 9)
 
@@ -77,7 +79,7 @@ def test_teilnahmen_ohne_waisen_bleiben_unberuehrt() -> None:
     """Eine einzelne laufende Sitzung und beendete Sitzungen ändern sich nicht."""
 
     mit_waisen: Teilnahme = Teilnahme.objects.create()
-    _, _, laufende, abgeschlossene, gescheiterte = _sitzungen_anlegen(mit_waisen, 5)
+    _, _, laufende, abgeschlossene, gescheiterte = sitzungen_anlegen(mit_waisen, 5)
     einzeln: Teilnahme = Teilnahme.objects.create()
     Sitzung.objects.filter(pk__in=[laufende.pk, abgeschlossene.pk]).update(
         teilnahme=einzeln

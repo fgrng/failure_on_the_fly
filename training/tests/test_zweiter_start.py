@@ -34,12 +34,14 @@ class ZweiterStartTests(TestCase):
         self._beitreten(self.training)
 
     def _training(self, ausbilderin: Konto, name: str) -> Training:
+        # Veröffentlicht ein Training mit beiden Vignetten.
         training: Training = Training.objects.anlegen(ausbilderin, name=name)
         training.vignetten.add(self.erste, self.zweite)
         training.veroeffentlichen()
         return training
 
     def _beitreten(self, training: Training) -> None:
+        # Tritt bei und startet nach abgelehnter Audioverarbeitung die erste Vignette.
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
         self.client.post(
             reverse("training:einwilligung", args=[training.pk, self.erste.pk]),
@@ -47,6 +49,7 @@ class ZweiterStartTests(TestCase):
         )
 
     def _starten(self, vignette: Vignette) -> HttpResponse:
+        # Wählt die Vignette im Training zum Start.
         return self.client.post(
             reverse("training:wahl", args=[self.training.pk, vignette.pk])
         )
