@@ -1,8 +1,7 @@
 """Tests des Import-Kommandos und der Token-Eingabe für Abschriften."""
 
-from datetime import UTC, datetime
-
 import re
+from datetime import UTC, datetime
 
 import pytest
 import time_machine

@@ -903,7 +903,7 @@ def test_anlegen_vergibt_lesbare_eindeutige_teilnahme_tokens() -> None:
 
 @pytest.mark.django_db
 def test_anlegen_vergibt_eine_teilnahmekennung_aus_acht_hexzeichen() -> None:
-    """Die Kennung ist ein eigener Zufallswert, nicht aus dem Token gebildet."""
+    """Auch die Teilnahme einer Erhebungsbindung trägt ihre Kennung."""
 
     erhebung: Erhebung = Erhebung.objects.anlegen(
         Konto.objects.create_user(username="ada"), name="Brüche"

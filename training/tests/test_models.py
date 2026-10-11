@@ -154,7 +154,7 @@ def test_teilnahme_traegt_hoechstens_eine_trainingsbindung() -> None:
 
 @pytest.mark.django_db
 def test_bindung_vergibt_eine_teilnahmekennung_aus_acht_hexzeichen() -> None:
-    """Die Kennung ist ein eigener Zufallswert, nicht aus Konto oder Training."""
+    """Auch die Teilnahme einer Trainingsbindung trägt ihre Kennung."""
 
     ada: Konto = Konto.objects.create_user(username="ada")
     training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")

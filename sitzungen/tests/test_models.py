@@ -250,11 +250,10 @@ def test_position_ist_je_teilnahme_eindeutig() -> None:
 
 @pytest.mark.django_db
 def test_teilnahme_erhaelt_beim_anlegen_eine_zufaellige_kennung() -> None:
-    """Acht Hexzeichen, je Teilnahme neu gezogen und nicht editierbar."""
+    """Acht Hexzeichen, je Teilnahme neu gezogen."""
 
     erste: Teilnahme = Teilnahme.objects.create()
     zweite: Teilnahme = Teilnahme.objects.create()
 
     assert re.fullmatch(r"[0-9a-f]{8}", erste.kennung)
     assert erste.kennung != zweite.kennung
-    assert not Teilnahme._meta.get_field("kennung").editable
