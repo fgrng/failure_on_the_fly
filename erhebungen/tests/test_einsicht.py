@@ -265,6 +265,14 @@ class EinsichtLinkTests(EinsichtTestCase):
 
         self.assertContains(self._detail(), _einsicht_url(self.erhebung))
 
+    def test_ohne_einwilligung_a_fehlt_der_link(self) -> None:
+        """Abgelehnte und offene Teilnahmen ergäben eine leere Einsicht."""
+
+        self._teilnahme(einwilligung=False)
+        self._teilnahme(einwilligung=None)
+
+        self.assertNotContains(self._detail(), _einsicht_url(self.erhebung))
+
 
 class EinsichtRasterTests(EinsichtTestCase):
     """Aufbau und Inhalt des Rasters."""
@@ -296,6 +304,29 @@ class EinsichtRasterTests(EinsichtTestCase):
             inhalt.index(fruehe.teilnahme.kennung),
             inhalt.index(spaete.teilnahme.kennung),
         )
+
+    def test_teilnahmen_ohne_beginn_stehen_oben(self) -> None:
+        """Bindungen aus der Zeit vor dem Beginndatum sind die ältesten."""
+
+        neue: Erhebungsbindung = self._teilnahme(
+            beginn=datetime(2026, 10, 1, 9, 0, tzinfo=_BERLIN)
+        )
+        alte: Erhebungsbindung = self._teilnahme()
+        Erhebungsbindung.objects.filter(pk=alte.pk).update(erstellt_am=None)
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(
+            inhalt.index(alte.teilnahme.kennung),
+            inhalt.index(neue.teilnahme.kennung),
+        )
+
+    def test_stichprobe_ohne_zeilen_nennt_den_leerzustand(self) -> None:
+        """Ohne eingewilligte Teilnahme steht statt Zeilen ein Hinweis."""
+
+        self._teilnahme(einwilligung=False)
+
+        self.assertContains(self._einsicht(), "Noch keine Teilnahme mit Einwilligung.")
 
     def test_ist_nach_stichproben_gegliedert(self) -> None:
         """Jede Teilnahme steht unter ihrer Stichprobe."""
@@ -584,10 +615,13 @@ class EinsichtSitzungTests(EinsichtTestCase):
 
         self.assertContains(antwort, f'href="{_einsicht_url(self.erhebung)}"')
 
-    def _sitzung_mit_itemblock(self, freitext: str | None) -> Sitzung:
+    def _sitzung_mit_itemblock(
+        self, freitext: str | None, *, abgeschickt: bool = True
+    ) -> Sitzung:
         # Eine abgeschlossene Sitzung einer Erhebung mit einem Likert- und
         # einem Freitext-Item nach der Sitzung; Likert ist mit Stufe 5
-        # beantwortet, Freitext mit dem übergebenen Text.
+        # beantwortet, Freitext mit dem übergebenen Text. Ein nicht
+        # abgeschickter Block wurde nur gezeigt.
         likert: FragebogenItem = FragebogenItem.objects.anlegen(
             self.ada,
             typ=FragebogenItem.Typ.LIKERT,
@@ -610,6 +644,7 @@ class EinsichtSitzungTests(EinsichtTestCase):
             Erhebungsitem.Andockpunkt.NACH_SITZUNG,
             ({"likert_stufe": 5}, {"freitext": freitext}),
             sitzung=sitzung,
+            erledigt_am=timezone.now() if abgeschickt else None,
         )
         return sitzung
 
@@ -642,6 +677,33 @@ class EinsichtSitzungTests(EinsichtTestCase):
             self._ansicht(sitzung).content.decode(),
             r"<dt>Was war schwierig\?</dt>\s*<dd>–</dd>",
         )
+
+    def test_sitzung_ohne_itemblock_zeigt_keinen_fragebogen(self) -> None:
+        """Ohne Items nach der Sitzung fehlt der Abschnitt."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+        self.assertNotContains(antwort, "Fragen zu dieser Sitzung")
+
+    def test_nicht_abgeschickter_itemblock_erscheint_nicht(self) -> None:
+        """Ein nur gezeigter Block ist nicht ausgefüllt und bleibt verborgen."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock(None, abgeschickt=False)
+
+        antwort: HttpResponse = self._ansicht(sitzung)
+
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+        self.assertNotContains(antwort, "Fragen zu dieser Sitzung")
+        self.assertNotContains(antwort, "Wie sicher fühlten Sie sich?")
+
+    def test_abgeschlossene_sitzung_ohne_diagnose(self) -> None:
+        """Fehlt die Diagnose, sagt die Ansicht das ausdrücklich."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+        Diagnose.objects.filter(sitzung=sitzung).delete()
+
+        self.assertContains(self._ansicht(sitzung), "Keine Diagnose abgegeben.")
 
     def test_item_antworten_stehen_unter_der_sitzung(self) -> None:
         """Der Item-Block folgt auf Debrief und Diagnose."""

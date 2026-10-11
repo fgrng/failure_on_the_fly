@@ -1000,16 +1000,17 @@ Antwortzeilen.
 
 ## Einsicht in die Erhebung
 
-Hat eine Erhebung Teilnahmen, steht auf ihrer Detailseite neben dem Export der
-Link „Einsicht“ (ADR-0049). Die Übersicht ist rein lesend und für den Kreis der
-Erhebung und die Administration erreichbar, auch für Teilnahmen von vor der
-Aufnahme in den Kreis und nach dem Archivieren von Stichprobe oder Erhebung. Wer
-aus dem Kreis ausgetreten ist und fremde Forschende bekommen 404, Konten ohne
-Forschungsrolle 403.
+Hat eine Erhebung Teilnahmen, die in der Übersicht als Zeile erscheinen, steht
+auf ihrer Detailseite neben dem Export der Link „Einsicht“ (ADR-0049). Die
+Übersicht ist rein lesend und für den Kreis der Erhebung und die Administration
+erreichbar, auch für Teilnahmen von vor der Aufnahme in den Kreis und nach dem
+Archivieren von Stichprobe oder Erhebung. Wer aus dem Kreis ausgetreten ist und
+fremde Forschende bekommen 404, Konten ohne Forschungsrolle 403.
 
 Je Stichprobe zeigt sie ein Raster wie die Fremdeinsicht im Training: eine Zeile
 je Teilnahme, beschriftet mit ihrer Teilnahmekennung und nach Beginn sortiert,
-die älteste oben, und eine Spalte je Vignette in der Reihenfolge der Erhebung.
+die älteste oben; Teilnahmen aus der Zeit vor dem Beginndatum gelten als die
+ältesten. Dazu kommt eine Spalte je Vignette in der Reihenfolge der Erhebung.
 Jede Zelle hält höchstens eine Sitzung als runde Bubble mit der gespielten
 Position aus der Vignettenziehung; Tooltip und Screenreader nennen ihren Status.
 Abgeschlossene Sitzungen erscheinen normal, abgebrochene und gescheiterte in
@@ -1017,7 +1018,8 @@ Warnfarbe, laufende gedimmt. Flüchtige Teilnahmen zeigen nur umrandete Bubbles,
 und ihre Zeile trägt den Hinweis „flüchtig, nur Ablaufgerüst“. Eingewilligte
 Teilnahmen ohne Sitzung stehen mit „noch keine Sitzung“ in der Liste;
 Teilnahmen, die Einwilligung a abgelehnt oder noch nicht gegeben haben, fehlen.
-Das Teilnahme-Token steht nirgends auf der Seite.
+Eine Stichprobe ohne solche Zeilen zeigt „Noch keine Teilnahme mit
+Einwilligung.“ Das Teilnahme-Token steht nirgends auf der Seite.
 
 Die Bubbles abgeschlossener, abgebrochener und gescheiterter Sitzungen nicht
 flüchtiger Teilnahmen sind Links auf die Sitzungsansicht unter
@@ -1026,13 +1028,14 @@ sind es nicht. Die Sitzungsansicht zeigt im Kopf Teilnahmekennung, Stichprobe,
 Vignette und Status und führt zurück zur Übersicht. Darunter steht die Sitzung
 rein lesend so, wie die Teilnehmer:in sie gesehen hat: Rahmenhandlung,
 Transkript in gespielter Reihenfolge und bei abgeschlossenen Sitzungen Debrief
-und abgegebene Diagnose. Anders als für die Teilnehmer:in liegt unter jedem
-Gesprächsschritt die Denkspur, eingeklappt unter „Denkspur ansehen“ wie im
-Probelauf, und unter der Sitzung stehen die Antworten auf den Item-Block nach
-dieser Sitzung, mit Skalenpol oder Freitext und einem Strich für unbeantwortete
-Items. Fehlversuche, das Teilnahme-Token, Formulare und Aktionen erscheinen
-nicht. Laufende Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die
-nicht zur Erhebung aus der URL gehören, antworten mit 404.
+und abgegebene Diagnose, ohne Diagnose „Keine Diagnose abgegeben.“. Anders als
+für die Teilnehmer:in liegt unter jedem Gesprächsschritt die Denkspur,
+eingeklappt unter „Denkspur ansehen“ wie im Probelauf, und unter der Sitzung
+stehen die Antworten auf den abgeschickten Item-Block nach dieser Sitzung, mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items. Fehlversuche,
+das Teilnahme-Token, Formulare und Aktionen erscheinen nicht. Laufende
+Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die nicht zur Erhebung
+aus der URL gehören, antworten mit 404.
 
 Hinter den Vignetten steht die Spalte „Abschluss“. Hat eine nicht flüchtige
 Teilnahme ihren Item-Block am Ende abgeschickt, steht dort eine verlinkte

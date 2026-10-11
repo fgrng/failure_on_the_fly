@@ -441,9 +441,7 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
             "kann_archivieren": erhebung.kann_archiviert_werden,
             "kann_entarchivieren": erhebung.kann_entarchiviert_werden,
             "stichproben": stichproben,
-            "hat_teilnahmen": any(
-                stichprobe.teilnahmezahl for stichprobe in stichproben
-            ),
+            "hat_teilnahmen": _einsicht_bindungen(erhebung).exists(),
         },
     )
 
@@ -471,14 +469,6 @@ def export(request: HttpRequest, pk: int) -> HttpResponse:
     return zip_download("erhebung", erhebung.pk, erhebung.name, datenspur_zip(erhebung))
 
 
-# Inhaltlich lesbar sind nur beendete Sitzungen nicht flüchtiger Teilnahmen.
-_BEENDET: tuple[str, ...] = (
-    Sitzung.Status.ABGESCHLOSSEN,
-    Sitzung.Status.ABGEBROCHEN,
-    Sitzung.Status.GESCHEITERT,
-)
-
-
 def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
     """Die Darstellung einer Sitzung im Raster der Einsicht."""
 
@@ -489,6 +479,20 @@ def _bubble_variante(sitzung: Sitzung, fluechtig: bool) -> str:
     if sitzung.status == Sitzung.Status.LAUFEND:
         return "laufend"
     return ""
+
+
+def _einsicht_bindungen(erhebung: Erhebung) -> QuerySet[Erhebungsbindung]:
+    # Die Zeilen der Einsicht: Teilnahmen mit Ziehung oder Einwilligung a;
+    # wer sie abgelehnt hat, hat weder Ziehung noch Sitzung.
+
+    return (
+        Erhebungsbindung.objects.filter(stichprobe__erhebung=erhebung)
+        .filter(
+            Q(vignettenziehungen__isnull=False)
+            | Q(teilnahme__sprachmodell_eingewilligt=True)
+        )
+        .distinct()
+    )
 
 
 def _einsehbare_abschlussbloecke(erhebung: Erhebung) -> QuerySet[Itemblock]:
@@ -513,12 +517,13 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
             "vignette__historie"
         )
     ]
+    einsehbar: QuerySet[Sitzung] = Sitzung.objects.in_erhebungen_einsehbar(
+        Erhebung.objects.sichtbar_fuer(konto)
+    ).filter(teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung)
     sitzungen: dict[tuple[int, int], Sitzung] = {
-        (sitzung.teilnahme_id, sitzung.vignette_id): sitzung
-        for sitzung in Sitzung.objects.in_erhebungen_einsehbar(
-            Erhebung.objects.sichtbar_fuer(konto)
-        ).filter(teilnahme__erhebungsbindung__stichprobe__erhebung=erhebung)
+        (sitzung.teilnahme_id, sitzung.vignette_id): sitzung for sitzung in einsehbar
     }
+    lesbar: set[int] = set(einsehbar.inhaltlich_lesbar().values_list("pk", flat=True))
     positionen: dict[tuple[int, int], int] = {
         (ziehung.erhebungsbindung.teilnahme_id, ziehung.vignette_id): ziehung.position
         for ziehung in Vignettenziehung.objects.filter(
@@ -530,17 +535,12 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
             "erhebungsbindung__teilnahme_id", flat=True
         )
     )
-    # Zeilen sind die Teilnahmen mit Ziehung oder Einwilligung a; wer sie
-    # abgelehnt hat, hat weder Ziehung noch Sitzung.
+    # Bindungen ohne Datum stammen aus der Zeit vor dem Feld; sie sind die
+    # ältesten.
     bindungen: QuerySet[Erhebungsbindung] = (
-        Erhebungsbindung.objects.filter(stichprobe__erhebung=erhebung)
-        .filter(
-            Q(vignettenziehungen__isnull=False)
-            | Q(teilnahme__sprachmodell_eingewilligt=True)
-        )
-        .distinct()
+        _einsicht_bindungen(erhebung)
         .select_related("teilnahme")
-        .order_by("erstellt_am", "pk")
+        .order_by(F("erstellt_am").asc(nulls_first=True), "pk")
     )
     zeilen_je_stichprobe: dict[int, list[dict[str, object]]] = {}
     for bindung in bindungen:
@@ -557,12 +557,12 @@ def _einsicht_raster(konto: Konto, erhebung: Erhebung) -> dict[str, object]:
                     "status": sitzung.get_status_display(),
                     "variante": _bubble_variante(sitzung, fluechtig),
                     "url": (
-                        None
-                        if fluechtig or sitzung.status not in _BEENDET
-                        else reverse(
+                        reverse(
                             "erhebungen:einsicht_sitzung",
                             args=[erhebung.pk, sitzung.pk],
                         )
+                        if sitzung.pk in lesbar
+                        else None
                     ),
                 }
             )
@@ -620,8 +620,7 @@ def einsicht_sitzung(request: HttpRequest, pk: int, sitzung_pk: int) -> HttpResp
     erhebung: Erhebung = _sichtbare_erhebung(request, pk)
     sitzung: Sitzung = get_object_or_404(
         Sitzung.objects.in_erhebungen_einsehbar(Erhebung.objects.filter(pk=erhebung.pk))
-        .filter(status__in=_BEENDET)
-        .exclude(Teilnahme.fluechtig_q("teilnahme__"))
+        .inhaltlich_lesbar()
         .select_related(
             "vignette__historie",
             "simulationskern",
@@ -629,7 +628,10 @@ def einsicht_sitzung(request: HttpRequest, pk: int, sitzung_pk: int) -> HttpResp
         ),
         pk=sitzung_pk,
     )
-    block: Itemblock | None = Itemblock.objects.filter(sitzung=sitzung).first()
+    # Erst ein abgeschickter Block zeigt, wie die Teilnehmer:in ihn ausfüllte.
+    block: Itemblock | None = Itemblock.objects.filter(
+        sitzung=sitzung, erledigt_am__isnull=False
+    ).first()
     uebersicht_url: str = reverse("erhebungen:einsicht", args=[erhebung.pk])
     return sitzung_anzeigen(
         request,

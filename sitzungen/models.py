@@ -94,6 +94,19 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
             )
         )
 
+    def inhaltlich_lesbar(self) -> "SitzungQuerySet":
+        """Beschränkt auf beendete Sitzungen nicht flüchtiger Teilnahmen.
+
+        Nur sie öffnet die Einsicht einer Erhebung inhaltlich (ADR-0049).
+        """
+        return self.filter(
+            status__in=(
+                Sitzung.Status.ABGESCHLOSSEN,
+                Sitzung.Status.ABGEBROCHEN,
+                Sitzung.Status.GESCHEITERT,
+            )
+        ).exclude(Teilnahme.fluechtig_q("teilnahme__"))
+
     def in_gespielter_folge(self) -> "SitzungQuerySet":
         """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
         return self.order_by(

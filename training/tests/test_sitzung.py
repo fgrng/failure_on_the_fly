@@ -355,6 +355,19 @@ class TrainingssitzungTests(TestCase):
             r"<p[^>]*>Mia addiert Zähler und Nenner.</p>",
         )
 
+    def test_vergangene_sitzung_ohne_diagnose(self) -> None:
+        """Fehlt die Diagnose, sagt die lesende Ansicht das ausdrücklich."""
+        self._sitzung_starten([])
+        sitzung: Sitzung = Sitzung.objects.get()
+        sitzung.status = Sitzung.Status.ABGESCHLOSSEN
+        sitzung.save()
+
+        response: HttpResponse = self.client.get(
+            reverse("training:sitzung_ansehen", args=[sitzung.pk])
+        )
+
+        self.assertContains(response, "Keine Diagnose abgegeben.")
+
     def test_vergangene_sitzung_zeigt_kein_diagnoseformular(self) -> None:
         """Die lesende Ansicht hat keine Formulare."""
         seite: str = self._abgeschlossene_sitzung_ansehen()
