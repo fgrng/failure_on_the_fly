@@ -59,6 +59,11 @@ urlpatterns: list[URLPattern] = [
         name="eigentuemerin_entfernen",
     ),
     path(
+        "eigene/<int:pk>/teilnehmende/<int:konto_pk>/entfernen/",
+        views.teilnehmerin_entfernen,
+        name="teilnehmerin_entfernen",
+    ),
+    path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,
         name="vignette_hinzufuegen",

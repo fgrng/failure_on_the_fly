@@ -242,6 +242,24 @@ In anderen Trainings, denen die Person weiter angehört, bleibt sie für deren
 Kreise einsehbar. Der Zugang von Kreis und Administration zum Training selbst
 ändert sich durch den Austritt von Teilnehmenden nicht.
 
+## Entfernen aus dem Training
+
+Jede Zeile der Fremdeinsicht trägt in der letzten Spalte „Entfernen“. Das klappt
+eine Bestätigung auf: Die Person kann über den offenen Trainings-Link wieder
+beitreten; wer fernbleiben soll, wird über die Sperre des Beitritts
+ferngehalten. Erst „Entfernen bestätigen“ entfernt (nur per POST, sonst 405) und
+führt mit der Meldung „… ist aus dem Training entfernt.“ zurück auf die
+Kuratierseite. Entfernen dürfen alle Eigentümer:innen des Trainings und die
+Administration in jedem Training; fremde Ausbilder:innen und
+Trainingsteilnehmende bekommen 404, ebenso ein Entfernen für ein Konto ohne
+aktive Bindung an dieses Training. Es ändert sich dann nichts.
+
+Entfernen führt in denselben Zustand wie ein eigener Austritt (siehe oben): Die
+Person verschwindet für Kreis und Administration rückwirkend aus Fremdeinsicht,
+Beigetretenen-Zahl und Trainingsexport, und sie selbst sieht genau das, was sie
+nach einem eigenen Austritt sähe. Wer entfernt hat, wird nicht gespeichert und
+nirgends angezeigt.
+
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite

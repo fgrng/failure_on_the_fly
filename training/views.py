@@ -455,6 +455,29 @@ def austreten(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+def teilnehmerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
+    """Entfernt eine Trainingsteilnehmerin auf demselben Weg wie ihr Austritt.
+
+    Nur Kreis und Administration; allen anderen ist das Training unbekannt (404),
+    ebenso ein Konto ohne aktive Bindung (ADR-0049).
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    bindung: Trainingsbindung = get_object_or_404(
+        training.trainingsbindung_set.aktiv().select_related("konto"),
+        konto_id=konto_pk,
+    )
+    bindung.austreten()
+    messages.success(
+        request, f"{_kontoname(bindung.konto)} ist aus dem Training entfernt."
+    )
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
 @_ausbilderin_erforderlich
 def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt ein sichtbares Training zur Kuratierung."""
@@ -521,6 +544,10 @@ def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
         zeilen.append(
             {
                 "name": _kontoname(bindung.konto),
+                "entfernen_url": reverse(
+                    "training:teilnehmerin_entfernen",
+                    args=[training.pk, bindung.konto_id],
+                ),
                 "zellen": zellen,
                 "ohne_sitzung": not any(zellen),
             }

@@ -74,6 +74,7 @@
                             {% for vignette in fremdeinsicht.vignetten %}
                                 <th scope="col" class="fremdeinsicht__vignette" title="{{ vignette.anzeigename }}"><span>{{ vignette.anzeigename }}</span></th>
                             {% endfor %}
+                            <th scope="col" class="fremdeinsicht__aktion">Aktion</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,10 +86,20 @@
                                         {% for sitzung in sitzungen %}<a class="fremdeinsicht__sitzung" href="{{ sitzung.url }}" data-datum="{{ sitzung.datum|date:"d.m.Y" }}" aria-label="Sitzung vom {{ sitzung.datum|date:"d.m.Y" }}">{{ sitzung.nummer }}</a>{% empty %}<span class="fremdeinsicht__leer">–</span>{% endfor %}
                                     </td>
                                 {% endfor %}
+                                <td class="fremdeinsicht__aktion">
+                                    <details>
+                                        <summary class="button button--danger">Entfernen</summary>
+                                        <p>{{ zeile.name }} kann über den offenen Trainings-Link wieder beitreten. Wer fernbleiben soll: Sperren Sie dazu den Beitritt.</p>
+                                        <form method="post" action="{{ zeile.entfernen_url }}">
+                                            {% csrf_token %}
+                                            <button class="button button--danger" type="submit">Entfernen bestätigen</button>
+                                        </form>
+                                    </details>
+                                </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="{{ fremdeinsicht.vignetten|length|add:1 }}" class="table__empty">Noch niemand ist beigetreten.</td>
+                                <td colspan="{{ fremdeinsicht.vignetten|length|add:2 }}" class="table__empty">Noch niemand ist beigetreten.</td>
                             </tr>
                         {% endfor %}
                     </tbody>

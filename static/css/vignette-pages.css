@@ -170,7 +170,7 @@
     --spalten: 1; /* das Template setzt die Vignettenzahl inline */
     table-layout: fixed;
     width: 100%;
-    min-width: calc(16rem + var(--spalten) * 5.5rem);
+    min-width: calc(16rem + var(--spalten) * 5.5rem + 10rem);
 }
 
 .fremdeinsicht__matrix .fremdeinsicht__name {
@@ -203,6 +203,15 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+.fremdeinsicht__aktion {
+    width: 10rem;
+    white-space: normal;
+}
+
+.fremdeinsicht__aktion details[open] p {
+    font-size: .8rem;
 }
 
 .fremdeinsicht__ohne-sitzung > * {
