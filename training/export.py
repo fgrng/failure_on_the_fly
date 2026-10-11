@@ -33,7 +33,8 @@ def trainingsexport_zip(training: Training) -> bytes:
     """
 
     sitzungen: list[Sitzung] = list(
-        Sitzung.objects.fremd_einsehbar(Training.objects.filter(pk=training.pk))
+        Training.objects.filter(pk=training.pk)
+        .fremd_einsehbare_sitzungen()
         .select_related("vignette__historie", "diagnose")
         .prefetch_related(
             Prefetch(

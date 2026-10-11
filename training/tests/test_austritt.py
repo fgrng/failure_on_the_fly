@@ -268,6 +268,52 @@ class AustrittTests(TestCase):
 
         self.assertEqual(wahl.status_code, 404)
 
+    def test_ausgetretener_kreis_tritt_ueber_den_link_wieder_bei(self) -> None:
+        """Eigentümerin und Administration spielen nach dem Wiederbeitritt wieder."""
+        administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
+        self.training.beitreten(administratorin)
+        self.training.beitreten(self.ausbilderin)
+
+        for konto in (self.ausbilderin, administratorin):
+            with self.subTest(konto=konto.username):
+                self.client.force_login(konto)
+                self._austreten()
+
+                self.client.get(
+                    reverse("training:beitreten", args=[self.training.trainings_link])
+                )
+
+                self.assertEqual(
+                    [zeile["ausgetreten"] for zeile in self._historie()], [False]
+                )
+                self.assertEqual(
+                    self.client.get(
+                        reverse(
+                            "training:wahl", args=[self.training.pk, self.vignette.pk]
+                        )
+                    ).status_code,
+                    200,
+                )
+
+    def test_gesperrter_beitritt_haelt_auch_den_ausgetretenen_kreis_fern(
+        self,
+    ) -> None:
+        """Die Bindung bleibt ausgetreten, die Trainingsseite bleibt erreichbar."""
+        self.training.beitreten(self.ausbilderin)
+        self.client.force_login(self.ausbilderin)
+        self._austreten()
+        self.training.beitritt_gesperrt = True
+        self.training.save(update_fields=["beitritt_gesperrt"])
+
+        antwort: HttpResponse = self.client.get(
+            reverse("training:beitreten", args=[self.training.trainings_link])
+        )
+
+        self.assertRedirects(
+            antwort, reverse("training:detail", args=[self.training.pk])
+        )
+        self.assertEqual([zeile["ausgetreten"] for zeile in self._historie()], [True])
+
 
 @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class LaufendeSitzungNachAustrittTests(TestCase):

@@ -46,34 +46,27 @@ class Teilnahme(models.Model):
 class SitzungQuerySet(models.QuerySet["Sitzung"]):
     """Abfragen über Sitzungen."""
 
-    def fremd_einsehbar(self, trainings: models.QuerySet) -> "SitzungQuerySet":
+    def fremd_einsehbar(
+        self, trainings: models.QuerySet, freigegebene_teilnahmen: models.QuerySet
+    ) -> "SitzungQuerySet":
         """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf.
 
         Einsicht folgt dem Anlass, nie der Vignette (ADR-0049): abgeschlossene
         Sitzungen, deren Teilnahme an einer aktiven Trainingsbindung eines der
-        Trainings hängt oder an einer Abschrift, die für eines von ihnen
-        freigegeben ist, solange ihr Konto genau diesem Training aktiv angehört;
-        nach dem Austritt aus dem Training verschwinden so auch ältere Sitzungen,
-        und die Freigaben ruhen. Wer die Trainings sieht, entscheidet der
-        Aufrufer über `Training.objects.sichtbar_fuer`; `sitzungen` kennt das
-        Training nur über den Rückwärtszugriff der Bindungen (ADR-0016).
+        Trainings hängt oder unter den Teilnahmen der für sie wirksam
+        freigegebenen Abschriften ist; nach dem Austritt aus dem Training
+        verschwinden so auch ältere Sitzungen, und die Freigaben ruhen. Beides
+        liefert `Training.objects.fremd_einsehbare_sitzungen`; `sitzungen`
+        kennt das Training nur über den Rückwärtszugriff der Bindungen
+        (ADR-0016).
         """
-        trainings_pks: models.QuerySet = trainings.values("pk")
         return self.filter(
             Q(
-                teilnahme__trainingsbindung__training__in=trainings_pks,
+                teilnahme__trainingsbindung__training__in=trainings.values("pk"),
                 # Trainingsbindung.Zustand.AKTIV, ohne training zu importieren.
                 teilnahme__trainingsbindung__zustand="aktiv",
             )
-            | Q(
-                # Freigaben wirken nur, solange das Konto der Abschrift genau
-                # diesem Training aktiv angehört; sonst ruhen sie.
-                teilnahme__abschrift__freigegeben_fuer__in=trainings_pks,
-                teilnahme__abschrift__freigegeben_fuer__trainingsbindung__konto=F(
-                    "teilnahme__abschrift__konto"
-                ),
-                teilnahme__abschrift__freigegeben_fuer__trainingsbindung__zustand="aktiv",
-            ),
+            | Q(teilnahme__in=freigegebene_teilnahmen),
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
 

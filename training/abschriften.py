@@ -67,7 +67,7 @@ def abschrift_freigeben(abschrift: Abschrift, trainings: list[int]) -> None:
 
     Freigeben lässt sie sich nur für Trainings, denen ihr Konto aktiv
     beigetreten ist; die Vignetten des Trainings spielen keine Rolle. Was nicht
-    genannt ist, ist widerrufen; ruhende Freigaben für verlassene Trainings
+    genannt ist, ist widerrufen; ruhende Freigaben für Trainings nach dem Austritt
     bleiben unberührt. Nennt die Auswahl ein anderes Training, bleibt alles,
     wie es war.
     """
@@ -84,7 +84,9 @@ def wirksame_freigaben(abschrift: Abschrift) -> QuerySet[Training]:
     """Die Freigaben für Trainings, denen das Konto aktiv angehört."""
 
     return abschrift.freigegeben_fuer.filter(
-        pk__in=Training.objects.beigetreten_von(abschrift.konto).values("pk")
+        pk__in=Abschrift.wirksame_freigaben()
+        .filter(abschrift=abschrift)
+        .values("training")
     )
 
 

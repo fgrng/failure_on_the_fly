@@ -111,6 +111,15 @@ class WiederbeitrittTests(FremdeinsichtTestCase):
         self.assertIn("1 Person beigetreten", seite)
         self.assertEqual(self.client.get(ansehen_url(self.sitzung)).status_code, 200)
 
+    def test_administration_liest_die_frueheren_sitzungen_wieder(self) -> None:
+        """Auch für die Administration ist die alte Sitzung wieder lesbar."""
+        self._austreten()
+        self._beitreten()
+
+        self.client.force_login(konto_mit_rollen("root", is_superuser=True))
+
+        self.assertEqual(self.client.get(ansehen_url(self.sitzung)).status_code, 200)
+
     def test_entfernte_tritt_ebenso_wieder_bei(self) -> None:
         """Entfernen ist kein Ausschluss."""
         self._entfernen()

@@ -237,7 +237,7 @@ class FreigebenTests(FreigabeTestCase):
 
         seite: str = self._abschriftseite()
 
-        self.assertIn("Sie sind noch keinem Training beigetreten.", seite)
+        self.assertIn("Sie gehören derzeit keinem Training an.", seite)
         self.assertNotIn("Freigaben speichern", seite)
 
     def test_private_abschrift_bleibt_im_kopf_privat(self) -> None:
@@ -444,7 +444,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
 
 
 class RuhendeFreigabeTests(FreigabeTestCase):
-    """Freigaben für ein verlassenes Training ruhen (ADR-0049)."""
+    """Freigaben ruhen nach dem Austritt aus dem Training (ADR-0049)."""
 
     def _austreten(self, training: Training | None = None) -> None:
         # Tritt als Teilnehmerin über die Trainingsseite aus.
@@ -523,8 +523,17 @@ class RuhendeFreigabeTests(FreigabeTestCase):
 
         self.assertEqual(self._status_fuer(self.ausbilderin), 404)
 
+    def test_abschriftseite_nennt_ausgetretene_nicht_unbeigetreten(self) -> None:
+        """Ohne aktive Bindung und ohne ruhende Freigabe passt der Hinweis auch nach dem Austritt."""
+        self._austreten()
+
+        seite: str = self._abschriftseite()
+
+        self.assertNotIn("noch keinem Training beigetreten", seite)
+        self.assertIn("Sie gehören derzeit keinem Training an.", seite)
+
     def test_abschriftseite_zeigt_ruhende_freigabe_getrennt(self) -> None:
-        """Das verlassene Training steht als ruhend, nicht in der Auswahl."""
+        """Das Training nach dem Austritt steht als ruhend, nicht in der Auswahl."""
         self._freigeben(self.training)
         self._austreten()
 
@@ -631,7 +640,7 @@ class RuhendeFreigabeTests(FreigabeTestCase):
 
         self.assertIn("ruht (ausgetreten)", self._abschriftseite())
 
-    def test_fuer_ein_verlassenes_training_entsteht_keine_neue_freigabe(
+    def test_nach_dem_austritt_entsteht_keine_neue_freigabe(
         self,
     ) -> None:
         """Auch ein manipulierter Formularwert gibt nicht frei."""

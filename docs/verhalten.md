@@ -209,14 +209,14 @@ dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
 ## Austritt aus dem Training
 
 Am Ende der Trainingsseite steht für Trainingsteilnehmer:innen der Abschnitt
-„Austritt“. „Aus dem Training austreten“ klappt eine Erklärung auf: Der Kreis
-sieht die eigenen Sitzungen danach nicht mehr, Freigaben von Abschriften für
-dieses Training ruhen, nichts wird gelöscht, und über den Trainings-Link ist ein
-Wiederbeitritt möglich, solange der Beitritt offen ist. Erst „Austritt
-bestätigen“ tritt aus (nur per POST, sonst 405) und führt mit der Meldung „Sie
-sind aus dem Training … ausgetreten.“ zurück auf die Trainingsseite. Ein zweiter
-Austritt ändert nichts und führt ebenso dorthin; ein Austritt aus einem
-Training, dem das Konto nie beigetreten ist, antwortet mit 404.
+„Austritt aus dem Training“. „Aus dem Training austreten“ klappt eine Erklärung
+auf: Der Kreis sieht die eigenen Sitzungen danach nicht mehr, Freigaben von
+Abschriften für dieses Training ruhen, nichts wird gelöscht, und über den
+Trainings-Link ist ein Wiederbeitritt möglich, solange der Beitritt offen ist.
+Erst „Austritt bestätigen“ tritt aus (nur per POST, sonst 405) und führt mit der
+Meldung „Sie sind aus dem Training … ausgetreten.“ zurück auf die
+Trainingsseite. Ein zweiter Austritt ändert nichts und führt ebenso dorthin; ein
+Austritt aus einem Training, dem das Konto nie beigetreten ist, bekommt 404.
 
 Danach ist die Person keine Trainingsteilnehmer:in mehr:
 
@@ -228,7 +228,8 @@ Danach ist die Person keine Trainingsteilnehmer:in mehr:
   starten“ noch den Austritt. Eigene Sitzungen öffnen sich weiter lesend, auch
   laufende, ohne Denkspur.
 - Vignettenwahl, Einwilligung und Sitzungsstart antworten mit 404; es entsteht
-  keine Sitzung. Das gilt auch, wenn die Person zum Kreis gehört.
+  keine Sitzung. Das gilt auch, wenn die Person zum Kreis gehört, bis sie über
+  den Trainings-Link wieder beitritt.
 - Eine beim Austritt laufende Sitzung bleibt laufend liegen. Gespräch, Beenden,
   Abbrechen, Debrief und Transkription antworten auch aus einem noch offenen Tab
   mit 404 und verändern nichts.
@@ -277,9 +278,14 @@ ohne neu erteilt zu werden; widerrufene bleiben widerrufen. Eine beim Austritt
 liegengebliebene laufende Sitzung lässt sich fortsetzen, solange sie noch in der
 Browser-Session steht.
 
+Das gilt ebenso für Kreis und Administration mit ausgetretener Trainingsbindung:
+Der Trainings-Link belebt auch ihre Bindung wieder.
+
 Ist der Beitritt gesperrt, bekommt die Ausgetretene die Meldung „Beitritt
-gesperrt“ (403) und bleibt ausgetreten. Ein Sitzungsstart belebt die Bindung
-nicht; das geht nur über den Trainings-Link.
+gesperrt“ (403) und bleibt ausgetreten. Kreis und Administration landen bei
+gesperrtem Beitritt wie bisher auf der Trainingsseite, ihre Bindung bleibt aber
+ausgetreten. Ein Sitzungsstart belebt die Bindung nicht; das geht nur über den
+Trainings-Link.
 
 ## Fremdeinsicht im Training
 
@@ -961,12 +967,13 @@ angehakt heißt freigegeben, und der Knopf „Freigaben speichern“. Freigegebe
 wird immer die ganze Abschrift, für beliebig viele Trainings und unabhängig
 davon, ob ihre Vignetten zum Training gehören (ADR-0049). Ein abgewählter Haken
 widerruft die Freigabe sofort. Ein Training ohne eigene Trainingsbindung oder
-mit ausgetretener wird mit 404 abgewiesen; für ein verlassenes Training entsteht
-so keine neue Freigabe. Der Seitenkopf nennt die Trainings, für die die
-Abschrift wirksam freigegeben ist; ohne Freigabe heißt es dort „Ihre Abschrift —
-nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene Trainingsexporte oder zur
-Wiedererkennung durch Forschende gibt es bewusst nicht. Wer noch keinem Training
-beigetreten ist, liest statt der Liste einen Hinweis.
+mit ausgetretener wird mit 404 abgewiesen; nach dem Austritt aus einem Training
+entsteht so keine neue Freigabe dafür. Der Seitenkopf nennt die Trainings, für
+die die Abschrift wirksam freigegeben ist; ohne Freigabe heißt es dort „Ihre
+Abschrift — nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene
+Trainingsexporte oder zur Wiedererkennung durch Forschende gibt es bewusst
+nicht. Wer derzeit keinem Training angehört, liest statt der Liste den Hinweis
+„Sie gehören derzeit keinem Training an.“, außer es gibt ruhende Freigaben.
 
 Nach dem Austritt aus einem Training ruht die Freigabe der Abschrift dafür
 (ADR-0049): Sie wirkt nicht, bleibt aber bestehen und lebt mit einem

@@ -93,7 +93,7 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 
 def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
     """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
-    return Sitzung.objects.fremd_einsehbar(Training.objects.sichtbar_fuer(konto))
+    return Training.objects.sichtbar_fuer(konto).fremd_einsehbare_sitzungen()
 
 
 def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
@@ -618,8 +618,9 @@ def _freigegebene_abschriften(
             ],
         }
         for abschrift in training.freigegebene_abschriften.filter(
-            # Freigaben Ausgetretener ruhen (ADR-0049).
-            konto__in=training.trainingsbindung_set.aktiv().values("konto")
+            pk__in=Abschrift.wirksame_freigaben()
+            .filter(training=training)
+            .values("abschrift")
         )
         .select_related("konto")
         .order_by("importiert_am", "pk")
@@ -720,14 +721,18 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
 
     Wer aktiv dabei ist, landet auch bei gesperrtem Beitritt im Training,
     ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
-    Ausgetretene treten über den offenen Link wieder bei.
+    Ausgetretene treten über den offenen Link wieder bei, auch aus dem Kreis.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    if not Training.objects.sichtbar_fuer(request.user).filter(
-        pk=training.pk
-    ).exists() and not training.beitreten(request.user):
+    kreis: bool = (
+        Training.objects.sichtbar_fuer(request.user).filter(pk=training.pk).exists()
+    )
+    gebunden: bool = training.trainingsbindung_set.filter(konto=request.user).exists()
+    if kreis and not gebunden:
+        return redirect("training:detail", pk=training.pk)
+    if not training.beitreten(request.user) and not kreis:
         return render(
             request,
             "training/beitritt_gesperrt.html",

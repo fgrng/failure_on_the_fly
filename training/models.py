@@ -14,6 +14,7 @@ from vignetten.models import vignette_archiviert
 
 if TYPE_CHECKING:
     from konten.models import Konto
+    from sitzungen.models import SitzungQuerySet
 
 
 _ZUSTANDSWECHSEL_FEHLERMELDUNG = (
@@ -56,6 +57,17 @@ class TrainingQuerySet(
                 .values("training")
             )
             | models.Q(pk__in=Training.objects.sichtbar_fuer(konto).values("pk"))
+        )
+
+    def fremd_einsehbare_sitzungen(self) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf (ADR-0049)."""
+        from sitzungen.models import Sitzung
+
+        return Sitzung.objects.fremd_einsehbar(
+            self,
+            Abschrift.wirksame_freigaben()
+            .filter(training__in=self)
+            .values("abschrift__teilnahme"),
         )
 
 
@@ -255,6 +267,18 @@ class Abschrift(Bindung):
     freigegeben_fuer: models.ManyToManyField = models.ManyToManyField(
         Training, related_name="freigegebene_abschriften", blank=True
     )
+
+    @staticmethod
+    def wirksame_freigaben() -> models.QuerySet:
+        """Die Freigaben, deren Konto genau diesem Training aktiv angehört.
+
+        Die einzige Stelle der Regel aus ADR-0049; jede andere Freigabe ruht.
+        Geliefert werden Zeilen der Zwischentabelle mit `abschrift` und `training`.
+        """
+        return Abschrift.freigegeben_fuer.through.objects.filter(
+            training__trainingsbindung__konto=models.F("abschrift__konto"),
+            training__trainingsbindung__zustand=Trainingsbindung.Zustand.AKTIV,
+        )
 
 
 def _pruefe_finale_vignetten(
