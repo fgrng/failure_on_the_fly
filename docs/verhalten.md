@@ -239,7 +239,8 @@ Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
 Sitzungen, Sitzungen derselben Person in einem fremden Training und jede Sitzung
 für aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in
 der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die
-Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur.
+Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur. Die lesende
+Ansicht zeigt die Diagnose als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
@@ -258,20 +259,26 @@ antwortet auch eine gemerkte Adresse mit 404.
 
 In der Werkzeugleiste über der Tabelle steht rechts der Knopf „Trainingsexport
 (ZIP)“, davor der gedämpfte Hinweis „pseudonym, nicht anonym“; sein Tooltip
-sagt, dass Kennzeichen je Export neu gezogen werden und Freitext nicht
-geschwärzt wird. Der Download heißt `training-<id>-<name>-<UTC-Zeitstempel>.zip`
-und enthält genau die Sitzungen der Fremdeinsicht (ADR-0049): je Person einen
-Ordner mit einem zufälligen Kennzeichen wie `teilnehmer-3f9a01c2`, darin eine
-Markdown-Datei je abgeschlossener Sitzung (`01-brüche-addieren.md`) mit
-Vignettenname, Ausgang, Datum, dem Transkript als Wechsel von Eingabe und
-Äußerung und der Diagnose. Freigegebene Abschriften liegen als Unterordner mit
-dem Erhebungsnamen im Ordner der Person; private und widerrufene fehlen, ebenso
-laufende, abgebrochene und gescheiterte Sitzungen. Das Archiv enthält keine
-Kontodaten, keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und
-keinen Kern; zwei Exporte vergeben verschiedene Kennzeichen. Herunterladen
-dürfen der Kreis und die Administration; fremde Ausbilder:innen bekommen 404,
-Konten ohne Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur
-und unterliegt nicht dem Exportkontrakt aus ADR-0029.
+sagt, dass die Teilnahmekennung statt Namen erscheint, gleich in jedem Export
+dieses Trainings, und Freitext nicht geschwärzt wird. Der Download heißt
+`training-<id>-<name>-<UTC-Zeitstempel>.zip` und enthält genau die Sitzungen der
+Fremdeinsicht (ADR-0049): je Person einen Ordner mit der Teilnahmekennung ihrer
+Trainingsbindung wie `teilnehmer-3f9a01c2`, darin eine Markdown-Datei je
+abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
+Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
+Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im Ordner
+der Person; private und widerrufene fehlen, ebenso laufende, abgebrochene und
+gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten, keine Denkspur,
+keine Fehlversuche, keine Modell-Konfiguration und keinen Kern. Zwei Exporte
+desselben Trainings tragen für dieselbe Person denselben Ordnernamen, auch nach
+Austritt und Wiederbeitritt, weil die Bindung bleibt; in einem anderen Training
+trägt dieselbe Person eine andere Kennung. Die Ordner stehen nach Kennung
+sortiert im Archiv, die Reihenfolge verrät also keine Namen. Tragen zwei
+Personen zufällig dieselbe Kennung, bekommt die später beigetretene eine Zählung
+(`teilnehmer-3f9a01c2-2`). Herunterladen dürfen der Kreis und die
+Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
+unterliegt nicht dem Exportkontrakt aus ADR-0029.
 
 ## Simulationskern
 
@@ -1004,12 +1011,15 @@ Detailseite. Eine fremde Erhebung bleibt dabei unauffindbar. Sobald eine
 Stichprobe besteht, lässt sich an der Erhebung die Datenspur als ZIP mit
 relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
-dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
-zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
-ist damit eine Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile
-nennt die verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem
-Budget bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
+Fehlversuche und Diagnosen. Jede Tabelle, die eine Teilnahme über ihr Token
+ausweist, nennt daneben in der Spalte `teilnahmekennung` deren Teilnahmekennung:
+acht Hexzeichen, beim Anlegen der Teilnahme zufällig gezogen und danach
+unveränderlich. Jeder Gesprächsschritt und jede Diagnose vermerken dabei den
+Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem zusammengesetzt
+wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und ist damit eine
+Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile nennt die
+verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem Budget
+bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
 Vignettenfassung zu lesen. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem
 vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
@@ -1026,6 +1036,55 @@ Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
 Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen«
 von »nie gesehen«. Flüchtige Teilnahmen haben Itemblöcke, aber keine
 Antwortzeilen.
+
+## Einsicht in die Erhebung
+
+Hat eine Erhebung Teilnahmen, die in der Übersicht als Zeile erscheinen, steht
+auf ihrer Detailseite neben dem Export der Link „Einsicht“ (ADR-0049). Die
+Übersicht ist rein lesend und für den Kreis der Erhebung und die Administration
+erreichbar, auch für Teilnahmen von vor der Aufnahme in den Kreis und nach dem
+Archivieren von Stichprobe oder Erhebung. Wer aus dem Kreis ausgetreten ist und
+fremde Forschende bekommen 404, Konten ohne Forschungsrolle 403.
+
+Je Stichprobe zeigt sie ein Raster wie die Fremdeinsicht im Training: eine Zeile
+je Teilnahme, beschriftet mit ihrer Teilnahmekennung und nach Beginn sortiert,
+die älteste oben; Teilnahmen aus der Zeit vor dem Beginndatum gelten als die
+ältesten. Dazu kommt eine Spalte je Vignette in der Reihenfolge der Erhebung.
+Jede Zelle hält höchstens eine Sitzung als runde Bubble mit der gespielten
+Position aus der Vignettenziehung; Tooltip und Screenreader nennen ihren Status.
+Abgeschlossene Sitzungen erscheinen normal, abgebrochene und gescheiterte in
+Warnfarbe, laufende gedimmt. Flüchtige Teilnahmen zeigen nur umrandete Bubbles,
+und ihre Zeile trägt den Hinweis „flüchtig, nur Ablaufgerüst“. Eingewilligte
+Teilnahmen ohne Sitzung stehen mit „noch keine Sitzung“ in der Liste;
+Teilnahmen, die Einwilligung a abgelehnt oder noch nicht gegeben haben, fehlen.
+Eine Stichprobe ohne solche Zeilen zeigt „Noch keine Teilnahme mit
+Einwilligung.“ Das Teilnahme-Token steht nirgends auf der Seite.
+
+Die Bubbles abgeschlossener, abgebrochener und gescheiterter Sitzungen nicht
+flüchtiger Teilnahmen sind Links auf die Sitzungsansicht unter
+`eigene/<pk>/einsicht/sitzungen/<sitzung_pk>/`; laufende und flüchtige Bubbles
+sind es nicht. Die Sitzungsansicht zeigt im Kopf Teilnahmekennung, Stichprobe,
+Vignette und Status und führt zurück zur Übersicht. Darunter steht die Sitzung
+rein lesend so, wie die Teilnehmer:in sie gesehen hat: Rahmenhandlung,
+Transkript in gespielter Reihenfolge und bei abgeschlossenen Sitzungen Debrief
+und abgegebene Diagnose, ohne Diagnose „Keine Diagnose abgegeben.“. Anders als
+für die Teilnehmer:in liegt unter jedem Gesprächsschritt die Denkspur,
+eingeklappt unter „Denkspur ansehen“ wie im Probelauf, und unter der Sitzung
+stehen die Antworten auf den abgeschickten Item-Block nach dieser Sitzung, mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items. Fehlversuche,
+das Teilnahme-Token, Formulare und Aktionen erscheinen nicht. Laufende
+Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die nicht zur Erhebung
+aus der URL gehören, antworten mit 404.
+
+Hinter den Vignetten steht die Spalte „Abschluss“. Hat eine nicht flüchtige
+Teilnahme ihren Item-Block am Ende abgeschickt, steht dort eine verlinkte
+Bubble; sonst ein Strich. Sie führt auf die Abschlussseite unter
+`eigene/<pk>/einsicht/teilnahmen/<teilnahme_pk>/abschluss/`. Die Seite nennt
+Teilnahmekennung und Stichprobe, zeigt die Antworten des Blocks rein lesend mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items und führt
+zurück zur Übersicht. Das Teilnahme-Token erscheint auch hier nicht. Flüchtige
+Teilnahmen, nicht abgeschickte Blöcke und Teilnahmen, die nicht zur Erhebung aus
+der URL gehören, antworten mit 404.
 
 ## Fragebogen-Items verwalten
 

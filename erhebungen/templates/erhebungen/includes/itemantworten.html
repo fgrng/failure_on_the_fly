@@ -1,0 +1,7 @@
+{# Die Antworten eines Item-Blocks, lesend; ohne Antwort ein Strich. #}
+<dl class="itemantworten">
+    {% for antwort in antworten %}
+        <dt>{{ antwort.erhebungsitem.item.wortlaut }}</dt>
+        <dd>{{ antwort.antworttext|default:"–"|linebreaksbr }}</dd>
+    {% endfor %}
+</dl>

@@ -148,7 +148,15 @@ def _forschenden_routen() -> list[tuple[str, dict[str, object]]]:
 
 _FORSCHENDEN_ROUTEN: list[tuple[str, dict[str, object]]] = _forschenden_routen()
 # Routen unter ``eigene/``, die GET annehmen; jede andere muss POST verlangen.
-_LESEROUTEN: set[str] = {"liste", "anlegen", "detail", "export"}
+_LESEROUTEN: set[str] = {
+    "liste",
+    "anlegen",
+    "detail",
+    "export",
+    "einsicht",
+    "einsicht_sitzung",
+    "einsicht_abschluss",
+}
 
 
 @pytest.mark.django_db
@@ -2413,6 +2421,80 @@ class ErhebungsExportTests(TestCase):
             },
         )
 
+    def test_fuehrt_die_teilnahmekennung_neben_jedem_token(self) -> None:
+        """Jede Zeile mit Token nennt daneben die gespeicherte Teilnahmekennung."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = Erhebung.objects.anlegen(ada, name="Kennung")
+        zuordnung: Erhebungsitem = _item_zuordnen(
+            erhebung,
+            _finales_item_anlegen(ada, "Was ist Ihnen aufgefallen?"),
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+            1,
+        )
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
+        bindungen: list[Erhebungsbindung] = [
+            _laufende_bindung(erhebung, f"2345-678{nummer}") for nummer in range(1, 3)
+        ]
+        for bindung in bindungen:
+            Vignettenziehung.objects.create(
+                erhebungsbindung=bindung, vignette=vignette, position=1
+            )
+            sitzung: Sitzung = Sitzung.objects.create(
+                teilnahme=bindung.teilnahme,
+                vignette=vignette,
+                simulationskern=kern,
+                modell_konfiguration=konfiguration,
+            )
+            Vignettenposition.objects.create(
+                teilnahme=bindung.teilnahme,
+                sitzung=sitzung,
+                vignette=vignette,
+                position=1,
+            )
+            ItemAntwort.objects.create(
+                itemblock=Itemblock.objects.create(
+                    erhebungsbindung=bindung,
+                    andockpunkt=Erhebungsitem.Andockpunkt.AM_ENDE,
+                ),
+                erhebungsbindung=bindung,
+                erhebungsitem=zuordnung,
+            )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        kennungen: set[tuple[str, str, str]] = {
+            (
+                datei,
+                zeile.get("token") or zeile["teilnahme_token"],
+                zeile["teilnahmekennung"],
+            )
+            for datei, zeilen in archiv.items()
+            for zeile in zeilen
+            if "token" in zeile or "teilnahme_token" in zeile
+        }
+        self.assertEqual(
+            kennungen,
+            {
+                (datei, bindung.token, bindung.teilnahme.kennung)
+                for datei in (
+                    "teilnahmen.csv",
+                    "vignettenziehungen.csv",
+                    "sitzungen.csv",
+                    "itembloecke.csv",
+                    "item_antworten.csv",
+                )
+                for bindung in bindungen
+            },
+        )
+
     def test_exportiert_die_verbrauchte_zeit_in_sekunden(self) -> None:
         """Die verbrauchte Zeit ist Datenspur (ADR-0012)."""
 
@@ -2752,6 +2834,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "id": str(bloecke[0].pk),
                     "teilnahme_token": "2345-6781",
+                    "teilnahmekennung": bindungen[0].teilnahme.kennung,
                     "andockpunkt": "nach_sitzung",
                     "sitzung_id": str(bloecke[0].sitzung_id),
                     "vorgelegt_am": "2026-07-01T08:00:00+00:00",
@@ -2760,6 +2843,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "id": str(bloecke[1].pk),
                     "teilnahme_token": "2345-6781",
+                    "teilnahmekennung": bindungen[0].teilnahme.kennung,
                     "andockpunkt": "am_ende",
                     "sitzung_id": "NA",
                     "vorgelegt_am": "2026-07-01T08:00:00+00:00",
@@ -2768,6 +2852,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "id": str(bloecke[2].pk),
                     "teilnahme_token": "2345-6782",
+                    "teilnahmekennung": bindungen[1].teilnahme.kennung,
                     "andockpunkt": "nach_sitzung",
                     "sitzung_id": str(bloecke[2].sitzung_id),
                     "vorgelegt_am": "2026-07-01T08:00:00+00:00",
@@ -2776,6 +2861,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "id": str(bloecke[3].pk),
                     "teilnahme_token": "2345-6782",
+                    "teilnahmekennung": bindungen[1].teilnahme.kennung,
                     "andockpunkt": "am_ende",
                     "sitzung_id": "NA",
                     "vorgelegt_am": "2026-07-01T08:00:00+00:00",
@@ -2885,6 +2971,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "itemblock_id": str(block_nach_sitzung.pk),
                     "teilnahme_token": "2345-6789",
+                    "teilnahmekennung": bindung.teilnahme.kennung,
                     "item_id": str(freitext_item.pk),
                     "item_typ": "freitext",
                     "andockpunkt": "nach_sitzung",
@@ -2896,6 +2983,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "itemblock_id": str(block_nach_sitzung.pk),
                     "teilnahme_token": "2345-6789",
+                    "teilnahmekennung": bindung.teilnahme.kennung,
                     "item_id": str(likert_item.pk),
                     "item_typ": "likert",
                     "andockpunkt": "nach_sitzung",
@@ -2907,6 +2995,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "itemblock_id": str(block_am_ende.pk),
                     "teilnahme_token": "2345-6789",
+                    "teilnahmekennung": bindung.teilnahme.kennung,
                     "item_id": str(freitext_item.pk),
                     "item_typ": "freitext",
                     "andockpunkt": "am_ende",
@@ -2918,6 +3007,7 @@ class ErhebungsExportTests(TestCase):
                 {
                     "itemblock_id": str(block_am_ende.pk),
                     "teilnahme_token": "2345-6789",
+                    "teilnahmekennung": bindung.teilnahme.kennung,
                     "item_id": str(likert_item.pk),
                     "item_typ": "likert",
                     "andockpunkt": "am_ende",

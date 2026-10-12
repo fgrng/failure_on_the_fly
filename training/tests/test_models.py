@@ -1,5 +1,7 @@
 """ORM-Tests für Trainings."""
 
+import re
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -152,6 +154,18 @@ def test_teilnahme_traegt_hoechstens_eine_trainingsbindung() -> None:
             training=Training.objects.anlegen(grace, name="Addition"),
             konto=grace,
         )
+
+
+@pytest.mark.django_db
+def test_bindung_vergibt_eine_teilnahmekennung_aus_acht_hexzeichen() -> None:
+    """Auch die Teilnahme einer Trainingsbindung trägt ihre Kennung."""
+
+    ada: Konto = Konto.objects.create_user(username="ada")
+    training: Training = Training.objects.anlegen(ada, name="Bruchrechnung")
+
+    bindung: Trainingsbindung = training.bindung_fuer(ada)
+
+    assert re.fullmatch(r"[0-9a-f]{8}", bindung.teilnahme.kennung)
 
 
 @pytest.mark.django_db

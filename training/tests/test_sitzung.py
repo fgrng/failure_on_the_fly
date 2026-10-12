@@ -351,6 +351,50 @@ class TrainingssitzungTests(TestCase):
         self.assertNotContains(response, "Ihre nächste Frage")
         self.assertNotContains(response, "Spracheingabe starten")
 
+    def _abgeschlossene_sitzung_ansehen(self) -> str:
+        """Schließt eine Sitzung mit Diagnose ab und liefert ihren Seiteninhalt."""
+        self._sitzung_starten(
+            [{"denkspur": "Interne Denkspur", "aeusserung": "Ich addiere alles."}]
+        )
+        self.client.post(reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"})
+        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(
+            reverse("training:debrief"), {"diagnose": "Mia addiert Zähler und Nenner."}
+        )
+        inhalt: str = self.client.get(
+            reverse("training:sitzung_ansehen", args=[Sitzung.objects.get().pk])
+        ).content.decode()
+        # Ohne die Navigation, deren Abmelden ein Formular ist.
+        return inhalt[inhalt.index('<article class="sitzung-seite"') :]
+
+    def test_vergangene_sitzung_zeigt_die_diagnose_als_text(self) -> None:
+        """Die lesende Ansicht nennt die abgegebene Diagnose."""
+        self.assertRegex(
+            self._abgeschlossene_sitzung_ansehen(),
+            r"<p[^>]*>Mia addiert Zähler und Nenner.</p>",
+        )
+
+    def test_vergangene_sitzung_ohne_diagnose(self) -> None:
+        """Fehlt die Diagnose, sagt die lesende Ansicht das ausdrücklich."""
+        self._sitzung_starten([])
+        sitzung: Sitzung = Sitzung.objects.get()
+        sitzung.status = Sitzung.Status.ABGESCHLOSSEN
+        sitzung.save()
+
+        response: HttpResponse = self.client.get(
+            reverse("training:sitzung_ansehen", args=[sitzung.pk])
+        )
+
+        self.assertContains(response, "Keine Diagnose abgegeben.")
+
+    def test_vergangene_sitzung_zeigt_kein_diagnoseformular(self) -> None:
+        """Die lesende Ansicht hat keine Formulare."""
+        seite: str = self._abgeschlossene_sitzung_ansehen()
+
+        for element in ("<form", "<textarea", "<button"):
+            with self.subTest(element=element):
+                self.assertNotIn(element, seite)
+
     def test_vergangene_sitzung_anderer_konten_nicht_einsehbar(self) -> None:
         """Fremde Sitzungen bleiben durch 404 geschützt."""
         self._sitzung_starten([])

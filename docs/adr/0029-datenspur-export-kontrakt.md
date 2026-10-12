@@ -62,14 +62,14 @@ Pfade statt als Inhalt.
 | --- | --- |
 | `erhebung.csv` | `id`, `name`, `randomisierung`, `instruktionstext`, `einwilligungstext`, `abschlusstext`, `modell_konfiguration_id` |
 | `stichproben.csv` | `id`, `beginn`, `ende`, `archiviert` |
-| `teilnahmen.csv` | `token`, `stichprobe_id`, `sprachmodell_eingewilligt`, `audioverarbeitung_eingewilligt`, `speicherung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
-| `vignettenziehungen.csv` | `token`, `vignette_id`, `position` |
-| `sitzungen.csv` | `id`, `token`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
+| `teilnahmen.csv` | `token`, `teilnahmekennung`, `stichprobe_id`, `sprachmodell_eingewilligt`, `audioverarbeitung_eingewilligt`, `speicherung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
+| `vignettenziehungen.csv` | `token`, `teilnahmekennung`, `vignette_id`, `position` |
+| `sitzungen.csv` | `id`, `token`, `teilnahmekennung`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am`, `eingabemodus` |
-| `itembloecke.csv` | `id`, `teilnahme_token`, `andockpunkt`, `sitzung_id`, `vorgelegt_am`, `erledigt_am` |
-| `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
+| `itembloecke.csv` | `id`, `teilnahme_token`, `teilnahmekennung`, `andockpunkt`, `sitzung_id`, `vorgelegt_am`, `erledigt_am` |
+| `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `teilnahmekennung`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
 | `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter` |

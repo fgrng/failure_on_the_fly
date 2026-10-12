@@ -44,6 +44,11 @@ class LikertSkalenpol(models.TextChoices):
         """Liefert die globale Stufe eines Skalenpols."""
         return list(cls).index(pol) + 1
 
+    @classmethod
+    def pol_fuer(cls, stufe: int) -> "LikertSkalenpol":
+        """Liefert den Skalenpol einer globalen Stufe."""
+        return list(cls)[stufe - 1]
+
 
 class FragebogenItemHistorieQuerySet(
     EigentuemerKreisQuerySet["FragebogenItemHistorie"],

@@ -1,0 +1,26 @@
+{% extends "sitzungen/sitzung.html" %}
+
+{% block title %}Einsicht · {{ erhebung.name }}{% endblock %}
+
+{% block sitzung_kopf %}
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen / <a href="{% url 'erhebungen:detail' erhebung.pk %}">{{ erhebung.name }}</a> / <a href="{{ uebersicht_url }}">Einsicht</a></p>
+            <h1>{{ sitzung.vignette.anzeigename }}</h1>
+            <p>Teilnahme <code>{{ sitzung.teilnahme.kennung }}</code> · Stichprobe {{ stichprobe.beginn|date:"d.m.Y" }} – {{ stichprobe.ende|date:"d.m.Y" }} · {{ sitzung.get_status_display }}</p>
+        </div>
+    </header>
+{% endblock %}
+
+{% block sitzung_fuss %}
+    {% if antworten %}
+        <section class="sitzung-abschnitt sitzung-anhang" aria-labelledby="einsicht-items-titel">
+            <header class="sitzung-abschnitt-kopf">
+                <span>Erhebung · Fragebogen</span>
+                <h1 id="einsicht-items-titel">Fragen zu dieser Sitzung</h1>
+            </header>
+            {% include "erhebungen/includes/itemantworten.html" %}
+        </section>
+    {% endif %}
+    <p><a href="{{ uebersicht_url }}">Zurück zur Einsicht</a></p>
+{% endblock %}
