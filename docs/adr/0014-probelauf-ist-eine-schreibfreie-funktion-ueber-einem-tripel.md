@@ -23,3 +23,9 @@ Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegesprä
 ## Nachführung (Grilling, Issue #285): Evalläufe
 
 Der Satz „Das System weiß nicht, ob eine Vignette je getestet wurde“ gilt nicht mehr ganz. Neben dem Probelauf gibt es den **Evallauf** (ADR-0046): automatisch, im Hintergrund (ADR-0047) und aufbewahrt. Das System weiß damit, ob für eine Vignettenfassung ein Evallauf existiert und wie er ausging; es erzwingt weiterhin nichts. Der Probelauf selbst bleibt unverändert schreibfrei und nutzt die Modell-Konfiguration der Verwendung *Schüler:in* (ADR-0013).
+
+## Nachführung (Triage, Issue #61): zulässige Fassungen
+
+Die Autor:in wählt nicht nur ihren Entwurf, sondern eine **eigene Fassung im Zustand Entwurf oder final**; die Detailansicht bot den Probelauf für finale Fassungen ohnehin schon an. Eine archivierte Fassung ist nicht mehr spielbar und startet keinen Probelauf. Die Administrator:in nimmt als Vignette weiterhin nur eine finale.
+
+Diese Zustandsprüfung gilt nur beim **Start**. Ein laufender Probelauf setzt seine Fassung fort, auch wenn sie inzwischen archiviert wurde: Er schreibt nichts, und „nicht mehr spielbar“ meint den Start neuer Läufe. Das Fortsetzen prüft nur noch den Zugriff: bei der Autor:in den Eigentümer-Kreis, bei der Administrator:in die Existenz der Fassung.

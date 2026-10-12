@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    finale_vignette,
     finaler_kern,
     konto_mit_rollen,
     vignetten_entwurf,
@@ -93,10 +94,10 @@ class _ProbelaufAufbau(TestCase):
 class ProbelaufStartTests(_ProbelaufAufbau):
     """Die HTTP-Naht startet einen Probelauf über einem festen Tripel."""
 
-    def test_auswahl_zeigt_nur_eigene_entwuerfe_und_startet_rahmenhandlung(
+    def test_auswahl_zeigt_nur_eigene_vignetten_und_startet_rahmenhandlung(
         self,
     ) -> None:
-        """Der Start zeigt nur eigene Entwürfe an und rendert die Rahmenhandlung."""
+        """Der Start zeigt nur eigene Vignetten an und rendert die Rahmenhandlung."""
 
         auswahl: HttpResponse = self.client.get(reverse("sitzungen:probelauf_auswahl"))
 
@@ -164,6 +165,52 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "begleitet Sie bei Mathematik in Klasse 5.")
         self.assertContains(response, "zeigt Ihnen die Bearbeitung.")
+
+    def test_auswahl_zeigt_eigene_finale_aber_keine_archivierte_fassung(
+        self,
+    ) -> None:
+        """Wählbar sind eigene Entwürfe und finale Fassungen (ADR-0014, #61)."""
+
+        finale_vignette(self.ada, name="Eigene Finale")
+        finale_vignette(self.ada, name="Eigene Archivierte").archivieren()
+        finale_vignette(konto_mit_rollen("linus"), name="Fremde Finale")
+
+        auswahl: HttpResponse = self.client.get(reverse("sitzungen:probelauf_auswahl"))
+
+        self.assertContains(auswahl, "Eigener Entwurf")
+        self.assertContains(auswahl, "Eigene Finale")
+        self.assertNotContains(auswahl, "Eigene Archivierte")
+        self.assertNotContains(auswahl, "Fremde Finale")
+
+    def test_eigene_finale_fassung_startet_mit_ihrem_gepinnten_kern(self) -> None:
+        """Auch die eigene finale Fassung lässt sich im Probelauf spielen."""
+
+        finale: Vignette = finale_vignette(self.ada)
+        nachfolger: Simulationskern = self.kern.bearbeiten()
+        nachfolger.rahmenhandlung_gespraechseinleitung = "Neuer Kern."
+        nachfolger.save()
+        nachfolger.finalisieren()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[finale.pk])
+        )
+
+        self.assertContains(response, "zeigt Ihnen die Bearbeitung.")
+        self.assertNotContains(response, "Neuer Kern.")
+        self.assertTrue(probelauf_laeuft(self.client.session))
+
+    def test_archivierte_fassung_startet_nicht(self) -> None:
+        """Eine archivierte Fassung ist nicht mehr spielbar."""
+
+        archivierte: Vignette = finale_vignette(self.ada)
+        archivierte.archivieren()
+
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[archivierte.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(probelauf_laeuft(self.client.session))
 
     def test_rahmenhandlung_erscheint_als_szenentext_mit_woertlichen_werten(
         self,
@@ -342,6 +389,22 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.entwurf.budget_typ = budget_typ
         self.entwurf.budget_wert = budget_wert
         self.entwurf.save()
+
+    def test_laufender_probelauf_ueberdauert_archivieren(self) -> None:
+        """Wird die Fassung während des Laufs archiviert, läuft er weiter."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        finale: Vignette = finale_vignette(self.ada)
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[finale.pk]))
+        finale.archivieren()
+
+        gespraech: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
+        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+
+        self.assertContains(gespraech, "Ich addiere einfach alles.")
+        self.assertContains(debrief, "fragt nach Ihrer Diagnose.")
 
     def _geglueckte_neben_fehlschlag_anlegen(self) -> ModellKonfiguration:
         # Belegt die Schülerin mit dem Fehlschlag und liefert eine geglückte
@@ -786,6 +849,18 @@ class AdministratorinProbelaufTests(TestCase):
         self.gepinnter_kern_pk: int = self.vignette.gepinnter_kern_id
         self.client.force_login(self.administratorin)
 
+    def _frei_starten(self, vignette: Vignette) -> HttpResponse:
+        """Startet den freien Probelauf mit Kern-Entwurf und Testkonfiguration."""
+
+        return self.client.post(
+            reverse("sitzungen:administratorin_probelauf_starten"),
+            {
+                "kern_pk": self.kern_entwurf.pk,
+                "modell_konfiguration_pk": self.test_konfiguration.pk,
+                "vignette_pk": vignette.pk,
+            },
+        )
+
     def test_administratorin_startet_freies_tripel_ohne_vignetten_pin_oder_aktive_konfiguration_zu_aendern(
         self,
     ) -> None:
@@ -843,6 +918,30 @@ class AdministratorinProbelaufTests(TestCase):
             ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN),
             self.test_konfiguration,
         )
+
+    def test_laufender_probelauf_ueberdauert_archivieren(self) -> None:
+        """Wird die Vignette während des Laufs archiviert, läuft er weiter."""
+
+        self._frei_starten(self.vignette)
+        self.vignette.archivieren()
+
+        gespraech: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"}
+        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+
+        self.assertContains(gespraech, "Sie zählt Zähler und Nenner.")
+        self.assertContains(debrief, "Weber beendet den Probelauf.")
+
+    def test_entwurf_und_archivierte_vignette_starten_nicht(self) -> None:
+        """Der freie Auswähler nimmt als Vignette nur eine finale (ADR-0014)."""
+
+        entwurf: Vignette = vignetten_entwurf(konto_mit_rollen("grace"))
+        self.vignette.archivieren()
+
+        for vignette in (entwurf, self.vignette):
+            with self.subTest(zustand=vignette.zustand):
+                self.assertEqual(self._frei_starten(vignette).status_code, 404)
 
     def test_nicht_administratorin_erreicht_freien_auswaehler_nicht(self) -> None:
         """Der administrative Einstieg ist ausschließlich der Group vorbehalten."""

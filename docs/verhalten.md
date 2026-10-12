@@ -163,6 +163,14 @@ nennt den Grund, die Eingaben bleiben stehen. Wer die Seite mit ungespeicherten
 Änderungen verlässt, wird vom Browser gewarnt. Die Bildbeschreibung bleibt Teil
 der Bildkarte.
 
+Den Probelauf startet eine Autor:in über eine eigene Fassung im Zustand Entwurf
+oder final, aus der Detailansicht oder von der Probelauf-Auswahl, die beide samt
+Zustand listet. Eine archivierte Fassung ist nicht mehr spielbar; auch ein
+direkter Start über sie scheitert. Administrator:innen wählen im freien
+Probelauf Kern und Modell-Konfiguration beliebig, als Vignette nur eine finale.
+Wird die Fassung während eines laufenden Probelaufs archiviert, läuft er bis zum
+Debrief weiter.
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;

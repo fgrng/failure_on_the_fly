@@ -44,20 +44,16 @@ if TYPE_CHECKING:
     from konten.models import Konto
 
 
-def _eigene_entwuerfe(konto: "Konto") -> QuerySet[Vignette]:
-    """Liefert die Entwürfe aus dem Eigentümer-Kreis eines Kontos."""
+def _startbare_eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
+    """Liefert die eigenen Entwürfe und finalen Fassungen für den Start (ADR-0014)."""
 
     return Vignette.objects.sichtbar_fuer(konto).filter(
-        zustand=Vignette.Zustand.ENTWURF
+        zustand__in=[Vignette.Zustand.ENTWURF, Vignette.Zustand.FINAL]
     )
 
 
-def _eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
-    """Liefert alle Fassungen aus dem Eigentümer-Kreis eines Kontos.
-
-    Ein Probelauf ist schreibfrei; deshalb darf er über jede eigene
-    Fassung laufen – Entwurf wie finalisiert oder archiviert.
-    """
+def _fortsetzbare_eigene_vignetten(konto: "Konto") -> QuerySet[Vignette]:
+    """Liefert jede Fassung des Eigentümer-Kreises, auch archivierte (ADR-0014)."""
 
     return Vignette.objects.sichtbar_fuer(konto)
 
@@ -71,11 +67,15 @@ def _administratorin_erforderlich(request: HttpRequest) -> HttpResponse | None:
 
 
 def _probelauf_vignetten(konto: "Konto", sink: ScratchSink) -> QuerySet[Vignette]:
-    """Begrenzt Vignetten passend zum gewählten Probelauf-Einstieg."""
+    """Begrenzt Vignetten passend zum gewählten Probelauf-Einstieg.
+
+    Den Zustand prüft nur der Start; ein laufender Probelauf überdauert das
+    Archivieren seiner Vignette.
+    """
 
     if sink.freie_auswahl:
-        return Vignette.objects.einbindbar()
-    return _eigene_vignetten(konto)
+        return Vignette.objects.all()
+    return _fortsetzbare_eigene_vignetten(konto)
 
 
 def _probelauf_vignette_und_kern(
@@ -187,12 +187,12 @@ def _probelauf_starten(
 
 @login_required
 def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
-    """Zeigt einer Autorin ausschließlich ihre wählbaren Vignettenentwürfe."""
+    """Zeigt einer Autorin ihre Entwürfe und finalen Fassungen zur Wahl."""
 
-    entwuerfe: QuerySet[Vignette] = _eigene_entwuerfe(request.user).select_related(
-        "historie"
-    )
-    return render(request, "sitzungen/probelauf_auswahl.html", {"entwuerfe": entwuerfe})
+    vignetten: QuerySet[Vignette] = _startbare_eigene_vignetten(
+        request.user
+    ).select_related("historie")
+    return render(request, "sitzungen/probelauf_auswahl.html", {"vignetten": vignetten})
 
 
 @login_required
@@ -202,7 +202,7 @@ def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     vignette: Vignette = get_object_or_404(
-        _eigene_vignetten(request.user).select_related("gepinnter_kern"),
+        _startbare_eigene_vignetten(request.user).select_related("gepinnter_kern"),
         pk=pk,
     )
     kern: Simulationskern = vignette.gepinnter_kern

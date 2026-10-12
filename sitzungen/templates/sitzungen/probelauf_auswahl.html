@@ -5,16 +5,16 @@
 {% block content %}
     <h1>Probelauf starten</h1>
     <ul>
-        {% for entwurf in entwuerfe %}
+        {% for vignette in vignetten %}
             <li>
-                {{ entwurf.historie.name }}
-                <form method="post" action="{% url 'sitzungen:probelauf_starten' entwurf.pk %}">
+                {{ vignette.historie.name }} ({{ vignette.get_zustand_display }})
+                <form method="post" action="{% url 'sitzungen:probelauf_starten' vignette.pk %}">
                     {% csrf_token %}
                     <button type="submit">Probelauf starten</button>
                 </form>
             </li>
         {% empty %}
-            <li>Keine Vignettenentwürfe vorhanden.</li>
+            <li>Keine Vignettenentwürfe oder finalen Fassungen vorhanden.</li>
         {% endfor %}
     </ul>
 {% endblock %}
