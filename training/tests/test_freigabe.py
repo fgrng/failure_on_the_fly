@@ -423,7 +423,7 @@ class FremdeinsichtInAbschriftenTests(FreigabeTestCase):
         self.assertNotContains(response, "Brüche kürzen")
 
     def test_fremde_vignette_ist_im_detail_nicht_erreichbar(self) -> None:
-        """Der Bestand schützt die Vignette weiter (ADR-0015)."""
+        """Der Bestand schützt die Vignette weiter (ADR-0039)."""
         self.ausbilderin.groups.add(Group.objects.get(name=AUTORIN_GRUPPE))
         self._freigeben(self.training)
         self.client.force_login(self.ausbilderin)

@@ -57,7 +57,7 @@ def test_austritt_entfernt_solange_eine_eigentuemerin_bleibt(
 def test_austritt_der_letzten_eigentuemerin_aendert_nichts(
     modell: type[EigentuemerKreis],
 ) -> None:
-    """Der letzte Platz im Kreis bleibt besetzt (ADR-0032)."""
+    """Der letzte Platz im Kreis bleibt besetzt (ADR-0039)."""
     ada: Konto = Konto.objects.create_user(username="ada")
     bestand: EigentuemerKreis = modell.objects.anlegen(ada)
 

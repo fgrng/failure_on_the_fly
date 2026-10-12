@@ -1,4 +1,4 @@
-"""Lebenszyklus und Vertrag des Evalkatalogs (ADR-0046, ADR-0035, ADR-0010)."""
+"""Lebenszyklus und Vertrag des Evalkatalogs (ADR-0046, ADR-0035, ADR-0054)."""
 
 from collections.abc import Callable
 
@@ -644,7 +644,7 @@ def test_vorlage_ausserhalb_ihres_vertrags_wird_nicht_final(
 
 @pytest.mark.django_db
 def test_promptvertrag_passt_in_beide_vorlagen_verlauf_nur_zum_bewerter() -> None:
-    """Die Prompt-Spalte aus ADR-0010 passt in beide Vorlagen, `$verlauf` nur
+    """Die Prompt-Spalte aus ADR-0054 passt in beide Vorlagen, `$verlauf` nur
     in die des Bewerters; die Lehrperson führt das Gespräch nativ (ADR-0052)."""
 
     gemeinsam: str = (

@@ -369,7 +369,7 @@ Importzeitpunkt, und verlinkt ihre abgeschlossenen Sitzungen untereinander. Ohne
 Freigaben steht dort „Niemand hat eine Abschrift freigegeben.“ Eine solche
 Sitzung öffnet sich lesend wie eine Trainingssitzung, ohne Denkspur und samt der
 gespielten Szene ihrer Vignette, auch wenn die Vignette dem Kreis nicht gehört
-(dritte Ausnahme in ADR-0015). Im Vignettenbestand des Kreises erscheint sie
+(dritte Ausnahme in ADR-0039). Im Vignettenbestand des Kreises erscheint sie
 nicht, und aufnehmen lässt sie sich nicht. Eine nicht freigegebene Abschrift
 erscheint in keiner Fremdeinsicht, auch nicht für die Administration; nach dem
 Widerruf oder dem Löschen der Abschrift antwortet auch eine gemerkte Adresse mit
