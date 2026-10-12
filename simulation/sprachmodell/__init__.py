@@ -5,8 +5,6 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Any, Callable, Protocol
 
-import litellm
-
 
 SCHUELERIN_SCHEMA: dict[str, object] = {
     "type": "object",
@@ -177,7 +175,14 @@ class LiteLLMSprachmodell:
 
         self.modell: str = modell
         self.parameter: dict[str, Any] = dict(parameter)
-        self.completion: Callable[..., Any] = completion or litellm.completion
+        if completion is None:
+            # LiteLLM erst beim ersten echten Adapter laden: Der Import kostet
+            # rund zwei Sekunden, und `simulation` lädt dieses Modul bei jedem
+            # Django-Start, also in jedem Test- und manage.py-Prozess.
+            import litellm
+
+            completion = litellm.completion
+        self.completion: Callable[..., Any] = completion
 
     def antworten(
         self,
@@ -193,6 +198,8 @@ class LiteLLMSprachmodell:
         # Allowlist der Mikro-Stellschrauben und überschreibt einen dort
         # dennoch gelandeten Wert.
         aufrufparameter: dict[str, Any] = {**self.parameter, "timeout": timeout}
+
+        import litellm
 
         try:
             modellantwort = self.completion(

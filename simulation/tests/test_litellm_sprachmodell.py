@@ -148,7 +148,7 @@ def test_antwort_versuchen_bildet_litellm_adapter_aus_modell_konfiguration() -> 
         )
     )
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwortversuch = antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -368,7 +368,7 @@ def _gesendete_nachrichten(kern: Simulationskern) -> list[dict[str, str]]:
     # Die Nachrichten eines Antwortversuchs nach einem Gesprächswechsel.
 
     completion: Mock = _geglueckte_completion()
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwort_versuchen(
             {"fehlermuster": "Brüche werden addiert.", "lernauftrag": "Addiere."},
             kern,
@@ -424,7 +424,7 @@ def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> N
 
     completion: Mock = _geglueckte_completion()
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -449,7 +449,7 @@ def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
 
     completion: Mock = _geglueckte_completion()
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -476,7 +476,7 @@ def test_antwort_versuchen_fordert_die_denkspur_vor_der_aeusserung_an() -> None:
 
     completion: Mock = _geglueckte_completion()
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -498,7 +498,7 @@ def test_antwort_versuchen_waehlt_den_fake_adapter_ueber_das_anbieterfeld() -> N
 
     completion: Mock = _geglueckte_completion()
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwortversuch = antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -551,7 +551,7 @@ def test_antwort_versuchen_teilt_eine_frist_ueber_alle_versuche(
     monkeypatch.setattr("simulation.time.monotonic", uhr)
     completion = _haengender_anbieter(uhr, 54.0)
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwortversuch = antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
@@ -589,7 +589,7 @@ def test_ausgabe_versuchen_teilt_die_frist_auch_fuer_den_bewerter(
     monkeypatch.setattr("simulation.time.monotonic", uhr)
     completion = _haengender_anbieter(uhr, 54.0)
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         ausgabeversuch = ausgabe_versuchen(
             "Du bewertest.",
             ModellKonfiguration(
@@ -622,7 +622,7 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
     monkeypatch.setattr("simulation.time.monotonic", _Testuhr(schritt=89.5))
     completion = Mock(side_effect=TimeoutError("Der Anbieter antwortete nicht."))
 
-    with patch("simulation.sprachmodell.litellm.completion", completion):
+    with patch("litellm.completion", completion):
         antwort_versuchen(
             {"lernauftrag": "Addiere zwei Brüche."},
             Simulationskern(user_prompt_vorlage="$lernauftrag"),
