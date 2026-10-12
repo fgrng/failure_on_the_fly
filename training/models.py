@@ -10,11 +10,12 @@ from django.db.models.signals import post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
 from konten.navigation import AUSBILDERIN_GRUPPE
-from sitzungen.bindungen import Bindung
+from sitzungen.bindungen import Bindung, BindungQuerySet
 from vignetten.models import vignette_archiviert
 
 if TYPE_CHECKING:
     from konten.models import Konto
+    from sitzungen.models import SitzungQuerySet
     from vignetten.models import Vignette
 
 
@@ -39,20 +40,36 @@ class TrainingQuerySet(
         return self.filter(zustand=Training.Zustand.VEROEFFENTLICHT)
 
     def beigetreten_von(self, konto: "Konto") -> models.QuerySet["Training"]:
-        """Liefert die Trainings, an denen das Konto eine Trainingsbindung hat."""
-        return self.filter(trainingsbindung__konto=konto)
+        """Liefert die Trainings, an denen das Konto eine aktive Trainingsbindung hat."""
+        return self.filter(
+            trainingsbindung__konto=konto,
+            trainingsbindung__zustand=Trainingsbindung.Zustand.AKTIV,
+        )
 
     def zugaenglich_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
         """Liefert die Trainings, die das Konto betreten darf (ADR-0049).
 
-        Teilnehmende erreichen ein Training nur über ihre Trainingsbindung;
-        Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
+        Teilnehmende erreichen ein Training nur über ihre aktive
+        Trainingsbindung; Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
         """
         return self.filter(
             models.Q(
-                pk__in=Trainingsbindung.objects.filter(konto=konto).values("training")
+                pk__in=Trainingsbindung.objects.aktiv()
+                .filter(konto=konto)
+                .values("training")
             )
             | models.Q(pk__in=Training.objects.sichtbar_fuer(konto).values("pk"))
+        )
+
+    def fremd_einsehbare_sitzungen(self) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf (ADR-0049)."""
+        from sitzungen.models import Sitzung
+
+        return Sitzung.objects.fremd_einsehbar(
+            self,
+            Abschrift.wirksame_freigaben()
+            .filter(training__in=self)
+            .values("abschrift__teilnahme"),
         )
 
 
@@ -181,15 +198,16 @@ class Training(EigentuemerKreis):
     def beitreten(self, konto: "Konto") -> bool:
         """Tritt dem Training über den Trainings-Link bei.
 
-        Liefert, ob das Konto danach dabei ist. Die Sperre hält nur Neue
-        fern; wer schon eine Bindung hat, bleibt dabei.
+        Liefert, ob das Konto danach dabei ist. Eine ausgetretene Bindung
+        lebt wieder auf. Die Sperre hält Neue und Ausgetretene fern; wer
+        aktiv dabei ist, bleibt dabei.
         """
         if (
             self.beitritt_gesperrt
-            and not self.trainingsbindung_set.filter(konto=konto).exists()
+            and not self.trainingsbindung_set.aktiv().filter(konto=konto).exists()
         ):
             return False
-        self.bindung_fuer(konto)
+        self.bindung_fuer(konto).wieder_beitreten()
         return True
 
     def bindung_fuer(self, konto: "Konto") -> "Trainingsbindung":
@@ -197,6 +215,7 @@ class Training(EigentuemerKreis):
 
         Beitritt und Sitzungsstart teilen sich diesen Weg; ein paralleler
         zweiter Aufruf scheitert an der Eindeutigkeit und lädt die erste.
+        Eine ausgetretene Bindung kommt unverändert zurück.
         """
         from sitzungen.models import Teilnahme
 
@@ -280,10 +299,32 @@ class Trainingsvignette(models.Model):
         super().save(*args, **kwargs)
 
 
+class TrainingsbindungQuerySet(BindungQuerySet):
+    """Abfragen über Trainingsbindungen."""
+
+    def aktiv(self) -> models.QuerySet["Trainingsbindung"]:
+        """Liefert die Bindungen, die Teilnahme am Training bedeuten."""
+        return self.filter(zustand=Trainingsbindung.Zustand.AKTIV)
+
+    def ausgetreten(self) -> models.QuerySet["Trainingsbindung"]:
+        """Liefert die Bindungen, deren Konto aus dem Training ausgetreten ist."""
+        return self.filter(zustand=Trainingsbindung.Zustand.AUSGETRETEN)
+
+
 class Trainingsbindung(Bindung):
-    """Verbindet eine Teilnahme mit Training und Nutzerkonto."""
+    """Verbindet eine Teilnahme mit Training und Nutzerkonto.
+
+    Ein Austritt löscht die Bindung nicht, sondern setzt ihren Zustand; wer ihn
+    ausgelöst hat, hält sie nicht fest (ADR-0049).
+    """
 
     KONTO_TRAGEND: bool = True
+
+    class Zustand(models.TextChoices):
+        """Die Zustände einer Trainingsbindung."""
+
+        AKTIV = "aktiv", "Aktiv"
+        AUSGETRETEN = "ausgetreten", "Ausgetreten"
 
     teilnahme: models.OneToOneField = models.OneToOneField(
         "sitzungen.Teilnahme", on_delete=models.CASCADE
@@ -292,6 +333,11 @@ class Trainingsbindung(Bindung):
     konto: models.ForeignKey = models.ForeignKey(
         "konten.Konto", on_delete=models.PROTECT
     )
+    zustand: models.CharField = models.CharField(
+        max_length=11, choices=Zustand, default=Zustand.AKTIV
+    )
+
+    objects: models.Manager["Trainingsbindung"] = TrainingsbindungQuerySet.as_manager()
 
     class Meta:
         """Erlaubt je Training und Konto höchstens eine Bindung."""
@@ -302,6 +348,28 @@ class Trainingsbindung(Bindung):
                 name="training_bindung_ist_je_konto_eindeutig",
             )
         ]
+
+    @property
+    def ist_aktiv(self) -> bool:
+        """Sagt, ob das Konto noch Trainingsteilnehmer:in ist."""
+        return self.zustand == self.Zustand.AKTIV
+
+    def austreten(self) -> None:
+        """Beendet die Teilnahme am Training; ein zweiter Austritt ändert nichts.
+
+        Teilnahme und Sitzungen bleiben bestehen.
+        """
+        self.zustand = self.Zustand.AUSGETRETEN
+        self.save(update_fields=["zustand"])
+
+    def wieder_beitreten(self) -> None:
+        """Belebt eine ausgetretene Bindung wieder; eine aktive bleibt, wie sie ist.
+
+        Nur der Beitritt über den Trainings-Link ruft diesen Weg (ADR-0049).
+        """
+        if not self.ist_aktiv:
+            self.zustand = self.Zustand.AKTIV
+            self.save(update_fields=["zustand"])
 
 
 class Abschrift(Bindung):
@@ -324,6 +392,18 @@ class Abschrift(Bindung):
     freigegeben_fuer: models.ManyToManyField = models.ManyToManyField(
         Training, related_name="freigegebene_abschriften", blank=True
     )
+
+    @staticmethod
+    def wirksame_freigaben() -> models.QuerySet:
+        """Die Freigaben, deren Konto genau diesem Training aktiv angehört.
+
+        Die einzige Stelle der Regel aus ADR-0049; jede andere Freigabe ruht.
+        Geliefert werden Zeilen der Zwischentabelle mit `abschrift` und `training`.
+        """
+        return Abschrift.freigegeben_fuer.through.objects.filter(
+            training__trainingsbindung__konto=models.F("abschrift__konto"),
+            training__trainingsbindung__zustand=Trainingsbindung.Zustand.AKTIV,
+        )
 
 
 def _archivierte_vignette_aus_trainings_entfernen(

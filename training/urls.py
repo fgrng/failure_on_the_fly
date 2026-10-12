@@ -22,6 +22,11 @@ urlpatterns: list[URLPattern] = [
         name="abschrift_freigaben",
     ),
     path(
+        "abschriften/<int:pk>/freigaben/<int:training_pk>/widerrufen/",
+        views.ruhende_freigabe_widerrufen,
+        name="abschrift_ruhende_freigabe_widerrufen",
+    ),
+    path(
         "abschriften/<int:pk>/loeschen/",
         views.abschrift_entfernen,
         name="abschrift_loeschen",
@@ -59,6 +64,11 @@ urlpatterns: list[URLPattern] = [
         name="eigentuemerin_entfernen",
     ),
     path(
+        "eigene/<int:pk>/teilnehmende/<int:konto_pk>/entfernen/",
+        views.teilnehmerin_entfernen,
+        name="teilnehmerin_entfernen",
+    ),
+    path(
         "eigene/<int:pk>/vignetten/<int:vignette_pk>/hinzufuegen/",
         views.vignette_hinzufuegen,
         name="vignette_hinzufuegen",
@@ -74,6 +84,7 @@ urlpatterns: list[URLPattern] = [
         name="vignette_verschieben",
     ),
     path("<int:pk>/", views.detail, name="detail"),
+    path("<int:pk>/austreten/", views.austreten, name="austreten"),
     path("beitreten/<uuid:trainings_link>/", views.beitreten, name="beitreten"),
     path(
         "<int:training_pk>/vignetten/<int:vignette_pk>/einwilligung/",

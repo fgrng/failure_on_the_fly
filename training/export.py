@@ -32,7 +32,8 @@ def trainingsexport_zip(training: Training) -> bytes:
     """
 
     sitzungen: list[Sitzung] = list(
-        Sitzung.objects.fremd_einsehbar(Training.objects.filter(pk=training.pk))
+        Training.objects.filter(pk=training.pk)
+        .fremd_einsehbare_sitzungen()
         .select_related("vignette__historie", "diagnose")
         .prefetch_related(
             Prefetch(
@@ -76,9 +77,11 @@ def _ordner_je_teilnahme(training: Training, teilnahmen: set[int]) -> dict[int, 
 
     ordner_je_konto: dict[int, str] = {}
     ordner: dict[int, str] = {}
-    for teilnahme_id, konto_id, kennung in training.trainingsbindung_set.order_by(
-        "pk"
-    ).values_list("teilnahme_id", "konto_id", "teilnahme__kennung"):
+    for teilnahme_id, konto_id, kennung in (
+        training.trainingsbindung_set.aktiv()
+        .order_by("pk")
+        .values_list("teilnahme_id", "konto_id", "teilnahme__kennung")
+    ):
         ordner_je_konto[konto_id] = _freier_name(
             f"teilnehmer-{kennung}", set(ordner_je_konto.values())
         )

@@ -45,7 +45,13 @@ from sitzungen.views import (
 
 from vignetten.models import Vignette
 
-from .abschriften import abschrift_freigeben, abschrift_holen, abschrift_loeschen
+from .abschriften import (
+    abschrift_freigeben,
+    abschrift_holen,
+    abschrift_loeschen,
+    ruhende_freigaben,
+    wirksame_freigaben,
+)
 from .export import trainingsexport_zip
 from .models import Abschrift, Training, Trainingsbindung
 
@@ -87,7 +93,7 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 
 def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
     """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
-    return Sitzung.objects.fremd_einsehbar(Training.objects.sichtbar_fuer(konto))
+    return Training.objects.sichtbar_fuer(konto).fremd_einsehbare_sitzungen()
 
 
 def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
@@ -97,11 +103,39 @@ def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
     )
 
 
+def _lesbares_training(request: HttpRequest, pk: int) -> Training:
+    """Lädt ein veröffentlichtes Training, das zugänglich ist oder dem die Person je angehörte.
+
+    Nach dem Austritt bleibt die Trainingsseite so lesend erreichbar.
+    """
+    return get_object_or_404(
+        Training.objects.veroeffentlicht().filter(
+            Q(pk__in=Training.objects.zugaenglich_fuer(request.user).values("pk"))
+            | Q(
+                pk__in=Trainingsbindung.objects.filter(konto=request.user).values(
+                    "training"
+                )
+            )
+        ),
+        pk=pk,
+    )
+
+
 def _zugaengliches_training_mit_finaler_vignette(
     request: HttpRequest, training_pk: int, vignette_pk: int
 ) -> tuple[Training, Vignette]:
-    """Lädt eine finale Vignette aus einem zugänglichen Training."""
+    """Lädt eine finale Vignette aus einem zugänglichen Training.
+
+    Wer aus dem Training ausgetreten ist, wählt dort nichts mehr, auch wenn der
+    Kreiszugang das Training sonst öffnet.
+    """
     training: Training = _zugaengliches_training(request, training_pk)
+    if (
+        Trainingsbindung.objects.ausgetreten()
+        .filter(training=training, konto=request.user)
+        .exists()
+    ):
+        raise Http404
     vignette: Vignette = get_object_or_404(
         training.vignetten.filter(zustand=Vignette.Zustand.FINAL), pk=vignette_pk
     )
@@ -200,6 +234,7 @@ def historie(request: HttpRequest) -> HttpResponse:
                 "sort_progress": abgeschlossene_vignetten
                 / (vignetten_gesamt if vignetten_gesamt else 1),
                 "sitzungen_nach_status": sitzungen_nach_status,
+                "ausgetreten": not bindung.ist_aktiv,
             }
         )
 
@@ -268,7 +303,7 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
     """
 
     abschrift: Abschrift = _eigene_abschrift(request, pk)
-    freigegeben: list[Training] = list(abschrift.freigegeben_fuer.order_by("name"))
+    freigegeben: list[Training] = list(wirksame_freigaben(abschrift).order_by("name"))
     return render(
         request,
         "training/abschrift.html",
@@ -280,6 +315,7 @@ def abschrift_ansehen(request: HttpRequest, pk: int) -> HttpResponse:
             "beigetretene_trainings": Training.objects.beigetreten_von(
                 request.user
             ).order_by("name"),
+            "ruhende_freigaben": ruhende_freigaben(abschrift).order_by("name"),
         },
     )
 
@@ -302,6 +338,26 @@ def abschrift_freigaben(request: HttpRequest, pk: int) -> HttpResponse:
         abschrift_freigeben(abschrift, auswahl)
     except ValidationError:
         raise Http404
+    return redirect("training:abschrift", pk=abschrift.pk)
+
+
+@login_required
+def ruhende_freigabe_widerrufen(
+    request: HttpRequest, pk: int, training_pk: int
+) -> HttpResponse:
+    """Widerruft die ruhende Freigabe einer eigenen Abschrift für ein Training.
+
+    Eine wirksame Freigabe widerruft nur die Auswahl; hier ist sie unbekannt.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    abschrift: Abschrift = _eigene_abschrift(request, pk)
+    training: Training = get_object_or_404(ruhende_freigaben(abschrift), pk=training_pk)
+    abschrift.freigegeben_fuer.remove(training)
+    messages.success(
+        request, f"Die ruhende Freigabe für „{training.name}“ ist widerrufen."
+    )
     return redirect("training:abschrift", pk=abschrift.pk)
 
 
@@ -349,8 +405,12 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen."""
-    training: Training = _zugaengliches_training(request, pk)
+    """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen.
+
+    Eine Ausgetretene sieht die Seite nur lesend: ihre Sitzungen, aber weder
+    Wahl noch Start noch den Austritt.
+    """
+    training: Training = _lesbares_training(request, pk)
     vignetten: QuerySet[Vignette] = training.vignetten_in_reihenfolge().filter(
         zustand=Vignette.Zustand.FINAL
     )
@@ -396,8 +456,53 @@ def detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "training/detail.html",
-        {"training": training, "vignetten_daten": vignetten_daten},
+        {
+            "training": training,
+            "vignetten_daten": vignetten_daten,
+            "ist_teilnehmerin": bindung is not None and bindung.ist_aktiv,
+            "ist_ausgetreten": bindung is not None and not bindung.ist_aktiv,
+        },
     )
+
+
+@login_required
+def austreten(request: HttpRequest, pk: int) -> HttpResponse:
+    """Tritt aus einem Training aus, dem das Konto angehört (ADR-0049)."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    bindung: Trainingsbindung = get_object_or_404(
+        Trainingsbindung.objects.select_related("training"),
+        training_id=pk,
+        konto=request.user,
+    )
+    bindung.austreten()
+    messages.success(
+        request, f"Sie sind aus dem Training „{bindung.training.name}“ ausgetreten."
+    )
+    return redirect("training:detail", pk=pk)
+
+
+@login_required
+def teilnehmerin_entfernen(
+    request: HttpRequest, pk: int, konto_pk: int
+) -> HttpResponse:
+    """Entfernt eine Trainingsteilnehmerin auf demselben Weg wie ihr Austritt.
+
+    Nur Kreis und Administration; allen anderen ist das Training unbekannt (404),
+    ebenso ein Konto ohne aktive Bindung (ADR-0049).
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    bindung: Trainingsbindung = get_object_or_404(
+        training.trainingsbindung_set.aktiv().select_related("konto"),
+        konto_id=konto_pk,
+    )
+    bindung.austreten()
+    messages.success(
+        request, f"{_kontoname(bindung.konto)} ist aus dem Training entfernt."
+    )
+    return redirect("training:kuratieren", pk=training.pk)
 
 
 @login_required
@@ -415,7 +520,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
             "trainings_link_url": request.build_absolute_uri(
                 reverse("training:beitreten", args=[training.trainings_link])
             ),
-            "beigetretene": training.trainingsbindung_set.count(),
+            "beigetretene": training.trainingsbindung_set.aktiv().count(),
             "fremdeinsicht": _fremdeinsicht(request.user, training),
             "freigegebene_abschriften": _freigegebene_abschriften(
                 request.user, training
@@ -429,8 +534,9 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
     # Baut die Tabelle der Fremdeinsicht: die Vignetten in empfohlener Reihenfolge
-    # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
-    # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
+    # als Spalten, alle aktiven Trainingsteilnehmenden nach Namen als Zeilen. Eine
+    # Zelle hält die abgeschlossenen Sitzungen der Person zu der Vignette,
+    # nummeriert je Zelle.
 
     vignetten: list[Vignette] = list(
         training.vignetten_in_reihenfolge().select_related("historie")
@@ -446,7 +552,7 @@ def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
         ).append(sitzung)
 
     zeilen: list[dict[str, object]] = []
-    for bindung in training.trainingsbindung_set.select_related("konto"):
+    for bindung in training.trainingsbindung_set.aktiv().select_related("konto"):
         zellen: list[list[dict[str, object]]] = [
             [
                 {
@@ -464,6 +570,10 @@ def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
         zeilen.append(
             {
                 "name": _kontoname(bindung.konto),
+                "entfernen_url": reverse(
+                    "training:teilnehmerin_entfernen",
+                    args=[training.pk, bindung.konto_id],
+                ),
                 "zellen": zellen,
                 "ohne_sitzung": not any(zellen),
             }
@@ -506,9 +616,13 @@ def _freigegebene_abschriften(
                 for sitzung in sitzungen_nach_teilnahme.get(abschrift.teilnahme_id, [])
             ],
         }
-        for abschrift in training.freigegebene_abschriften.select_related(
-            "konto"
-        ).order_by("importiert_am", "pk")
+        for abschrift in training.freigegebene_abschriften.filter(
+            pk__in=Abschrift.wirksame_freigaben()
+            .filter(training=training)
+            .values("abschrift")
+        )
+        .select_related("konto")
+        .order_by("importiert_am", "pk")
     ]
     abschriften.sort(key=lambda abschrift: str(abschrift["name"]).casefold())
     return abschriften
@@ -622,15 +736,20 @@ def _beitritt_schalten(request: HttpRequest, pk: int, gesperrt: bool) -> HttpRes
 def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
 
-    Wer schon dabei ist, landet auch bei gesperrtem Beitritt im Training,
+    Wer aktiv dabei ist, landet auch bei gesperrtem Beitritt im Training,
     ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
+    Ausgetretene treten über den offenen Link wieder bei, auch aus dem Kreis.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
-    if not Training.objects.sichtbar_fuer(request.user).filter(
-        pk=training.pk
-    ).exists() and not training.beitreten(request.user):
+    kreis: bool = (
+        Training.objects.sichtbar_fuer(request.user).filter(pk=training.pk).exists()
+    )
+    gebunden: bool = training.trainingsbindung_set.filter(konto=request.user).exists()
+    if kreis and not gebunden:
+        return redirect("training:detail", pk=training.pk)
+    if not training.beitreten(request.user) and not kreis:
         return render(
             request,
             "training/beitritt_gesperrt.html",
@@ -638,6 +757,17 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
             status=403,
         )
     return redirect("training:detail", pk=training.pk)
+
+
+def _aktive_bindung(training: Training, konto: Konto) -> Trainingsbindung:
+    """Lädt die Bindung für einen Sitzungsstart; eine ausgetretene ist unbekannt.
+
+    Reaktiviert wird nur über den Beitritt, nie über den Start.
+    """
+    bindung: Trainingsbindung = training.bindung_fuer(konto)
+    if not bindung.ist_aktiv:
+        raise Http404
+    return bindung
 
 
 @login_required
@@ -693,7 +823,7 @@ def _nach_einwilligung_starten(
     abzubrechen: int | None = None,
 ) -> HttpResponse:
     """Fragt zuerst die Audioverarbeitung ab und startet dann."""
-    bindung: Trainingsbindung = training.bindung_fuer(request.user)
+    bindung: Trainingsbindung = _aktive_bindung(training, request.user)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
         return render(
             request,
@@ -717,7 +847,7 @@ def einwilligung(
     training, vignette = _zugaengliches_training_mit_finaler_vignette(
         request, training_pk, vignette_pk
     )
-    bindung: Trainingsbindung = training.bindung_fuer(request.user)
+    bindung: Trainingsbindung = _aktive_bindung(training, request.user)
     if bindung.teilnahme.audioverarbeitung_eingewilligt is not None:
         return HttpResponseBadRequest("Die Einwilligung wurde bereits festgehalten.")
     entscheidung: str | None = request.POST.get("audioverarbeitung_eingewilligt")
@@ -744,12 +874,17 @@ def _sitzungsnavigation(sitzung_pk: int) -> Sitzungsnavigation:
 
 
 def training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
-    """Lädt eine Sitzung nur über eine eigene Trainingsbindung, sonst 404."""
+    """Lädt eine Sitzung nur über eine eigene aktive Trainingsbindung, sonst 404.
+
+    Nach einem Austritt bleibt die Sitzung laufend liegen und ist für die
+    Gesprächsabläufe unbekannt, bis die Bindung wieder aktiv ist.
+    """
 
     return get_object_or_404(
         Sitzung.objects.select_related("vignette", "simulationskern", "teilnahme"),
         pk=pk,
         teilnahme__trainingsbindung__konto=request.user,
+        teilnahme__trainingsbindung__zustand=Trainingsbindung.Zustand.AKTIV,
     )
 
 

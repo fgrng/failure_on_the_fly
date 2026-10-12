@@ -206,16 +206,16 @@ Wer den Link eingeloggt ohne Kreis- oder Administrationszugang öffnet, tritt be
 und landet auf der Trainingsseite; auch eine Ausbilderrolle allein begründet
 keinen Kreiszugang. Erneutes Öffnen führt ohne zusätzlichen Beitritt direkt
 dorthin. Ohne Anmeldung führt der Link über den Login zurück zum Beitritt. Bei
-gesperrtem Beitritt sehen neue Konten die Meldung „Beitritt gesperrt“ mit der
-Bitte, sich an die Ausbilder:in zu wenden; Beigetretene kommen weiter ins
-Training. Der aktuelle Eigentümer-Kreis und die Administration gelangen über
-offene wie gesperrte Trainings-Links direkt zur Trainingsseite, ohne
-beizutreten: Auch wiederholte Aufrufe erzeugen weder Trainingsbindung noch
-Teilnahme und erhöhen die Zahl der Beigetretenen nicht. Erst ein tatsächlicher
-Sitzungsstart legt bei Bedarf die erforderliche Bindung und Teilnahme an.
-Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf unverändert erhalten.
-Der Link eines Entwurfs bleibt für alle Konten unbekannt (404). Ein Training
-ohne Vignetten lässt sich veröffentlichen und beitreten.
+gesperrtem Beitritt sehen neue und ausgetretene Konten die Meldung „Beitritt
+gesperrt“ (403) mit der Bitte, sich an die Ausbilder:in zu wenden; aktive
+Trainingsteilnehmende kommen weiter ins Training. Der aktuelle Eigentümer-Kreis
+und die Administration gelangen über offene wie gesperrte Trainings-Links direkt
+zur Trainingsseite, ohne beizutreten: Auch wiederholte Aufrufe erzeugen weder
+Trainingsbindung noch Teilnahme und erhöhen die Zahl der Beigetretenen nicht.
+Erst ein tatsächlicher Sitzungsstart legt bei Bedarf die erforderliche Bindung
+und Teilnahme an. Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf
+unverändert erhalten. Der Link eines Entwurfs bleibt für alle Konten unbekannt
+(404). Ein Training ohne Vignetten lässt sich veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
@@ -250,40 +250,122 @@ verschiedenen Trainings darf gleichzeitig je eine Sitzung laufen. Liegen
 gebliebene ältere laufende Sitzungen aus der Zeit vor dieser Regel stehen als
 abgebrochen in der Liste; die jüngste ist fortsetzbar.
 
+## Austritt aus dem Training
+
+Am Ende der Trainingsseite steht für Trainingsteilnehmer:innen der Abschnitt
+„Austritt aus dem Training“. „Aus dem Training austreten“ klappt eine Erklärung
+auf: Der Kreis sieht die eigenen Sitzungen danach nicht mehr, Freigaben von
+Abschriften für dieses Training ruhen, nichts wird gelöscht, und über den
+Trainings-Link ist ein Wiederbeitritt möglich, solange der Beitritt offen ist.
+Erst „Austritt bestätigen“ tritt aus (nur per POST, sonst 405) und führt mit der
+Meldung „Sie sind aus dem Training … ausgetreten.“ zurück auf die
+Trainingsseite. Ein zweiter Austritt ändert nichts und führt ebenso dorthin; ein
+Austritt aus einem Training, dem das Konto nie beigetreten ist, bekommt 404.
+
+Danach ist die Person keine Trainingsteilnehmer:in mehr:
+
+- Der Trainingskatalog zeigt das Training nicht mehr. „Meine Trainings“ führt es
+  weiter, mit dem Kennzeichen „ausgetreten“.
+- Die Trainingsseite bleibt erreichbar, zeigt statt der Einleitung und des
+  Hinweises zur Fremdeinsicht „Sie sind nicht mehr Teilnehmer:in dieses
+  Trainings.“ und listet die eigenen Sitzungen in jedem Status, aber weder „Neu
+  starten“ noch den Austritt. Eigene Sitzungen öffnen sich weiter lesend, auch
+  laufende, ohne Denkspur.
+- Vignettenwahl, Einwilligung und Sitzungsstart antworten mit 404; es entsteht
+  keine Sitzung. Das gilt auch, wenn die Person zum Kreis gehört, bis sie über
+  den Trainings-Link wieder beitritt.
+- Eine beim Austritt laufende Sitzung bleibt laufend liegen. Gespräch, Beenden,
+  Abbrechen, Debrief und Transkription antworten auch aus einem noch offenen Tab
+  mit 404 und verändern nichts.
+
+Für Kreis und Administration verschwindet die Person rückwirkend und spurlos aus
+diesem Training: keine Zeile mehr in der Fremdeinsicht, kein Mitzählen in der
+Zahl der Beigetretenen, keine Sitzungen in einem danach gezogenen
+Trainingsexport, und jede ihrer Sitzungen dieses Trainings antwortet mit 404,
+auch eine, die vorher lesbar war. Ein vorher gezogener Export bleibt, wo er ist.
+Ihre für dieses Training freigegebenen Abschriften ruhen (siehe „Abschriften
+holen“): Sie stehen nicht mehr unter „Freigegebene Abschriften“, ihre Sitzungen
+antworten mit 404, und ein danach gezogener Export enthält sie nicht. In anderen
+Trainings, denen die Person weiter angehört, bleibt sie für deren Kreise
+einsehbar, auch mit dort wirksamen Freigaben derselben Abschrift. Der Zugang von
+Kreis und Administration zum Training selbst ändert sich durch den Austritt von
+Teilnehmenden nicht.
+
+## Entfernen aus dem Training
+
+Jede Zeile der Fremdeinsicht trägt in der letzten Spalte „Entfernen“. Das klappt
+eine Bestätigung auf: Die Person kann über den offenen Trainings-Link wieder
+beitreten; wer fernbleiben soll, wird über die Sperre des Beitritts
+ferngehalten. Erst „Entfernen bestätigen“ entfernt (nur per POST, sonst 405) und
+führt mit der Meldung „… ist aus dem Training entfernt.“ zurück auf die
+Kuratierseite. Entfernen dürfen alle Eigentümer:innen des Trainings und die
+Administration in jedem Training; fremde Ausbilder:innen und
+Trainingsteilnehmende bekommen 404, ebenso ein Entfernen für ein Konto ohne
+aktive Bindung an dieses Training. Es ändert sich dann nichts.
+
+Entfernen führt in denselben Zustand wie ein eigener Austritt (siehe oben): Die
+Person verschwindet für Kreis und Administration rückwirkend aus Fremdeinsicht,
+Beigetretenen-Zahl und Trainingsexport, und sie selbst sieht genau das, was sie
+nach einem eigenen Austritt sähe. Wer entfernt hat, wird nicht gespeichert und
+nirgends angezeigt.
+
+## Wiederbeitritt
+
+Wer ausgetreten ist oder entfernt wurde, tritt über den offenen Trainings-Link
+wieder bei. Dieselbe Trainingsbindung lebt wieder auf; es entsteht weder eine
+zweite Bindung noch eine zweite Teilnahme. Das Training steht wieder im Katalog,
+die Trainingsseite bietet wieder Wahl, Start und Austritt, und „Meine Trainings“
+kennzeichnet es nicht mehr als ausgetreten. Die Person erscheint wieder in der
+Fremdeinsicht und in der Zahl der Beigetretenen, ihre früheren Sitzungen sind
+für Kreis und Administration wieder lesbar. Ruhende Freigaben wirken wieder,
+ohne neu erteilt zu werden; widerrufene bleiben widerrufen. Eine beim Austritt
+liegengebliebene laufende Sitzung lässt sich wieder fortsetzen.
+
+Das gilt ebenso für Kreis und Administration mit ausgetretener Trainingsbindung:
+Der Trainings-Link belebt auch ihre Bindung wieder.
+
+Ist der Beitritt gesperrt, bekommt die Ausgetretene die Meldung „Beitritt
+gesperrt“ (403) und bleibt ausgetreten. Kreis und Administration landen bei
+gesperrtem Beitritt wie bisher auf der Trainingsseite, ihre Bindung bleibt aber
+ausgetreten. Ein Sitzungsstart belebt die Bindung nicht; das geht nur über den
+Trainings-Link.
+
 ## Fremdeinsicht im Training
 
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite
-die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen als Zeilen,
-nach Namen sortiert, und den Vignetten des Trainings in empfohlener Reihenfolge
-als Spalten. Wer noch keine abgeschlossene Sitzung hat, steht mit gedämpfter
-Schrift trotzdem in der Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer
-Zelle als runder Kreis mit ihrer laufenden Nummer zu dieser Vignette; beim
-Zeigen oder Fokussieren erscheint sofort ihr Datum. Eine leere Zelle trägt einen
-blassen Strich. Ein Training ohne Vignetten zeigt statt der Tabelle einen
-Hinweis.
+die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen, die nicht
+aus dem Training ausgetreten sind, als Zeilen, nach Namen sortiert, und den
+Vignetten des Trainings in empfohlener Reihenfolge als Spalten. Wer noch keine
+abgeschlossene Sitzung hat, steht mit gedämpfter Schrift trotzdem in der
+Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer Zelle als runder Kreis
+mit ihrer laufenden Nummer zu dieser Vignette; beim Zeigen oder Fokussieren
+erscheint sofort ihr Datum. Eine leere Zelle trägt einen blassen Strich. Ein
+Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
 
 Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
 Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
 alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor ihrer
 Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
-Sitzungen, Sitzungen derselben Person in einem fremden Training und jede Sitzung
-für aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in
-der Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die
-Teilnehmer:in in jedem Status lesbar, ebenfalls ohne Denkspur. Die lesende
-Ansicht zeigt die Diagnose als Text, ohne Formular.
+Sitzungen, Sitzungen derselben Person in einem fremden Training, jede Sitzung
+einer aus dem Training Ausgetretenen und jede Sitzung für aus dem Kreis
+ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der Vignette
+antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
+Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die Diagnose
+als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
 jede Abschrift, die eine Beigetretene für dieses Training freigegeben hat,
-beschriftet mit Erhebungsname und Importzeitpunkt, und verlinkt ihre
-abgeschlossenen Sitzungen untereinander. Ohne Freigaben steht dort „Niemand hat
-eine Abschrift freigegeben.“ Eine solche Sitzung öffnet sich lesend wie eine
-Trainingssitzung, ohne Denkspur und samt der gespielten Szene ihrer Vignette,
-auch wenn die Vignette dem Kreis nicht gehört (dritte Ausnahme in ADR-0015). Im
-Vignettenbestand des Kreises erscheint sie nicht, und aufnehmen lässt sie sich
-nicht. Eine nicht freigegebene Abschrift erscheint in keiner Fremdeinsicht, auch
-nicht für die Administration; nach dem Widerruf oder dem Löschen der Abschrift
-antwortet auch eine gemerkte Adresse mit 404.
+solange sie dem Training noch angehört, beschriftet mit Erhebungsname und
+Importzeitpunkt, und verlinkt ihre abgeschlossenen Sitzungen untereinander. Ohne
+Freigaben steht dort „Niemand hat eine Abschrift freigegeben.“ Eine solche
+Sitzung öffnet sich lesend wie eine Trainingssitzung, ohne Denkspur und samt der
+gespielten Szene ihrer Vignette, auch wenn die Vignette dem Kreis nicht gehört
+(dritte Ausnahme in ADR-0015). Im Vignettenbestand des Kreises erscheint sie
+nicht, und aufnehmen lässt sie sich nicht. Eine nicht freigegebene Abschrift
+erscheint in keiner Fremdeinsicht, auch nicht für die Administration; nach dem
+Widerruf oder dem Löschen der Abschrift antwortet auch eine gemerkte Adresse mit
+dem Status 404.
 
 ## Trainingsexport
 
@@ -298,15 +380,16 @@ abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
 Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
 Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im Ordner
 der Person; private und widerrufene fehlen, ebenso laufende, abgebrochene und
-gescheiterte Sitzungen. Das Archiv enthält keine Kontodaten, keine Denkspur,
-keine Fehlversuche, keine Modell-Konfiguration und keinen Kern. Zwei Exporte
-desselben Trainings tragen für dieselbe Person denselben Ordnernamen, auch nach
-Austritt und Wiederbeitritt, weil die Bindung bleibt; in einem anderen Training
-trägt dieselbe Person eine andere Kennung. Die Ordner stehen nach Kennung
-sortiert im Archiv, die Reihenfolge verrät also keine Namen. Tragen zwei
-Personen zufällig dieselbe Kennung, bekommt die später beigetretene eine Zählung
-(`teilnehmer-3f9a01c2-2`). Herunterladen dürfen der Kreis und die
-Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+gescheiterte Sitzungen. Wer aus dem Training ausgetreten ist, hat in einem
+danach gezogenen Export weder Ordner noch Dateien. Das Archiv enthält keine
+Kontodaten, keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und
+keinen Kern. Zwei Exporte desselben Trainings tragen für dieselbe Person
+denselben Ordnernamen, auch nach Austritt und Wiederbeitritt, weil die Bindung
+bleibt; in einem anderen Training trägt dieselbe Person eine andere Kennung. Die
+Ordner stehen nach Kennung sortiert im Archiv, die Reihenfolge verrät also keine
+Namen. Tragen zwei Personen zufällig dieselbe Kennung, bekommt die später
+beigetretene eine Zählung (`teilnehmer-3f9a01c2-2`). Herunterladen dürfen der
+Kreis und die Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
 Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
 unterliegt nicht dem Exportkontrakt aus ADR-0029.
 
@@ -952,16 +1035,29 @@ Abschrift löschen; dabei verschwinden ihre Teilnahme, die kopierten Sitzungen
 und alle Freigaben, während die Daten der Erhebung unberührt bleiben.
 
 Vor dem Löschknopf steht die Sektion „Freigabe“: eine Checkbox-Liste aller
-Trainings, denen das Konto beigetreten ist, angehakt heißt freigegeben, und der
-Knopf „Freigaben speichern“. Freigegeben wird immer die ganze Abschrift, für
-beliebig viele Trainings und unabhängig davon, ob ihre Vignetten zum Training
-gehören (ADR-0049). Ein abgewählter Haken widerruft die Freigabe sofort. Ein
-Training ohne eigene Trainingsbindung wird mit 404 abgewiesen. Der Seitenkopf
-nennt die Trainings, für die die Abschrift freigegeben ist; ohne Freigabe heißt
-es dort „Ihre Abschrift — nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene
+Trainings, denen das Konto beigetreten und aus denen es nicht ausgetreten ist,
+angehakt heißt freigegeben, und der Knopf „Freigaben speichern“. Freigegeben
+wird immer die ganze Abschrift, für beliebig viele Trainings und unabhängig
+davon, ob ihre Vignetten zum Training gehören (ADR-0049). Ein abgewählter Haken
+widerruft die Freigabe sofort. Ein Training ohne eigene Trainingsbindung oder
+mit ausgetretener wird mit 404 abgewiesen; nach dem Austritt aus einem Training
+entsteht so keine neue Freigabe dafür. Der Seitenkopf nennt die Trainings, für
+die die Abschrift wirksam freigegeben ist; ohne Freigabe heißt es dort „Ihre
+Abschrift — nur Sie lesen sie.“ Einen Hinweis auf bereits gezogene
 Trainingsexporte oder zur Wiedererkennung durch Forschende gibt es bewusst
-nicht. Wer noch keinem Training beigetreten ist, liest statt der Liste einen
-Hinweis.
+nicht. Wer derzeit keinem Training angehört, liest statt der Liste den Hinweis
+„Sie gehören derzeit keinem Training an.“, außer es gibt ruhende Freigaben.
+
+Nach dem Austritt aus einem Training ruht die Freigabe der Abschrift dafür
+(ADR-0049): Sie wirkt nicht, bleibt aber bestehen und lebt mit einem
+Wiederbeitritt wieder auf. Fremdeinsicht in eine Abschrift gibt es nur, solange
+ihr Konto genau dem Training, für das freigegeben ist, aktiv angehört. Unter der
+Checkbox-Liste stehen ruhende Freigaben getrennt unter „Ruhende Freigaben“, je
+Training mit „ruht (ausgetreten)“ und dem Knopf „Freigabe widerrufen“. Er
+widerruft nur diese eine Freigabe (nur per POST, sonst 405) und führt mit der
+Meldung „Die ruhende Freigabe für … ist widerrufen.“ zurück auf die Abschrift;
+für ein Training ohne ruhende Freigabe antwortet er mit 404. „Freigaben
+speichern“ lässt ruhende Freigaben unverändert.
 
 ## Erhebungen verwalten
 

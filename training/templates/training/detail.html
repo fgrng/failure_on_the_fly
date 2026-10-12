@@ -13,8 +13,12 @@
         <div>
             <p>Ausbildung / Training starten</p>
             <h1>{{ training.name }}</h1>
+            {% if ist_ausgetreten %}
+            <span class="page-head__hinweis">Sie sind nicht mehr Teilnehmer:in dieses Trainings. Ihre eigenen Sitzungen können Sie weiter lesen.</span>
+            {% else %}
             <span>Wählen Sie eine Vignette, um das Training zu beginnen.</span>
             <span class="page-head__hinweis">Die Ausbilder:innen dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.</span>
+            {% endif %}
         </div>
         <a class="button button--secondary" href="{% url 'training:katalog' %}">Zurück zum Katalog</a>
     </header>
@@ -31,7 +35,7 @@
                     <tr>
                         <th scope="col">Name / Fach</th>
                         <th scope="col">Ihre Sitzungen</th>
-                        <th scope="col">Aktion</th>
+                        {% if not ist_ausgetreten %}<th scope="col">Aktion</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -46,7 +50,7 @@
                                     <summary class="badge badge--draft">{{ daten.sitzungen_nach_status.laufend|length }} laufend ▾</summary>
                                     <ul class="sitzungsmenue__liste">
                                         {% for sitzung in daten.sitzungen_nach_status.laufend %}
-                                        <li><a href="{{ sitzung.fortsetzen_url }}">Fortsetzen</a> · <a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        <li>{% if not ist_ausgetreten %}<a href="{{ sitzung.fortsetzen_url }}">Fortsetzen</a> · {% endif %}<a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
                                         {% endfor %}
                                     </ul>
                                 </details>
@@ -86,9 +90,11 @@
                             <span class="sitzungen-leer">Noch keine</span>
                             {% endif %}
                         </td>
+                        {% if not ist_ausgetreten %}
                         <td>
                             <a class="button" href="{{ daten.url }}">Neu starten</a>
                         </td>
+                        {% endif %}
                     </tr>
                     {% empty %}
                     <tr>
@@ -99,5 +105,23 @@
             </table>
         </div>
     </section>
+
+    {% if ist_teilnehmerin %}
+    <section class="page-section" aria-labelledby="section-austritt">
+        <header class="page-section__head">
+            <b>02</b><span>
+                <h2 id="section-austritt">Austritt aus dem Training</h2><small>Die Trainingsteilnahme beenden</small>
+            </span>
+        </header>
+        <details>
+            <summary class="button button--secondary">Aus dem Training austreten</summary>
+            <p>Nach dem Austritt sieht der Kreis dieses Trainings Ihre Sitzungen nicht mehr. Freigaben Ihrer Abschriften für dieses Training ruhen. Nichts wird gelöscht: Ihre Sitzungen lesen Sie weiter hier und in Ihrer Historie. Über den Trainings-Link können Sie wieder beitreten, solange der Beitritt offen ist.</p>
+            <form method="post" action="{% url 'training:austreten' training.pk %}">
+                {% csrf_token %}
+                <button class="button button--danger" type="submit">Austritt bestätigen</button>
+            </form>
+        </details>
+    </section>
+    {% endif %}
 </section>
 {% endblock %}
