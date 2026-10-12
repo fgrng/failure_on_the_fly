@@ -579,10 +579,9 @@ def test_ansicht_bietet_keine_eingabe_und_keine_sitzungsnavigation(
     inhalt: str = _gelesene_ansicht(client)
 
     assert "<textarea" not in inhalt
-    assert reverse("training:gespraech") not in inhalt
-    assert reverse("training:debrief") not in inhalt
-    assert reverse("training:abbrechen") not in inhalt
-    assert reverse("training:transkription") not in inhalt
+    for sitzung in Sitzung.objects.all():
+        for route in ("gespraech", "debrief", "abbrechen", "transkription"):
+            assert reverse(f"training:{route}", args=[sitzung.pk]) not in inhalt
     assert 'type="text"' not in inhalt
 
 

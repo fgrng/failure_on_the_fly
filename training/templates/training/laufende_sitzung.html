@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Es läuft noch eine Sitzung{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/vignette-pages.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page area--participant">
+    <header class="page-head">
+        <div>
+            <p>Ausbildung / Training starten</p>
+            <h1>Es läuft noch eine Sitzung</h1>
+            <span>{{ laufende.vignette.anzeigename }}, begonnen am {{ laufende.erstellt_am|date:"d.m.Y H:i" }}</span>
+        </div>
+    </header>
+
+    <div class="messages" style="margin-top: var(--space-4);">
+        <div class="message--info">
+            In diesem Training läuft immer nur eine Sitzung. Setzen Sie sie fort, oder brechen Sie sie ab und starten Sie „{{ vignette.anzeigename }}“.
+        </div>
+    </div>
+
+    <div class="vignette-form-actions" style="margin-top: var(--space-4); display: flex; gap: var(--space-3); align-items: center;">
+        <a class="button" href="{% url 'training:gespraech' laufende.pk %}">Fortsetzen</a>
+        <form method="post" action="{% url 'training:neu_starten' training.pk vignette.pk %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="laufende_sitzung" value="{{ laufende.pk }}">
+            <button class="button button--secondary" type="submit">Abbrechen und neu starten</button>
+        </form>
+        <a class="button button--secondary" href="{% url 'training:detail' training.pk %}">Zurück zum Training</a>
+    </div>
+</section>
+{% endblock %}

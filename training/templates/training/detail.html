@@ -46,7 +46,7 @@
                                     <summary class="badge badge--draft">{{ daten.sitzungen_nach_status.laufend|length }} laufend ▾</summary>
                                     <ul class="sitzungsmenue__liste">
                                         {% for sitzung in daten.sitzungen_nach_status.laufend %}
-                                        <li><a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        <li><a href="{{ sitzung.fortsetzen_url }}">Fortsetzen</a> · <a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
                                         {% endfor %}
                                     </ul>
                                 </details>

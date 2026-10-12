@@ -134,7 +134,8 @@ Stelle. Der Anhang-Slot ist damit dauerhaft und keine Übergangslösung.
   durch diese Änderung selbst: Solange der Fortschritt im Browser lag, war er pro
   Browser serialisiert. Ein harter Datenbank-Constraint gegen mehrere gleichzeitig
   laufende Sitzungen gehörte der Sitzungs-App und träfe auch Trainings; er ist
-  hier bewusst nicht Teil der Entscheidung.
+  hier bewusst nicht Teil der Entscheidung. ADR-0053 hat ihn inzwischen
+  eingeführt, für Training und Erhebung.
 - Die bisherige Block-Dataclass entfällt ersatzlos — sie existierte nur, weil es
   keine Tabelle gab. Der Fachbegriff **Itemblock** hat danach genau einen
   Referenten und steht im Glossar. Der **Fortschritt** bekommt keinen Eintrag: Er

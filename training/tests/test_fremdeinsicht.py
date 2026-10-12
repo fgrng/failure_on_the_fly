@@ -126,8 +126,8 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         response: HttpResponse = self.client.get(ansehen_url(sitzung))
 
         for bedienelement in (
-            reverse("training:abbrechen"),
-            reverse("training:gespraech"),
+            reverse("training:abbrechen", args=[sitzung.pk]),
+            reverse("training:gespraech", args=[sitzung.pk]),
             "Sitzung abbrechen",
             "Fortsetzen",
             "Löschen",

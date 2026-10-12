@@ -310,7 +310,7 @@ class GeschlossenesTrainingTests(TestCase):
                     Trainingsbindung, Trainingsbindung.objects.get(konto=konto)
                 )
                 sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
-                self.client.post(reverse("training:abbrechen"))
+                self.client.post(reverse("training:abbrechen", args=[sitzung.pk]))
 
                 for gesperrt in (False, True):
                     self.training.beitritt_gesperrt = gesperrt

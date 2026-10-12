@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import time_machine
 from django.http import HttpResponse
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
@@ -19,6 +19,7 @@ from sitzungen.models import (
     Vignettenposition,
 )
 from training.models import Training
+from training.tests.aufbau import route_der_letzten_sitzung
 from vignetten.models import Vignette
 
 
@@ -110,7 +111,7 @@ class TrainingssitzungTests(TestCase):
             "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose.",
         )
         self.assertContains(
-            self.start_response, f'action="{reverse("training:abbrechen")}"'
+            self.start_response, f'action="{route_der_letzten_sitzung("abbrechen")}"'
         )
 
     def test_training_liest_die_schuelerin_nicht_lehrperson_oder_bewerter(
@@ -166,7 +167,9 @@ class TrainingssitzungTests(TestCase):
         """Auch die Diagnose bleibt ohne Einwilligung per Tastatur abschließbar."""
         self._sitzung_starten([], audioverarbeitung_eingewilligt=False)
 
-        debrief: HttpResponse = self.client.post(reverse("training:gespraech_beenden"))
+        debrief: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("gespraech_beenden")
+        )
 
         self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
         self.assertNotContains(debrief, "Spracheingabe starten")
@@ -179,32 +182,31 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten([{"fehler": "anbieterfehler"}] * 3)
 
         fehlermeldung: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(fehlermeldung, "Die Antwort konnte nicht erzeugt werden.")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
         self.assertIsNone(Gespraechsschritt.objects.get().aeusserung)
-        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
 
     def test_abbrechen_setzt_den_gewollten_status_ohne_diagnose(self) -> None:
         """Ein aktiver Abbruch bleibt vom technischen Scheitern unterscheidbar."""
         training: Training = self._sitzung_starten([])
-        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
 
-        response: HttpResponse = self.client.post(reverse("training:abbrechen"))
+        response: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("abbrechen")
+        )
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
 
-        session = self.client.session
-        session["training_sitzung_pk"] = sitzung.pk
-        session.save()
         stale_diagnose: HttpResponse = self.client.post(
-            reverse("training:debrief"), {"diagnose": "Bruchfehler"}
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
         )
 
         self.assertRedirects(
@@ -214,6 +216,18 @@ class TrainingssitzungTests(TestCase):
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
 
+    def test_abgebrochene_sitzung_bietet_beim_beenden_keinen_debrief(self) -> None:
+        """Über ihre Adresse führt eine abgebrochene Sitzung nicht zur Diagnose."""
+        training: Training = self._sitzung_starten([])
+        self.client.post(route_der_letzten_sitzung("abbrechen"))
+
+        response: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("gespraech_beenden")
+        )
+
+        self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
     def test_trainingssitzung_fuehrt_den_eingabemodus_mit(self) -> None:
         """Training folgt der Erhebung: Der Modus kommt aus dem Formular (Spec: #122)."""
 
@@ -222,7 +236,7 @@ class TrainingssitzungTests(TestCase):
         )
 
         self.client.post(
-            reverse("training:gespraech"),
+            route_der_letzten_sitzung("gespraech"),
             {"eingabe": "Wie rechnest du?", "eingabemodus": "transkribiert"},
         )
 
@@ -235,10 +249,10 @@ class TrainingssitzungTests(TestCase):
         """Training folgt der Erhebung auch an der Diagnose (Spec: #122)."""
 
         self._sitzung_starten([])
-        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
 
         self.client.post(
-            reverse("training:debrief"),
+            route_der_letzten_sitzung("debrief"),
             {"diagnose": "Bruchfehler", "eingabemodus": "gemischt"},
         )
 
@@ -250,9 +264,13 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten(
             [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
         )
-        self.client.post(reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"})
-        self.client.post(reverse("training:gespraech_beenden"))
-        self.client.post(reverse("training:debrief"), {"diagnose": "Bruchfehler"})
+        self.client.post(
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
+        )
 
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
         self.assertFalse(Vignettenposition.objects.exists())
@@ -265,7 +283,7 @@ class TrainingssitzungTests(TestCase):
         )
 
         debrief: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
@@ -274,7 +292,7 @@ class TrainingssitzungTests(TestCase):
         self.assertFalse(Diagnose.objects.exists())
 
         fertig: HttpResponse = self.client.post(
-            reverse("training:debrief"), {"diagnose": "Bruchfehler"}
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
         )
 
         self.assertEqual(fertig.status_code, 302)
@@ -284,14 +302,14 @@ class TrainingssitzungTests(TestCase):
     def test_debrief_nach_vorzeitigem_gespraechsende_bleibt_laufend(self) -> None:
         """Der Debrief schließt die Sitzung erst mit ihrer Diagnose ab."""
         training: Training = self._sitzung_starten([])
-        self.client.post(reverse("training:gespraech_beenden"))
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
 
         sitzung: Sitzung = Sitzung.objects.get()
         self.assertEqual(sitzung.status, Sitzung.Status.LAUFEND)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
 
         response: HttpResponse = self.client.post(
-            reverse("training:debrief"), {"diagnose": "Bruchfehler"}
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
         )
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
@@ -306,13 +324,13 @@ class TrainingssitzungTests(TestCase):
                 budget_typ=Vignette.BudgetTyp.ZEIT,
                 budget_wert=1,
             )
-            self.client.get(reverse("training:gespraech"))
+            self.client.get(route_der_letzten_sitzung("gespraech"))
 
         with time_machine.travel(
             datetime(2026, 7, 1, 10, 0, 5, tzinfo=UTC), tick=False
         ):
             debrief: HttpResponse = self.client.post(
-                reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+                route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
             )
 
         self.assertContains(debrief, "Was ist Ihnen aufgefallen?")
@@ -326,7 +344,7 @@ class TrainingssitzungTests(TestCase):
             [{"denkspur": "Interne Denkspur", "aeusserung": "Sichtbare Antwort."}]
         )
         response: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
         self.assertContains(response, "Sichtbare Antwort.")
         self.assertNotContains(response, "Interne Denkspur")
@@ -336,9 +354,13 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten(
             [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
         )
-        self.client.post(reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"})
-        self.client.post(reverse("training:gespraech_beenden"))
-        self.client.post(reverse("training:debrief"), {"diagnose": "Bruchfehler"})
+        self.client.post(
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
+        )
         sitzung: Sitzung = Sitzung.objects.get()
 
         response: HttpResponse = self.client.get(
@@ -356,10 +378,13 @@ class TrainingssitzungTests(TestCase):
         self._sitzung_starten(
             [{"denkspur": "Interne Denkspur", "aeusserung": "Ich addiere alles."}]
         )
-        self.client.post(reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"})
-        self.client.post(reverse("training:gespraech_beenden"))
         self.client.post(
-            reverse("training:debrief"), {"diagnose": "Mia addiert Zähler und Nenner."}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(
+            route_der_letzten_sitzung("debrief"),
+            {"diagnose": "Mia addiert Zähler und Nenner."},
         )
         inhalt: str = self.client.get(
             reverse("training:sitzung_ansehen", args=[Sitzung.objects.get().pk])
@@ -407,3 +432,73 @@ class TrainingssitzungTests(TestCase):
             reverse("training:sitzung_ansehen", args=[sitzung.pk])
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_fremde_sitzungsadresse_ergibt_404(self) -> None:
+        """Eine geratene Sitzungs-pk führt nicht in eine fremde Sitzung."""
+        self._sitzung_starten([])
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.client.force_login(konto_mit_rollen("margaret"))
+
+        for route, methode in (
+            ("training:gespraech", self.client.get),
+            ("training:gespraech_beenden", self.client.post),
+            ("training:abbrechen", self.client.post),
+            ("training:debrief", self.client.post),
+            ("training:transkription", self.client.post),
+        ):
+            with self.subTest(route=route):
+                response: HttpResponse = methode(reverse(route, args=[sitzung.pk]))
+                self.assertEqual(response.status_code, 404)
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
+    def test_laufende_sitzung_laesst_sich_aus_frischem_client_fortsetzen(
+        self,
+    ) -> None:
+        """Ein anderer Browser mit demselben Konto setzt das Gespräch fort."""
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
+        )
+        sitzung: Sitzung = Sitzung.objects.get()
+        gespraech_url: str = reverse("training:gespraech", args=[sitzung.pk])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+        anderer_browser: Client = Client()
+        anderer_browser.force_login(Konto.objects.get(username="grace"))
+
+        fortgesetzt: HttpResponse = anderer_browser.get(gespraech_url)
+
+        self.assertContains(fortgesetzt, "Wie rechnest du?")
+        self.assertContains(fortgesetzt, "Ich addiere alles.")
+        self.assertContains(fortgesetzt, "Ihre nächste Frage")
+        weiter: HttpResponse = anderer_browser.post(
+            gespraech_url, {"eingabe": "Und dann?"}
+        )
+        self.assertContains(weiter, "Wie rechnest du?")
+        self.assertContains(weiter, "Und dann?")
+        self.assertEqual(Gespraechsschritt.objects.count(), 2)
+
+    def test_trainingsseite_bietet_laufende_sitzung_zum_fortsetzen_an(self) -> None:
+        """Die laufende Sitzung trägt den Link auf ihre Gesprächsroute."""
+        training: Training = self._sitzung_starten([])
+        sitzung: Sitzung = Sitzung.objects.get()
+
+        response: HttpResponse = self.client.get(
+            reverse("training:detail", args=[training.pk])
+        )
+
+        self.assertContains(
+            response,
+            f'href="{reverse("training:gespraech", args=[sitzung.pk])}">Fortsetzen',
+        )
+
+    def test_trainingsseite_bietet_abgebrochene_sitzung_nicht_zum_fortsetzen_an(
+        self,
+    ) -> None:
+        """Eine beendete Sitzung lässt sich von der Trainingsseite nicht fortsetzen."""
+        training: Training = self._sitzung_starten([])
+        self.client.post(route_der_letzten_sitzung("abbrechen"))
+
+        response: HttpResponse = self.client.get(
+            reverse("training:detail", args=[training.pk])
+        )
+
+        self.assertNotContains(response, "Fortsetzen")

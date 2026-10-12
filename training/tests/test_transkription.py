@@ -18,7 +18,7 @@ from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.views import transkriptions_endpunkt
 from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
-from training.views import training_sitzung
+from training.views import laufende_training_sitzung
 from vignetten.models import Vignette
 
 
@@ -44,23 +44,26 @@ class TranskriptionsEndpointTests(TestCase):
         )
         return Sitzung.objects.get()
 
-    def _anfragen(self, anbieter: FakeTranskription) -> HttpResponse:
+    def _anfragen(self, sitzung: Sitzung, anbieter: FakeTranskription) -> HttpResponse:
         request: HttpRequest = RequestFactory().post(
-            "/training/sitzung/transkription/", {"audio": audioaufnahme()}
+            reverse("training:transkription", args=[sitzung.pk]),
+            {"audio": audioaufnahme()},
         )
         request.user = get_user_model().objects.get(username="grace")
         request.session = self.client.session
         try:
-            return transkriptions_endpunkt(lambda: anbieter, training_sitzung)(request)
+            return transkriptions_endpunkt(lambda: anbieter, laufende_training_sitzung)(
+                request, pk=sitzung.pk
+            )
         finally:
             request.close()
 
     def test_liefert_das_transkript_einer_aufnahme(self) -> None:
         """Audio wird nur in der Anfrage zum Text für das Frontend überführt."""
-        self._sitzung_starten()
+        sitzung: Sitzung = self._sitzung_starten()
 
         response: HttpResponse = self._anfragen(
-            FakeTranskription(["Wie hast du gerechnet?"])
+            sitzung, FakeTranskription(["Wie hast du gerechnet?"])
         )
 
         self.assertEqual(response.status_code, 200)
@@ -74,7 +77,7 @@ class TranskriptionsEndpointTests(TestCase):
         sitzung.teilnahme.save(update_fields=["audioverarbeitung_eingewilligt"])
         anbieter = FakeTranskription(["Text"])
 
-        response: HttpResponse = self._anfragen(anbieter)
+        response: HttpResponse = self._anfragen(sitzung, anbieter)
 
         self.assertEqual(response.status_code, 403)
         self.assertJSONEqual(response.content, {"status": "einwilligung_verweigert"})
@@ -82,11 +85,11 @@ class TranskriptionsEndpointTests(TestCase):
 
     def test_ohne_laufende_sitzung_bleibt_der_endpunkt_verschlossen(self) -> None:
         """Ein Trainingskonto allein berechtigt nicht zur Transkription."""
-        self._sitzung_starten()
-        self.client.post(reverse("training:abbrechen"))
+        sitzung: Sitzung = self._sitzung_starten()
+        self.client.post(reverse("training:abbrechen", args=[sitzung.pk]))
         anbieter = FakeTranskription(["Text"])
 
         with self.assertRaises(PermissionDenied):
-            self._anfragen(anbieter)
+            self._anfragen(sitzung, anbieter)
 
         self.assertEqual(anbieter.skript, ["Text"])

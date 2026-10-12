@@ -348,7 +348,7 @@ class InhaltTests(TrainingsexportTestCase):
     ) -> None:
         """Exporte verschiedener Trainings verknüpfen niemanden."""
         zweites: Training = Training.objects.anlegen(self.ausbilderin, name="Zweites")
-        zweites.vignetten.add(self.vignette)
+        zweites.vignette_aufnehmen(self.vignette)
         zweites.veroeffentlichen()
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         gespielte_sitzung(zweites, self.teilnehmerin, self.vignette)
