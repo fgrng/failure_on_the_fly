@@ -351,7 +351,7 @@ def anlegen(request: HttpRequest) -> HttpResponse:
 def detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt die Vignetten eines zugänglichen Trainings inkl. eigener Sitzungen."""
     training: Training = _zugaengliches_training(request, pk)
-    vignetten: QuerySet[Vignette] = training.vignetten.filter(
+    vignetten: QuerySet[Vignette] = training.vignetten_in_reihenfolge().filter(
         zustand=Vignette.Zustand.FINAL
     )
     sitzungen_nach_vignette: dict[int, list[Sitzung]] = {}
@@ -409,6 +409,7 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
         "training/kuratieren.html",
         {
             "training": training,
+            "vignetten": training.vignetten_in_reihenfolge(),
             "zustand_badge": _zustand_badge(training),
             "trainings_link_url": request.build_absolute_uri(
                 reverse("training:beitreten", args=[training.trainings_link])
@@ -426,16 +427,13 @@ def kuratieren(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def _fremdeinsicht(konto: Konto, training: Training) -> dict[str, object]:
-    # Baut die Tabelle der Fremdeinsicht: die Vignetten in Kuratierreihenfolge
+    # Baut die Tabelle der Fremdeinsicht: die Vignetten in empfohlener Reihenfolge
     # als Spalten, alle Beigetretenen nach Namen als Zeilen. Eine Zelle hält die
     # abgeschlossenen Sitzungen der Person zu der Vignette, nummeriert je Zelle.
 
-    vignetten: list[Vignette] = [
-        eintrag.vignette
-        for eintrag in Training.vignetten.through.objects.filter(training=training)
-        .select_related("vignette__historie")
-        .order_by("pk")
-    ]
+    vignetten: list[Vignette] = list(
+        training.vignetten_in_reihenfolge().select_related("historie")
+    )
     sitzungen_nach_zelle: dict[tuple[int, int], list[Sitzung]] = {}
     for sitzung in (
         _fremd_einsehbare_sitzungen(konto)
@@ -550,7 +548,7 @@ def vignette_hinzufuegen(
     vignette: Vignette = get_object_or_404(
         _eigene_finalen_vignetten(request), pk=vignette_pk
     )
-    training.vignetten.add(vignette)
+    training.vignette_aufnehmen(vignette)
     return redirect("training:kuratieren", pk=training.pk)
 
 
@@ -562,7 +560,25 @@ def vignette_entfernen(request: HttpRequest, pk: int, vignette_pk: int) -> HttpR
         return HttpResponseNotAllowed(["POST"])
     training: Training = _sichtbares_training(request, pk)
     vignette: Vignette = get_object_or_404(training.vignetten, pk=vignette_pk)
-    training.vignetten.remove(vignette)
+    training.vignette_entfernen(vignette)
+    return redirect("training:kuratieren", pk=training.pk)
+
+
+@login_required
+@_ausbilderin_erforderlich
+def vignette_verschieben(
+    request: HttpRequest, pk: int, vignette_pk: int
+) -> HttpResponse:
+    """Setzt eine gebundene Vignette an eine neue Position, auch veröffentlicht."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    training: Training = _sichtbares_training(request, pk)
+    vignette: Vignette = get_object_or_404(training.vignetten, pk=vignette_pk)
+    try:
+        position: int = int(request.POST["position"])
+    except KeyError, ValueError:
+        return HttpResponseBadRequest("Position fehlt oder ist keine Zahl.")
+    training.vignette_verschieben(vignette, position)
     return redirect("training:kuratieren", pk=training.pk)
 
 

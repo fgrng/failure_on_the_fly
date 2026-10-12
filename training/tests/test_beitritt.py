@@ -278,7 +278,7 @@ class GeschlossenesTrainingTests(TestCase):
         self.vignette: Vignette = finale_vignette(
             konto_mit_rollen("barbara", AUTORIN_GRUPPE), name="Brüche vergleichen"
         )
-        self.training.vignetten.add(self.vignette)
+        self.training.vignette_aufnehmen(self.vignette)
         self.training.veroeffentlichen()
 
     def _beitreten(self, konto: Konto) -> None:

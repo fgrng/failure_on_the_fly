@@ -140,7 +140,7 @@ class SitzungAnsehenTests(FremdeinsichtTestCase):
         fremdes_training: Training = Training.objects.anlegen(
             fremder_kreis, name="Anderes Seminar"
         )
-        fremdes_training.vignetten.add(self.vignette)
+        fremdes_training.vignette_aufnehmen(self.vignette)
         fremdes_training.veroeffentlichen()
         fremdes_training.beitreten(self.teilnehmerin)
         sitzung: Sitzung = gespielte_sitzung(
@@ -231,14 +231,25 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
             kuratierseite(self.client, self.training, self.ausbilderin),
         )
 
-    def test_spalten_folgen_der_kuratierreihenfolge(self) -> None:
+    def test_spalten_folgen_der_empfohlenen_reihenfolge(self) -> None:
         """Eine später aufgenommene Vignette steht rechts, nicht alphabetisch."""
-        self.training.vignetten.add(finale_vignette(self.autorin, name="Addition"))
+        self.training.vignette_aufnehmen(finale_vignette(self.autorin, name="Addition"))
 
         seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
 
         self.assertLess(
             seite.index('title="Brüche addieren"'), seite.index('title="Addition"')
+        )
+
+    def test_spalten_folgen_einer_verschobenen_vignette(self) -> None:
+        """Nach dem Verschieben stehen die Spalten in der neuen Reihenfolge."""
+        self.training.vignette_aufnehmen(finale_vignette(self.autorin, name="Addition"))
+        self.training.vignette_verschieben(self.vignette, 2)
+
+        seite: str = kuratierseite(self.client, self.training, self.ausbilderin)
+
+        self.assertLess(
+            seite.index('title="Addition"'), seite.index('title="Brüche addieren"')
         )
 
     def test_abgeschlossene_sitzung_ist_verlinkt(self) -> None:
@@ -285,7 +296,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
     def test_nummerierung_beginnt_je_vignette_neu(self) -> None:
         """Die erste Sitzung zu einer weiteren Vignette trägt wieder die 1."""
         weitere: Vignette = finale_vignette(self.autorin, name="Addition")
-        self.training.vignetten.add(weitere)
+        self.training.vignette_aufnehmen(weitere)
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
         gespielte_sitzung(self.training, self.teilnehmerin, weitere)
@@ -309,7 +320,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
     def test_training_ohne_beigetretene_zeigt_eine_leerzeile(self) -> None:
         """Solange niemand beigetreten ist, sagt die Tabelle das."""
         leeres: Training = Training.objects.anlegen(self.ausbilderin, name="Neu")
-        leeres.vignetten.add(self.vignette)
+        leeres.vignette_aufnehmen(self.vignette)
         leeres.veroeffentlichen()
         self.client.force_login(self.ausbilderin)
 
@@ -321,7 +332,7 @@ class FremdeinsichtTabelleTests(FremdeinsichtTestCase):
 
     def test_leeres_training_zeigt_einen_hinweis_statt_der_tabelle(self) -> None:
         """Ohne Vignetten gibt es nichts zu tabellieren."""
-        self.training.vignetten.clear()
+        self.training.vignette_entfernen(self.vignette)
 
         self.assertIn(
             "Dieses Training enthält keine Vignetten.",

@@ -286,7 +286,7 @@ class InhaltTests(TrainingsexportTestCase):
         fremdes: Training = Training.objects.anlegen(
             konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Fremd"
         )
-        fremdes.vignetten.add(self.vignette)
+        fremdes.vignette_aufnehmen(self.vignette)
         fremdes.veroeffentlichen()
         gespielte_sitzung(fremdes, self.teilnehmerin, self.vignette)
 

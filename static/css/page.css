@@ -291,6 +291,24 @@ p.eigentuemerinnen__hinweis {
     width: auto;
 }
 
+/* ---- Reihenfolge-Aktionen: Hoch, Runter und Entfernen in einer Zeile ---- */
+.reihenfolge-aktionen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.reihenfolge-aktionen form {
+    margin: 0;
+}
+
+/* Umrandet in der Bereichsfarbe der Seite statt im allgemeinen Akzent. */
+.button--bereich,
+.button--bereich:hover {
+    border-color: var(--area-solid);
+    color: var(--area-solid);
+}
+
 /* ---- Stichprobe anlegen: eine rechtsbündige Zeile über ihrer Tabelle ---- */
 .stichprobe-anlegen {
     display: flex;

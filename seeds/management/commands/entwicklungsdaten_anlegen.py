@@ -142,6 +142,19 @@ VIGNETTEN: list[dict[str, object]] = [
 ]
 
 
+def _vignetten_setzen(training: Training, vignetten: list[Vignette]) -> None:
+    """Stellt die Vignetten eines Trainings ein; Neue kommen in Listenfolge ans Ende.
+
+    Bereits aufgenommene Vignetten behalten ihre Position.
+    """
+    for ueberzaehlige in training.vignetten_in_reihenfolge().exclude(
+        pk__in=[vignette.pk for vignette in vignetten]
+    ):
+        training.vignette_entfernen(ueberzaehlige)
+    for vignette in vignetten:
+        training.vignette_aufnehmen(vignette)
+
+
 class Command(BaseCommand):
     """Legt idempotent Konten, Kern, Modell-Konfiguration, Vignetten und Trainings an."""
 
@@ -290,7 +303,7 @@ class Command(BaseCommand):
             veroeffentlicht = Training.objects.anlegen(
                 ausbilderin, name="Diagnose-Grundlagen"
             )
-        veroeffentlicht.vignetten.set(vignetten)
+        _vignetten_setzen(veroeffentlicht, vignetten)
         if ist_neu:
             veroeffentlicht.veroeffentlichen()
             self.stdout.write(
@@ -315,7 +328,7 @@ class Command(BaseCommand):
         elif entwurf.name != "Entwurf: Gleichheitszeichen diagnostizieren":
             entwurf.name = "Entwurf: Gleichheitszeichen diagnostizieren"
             entwurf.save(update_fields=["name"])
-        entwurf.vignetten.set(vignetten[:1])
+        _vignetten_setzen(entwurf, vignetten[:1])
         if ist_neu and vignetten:
             self.stdout.write(
                 "  Training 'Entwurf: Gleichheitszeichen diagnostizieren' "

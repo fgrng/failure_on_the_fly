@@ -207,7 +207,7 @@ Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsb
 _Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
-Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten, die Teilnehmende in freier Reihenfolge und beliebig oft spielen. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem die Trainingsteilnehmenden ihre Abschriften freigeben. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
+Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten in einer empfohlenen Reihenfolge, die Teilnehmende unabhängig davon in freier Reihenfolge und beliebig oft spielen. Die empfohlene Reihenfolge gehört zur Konfiguration des Trainings; anders als die Vignettenposition einer Erhebungssitzung hält sie nicht fest, was gespielt wurde, und Trainingssitzungen tragen keine Vignettenposition. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem die Trainingsteilnehmenden ihre Abschriften freigeben. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
 _Avoid_: Übung, Kurs, Übungsmodus; Gruppe, Mitglieder (für die Trainingsteilnehmenden)
 
 **Austritt aus dem Training**:

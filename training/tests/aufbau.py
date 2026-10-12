@@ -121,6 +121,6 @@ class FremdeinsichtTestCase(TestCase):
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
-        self.training.vignetten.add(self.vignette)
+        self.training.vignette_aufnehmen(self.vignette)
         self.training.veroeffentlichen()
         self.training.beitreten(self.teilnehmerin)
