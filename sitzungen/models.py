@@ -1,13 +1,28 @@
 """Persistenzmodelle einer Sitzung."""
 
+import secrets
+
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import F, Q
 
 
+def neue_teilnahmekennung() -> str:
+    """Zieht eine Teilnahmekennung, die nichts in sich trägt (ADR-0049)."""
+
+    return secrets.token_hex(4)
+
+
 class Teilnahme(models.Model):
     """Die anonyme Klammer für Sitzungen eines Aufrufers."""
 
+    # Der pseudonyme Name der Teilnahme in Einsicht und Exporten; nie das
+    # Token, und die Abschrift bekommt mit ihrer Teilnahme eine eigene.
+    kennung: models.CharField = models.CharField(
+        max_length=8,
+        default=neue_teilnahmekennung,
+        editable=False,
+    )
     # Die drei Einwilligungen einer Erhebungsteilnahme; `None` heißt nicht
     # entschieden oder nicht angeboten. Die Audioverarbeitung heißt in der
     # Oberfläche Spracherkennung und wird auch im Training eingeholt.
@@ -70,6 +85,42 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
             status=Sitzung.Status.ABGESCHLOSSEN,
         ).distinct()
 
+    def laufende_von(self, teilnahme: Teilnahme) -> "Sitzung | None":
+        """Liefert die laufende Sitzung der Teilnahme oder keine.
+
+        Es gibt höchstens eine; die Datenbank erzwingt das.
+        """
+        return self.filter(teilnahme=teilnahme, status=Sitzung.Status.LAUFEND).first()
+
+    def in_erhebungen_einsehbar(self, erhebungen: models.QuerySet) -> "SitzungQuerySet":
+        """Liefert die Sitzungen, die der Kreis dieser Erhebungen sieht.
+
+        Einsicht folgt dem Anlass (ADR-0049): die Sitzungen, deren Teilnahme an
+        einer Erhebungsbindung einer Stichprobe der Erhebungen hängt, in jedem
+        Status und auch flüchtige Gerüste. Inhaltlich lesbar sind davon nur
+        beendete Sitzungen nicht flüchtiger Teilnahmen; die Übersicht zeigt
+        von den übrigen allein Status und Position. Wer die Erhebungen sieht,
+        entscheidet der Aufrufer über `Erhebung.objects.sichtbar_fuer`.
+        """
+        return self.filter(
+            teilnahme__erhebungsbindung__stichprobe__erhebung__in=erhebungen.values(
+                "pk"
+            )
+        )
+
+    def inhaltlich_lesbar(self) -> "SitzungQuerySet":
+        """Beschränkt auf beendete Sitzungen nicht flüchtiger Teilnahmen.
+
+        Nur sie öffnet die Einsicht einer Erhebung inhaltlich (ADR-0049).
+        """
+        return self.filter(
+            status__in=(
+                Sitzung.Status.ABGESCHLOSSEN,
+                Sitzung.Status.ABGEBROCHEN,
+                Sitzung.Status.GESCHEITERT,
+            )
+        ).exclude(Teilnahme.fluechtig_q("teilnahme__"))
+
     def in_gespielter_folge(self) -> "SitzungQuerySet":
         """Sortiert nach der Vignettenposition; Sitzungen ohne Position hinten."""
         return self.order_by(
@@ -117,6 +168,17 @@ class Sitzung(models.Model):
     offene_spanne_seit: models.DateTimeField = models.DateTimeField(null=True)
 
     objects: models.Manager["Sitzung"] = SitzungQuerySet.as_manager()
+
+    class Meta:
+        """Hält je Teilnahme höchstens eine Sitzung laufend."""
+
+        constraints: list[models.BaseConstraint] = [
+            models.UniqueConstraint(
+                fields=["teilnahme"],
+                condition=Q(status="laufend"),
+                name="sitzungen_hoechstens_eine_laufende_sitzung_je_teilnahme",
+            ),
+        ]
 
     @property
     def gespraechsschritte(self) -> models.QuerySet["Gespraechsschritt"]:

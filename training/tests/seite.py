@@ -36,3 +36,12 @@ def kuratierseite(client: Client, training: Training, konto: Konto) -> str:
     if antwort.status_code != 200:
         raise AssertionError(f"Die Seite antwortet mit {antwort.status_code}.")
     return antwort.content.decode()
+
+
+def nummerierte_vignetten(seite: str) -> list[str]:
+    """Liefert die nummerierten Vignettenzellen einer Seite, etwa ``"1. Brüche"``."""
+
+    return [
+        f"{nummer}. {name}"
+        for nummer, name in re.findall(r"<td>(\d+)\. ([^<]+)</td>", seite)
+    ]

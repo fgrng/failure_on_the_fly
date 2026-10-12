@@ -16,6 +16,21 @@ from simulation.models import (
 from simulation.standardkern import STANDARDKERN_VORLAGEN
 
 
+def _kern_daten(kern: Simulationskern, **werte: str) -> dict[str, str]:
+    # POST-Daten mit den gespeicherten Texten ohne User-Prompt-Vorlage,
+    # überschrieben durch werte.
+    daten: dict[str, str] = {
+        feld: getattr(kern, feld)
+        for feld in (
+            "rahmenhandlung_einleitung",
+            "rahmenhandlung_gespraechseinleitung",
+            "rahmenhandlung_debrief",
+            "system_prompt_vorlage",
+        )
+    }
+    return {**daten, **werte}
+
+
 class SimulationskernAnsichtLeereRahmenhandlungTests(TestCase):
     """Leere Abschnitte der Rahmenhandlung zeigen den gewohnten Platzhalter."""
 
@@ -396,7 +411,6 @@ class SimulationskernVerwaltungTests(TestCase):
             "Gesprächseinleitung",
             "Debrief",
             "System-Prompt-Vorlage",
-            "User-Prompt-Vorlage",
         ):
             self.assertContains(response, f">{bezeichnung}</label>")
 
@@ -422,7 +436,7 @@ class SimulationskernVerwaltungTests(TestCase):
             self.assertContains(response, f'id="id_{feld}_vorschau"')
             self.assertContains(response, f'aria-describedby="id_{feld}_helptext"')
         self.assertNotContains(response, 'id="id_system_prompt_vorlage_vorschau"')
-        self.assertContains(response, "Erlaubte Platzhalter:", count=5)
+        self.assertContains(response, "Erlaubte Platzhalter:", count=4)
 
     def test_ungueltiger_platzhalter_erscheint_am_verursachenden_feld(self) -> None:
         """Die Formularvalidierung ordnet Vertragsverletzungen dem Feld zu."""
@@ -678,20 +692,6 @@ class SimulationskernLangeTexteTests(TestCase):
         self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
-    def _daten(self, **werte: str) -> dict[str, str]:
-        # POST-Daten mit den gespeicherten Texten, überschrieben durch werte.
-        daten: dict[str, str] = {
-            feld: getattr(self.entwurf, feld)
-            for feld in (
-                "rahmenhandlung_einleitung",
-                "rahmenhandlung_gespraechseinleitung",
-                "rahmenhandlung_debrief",
-                "system_prompt_vorlage",
-                "user_prompt_vorlage",
-            )
-        }
-        return {**daten, **werte}
-
     def test_texte_erscheinen_gerendert_mit_bearbeiten_oder_text_schreiben(
         self,
     ) -> None:
@@ -702,8 +702,8 @@ class SimulationskernLangeTexteTests(TestCase):
             response, "Frau <strong>$lehrperson_name</strong> unterrichtet."
         )
         self.assertContains(response, "<p>Du bist **$schuelerin_name**.</p>")
-        self.assertContains(response, "Noch kein Text", count=3)
-        self.assertContains(response, ">Text schreiben</button>", count=3)
+        self.assertContains(response, "Noch kein Text", count=2)
+        self.assertContains(response, ">Text schreiben</button>", count=2)
 
     def test_jeder_speichern_knopf_speichert_den_ganzen_kern(self) -> None:
         """Alle Speichern-Knöpfe senden dasselbe Formular mit allen Feldern."""
@@ -714,12 +714,13 @@ class SimulationskernLangeTexteTests(TestCase):
             for beschriftung, formular in submit_knoepfe(response)
             if "speichern" in beschriftung.lower()
         ]
-        self.assertEqual(len(speichern), 5 + 1)
+        self.assertEqual(len(speichern), 4 + 1)
         self.assertEqual(set(speichern), {"kern-formular"})
 
         self.client.post(
             self.url,
-            self._daten(
+            _kern_daten(
+                self.entwurf,
                 rahmenhandlung_debrief="Neuer Debrief",
                 user_prompt_vorlage="Neue Eingabe",
             ),
@@ -734,7 +735,7 @@ class SimulationskernLangeTexteTests(TestCase):
     def test_text_mit_fehler_startet_offen(self) -> None:
         """Nach einem Platzhalterfehler steht nur der betroffene Text offen."""
         response: HttpResponse = self.client.post(
-            self.url, self._daten(system_prompt_vorlage="$unbekannt")
+            self.url, _kern_daten(self.entwurf, system_prompt_vorlage="$unbekannt")
         )
 
         self.assertContains(response, "bearbeiten: true", count=1)
@@ -787,3 +788,105 @@ class SimulationskernSeitennavigationTests(TestCase):
             '<a href="/system/kern/verwalten/">Simulationskern verwalten</a>',
             html=False,
         )
+
+
+class SimulationskernLeereUserPromptVorlageTests(TestCase):
+    """Eine leere User-Prompt-Vorlage bleibt verborgen (ADR-0052, #436)."""
+
+    def setUp(self) -> None:
+        """Legt einen Entwurf ohne User-Prompt-Vorlage an."""
+        self.entwurf: Simulationskern = Simulationskern.objects.anlegen(
+            system_prompt_vorlage="Du bist $schuelerin_name.",
+        )
+        self.url: str = reverse("simulation:kern_bearbeiten", args=[self.entwurf.pk])
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
+
+    def _user_prompt_fuellen(self, text: str) -> None:
+        # Füllt das Altfeld wie bei einer überholten Fassung.
+        self.entwurf.user_prompt_vorlage = text
+        self.entwurf.save()
+
+    def test_leerer_entwurf_zeigt_das_feld_nicht(self) -> None:
+        """Ohne gespeicherte Vorlage erscheint das Feld nicht im Formular."""
+        response: HttpResponse = self.client.get(self.url)
+
+        self.assertNotContains(response, "user_prompt_vorlage")
+        self.assertNotContains(response, "User-Prompt-Vorlage")
+
+    def test_gefuellter_entwurf_zeigt_das_feld(self) -> None:
+        """Eine gespeicherte Vorlage steht unter ihrer Bezeichnung bearbeitbar."""
+        self._user_prompt_fuellen("Alte Eingabe")
+
+        response: HttpResponse = self.client.get(self.url)
+
+        self.assertContains(response, ">User-Prompt-Vorlage</label>")
+        self.assertContains(response, "Alte Eingabe")
+
+    def test_geleertes_feld_verschwindet_beim_naechsten_aufruf(self) -> None:
+        """Wer die Vorlage leert und speichert, sieht das Feld danach nicht mehr."""
+        self._user_prompt_fuellen("Alte Eingabe")
+
+        response: HttpResponse = self.client.post(
+            self.url, _kern_daten(self.entwurf, user_prompt_vorlage="")
+        )
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+
+        self.entwurf.refresh_from_db()
+        self.assertEqual(self.entwurf.user_prompt_vorlage, "")
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "user_prompt_vorlage")
+        self.assertNotContains(response, "User-Prompt-Vorlage")
+
+    def test_speichern_ohne_feld_laesst_die_vorlage_unberuehrt(self) -> None:
+        """Fehlt das Feld in den Daten, bleibt die Vorlage und es gibt keinen Fehler."""
+        response: HttpResponse = self.client.post(
+            self.url,
+            _kern_daten(self.entwurf, system_prompt_vorlage="Neuer System-Prompt"),
+        )
+
+        self.assertRedirects(response, reverse("simulation:kern_verwalten"))
+        self.entwurf.refresh_from_db()
+        self.assertEqual(
+            (self.entwurf.system_prompt_vorlage, self.entwurf.user_prompt_vorlage),
+            ("Neuer System-Prompt", ""),
+        )
+
+    def test_fehler_nach_gefuelltem_feld_zeigt_es_weiter(self) -> None:
+        """Abgeschickte Daten halten das Feld sichtbar, auch bei einem Fehler."""
+        response: HttpResponse = self.client.post(
+            self.url,
+            _kern_daten(
+                self.entwurf,
+                system_prompt_vorlage="$unbekannt",
+                user_prompt_vorlage="Neue Eingabe",
+            ),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, ">User-Prompt-Vorlage</label>")
+        self.assertContains(response, "Neue Eingabe")
+
+    def test_uebersicht_zeigt_den_abschnitt_nur_bei_gefuellter_vorlage(self) -> None:
+        """Entwurf und finale Fassung ohne Vorlage tragen keinen Abschnitt."""
+        self.entwurf.finalisieren()
+        self.entwurf.bearbeiten()
+
+        for route in ("simulation:kern", "simulation:kern_verwalten"):
+            with self.subTest(route=route):
+                response: HttpResponse = self.client.get(reverse(route))
+
+                self.assertNotContains(response, "User-Prompt-Vorlage")
+
+    def test_uebersicht_zeigt_gefuellte_vorlage_ueberholter_fassungen(self) -> None:
+        """Eine archivierte Fassung mit Vorlage bleibt lesbar, die neue ohne nicht."""
+        self._user_prompt_fuellen("Alte Eingabe")
+        self.entwurf.finalisieren()
+        neue_fassung: Simulationskern = self.entwurf.bearbeiten()
+        neue_fassung.user_prompt_vorlage = ""
+        neue_fassung.save()
+        neue_fassung.finalisieren()
+
+        response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
+
+        self.assertContains(response, "<h3>User-Prompt-Vorlage</h3>", count=1)
+        self.assertContains(response, "Alte Eingabe", count=1)

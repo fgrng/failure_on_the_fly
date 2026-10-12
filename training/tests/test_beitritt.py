@@ -278,7 +278,7 @@ class GeschlossenesTrainingTests(TestCase):
         self.vignette: Vignette = finale_vignette(
             konto_mit_rollen("barbara", AUTORIN_GRUPPE), name="Brüche vergleichen"
         )
-        self.training.vignetten.add(self.vignette)
+        self.training.vignette_aufnehmen(self.vignette)
         self.training.veroeffentlichen()
 
     def _beitreten(self, konto: Konto) -> None:
@@ -310,7 +310,7 @@ class GeschlossenesTrainingTests(TestCase):
                     Trainingsbindung, Trainingsbindung.objects.get(konto=konto)
                 )
                 sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
-                self.client.post(reverse("training:abbrechen"))
+                self.client.post(reverse("training:abbrechen", args=[sitzung.pk]))
 
                 for gesperrt in (False, True):
                     self.training.beitritt_gesperrt = gesperrt

@@ -1,0 +1,1033 @@
+"""HTTP-Tests der Übersicht in der Fremdeinsicht einer Erhebung (ADR-0049)."""
+
+import re
+from collections.abc import Iterable
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import time_machine
+from django.http import HttpResponse
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from config.tests.aufbau import finale_vignette, finaler_kern, konto_mit_rollen
+from erhebungen.models import (
+    Erhebung,
+    Erhebungsbindung,
+    Erhebungsitem,
+    ItemAntwort,
+    Itemblock,
+    Stichprobe,
+    Vignettenziehung,
+)
+from erhebungen.tests.aufbau import finale_erhebung, forschende
+from fragebogen_items.models import FragebogenItem
+from konten.models import Konto
+from konten.navigation import AUSBILDERIN_GRUPPE, AUTORIN_GRUPPE
+from simulation.models import ModellKonfiguration, Verwendung
+from sitzungen.models import (
+    Diagnose,
+    Fehlversuch,
+    Gespraechsschritt,
+    Sitzung,
+    Teilnahme,
+)
+from vignetten.models import Vignette
+
+_BERLIN: ZoneInfo = ZoneInfo("Europe/Berlin")
+
+
+def _einsicht_url(erhebung: Erhebung) -> str:
+    return reverse("erhebungen:einsicht", args=[erhebung.pk])
+
+
+def _sitzung_url(erhebung: Erhebung, sitzung: Sitzung) -> str:
+    return reverse("erhebungen:einsicht_sitzung", args=[erhebung.pk, sitzung.pk])
+
+
+def _abschluss_url(erhebung: Erhebung, bindung: Erhebungsbindung) -> str:
+    return reverse(
+        "erhebungen:einsicht_abschluss", args=[erhebung.pk, bindung.teilnahme_id]
+    )
+
+
+def _block_mit_antworten(
+    bindung: Erhebungsbindung,
+    andockpunkt: Erhebungsitem.Andockpunkt,
+    antworten: Iterable[dict[str, object]],
+    *,
+    sitzung: Sitzung | None = None,
+    erledigt_am: datetime | None = None,
+) -> Itemblock:
+    # Ein Item-Block der Teilnahme; die Antworten gehen der Reihe nach an die
+    # Items der Erhebung an diesem Andockpunkt.
+    block: Itemblock = Itemblock.objects.create(
+        erhebungsbindung=bindung,
+        andockpunkt=andockpunkt,
+        sitzung=sitzung,
+        erledigt_am=erledigt_am,
+    )
+    for erhebungsitem, werte in zip(
+        bindung.stichprobe.erhebung.itemzugehoerigkeiten.filter(
+            andockpunkt=andockpunkt
+        ).order_by("position"),
+        antworten,
+    ):
+        ItemAntwort.objects.create(
+            itemblock=block,
+            erhebungsbindung=bindung,
+            erhebungsitem=erhebungsitem,
+            sitzung=sitzung,
+            **werte,
+        )
+    return block
+
+
+class EinsichtTestCase(TestCase):
+    """Eine finale Erhebung von ada mit zwei Vignetten und einer Stichprobe."""
+
+    def setUp(self) -> None:
+        self.ada: Konto = forschende("ada")
+        self.brueche: Vignette = finale_vignette(self.ada, name="Brüche addieren")
+        self.zinsen: Vignette = finale_vignette(self.ada, name="Zinsen rechnen")
+        self.erhebung: Erhebung = finale_erhebung(
+            self.ada, vignetten=[self.brueche, self.zinsen]
+        )
+        self.stichprobe: Stichprobe = self._stichprobe(self.erhebung)
+
+    def _stichprobe(self, erhebung: Erhebung) -> Stichprobe:
+        return Stichprobe.objects.create(
+            erhebung=erhebung,
+            beginn=timezone.now() - timedelta(days=30),
+            ende=timezone.now() + timedelta(days=30),
+        )
+
+    def _teilnahme(
+        self,
+        stichprobe: Stichprobe | None = None,
+        *,
+        beginn: datetime | None = None,
+        einwilligung: bool | None = True,
+        fluechtig: bool = False,
+        ziehung: tuple[Vignette, ...] | None = None,
+    ) -> Erhebungsbindung:
+        # Eine Teilnahme, begonnen zum angegebenen Zeitpunkt; die Ziehung legt
+        # die gespielte Reihenfolge fest, ohne Angabe die der Erhebung.
+        with time_machine.travel(beginn or timezone.now(), tick=False):
+            bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(
+                stichprobe or self.stichprobe
+            )
+        bindung.teilnahme.sprachmodell_eingewilligt = einwilligung
+        bindung.teilnahme.speicherung_eingewilligt = not fluechtig
+        bindung.teilnahme.save()
+        if einwilligung:
+            for position, vignette in enumerate(
+                ziehung or (self.brueche, self.zinsen), start=1
+            ):
+                Vignettenziehung.objects.create(
+                    erhebungsbindung=bindung, vignette=vignette, position=position
+                )
+        return bindung
+
+    def _sitzung(
+        self,
+        bindung: Erhebungsbindung,
+        vignette: Vignette,
+        status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
+    ) -> Sitzung:
+        return Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=finaler_kern(),
+            modell_konfiguration=ModellKonfiguration.objects.belegte(
+                Verwendung.SCHUELERIN
+            ),
+            status=status,
+        )
+
+    def _einsicht(self, konto: Konto | None = None) -> HttpResponse:
+        self.client.force_login(konto or self.ada)
+        return self.client.get(_einsicht_url(self.erhebung))
+
+    def _zeile(self, antwort: HttpResponse, bindung: Erhebungsbindung) -> str:
+        # Die Tabellenzeile, die mit der Kennung der Teilnahme beschriftet ist.
+        treffer: list[str] = re.findall(
+            r"<tr\b(?:(?!</tr>).)*</tr>", antwort.content.decode(), re.DOTALL
+        )
+        zeilen: list[str] = [
+            zeile for zeile in treffer if bindung.teilnahme.kennung in zeile
+        ]
+        self.assertEqual(len(zeilen), 1, zeilen)
+        return zeilen[0]
+
+
+class EinsichtZugangTests(EinsichtTestCase):
+    """Wer die Übersicht erreicht."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.bindung: Erhebungsbindung = self._teilnahme()
+
+    def test_kreismitglied_sieht_die_teilnahme_unter_ihrer_kennung(self) -> None:
+        """Die eigene Erhebung zeigt jede eingewilligte Teilnahme."""
+
+        antwort: HttpResponse = self._einsicht()
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_administration_sieht_jede_erhebung(self) -> None:
+        """Die Administration sieht die Übersicht einer fremden Erhebung."""
+
+        admin: Konto = konto_mit_rollen("root", is_superuser=True)
+
+        antwort: HttpResponse = self._einsicht(admin)
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_fremder_kreis_bekommt_404(self) -> None:
+        """Eine fremde Erhebung bleibt unauffindbar."""
+
+        self.assertEqual(self._einsicht(forschende("grace")).status_code, 404)
+
+    def test_andere_rollen_werden_abgewiesen(self) -> None:
+        """Ohne Forschungsrolle gibt es keine Einsicht."""
+
+        for username, rollen in (
+            ("hedy", (AUSBILDERIN_GRUPPE,)),
+            ("lin", (AUTORIN_GRUPPE,)),
+            ("mo", ()),
+        ):
+            with self.subTest(username=username):
+                konto: Konto = konto_mit_rollen(username, *rollen)
+
+                self.assertEqual(self._einsicht(konto).status_code, 403)
+
+    def test_neues_kreismitglied_sieht_aeltere_teilnahmen(self) -> None:
+        """Einsicht folgt der aktuellen Eigentümerschaft, auch rückwirkend."""
+
+        neu: Konto = forschende("hedy")
+        self.erhebung.eigentuemerinnen.add(neu)
+
+        antwort: HttpResponse = self._einsicht(neu)
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_ausgetretenes_kreismitglied_bekommt_404(self) -> None:
+        """Wer den Kreis verlässt, sieht sofort nichts mehr."""
+
+        self.erhebung.eigentuemerinnen.add(forschende("hedy"))
+        self.erhebung.austreten(self.ada.pk)
+
+        self.assertEqual(self._einsicht().status_code, 404)
+
+    def test_bleibt_nach_dem_archivieren_der_erhebung_lesbar(self) -> None:
+        """Eine archivierte Erhebung zeigt ihre Teilnahmen weiter."""
+
+        self.stichprobe.ende = timezone.now() - timedelta(days=1)
+        self.stichprobe.save(update_fields=["ende"])
+        self.erhebung.archivieren()
+
+        antwort: HttpResponse = self._einsicht()
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_archivierte_stichprobe_bleibt_lesbar(self) -> None:
+        """Eine archivierte Stichprobe steht weiter in der Übersicht."""
+
+        # Archivieren lassen sich nur Stichproben ohne Daten.
+        archivierte: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=datetime(2027, 3, 1, tzinfo=_BERLIN),
+            ende=datetime(2027, 3, 31, tzinfo=_BERLIN),
+        )
+        archivierte.archivieren()
+
+        self.assertContains(self._einsicht(), "Stichprobe 01.03.2027 – 31.03.2027")
+
+
+class EinsichtLinkTests(EinsichtTestCase):
+    """Der Link auf der Detailseite der Erhebung."""
+
+    def _detail(self) -> HttpResponse:
+        self.client.force_login(self.ada)
+        return self.client.get(reverse("erhebungen:detail", args=[self.erhebung.pk]))
+
+    def test_ohne_teilnahmen_fehlt_der_link(self) -> None:
+        """Eine Stichprobe ohne Teilnahmen bietet keine leere Einsicht an."""
+
+        self.assertNotContains(self._detail(), _einsicht_url(self.erhebung))
+
+    def test_mit_teilnahme_erscheint_der_link(self) -> None:
+        """Sobald eine Teilnahme besteht, führt der Link zur Einsicht."""
+
+        self._teilnahme()
+
+        self.assertContains(self._detail(), _einsicht_url(self.erhebung))
+
+    def test_ohne_einwilligung_a_fehlt_der_link(self) -> None:
+        """Abgelehnte und offene Teilnahmen ergäben eine leere Einsicht."""
+
+        self._teilnahme(einwilligung=False)
+        self._teilnahme(einwilligung=None)
+
+        self.assertNotContains(self._detail(), _einsicht_url(self.erhebung))
+
+
+class EinsichtRasterTests(EinsichtTestCase):
+    """Aufbau und Inhalt des Rasters."""
+
+    def test_spalten_folgen_der_erhebungsreihenfolge(self) -> None:
+        """Die Vignetten stehen in der Reihenfolge der Erhebung."""
+
+        # Umgekehrt zur Anlagereihenfolge der Vignetten.
+        self.erhebung = finale_erhebung(self.ada, vignetten=[self.zinsen, self.brueche])
+        self._stichprobe(self.erhebung)
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(inhalt.index("Zinsen rechnen"), inhalt.index("Brüche addieren"))
+
+    def test_zeilen_sind_nach_beginn_sortiert(self) -> None:
+        """Die älteste Teilnahme steht oben."""
+
+        spaete: Erhebungsbindung = self._teilnahme(
+            beginn=datetime(2026, 10, 5, 9, 0, tzinfo=_BERLIN)
+        )
+        fruehe: Erhebungsbindung = self._teilnahme(
+            beginn=datetime(2026, 10, 1, 9, 0, tzinfo=_BERLIN)
+        )
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(
+            inhalt.index(fruehe.teilnahme.kennung),
+            inhalt.index(spaete.teilnahme.kennung),
+        )
+
+    def test_teilnahmen_ohne_beginn_stehen_oben(self) -> None:
+        """Bindungen aus der Zeit vor dem Beginndatum sind die ältesten."""
+
+        neue: Erhebungsbindung = self._teilnahme(
+            beginn=datetime(2026, 10, 1, 9, 0, tzinfo=_BERLIN)
+        )
+        alte: Erhebungsbindung = self._teilnahme()
+        Erhebungsbindung.objects.filter(pk=alte.pk).update(erstellt_am=None)
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(
+            inhalt.index(alte.teilnahme.kennung),
+            inhalt.index(neue.teilnahme.kennung),
+        )
+
+    def test_stichprobe_ohne_zeilen_nennt_den_leerzustand(self) -> None:
+        """Ohne eingewilligte Teilnahme steht statt Zeilen ein Hinweis."""
+
+        self._teilnahme(einwilligung=False)
+
+        self.assertContains(self._einsicht(), "Noch keine Teilnahme mit Einwilligung.")
+
+    def test_ist_nach_stichproben_gegliedert(self) -> None:
+        """Jede Teilnahme steht unter ihrer Stichprobe."""
+
+        zweite: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=datetime(2027, 3, 1, tzinfo=_BERLIN),
+            ende=datetime(2027, 3, 31, tzinfo=_BERLIN),
+        )
+        erste_bindung: Erhebungsbindung = self._teilnahme()
+        zweite_bindung: Erhebungsbindung = self._teilnahme(zweite)
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(
+            inhalt.index(erste_bindung.teilnahme.kennung), inhalt.index("01.03.2027")
+        )
+        self.assertLess(
+            inhalt.index("01.03.2027"), inhalt.index(zweite_bindung.teilnahme.kennung)
+        )
+
+    def test_bubble_zeigt_die_gespielte_position(self) -> None:
+        """Die Position stammt aus der Ziehung, nicht aus der Spalte."""
+
+        bindung: Erhebungsbindung = self._teilnahme(ziehung=(self.zinsen, self.brueche))
+        self._sitzung(bindung, self.zinsen)
+        self._sitzung(bindung, self.brueche, Sitzung.Status.LAUFEND)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        self.assertRegex(
+            zeile,
+            r'class="fremdeinsicht__sitzung"[^>]*aria-label="Position 1, '
+            r'Abgeschlossen"[^>]*>1<',
+        )
+
+    def test_abgebrochene_und_gescheiterte_tragen_warnfarbe_und_status(
+        self,
+    ) -> None:
+        """Auffällige Ausgänge fallen auf und nennen ihren Status."""
+
+        bindung: Erhebungsbindung = self._teilnahme()
+        self._sitzung(bindung, self.brueche, Sitzung.Status.ABGEBROCHEN)
+        self._sitzung(bindung, self.zinsen, Sitzung.Status.GESCHEITERT)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        for position, status in ((1, "Abgebrochen"), (2, "Gescheitert")):
+            self.assertRegex(
+                zeile,
+                r'class="fremdeinsicht__sitzung fremdeinsicht__sitzung--warnung"'
+                rf' title="{status}" aria-label="Position {position}, {status}"'
+                rf"[^>]*>{position}<",
+            )
+
+    def test_laufende_sitzung_ist_gedimmt(self) -> None:
+        """Eine laufende Sitzung zeigt nur, dass sie läuft."""
+
+        bindung: Erhebungsbindung = self._teilnahme()
+        self._sitzung(bindung, self.brueche, Sitzung.Status.LAUFEND)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        self.assertIn(
+            'class="fremdeinsicht__sitzung fremdeinsicht__sitzung--laufend"', zeile
+        )
+
+    def test_bubbles_beendeter_sitzungen_sind_verlinkt(self) -> None:
+        """Abgeschlossene, abgebrochene und gescheiterte Sitzungen öffnen sich."""
+
+        for status in (
+            Sitzung.Status.ABGESCHLOSSEN,
+            Sitzung.Status.ABGEBROCHEN,
+            Sitzung.Status.GESCHEITERT,
+        ):
+            with self.subTest(status=status):
+                bindung: Erhebungsbindung = self._teilnahme()
+                sitzung: Sitzung = self._sitzung(bindung, self.brueche, status)
+
+                self.assertIn(
+                    f'href="{_sitzung_url(self.erhebung, sitzung)}"',
+                    self._zeile(self._einsicht(), bindung),
+                )
+
+    def test_laufende_bubble_ist_nicht_verlinkt(self) -> None:
+        """Live-Mitlesen gibt es nicht, also auch keinen Link."""
+
+        bindung: Erhebungsbindung = self._teilnahme()
+        self._sitzung(bindung, self.brueche, Sitzung.Status.LAUFEND)
+
+        self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
+
+    def test_fluechtige_bubble_ist_nicht_verlinkt(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es nichts zu lesen."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(bindung, self.brueche)
+
+        self.assertNotIn("<a ", self._zeile(self._einsicht(), bindung))
+
+    def test_fluechtige_zeile_traegt_den_hinweis(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es nur das Ablaufgerüst."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(bindung, self.brueche)
+
+        self.assertIn(
+            "flüchtig, nur Ablaufgerüst", self._zeile(self._einsicht(), bindung)
+        )
+
+    def test_fluechtige_bubbles_sind_in_jedem_status_umrandet(self) -> None:
+        """Auch eine gescheiterte flüchtige Sitzung ist nur umrandet."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._sitzung(bindung, self.brueche)
+        self._sitzung(bindung, self.zinsen, Sitzung.Status.GESCHEITERT)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        self.assertEqual(zeile.count("fremdeinsicht__sitzung--fluechtig"), 2)
+
+    def test_eingewilligte_teilnahme_ohne_sitzung(self) -> None:
+        """Wer eingewilligt, aber noch nicht gespielt hat, steht in der Liste."""
+
+        bindung: Erhebungsbindung = self._teilnahme()
+
+        self.assertIn("noch keine Sitzung", self._zeile(self._einsicht(), bindung))
+
+    def test_abgelehnte_und_unentschiedene_teilnahmen_fehlen(self) -> None:
+        """Ohne Einwilligung a gibt es keine Ziehung und keine Zeile."""
+
+        abgelehnt: Erhebungsbindung = self._teilnahme(einwilligung=False)
+        offen: Erhebungsbindung = self._teilnahme(einwilligung=None)
+
+        antwort: HttpResponse = self._einsicht()
+
+        self.assertNotContains(antwort, abgelehnt.teilnahme.kennung)
+        self.assertNotContains(antwort, offen.teilnahme.kennung)
+
+    def test_token_steht_nirgends_im_html(self) -> None:
+        """Über die Einsicht lässt sich keine Teilnahme fortsetzen."""
+
+        bindung: Erhebungsbindung = self._teilnahme()
+        self._sitzung(bindung, self.brueche)
+
+        self.assertNotContains(self._einsicht(), bindung.token)
+
+    def test_teilnahmen_anderer_erhebungen_fehlen(self) -> None:
+        """Eine fremde Erhebung derselben Vignette steuert keine Zeile bei."""
+
+        andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        fremde: Erhebungsbindung = self._teilnahme(
+            self._stichprobe(andere), ziehung=(self.brueche,)
+        )
+        self._sitzung(fremde, self.brueche)
+
+        self.assertNotContains(self._einsicht(), fremde.teilnahme.kennung)
+
+
+class EinsichtSitzungTests(EinsichtTestCase):
+    """Die lesende Sitzungsansicht der Einsicht."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.bindung: Erhebungsbindung = self._teilnahme()
+
+    def _gespielte_sitzung(
+        self,
+        status: Sitzung.Status = Sitzung.Status.ABGESCHLOSSEN,
+        bindung: Erhebungsbindung | None = None,
+    ) -> Sitzung:
+        # Eine Sitzung mit einem Gesprächsschritt samt Denkspur und
+        # Fehlversuch und einer abgegebenen Diagnose.
+        sitzung: Sitzung = self._sitzung(bindung or self.bindung, self.brueche, status)
+        schritt: Gespraechsschritt = Gespraechsschritt.objects.create(
+            sitzung=sitzung,
+            eingabe="Wie hast du gerechnet?",
+            denkspur="Mia addiert Zähler und Nenner.",
+            aeusserung="Ich habe oben und unten zusammengezählt.",
+            reihenfolge=1,
+        )
+        Fehlversuch.objects.create(
+            gespraechsschritt=schritt,
+            grund="kein JSON",
+            rohantwort="Verworfene Rohantwort des Modells.",
+        )
+        Diagnose.objects.create(sitzung=sitzung, text="Zähler und Nenner addiert.")
+        return sitzung
+
+    def _ansicht(self, sitzung: Sitzung, konto: Konto | None = None) -> HttpResponse:
+        self.client.force_login(konto or self.ada)
+        return self.client.get(_sitzung_url(self.erhebung, sitzung))
+
+    def _seite(self, antwort: HttpResponse) -> str:
+        # Der Seiteninhalt ohne die Navigation, deren Abmelden ein Formular ist.
+        inhalt: str = antwort.content.decode()
+        return inhalt[inhalt.index('<article class="sitzung-seite"') :]
+
+    def test_kreis_liest_das_transkript(self) -> None:
+        """Eingabe und Äußerung stehen so da, wie die Teilnehmerin sie sah."""
+
+        inhalt: str = self._ansicht(self._gespielte_sitzung()).content.decode()
+
+        self.assertLess(
+            inhalt.index("Wie hast du gerechnet?"),
+            inhalt.index("Ich habe oben und unten zusammengezählt."),
+        )
+
+    def test_kreis_liest_die_denkspur_eingeklappt(self) -> None:
+        """Die Denkspur liegt unter „Denkspur ansehen“ wie im Probelauf."""
+
+        inhalt: str = self._ansicht(self._gespielte_sitzung()).content.decode()
+
+        self.assertRegex(
+            inhalt,
+            r"<details[^>]*>\s*<summary>Denkspur ansehen</summary>"
+            r"\s*<p>Mia addiert Zähler und Nenner.</p>",
+        )
+
+    def test_kreis_liest_die_diagnose(self) -> None:
+        """Die abgeschlossene Sitzung zeigt die abgegebene Diagnose."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+
+    def test_administration_liest_jede_sitzung(self) -> None:
+        """Die Administration öffnet die Sitzung einer fremden Erhebung."""
+
+        admin: Konto = konto_mit_rollen("root", is_superuser=True)
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung(), admin)
+
+        self.assertContains(antwort, "Mia addiert Zähler und Nenner.")
+
+    def test_abgebrochene_sitzung_zeigt_keine_diagnose(self) -> None:
+        """Nur abgeschlossene Sitzungen haben einen Debrief."""
+
+        for status in (Sitzung.Status.ABGEBROCHEN, Sitzung.Status.GESCHEITERT):
+            with self.subTest(status=status):
+                antwort: HttpResponse = self._ansicht(
+                    self._gespielte_sitzung(status, self._teilnahme())
+                )
+
+                self.assertContains(antwort, "Ich habe oben und unten zusammengezählt.")
+                self.assertNotContains(antwort, "Zähler und Nenner addiert.")
+
+    def test_kopf_nennt_die_teilnahmekennung(self) -> None:
+        """Wer liest, weiß, wessen Sitzung er liest."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, self.bindung.teilnahme.kennung)
+
+    def test_kopf_nennt_die_stichprobe(self) -> None:
+        """Die Stichprobe steht mit ihrem Zeitraum im Kopf."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(
+            antwort,
+            f"Stichprobe {self.stichprobe.beginn:%d.%m.%Y} – "
+            f"{self.stichprobe.ende:%d.%m.%Y}",
+        )
+
+    def test_kopf_nennt_die_vignette(self) -> None:
+        """Die gespielte Vignette ist die Überschrift der Ansicht."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "<h1>Brüche addieren</h1>", html=True)
+
+    def test_kopf_nennt_den_status(self) -> None:
+        """Auch eine gescheiterte Sitzung sagt, wie sie endete."""
+
+        antwort: HttpResponse = self._ansicht(
+            self._gespielte_sitzung(Sitzung.Status.GESCHEITERT)
+        )
+
+        self.assertContains(antwort, "Gescheitert")
+
+    def test_ein_weg_fuehrt_zurueck_zur_uebersicht(self) -> None:
+        """Die Ansicht verlinkt die Übersicht der Einsicht."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, f'href="{_einsicht_url(self.erhebung)}"')
+
+    def _sitzung_mit_itemblock(
+        self, freitext: str | None, *, abgeschickt: bool = True
+    ) -> Sitzung:
+        # Eine abgeschlossene Sitzung einer Erhebung mit einem Likert- und
+        # einem Freitext-Item nach der Sitzung; Likert ist mit Stufe 5
+        # beantwortet, Freitext mit dem übergebenen Text. Ein nicht
+        # abgeschickter Block wurde nur gezeigt.
+        likert: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada,
+            typ=FragebogenItem.Typ.LIKERT,
+            wortlaut="Wie sicher fühlten Sie sich?",
+        )
+        offen: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Was war schwierig?"
+        )
+        for item in (likert, offen):
+            item.finalisieren()
+        self.erhebung = finale_erhebung(
+            self.ada, vignetten=[self.brueche], items_nach_sitzung=[likert, offen]
+        )
+        bindung: Erhebungsbindung = self._teilnahme(
+            self._stichprobe(self.erhebung), ziehung=(self.brueche,)
+        )
+        sitzung: Sitzung = self._gespielte_sitzung(bindung=bindung)
+        _block_mit_antworten(
+            bindung,
+            Erhebungsitem.Andockpunkt.NACH_SITZUNG,
+            ({"likert_stufe": 5}, {"freitext": freitext}),
+            sitzung=sitzung,
+            erledigt_am=timezone.now() if abgeschickt else None,
+        )
+        return sitzung
+
+    def test_likert_antwort_steht_als_skalenpol(self) -> None:
+        """Die Stufe erscheint als der Pol, den die Teilnehmerin wählte."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Wie sicher fühlten Sie sich\?</dt>\s*<dd>Stimme zu</dd>",
+        )
+
+    def test_freitext_antwort_steht_als_text(self) -> None:
+        """Der Freitext erscheint unter seinem Item."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Was war schwierig\?</dt>\s*<dd>Das Kürzen.</dd>",
+        )
+
+    def test_unbeantwortetes_item_zeigt_einen_strich(self) -> None:
+        """Antworten sind freiwillig; ein leeres Item bleibt sichtbar."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock(None)
+
+        self.assertRegex(
+            self._ansicht(sitzung).content.decode(),
+            r"<dt>Was war schwierig\?</dt>\s*<dd>–</dd>",
+        )
+
+    def test_sitzung_ohne_itemblock_zeigt_keinen_fragebogen(self) -> None:
+        """Ohne Items nach der Sitzung fehlt der Abschnitt."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+        self.assertNotContains(antwort, "Fragen zu dieser Sitzung")
+
+    def test_nicht_abgeschickter_itemblock_erscheint_nicht(self) -> None:
+        """Ein nur gezeigter Block ist nicht ausgefüllt und bleibt verborgen."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock(None, abgeschickt=False)
+
+        antwort: HttpResponse = self._ansicht(sitzung)
+
+        self.assertContains(antwort, "Zähler und Nenner addiert.")
+        self.assertNotContains(antwort, "Fragen zu dieser Sitzung")
+        self.assertNotContains(antwort, "Wie sicher fühlten Sie sich?")
+
+    def test_abgeschlossene_sitzung_ohne_diagnose(self) -> None:
+        """Fehlt die Diagnose, sagt die Ansicht das ausdrücklich."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+        Diagnose.objects.filter(sitzung=sitzung).delete()
+
+        self.assertContains(self._ansicht(sitzung), "Keine Diagnose abgegeben.")
+
+    def test_item_antworten_stehen_unter_der_sitzung(self) -> None:
+        """Der Item-Block folgt auf Debrief und Diagnose."""
+
+        sitzung: Sitzung = self._sitzung_mit_itemblock("Das Kürzen.")
+
+        inhalt: str = self._ansicht(sitzung).content.decode()
+
+        self.assertLess(
+            inhalt.index("Zähler und Nenner addiert."),
+            inhalt.index("Wie sicher fühlten Sie sich?"),
+        )
+
+    def test_fehlversuche_erscheinen_nicht(self) -> None:
+        """Verworfene Rohantworten des Modells bleiben verborgen."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertNotContains(antwort, "Verworfene Rohantwort des Modells.")
+
+    def test_token_erscheint_nicht(self) -> None:
+        """Die Ansicht führt in keine Teilnahme zurück."""
+
+        antwort: HttpResponse = self._ansicht(self._gespielte_sitzung())
+
+        self.assertNotContains(antwort, self.bindung.token)
+
+    def test_keine_formulare_und_aktionen(self) -> None:
+        """Die Ansicht ist rein lesend."""
+
+        seite: str = self._seite(self._ansicht(self._gespielte_sitzung()))
+
+        for element in ("<form", "<textarea", "<button"):
+            with self.subTest(element=element):
+                self.assertNotIn(element, seite)
+
+    def test_laufende_sitzung_bekommt_404(self) -> None:
+        """Live-Mitlesen gibt es nicht."""
+
+        sitzung: Sitzung = self._gespielte_sitzung(Sitzung.Status.LAUFEND)
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+    def test_fluechtige_sitzung_bekommt_404(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es nur das Gerüst."""
+
+        sitzung: Sitzung = self._gespielte_sitzung(
+            bindung=self._teilnahme(fluechtig=True)
+        )
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+    def test_sitzung_einer_anderen_erhebung_bekommt_404(self) -> None:
+        """Die Sitzung wird gegen die Erhebung aus der URL geprüft."""
+
+        andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        fremde: Sitzung = self._gespielte_sitzung(
+            bindung=self._teilnahme(self._stichprobe(andere), ziehung=(self.brueche,))
+        )
+
+        self.assertEqual(self._ansicht(fremde).status_code, 404)
+
+    def test_fremder_kreis_bekommt_404(self) -> None:
+        """Außerhalb des Kreises bleibt die Sitzung unauffindbar."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+
+        self.assertEqual(self._ansicht(sitzung, forschende("grace")).status_code, 404)
+
+    def test_andere_rollen_werden_abgewiesen(self) -> None:
+        """Ohne Forschungsrolle gibt es keine Sitzungsansicht."""
+
+        sitzung: Sitzung = self._gespielte_sitzung()
+
+        konto: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+
+        self.assertEqual(self._ansicht(sitzung, konto).status_code, 403)
+
+    def test_trainingssitzung_bekommt_404(self) -> None:
+        """Eine Sitzung ohne Erhebungsbindung ist hier unbekannt."""
+
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=Teilnahme.objects.create(),
+            vignette=self.brueche,
+            simulationskern=finaler_kern(),
+            modell_konfiguration=ModellKonfiguration.objects.belegte(
+                Verwendung.SCHUELERIN
+            ),
+            status=Sitzung.Status.ABGESCHLOSSEN,
+        )
+
+        self.assertEqual(self._ansicht(sitzung).status_code, 404)
+
+
+class EinsichtAbschlussTests(EinsichtTestCase):
+    """Die Spalte „Abschluss“ und die Seite mit dem Item-Block am Ende."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        likert: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada,
+            typ=FragebogenItem.Typ.LIKERT,
+            wortlaut="Wie realistisch wirkten die Gespräche?",
+        )
+        offen: FragebogenItem = FragebogenItem.objects.anlegen(
+            self.ada, wortlaut="Was nehmen Sie mit?"
+        )
+        for item in (likert, offen):
+            item.finalisieren()
+        self.erhebung = finale_erhebung(
+            self.ada,
+            vignetten=[self.brueche, self.zinsen],
+            items_am_ende=[likert, offen],
+        )
+        self.stichprobe = self._stichprobe(self.erhebung)
+        self.bindung: Erhebungsbindung = self._teilnahme()
+
+    def _abschlussblock(
+        self,
+        bindung: Erhebungsbindung | None = None,
+        *,
+        erledigt: bool = True,
+        freitext: str | None = "Mehr Geduld beim Nachfragen.",
+    ) -> Itemblock:
+        # Der Block am Ende mit Stufe 2 auf dem Likert-Item und dem Freitext;
+        # erledigt heißt, die Teilnehmerin hat ihn abgeschickt.
+        return _block_mit_antworten(
+            bindung or self.bindung,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+            ({"likert_stufe": 2}, {"freitext": freitext}),
+            erledigt_am=timezone.now() if erledigt else None,
+        )
+
+    def _abschluss(
+        self, bindung: Erhebungsbindung | None = None, konto: Konto | None = None
+    ) -> HttpResponse:
+        self.client.force_login(konto or self.ada)
+        return self.client.get(_abschluss_url(self.erhebung, bindung or self.bindung))
+
+    def test_raster_hat_eine_spalte_abschluss(self) -> None:
+        """Hinter den Vignetten steht die Spalte für den Block am Ende."""
+
+        inhalt: str = self._einsicht().content.decode()
+
+        self.assertLess(inhalt.index("Zinsen rechnen"), inhalt.index(">Abschluss<"))
+
+    def test_beantworteter_block_ist_eine_verlinkte_bubble(self) -> None:
+        """Wer den Block am Ende abgeschickt hat, hat eine Abschlussseite."""
+
+        self._abschlussblock()
+
+        self.assertIn(
+            f'href="{_abschluss_url(self.erhebung, self.bindung)}"',
+            self._zeile(self._einsicht(), self.bindung),
+        )
+
+    def test_unbeantworteter_block_hat_keine_bubble(self) -> None:
+        """Ein vorgelegter, nicht abgeschickter Block zeigt nichts."""
+
+        self._abschlussblock(erledigt=False)
+
+        zeile: str = self._zeile(self._einsicht(), self.bindung)
+
+        self.assertNotIn("fremdeinsicht__sitzung", zeile)
+
+    def test_fluechtige_teilnahme_hat_keine_bubble(self) -> None:
+        """Von flüchtigen Teilnahmen gibt es keine Antworten zu lesen."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._abschlussblock(bindung)
+
+        zeile: str = self._zeile(self._einsicht(), bindung)
+
+        self.assertNotIn("fremdeinsicht__sitzung", zeile)
+
+    def test_seite_zeigt_die_likert_antwort_als_skalenpol(self) -> None:
+        """Die Stufe erscheint als der Pol, den die Teilnehmerin wählte."""
+
+        self._abschlussblock()
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Wie realistisch wirkten die Gespräche\?</dt>\s*"
+            r"<dd>Stimme nicht zu</dd>",
+        )
+
+    def test_seite_zeigt_die_freitext_antwort(self) -> None:
+        """Der Freitext erscheint unter seinem Item."""
+
+        self._abschlussblock()
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Was nehmen Sie mit\?</dt>\s*<dd>Mehr Geduld beim Nachfragen.</dd>",
+        )
+
+    def test_unbeantwortetes_item_zeigt_einen_strich(self) -> None:
+        """Antworten sind freiwillig; ein leeres Item bleibt sichtbar."""
+
+        self._abschlussblock(freitext=None)
+
+        self.assertRegex(
+            self._abschluss().content.decode(),
+            r"<dt>Was nehmen Sie mit\?</dt>\s*<dd>–</dd>",
+        )
+
+    def test_seite_nennt_die_teilnahmekennung(self) -> None:
+        """Wer liest, weiß, wessen Antworten er liest."""
+
+        self._abschlussblock()
+
+        self.assertContains(self._abschluss(), self.bindung.teilnahme.kennung)
+
+    def test_seite_nennt_die_stichprobe(self) -> None:
+        """Die Stichprobe steht mit ihrem Zeitraum im Kopf."""
+
+        self._abschlussblock()
+
+        self.assertContains(
+            self._abschluss(),
+            f"Stichprobe {self.stichprobe.beginn:%d.%m.%Y} – "
+            f"{self.stichprobe.ende:%d.%m.%Y}",
+        )
+
+    def test_ein_weg_fuehrt_zurueck_zur_uebersicht(self) -> None:
+        """Die Seite verlinkt die Übersicht der Einsicht."""
+
+        self._abschlussblock()
+
+        self.assertContains(self._abschluss(), f'href="{_einsicht_url(self.erhebung)}"')
+
+    def test_token_erscheint_nicht(self) -> None:
+        """Die Seite führt in keine Teilnahme zurück."""
+
+        self._abschlussblock()
+
+        self.assertNotContains(self._abschluss(), self.bindung.token)
+
+    def test_seite_hat_kein_formular(self) -> None:
+        """Die Seite ist rein lesend."""
+
+        self._abschlussblock()
+
+        inhalt: str = self._abschluss().content.decode()
+        seite: str = inhalt[inhalt.index("<main") :]
+
+        self.assertNotIn("<form", seite)
+
+    def test_administration_liest_jede_abschlussseite(self) -> None:
+        """Die Administration öffnet die Seite einer fremden Erhebung."""
+
+        self._abschlussblock()
+        admin: Konto = konto_mit_rollen("root", is_superuser=True)
+
+        self.assertContains(
+            self._abschluss(konto=admin), "Mehr Geduld beim Nachfragen."
+        )
+
+    def test_unbeantworteter_block_bekommt_404(self) -> None:
+        """Ohne abgeschickten Block gibt es keine Seite."""
+
+        self._abschlussblock(erledigt=False)
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_ohne_block_bekommt_404(self) -> None:
+        """Wer noch nicht am Ende ist, hat keine Abschlussseite."""
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_fluechtige_teilnahme_bekommt_404(self) -> None:
+        """Auch über eine geratene URL gibt es nichts Flüchtiges zu lesen."""
+
+        bindung: Erhebungsbindung = self._teilnahme(fluechtig=True)
+        self._abschlussblock(bindung)
+
+        self.assertEqual(self._abschluss(bindung).status_code, 404)
+
+    def test_teilnahme_einer_anderen_erhebung_bekommt_404(self) -> None:
+        """Die Teilnahme wird gegen die Erhebung aus der URL geprüft."""
+
+        andere: Erhebung = finale_erhebung(self.ada, vignetten=[self.brueche])
+        fremde: Erhebungsbindung = self._teilnahme(
+            self._stichprobe(andere), ziehung=(self.brueche,)
+        )
+        _block_mit_antworten(
+            fremde,
+            Erhebungsitem.Andockpunkt.AM_ENDE,
+            (),
+            erledigt_am=timezone.now(),
+        )
+
+        self.assertEqual(self._abschluss(fremde).status_code, 404)
+
+    def test_ausgetretenes_kreismitglied_bekommt_404(self) -> None:
+        """Wer den Kreis verlässt, liest keine Antworten mehr."""
+
+        self._abschlussblock()
+        self.erhebung.eigentuemerinnen.add(forschende("hedy"))
+        self.erhebung.austreten(self.ada.pk)
+
+        self.assertEqual(self._abschluss().status_code, 404)
+
+    def test_bleibt_nach_dem_archivieren_der_erhebung_lesbar(self) -> None:
+        """Eine archivierte Erhebung zeigt ihre Abschlussseiten weiter."""
+
+        self._abschlussblock()
+        self.stichprobe.ende = timezone.now() - timedelta(days=1)
+        self.stichprobe.save(update_fields=["ende"])
+        self.erhebung.archivieren()
+
+        self.assertContains(self._abschluss(), "Mehr Geduld beim Nachfragen.")
+
+    def test_fremder_kreis_bekommt_404(self) -> None:
+        """Außerhalb des Kreises bleibt die Seite unauffindbar."""
+
+        self._abschlussblock()
+
+        self.assertEqual(self._abschluss(konto=forschende("grace")).status_code, 404)
+
+    def test_andere_rollen_werden_abgewiesen(self) -> None:
+        """Ohne Forschungsrolle gibt es keine Abschlussseite."""
+
+        self._abschlussblock()
+        konto: Konto = konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE)
+
+        self.assertEqual(self._abschluss(konto=konto).status_code, 403)

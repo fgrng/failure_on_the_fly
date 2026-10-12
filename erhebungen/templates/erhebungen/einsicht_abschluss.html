@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Einsicht · {{ erhebung.name }}{% endblock %}
+
+{% block content %}
+<section class="page area--research">
+    <header class="page-head">
+        <div>
+            <p>Forschung / Meine Erhebungen / <a href="{% url 'erhebungen:detail' erhebung.pk %}">{{ erhebung.name }}</a> / <a href="{% url 'erhebungen:einsicht' erhebung.pk %}">Einsicht</a></p>
+            <h1>Abschluss</h1>
+            <p>Teilnahme <code>{{ teilnahme.kennung }}</code> · Stichprobe {{ stichprobe.beginn|date:"d.m.Y" }} – {{ stichprobe.ende|date:"d.m.Y" }}</p>
+        </div>
+    </header>
+
+    <section class="page-section" aria-labelledby="einsicht-abschluss-titel">
+        <header class="page-section__head">
+            <span><h2 id="einsicht-abschluss-titel">Fragen am Ende</h2></span>
+        </header>
+        {% include "erhebungen/includes/itemantworten.html" %}
+    </section>
+
+    <p><a href="{% url 'erhebungen:einsicht' erhebung.pk %}">Zurück zur Einsicht</a></p>
+</section>
+{% endblock %}

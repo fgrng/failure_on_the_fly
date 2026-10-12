@@ -41,7 +41,7 @@
                 <tbody>
                     {% for daten in vignetten_daten %}
                     <tr>
-                        <td>{{ daten.name }}</td>
+                        <td>{{ forloop.counter }}. {{ daten.name }}</td>
                         <td>
                             {% if daten.sitzungen_nach_status.laufend or daten.sitzungen_nach_status.abgeschlossen or daten.sitzungen_nach_status.abgebrochen or daten.sitzungen_nach_status.gescheitert %}
                             <div class="sitzungsmenues">
@@ -50,7 +50,7 @@
                                     <summary class="badge badge--draft">{{ daten.sitzungen_nach_status.laufend|length }} laufend ▾</summary>
                                     <ul class="sitzungsmenue__liste">
                                         {% for sitzung in daten.sitzungen_nach_status.laufend %}
-                                        <li><a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
+                                        <li>{% if not ist_ausgetreten %}<a href="{{ sitzung.fortsetzen_url }}">Fortsetzen</a> · {% endif %}<a href="{{ sitzung.url }}">Sitzung #{{ sitzung.id }} ansehen</a></li>
                                         {% endfor %}
                                     </ul>
                                 </details>

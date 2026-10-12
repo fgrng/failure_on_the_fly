@@ -1,5 +1,7 @@
 """ORM-nahe Tests der persistierten Sitzung."""
 
+import re
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -20,11 +22,15 @@ from vignetten.models import Vignette
 def _sitzung_anlegen() -> Sitzung:
     """Legt die minimale, vollständig gepinnte Sitzung für Constraint-Tests an."""
 
-    return _sitzungen_anlegen(Teilnahme.objects.create(), 1)[0]
+    return sitzungen_anlegen(Teilnahme.objects.create(), 1)[0]
 
 
-def _sitzungen_anlegen(teilnahme: Teilnahme, anzahl: int) -> list[Sitzung]:
-    # Legt gepinnte Sitzungen einer Teilnahme an, jede mit eigener Vignette.
+def sitzungen_anlegen(
+    teilnahme: Teilnahme,
+    anzahl: int,
+    status: Sitzung.Status = Sitzung.Status.LAUFEND,
+) -> list[Sitzung]:
+    """Legt gepinnte Sitzungen einer Teilnahme an, jede mit eigener Vignette."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen()
     kern.finalisieren()
@@ -38,6 +44,7 @@ def _sitzungen_anlegen(teilnahme: Teilnahme, anzahl: int) -> list[Sitzung]:
             vignette=Vignette.objects.anlegen(autorin),
             simulationskern=kern,
             modell_konfiguration=konfiguration,
+            status=status,
         )
         for _ in range(anzahl)
     ]
@@ -170,7 +177,9 @@ def test_vignettenpositionen_einer_teilnahme_sind_nach_position_geordnet() -> No
     """Die Datenspur bewahrt die gespielte Vignetten-Reihenfolge je Teilnahme."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    erste_sitzung, zweite_sitzung = _sitzungen_anlegen(teilnahme, 2)
+    erste_sitzung, zweite_sitzung = sitzungen_anlegen(
+        teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
+    )
 
     Vignettenposition.objects.create(
         teilnahme=teilnahme,
@@ -213,7 +222,9 @@ def test_vignettenposition_lehnt_vignette_aus_einer_anderen_sitzung_ab() -> None
     """Die Datenspur bewahrt die tatsächlich in der Sitzung gespielte Fassung."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    sitzung, andere_sitzung = _sitzungen_anlegen(teilnahme, 2)
+    sitzung, andere_sitzung = sitzungen_anlegen(
+        teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
+    )
 
     with pytest.raises(ValidationError, match="stimmt nicht mit der Sitzung"):
         Vignettenposition.objects.create(
@@ -229,7 +240,9 @@ def test_position_ist_je_teilnahme_eindeutig() -> None:
     """Zwei Sitzungen derselben Teilnahme teilen sich keine Position."""
 
     teilnahme: Teilnahme = Teilnahme.objects.create()
-    erste_sitzung, zweite_sitzung = _sitzungen_anlegen(teilnahme, 2)
+    erste_sitzung, zweite_sitzung = sitzungen_anlegen(
+        teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN
+    )
     Vignettenposition.objects.create(
         teilnahme=teilnahme,
         sitzung=erste_sitzung,
@@ -244,3 +257,46 @@ def test_position_ist_je_teilnahme_eindeutig() -> None:
             position=1,
             vignette=zweite_sitzung.vignette,
         )
+
+
+@pytest.mark.django_db
+def test_zweite_laufende_sitzung_derselben_teilnahme_scheitert() -> None:
+    """Je Teilnahme läuft höchstens eine Sitzung, auch ohne View davor."""
+
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        sitzungen_anlegen(teilnahme, 2)
+
+
+@pytest.mark.django_db
+def test_laufende_sitzung_neben_abgeschlossener_ist_erlaubt() -> None:
+    """Die Regel trifft nur laufende Sitzungen."""
+
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    _, laufende = sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGESCHLOSSEN)
+    laufende.status = Sitzung.Status.LAUFEND
+    laufende.save()
+
+    assert Sitzung.objects.laufende_von(teilnahme) == laufende
+
+
+@pytest.mark.django_db
+def test_teilnahme_ohne_laufende_sitzung_hat_keine() -> None:
+    """Die Abfrage antwortet ohne laufende Sitzung mit keiner."""
+
+    teilnahme: Teilnahme = Teilnahme.objects.create()
+    sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGEBROCHEN)
+
+    assert Sitzung.objects.laufende_von(teilnahme) is None
+
+
+@pytest.mark.django_db
+def test_teilnahme_erhaelt_beim_anlegen_eine_zufaellige_kennung() -> None:
+    """Acht Hexzeichen, je Teilnahme neu gezogen."""
+
+    erste: Teilnahme = Teilnahme.objects.create()
+    zweite: Teilnahme = Teilnahme.objects.create()
+
+    assert re.fullmatch(r"[0-9a-f]{8}", erste.kennung)
+    assert erste.kennung != zweite.kennung

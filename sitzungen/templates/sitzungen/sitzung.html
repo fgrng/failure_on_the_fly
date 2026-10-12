@@ -10,6 +10,7 @@
 {% endblock %}
 
 {% block content %}
+    {% block sitzung_kopf %}{% endblock %}
     <article class="sitzung-seite">
         <section class="rahmenhandlung" aria-labelledby="rahmenhandlung-titel">
             <header class="sitzung-abschnitt-kopf">
@@ -28,5 +29,6 @@
         <div id="sitzung-fortsetzung">
             {% include "sitzungen/includes/sitzung_fortsetzung.html" %}
         </div>
+        {% block sitzung_fuss %}{% endblock %}
     </article>
 {% endblock %}

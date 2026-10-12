@@ -275,6 +275,38 @@
     opacity: 1;
 }
 
+/* ---- Erhebung: Einsicht ---- */
+.fremdeinsicht__hinweis {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+}
+
+/* Ohne Datum trägt die Bubble ihren Status als `title`. */
+.fremdeinsicht__sitzung:not([data-datum])::after {
+    display: none;
+}
+
+span.fremdeinsicht__sitzung:hover {
+    background: var(--color-area-participant-solid);
+}
+
+.fremdeinsicht__sitzung--warnung,
+span.fremdeinsicht__sitzung--warnung:hover {
+    background: var(--color-danger);
+}
+
+.fremdeinsicht__sitzung--laufend {
+    opacity: .4;
+}
+
+.fremdeinsicht__sitzung--fluechtig,
+span.fremdeinsicht__sitzung--fluechtig:hover {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--color-area-participant-solid);
+    color: var(--color-text);
+}
+
 /* ---- Training: freigegebene Abschriften unter der Fremdeinsicht ---- */
 .freigegebene-abschriften__sitzungen {
     margin: 0;

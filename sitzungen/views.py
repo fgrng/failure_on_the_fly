@@ -120,7 +120,7 @@ def _gespraech_anzeigen(
         vignette=vignette,
         kern=kern,
         gespraechsschritte=schritte,
-        ist_probelauf=True,
+        zeigt_denkspur=True,
         navigation=_sitzungsnavigation(),
         erneute_eingabe=erneute_eingabe,
         erneuter_eingabemodus=erneuter_eingabemodus,
@@ -141,7 +141,7 @@ def _debrief_anzeigen(
         vignette=vignette,
         kern=kern,
         gespraechsschritte=schritte,
-        ist_probelauf=True,
+        zeigt_denkspur=True,
         navigation=_sitzungsnavigation(),
         zeigt_debrief=True,
         spracheingabe_verfuegbar=True,
@@ -179,7 +179,7 @@ def _probelauf_starten(
         vignette=vignette,
         kern=kern,
         gespraechsschritte=sink.gespraechsschritte,
-        ist_probelauf=True,
+        zeigt_denkspur=True,
         navigation=_sitzungsnavigation(),
         spracheingabe_verfuegbar=True,
     )
@@ -344,15 +344,15 @@ def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None
 
 def transkriptions_endpunkt(
     anbieter_bilden: Callable[[], Transkription],
-    sitzung_aufloesen: Callable[[HttpRequest], Sitzung | None],
-) -> Callable[[HttpRequest], HttpResponse]:
+    sitzung_aufloesen: Callable[..., Sitzung | None],
+) -> Callable[..., HttpResponse]:
     """Erzeugt den geschützten Endpunkt eines Prinzipals für seinen Anbieter.
 
     `anbieter_bilden` wird je Anfrage gerufen: Die Anbieterkonfiguration liegt
     in der Datenbank, und ein gehaltener Adapter überlebte ihre Änderung.
 
-    `sitzung_aufloesen` trägt die Autorisierung des jeweiligen Prinzipals und
-    hat drei erlaubte Ausgänge:
+    `sitzung_aufloesen` trägt die Autorisierung des jeweiligen Prinzipals,
+    erhält die URL-Parameter der Route und hat drei erlaubte Ausgänge:
 
     - eine Sitzung: Ihre Teilnahme muss in die Audioverarbeitung eingewilligt
       haben, sonst endet die Anfrage hier.
@@ -363,11 +363,11 @@ def transkriptions_endpunkt(
     Das Zero-Retention-Tor aus ADR-0026 liegt dahinter und gilt für alle.
     """
 
-    def endpunkt(request: HttpRequest) -> HttpResponse:
+    def endpunkt(request: HttpRequest, **url_parameter: object) -> HttpResponse:
         # Prüft die Vorbedingungen, bevor Audio den Anbieter erreichen kann.
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
-        sitzung: Sitzung | None = sitzung_aufloesen(request)
+        sitzung: Sitzung | None = sitzung_aufloesen(request, **url_parameter)
         if (
             sitzung is not None
             and not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt
@@ -410,7 +410,7 @@ def persistierten_debrief_anzeigen(
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
         gespraechsschritte=sink.gespraechsschritte,
-        ist_probelauf=False,
+        zeigt_denkspur=False,
         zeigt_debrief=True,
         navigation=navigation,
         spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
@@ -455,7 +455,7 @@ def _persistiertes_gespraech_anzeigen(
         gespraechsschritte=sink_fuer_sitzung(
             sitzung, request.session
         ).gespraechsschritte,
-        ist_probelauf=False,
+        zeigt_denkspur=False,
         ist_gescheitert=ist_gescheitert,
         ist_lesend=ist_lesend,
         navigation=navigation,

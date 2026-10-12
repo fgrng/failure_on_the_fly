@@ -25,6 +25,9 @@
 
     <form method="post" action="{% url 'training:einwilligung' training.pk vignette.pk %}" style="margin-top: var(--space-4);">
         {% csrf_token %}
+        {% if laufende_sitzung is not None %}
+            <input type="hidden" name="laufende_sitzung" value="{{ laufende_sitzung }}">
+        {% endif %}
         <div class="vignette-form-actions" style="justify-content: flex-start; display: flex; gap: var(--space-3);">
             <button class="button" type="submit" name="audioverarbeitung_eingewilligt" value="ja">Einwilligen und Training starten</button>
             <button class="button button--secondary" type="submit" name="audioverarbeitung_eingewilligt" value="nein">Ohne Audio fortfahren</button>

@@ -71,13 +71,13 @@ sind, brauchst du keine Persona-Anweisungen zu schreiben — was du an Persona
 brauchst, gehört eingebettet in die Fehlermuster-Beschreibung oder in die
 Simulationshinweise.
 
-## Was der User-Prompt aus deinen Feldern baut
+## Der Arbeitskontext aus deinen Feldern
 
-Die User-Prompt-Vorlage liefert den Arbeitskontext: den **Lernauftrag** und
-das **Arbeitsheft**, jeweils als Text mit Bildbeschreibung an der Bildposition,
-und direkt darunter die jeweiligen **Simulationshinweise**, falls vorhanden.
-Sie schließt mit der Anweisung, auf die kommende Ansprache mit Denkspur und
-Äußerung zu antworten.
+Die User-Prompt-Vorlage liefert den Arbeitskontext, der an den System-Prompt
+angehängt wird: den **Lernauftrag** und das **Arbeitsheft**, jeweils als Text
+mit Bildbeschreibung an der Bildposition, und direkt darunter die jeweiligen
+**Simulationshinweise**, falls vorhanden. Sie schließt mit der Anweisung, auf
+die kommende Ansprache mit Denkspur und Äußerung zu antworten.
 
 **Konsequenz für dich:** Was nicht im Lernauftrag, im Arbeitsheft oder in den
 Simulationshinweisen steht, existiert für die simulierte Schüler:in nicht.

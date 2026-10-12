@@ -43,21 +43,18 @@ _JSON_TYPEN: dict[str, type] = {"string": str, "boolean": bool}
 
 def nachrichten_bauen(
     system_prompt: str,
-    user_prompt: str,
     verlauf: Sequence[tuple[str, str]],
     eingabe: str,
 ) -> list[dict[str, str]]:
     """Baut den Gesprächsverlauf als native Konversationsnachrichten.
 
-    Die Rolle und der Arbeitskontext stehen einmal am Anfang; danach wechseln
-    sich Eingaben der Teilnehmer:in und sichtbare Äußerungen der simulierten
-    Schüler:in ab. Die Denkspur erreicht keinen Eintrag (ADR-0005).
+    Der System-Prompt steht einmal am Anfang; danach wechseln sich die
+    Paare aus `user` und `assistant` ab, und die Eingabe ist die letzte
+    `user`-Nachricht (ADR-0052). Die Denkspur erreicht keinen Eintrag
+    (ADR-0005).
     """
 
-    nachrichten: list[dict[str, str]] = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    nachrichten: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     for frage, aeusserung in verlauf:
         nachrichten.append({"role": "user", "content": frage})
         nachrichten.append({"role": "assistant", "content": aeusserung})
@@ -107,7 +104,6 @@ class Sprachmodell(Protocol):
     def antworten(
         self,
         system_prompt: str,
-        user_prompt: str,
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
@@ -139,7 +135,6 @@ class FakeSprachmodell:
     def antworten(
         self,
         system_prompt: str,
-        user_prompt: str,
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
@@ -187,7 +182,6 @@ class LiteLLMSprachmodell:
     def antworten(
         self,
         system_prompt: str,
-        user_prompt: str,
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
@@ -203,9 +197,7 @@ class LiteLLMSprachmodell:
         try:
             modellantwort = self.completion(
                 model=self.modell,
-                messages=nachrichten_bauen(
-                    system_prompt, user_prompt, verlauf, eingabe
-                ),
+                messages=nachrichten_bauen(system_prompt, verlauf, eingabe),
                 # Der Schemaname ist neutral: Dieselbe Naht fordert die
                 # Ausgaben von Schüler:in, Lehrperson und Bewerter an.
                 response_format={

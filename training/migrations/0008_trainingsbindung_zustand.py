@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('training', '0006_abschrift_freigabe'),
+        ('training', '0007_trainingsvignette'),
     ]
 
     operations = [

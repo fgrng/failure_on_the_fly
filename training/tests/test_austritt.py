@@ -39,7 +39,7 @@ class AustrittTests(TestCase):
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
-        self.training.vignetten.add(self.vignette)
+        self.training.vignette_aufnehmen(self.vignette)
         self.training.veroeffentlichen()
         self.client.force_login(self.teilnehmerin)
         self.client.get(
@@ -172,6 +172,21 @@ class AustrittTests(TestCase):
         )
         self.assertNotContains(detail, "Neu starten")
         self.assertNotContains(detail, "Aus dem Training austreten")
+
+    def test_trainingsseite_bietet_laufende_sitzung_nicht_zum_fortsetzen(
+        self,
+    ) -> None:
+        """Die liegengebliebene Sitzung ist lesbar, aber nicht fortsetzbar."""
+        sitzung: Sitzung = gespielte_sitzung(
+            self.training, self.teilnehmerin, self.vignette, Sitzung.Status.LAUFEND
+        )
+        self._austreten()
+
+        detail: HttpResponse = self._detail()
+
+        self.assertContains(detail, ansehen_url(sitzung))
+        self.assertNotContains(detail, "Fortsetzen")
+        self.assertNotContains(detail, reverse("training:gespraech", args=[sitzung.pk]))
 
     def test_wahl_einwilligung_und_start_werden_abgewiesen(self) -> None:
         """Nach dem Austritt entsteht keine Sitzung, und die Bindung bleibt ruhend."""
@@ -329,7 +344,7 @@ class LaufendeSitzungNachAustrittTests(TestCase):
         self.training: Training = Training.objects.anlegen(
             ausbilderin, name="Bruchrechnung"
         )
-        self.training.vignetten.add(vignette)
+        self.training.vignette_aufnehmen(vignette)
         self.training.veroeffentlichen()
         self.client.force_login(konto_mit_rollen("grace"))
         self.client.get(
@@ -340,8 +355,9 @@ class LaufendeSitzungNachAustrittTests(TestCase):
             reverse("training:einwilligung", args=[self.training.pk, vignette.pk]),
             {"audioverarbeitung_eingewilligt": "ja"},
         )
+        self.sitzung_pk: int = start.context["sitzung_pk"]
         self.sitzung_url: str = reverse(
-            "training:sitzung_ansehen", args=[start.context["sitzung_pk"]]
+            "training:sitzung_ansehen", args=[self.sitzung_pk]
         )
         self.client.post(reverse("training:austreten", args=[self.training.pk]))
 
@@ -357,7 +373,9 @@ class LaufendeSitzungNachAustrittTests(TestCase):
 
         for ablauf, (name, daten) in anfragen.items():
             with self.subTest(ablauf=ablauf):
-                antwort: HttpResponse = self.client.post(reverse(name), daten)
+                antwort: HttpResponse = self.client.post(
+                    reverse(name, args=[self.sitzung_pk]), daten
+                )
                 self.assertEqual(antwort.status_code, 404)
         self.assertEqual(
             [
@@ -373,13 +391,14 @@ class LaufendeSitzungNachAustrittTests(TestCase):
         self.assertNotContains(sitzung, "Zähler addiert.")
 
     def test_nach_dem_wiederbeitritt_laesst_sie_sich_fortsetzen(self) -> None:
-        """Der Fortschrittsmarker der Browser-Session trägt wieder."""
+        """Die Sitzungsadresse trägt wieder."""
         self.client.get(
             reverse("training:beitreten", args=[self.training.trainings_link])
         )
 
         antwort: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            reverse("training:gespraech", args=[self.sitzung_pk]),
+            {"eingabe": "Wie rechnest du?"},
         )
 
         self.assertEqual(antwort.status_code, 200)
@@ -441,7 +460,7 @@ class FremdeinsichtNachAustrittTests(FremdeinsichtTestCase):
         anderes: Training = Training.objects.anlegen(
             self.ausbilderin, name="Dezimalzahlen"
         )
-        anderes.vignetten.add(self.vignette)
+        anderes.vignette_aufnehmen(self.vignette)
         anderes.veroeffentlichen()
         anderes.beitreten(self.teilnehmerin)
         sitzung: Sitzung = gespielte_sitzung(anderes, self.teilnehmerin, self.vignette)

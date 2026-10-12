@@ -1,11 +1,10 @@
 """Schreibt den Trainingsexport: die Fremdeinsicht eines Trainings als Markdown.
 
-Der Export ist pseudonym, nicht anonym (ADR-0049): Ordner tragen je Export neu
-gezogene Kennzeichen statt Kontodaten, Freitext bleibt ungeschwärzt. Er ist
+Der Export ist pseudonym, nicht anonym (ADR-0049): Ordner tragen die
+Teilnahmekennung statt Kontodaten, Freitext bleibt ungeschwärzt. Er ist
 keine Datenspur und unterliegt nicht dem Exportkontrakt aus ADR-0029.
 """
 
-import secrets
 from collections import Counter
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -61,7 +60,7 @@ def trainingsexport_zip(training: Training) -> bytes:
 
     puffer: BytesIO = BytesIO()
     with ZipFile(puffer, "w", compression=ZIP_DEFLATED) as archiv:
-        # Nach Kennzeichen sortiert verrät die Reihenfolge keine Namen.
+        # Nach Kennung sortiert verrät die Reihenfolge keine Namen.
         for name in sorted(dateien):
             archiv.writestr(name, dateien[name])
     return puffer.getvalue()
@@ -70,44 +69,37 @@ def trainingsexport_zip(training: Training) -> bytes:
 def _ordner_je_teilnahme(training: Training, teilnahmen: set[int]) -> dict[int, str]:
     """Ordnet jeder Teilnahme ihren Ordner im Archiv zu.
 
-    Die Konten dienen nur der Gruppierung; ins Archiv geht keins davon. Nur
-    Abschriften mit einsehbaren Sitzungen belegen einen Unterordnernamen.
+    Je Konto heißt der Ordner nach der Teilnahmekennung seiner
+    Trainingsbindung; gleiche Kennungen werden durchgezählt. Die Konten dienen
+    nur der Gruppierung; ins Archiv geht keins davon. Nur Abschriften mit
+    einsehbaren Sitzungen belegen einen Unterordnernamen.
     """
 
-    konto_je_teilnahme: dict[int, int] = dict(
-        training.trainingsbindung_set.aktiv().values_list("teilnahme_id", "konto_id")
-    )
+    ordner_je_konto: dict[int, str] = {}
+    ordner: dict[int, str] = {}
+    for teilnahme_id, konto_id, kennung in (
+        training.trainingsbindung_set.aktiv()
+        .order_by("pk")
+        .values_list("teilnahme_id", "konto_id", "teilnahme__kennung")
+    ):
+        ordner_je_konto[konto_id] = _freier_name(
+            f"teilnehmer-{kennung}", set(ordner_je_konto.values())
+        )
+        ordner[teilnahme_id] = ordner_je_konto[konto_id]
+
     abschriften: list[Abschrift] = list(
         training.freigegebene_abschriften.filter(teilnahme_id__in=teilnahmen).order_by(
             "importiert_am", "pk"
         )
     )
-    for abschrift in abschriften:
-        konto_je_teilnahme[abschrift.teilnahme_id] = abschrift.konto_id
-
-    kennzeichen_je_konto: dict[int, str] = _kennzeichen(
-        set(konto_je_teilnahme.values())
-    )
-    ordner: dict[int, str] = {
-        teilnahme_id: kennzeichen_je_konto[konto_id]
-        for teilnahme_id, konto_id in konto_je_teilnahme.items()
-    }
+    # Freigeben setzt eine Trainingsbindung voraus, das Konto hat also einen Ordner.
     for abschrift in abschriften:
         ordner[abschrift.teilnahme_id] = _freier_name(
-            f"{ordner[abschrift.teilnahme_id]}/"
+            f"{ordner_je_konto[abschrift.konto_id]}/"
             f"{_dateiname(abschrift.erhebungsname, 'abschrift')}",
             set(ordner.values()),
         )
     return ordner
-
-
-def _kennzeichen(konten: set[int]) -> dict[int, str]:
-    """Zieht je Konto ein zufälliges, in diesem Export eindeutiges Kennzeichen."""
-
-    kennzeichen: set[str] = set()
-    while len(kennzeichen) < len(konten):
-        kennzeichen.add(f"teilnehmer-{secrets.token_hex(4)}")
-    return dict(zip(konten, kennzeichen, strict=True))
 
 
 def _dateiname(text: str, ersatz: str) -> str:

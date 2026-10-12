@@ -29,6 +29,12 @@ def ansehen_url(sitzung: Sitzung) -> str:
     return reverse("training:sitzung_ansehen", args=[sitzung.pk])
 
 
+def route_der_letzten_sitzung(name: str) -> str:
+    """Adresse einer Sitzungsroute der zuletzt gestarteten Sitzung."""
+
+    return reverse(f"training:{name}", args=[Sitzung.objects.latest("pk").pk])
+
+
 def _sitzung_mit_verlauf(
     teilnahme: Teilnahme,
     vignette: Vignette,
@@ -121,7 +127,7 @@ class FremdeinsichtTestCase(TestCase):
         self.training: Training = Training.objects.anlegen(
             self.ausbilderin, name="Bruchrechnung"
         )
-        self.training.vignetten.add(self.vignette)
+        self.training.vignette_aufnehmen(self.vignette)
         self.training.veroeffentlichen()
         self.training.beitreten(self.teilnehmerin)
 

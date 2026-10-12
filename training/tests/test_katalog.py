@@ -19,6 +19,7 @@ from sitzungen.models import (
     Teilnahme,
 )
 from training.models import Training, Trainingsbindung
+from training.tests.aufbau import route_der_letzten_sitzung
 from training.tests.seite import tabellenzeilen
 from vignetten.models import Vignette
 
@@ -108,7 +109,7 @@ class TrainingskatalogTests(TestCase):
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -139,7 +140,7 @@ class TrainingskatalogTests(TestCase):
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Archivierte Brüche")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         vignette.archivieren()
         training.veroeffentlichen()
         self.client.force_login(studierende)
@@ -182,7 +183,7 @@ class TrainingskatalogTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(studierende)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -199,19 +200,21 @@ class TrainingskatalogTests(TestCase):
         self.assertEqual(Teilnahme.objects.count(), 1)
         self.assertEqual(Trainingsbindung.objects.count(), 1)
         gespraech: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(gespraech, "Ich addiere einfach alles.")
         self.assertNotContains(gespraech, "Mia addiert Zähler und Nenner.")
         schritt: Gespraechsschritt = Gespraechsschritt.objects.get()
         self.assertEqual(schritt.denkspur, "Mia addiert Zähler und Nenner.")
-        debrief: HttpResponse = self.client.post(reverse("training:gespraech_beenden"))
+        debrief: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("gespraech_beenden")
+        )
 
         self.assertContains(debrief, "Frau Weber fragt nach Ihrer Diagnose.")
         self.assertContains(debrief, "Diagnose aufnehmen")
         fertig: HttpResponse = self.client.post(
-            reverse("training:debrief"),
+            route_der_letzten_sitzung("debrief"),
             {"diagnose": "Mia addiert Zähler und Nenner."},
         )
 
@@ -239,7 +242,7 @@ class TrainingskatalogTests(TestCase):
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -292,7 +295,8 @@ class TrainingshistorieTests(TestCase):
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         erste: Vignette = finale_vignette(ausbilderin, name="Erste")
         zweite: Vignette = finale_vignette(ausbilderin, name="Zweite")
-        training.vignetten.add(erste, zweite)
+        training.vignette_aufnehmen(erste)
+        training.vignette_aufnehmen(zweite)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -301,14 +305,14 @@ class TrainingshistorieTests(TestCase):
             reverse("training:einwilligung", args=[training.pk, erste.pk]),
             {"audioverarbeitung_eingewilligt": "nein"},
         )
-        self.client.post(reverse("training:gespraech_beenden"))
-        self.client.post(reverse("training:debrief"), {"diagnose": "Bruch"})
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(route_der_letzten_sitzung("debrief"), {"diagnose": "Bruch"})
         self.client.post(reverse("training:wahl", args=[training.pk, zweite.pk]))
         self.client.post(
             reverse("training:einwilligung", args=[training.pk, zweite.pk]),
             {"audioverarbeitung_eingewilligt": "nein"},
         )
-        self.client.post(reverse("training:abbrechen"))
+        self.client.post(route_der_letzten_sitzung("abbrechen"))
 
         response: HttpResponse = self.client.get(reverse("training:historie"))
 
@@ -344,7 +348,7 @@ class TrainingsabbruchTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
         vignette: Vignette = finale_vignette(ausbilderin, name="Brüche vergleichen")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -367,7 +371,7 @@ class TrainingsabbruchTests(TestCase):
         )
 
         response: HttpResponse = self.client.post(
-            reverse("training:gespraech"), {"eingabe": "Wie rechnest du?"}
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
         )
 
         self.assertContains(response, "Ich addiere alles.")
@@ -377,7 +381,9 @@ class TrainingsabbruchTests(TestCase):
         """Der aktive Abbruch bleibt von Abschluss und technischem Fehlschlag getrennt."""
         training: Training = self._sitzung_starten()
 
-        response: HttpResponse = self.client.post(reverse("training:abbrechen"))
+        response: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("abbrechen")
+        )
 
         self.assertRedirects(response, reverse("training:detail", args=[training.pk]))
         sitzung: Sitzung = Sitzung.objects.get()

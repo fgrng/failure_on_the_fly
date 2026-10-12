@@ -172,6 +172,20 @@ vorhandene entfernen. Der Kreis bleibt auch bei veröffentlichten Trainings
 besetzt; die eigene Entfernung übergibt das Training an die verbleibenden
 Eigentümer:innen.
 
+Die Vignetten eines Trainings stehen in einer empfohlenen Reihenfolge. Eine neu
+aufgenommene Vignette steht am Ende; beim Entfernen rücken die übrigen lückenlos
+nach. Auf der Kuratierseite verschieben »Hoch« und »Runter« eine Vignette um
+eine Stelle, im Entwurf wie nach dem Veröffentlichen; die erste Vignette hat
+keinen Hoch-, die letzte keinen Runter-Knopf. Verschieben darf, wer aufnehmen
+und entfernen darf. Teilnehmende sehen die neue Reihenfolge sofort, ihre
+bisherigen Sitzungen bleiben unberührt. Kuratierseite und Trainingsseite der
+Teilnehmenden zeigen die Vignetten in dieser Reihenfolge und nummeriert (1., 2.,
+…); auf der Trainingsseite laufen die Nummern über die angezeigten finalen
+Vignetten. Die Reihenfolge ist nur ein Vorschlag: Jede Vignette bleibt frei und
+beliebig oft startbar, der Spielstand je Vignette bleibt sichtbar.
+Trainingssitzungen halten keine Vignettenposition fest, und der Trainingsexport
+bleibt unverändert.
+
 ## Geschlossenes Training und Beitritt
 
 Ein Training ist geschlossen (ADR-0049). Teilnehmende sehen im Trainingskatalog
@@ -205,6 +219,36 @@ unverändert erhalten. Der Link eines Entwurfs bleibt für alle Konten unbekannt
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
+
+## Trainingssitzung fortsetzen
+
+Eine Trainingssitzung ist über ihre eigene Adresse erreichbar; der Browser merkt
+sich keine aktuelle Sitzung. Gespräch, Gespräch beenden, Abbrechen, Debrief und
+Spracheingabe tragen die Sitzung in der Adresse. Erreichbar ist sie nur für das
+Konto, dessen Trainingsbindung sie gehört; jede andere Sitzungsadresse antwortet
+mit 404. Beendete, abgebrochene und gescheiterte Sitzungen lassen sich über
+diese Adressen nicht weiterspielen.
+
+Auf der Trainingsseite trägt jede eigene laufende Sitzung neben „Sitzung #…
+ansehen“ den Link „Fortsetzen“. Er führt mit dem bisherigen Gespräch zurück in
+die Sitzung, auch in einem anderen Tab, einem anderen Browser oder auf einem
+anderen Gerät.
+
+Je Training läuft höchstens eine eigene Sitzung. Wer eine Vignette startet,
+während noch eine Sitzung läuft, auch bei derselben Vignette und aus einem
+anderen Tab oder Gerät, sieht statt eines neuen Gesprächs die Seite „Es läuft
+noch eine Sitzung“. Sie nennt die laufende Vignette und ihren Beginn und bietet
+an:
+
+- **Fortsetzen**: zurück in die laufende Sitzung mit dem bisherigen Gespräch.
+- **Abbrechen und neu starten**: Die laufende Sitzung wird abgebrochen, und die
+  gewählte Vignette startet. Läuft inzwischen eine andere Sitzung als die
+  genannte, wird nichts abgebrochen und die Seite nennt die aktuelle.
+
+Die Abfrage zur Audioverarbeitung kommt wie bisher vor dieser Seite. In
+verschiedenen Trainings darf gleichzeitig je eine Sitzung laufen. Liegen
+gebliebene ältere laufende Sitzungen aus der Zeit vor dieser Regel stehen als
+abgebrochen in der Liste; die jüngste ist fortsetzbar.
 
 ## Austritt aus dem Training
 
@@ -275,8 +319,7 @@ kennzeichnet es nicht mehr als ausgetreten. Die Person erscheint wieder in der
 Fremdeinsicht und in der Zahl der Beigetretenen, ihre früheren Sitzungen sind
 für Kreis und Administration wieder lesbar. Ruhende Freigaben wirken wieder,
 ohne neu erteilt zu werden; widerrufene bleiben widerrufen. Eine beim Austritt
-liegengebliebene laufende Sitzung lässt sich fortsetzen, solange sie noch in der
-Browser-Session steht.
+liegengebliebene laufende Sitzung lässt sich wieder fortsetzen.
 
 Das gilt ebenso für Kreis und Administration mit ausgetretener Trainingsbindung:
 Der Trainings-Link belebt auch ihre Bindung wieder.
@@ -292,7 +335,7 @@ Trainings-Link.
 Unter dem Band des Trainings-Links zeigt die Kuratierseite über die ganze Breite
 die Fremdeinsicht (ADR-0049): eine Tabelle mit allen Beigetretenen, die nicht
 aus dem Training ausgetreten sind, als Zeilen, nach Namen sortiert, und den
-Vignetten des Trainings in Kuratierreihenfolge als Spalten. Wer noch keine
+Vignetten des Trainings in empfohlener Reihenfolge als Spalten. Wer noch keine
 abgeschlossene Sitzung hat, steht mit gedämpfter Schrift trotzdem in der
 Tabelle. Jede abgeschlossene Sitzung erscheint in ihrer Zelle als runder Kreis
 mit ihrer laufenden Nummer zu dieser Vignette; beim Zeigen oder Fokussieren
@@ -307,7 +350,8 @@ Sitzungen, Sitzungen derselben Person in einem fremden Training, jede Sitzung
 einer aus dem Training Ausgetretenen und jede Sitzung für aus dem Kreis
 ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der Vignette
 antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
-Status lesbar, ebenfalls ohne Denkspur.
+Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die Diagnose
+als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
@@ -327,22 +371,27 @@ dem Status 404.
 
 In der Werkzeugleiste über der Tabelle steht rechts der Knopf „Trainingsexport
 (ZIP)“, davor der gedämpfte Hinweis „pseudonym, nicht anonym“; sein Tooltip
-sagt, dass Kennzeichen je Export neu gezogen werden und Freitext nicht
-geschwärzt wird. Der Download heißt `training-<id>-<name>-<UTC-Zeitstempel>.zip`
-und enthält genau die Sitzungen der Fremdeinsicht (ADR-0049): je Person einen
-Ordner mit einem zufälligen Kennzeichen wie `teilnehmer-3f9a01c2`, darin eine
-Markdown-Datei je abgeschlossener Sitzung (`01-brüche-addieren.md`) mit
-Vignettenname, Ausgang, Datum, dem Transkript als Wechsel von Eingabe und
-Äußerung und der Diagnose. Freigegebene Abschriften liegen als Unterordner mit
-dem Erhebungsnamen im Ordner der Person; private und widerrufene fehlen, ebenso
-laufende, abgebrochene und gescheiterte Sitzungen. Wer aus dem Training
-ausgetreten ist, hat in einem danach gezogenen Export weder Ordner noch Dateien.
-Das Archiv enthält keine Kontodaten, keine Denkspur, keine Fehlversuche, keine
-Modell-Konfiguration und keinen Kern; zwei Exporte vergeben verschiedene
-Kennzeichen. Herunterladen dürfen der Kreis und die Administration; fremde
-Ausbilder:innen bekommen 404, Konten ohne Ausbilder:innen-Rolle 403. Der
-Trainingsexport ist keine Datenspur und unterliegt nicht dem Exportkontrakt aus
-ADR-0029.
+sagt, dass die Teilnahmekennung statt Namen erscheint, gleich in jedem Export
+dieses Trainings, und Freitext nicht geschwärzt wird. Der Download heißt
+`training-<id>-<name>-<UTC-Zeitstempel>.zip` und enthält genau die Sitzungen der
+Fremdeinsicht (ADR-0049): je Person einen Ordner mit der Teilnahmekennung ihrer
+Trainingsbindung wie `teilnehmer-3f9a01c2`, darin eine Markdown-Datei je
+abgeschlossener Sitzung (`01-brüche-addieren.md`) mit Vignettenname, Ausgang,
+Datum, dem Transkript als Wechsel von Eingabe und Äußerung und der Diagnose.
+Freigegebene Abschriften liegen als Unterordner mit dem Erhebungsnamen im Ordner
+der Person; private und widerrufene fehlen, ebenso laufende, abgebrochene und
+gescheiterte Sitzungen. Wer aus dem Training ausgetreten ist, hat in einem
+danach gezogenen Export weder Ordner noch Dateien. Das Archiv enthält keine
+Kontodaten, keine Denkspur, keine Fehlversuche, keine Modell-Konfiguration und
+keinen Kern. Zwei Exporte desselben Trainings tragen für dieselbe Person
+denselben Ordnernamen, auch nach Austritt und Wiederbeitritt, weil die Bindung
+bleibt; in einem anderen Training trägt dieselbe Person eine andere Kennung. Die
+Ordner stehen nach Kennung sortiert im Archiv, die Reihenfolge verrät also keine
+Namen. Tragen zwei Personen zufällig dieselbe Kennung, bekommt die später
+beigetretene eine Zählung (`teilnehmer-3f9a01c2-2`). Herunterladen dürfen der
+Kreis und die Administration; fremde Ausbilder:innen bekommen 404, Konten ohne
+Ausbilder:innen-Rolle 403. Der Trainingsexport ist keine Datenspur und
+unterliegt nicht dem Exportkontrakt aus ADR-0029.
 
 ## Simulationskern
 
@@ -384,6 +433,23 @@ Jeder Speichern-Knopf, am Text wie »Kern-Entwurf speichern«, speichert den
 ganzen Entwurf; »Abbrechen« verwirft nur die Änderungen an diesem Text. Ein Text
 mit ungültigem Platzhalter steht nach dem Speichern offen. Wer die Seite mit
 ungespeicherten Änderungen verlässt, wird vom Browser gewarnt.
+
+Der Arbeitskontext steht in der System-Prompt-Vorlage; die User-Prompt-Vorlage
+ist ein Altfeld (ADR-0052). Die Bearbeitungsseite zeigt sie nur, solange der
+Entwurf oder die abgeschickten Daten sie füllen, auch nach einem
+Validierungsfehler. So lässt sich der Arbeitskontext einer Altfassung in die
+System-Prompt-Vorlage verschieben und das Feld leeren; danach erscheint es nicht
+mehr. Ohne das Feld lässt das Speichern die Vorlage unberührt. Die Leseansichten
+zeigen den Abschnitt je Fassung nur bei gefüllter Vorlage, auch bei archivierten
+Fassungen.
+
+Die simulierte Schüler:in erhält ihren Arbeitskontext im System-Prompt, in
+Sitzung, Probelauf und Evalgespräch gleich: Der System-Prompt ist die gerenderte
+System-Prompt-Vorlage. Ist die User-Prompt-Vorlage der Kern-Fassung gefüllt,
+wird sie gerendert und mit einer Leerzeile angehängt; ist sie leer, hängt nichts
+an. Danach wechseln sich die Ansprachen der Teilnehmer:in (`user`) und die
+Äußerungen der Schüler:in (`assistant`) ab, die erste `user`-Nachricht ist die
+erste Ansprache. Jede `user`-Nachricht stammt von der Teilnehmer:in (ADR-0052).
 
 ## Modell-Konfiguration
 
@@ -480,9 +546,9 @@ darunter jedes Eval als eigenen Knoten in seiner Reihenfolge, unter jedem Eval
 seine Evalinputs. „Durchlauf und Vorlagen“ trägt *k*, die Zahl der
 Wiederholungen je Evalinput (Startwert 3), die Lehrperson-Vorlage und die
 Bewerter-Vorlage. Unter jeder Vorlage stehen ihre erlaubten Platzhalter als
-Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie `$inputstrategie`
-und `$verlauf`, in der Bewerter-Vorlage die des Promptvertrags sowie
-`$kriterium` und `$verlauf`. Hervorgehoben und vorn steht der Platzhalter, den
+Knöpfe: in der Lehrperson-Vorlage die des Promptvertrags sowie
+`$inputstrategie`, in der Bewerter-Vorlage die des Promptvertrags sowie
+`$kriterium` und `$verlauf`. Hervorgehoben und vorn stehen die Platzhalter, die
 nur diese Vorlage kennt. Ein Klick fügt ihn an der Schreibmarke ein. Geprüft
 werden die Vorlagen erst beim Finalisieren. „Änderungen speichern“ übernimmt die
 Werte und bleibt im Editor, „Abbrechen“ führt ohne Speichern zurück zur
@@ -681,17 +747,24 @@ Schritt ist die Inputäußerung wörtlich die Äußerung der Lehrperson. Bei ein
 gelenkten formuliert die simulierte Lehrperson sie mit der festgehaltenen
 Lehrpersonen-Konfiguration: Ihr System-Prompt ist die gerenderte
 Lehrperson-Vorlage des festgehaltenen Katalogs mit `$inputstrategie` (Text des
-Schritts) und `$verlauf` (bisheriger Verlauf ohne Denkspur), der User-Prompt
-dieser Verlauf, die Eingabe die Inputstrategie. Die Schüler:in antwortet in
-beiden Fällen über denselben Antwortversuch wie in der Sitzung, ohne Denkspur im
-Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem Evalkriterium des
-Evals und jedem übergreifenden Kriterium. Sein System-Prompt ist die gerenderte
-Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf samt Denkspur), der
-User-Prompt der Verlauf, die Eingabe der Kriteriumstext. Inputstrategie und
-Kriterium werden als reiner Text eingesetzt und nicht selbst als Vorlage
-ausgewertet; Anweisungen stehen allein in den Vorlagen des Katalogs. Jedes
-Gespräch, jeder Wechsel und jedes Urteil wird sofort geschrieben; kein
-Modellaufruf hält eine Schreibtransaktion offen.
+Schritts); die Inputstrategie steht nur dort, nie als Nachricht. Das Gespräch
+führt die Lehrperson nativ, spiegelbildlich zur Schüler:in: Ihr Verlauf beginnt
+mit der festen Einstiegsnachricht „Beginnen Sie das Gespräch.“ als `user`,
+danach stehen ihre eigenen Äußerungen, auch die wörtlichen fester Schritte, als
+`assistant` und die Äußerungen der Schüler:in ohne Denkspur als `user`. Die
+letzte Nachricht ist die jüngste Äußerung der Schüler:in, im ersten Zug die
+Einstiegsnachricht. Eine Lehrperson-Vorlage mit `$verlauf` wird beim
+Finalisieren abgelehnt; in einer schon finalisierten Altvorlage bleibt
+`$verlauf` leer. Die Schüler:in antwortet in beiden Fällen über denselben
+Antwortversuch wie in der Sitzung, mit derselben Nachrichtenordnung und ohne
+Denkspur im Kontext. Danach beurteilt der Bewerter das Gespräch nach jedem
+Evalkriterium des Evals und jedem übergreifenden Kriterium. Sein System-Prompt
+ist die gerenderte Bewerter-Vorlage mit `$kriterium` und `$verlauf` (Verlauf
+samt Denkspur); den Verlauf erhält er nur dort. Seine einzige `user`-Nachricht
+ist der Kriteriumstext. Inputstrategie und Kriterium werden als reiner Text
+eingesetzt und nicht selbst als Vorlage ausgewertet; Anweisungen stehen allein
+in den Vorlagen des Katalogs. Jedes Gespräch, jeder Wechsel und jedes Urteil
+wird sofort geschrieben; kein Modellaufruf hält eine Schreibtransaktion offen.
 
 Scheitert der Antwortversuch der Schüler:in endgültig, endet das Gespräch mit
 einem Wechsel ohne Antwort samt Fehlversuchen, und jedes seiner Kriterien ist
@@ -1064,12 +1137,15 @@ Detailseite. Eine fremde Erhebung bleibt dabei unauffindbar. Sobald eine
 Stichprobe besteht, lässt sich an der Erhebung die Datenspur als ZIP mit
 relationalen CSV-Dateien herunterladen, einschließlich der geplanten
 Vignettenziehungen, der tatsächlich gelaufenen Sitzungen, Gesprächsschritte,
-Fehlversuche und Diagnosen. Jeder Gesprächsschritt und jede Diagnose vermerken
-dabei den Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem
-zusammengesetzt wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und
-ist damit eine Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile
-nennt die verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem
-Budget bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
+Fehlversuche und Diagnosen. Jede Tabelle, die eine Teilnahme über ihr Token
+ausweist, nennt daneben in der Spalte `teilnahmekennung` deren Teilnahmekennung:
+acht Hexzeichen, beim Anlegen der Teilnahme zufällig gezogen und danach
+unveränderlich. Jeder Gesprächsschritt und jede Diagnose vermerken dabei den
+Eingabemodus: ob der Text getippt, eingesprochen oder aus beidem zusammengesetzt
+wurde. Der Wert wird im Browser der Teilnehmer:in bestimmt und ist damit eine
+Angabe für die Auswertung, kein Nachweis. Jede Sitzungszeile nennt die
+verbrauchte Zeit in Sekunden; bei einer Vignette mit schrittbasiertem Budget
+bleibt sie bei null, der Wert ist also zusammen mit dem Budget-Typ der
 Vignettenfassung zu lesen. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem
 vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
@@ -1086,6 +1162,55 @@ Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
 Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen«
 von »nie gesehen«. Flüchtige Teilnahmen haben Itemblöcke, aber keine
 Antwortzeilen.
+
+## Einsicht in die Erhebung
+
+Hat eine Erhebung Teilnahmen, die in der Übersicht als Zeile erscheinen, steht
+auf ihrer Detailseite neben dem Export der Link „Einsicht“ (ADR-0049). Die
+Übersicht ist rein lesend und für den Kreis der Erhebung und die Administration
+erreichbar, auch für Teilnahmen von vor der Aufnahme in den Kreis und nach dem
+Archivieren von Stichprobe oder Erhebung. Wer aus dem Kreis ausgetreten ist und
+fremde Forschende bekommen 404, Konten ohne Forschungsrolle 403.
+
+Je Stichprobe zeigt sie ein Raster wie die Fremdeinsicht im Training: eine Zeile
+je Teilnahme, beschriftet mit ihrer Teilnahmekennung und nach Beginn sortiert,
+die älteste oben; Teilnahmen aus der Zeit vor dem Beginndatum gelten als die
+ältesten. Dazu kommt eine Spalte je Vignette in der Reihenfolge der Erhebung.
+Jede Zelle hält höchstens eine Sitzung als runde Bubble mit der gespielten
+Position aus der Vignettenziehung; Tooltip und Screenreader nennen ihren Status.
+Abgeschlossene Sitzungen erscheinen normal, abgebrochene und gescheiterte in
+Warnfarbe, laufende gedimmt. Flüchtige Teilnahmen zeigen nur umrandete Bubbles,
+und ihre Zeile trägt den Hinweis „flüchtig, nur Ablaufgerüst“. Eingewilligte
+Teilnahmen ohne Sitzung stehen mit „noch keine Sitzung“ in der Liste;
+Teilnahmen, die Einwilligung a abgelehnt oder noch nicht gegeben haben, fehlen.
+Eine Stichprobe ohne solche Zeilen zeigt „Noch keine Teilnahme mit
+Einwilligung.“ Das Teilnahme-Token steht nirgends auf der Seite.
+
+Die Bubbles abgeschlossener, abgebrochener und gescheiterter Sitzungen nicht
+flüchtiger Teilnahmen sind Links auf die Sitzungsansicht unter
+`eigene/<pk>/einsicht/sitzungen/<sitzung_pk>/`; laufende und flüchtige Bubbles
+sind es nicht. Die Sitzungsansicht zeigt im Kopf Teilnahmekennung, Stichprobe,
+Vignette und Status und führt zurück zur Übersicht. Darunter steht die Sitzung
+rein lesend so, wie die Teilnehmer:in sie gesehen hat: Rahmenhandlung,
+Transkript in gespielter Reihenfolge und bei abgeschlossenen Sitzungen Debrief
+und abgegebene Diagnose, ohne Diagnose „Keine Diagnose abgegeben.“. Anders als
+für die Teilnehmer:in liegt unter jedem Gesprächsschritt die Denkspur,
+eingeklappt unter „Denkspur ansehen“ wie im Probelauf, und unter der Sitzung
+stehen die Antworten auf den abgeschickten Item-Block nach dieser Sitzung, mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items. Fehlversuche,
+das Teilnahme-Token, Formulare und Aktionen erscheinen nicht. Laufende
+Sitzungen, Sitzungen flüchtiger Teilnahmen und Sitzungen, die nicht zur Erhebung
+aus der URL gehören, antworten mit 404.
+
+Hinter den Vignetten steht die Spalte „Abschluss“. Hat eine nicht flüchtige
+Teilnahme ihren Item-Block am Ende abgeschickt, steht dort eine verlinkte
+Bubble; sonst ein Strich. Sie führt auf die Abschlussseite unter
+`eigene/<pk>/einsicht/teilnahmen/<teilnahme_pk>/abschluss/`. Die Seite nennt
+Teilnahmekennung und Stichprobe, zeigt die Antworten des Blocks rein lesend mit
+Skalenpol oder Freitext und einem Strich für unbeantwortete Items und führt
+zurück zur Übersicht. Das Teilnahme-Token erscheint auch hier nicht. Flüchtige
+Teilnahmen, nicht abgeschickte Blöcke und Teilnahmen, die nicht zur Erhebung aus
+der URL gehören, antworten mit 404.
 
 ## Fragebogen-Items verwalten
 

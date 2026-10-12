@@ -174,7 +174,7 @@ def sitzung_anzeigen(
     vignette: Vignette,
     kern: Simulationskern,
     gespraechsschritte: list[GespraechsschrittDaten] | QuerySet[Gespraechsschritt],
-    ist_probelauf: bool,
+    zeigt_denkspur: bool,
     navigation: Sitzungsnavigation,
     erneute_eingabe: str | None = None,
     erneuter_eingabemodus: str = Eingabemodus.GETIPPT,
@@ -185,8 +185,14 @@ def sitzung_anzeigen(
     sitzung_pk: int | None = None,
     anhang: str | None = None,
     abgegebene_diagnose: str | None = None,
+    seitenvorlage: str = "sitzungen/sitzung.html",
+    seitenkontext: Mapping[str, object] | None = None,
 ) -> HttpResponse:
-    """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung."""
+    """Rendert die ganze Sitzung oder nur ihre HTMX-Fortsetzung.
+
+    Eine eigene Seitenvorlage erweitert `sitzungen/sitzung.html` um Kopf und
+    Fuß; ihr Seitenkontext steht dort zusätzlich bereit.
+    """
 
     context: dict[str, object] = {
         "vignette": vignette,
@@ -195,7 +201,7 @@ def sitzung_anzeigen(
             kern.rahmenhandlung_gespraechseinleitung, vignette
         ),
         "gespraechsschritte": gespraechsschritte,
-        "ist_probelauf": ist_probelauf,
+        "zeigt_denkspur": zeigt_denkspur,
         "erneute_eingabe": erneute_eingabe,
         "erneuter_eingabemodus": erneuter_eingabemodus,
         "ist_gescheitert": ist_gescheitert,
@@ -208,10 +214,11 @@ def sitzung_anzeigen(
         "sitzung_pk": sitzung_pk,
         "anhang": anhang,
         "abgegebene_diagnose": abgegebene_diagnose,
+        **(seitenkontext or {}),
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
         if _ist_htmx(request)
-        else "sitzungen/sitzung.html"
+        else seitenvorlage
     )
     return render(request, template, context)
