@@ -113,8 +113,7 @@ Der Gespraechsverlauf wird als native Konversationsnachrichten aufgebaut
 (Funktion `nachrichten_bauen`):
 
 ```
-[system]  System-Prompt (Rolle, Regel, Verhalten)
-[user]    User-Prompt (Arbeitskontext)
+[system]  System-Prompt (Rolle, Regel, Verhalten, Arbeitskontext)
 [user]    Eingabe 1 der Teilnehmer:in
 [assistant] Aeusserung 1 der Schueler:in
 [user]    Eingabe 2 der Teilnehmer:in

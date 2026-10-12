@@ -64,6 +64,13 @@ class SimulationskernForm(ModelForm):
             _PROMPT_FELDER,
             _platzhalter_hinweis(VERTRAG_PROMPT, PROMPT_PLATZHALTER_MIT_UMGEBUNG),
         )
+        # Altfeld (ADR-0052): nur sichtbar, solange Entwurf oder Eingabe es
+        # füllen. Ohne Feld lässt das Speichern die Vorlage unberührt.
+        if not (
+            self.instance.user_prompt_vorlage
+            or self.data.get(self.add_prefix("user_prompt_vorlage"))
+        ):
+            del self.fields["user_prompt_vorlage"]
 
     def _beschriften(self, felder: dict[str, str], hinweis: str) -> None:
         # Versieht die angegebenen Felder mit Bezeichnung und Vertragshinweis.

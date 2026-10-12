@@ -37,7 +37,7 @@
                 <tbody>
                     {% for daten in vignetten_daten %}
                     <tr>
-                        <td>{{ daten.name }}</td>
+                        <td>{{ forloop.counter }}. {{ daten.name }}</td>
                         <td>
                             {% if daten.sitzungen_nach_status.laufend or daten.sitzungen_nach_status.abgeschlossen or daten.sitzungen_nach_status.abgebrochen or daten.sitzungen_nach_status.gescheitert %}
                             <div class="sitzungsmenues">

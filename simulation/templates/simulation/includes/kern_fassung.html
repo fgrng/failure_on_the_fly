@@ -25,7 +25,9 @@
         <div class="system-page-field-list">
             {% if simulationskern %}
                 <section class="page-field"><h3>System-Prompt-Vorlage</h3><pre>{{ simulationskern.system_prompt_vorlage }}</pre></section>
-                <section class="page-field"><h3>User-Prompt-Vorlage</h3><pre>{{ simulationskern.user_prompt_vorlage }}</pre></section>
+                {% if simulationskern.user_prompt_vorlage %}
+                    <section class="page-field"><h3>User-Prompt-Vorlage</h3><pre>{{ simulationskern.user_prompt_vorlage }}</pre></section>
+                {% endif %}
             {% else %}
                 <p class="system-page-empty">Noch keine Prompt-Vorlagen vorhanden.</p>
             {% endif %}

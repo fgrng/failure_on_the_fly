@@ -20,18 +20,16 @@ def vor_jedem_aufruf(
     def umhuellt(
         sprachmodell: FakeSprachmodell,
         system_prompt: str,
-        user_prompt: str,
         verlauf: Sequence[tuple[str, str]],
         eingabe: str,
         ausgabe_schema: Mapping[str, object],
         timeout: float,
     ) -> dict[str, object]:
         # Erst der Testadapter, dann antwortet der echte Fake.
-        vorher(nachrichten_bauen(system_prompt, user_prompt, verlauf, eingabe))
+        vorher(nachrichten_bauen(system_prompt, verlauf, eingabe))
         return echte_antworten(
             sprachmodell,
             system_prompt,
-            user_prompt,
             verlauf,
             eingabe,
             ausgabe_schema,

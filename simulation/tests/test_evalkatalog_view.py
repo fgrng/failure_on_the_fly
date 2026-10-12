@@ -163,7 +163,6 @@ class EvalkatalogEditorTests(TestCase):
             "schuelerin_geschlecht",
             "schuelerin_name",
             "thema",
-            "verlauf",
         ]
 
         response: HttpResponse = self.client.get(self.url)
@@ -173,7 +172,7 @@ class EvalkatalogEditorTests(TestCase):
             knoepfe,
             {
                 "id_lehrperson_vorlage": ["inputstrategie", *gemeinsam],
-                "id_bewerter_vorlage": ["kriterium", *gemeinsam],
+                "id_bewerter_vorlage": ["kriterium", "verlauf", *gemeinsam],
             },
         )
 

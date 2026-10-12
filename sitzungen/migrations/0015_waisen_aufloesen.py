@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
     """Bereitet den Constraint „höchstens eine laufende Sitzung“ vor."""
 
     dependencies = [
-        ("sitzungen", "0013_teilnahme_drei_einwilligungen"),
+        ("sitzungen", "0014_teilnahme_kennung"),
     ]
 
     operations = [

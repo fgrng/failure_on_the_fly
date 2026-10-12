@@ -13,7 +13,7 @@ from django.urls import reverse
 from config.tests.aufbau import konto_mit_rollen
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE
-from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung
+from sitzungen.models import Fehlversuch, Gespraechsschritt, Sitzung, Teilnahme
 from training.models import Abschrift, Training
 from training.tests.aufbau import (
     FremdeinsichtTestCase,
@@ -55,8 +55,14 @@ class TrainingsexportTestCase(FremdeinsichtTestCase):
             }
 
     def _ordner(self, archiv: dict[str, str]) -> set[str]:
-        # Die Kennzeichen der obersten Ordner.
+        # Die Namen der obersten Ordner.
         return {name.split("/")[0] for name in archiv}
+
+    def _kennung_setzen(self, konto: Konto, kennung: str) -> None:
+        # Gibt der Trainingsbindung des Kontos eine bekannte Kennung.
+        teilnahme: Teilnahme = self.training.bindung_fuer(konto).teilnahme
+        teilnahme.kennung = kennung
+        teilnahme.save(update_fields=["kennung"])
 
 
 class ZugriffTests(TrainingsexportTestCase):
@@ -165,13 +171,14 @@ class InhaltTests(TrainingsexportTestCase):
             ["01-brüche-addieren.md", "02-brüche-addieren.md"],
         )
 
-    def test_ordner_heissen_nach_kennzeichen(self) -> None:
-        """Der Ordner trägt ein Kennzeichen, keinen Namen."""
+    def test_ordner_heissen_nach_der_teilnahmekennung(self) -> None:
+        """Der Ordner trägt die Teilnahmekennung der Trainingsbindung."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        self._kennung_setzen(self.teilnehmerin, "3f9a01c2")
 
         (ordner,) = self._ordner(self._archiv())
 
-        self.assertRegex(ordner, r"^teilnehmer-[0-9a-f]+$")
+        self.assertEqual(ordner, "teilnehmer-3f9a01c2")
 
     def test_datei_enthaelt_vignette_ausgang_transkript_und_diagnose(self) -> None:
         """Dasselbe wie in der Fremdeinsicht, als Markdown, datiert in Ortszeit."""
@@ -286,7 +293,7 @@ class InhaltTests(TrainingsexportTestCase):
         fremdes: Training = Training.objects.anlegen(
             konto_mit_rollen("hedy", AUSBILDERIN_GRUPPE), name="Fremd"
         )
-        fremdes.vignetten.add(self.vignette)
+        fremdes.vignette_aufnehmen(self.vignette)
         fremdes.veroeffentlichen()
         gespielte_sitzung(fremdes, self.teilnehmerin, self.vignette)
 
@@ -321,14 +328,55 @@ class InhaltTests(TrainingsexportTestCase):
         self.assertNotIn("Verworfene Rohantwort.", text)
         self.assertNotIn("Ungültiges JSON", text)
 
-    def test_zwei_exporte_ziehen_verschiedene_kennzeichen(self) -> None:
-        """Kennzeichen verfolgen niemanden über die Zeit."""
+    def test_zwei_exporte_tragen_dieselben_ordner(self) -> None:
+        """Zwei Exporte desselben Trainings lassen sich aufeinander beziehen."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
 
-        erstes: set[str] = self._ordner(self._archiv())
-        zweites: set[str] = self._ordner(self._archiv())
+        self.assertEqual(self._ordner(self._archiv()), self._ordner(self._archiv()))
 
-        self.assertNotEqual(erstes, zweites)
+    def test_wiederbeitritt_behaelt_die_kennung(self) -> None:
+        """Ein erneuter Beitritt führt die Person im selben Ordner."""
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        vorher: set[str] = self._ordner(self._archiv())
+
+        self.training.beitreten(self.teilnehmerin)
+
+        self.assertEqual(self._ordner(self._archiv()), vorher)
+
+    def test_dieselbe_person_traegt_in_zwei_trainings_verschiedene_kennungen(
+        self,
+    ) -> None:
+        """Exporte verschiedener Trainings verknüpfen niemanden."""
+        zweites: Training = Training.objects.anlegen(self.ausbilderin, name="Zweites")
+        zweites.vignette_aufnehmen(self.vignette)
+        zweites.veroeffentlichen()
+        gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(zweites, self.teilnehmerin, self.vignette)
+        erstes_archiv: set[str] = self._ordner(self._archiv())
+        self.training = zweites
+
+        self.assertNotEqual(self._ordner(self._archiv()), erstes_archiv)
+
+    def test_gleiche_kennungen_ergeben_getrennte_ordner(self) -> None:
+        """Kollidieren zwei Kennungen, zählt die später Beigetretene weiter."""
+        zweite: Konto = Konto.objects.create_user(username="margaret")
+        self.training.beitreten(zweite)
+        for _ in range(2):
+            gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        gespielte_sitzung(self.training, zweite, self.vignette)
+        for konto in (self.teilnehmerin, zweite):
+            self._kennung_setzen(konto, "0badcafe")
+
+        archiv: dict[str, str] = self._archiv()
+
+        self.assertEqual(
+            sorted(archiv),
+            [
+                "teilnehmer-0badcafe-2/01-brüche-addieren.md",
+                "teilnehmer-0badcafe/01-brüche-addieren.md",
+                "teilnehmer-0badcafe/02-brüche-addieren.md",
+            ],
+        )
 
 
 class AbschriftTests(TrainingsexportTestCase):
@@ -339,17 +387,17 @@ class AbschriftTests(TrainingsexportTestCase):
     ) -> None:
         """Sie liegt im Ordner der Person, benannt nach der Erhebung."""
         gespielte_sitzung(self.training, self.teilnehmerin, self.vignette)
+        self._kennung_setzen(self.teilnehmerin, "3f9a01c2")
         kopie: Abschrift = abschrift_mit_sitzung(self.teilnehmerin, self.vignette)
         self._freigeben(kopie, self.training)
 
         archiv: dict[str, str] = self._archiv()
 
-        (ordner,) = self._ordner(archiv)
         abschriftdateien: list[str] = [name for name in archiv if name.count("/") == 2]
         self.assertEqual(len(archiv), 2)
         self.assertEqual(len(abschriftdateien), 1)
         self.assertTrue(
-            abschriftdateien[0].startswith(f"{ordner}/studie-bruchrechnung/")
+            abschriftdateien[0].startswith("teilnehmer-3f9a01c2/studie-bruchrechnung/")
         )
         self.assertIn("Nur den Zähler gekürzt.", archiv[abschriftdateien[0]])
 
@@ -379,14 +427,14 @@ class AbschriftTests(TrainingsexportTestCase):
 
         archiv: dict[str, str] = self._archiv()
 
-        # Das Kennzeichen ist zufällig; beide Ordner liegen unter derselben Person.
+        # Beide Ordner liegen unter derselben Person.
         pfade: list[list[str]] = sorted(name.split("/", 1) for name in archiv)
-        kennzeichen: str = pfade[0][0]
+        ordner: str = pfade[0][0]
         self.assertEqual(
             pfade,
             [
-                [kennzeichen, "studie-bruchrechnung-2/01-brüche-addieren.md"],
-                [kennzeichen, "studie-bruchrechnung/01-brüche-addieren.md"],
+                [ordner, "studie-bruchrechnung-2/01-brüche-addieren.md"],
+                [ordner, "studie-bruchrechnung/01-brüche-addieren.md"],
             ],
         )
 

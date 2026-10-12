@@ -61,7 +61,7 @@
         <div class="table-toolbar fremdeinsicht__toolbar">
             <span class="table-toolbar__count">{{ fremdeinsicht.zeilen|length }} Teilnehmende · {{ fremdeinsicht.vignetten|length }} Vignette{{ fremdeinsicht.vignetten|length|pluralize:"n" }}</span>
             <span class="fremdeinsicht__export">
-                <small class="fremdeinsicht__exporthinweis" tabindex="0" title="Kennzeichen statt Namen, je Export neu gezogen. Freitext wird nicht geschwärzt.">pseudonym, nicht anonym</small>
+                <small class="fremdeinsicht__exporthinweis" tabindex="0" title="Teilnahmekennung statt Namen, gleich in jedem Export dieses Trainings. Freitext wird nicht geschwärzt.">pseudonym, nicht anonym</small>
                 <a class="button button--secondary" href="{% url 'training:trainingsexport' training.pk %}">Trainingsexport (ZIP)</a>
             </span>
         </div>
@@ -148,14 +148,30 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for vignette in training.vignetten.all %}
+                    {% for vignette in vignetten %}
                         <tr>
-                            <td>{{ vignette.anzeigename }}</td>
+                            <td>{{ forloop.counter }}. {{ vignette.anzeigename }}</td>
                             <td>
-                                <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}" style="margin: 0;">
-                                    {% csrf_token %}
-                                    <button class="button button--danger" type="submit">Entfernen</button>
-                                </form>
+                                <div class="reihenfolge-aktionen">
+                                    {% if not forloop.first %}
+                                        <form method="post" action="{% url 'training:vignette_verschieben' training.pk vignette.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="position" value="{{ forloop.counter|add:-1 }}">
+                                            <button class="button button--secondary button--bereich" type="submit" aria-label="{{ vignette.anzeigename }} nach oben">Hoch</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if not forloop.last %}
+                                        <form method="post" action="{% url 'training:vignette_verschieben' training.pk vignette.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="position" value="{{ forloop.counter|add:1 }}">
+                                            <button class="button button--secondary button--bereich" type="submit" aria-label="{{ vignette.anzeigename }} nach unten">Runter</button>
+                                        </form>
+                                    {% endif %}
+                                    <form method="post" action="{% url 'training:vignette_entfernen' training.pk vignette.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button button--danger" type="submit">Entfernen</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}

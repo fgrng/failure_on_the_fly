@@ -1,5 +1,7 @@
 """ORM-nahe Tests der persistierten Sitzung."""
 
+import re
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -287,3 +289,14 @@ def test_teilnahme_ohne_laufende_sitzung_hat_keine() -> None:
     sitzungen_anlegen(teilnahme, 2, Sitzung.Status.ABGEBROCHEN)
 
     assert Sitzung.objects.laufende_von(teilnahme) is None
+
+
+@pytest.mark.django_db
+def test_teilnahme_erhaelt_beim_anlegen_eine_zufaellige_kennung() -> None:
+    """Acht Hexzeichen, je Teilnahme neu gezogen."""
+
+    erste: Teilnahme = Teilnahme.objects.create()
+    zweite: Teilnahme = Teilnahme.objects.create()
+
+    assert re.fullmatch(r"[0-9a-f]{8}", erste.kennung)
+    assert erste.kennung != zweite.kennung

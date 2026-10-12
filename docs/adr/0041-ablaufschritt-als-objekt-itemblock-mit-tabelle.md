@@ -113,7 +113,7 @@ Stelle. Der Anhang-Slot ist damit dauerhaft und keine Übergangslösung.
   verworfen. Es hätte den Datenverlust beim Browserwechsel erhalten, der der
   eigentliche Anlass ist.
 - **Einen Ablauf für Training und Erhebung gemeinsam abstrahieren** — verworfen
-  (vorerst). Ein Training ist ein Vorrat in freier Reihenfolge, keine Sequenz;
+  (bestätigt in #205, siehe Nachtrag). Ein Training ist ein Vorrat in freier Reihenfolge, keine Sequenz;
   eine Abstraktion über genau einen Fall. Die Trennlinie „der Fortschritt liest
   von einer Sitzung nur deren Status" ist bewusst so gelegt, dass sie auch für
   einen Trainingsablauf gälte.
@@ -145,3 +145,11 @@ Stelle. Der Anhang-Slot ist damit dauerhaft und keine Übergangslösung.
   auf den Block ist sofort verpflichtend. Ein Backfill käme ohnehin nicht in
   Frage: Der Erledigt-Zustand ist für Altdaten grundsätzlich nicht
   rekonstruierbar — genau deshalb gibt es die Tabelle.
+
+## Nachtrag (2026-10): Kein gemeinsamer Ablauf
+
+Die Ablehnung eines gemeinsamen Ablaufs für Training und Erhebung ist im
+Grilling #205 bestätigt; das „vorerst“ entfällt. Auch mit der empfohlenen
+Reihenfolge der Trainingsvignetten (#439) bleibt ein Training ein Vorrat in
+freier Reihenfolge: Die Reihenfolge ist eine Empfehlung der Konfiguration, kein
+Ablauf, und ein gemeinsamer Begriff wie „Sitzungsreihe“ wird nicht eingeführt.

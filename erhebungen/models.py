@@ -675,6 +675,14 @@ class ItemAntwort(models.Model):
     )
     vorgelegt_am: models.DateTimeField = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def antworttext(self) -> str | None:
+        """Die Antwort, wie sie dargeboten wurde: Skalenpol oder Freitext."""
+
+        if self.likert_stufe is not None:
+            return LikertSkalenpol.pol_fuer(self.likert_stufe).label
+        return self.freitext
+
     def clean(self) -> None:
         """Hält Teilnahme, Andockpunkt und Antworttyp konsistent."""
 

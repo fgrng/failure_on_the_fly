@@ -43,7 +43,7 @@ fake(Verwendung.BEWERTER, [{"begruendung": f"B{n}", "erfuellt": n % 4 != 0} for 
 
 katalog = Evalkatalog.objects.anlegen()
 katalog.k = 3
-katalog.lehrperson_vorlage = "Frag $schuelerin_name nach: $inputstrategie. Bisher: $verlauf"
+katalog.lehrperson_vorlage = "Frag $schuelerin_name nach: $inputstrategie."
 katalog.bewerter_vorlage = "Prüfe $kriterium am Verlauf $verlauf."
 katalog.save()
 katalog.kriterium_anlegen("Bleibt in der Rolle")

@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('simulation', '0014_evalinput_inputschritt'),
-        ('sitzungen', '0014_waisen_aufloesen'),
+        ('sitzungen', '0015_waisen_aufloesen'),
         ('vignetten', '0011_vignette_geaendert_am'),
     ]
 

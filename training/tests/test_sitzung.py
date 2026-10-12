@@ -11,7 +11,13 @@ from config.tests.aufbau import finale_vignette, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen.models import Diagnose, Eingabemodus, Gespraechsschritt, Sitzung
+from sitzungen.models import (
+    Diagnose,
+    Eingabemodus,
+    Gespraechsschritt,
+    Sitzung,
+    Vignettenposition,
+)
 from training.models import Training
 from training.tests.aufbau import route_der_letzten_sitzung
 from vignetten.models import Vignette
@@ -62,7 +68,7 @@ class TrainingssitzungTests(TestCase):
         )
         if kern_ueberholen:
             kern.bearbeiten().finalisieren()
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
@@ -252,6 +258,23 @@ class TrainingssitzungTests(TestCase):
 
         self.assertEqual(Diagnose.objects.get().eingabemodus, Eingabemodus.GEMISCHT)
 
+    def test_trainingssitzung_schreibt_keine_vignettenposition(self) -> None:
+        """Die Position gehört der Erhebung; Training hält sie im Training (#442)."""
+
+        self._sitzung_starten(
+            [{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}]
+        )
+        self.client.post(
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
+        )
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertFalse(Vignettenposition.objects.exists())
+
     def test_schrittbudget_zeigt_debrief_bei_laufender_sitzung(self) -> None:
         """Auch ein ausgeschöpftes Schrittbudget schließt erst mit Diagnose ab."""
         self._sitzung_starten(
@@ -349,6 +372,53 @@ class TrainingssitzungTests(TestCase):
         self.assertContains(response, "Was ist Ihnen aufgefallen?")
         self.assertNotContains(response, "Ihre nächste Frage")
         self.assertNotContains(response, "Spracheingabe starten")
+
+    def _abgeschlossene_sitzung_ansehen(self) -> str:
+        """Schließt eine Sitzung mit Diagnose ab und liefert ihren Seiteninhalt."""
+        self._sitzung_starten(
+            [{"denkspur": "Interne Denkspur", "aeusserung": "Ich addiere alles."}]
+        )
+        self.client.post(
+            route_der_letzten_sitzung("gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
+        self.client.post(
+            route_der_letzten_sitzung("debrief"),
+            {"diagnose": "Mia addiert Zähler und Nenner."},
+        )
+        inhalt: str = self.client.get(
+            reverse("training:sitzung_ansehen", args=[Sitzung.objects.get().pk])
+        ).content.decode()
+        # Ohne die Navigation, deren Abmelden ein Formular ist.
+        return inhalt[inhalt.index('<article class="sitzung-seite"') :]
+
+    def test_vergangene_sitzung_zeigt_die_diagnose_als_text(self) -> None:
+        """Die lesende Ansicht nennt die abgegebene Diagnose."""
+        self.assertRegex(
+            self._abgeschlossene_sitzung_ansehen(),
+            r"<p[^>]*>Mia addiert Zähler und Nenner.</p>",
+        )
+
+    def test_vergangene_sitzung_ohne_diagnose(self) -> None:
+        """Fehlt die Diagnose, sagt die lesende Ansicht das ausdrücklich."""
+        self._sitzung_starten([])
+        sitzung: Sitzung = Sitzung.objects.get()
+        sitzung.status = Sitzung.Status.ABGESCHLOSSEN
+        sitzung.save()
+
+        response: HttpResponse = self.client.get(
+            reverse("training:sitzung_ansehen", args=[sitzung.pk])
+        )
+
+        self.assertContains(response, "Keine Diagnose abgegeben.")
+
+    def test_vergangene_sitzung_zeigt_kein_diagnoseformular(self) -> None:
+        """Die lesende Ansicht hat keine Formulare."""
+        seite: str = self._abgeschlossene_sitzung_ansehen()
+
+        for element in ("<form", "<textarea", "<button"):
+            with self.subTest(element=element):
+                self.assertNotIn(element, seite)
 
     def test_vergangene_sitzung_anderer_konten_nicht_einsehbar(self) -> None:
         """Fremde Sitzungen bleiben durch 404 geschützt."""

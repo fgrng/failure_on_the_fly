@@ -39,7 +39,8 @@ class ZweiterStartTests(TestCase):
     def _training(self, ausbilderin: Konto, name: str) -> Training:
         # Veröffentlicht ein Training mit beiden Vignetten.
         training: Training = Training.objects.anlegen(ausbilderin, name=name)
-        training.vignetten.add(self.erste, self.zweite)
+        training.vignette_aufnehmen(self.erste)
+        training.vignette_aufnehmen(self.zweite)
         training.veroeffentlichen()
         return training
 

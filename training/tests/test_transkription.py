@@ -33,7 +33,7 @@ class TranskriptionsEndpointTests(TestCase):
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         vignette: Vignette = finale_vignette(ausbilderin)
         training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
-        training.vignetten.add(vignette)
+        training.vignette_aufnehmen(vignette)
         training.veroeffentlichen()
         self.client.force_login(teilnehmerin)
         self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
