@@ -50,7 +50,7 @@ A term earns a glossary entry when code, an ADR, or the user interface carries i
 
 ## Writing ADRs
 
-Frontmatter schema, status values, the issue-or-ADR rule, the skeleton with German headings, numbering and where ADR references may appear are fixed in **`docs/adr/README.md`**. It takes precedence over `.claude/skills/domain-modeling/ADR-FORMAT.md` where the two disagree.
+Before writing a new ADR or amending or superseding an existing one, follow **`docs/adr/README.md`**.
 
 ## Flag ADR conflicts
 

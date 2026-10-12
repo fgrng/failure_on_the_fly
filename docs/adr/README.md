@@ -1,25 +1,37 @@
 # Architecture Decision Records
 
-Ein ADR hält eine Entscheidung fest, die sich im Code nicht von selbst erklärt,
-samt ihrer Gründe. Das Glossar (`GLOSSARY.md`) sagt, *was* ein Begriff meint;
-das ADR sagt, *warum* es so ist.
+Diese Datei regelt Form und Pflege der ADRs. Wo sie
+`.claude/skills/domain-modeling/ADR-FORMAT.md` widerspricht, gilt sie.
 
-Diese Datei regelt die Form. Sie geht den allgemeinen Vorgaben in
-`.claude/skills/domain-modeling/ADR-FORMAT.md` vor, wo beide sich
-widersprechen.
+Ein angenommenes ADR ist **eingefroren**: Sein Entscheidungstext bleibt so,
+wie er die damalige Umsetzung begründet hat. Wer einem ADR-Verweis aus dem
+Code folgt, findet dort diese Begründung. Was sich später ändert, läuft über
+den Status, einen Nachführungsblock und neue ADRs.
 
-## Der Entscheidungstext ist unveränderlich
+## Eine Entscheidung ändert sich
 
-Ein angenommenes ADR wird nicht umgeschrieben. Was sich danach ändert, läuft
-über den Status im Frontmatter, einen Nachführungsblock und neue ADRs. Die
-Git-Historie ersetzt das nicht: Wer einem ADR-Verweis aus einem Codekommentar
-folgt, muss die Begründung finden, die diesen Code geformt hat, nicht deren
-heutige Fassung.
+1. **Nachführen oder ersetzen?** Wechselt nur eine *Tatsache innerhalb der
+   Regel* (eine Zahl, ein Name, eine Farbe, ein Anbieter), wird das alte ADR
+   **nachgeführt**, und der Anlass darf ein Issue sein. Wechselt die *Regel
+   selbst*, braucht es ein neues ADR. Die Probe: Bräche ein Test, wenn ich
+   weiter dem alten Wortlaut folgte? Dann ein neues ADR. Gilt die alte
+   Entscheidung danach im Kern nicht mehr, **ersetzt** das neue ADR sie.
+2. **Das alte ADR markieren.**
+   - Nachgeführt: `status: amended`, der Anlass in `amended-by`, und die
+     Differenz im Nachführungsblock unter dem Titel. Gibt es schon einen
+     Block, wächst er um einen Absatz; das ADR trägt immer genau einen.
+   - Ersetzt: `status: superseded` und `superseded-by`. Sein
+     Nachführungsblock fällt weg, der Entscheidungstext bleibt.
+3. **Verweise umleiten.** Glossar, Code, Templates und Tests, die auf ein
+   ersetztes ADR zeigen, zeigen danach auf den Nachfolger.
 
-Die einmalige Konsolidierung aus #235 hat ältere ADRs zusammengeführt und neu
-eingestuft. Sie war die Ausnahme, mit der diese Regel beginnt.
+Fertig, wenn das Frontmatter des alten ADRs auf den Anlass zeigt und
+`rg -g '!docs/**' 'ADR-NNNN'` für ein ersetztes ADR keinen Treffer mehr
+liefert.
 
 ## Frontmatter
+
+Das Frontmatter trägt genau diese Felder:
 
 ```yaml
 ---
@@ -31,24 +43,14 @@ deprecated-by: "#123"            # optional bei deprecated
 ```
 
 - **`accepted`**: Die Entscheidung gilt wie geschrieben.
-- **`amended`**: Die Entscheidung gilt, aber ein späteres ADR oder Issue
-  verengt, erweitert oder korrigiert eine Tatsache darin. Der Text bleibt; ein
-  einziger Nachführungsblock unter dem Titel trägt die Differenz.
-- **`superseded`**: Die Entscheidung gilt nicht mehr; ein anderes ADR ersetzt
-  sie. Der Text bleibt als Begründung ihrer Zeit, Nachführungsblöcke fallen
-  weg, das Frontmatter trägt die Warnung.
+- **`amended`**: Die Entscheidung gilt; ein späteres ADR oder Issue verengt,
+  erweitert oder korrigiert eine Tatsache darin.
+- **`superseded`**: Ein anderes ADR ersetzt die Entscheidung. Der Text bleibt
+  als Begründung seiner Zeit.
 - **`deprecated`**: Die Entscheidung ist ohne Nachfolger zurückgenommen.
-  `deprecated-by` darf auf das Issue zeigen, das sie zurücknahm.
 
-Kein Datum, keine Beteiligten, keine Liste der ADRs, die auf dieses verweisen.
-Die Nummer im Dateinamen ordnet die ADRs zeitlich.
-
-## Issue oder ADR?
-
-Eine Nachführung darf auf ein Issue statt auf ein ADR zeigen, wenn nur eine
-*Tatsache innerhalb der Regel* wechselt: eine Zahl, ein Name, eine Farbe, ein
-Anbieter. Ändert sich die *Regel selbst*, braucht es ein neues ADR. Die Probe:
-*Bräche ein Test, wenn ich weiter dem alten Wortlaut folgte?* Dann ein ADR.
+Die Nummer im Dateinamen ordnet die ADRs zeitlich; Datum und Beteiligte
+stehen in der Git-Historie.
 
 ## Grundgerüst
 
@@ -56,34 +58,26 @@ Jede ADR-Datei hat dieselbe Form, mit deutschen Abschnittsüberschriften:
 
 1. Frontmatter.
 2. `# Titel`: ein Satz, der die Entscheidung ausspricht.
-3. Optional **genau ein** Nachführungsblock direkt unter dem Titel, als
-   Blockquote in der Form `> **Nachgeführt durch ADR-0037, #168:** …`. Nie ein
-   Blockquote mitten im Text, nie ein Abschnitt „Nachtrag“.
+3. Optional der Nachführungsblock direkt unter dem Titel, als Blockquote:
+   `> **Nachgeführt durch ADR-0037, #168:** …`. Er ist der einzige Ort für
+   Nachführungen.
 4. Der Entscheidungstext, mit freien Zwischenüberschriften.
 5. Optional `## Erwogene Optionen`.
 6. `## Folgen`.
 
-Englische Überschriften (`Considered Options`, `Consequences`) und
-`superseded by ADR-NNNN` im Statusfeld werden nicht verwendet.
-
 ## Nummernvergabe
 
-Die nächste freie Nummer wird beim Merge vergeben, nicht beim Anlegen des
-Branches. Zwei Branches, die beide die nächste Nummer beanspruchen,
-kollidieren. Bis zum Merge heißt das ADR nach seinem Arbeitstitel.
+Die nächste freie Nummer wird beim Merge vergeben. Bis dahin heißt das ADR
+nach seinem Arbeitstitel; so kollidieren zwei Branches nicht.
 
-## Wo ADR-Verweise stehen dürfen
+## Wo ADR-Verweise stehen
 
 - **Glossar (`GLOSSARY.md`)**: am Begriff, der ohne die Entscheidung
-  unvollständig wäre, als `(ADR-0036)`. Nie als Volltextkopie des ADRs.
-- **Code und Templates**: nur dort, wo die Umsetzung sonst wie ein Fehler
+  unvollständig wäre, als `(ADR-0036)`.
+- **Code und Templates**: dort, wo die Umsetzung sonst wie ein Fehler
   aussähe.
 - **Tests**: frei. Ein Test, der eine ADR-Regel bewacht, nennt sie.
-- **README**: nie. Ihre Leser:innen sind Nutzer:innen und Betreiber:innen.
-- **ADRs selbst**: Vorwärtsverweise auf andere ADRs sind in Ordnung, eine
-  Rückwärtsliste nicht.
+- **ADRs**: Vorwärtsverweise auf andere ADRs.
+- **README**: keine. Ihre Leser:innen sind Nutzer:innen und Betreiber:innen.
 
-Glossar und README verweisen nie auf ein `superseded`- oder
-`deprecated`-ADR. Sie folgen `superseded-by` und zeigen auf den Nachfolger.
-
-Offene Fragen stehen nicht in einer Datei, sondern als Issues im Tracker.
+Glossar, Code und Tests zeigen auf ADRs mit `accepted` oder `amended`.
