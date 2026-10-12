@@ -8,7 +8,7 @@ Der Zugang zu einer Erhebung läuft über einen **Teilnahme-Link**, der für all
 
 Eine **Stichprobe** ist eine rein organisatorische Untergruppe (Trägerin von Link und Teilnahmen), die der Gruppenstruktur im Export dient. Das experimentelle Design — Vignetten-Auswahl, Reihenfolge, Randomisierung, Fragebogen-Items — gehört zur **Erhebung**, nicht zur Stichprobe.
 
-## Consequences
+## Folgen
 
 - Der Export enthält ausschließlich Teilnahme-Token, keine Identitäten. Etwaige Kontaktdaten liegen getrennt von den Forschungsdaten.
 - Trainings können daher niemals als Vorstudie zu einer Erhebung derselben Personen ausgewertet werden. Das ist beabsichtigt.

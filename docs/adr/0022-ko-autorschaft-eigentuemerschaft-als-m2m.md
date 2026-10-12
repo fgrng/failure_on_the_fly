@@ -1,13 +1,9 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0039
 ---
 
 # Ko-Autorschaft: Eigentümerschaft ist ein M2M gleichrangiger Eigentümerinnen
-
-> **Nachgeführt durch ADR-0032 (Eigentümerschaft):** Das M2M gleichrangiger
-> Eigentümerinnen gilt auch für Training und Erhebung. Es bleibt je Objekt
-> uniform und alles-oder-nichts; der Teilungskanal einer Erhebung und ihre
-> weitergehenden Folgen sind dort festgehalten.
 
 Eine Vignettenhistorie gehört **einer oder mehreren** Autor:innen, alle gleichrangig. Das führt ADR-0019 (Eigentümer als einzelner Fremdschlüssel) und ADR-0015 (eine Autor:in sieht ausschließlich ihre eigenen Vignetten) an einem Punkt fort: Aus dem Fremdschlüssel wird ein Many-to-Many `eigentuemerinnen` an der Vignettenhistorie, und die Privatheit verengt sich, statt zu fallen.
 
@@ -29,13 +25,13 @@ Die Invariante lautet: **Eine nicht-archivierte Vignettenhistorie hat mindestens
 
 Diese Invariante ist eine Zählung über die Zeilen einer Through-Tabelle und lässt sich nicht billig als Datenbank-Constraint ausdrücken. Sie lebt deshalb im **Konto-Löschpfad** (App `konten`, App-Ebene), nicht im Schema. Kontolöschung ist selten; Effizienz ist hier kein Argument.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Einzelner Eigentümer-Fremdschlüssel plus reine Übertragung** — verworfen. Er löst das Weggang-Problem, aber die Domäne will echte Ko-Autorschaft: zwei Menschen, die dieselbe Vignette gemeinsam verantworten, nicht eine, die der anderen Leserechte gibt.
 - **Through-Model mit ausgezeichneter Urheberin** — verworfen, solange kein Fall verlangt, dass eine Eingeladene weniger darf als die Urheberin. Später additiv nachrüstbar.
 - **django-guardian** — verworfen (oben).
 
-## Consequences
+## Folgen
 
 - **ADR-0015 ist nachgeführt:** Der Satz „ausschließlich ihre eigenen Vignetten" gilt nur noch für den Eigentümer-Kreis. Die Privatheit bleibt revidierbar, ist aber nicht mehr die ganze Antwort — aus Eigentümerschaft ist eine Zugriffsregel mit mehreren Beteiligten geworden.
 - **ADR-0019 ist nachgeführt:** „Der Eigentümer ist ein Fremdschlüssel" wird zu „die Eigentümerinnen sind ein M2M". Die Stelle bleibt die Vignettenhistorie, die Regel bleibt an `sichtbar_fuer`.

@@ -6,7 +6,9 @@ How the engineering skills should consume this repo's domain documentation when 
 
 - **`GLOSSARY.md`** at the repo root, or
 - **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+- **`docs/adr/`**: read ADRs that touch the area you're about to work in. Skip files whose frontmatter says `superseded` or `deprecated` unless you need the historical reasoning; follow `superseded-by` instead.
+
+Open questions are not kept in a file. They live as issues in the tracker (see `issue-tracker.md`).
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
@@ -43,6 +45,12 @@ Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
 When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
 
 If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+
+A term earns a glossary entry when code, an ADR, or the user interface carries it. Architecture vocabulary (seams, sinks, mixins) does not belong in the glossary; its home is the ADR that introduces it.
+
+## Writing ADRs
+
+Frontmatter schema, status values, the issue-or-ADR rule, the skeleton with German headings, numbering and where ADR references may appear are fixed in **`docs/adr/README.md`**. It takes precedence over `.claude/skills/domain-modeling/ADR-FORMAT.md` where the two disagree.
 
 ## Flag ADR conflicts
 

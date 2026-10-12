@@ -22,12 +22,12 @@ Vor allem aber schriebe Djangos **Autoescaping** ein Apostroph im Lernauftrag al
 
 `string.Template` kennt keine Bedingungen und keine Schleifen. Das ist gewollt: Eine Vorlage mit `{% if %}` könnte Leerstellen bedingt verwenden, womit die Menge der tatsächlich benutzten Platzhalter nicht mehr konstant wäre — und ADR-0010 nennt genau diese Konstanz „eine Aussage über die Domäne". Logikfreiheit hält den Vertrag statisch prüfbar.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Django-Templates** — verworfen: Autoescaping beschädigt den Prompt, und die Vertragsprüfung wird zum Nodelist-Lauf mit Tag-Verbot.
 - **Jinja2** — verworfen als unnötige Abhängigkeit; bringt dieselbe Logik-Mächtigkeit, die wir gerade nicht wollen.
 
-## Consequences
+## Folgen
 
 - Grammatische Formen, die Fließtext braucht, kann die Vorlage nicht selbst bilden. Der Code berechnet sie und reicht sie als eigene Platzhalter in `VERTRAG_RAHMEN` (ADR-0010).
 - Der Kern ist deutschsprachig (ADR-0004); die abgeleiteten Formen sind deutsche Grammatik im Code, keine Vorlagensache.
