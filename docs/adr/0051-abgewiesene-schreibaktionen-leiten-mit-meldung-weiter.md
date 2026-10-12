@@ -27,7 +27,7 @@ Weiterleitung über `fetch`. Damit liegt kein Rendern mehr in einer Transaktion
 Eine **fremde** Erhebung bleibt ein 404 über die Sichtbarkeitsauflösung. Wer die
 Erhebung nicht sehen darf, erfährt nicht, dass es sie gibt.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Durchgehend 403.** Verworfen: Eine Forschende, die auf eine veraltete
   Schaltfläche klickt, etwa in einem zweiten Tab nach dem Finalisieren, sieht
@@ -36,7 +36,7 @@ Erhebung nicht sehen darf, erfährt nicht, dass es sie gibt.
   ein anderes Idiom. ADR-0034, das zwei Idiome nebeneinander begründete, ist
   durch ADR-0048 abgelöst.
 
-## Consequences
+## Folgen
 
 - Die Sperrtests in `erhebungen/tests/test_forschenden_views.py` erwarten die
   Weiterleitung, die Meldung und die unveränderte Detailseite, nicht mehr 403.

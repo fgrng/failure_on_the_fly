@@ -163,15 +163,15 @@ einmal existiert.
 
 ## Folgen
 
-- ADR-0022 und ADR-0032 sind fortgeführt: Der Kreis gleichrangiger
-  Eigentümerinnen ist nun nicht nur überall derselbe Begriff, sondern derselbe
-  Code. ADR-0019 bleibt gewahrt — die Sichtbarkeitsregel wohnt weiter am
-  QuerySet, nur an einer Stelle statt an vier.
+- ADR-0039 ist fortgeführt: Der Kreis gleichrangiger Eigentümerinnen ist nun
+  nicht nur überall derselbe Begriff, sondern derselbe Code. Die
+  Sichtbarkeitsregel wohnt weiter am QuerySet, nur an einer Stelle statt an
+  vier.
 - ADR-0016 ist in einem Punkt nachgeführt: Die Gegenkante von `konten` in die
   Bestands-Apps entfällt. Die Zahl der Nähte bleibt zwei.
-- ADR-0017 bleibt in Kraft. Diese Basis ist kein Präzedenzfall für eine
-  Lebenszyklus-Basis; wer eine vorschlägt, argumentiert gegen ADR-0017, nicht
-  mit diesem ADR.
+- Die eigenständige Implementierung je Artefakt aus ADR-0040 bleibt in Kraft.
+  Diese Basis ist kein Präzedenzfall für eine Lebenszyklus-Basis; wer eine
+  vorschlägt, argumentiert gegen ADR-0040, nicht mit diesem ADR.
 - Der Austritt schweigt, wenn die Invariante greift, und meldet über seinen
   Rückgabewert nur, ob entfernt wurde. Die Oberfläche zeigt die
   Entfernen-Schaltfläche ohnehin erst ab zwei Eigentümerinnen; der Fall entsteht
@@ -183,7 +183,7 @@ einmal existiert.
   deklariert, fällt aus allen dreien heraus, ohne dass etwas rot wird — das ist
   die verbleibende Bruchstelle.
 
-## Nachtrag (2026-10): auch die Views sind gemeinsam
+## Auch die Views sind gemeinsam
 
 Die Views „Eigentümerin hinzufügen“ und „Eigentümerin entfernen“ existieren
 einmal, in `konten/eigentuemer_views.py` (#364, aus dem Architektur-Review

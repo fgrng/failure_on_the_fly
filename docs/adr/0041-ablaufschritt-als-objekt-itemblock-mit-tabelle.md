@@ -146,7 +146,7 @@ Stelle. Der Anhang-Slot ist damit dauerhaft und keine Übergangslösung.
   Frage: Der Erledigt-Zustand ist für Altdaten grundsätzlich nicht
   rekonstruierbar — genau deshalb gibt es die Tabelle.
 
-## Nachtrag (2026-10): Kein gemeinsamer Ablauf
+## Kein gemeinsamer Ablauf
 
 Die Ablehnung eines gemeinsamen Ablaufs für Training und Erhebung ist im
 Grilling #205 bestätigt; das „vorerst“ entfällt. Auch mit der empfohlenen

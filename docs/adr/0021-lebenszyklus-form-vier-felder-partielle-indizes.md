@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0040
 ---
 
 # Die Lebenszyklus-Form: vier Felder, partielle Unique-Indizes statt Prüfungen, eifrige Historie
@@ -38,12 +39,12 @@ Die Historie-Zeile entsteht in derselben Transaktion wie die **erste** Fassung, 
 
 ADR-0017 sagt „jede App implementiert selbst" und begründet, warum es keine geteilte Klasse gibt. Es sagt nicht, *welche* Form implementiert wird. Ohne dieses ADR wählte jede App ihre eigene Mechanik — die eine ein `CheckConstraint`, die andere eine `full_clean()`-Prüfung, die dritte einen Signal-Handler —, und ADR-0017s eigene Warnung vor auseinanderlaufenden Invarianten würde wahr, bevor die erste Zeile Code steht. Dieses ADR ist eine Spezifikation, die drei Apps unabhängig erfüllen, keine gemeinsame Implementierung.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Die Invarianten als Modell-Prüfungen (`clean()`)** — verworfen. Sie hingen am Aufruf von `full_clean()` und ließen sich per direktem `save()` oder Bulk-Write umgehen; ein Datenbank-Index kann das nicht.
 - **Faule Historie-Entstehung** — verworfen, weil sie eine finale Fassung mutieren müsste (oben).
 
-## Consequences
+## Folgen
 
 - Die Form ist an drei Stellen implementiert und kann auseinanderlaufen (ADR-0017). Dieses ADR macht die Form explizit, damit eine Abweichung als Abweichung erkennbar ist und nicht als eine von drei gleichberechtigten Auslegungen.
 - Der Simulationskern braucht eine Historie, obwohl er konzeptionell eine einzige Linie ist (ADR-0004) — sonst hätte der Entwurf-Index keine Spalte. Seine Historie ist ein namenloser Singleton ohne Sprachfeld.

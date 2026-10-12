@@ -1,8 +1,17 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0046, "#61"]
 ---
 
 # Der Probelauf ist eine schreibfreie Funktion über einem Tripel
+
+> **Nachgeführt durch ADR-0046, #61:**
+>
+> *ADR-0046:* Der Satz „Das System weiß nicht, ob eine Vignette je getestet wurde“ gilt nicht mehr ganz. Neben dem Probelauf gibt es den **Evallauf** (ADR-0046): automatisch, im Hintergrund (ADR-0047) und aufbewahrt. Das System weiß damit, ob für eine Vignettenfassung ein Evallauf existiert und wie er ausging; es erzwingt weiterhin nichts. Der Probelauf selbst bleibt unverändert schreibfrei und nutzt die Modell-Konfiguration der Verwendung *Schüler:in* (ADR-0013).
+>
+> *#61:* Die Autor:in wählt nicht nur ihren Entwurf, sondern eine **eigene Fassung im Zustand Entwurf oder final**; die Detailansicht bot den Probelauf für finale Fassungen ohnehin schon an. Eine archivierte Fassung ist nicht mehr spielbar und startet keinen Probelauf. Die Administrator:in nimmt als Vignette weiterhin nur eine finale.
+>
+> Diese Zustandsprüfung gilt nur beim **Start**. Ein laufender Probelauf setzt seine Fassung fort, auch wenn sie inzwischen archiviert wurde: Er schreibt nichts, und „nicht mehr spielbar“ meint den Start neuer Läufe. Das Fortsetzen prüft nur noch den Zugriff: bei der Autor:in den Eigentümer-Kreis, bei der Administrator:in die Existenz der Fassung.
 
 Ein **Probelauf** ist eine schreibfreie Sitzung über einem Tripel aus **Vignette, Simulationskern und Modell-Konfiguration**. Er persistiert nichts, verändert nichts und zeigt als einziger Ort die Denkspur live. Er ist damit keine Eigenschaft der Vignette, sondern eine Funktion, deren Freiheitsgrade die Rolle bestimmt:
 
@@ -11,7 +20,7 @@ Ein **Probelauf** ist eine schreibfreie Sitzung über einem Tripel aus **Vignett
 
 Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegespräch, Debrief und Diagnosefeld. Ablauf und Ansicht sind identisch mit denen einer Sitzung; der einzige Unterschied ist die Persistierung. Die Autor:in sieht, was die Teilnehmer:in sehen wird, plus die Denkspur, die diese nie sieht. Auch die Diagnose wird nicht persistiert.
 
-## Consequences
+## Folgen
 
 - `GLOSSARY.md` definiert die Diagnose als etwas, das „erfasst, nicht bewertet" wird (ADR-0009). Im Probelauf wird sie **weder** erfasst noch bewertet: Sie wird eingegeben, damit die Autor:in den Debrief so erlebt wie die Teilnehmer:in, und dann verworfen. Das „erfasst" von ADR-0009 grenzt gegen *bewerten* ab, nicht gegen *verwerfen*, und gilt für Sitzungen einer Teilnahme.
 
@@ -19,13 +28,3 @@ Der Probelauf durchläuft die **volle Sitzung**: Rahmenhandlung, Diagnosegesprä
 - Ein Probelauf einer Administrator:in gegen einen Kern-Entwurf läuft mit einer Vignette, die für einen anderen Kern geschrieben wurde. Ihre Felder passen, weil der Vertrag fest ist (ADR-0010) — ihr Fehlermuster wurde gegen diesen Kern nie geprüft. Das ist richtig so: Die Administrator:in prüft den Kern, nicht die Vignette.
 - Probeläufe verursachen Modellkosten, ohne eine Spur zu hinterlassen. Ob das Betreibende interessiert, ist eine Frage der Admin-Seite.
 - Administrator:innen können eine neue Modell-Konfiguration erproben, bevor sie sie aktiv schalten (ADR-0013).
-
-## Nachführung (Grilling, Issue #285): Evalläufe
-
-Der Satz „Das System weiß nicht, ob eine Vignette je getestet wurde“ gilt nicht mehr ganz. Neben dem Probelauf gibt es den **Evallauf** (ADR-0046): automatisch, im Hintergrund (ADR-0047) und aufbewahrt. Das System weiß damit, ob für eine Vignettenfassung ein Evallauf existiert und wie er ausging; es erzwingt weiterhin nichts. Der Probelauf selbst bleibt unverändert schreibfrei und nutzt die Modell-Konfiguration der Verwendung *Schüler:in* (ADR-0013).
-
-## Nachführung (Triage, Issue #61): zulässige Fassungen
-
-Die Autor:in wählt nicht nur ihren Entwurf, sondern eine **eigene Fassung im Zustand Entwurf oder final**; die Detailansicht bot den Probelauf für finale Fassungen ohnehin schon an. Eine archivierte Fassung ist nicht mehr spielbar und startet keinen Probelauf. Die Administrator:in nimmt als Vignette weiterhin nur eine finale.
-
-Diese Zustandsprüfung gilt nur beim **Start**. Ein laufender Probelauf setzt seine Fassung fort, auch wenn sie inzwischen archiviert wurde: Er schreibt nichts, und „nicht mehr spielbar“ meint den Start neuer Läufe. Das Fortsetzen prüft nur noch den Zugriff: bei der Autor:in den Eigentümer-Kreis, bei der Administrator:in die Existenz der Fassung.

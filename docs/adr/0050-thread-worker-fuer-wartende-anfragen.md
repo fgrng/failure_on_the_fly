@@ -29,7 +29,7 @@ belegter Prozess weitere Verbindungen annimmt und hinter seinen Threads staut,
 während andere frei sind. Zahlen und Quellen stehen in
 `docs/research/2026-10-08-worker-belegung-uberspace-anbieter.md`.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Mehr synchrone Worker** — verworfen. 150 Prozesse à 230 MB sprengen das
   Speicherlimit um eine Größenordnung.
@@ -42,7 +42,7 @@ während andere frei sind. Zahlen und Quellen stehen in
 - **ASGI mit async Views** — verworfen. Das trüge dieselbe Last, verlangte aber
   async-Nähte zu beiden Anbietern und zur Datenbank.
 
-## Consequences
+## Folgen
 
 - **`--timeout` begrenzt keine einzelne Anfrage mehr.** Beim Thread-Worker
   meldet sich der Prozess weiter, solange seine Threads warten; gunicorn tötet
@@ -70,14 +70,14 @@ während andere frei sind. Zahlen und Quellen stehen in
   Teilnehmenden: Nachtrag vom 2026-10-08 in
   `docs/research/2026-09-21-sqlite-nebenlaeufigkeit-wal.md`.
 
-## Nachtrag: Fake-Sprachmodell ohne geteilte Liste
+## Fake-Sprachmodell ohne geteilte Liste
 
 Seit #379 hält `FakeSprachmodell` keine Liste `letzte_anfragen` mehr. Tests
 zeichnen ihre Anfragen über `config.tests.sprachmodell.anfragen_aufzeichnen`
 je Test in eine eigene Liste auf; kein Sprachmodell-Adapter teilt damit noch
 Zustand zwischen Threads.
 
-## Nachtrag: Evalkatalog-Knoten rendern ohne Schreibsperre
+## Evalkatalog-Knoten rendern ohne Schreibsperre
 
 Mehr Threads halten auch die globale Schreibsperre von SQLite öfter (#249).
 Seit #409 lesen und rendern die Knoten „Übergreifende Kriterien“, Eval und

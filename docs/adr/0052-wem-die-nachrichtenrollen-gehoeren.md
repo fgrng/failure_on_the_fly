@@ -17,13 +17,13 @@ Gepinnte Fassungen sind unveränderlich (ADR-0035), die Nachrichtenordnung ist C
 - **Simulationskern**: Das Feld `user_prompt_vorlage` bleibt in Datenbank und Datenspur-Export (ADR-0029). Neue Fassungen lassen es leer und schreiben den Arbeitskontext in die System-Prompt-Vorlage. Ist es gefüllt, wird es gerendert an den System-Prompt angehängt. Formular und Übersicht zeigen es nur, wenn es nicht leer ist.
 - **Lehrperson-Vorlage**: `$verlauf` gehört nicht mehr zu ihrem Vertrag. Für Altvorlagen wird er als leerer Text eingesetzt, damit sie weiter rendern, ohne den Verlauf doppelt zu führen.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Die User-Prompt-Vorlage streichen und beide Felder zusammenführen** — verworfen. Altfassungen hätten ein Feld, das es nicht mehr gibt: Entweder würden finale Fassungen umgeschrieben (verbietet ADR-0035), oder es bliebe ein dauerhaft zweiter Codepfad. Zudem bräche der Exportkontrakt für bereits erhobene Daten.
 - **Nur den Prompttext ändern, den Nachrichtenaufbau lassen** — verworfen. Die erste `user`-Nachricht bliebe mehrdeutig.
 - **Die Inputstrategie als letzte `user`-Nachricht der Lehrperson** — verworfen. Sie sähe für die Lehrperson aus wie eine Äußerung der Schüler:in.
 
-## Consequences
+## Folgen
 
 - Ob und wie sich die Schüler:in an das bisherige Gespräch erinnert, regelt allein der Prompttext einer Kern-Fassung, nicht der Code.
 - Der Standardkern behält seine gefüllte User-Prompt-Vorlage; frische Instanzen zeigen das Feld, bis eine neue Fassung es leert.

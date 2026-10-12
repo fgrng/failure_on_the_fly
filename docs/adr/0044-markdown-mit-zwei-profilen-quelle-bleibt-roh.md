@@ -10,7 +10,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 
 **Die Quelle bleibt roh.** Gespeichert wird der Markdown-Text, wie er eingegeben wurde. Das Sprachmodell erhält ihn unverändert, der Datenspur-Export (ADR-0029) ebenso; gerendert wird erst im Template.
 
-## Considered Options
+## Erwogene Optionen
 
 - **`markdown-it-py` mit abgeschalteten Regeln und ohne Sanitizer** — gewählt. Der CommonMark-Parser escaped rohes HTML ab Werk; was nicht gewünscht ist, wird als Regel abgeschaltet. Sicherheit entsteht dadurch, dass unerwünschtes HTML gar nicht erst erzeugt wird, statt dass ein zweites Werkzeug es nachträglich entfernt.
 - **Python-Markdown plus Sanitizer (bleach/nh3)** — verworfen. Zwei Werkzeuge, deren Umfänge sich decken müssen; was der Sanitizer entfernt, sähen Forschende in der Vorschau nicht als Text, sondern gar nicht.
@@ -18,7 +18,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - **Rendern beim Speichern, HTML in der Datenbank** — verworfen. Prompt und Export bräuchten dann die Quelle zusätzlich, und eine Änderung am Umfang verlangte eine Migration aller Texte.
 - **Überschriften so ausgeben, wie sie geschrieben sind** — verworfen. Ein `#` als `h1` bräche die Gliederung der Seite; Forschende sollen die Seitengliederung nicht kennen müssen.
 
-## Consequences
+## Folgen
 
 - Wer Schülernotation mit `*`, `_`, führendem `-` oder `1.` wörtlich zeigen will, escaped sie mit Backslash.
 - In der Rahmenhandlung werden die Platzhalterwerte der Vignette vor dem Einsetzen (ADR-0020) mit Backslash vor jedem ASCII-Satzzeichen escaped (`texte.markdown.woertlich`); erst der gefüllte Text wird gerendert. So wirkt nur das Markdown des Kerns.
@@ -27,7 +27,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - `&`-Entitäten werden nicht aufgelöst, sondern erscheinen wörtlich.
 - Die Editor-Vorschau holt das Fragment von `texte:vorschau` (POST mit `quelle` und `profil`), statt in JavaScript zu rendern. Für die Rollenprüfung (Autor:in, Forschende:r, Administration) kennt `texte` dafür `konten`, die Infrastruktur aller Apps; Domänen-Apps kennt es weiterhin nicht.
 
-## Nachtrag (2026-09): Eingerückte Codeblöcke, E-Mail-Links, Profil-Register
+## Eingerückte Codeblöcke, E-Mail-Links, Profil-Register
 
 - **Eingerückte Codeblöcke gehören zum Umfang beider Profile.** Nach einer Leerzeile wird ein um vier Leerzeichen eingerückter Block zu `<pre><code>` und behält seine Einrückung; so lassen sich Rechenschritte im Arbeitsheft untereinander ausrichten. Umzäunte Codeblöcke und Inline-Backticks erscheinen weiterhin wörtlich.
 - **`mailto:`-Links öffnen nicht in neuem Tab.** Ein neuer Tab bliebe leer, weil das Mailprogramm übernimmt. Sie tragen statt des Pfeils einen Briefumschlag und kündigen sich Screenreadern als „E-Mail“ an; `https:`/`http:` bleiben wie beschrieben.

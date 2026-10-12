@@ -1,6 +1,6 @@
-______________________________________________________________________
-
-## status: accepted
+---
+status: accepted
+---
 
 # Einsicht folgt dem Anlass, nie der Vignette
 
@@ -117,7 +117,7 @@ nicht anonym: Teilnehmende erscheinen unter ihrer Teilnahmekennung, Kontodaten
 fehlen, Freitext wird nicht geschwärzt. Er ist keine Datenspur; deren
 Definition bleibt Erhebungssache.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Kante über die Vignette** — verworfen: zieht fremde Anlässe herein.
 - **Eigene Seminar-Ebene über Trainings** — verworfen für jetzt: ein zweites
@@ -141,7 +141,7 @@ Definition bleibt Erhebungssache.
   Abschrift kennt ihre Erhebung bewusst nicht (ADR-0043), und fremde
   Erhebungsvignetten kann kein Kreis in sein Training aufnehmen (ADR-0015).
 
-## Consequences
+## Folgen
 
 - **Eine freigegebene Abschrift ist für Dritte mit dem Erhebungsexport
   abgleichbar.** Ist eine Ausbilder:in zugleich Forschende der Erhebung, erkennt
