@@ -616,6 +616,12 @@ def test_unvollstaendiger_entwurf_wird_nicht_final(
         ),
         (
             "lehrperson_vorlage",
+            "Lenke nach $inputstrategie. Bisher: $verlauf",
+            "Die Lehrperson-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
+            "$verlauf.",
+        ),
+        (
+            "lehrperson_vorlage",
             "Kostet 5 $ pro Lauf.",
             "Die Lehrperson-Vorlage enthält einen ungültigen Platzhalter.",
         ),
@@ -637,18 +643,18 @@ def test_vorlage_ausserhalb_ihres_vertrags_wird_nicht_final(
 
 
 @pytest.mark.django_db
-def test_promptvertrag_und_verlauf_sind_in_beiden_vorlagen_erlaubt() -> None:
-    """Die Prompt-Spalte aus ADR-0010 und `$verlauf` passen in beide Vorlagen."""
+def test_promptvertrag_passt_in_beide_vorlagen_verlauf_nur_zum_bewerter() -> None:
+    """Die Prompt-Spalte aus ADR-0010 passt in beide Vorlagen, `$verlauf` nur
+    in die des Bewerters; die Lehrperson führt das Gespräch nativ (ADR-0052)."""
 
     gemeinsam: str = (
         "$fehlermuster_beschreibung $lernauftrag $arbeitsheft"
         " $lernauftrag_simulationshinweise $arbeitsheft_simulationshinweise"
         " $schuelerin_name $schuelerin_geschlecht $fach $thema $klassenstufe"
-        " $verlauf"
     )
     katalog: Evalkatalog = vollstaendiger_katalog()
     katalog.lehrperson_vorlage = f"{gemeinsam} $inputstrategie"
-    katalog.bewerter_vorlage = f"{gemeinsam} $kriterium"
+    katalog.bewerter_vorlage = f"{gemeinsam} $kriterium $verlauf"
     katalog.save()
 
     katalog.finalisieren()

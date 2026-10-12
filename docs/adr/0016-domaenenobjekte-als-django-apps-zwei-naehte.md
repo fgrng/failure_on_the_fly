@@ -65,6 +65,8 @@ Das **Sprachmodell** (`simulation/sprachmodell/`): ein Protokoll mit einer Metho
 
 Die eine Methode nimmt System-Prompt, User-Prompt, den bisherigen Gesprächsverlauf, die neue Eingabe und das Ausgabeschema und liefert **eines**: das geparste Structured-Output-Objekt, aus dem Denkspur und Äußerung stammen (ADR-0005). Nichts reist an dem Schema vorbei. Eine native Reasoning-Spur des Anbieters wird nicht durchgereicht — ADR-0005 verwirft sie als Artefakt, dessen Gehalt am Anbieter hängt statt an der Vignette. Die Naht bleibt dadurch so schmal wie möglich: ein Rückgabewert, dessen Form der Aufrufer kennt.
 
+> **Nachgeführt durch ADR-0052 (Nachrichtenrollen):** Die Methode nimmt keinen gesonderten User-Prompt mehr, nur System-Prompt, Verlauf, Eingabe und Ausgabeschema; jede `user`-Nachricht stammt vom Gegenüber der Rolle.
+
 Dass der **Verlauf hinter die Naht** reicht statt davor zu einem Prompt-String zusammengeklebt zu werden, hat denselben Grund: Wie eine Konversation gegenüber einem Anbieter dargestellt wird — abwechselnde `user`- und `assistant`-Rollen — ist Adapter-Wissen. Die Domänenseite übergibt Gesprächsschritte als Paare aus Eingabe und sichtbarer Äußerung und weiß nicht, in welches Format sie geraten.
 
 Der **Sink** (`sitzungen/sink.py`): das Ziel eines Sitzungslaufs, mit zwei Adaptern. `DBSink` persistiert eine Sitzung inkrementell; `ScratchSink` hält einen schreibfreien Probelauf in der Browser-Session. Der Lauf (`sitzungen/durchlauf.py`) kennt nur den Sink und bleibt damit zwischen regulärer Sitzung und Probelauf austauschbar.

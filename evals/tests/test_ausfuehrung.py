@@ -1,6 +1,7 @@
 """Die Einstiegsfunktion „Evallauf ausführen“ mit drei Fake-Konfigurationen."""
 
 import pytest
+from django.db import models
 
 from config.tests.aufbau import (
     finale_vignette,
@@ -19,6 +20,7 @@ from evals.tests.aufbau import (
     gelenkt,
     urteile,
 )
+from simulation.models import Evalkatalog
 from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -79,13 +81,20 @@ def test_je_wiederholung_ein_gespraech_mit_einem_wechsel_je_inputschritt() -> No
     ] == [(1, ["Eins", "Zwei", "Drei"]), (2, ["Eins", "Zwei", "Drei"])]
 
 
-def _anfragetexte(vignette: Vignette) -> list[str]:
-    # Führt einen Lauf aus; je Anbieter-Anfrage alle Nachrichten als ein Text.
+def _anfragen(vignette: Vignette) -> list[list[dict[str, str]]]:
+    # Führt einen Lauf aus; je Anbieter-Anfrage ihre gesendeten Nachrichten.
 
     with anfragen_aufzeichnen() as anfragen:
         _ausgefuehrter_lauf(vignette)
+    return anfragen
+
+
+def _anfragetexte(vignette: Vignette) -> list[str]:
+    # Führt einen Lauf aus; je Anbieter-Anfrage alle Nachrichten als ein Text.
+
     return [
-        " ".join(nachricht["content"] for nachricht in anfrage) for anfrage in anfragen
+        " ".join(nachricht["content"] for nachricht in anfrage)
+        for anfrage in _anfragen(vignette)
     ]
 
 
@@ -124,6 +133,42 @@ def test_bewerter_sieht_verlauf_samt_denkspur_und_kriterium() -> None:
     assert all(
         text in bewerter for text in ("Denkspur 1", "Denkspur 2", "Muster gezeigt")
     )
+
+
+def _gesprochen(anfrage: list[dict[str, str]]) -> list[tuple[str, str]]:
+    # Die Nachrichten einer Anfrage nach dem System-Prompt, als (Rolle, Text).
+
+    system, *gespraech = anfrage
+    assert system["role"] == "system"
+    return [(nachricht["role"], nachricht["content"]) for nachricht in gespraech]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_schuelerin_erhaelt_dieselbe_nachrichtenordnung_wie_in_der_sitzung() -> None:
+    """Jede user-Nachricht an die Schüler:in ist eine Äußerung der Lehrperson."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert _gesprochen(anfragen[1]) == [
+        ("user", "Wie hast du gerechnet?"),
+        ("assistant", "Antwort 1"),
+        ("user", "Warum so?"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
+def test_bewerter_erhaelt_allein_das_kriterium_als_user_nachricht() -> None:
+    """Der Verlauf steht nur im System-Prompt des Bewerters (ADR-0052)."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    anfragen = _anfragen(vignette)
+
+    assert _gesprochen(anfragen[-1]) == [("user", "Muster gezeigt")]
 
 
 @pytest.mark.django_db
@@ -223,20 +268,81 @@ def gelenkt_nach_festem_schritt() -> None:
     )
 
 
+@pytest.fixture
+def gelenkt_fest_gelenkt() -> None:
+    """Gelenkt, fest, gelenkt: die Lehrperson spricht zweimal selbst."""
+
+    finaler_katalog(
+        k=1,
+        schritte=(gelenkt("Begrüße"), "Wie hast du gerechnet?", gelenkt("Frag nach")),
+        uebergreifende=(),
+    )
+    drei_fakes(
+        schuelerin=antworten(3), bewerter=urteile(True), lehrperson=aeusserungen(2)
+    )
+
+
 @pytest.mark.django_db
-@pytest.mark.usefixtures("gelenkt_nach_festem_schritt")
-def test_lehrperson_sieht_den_bisherigen_verlauf_ohne_denkspur() -> None:
-    """Die Lehrperson kennt Frage und Antwort, nicht die Denkspur."""
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_lehrperson_beginnt_mit_der_einstiegsnachricht() -> None:
+    """Im ersten Zug ist die Einstiegsnachricht die einzige user-Nachricht."""
 
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
-    _, lehrperson, _, _ = _anfragetexte(vignette)
+    erste_lehrperson, *_ = _anfragen(vignette)
 
-    assert (
-        "Wie hast du gerechnet?" in lehrperson,
-        "Antwort 1" in lehrperson,
-        "Denkspur 1" in lehrperson,
-    ) == (True, True, False)
+    assert _gesprochen(erste_lehrperson) == [("user", "Beginnen Sie das Gespräch.")]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_lehrperson_fuehrt_das_gespraech_nativ_ohne_denkspur() -> None:
+    """Eigene Äußerungen, auch feste, als assistant; die der Schüler:in als user."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
+
+    assert _gesprochen(zweite_lehrperson) == [
+        ("user", "Beginnen Sie das Gespräch."),
+        ("assistant", "Gelenkte Frage 1"),
+        ("user", "Antwort 1"),
+        ("assistant", "Wie hast du gerechnet?"),
+        ("user", "Antwort 2"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_inputstrategie_steht_nur_im_system_prompt_der_lehrperson() -> None:
+    """Die Strategie des Schritts ist Arbeitskontext, keine Äußerung (ADR-0052)."""
+
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    _, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
+
+    system, *gespraech = zweite_lehrperson
+    assert "Sprich mit Lea nach Frag nach." in system["content"]
+    assert all("Frag nach" not in nachricht["content"] for nachricht in gespraech)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("gelenkt_fest_gelenkt")
+def test_finalisierte_altvorlage_mit_verlauf_setzt_dort_nichts_ein() -> None:
+    """`$verlauf` gehört nicht mehr zum Vertrag, alte Fassungen laufen weiter."""
+
+    # Am Lebenszyklus vorbei, wie eine vor diesem Vertrag finalisierte Fassung.
+    models.QuerySet(model=Evalkatalog).filter(zustand=Evalkatalog.Zustand.FINAL).update(
+        lehrperson_vorlage="Nach $inputstrategie. Bisher:[$verlauf]"
+    )
+    vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
+
+    erste_lehrperson, _, _, zweite_lehrperson, _, _ = _anfragen(vignette)
+
+    assert [erste_lehrperson[0]["content"], zweite_lehrperson[0]["content"]] == [
+        "Nach Begrüße. Bisher:[]",
+        "Nach Frag nach. Bisher:[]",
+    ]
 
 
 @pytest.mark.django_db

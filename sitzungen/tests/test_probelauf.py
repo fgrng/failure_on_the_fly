@@ -597,8 +597,10 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.assertContains(response, "Ich addiere einfach alles.")
 
     def test_modellverlauf_traegt_beide_gespraechsseiten(self) -> None:
-        """Beide Gesprächsseiten reisen als native Rollen zum Modell."""
+        """Der Arbeitskontext steht im System-Prompt, jede user-Nachricht ist eine Ansprache."""
 
+        self.entwurf.lernauftrag_simulationshinweise = "Rechne ohne Hilfsmittel."
+        self.entwurf.save()
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
@@ -610,8 +612,11 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
                 reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum so?"}
             )
 
+        system, *gespraech = aufgezeichnet[-1]
+        self.assertEqual(system["role"], "system")
+        self.assertIn("Rechne ohne Hilfsmittel.", system["content"])
         self.assertEqual(
-            aufgezeichnet[-1][-3:],
+            gespraech,
             [
                 {"role": "user", "content": "Wie rechnest du?"},
                 {"role": "assistant", "content": "Ich addiere einfach alles."},
