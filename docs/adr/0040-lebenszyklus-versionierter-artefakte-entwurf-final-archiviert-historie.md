@@ -5,8 +5,9 @@ status: accepted
 # Lebenszyklus versionierter Artefakte: Entwurf, final, archiviert, Historie
 
 Dieses ADR fasst den Stand von ADR-0003, ADR-0017 und ADR-0021 zusammen und
-ersetzt sie. Die Kern-Sonderform steht in ADR-0035, die Erhebung als
-Nicht-Artefakt in ADR-0027; beide gelten fort. Von ADR-0028 bleibt die
+ersetzt sie. Die Kern-Sonderform aus ADR-0035 ist hier aufgenommen; dieses
+ADR ersetzt auch ADR-0035. Die Erhebung als Nicht-Artefakt regelt weiterhin
+ADR-0027. Von ADR-0028 bleibt die
 Privatheit des Items (heute in ADR-0039), die Ausnahme von der
 Historien-Archivierung wird hier aufgehoben. Von ADR-0051 übernimmt es die
 Weiterleitungsregel für abgewiesene Schreibaktionen und ersetzt es.
@@ -80,7 +81,22 @@ gleichermaßen.
 **Für den Simulationskern gilt das nicht.** Dort heißt `archiviert`
 **überholt**: Es entsteht nur als Nebenwirkung des Finalisierens der
 Nachfolgerin, ist nicht umkehrbar, und zu jedem Zeitpunkt trägt die eine
-Kern-Historie genau eine finale Fassung (ADR-0035).
+Kern-Historie genau eine finale Fassung; ein partieller Unique-Index macht
+das zu einer Eigenschaft der Daten, und `Vignette.objects.anlegen()` wie
+`vorspulen()` greifen damit nach der einzigen Kandidatin statt nach einem
+Ranking.
+
+Die Umkehrbarkeit fehlt dort, weil nichts verschwindet: Der Inhalt einer
+überholten Fassung bleibt in der Verwaltungsübersicht lesbar und wandert
+unverändert in den Export (ADR-0029). Eine misslungene Fassung wird nicht
+zurückgenommen, sondern durch eine neue ersetzt, deren Inhalt die
+Administration bei Bedarf von Hand aus der Übersicht kopiert; `archivieren()`
+und `entarchivieren()` gibt es am Kern nicht. Ein Vignettenentwurf auf einer
+überholten Kern-Fassung bleibt finalisierbar und spielbar: Gespielt wird,
+worauf gepinnt wurde, und Vorspulen bleibt Wahl der Autor:in (ADR-0004). Die
+Detailansicht weist mit einem statischen Hinweis darauf hin, weil der
+überholte Pin ein Zustand ist, keine Meldung. Der Evalkatalog trägt dieselbe
+Sonderform (ADR-0046).
 
 ## Die Form: vier Felder und partielle Unique-Indizes
 
@@ -95,7 +111,7 @@ Jedes versionierte Artefakt implementiert dieselbe Form:
 
 Der Automat hat drei Kanten: `entwurf → final`, `final → archiviert`,
 `archiviert → final`. Beim Kern bleibt davon nur `entwurf → final` als
-eigenständiger Übergang (ADR-0035). Ein Entwurf wird nie archiviert, sondern
+eigenständiger Übergang. Ein Entwurf wird nie archiviert, sondern
 gelöscht. Deshalb impliziert `archiviert` immer „war einmal final", und
 `finalisiert_am` überlebt das Entarchivieren.
 
@@ -110,7 +126,7 @@ Der erste erzwingt „höchstens ein Entwurf je Historie". Der zweite verbietet
 zwei nicht-archivierte Fassungen mit derselben Vorgängerin, womit das
 Entarchivieren gar nicht erst falsch ausgehen kann. Dazu ein
 `CheckConstraint`: `zustand='entwurf'` genau dann, wenn `finalisiert_am IS NULL`. Der Kern ergänzt einen dritten partiellen Index für die eine finale
-Fassung (ADR-0035).
+Fassung.
 
 Die **Historie entsteht eifrig**, in derselben Transaktion wie die erste
 Fassung. Bei fauler Entstehung müsste der `historie`-Fremdschlüssel an der
@@ -148,7 +164,7 @@ Die Basis für den Eigentümer-Kreis (ADR-0037) widerspricht dem nicht: Sie
 spannt quer zur Lebenszyklus-Achse und trägt keinen Zustand. Ebenso wenig die
 Lebenszyklus-Basis in `simulation/lebenszyklus.py`: Sie teilt die Form nur
 innerhalb der App `simulation`, zwischen Simulationskern und Evalkatalog, die
-beide die Kern-Sonderform aus ADR-0035 tragen. Über App-Grenzen hinweg gibt es
+beide die Kern-Sonderform tragen. Über App-Grenzen hinweg gibt es
 keine geteilte Klasse und keine geteilte Funktion.
 
 ## Fehlerregel und Übergangsmechanik
@@ -216,7 +232,7 @@ gesperrt bleibt.
   darstellen können.
 - **Irreversibles Archivieren** — verworfen. Ohne Umkehrbarkeit wäre
   Archivieren ein physisches Löschen unter anderem Namen. Für den Kern später
-  doch gewählt, weil dort nichts verschwindet (ADR-0035).
+  doch gewählt, weil dort nichts verschwindet (siehe oben).
 - **Abstrakte Basismodelle in einer `versioning`-App** — verworfen. Setzt
   voraus, dass die drei Lebenszyklen gleich bleiben; sie sind es schon heute
   nicht.

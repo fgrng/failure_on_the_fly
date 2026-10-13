@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0054
 ---
 
 # Positionsmarker im Text, Umhüllung im Platzhalterwert und harter Schnitt am Platzhaltervertrag

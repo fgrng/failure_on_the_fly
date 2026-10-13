@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0060
 ---
 
 # Die Sitzung wächst auf einer Seite

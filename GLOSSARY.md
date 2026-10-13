@@ -130,7 +130,7 @@ Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Pr
 _Avoid_: Prompt, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
 
 **Prompt-Vorlage**:
-Eine der Textvorlagen einer Kern-Fassung — System-Prompt, User-Prompt sowie die drei Abschnitte der Rahmenhandlung —, aus der je Sitzung oder Gesprächsschritt der konkrete Text entsteht. Vorlagensprache ist `string.Template` (ADR-0020). Ihre **Platzhalter** (`$name`) sind benannte Leerstellen, die beim Rendern mit Vignetteninhalten gefüllt werden; welche es gibt, ist ein fester, im Code festgelegter Vertrag zwischen Vignette und Vorlage, den der Kern nicht erweitern kann (ADR-0054). Ein Platzhalter ist kein Positionsmarker: Der Marker `[bild]` steht innerhalb eines Platzhalterwerts (ADR-0030).
+Eine der Textvorlagen einer Kern-Fassung — System-Prompt, User-Prompt sowie die drei Abschnitte der Rahmenhandlung —, aus der je Sitzung oder Gesprächsschritt der konkrete Text entsteht. Vorlagensprache ist `string.Template` (ADR-0020). Ihre **Platzhalter** (`$name`) sind benannte Leerstellen, die beim Rendern mit Vignetteninhalten gefüllt werden; welche es gibt, ist ein fester, im Code festgelegter Vertrag zwischen Vignette und Vorlage, den der Kern nicht erweitern kann (ADR-0054). Ein Platzhalter ist kein Positionsmarker: Der Marker `[bild]` steht innerhalb eines Platzhalterwerts (ADR-0054).
 _Avoid_: Template, Prompt, Variable, Slot
 
 **Arbeitskontext**:
@@ -177,13 +177,13 @@ Der unveränderliche Zustand eines versionierten Artefakts. Nur finale Fassungen
 _Avoid_: veröffentlicht, publiziert, freigegeben — Vignetten sind privat, es gibt nichts zu veröffentlichen.
 
 **Archiviert**:
-Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar: Sie startet keine neue Sitzung und keinen Probelauf mehr, ein bereits laufender Probelauf läuft weiter. Aus jeder Datenspur heraus bleibt sie lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar. Beim Simulationskern und beim Evalkatalog heißt derselbe Zustand **überholt**: Dort entsteht er nur als Nebenwirkung des Finalisierens der Nachfolgerin und ist nicht umkehrbar (ADR-0035, ADR-0046).
+Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar: Sie startet keine neue Sitzung und keinen Probelauf mehr, ein bereits laufender Probelauf läuft weiter. Aus jeder Datenspur heraus bleibt sie lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar. Beim Simulationskern und beim Evalkatalog heißt derselbe Zustand **überholt**: Dort entsteht er nur als Nebenwirkung des Finalisierens der Nachfolgerin und ist nicht umkehrbar (ADR-0040, ADR-0046).
 _Avoid_: gelöscht, deaktiviert, zurückgezogen
 
 **Historie**:
 Das Objekt, das die sequenziell entstandenen Fassungen eines versionierten Artefakts zusammenfasst. Sie bleibt linear und trägt höchstens einen Entwurf. Entsteht automatisch und wird erst ab der zweiten Fassung sichtbar und benennbar.
 
-**Vignettenhistorie** und **Fragebogen-Item-Historie** tragen je einen Eigentümer-Kreis und sind als Ganzes archivierbar: Das archiviert alle Fassungen und löscht den offenen Entwurf (ADR-0040). Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0035) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Ebenso namenlos ist die **Evalkatalog-Historie**: die einzige Linie des Evalkatalogs, ebenfalls mit genau einer finalen Fassung und allein in der Hand der Administration. Was alle vier teilen, ist der Zustandsautomat, nicht die Ausstattung.
+**Vignettenhistorie** und **Fragebogen-Item-Historie** tragen je einen Eigentümer-Kreis und sind als Ganzes archivierbar: Das archiviert alle Fassungen und löscht den offenen Entwurf (ADR-0040). Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0040) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Ebenso namenlos ist die **Evalkatalog-Historie**: die einzige Linie des Evalkatalogs, ebenfalls mit genau einer finalen Fassung und allein in der Hand der Administration. Was alle vier teilen, ist der Zustandsautomat, nicht die Ausstattung.
 _Avoid_: Familie, Reihe, Strang, Lineage
 
 ## Anlässe für Sitzungen

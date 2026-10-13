@@ -5,7 +5,11 @@ status: accepted
 # Fester Vertrag zwischen Vignette und Vorlagen: benannte Platzhaltermengen im Code
 
 Dieses ADR fasst ADR-0010 und seine Nachführungen aus #3 und #285 zusammen,
-berücksichtigt die Nachrichtenordnung aus ADR-0052 und ersetzt ADR-0010.
+berücksichtigt die Nachrichtenordnung aus ADR-0052 und ersetzt ADR-0010. Es
+nimmt außerdem den Positionsmarker und die Umhüllung aus ADR-0030 (samt
+Nachführung durch #270) auf und ersetzt auch dieses; der harte Schnitt am
+Platzhaltervertrag, den ADR-0030 außerdem festhielt, war ein einmaliger
+Vorgang ohne Produktivdaten.
 
 ## Die Leerstellen liegen im Code, nicht im Kern
 
@@ -100,8 +104,29 @@ werden, wenn sie nicht leer sind, von der Platzhalterfunktion der Vignette in
 gleichnamige XML-artige Umgebungen gefasst. `$lernauftrag` und `$arbeitsheft`
 enthalten darin die nichtleeren, einzeln gefassten Stücke `*_text` und
 `*_bildbeschreibung` in der Reihenfolge, die der Positionsmarker vorgibt
-(ADR-0030). Die Vorlage enthält nur den nackten Platzhalter. Nutzereingaben
-werden nicht escaped.
+(siehe unten). Die Vorlage enthält nur den nackten Platzhalter. Stünden die
+Tags in der Vorlage, blieben bei leeren Feldern leere Hüllen im Prompt stehen,
+die das Modell als fehlende Information fehldeuten könnte. Nutzereingaben
+werden nicht escaped, weil es Prompts sind und kein XML.
+
+#### Der Positionsmarker `[bild]`
+
+Lernauftrag und Arbeitsheft tragen je Text, ein optionales Bild, eine
+Bildbeschreibung und Simulationshinweise. Wo das Bild im Text steht, bestimmt
+die Autor:in mit dem Positionsmarker `[bild]` im Textfeld selbst, nicht mit
+einem Layout-Feld: Was vor dem Marker steht, erscheint über dem Bild, was
+danach steht, darunter. Der Marker zählt nur, wenn er allein auf einer Zeile
+steht (umgebender Leerraum erlaubt, Schreibung egal); die Markerzeile fällt
+samt Umbruch weg. Mitten in einer Zeile oder als Linktext (`[bild](…)`) ist
+`[bild]` gewöhnlicher Text (#270). Ohne Marker steht das Bild unter dem Text;
+ein Marker ohne hochgeladenes Bild wird ersatzlos entfernt, ohne dass ein
+Validierungsfehler den Entwurf blockiert; bei mehreren Markern gewinnt der
+erste. Dieselbe Funktion des Vignettenmodells zerlegt den Text für die
+Webansicht (Einsetzen des Bildes) und für den Prompt (Einsetzen der
+Bildbeschreibung); so entstehen im Prompt zwei `*_text`-Umgebungen um die
+`*_bildbeschreibung`, und die Position bleibt für das Modell erhalten. Ein
+Layout-Dropdown und ein block-basierter Editor wurden verworfen: Die Textfelder
+bleiben Klartext, der Marker wird im Hilfetext des Feldes erklärt.
 
 ### `VERTRAG_RAHMEN`
 

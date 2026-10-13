@@ -1,4 +1,4 @@
-"""Lebenszyklus und Vertrag des Evalkatalogs (ADR-0046, ADR-0035, ADR-0054)."""
+"""Lebenszyklus und Vertrag des Evalkatalogs (ADR-0046, ADR-0040, ADR-0054)."""
 
 from collections.abc import Callable
 

@@ -461,7 +461,7 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
 
 @pytest.mark.django_db
 def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
-    """Ein antwortloser Schritt bleibt aus dem Verlauf, aber im Transkript (ADR-0011)."""
+    """Ein antwortloser Schritt bleibt aus dem Verlauf, aber im Transkript (ADR-0061)."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
@@ -522,7 +522,7 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
 def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behandelt() -> (
     None
 ):
-    """Der Probelauf verwirft den gescheiterten Schritt, die Sitzung behält ihn (ADR-0011)."""
+    """Der Probelauf verwirft den gescheiterten Schritt, die Sitzung behält ihn (ADR-0061)."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3

@@ -5,7 +5,8 @@ status: accepted
 # UI: CD-konform als Tool-UI, semantische Tokens, eine Interaktionsfarbe, Bereichsfarbe nur im Chrome
 
 Dieses ADR fasst die Regeln aus ADR-0023 und ADR-0024 (samt Nachführungen
-durch #168 und #308) zusammen und ersetzt beide. Die konkreten Werte, die
+durch #168 und #308) zusammen und ersetzt beide; die Sitzungsseite aus
+ADR-0025 nimmt es auf und ersetzt auch dieses. Die konkreten Werte, die
 beide ADRs mitführten (Hex-Werte, Rasterbreiten, Umbruchpunkte,
 Sidebar-Zustände, welche Seite in welchem Bereich liegt), stehen nicht mehr in
 einem ADR. Ihre Quelle der Wahrheit ist der Code: `static/css/tokens.css` für
@@ -80,6 +81,30 @@ Pseudonymisierung und Einzelinstanz-Deployment. Ein Mono-Token bleibt ein
 reiner System-Stack, weil dafür keine Schriftdatei bezogen wird; feste
 Laufweite ist Zeichenfolgen vorbehalten, die Zeichen für Zeichen abgetippt
 werden (Teilnahme-Token), nicht Fließtext oder Transkripten.
+
+## Die Sitzung wächst auf einer Seite
+
+Eine Sitzung wird als eine durchgehende Seite dargeboten. Die Rahmenhandlung
+(erzählende Einleitung und kurze Gesprächseinleitung) bleibt sichtbar;
+darunter stehen von Beginn an das Diagnosegespräch und sein Eingabefeld, und
+nach dem Gespräch folgt der Debrief als weiterer Abschnitt. Einen eigenen
+Schritt „Gespräch beginnen“ gibt es nicht. htmx ersetzt ausschließlich die
+Fortsetzung unter der Rahmenhandlung, sodass neue Gesprächsschritte und der
+Debrief das bestehende Transkript ergänzen, ohne frühere Abschnitte zu
+entfernen; Formulare und Views bleiben ohne htmx als normale HTTP-Endpunkte
+nutzbar.
+
+Die Fortsetzung hat einen **generischen Anhang-Slot** für bereits gerendertes
+HTML. Erhebungen nutzen ihn nach jeder beendeten Sitzung für ihren Itemblock,
+der damit Teil des ersetzten Fragments bleibt; der Abschluss-Block hat keine
+Sitzungsseite und bleibt eine eigene Seite. Der Slot ist dauerhaft, keine
+Übergangslösung: Ein Seitenwechsel unmittelbar nach dem Debrief erhöhte die
+Abbruchwahrscheinlichkeit an der verletzlichsten Stelle (ADR-0041).
+
+Probelauf und persistierte Sitzung verwenden dieselbe Darstellung; der
+Probelauf ergänzt allein die live sichtbare Denkspur (ADR-0014). Die
+Sprechblasen der beiden Gesprächsseiten, die schmale zentrierte Lesespalte und
+ihre Umbruchpunkte sind Werte in den Stylesheets.
 
 ## Erwogene Optionen
 

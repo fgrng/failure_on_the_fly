@@ -1736,7 +1736,7 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
-        # Ein Gesprächsschritt je Anfrage: die drei Versuche aus ADR-0011, sonst nichts.
+        # Ein Gesprächsschritt je Anfrage: die drei Versuche aus ADR-0061, sonst nichts.
         self.assertEqual(len(anfragen), 3)
 
     def test_eingabemodus_kommt_aus_dem_formular_und_faellt_tolerant_zurueck(
@@ -1776,7 +1776,7 @@ class ErhebungsteilnahmeTests(TestCase):
         )
 
     def test_antwortloser_schritt_traegt_den_eingabemodus(self) -> None:
-        """Auch der Abbruchschritt nach ADR-0011 behält die Herkunft seiner Eingabe."""
+        """Auch der Abbruchschritt nach ADR-0061 behält die Herkunft seiner Eingabe."""
 
         self._scheiternde_erhebung_einrichten()
         self._vignette_anlegen()

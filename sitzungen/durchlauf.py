@@ -47,7 +47,7 @@ def modellverlauf(sink: SitzungSink) -> list[tuple[str, str]]:
     """Projiziert die bisherigen Schritte auf die beiden sichtbaren Gesprächsseiten.
 
     Die Denkspur bleibt draußen (ADR-0005), ebenso ein Schritt ohne Äußerung —
-    der dokumentiert im Transkript den Abbruch, nicht den Kontext (ADR-0011).
+    der dokumentiert im Transkript den Abbruch, nicht den Kontext (ADR-0061).
     """
 
     verlauf: list[tuple[str, str]] = []
@@ -88,7 +88,7 @@ def gespraechsschritt_ausfuehren(
 
     Die Uhr steht still, solange das Modell antwortet (ADR-0057). Ob ein
     endgültig gescheiterter Schritt neben dem Transkript stehen bleibt
-    (ADR-0011) und ob das erschöpfte Budget die Sitzung abschließt, entscheidet
+    (ADR-0061) und ob das erschöpfte Budget die Sitzung abschließt, entscheidet
     der Sink hinter der Naht — nicht dieser Ablauf.
     """
 

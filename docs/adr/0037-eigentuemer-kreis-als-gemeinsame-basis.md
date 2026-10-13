@@ -1,14 +1,27 @@
 ---
 status: amended
-amended-by: [ADR-0059]
+amended-by: [ADR-0059, "#364"]
 ---
 
 # Der Eigentümer-Kreis ist eine gemeinsame Basis in `konten`
 
-> **Nachgeführt durch ADR-0059:** Der Abschnitt „Nebenläufigkeit" unten ist
-> in ADR-0059 aufgegangen; dort steht die Regel für das ganze Projekt. Die
-> Aussage, `select_for_update()` sei auf SQLite wirkungslos und der Austritt
-> verlasse sich auf `atomic()` mit sofortiger Schreibsperre, gilt unverändert.
+> **Nachgeführt durch ADR-0059, #364:**
+>
+> *ADR-0059:* Der Abschnitt „Nebenläufigkeit" unten ist in ADR-0059
+> aufgegangen; dort steht die Regel für das ganze Projekt. Die Aussage,
+> `select_for_update()` sei auf SQLite wirkungslos und der Austritt verlasse
+> sich auf `atomic()` mit sofortiger Schreibsperre, gilt unverändert.
+>
+> *#364:* Auch die Views sind gemeinsam. „Eigentümerin hinzufügen“ und
+> „Eigentümerin entfernen“ existieren einmal, in
+> `konten/eigentuemer_views.py` (aus dem Architektur-Review #255);
+> `eigentuemer_views()` baut das Paar, und jede Bestands-App bindet es mit
+> dem ein, was sich wirklich unterscheidet: ihrer Rollenprüfung, einer
+> Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg
+> liefert (bei Vignette und Fragebogen-Item trägt die Historie den Kreis),
+> und ihrer Liste als Ziel nach dem Selbstaustritt. Die Kante zeigt weiter von
+> den Apps auf `konten`; eine gemeinsame Lebenszyklus-Hülle folgt daraus
+> nicht, ADR-0040 gilt fort.
 
 Der Eigentümer-Kreis aus ADR-0039 wird **ein** Gegenstand: ein
 abstraktes Modell `EigentuemerKreis` samt einem QuerySet-Mixin im Modul
@@ -188,19 +201,3 @@ einmal existiert.
   Löschschutz und Vertragstest aufgenommen. Wer stattdessen ein eigenes M2M-Feld
   deklariert, fällt aus allen dreien heraus, ohne dass etwas rot wird — das ist
   die verbleibende Bruchstelle.
-
-## Auch die Views sind gemeinsam
-
-Die Views „Eigentümerin hinzufügen“ und „Eigentümerin entfernen“ existieren
-einmal, in `konten/eigentuemer_views.py` (#364, aus dem Architektur-Review
-#255). `eigentuemer_views()` baut das Paar; jede Bestands-App bindet es mit
-dem ein, was sich wirklich unterscheidet: ihrer Rollenprüfung, einer
-Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg liefert
-(bei Vignette und Fragebogen-Item trägt die Historie den Kreis, der Rückweg
-führt auf die Fassung), und ihrer Liste als Ziel nach dem Selbstaustritt.
-URLs, Rollenprüfungen und Rückwege sind unverändert.
-
-Die Kante zeigt weiter von den Apps auf `konten`; der Importgraph-Wächter in
-`config/tests/test_importgraph.py` hält fest, dass `konten` keine andere App
-importiert. Eine gemeinsame Lebenszyklus-Hülle folgt daraus
-nicht: Sie ist in #255 ausdrücklich verworfen, ADR-0040 gilt fort.

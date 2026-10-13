@@ -4,103 +4,64 @@ status: accepted
 
 # Historische Migrationen sind unveränderlich
 
-Eine ausgelieferte Migration wird nicht mehr angefasst. Weder ihre
+Eine ausgelieferte Migration wird nicht mehr angefasst: weder ihre
 `dependencies` noch die Feldnamen in ihrem Modellzustand. Was sich am Modell
-ändert, bekommt eine neue Migration.
+ändert, bekommt eine neue Migration. Ausgeliefert ist eine Migration, sobald
+sie mit ihrem PR nach `main` geht; der Auslöser ist der PR und nicht die
+Produktivinstanz, denn was dort gelaufen ist, fließt nicht verlässlich ins
+Repo zurück.
 
-Die Entscheidung fällt nach zwei Brüchen, die beide beim Nachziehen von PRD #137
-entstanden sind und beide auf jeder bestehenden Entwicklungsdatenbank zuschlugen,
-während die Testsuite grün blieb. Test-Datenbanken werden immer frisch migriert;
-sie sehen keinen der beiden Fehler.
+## Warum
 
-## 1. `dependencies` bleiben unangetastet
+Die Entscheidung fällt nach zwei Brüchen beim Nachziehen von PRD #137. Beide
+schlugen auf jeder bestehenden Entwicklungsdatenbank zu, während die Testsuite
+grün blieb: Test-Datenbanken werden immer frisch migriert und sehen so etwas
+nie.
 
-`training/migrations/0001_initial.py` und
-`erhebungen/migrations/0005_erhebungsvignette_erhebung_vignetten_and_more.py`
-wurden auf `vignetten.0005_vignette_lernauftrag_bild_and_more` vorwärts gezogen.
-Auf einer Datenbank, die `training.0001` längst angewandt hatte, bricht danach
-jeder `manage.py`-Aufruf:
+- **Verschobene `dependencies`.** `training.0001` und `erhebungen.0005`
+  wurden auf eine spätere `vignetten`-Migration vorwärts gezogen.
+  `django_migrations` speichert keine Abhängigkeiten, nur welche Migration
+  wann lief; `check_consistent_history` vergleicht die neue Kante gegen alte
+  Zeitstempel und bricht mit `InconsistentMigrationHistory` jeden
+  `manage.py`-Aufruf ab. Eine nachträglich verschobene Abhängigkeit lässt sich
+  prinzipiell nicht mit der Historie versöhnen.
+- **Umbenannte Felder im Modellzustand.** Die Umbenennungen aus #138 wurden
+  direkt in `vignetten.0001_initial` geschrieben statt als
+  `RenameField`-Migration. Auf einer bestehenden Datenbank hießen die Spalten
+  weiter alt, und der nächste Tabellen-Remake füllte die neuen Spalten still
+  mit ihrem eigenen Namen als Literal. Kein Fehler, keine Warnung,
+  Datenverlust.
 
-```
-django.db.migrations.exceptions.InconsistentMigrationHistory: Migration
-training.0001_initial is applied before its dependency
-vignetten.0005_vignette_lernauftrag_bild_and_more on database 'default'.
-```
+Die Freiheit eines harten Schnitts, wie ADR-0030 sie für den
+Platzhaltervertrag genommen hat, ist deshalb auf Anwendungsdaten begrenzt und
+deckt Migrationen nicht ab.
 
-`django_migrations` speichert keine Abhängigkeiten, sondern nur, welche
-Migration wann lief. Eine nachträglich verschobene Abhängigkeit lässt sich
-deshalb prinzipiell nicht mit der Historie versöhnen —
-`check_consistent_history` vergleicht die neue Kante gegen alte Zeitstempel und
-muss scheitern. Beide Abhängigkeiten stehen wieder auf
-`vignetten.0002_alter_vignette_arbeitsheft_bild`.
+## Folgerungen
 
-**Braucht eine spätere Migration eine frühere Fremd-App, zeigt die Kante
-vorwärts.** Die Vorwärtsverschiebung war der Versuch, ein echtes Problem zu
-lösen: Der Trigger `training_nur_finale_vignetten_einbinden` referenziert
-`vignetten_vignette`, und der Tabellen-Remake, den SQLite für den neuen
-`CheckConstraint` in `vignetten.0005` braucht, droppt diese Tabelle
-zwischenzeitlich:
+- **Braucht eine spätere Migration eine frühere Fremd-App, zeigt die Kante
+  vorwärts.** Der Anlass des ersten Bruchs war echt: Ein Trigger in `training`
+  referenziert `vignetten_vignette`, und der Tabellen-Remake, den SQLite für
+  einen neuen Constraint braucht, droppt diese Tabelle zwischenzeitlich. Die
+  Lösung ist die umgekehrte Kante: Die `vignetten`-Migration hängt von
+  `training.0001` ab und klammert den Remake in `DROP TRIGGER` /
+  `CREATE TRIGGER`. Jeder Trigger, der `vignetten_vignette` referenziert,
+  gehört in die Trigger-Klammer jeder Migration, die diese Tabelle umbaut.
+- **Kein mechanischer Guard.** Ein Test kann die Invariante nicht prüfen:
+  Welche Abhängigkeit galt, als eine Migration lief, steht in keiner Datei
+  und in keiner Tabelle. Dieses ADR ist der Guard.
+- **Migrationstests enden mit der Auslieferung.** Ein Test, der eine
+  ausgelieferte Migration vor- und zurückmigriert, kann nichts mehr fangen; er
+  ist ein Werkzeug der Entwicklung, kein Bestand der Suite. Die Abschlussphase
+  einer Spec streicht deshalb die Tests der Migrationen, die die Spec selbst
+  neu anlegt (`docs/agents/issue-tracker.md`); Migrationen aus Tickets ohne
+  Spec räumt die Maintainerin von Hand ab.
 
-```
-django.db.utils.OperationalError: error in trigger
-training_nur_finale_vignetten_einbinden: no such table: main.vignetten_vignette
-```
+## Folgen
 
-Die Lösung ist die umgekehrte Kante: `vignetten.0005` hängt von
-`training.0001` ab und klammert den Remake in `DROP TRIGGER` / `CREATE TRIGGER`
-— genauso, wie es die beiden `erhebungen`-Trigger dort schon wurden. Damit
-gilt: **jeder Trigger, der `vignetten_vignette` referenziert, gehört in die
-Trigger-Klammer jeder Migration, die diese Tabelle umbaut.**
-
-## 2. Feldnamen im Modellzustand bleiben unangetastet
-
-Die Umbenennungen aus #138 (`lernauftrag` → `lernauftrag_text`,
-`arbeitsheft_beschreibung` → `arbeitsheft_bildbeschreibung`) wurden direkt in
-`vignetten/migrations/0001_initial.py` geschrieben, statt eine `RenameField`-
-Migration zu erzeugen. Auf einer frischen Datenbank fällt das nicht auf. Auf
-einer bestehenden heißen die Spalten weiter alt, und der nächste Tabellen-Remake
-füllt die neuen Spalten **still mit ihrem eigenen Namen als Literal**:
-
-```
-sqlite> select id, lernauftrag_text from vignetten_vignette limit 1;
-1|lernauftrag_text
-```
-
-Kein Fehler, keine Warnung, Datenverlust. Genau deshalb ist die in ADR-0030 §3
-beschriebene Freiheit des harten Schnitts auf den *Platzhaltervertrag* begrenzt
-und deckt Migrationen nicht mit ab.
-
-## Kein mechanischer Guard
-
-Ein Test kann die verletzte Invariante nicht prüfen: Die nötige Information —
-welche Abhängigkeit galt, als eine Migration lief — steht in keiner Datei und
-in keiner Tabelle. Diese ADR ist der Guard.
-
-## Migrationstests enden mit der Auslieferung
-
-Ausgeliefert ist eine Migration, sobald sie mit dem PR ihrer Spec nach `main`
-geht. Ab dann wird sie nicht mehr verändert, und ein Test, der sie vor- und
-zurückmigriert, kann nichts mehr fangen. Er ist ein Werkzeug der Entwicklung,
-kein Bestand der Suite.
-
-Deshalb streicht die Abschlussphase einer Spec die Tests der Migrationen, die
-die Spec selbst neu anlegt, bevor ihr PR entsteht. Der Schritt läuft nur, wenn
-der Integrations-Branch gegenüber `origin/main` neue Migrationsdateien
-enthält. Migrationen aus Tickets ohne Spec (`sandcastle/standalone`,
-interaktiv auf `main`) räumt die Maintainerin bzw. der Maintainer von Hand ab.
-
-Der Auslöser ist der PR nach `main` und nicht die Produktivinstanz: Was dort
-gelaufen ist, fließt nicht verlässlich ins Repo zurück. Bestehende
-Entwicklungsdatenbanken, die Lücke aus den beiden Brüchen oben, erreicht ein
-Test ohnehin nicht, weil Test-Datenbanken immer frisch migriert werden.
-
-## Reparatur einer betroffenen Entwicklungsdatenbank
-
-Wer eine Datenbank aus der Zeit vor #138 hat, benennt die beiden Spalten von
-Hand um und migriert dann normal weiter. Kein `flush`, kein `--fake`:
-
-```sql
-ALTER TABLE vignetten_vignette RENAME COLUMN lernauftrag TO lernauftrag_text;
-ALTER TABLE vignetten_vignette
-    RENAME COLUMN arbeitsheft_beschreibung TO arbeitsheft_bildbeschreibung;
-```
+- Eine fehlerhafte Migration wird durch eine weitere korrigiert, nie durch
+  Bearbeiten.
+- Verweise aus Migrationen auf inzwischen ersetzte ADRs bleiben stehen
+  (`docs/adr/README.md`).
+- Eine Entwicklungsdatenbank aus der Zeit vor #138 repariert man von Hand:
+  die beiden Spalten umbenennen, dann normal weitermigrieren. Kein `flush`,
+  kein `--fake`.

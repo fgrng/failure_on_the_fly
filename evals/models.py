@@ -479,7 +479,7 @@ class Wechsel(models.Model):
     """Ein Inputschritt im Evalgespräch: Äußerung der Lehrperson und Antwort.
 
     Ohne Äußerung der Schüler:in ist der Antwortversuch endgültig gescheitert
-    (wie ADR-0011); die Fehlversuche stehen daneben.
+    (wie ADR-0061); die Fehlversuche stehen daneben.
     """
 
     gespraech: models.ForeignKey = models.ForeignKey(

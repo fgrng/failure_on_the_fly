@@ -1,8 +1,14 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0052]
 ---
 
 # Ein zentraler, fach-agnostischer Simulationskern, den die Vignette beim Finalisieren pinnt
+
+> **Nachgeführt durch ADR-0052:** Der Arbeitskontext steht im System-Prompt.
+> Neue Kern-Fassungen lassen die User-Prompt-Vorlage leer; das Feld bleibt als
+> Altfeld für gepinnte Fassungen. Die „Prompt-Vorlagen“ unten sind damit in
+> der Sache eine: die System-Prompt-Vorlage.
 
 Verhaltens- und Logikregeln der Simulation werden **einmal zentral spezifiziert**, nicht pro Vignette neu erfunden. Es gibt konzeptionell genau **eine Kern-Linie für alle Vignetten**, über alle Fächer hinweg. Der Kern ist ein versioniertes Artefakt (siehe ADR-0003) und wird ausschließlich von Administrator:innen gepflegt — nicht von Autor:innen, deren Aufgabe allein die Beschreibung des Fehlermusters ist.
 

@@ -1,14 +1,9 @@
 ---
-status: amended
-amended-by: ["#27"]
+status: superseded
+superseded-by: ADR-0061
 ---
 
 # Der Gesprächsschritt ist atomar; Fehlversuche stehen neben dem Transkript
-
-> **Nachgeführt durch #27:** Die begrenzte Wiederholung ist beziffert:
-> `MAX_VERSUCHE = 3` in `simulation`. Scheitert der dritte Versuch, ist der
-> Gesprächsschritt endgültig gescheitert. Die Folge „noch offen" unten ist
-> damit entschieden.
 
 Ein **Gesprächsschritt** existiert nur, wenn Eingabe, Denkspur und sichtbare Äußerung alle vorliegen. Liefert das Modell kein verwertbares Ergebnis — Formatbruch, Anbieterfehler, Filter —, wird begrenzt wiederholt. Scheitert es endgültig, sieht die Teilnehmer:in einen Fehler; das Transkript bleibt unberührt und ein Schritt-Budget unangetastet.
 

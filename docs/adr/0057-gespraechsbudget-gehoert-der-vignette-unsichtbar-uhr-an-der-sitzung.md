@@ -28,7 +28,7 @@ Antwort steht. Gemessen wird, was gemessen werden soll: die Zeit, die die
 angehende Lehrperson für ihre diagnostischen Entscheidungen aufwendet.
 Modelllatenz schwankt zwischen Teilnehmenden und über den Tag; sie ins Budget
 zu ziehen hieße, sie in die Daten zu ziehen. Aus demselben Grund kosten
-Fehlversuche (ADR-0011) keine Budgetzeit.
+Fehlversuche (ADR-0061) keine Budgetzeit.
 
 Bei schrittbasiertem Budget läuft überhaupt keine Uhr. Dort wird nicht gemessen
 und pausiert, sondern gar nicht erst angesetzt: Die Null einer solchen Sitzung
@@ -89,7 +89,7 @@ deutlich. Für Erhebungen ist die harte Obergrenze der **Erhebungszeitraum**:
 Nach dem Fenster gilt eine unvollständige Teilnahme als verfallen und ist nicht
 fortsetzbar (#60). Für Trainingssitzungen gibt es keine Obergrenze; das ist als
 #237 offen. Eine laufende Sitzung endet nur durch Abschließen, Scheitern oder
-ausdrücklichen Abbruch, und je Teilnahme läuft höchstens eine (ADR-0053).
+ausdrücklichen Abbruch, und je Teilnahme läuft höchstens eine (ADR-0061).
 
 ## Erwogene Optionen
 

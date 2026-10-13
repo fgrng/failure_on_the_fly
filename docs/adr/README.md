@@ -32,6 +32,64 @@ Fertig, wenn das Frontmatter des alten ADRs auf den Anlass zeigt und
 `rg -g '!docs/**' 'ADR-NNNN'` für ein ersetztes ADR keinen Treffer mehr
 liefert.
 
+## Wegweiser
+
+Nur ADRs mit `accepted` oder `amended`, nach Thema. Wer ein ADR anlegt oder
+ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
+
+**Domäne und Forschungsinstrument**
+
+- ADR-0001 Fehlermuster als einziger Oberbegriff, verortet in der Vignette
+- ADR-0002 Training und Erhebung getrennt, gemeinsames Sitzungs-Rückgrat
+- ADR-0004 Ein zentraler, fach-agnostischer Simulationskern, gepinnt von der Vignette
+- ADR-0008 Das Fragebogen-Item ist die atomare Einheit
+- ADR-0009 Die Diagnose wird erfasst, nicht bewertet
+- ADR-0046 Evals prüfen die Simulation; eigener, ungepinnter Evalkatalog
+
+**Pseudonymität und Datenschutz**
+
+- ADR-0006 Erhebungs-Teilnahmen sind pseudonym und vom Training getrennt
+- ADR-0007 Audio wird nie gespeichert; das Transkript ist nicht korrigierbar
+- ADR-0026 Transkription über externen Auftragsverarbeiter mit Zero-Retention
+- ADR-0045 Flüchtige Teilnahme: Gerüst in der DB, Inhalte nie
+- ADR-0058 Die Teilnahme trägt keine Identität: zwei Bindungen, Abschrift als Kopie
+
+**Eigentum, Rollen und Lebenszyklus**
+
+- ADR-0027 Die Erhebung leiht die Statusnamen, ist aber ein einzelnes Objekt
+- ADR-0037 Der Eigentümer-Kreis ist eine gemeinsame Basis in `konten`
+- ADR-0039 Eigentümerschaft: Privatheit, Kreis, Sichtbarkeit am QuerySet
+- ADR-0040 Lebenszyklus versionierter Artefakte, samt Kern-Sonderform
+- ADR-0048 Vignettenposition getrennt von der Reihenfolgeregel
+
+**Sitzung und Datenspur**
+
+- ADR-0005 Denkspur pro Antwort; Teilnehmende sehen sie nie
+- ADR-0014 Der Probelauf ist eine schreibfreie Funktion über einem Tripel
+- ADR-0029 Die Datenspur wird long-relational, selbsttragend, pro Erhebung exportiert
+- ADR-0049 Einsicht folgt dem Anlass, nie der Vignette
+- ADR-0057 Das Gesprächsbudget gehört der Vignette, ist unsichtbar, Uhr an der Sitzung
+- ADR-0061 Höchstens eine laufende Sitzung je Teilnahme; der Gesprächsschritt ist atomar
+
+**Simulation, Vorlagen und Anbieter**
+
+- ADR-0020 Die Vorlagen des Kerns sind `string.Template`
+- ADR-0052 Wem die Nachrichtenrollen gehören
+- ADR-0054 Fester Vertrag zwischen Vignette und Vorlagen, samt Positionsmarker
+- ADR-0056 Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung
+
+**Architektur und Betrieb**
+
+- ADR-0031 Historische Migrationen sind unveränderlich
+- ADR-0041 Der Ablauf-Schritt ist ein Objekt, der Itemblock bekommt eine Tabelle
+- ADR-0044 Markdown mit zwei Profilen, Quelle bleibt roh
+- ADR-0055 Apps entlang der Domänenobjekte, azyklischer Importgraph, drei Nähte
+- ADR-0059 Nebenläufigkeit: SQLite, ein Thread je wartender Anfrage, ein Prozess für Evalläufe
+
+**UI**
+
+- ADR-0060 CD-konformes Tool-UI, semantische Tokens, die Sitzung wächst auf einer Seite
+
 ## Frontmatter
 
 Das Frontmatter trägt genau diese Felder:

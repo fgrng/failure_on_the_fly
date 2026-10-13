@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0040
 ---
 
 # Der Simulationskern trägt genau eine finale Fassung; Finalisieren archiviert die Vorgängerin

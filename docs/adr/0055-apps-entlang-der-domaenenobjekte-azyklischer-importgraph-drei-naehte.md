@@ -126,7 +126,7 @@ mindestens zwei echte Adapter, und eine weitere ist ein neues ADR.
 
 `simulation/sprachmodell/`: ein Protokoll mit einer Methode und zwei Adaptern,
 `LiteLLMSprachmodell` für die echten Anbieter und `FakeSprachmodell`, ohne den
-die Fehlversuch-Schreibbahn aus ADR-0011 nicht prüfbar wäre und der Probelauf
+die Fehlversuch-Schreibbahn aus ADR-0061 nicht prüfbar wäre und der Probelauf
 in der Entwicklung Geld kostete. Der Adapter wird über das Anbieterfeld der
 Modell-Konfiguration gewählt (ADR-0056).
 
@@ -177,7 +177,7 @@ Vignette, Kern und Modell-Konfiguration, den lesenden Zugriff auf die
 bisherigen Gesprächsschritte, die Budget-Uhr über `zug_beginnen` und
 `zug_beenden` (ADR-0057), die Budgeterschöpfung als Rückgabe des angehängten
 Schritts, und die beiden Stellen, an denen die Anlässe auseinandergehen: ob ein
-endgültig gescheiterter Schritt neben dem Transkript stehen bleibt (ADR-0011:
+endgültig gescheiterter Schritt neben dem Transkript stehen bleibt (ADR-0061:
 die persistierte Sitzung behält ihn, der Probelauf verwirft ihn) und ob das
 erschöpfte Budget die Sitzung abschließt. Der Budgetstand selbst ist ein
 speicherloses Wertobjekt mit einer Implementierung; seine Speicher sind die
@@ -217,7 +217,7 @@ persistiert ihn über den Sink. Der Antwortversuch ist nicht dasselbe wie ein
 Gesprächsschritt: Er ist flüchtig, darf scheitern und trägt die Fehlversuche
 mit sich, die ein Gesprächsschritt neben sich stellt. Er ist auch **nicht** die
 Rückgabe der Sprachmodell-Naht: Zwischen beiden sitzt die begrenzte
-Wiederholung aus ADR-0011 (`MAX_VERSUCHE`). Dass sie in `simulation` liegt und
+Wiederholung aus ADR-0061 (`MAX_VERSUCHE`). Dass sie in `simulation` liegt und
 nicht hinter der Naht, ist der Grund, warum der Fake die Fehlversuch-Schreibbahn
 prüfen kann.
 

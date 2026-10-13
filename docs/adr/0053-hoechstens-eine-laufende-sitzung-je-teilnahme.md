@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0061
 ---
 
 # Höchstens eine laufende Sitzung je Teilnahme
