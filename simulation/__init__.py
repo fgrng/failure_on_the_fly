@@ -27,11 +27,11 @@ MAX_VERSUCHE: int = 3
 # Wie lange ein Gesprächsschritt höchstens auf das Sprachmodell warten darf —
 # alle Versuche eines Schritts teilen sich diese Frist, jeder einzelne Aufruf
 # bekommt die verbliebene Restzeit als Timeout. Das ist nicht das
-# Gesprächsbudget der Vignette (ADR-0012), sondern eine Zusage dieser Naht.
+# Gesprächsbudget der Vignette (ADR-0057), sondern eine Zusage dieser Naht.
 #
 # Nach oben begrenzt das Deployment: Das Uberspace-Frontend schließt eine
 # Verbindung nach drei Minuten ohne Daten, und gunicorns Thread-Worker bricht
-# eine einzelne Anfrage nicht selbst ab (docs/DEPLOYMENT.md, ADR-0050). 90 s
+# eine einzelne Anfrage nicht selbst ab (docs/DEPLOYMENT.md, ADR-0059). 90 s
 # lassen dazu Luft, auch wenn mehrere Versuche in dieselbe Anfrage fallen und
 # der Endpunkt danach noch schreibt. Nach unten begrenzt die Denkspur, die das
 # Ausgabeschema vor der Äußerung erzwingt (ADR-0005): Ein Reasoning-Modell
@@ -136,10 +136,10 @@ def antwort_versuchen(
     """Erzeugt schreibfrei eine Antwort der simulierten Schüler:in.
 
     Die Prompt-Platzhalter (Name → Text) berechnet die Aufruferin aus ihrer
-    Vignette; `simulation` kennt keine Vignette (ADR-0016). Der Arbeitskontext
+    Vignette; `simulation` kennt keine Vignette (ADR-0055). Der Arbeitskontext
     steht im System-Prompt: Eine gefüllte User-Prompt-Vorlage (Altbestand)
     wird gerendert mit einer Leerzeile angehängt (ADR-0052). Ihre früheren
-    Antworten sieht die Schüler:in samt Denkspur (ADR-0054).
+    Antworten sieht die Schüler:in samt Denkspur (ADR-0062).
     """
 
     system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)

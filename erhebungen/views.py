@@ -95,7 +95,7 @@ _BADGE_BESCHRIFTUNGEN: dict[str, str] = {
 
 # Eine einzige Tür für den gesamten Forschungsbereich, wie in fragebogen_items
 # und vignetten: Die Administration sieht eine Erhebung nicht nur, sie kann sie
-# auch anlegen und bearbeiten (ADR-0033).
+# auch anlegen und bearbeiten (ADR-0039).
 _forschende_oder_administratorin_erforderlich = rolle_erforderlich(ist_forschende)
 
 
@@ -283,7 +283,7 @@ def _entwurfsaktion(
     dazwischen finalisiert. Eine Antwort liefert die Aktion nur für ihre
     eigenen Fehlerfälle. Ist die Erhebung kein Entwurf mehr oder weist das
     Modell die Änderung ab, sagt eine Meldung auf der Detailseite, warum nichts
-    geändert wurde (ADR-0051). Die Detailseite rendert erst die Weiterleitung,
+    geändert wurde (ADR-0040). Die Detailseite rendert erst die Weiterleitung,
     außerhalb der Transaktion (#249).
     """
 

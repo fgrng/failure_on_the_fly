@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0059
 ---
 
 # Evalläufe laufen in einem eigenen Hintergrundprozess, eine Warteschlange in der Datenbank
@@ -10,19 +11,15 @@ Evalläufe werden deshalb von einem **eigenen Prozess** abgearbeitet: einem Mana
 
 Bricht der Prozess mitten in einem Lauf ab, bleibt der Evallauf **abgebrochen** stehen; was fertig war, bleibt sichtbar. Fortgesetzt wird nicht, er wird neu ausgelöst.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Synchron in der Anfrage** — unmöglich; das Worker-Timeout liegt bei 180 s.
 - **Der Browser treibt den Lauf**, Evalgespräch für Evalgespräch per HTMX — verworfen. Jede Anfrage belegte einen der drei gunicorn-Worker und konkurrierte mit laufenden Erhebungen; ein geschlossener Tab bräche den Lauf ab.
 - **Nur als Management-Command für Administrator:innen** — verworfen. Der Evallauf ist ein Werkzeug der Autor:in.
 - **Eine Worker-Bibliothek mit eigenem Broker** — verworfen. Ein Dienst, eine Abhängigkeit und ein Betriebsrisiko mehr für einen einzigen Anwendungsfall, dessen Durchsatz ein Lauf nach dem anderen ist.
 
-## Consequences
+## Folgen
 
 - Die Instanz betreibt künftig zwei Prozesse; `docs/DEPLOYMENT.md` beschreibt beide.
 - Der Hintergrundprozess schreibt in dieselbe SQLite-Datei wie gunicorn. Bei einem Lauf nach dem anderen ist das eine zusätzliche Schreiberin, keine Last.
 - Er ist das Fundament für eine spätere Regressionsreihe über viele Vignetten.
-
-## Nachtrag (2026-10): Thread-Worker statt drei synchroner Worker
-
-Seit ADR-0050 läuft gunicorn mit dem Thread-Worker; die »drei gunicorn-Worker« oben sind drei Prozesse mit vielen Threads, und `--timeout` begrenzt keine einzelne Anfrage mehr. Die Entscheidung hält trotzdem: Eine Anfrage endet spätestens, wenn das Uberspace-Frontend sie nach drei Minuten ohne Daten schließt, und ein Evallauf dauert Dutzende Minuten.

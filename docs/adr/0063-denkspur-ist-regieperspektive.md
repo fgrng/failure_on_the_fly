@@ -16,7 +16,7 @@ Drei Gründe: Die Denkspur ist ein Forschungsdatum (ADR-0005) und soll prüfbar 
 ## Folgen
 
 - Der Rollenschutz gilt der Äußerung. Die Denkspur darf „Rollenbruchversuch“ schreiben, die Äußerung reagiert als Kind.
-- Seit ADR-0054 steht die Denkspur im Verlauf. Die Regieperspektive schreibt deshalb nur, was sie braucht, und führt keine Listen zu vermeidender Wörter, die das Modell im nächsten Zug wiederläse.
+- Seit ADR-0062 steht die Denkspur im Verlauf. Die Regieperspektive schreibt deshalb nur, was sie braucht, und führt keine Listen zu vermeidender Wörter, die das Modell im nächsten Zug wiederläse.
 - Die Sichtbarkeitsregeln aus ADR-0005 bleiben: Teilnehmer:innen sehen die Denkspur nie, Forschende immer.
 - Gilt für Kern-Fassungen ab #466. Gepinnte Fassungen in laufenden Erhebungen behalten ihre Lesart.
 - Der Glossareintrag **Denkspur** ist nachgezogen.

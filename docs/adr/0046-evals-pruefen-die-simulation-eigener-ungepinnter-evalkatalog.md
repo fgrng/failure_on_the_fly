@@ -24,14 +24,14 @@ Jedes Kriterium wird an jedem Evalgespräch als *erfüllt* oder *nicht erfüllt*
 
 Der Evallauf ist beim Finalisieren einer Vignette ein **Hinweis, keine Sperre** — dieselbe Linie wie „Warnung statt Sperre“ beim überholten Kern (#189). Der Bewerter ist ein Sprachmodell; sein Urteil muss überstimmbar sein, und das Finalisieren darf nicht an einem Hintergrundprozess und drei erreichbaren Anbietern hängen.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Evals als dritter Teil des Simulationskerns** — verworfen. Kernregel und Kriterium wären gemeinsam versioniert und könnten nicht auseinanderdriften; aber jede Rubrik-Korrektur erzeugte eine Kern-Fassung und erreichte keine finale Vignette.
 - **Die Vignette pinnt beim Finalisieren auch den Katalog** — verworfen, aus demselben Grund, aus dem ADR-0004 die Einheitlichkeits-Invariante verwarf: Eine Rubrik-Korrektur erzwänge inhaltsleere Vignetten-Neufassungen.
 - **Der Bewerter misst an der System-Prompt-Vorlage des gepinnten Kerns** — verworfen. Das Urteil hinge an zwei Modelltexten statt an einem, und dasselbe Kriterium bedeutete je Vignette anderes.
 - **Evals je Vignette, von der Autor:in geschrieben** — verworfen. Die Prüfung ist fach-agnostisch und systemweit wie der Kern; Vignettenspezifisches erhält sie über den Vertrag (ADR-0010).
 
-## Consequences
+## Folgen
 
 - ADR-0014 gilt nicht mehr ganz: Das System weiß künftig, ob für eine Vignettenfassung ein Evallauf existiert und wie er ausging. Erzwungen wird weiterhin nichts, und der Probelauf bleibt schreibfrei.
 - Ein Evallauf wird anders als der Probelauf **aufbewahrt** — je Vignettenfassung höchstens einer, der jüngste ersetzt den älteren.

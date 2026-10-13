@@ -76,7 +76,7 @@
     font-weight: 600;
 }
 
-/* Aktiv und Hover tragen den Ton der Gruppe, die Schrift bleibt dunkel (ADR-0024). */
+/* Aktiv und Hover tragen den Ton der Gruppe, die Schrift bleibt dunkel (ADR-0060). */
 .sidebar-nav__group a:hover {
     background: color-mix(in srgb, var(--nav-tint) 50%, var(--color-surface));
     box-shadow: inset 3px 0 color-mix(in srgb, var(--nav-solid) 40%, var(--color-surface));

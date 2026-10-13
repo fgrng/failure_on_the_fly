@@ -1,6 +1,6 @@
 # Evallauf-Durchspielprobe
 
-Die Probe spielt den Evallauf-Dienst (#421, ADR-0047) lokal ohne Zugangsdaten durch: Start in der Oberfläche, Browser schließen, Verarbeitung im separaten Prozess, Ergebnis nach Rückkehr und erhaltene Teilstände nach einem Prozessneustart. Sie braucht drei `fake`-Konfigurationen und einen eigens angelegten finalen Testkatalog. Der Testkatalog gehört nur in die Wegwerf-Datenbank dieser Probe und ist kein Standardkatalog im Produkt; den ersten echten Katalog liefert #300.
+Die Probe spielt den Evallauf-Dienst (#421, ADR-0059) lokal ohne Zugangsdaten durch: Start in der Oberfläche, Browser schließen, Verarbeitung im separaten Prozess, Ergebnis nach Rückkehr und erhaltene Teilstände nach einem Prozessneustart. Sie braucht drei `fake`-Konfigurationen und einen eigens angelegten finalen Testkatalog. Der Testkatalog gehört nur in die Wegwerf-Datenbank dieser Probe und ist kein Standardkatalog im Produkt; den ersten echten Katalog liefert #300.
 
 ## Vorbereitung
 

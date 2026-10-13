@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0061
 ---
 
 # Höchstens eine laufende Sitzung je Teilnahme
@@ -38,7 +39,7 @@ verfälschte die Statuszählung auf der Trainingsseite und in der Fremdeinsicht.
   `laufend` und fortsetzbar, alle älteren werden `abgebrochen`. Hier bezeichnet
   `abgebrochen` ausnahmsweise passiv liegen gebliebene Altbestände.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Eine laufende Sitzung beim Neustart automatisch beenden** — verworfen. Es
   verwirft die Arbeit der Teilnehmenden ohne Rückfrage und erfindet einen
@@ -51,7 +52,7 @@ verfälschte die Statuszählung auf der Trainingsseite und in der Fremdeinsicht.
 - **Den Constraint nur für Erhebungen** — verworfen. Gerade im Training
   entstanden die Waisen.
 
-## Consequences
+## Folgen
 
 - Laufende Sitzungen in verschiedenen Trainings bleiben gleichzeitig erlaubt:
   Jedes Training ist eine eigene Teilnahme.

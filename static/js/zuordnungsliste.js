@@ -62,7 +62,7 @@ function zuordnungsliste({ datenId, verfuegbarId, randomisierungId, fest }) {
             const doc = new DOMParser().parseFromString(await response.text(), "text/html");
             if (doc.querySelector(".messages .message--error")) {
                 // Abgewiesen, etwa weil die Erhebung inzwischen final ist: Die
-                // Seite zeigt den aktuellen Stand samt Meldung (ADR-0051).
+                // Seite zeigt den aktuellen Stand samt Meldung (ADR-0040).
                 // Andere Meldungen, etwa aus einem zweiten Tab, weisen nichts ab.
                 document.querySelector(".site-main").replaceWith(doc.querySelector(".site-main"));
                 return;

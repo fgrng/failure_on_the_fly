@@ -109,7 +109,7 @@ def zwei_schritte_ein_kriterium() -> None:
 @pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
 def test_schuelerin_sieht_ihre_fruehere_antwort_samt_denkspur() -> None:
-    """Der zweite Antwortversuch kennt Äußerung und Denkspur (ADR-0054)."""
+    """Der zweite Antwortversuch kennt Äußerung und Denkspur (ADR-0062)."""
 
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 

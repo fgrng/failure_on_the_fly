@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0061
 ---
 
 # Der Gesprächsschritt ist atomar; Fehlversuche stehen neben dem Transkript
@@ -14,7 +15,7 @@ Jede verworfene Antwort wird samt ihrem Grund als **Fehlversuch** protokolliert 
 
 Das **Transkript** nimmt sie nicht auf. Es ist die Aufzeichnung der diagnostischen Gesprächsführung der angehenden Lehrperson (ADR-0007); was verworfen wurde, hat sie nie gesehen und nie beantwortet, und es war nie Teil des Verlaufs.
 
-## Consequences
+## Folgen
 
 - Neben dem Transkript existiert eine zweite Schreibbahn. Beide gehören zur Datenspur, nur eine zum Gespräch.
 - Wie viele Wiederholungen zulässig sind, bevor eine Sitzung aufgibt, ist noch offen.

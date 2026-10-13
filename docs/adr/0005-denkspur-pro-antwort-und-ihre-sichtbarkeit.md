@@ -1,11 +1,22 @@
 ---
 status: amended
-amended-by: ["denkspur-ist-regieperspektive", "#466"]
+amended-by: [ADR-0049, ADR-0052, ADR-0062, ADR-0063]
 ---
 
 # Denkspur entsteht pro Antwort; Teilnehmende sehen sie nie
 
-> **Nachgeführt durch ADR „Denkspur ist Regieperspektive“, #466:** Die Denkspur ist die Regieperspektive der Simulation auf die nächste Äußerung, nicht ein Selbstgespräch in der Rolle. Sie darf Fachsprache nutzen und das Fehlermuster benennen; nur die Äußerung ist in der Rolle.
+> **Nachgeführt durch ADR-0049, ADR-0052, ADR-0062, ADR-0063:** Die Ausbilder:in sieht
+> die Denkspur nicht. Ihre Fremdeinsicht zeigt, was die Teilnehmer:in sieht;
+> die Denkspur bleibt Probelauf und Forschenden vorbehalten (ADR-0049). Der
+> Arbeitskontext steht im System-Prompt; jede `user`-Nachricht an die
+> simulierte Schüler:in ist eine Ansprache der Teilnehmer:in (ADR-0052). Der
+> Abschnitt „Die Denkspur fließt nicht in den Kontext zurück“ ist abgelöst:
+> Jede `assistant`-Nachricht trägt Denkspur und Äußerung als JSON-Objekt nach
+> dem Ausgabeschema; die native Nachrichtenform bleibt (ADR-0062).
+>
+> Die Denkspur ist die Regieperspektive der Simulation auf die nächste
+> Äußerung, nicht ein Selbstgespräch in der Rolle. Sie darf Fachsprache nutzen
+> und das Fehlermuster benennen; nur die Äußerung ist in der Rolle (ADR-0063).
 
 Die **Denkspur** — das interne Reasoning der simulierten Schüler:in — entsteht **zu jeder einzelnen Antwort**, nicht als zusammenfassende Selbstauskunft am Ende einer Sitzung. Nur so wird nachvollziehbar, ob das Fehlermuster *durchgängig* konsistent angewandt wurde; genau das ist der forschende und didaktische Kern des Instruments.
 
@@ -27,10 +38,6 @@ Der Gesprächsverlauf, der bei jedem Zug an das Modell zurückgeht, enthält die
 
 Der Verlauf reist als **native Konversationsnachrichten** des Anbieters, nicht als nacherzählter Verlaufsblock im User-Prompt. Die Einträge der simulierten Schüler:in tragen ausschließlich ihre sichtbare Äußerung als Klartext — die Denkspur bleibt also auch dann draußen, wenn die Antwort, aus der sie stammt, wieder im Kontext steht.
 
-> **Nachgeführt durch ADR-0052 (Nachrichtenrollen):** Der Arbeitskontext steht im System-Prompt; jede `user`-Nachricht an die simulierte Schüler:in ist eine Ansprache der Teilnehmer:in.
-
-> **Abgelöst durch ADR-0054:** Die Denkspur fließt doch in den Verlauf zurück. Jede `assistant`-Nachricht trägt Denkspur und Äußerung als JSON-Objekt nach dem Ausgabeschema; die native Nachrichtenform bleibt.
-
 ## Sichtbarkeit
 
 Die Sichtbarkeit ist bewusst gestaffelt:
@@ -40,11 +47,7 @@ Die Sichtbarkeit ist bewusst gestaffelt:
 - **Forschende:r:** immer, als Teil der Datenspur und des Exports.
 - **Ausbilder:in:** im Rahmen der Sitzungseinsicht ihres eigenen Trainings.
 
-> **Nachgeführt durch ADR-0049 (Einsicht):** Die Ausbilder:in sieht die
-> Denkspur nicht. Ihre Fremdeinsicht zeigt, was die Teilnehmer:in sieht;
-> die Denkspur bleibt Probelauf und Forschenden vorbehalten.
-
-## Consequences
+## Folgen
 
 - Die Vignette braucht eine **Arbeitsheft-Bildbeschreibung** — eine textuelle Fassung dessen, was im Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Menschen und speist, an der Bildposition zusammen mit dem Arbeitsheft-Text, das Reasoning.
 - Der didaktisch reizvolle Gedanke, Trainingsteilnehmenden nachträglich zu zeigen, „wie die Simulation gedacht hat", ist verworfen.

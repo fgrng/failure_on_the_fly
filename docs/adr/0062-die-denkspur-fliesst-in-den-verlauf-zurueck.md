@@ -10,14 +10,14 @@ Zwei Gründe: Die Schüler:in kennt ihre früheren Überlegungen und kann über 
 
 Das JSON wird aus den gespeicherten Feldern rekonstruiert (`json.dumps(…, ensure_ascii=False)`, Schlüsselreihenfolge wie im Schema), nicht aus einer aufbewahrten Rohantwort. Es ist inhaltlich identisch mit der Ausgabe; Abweichungen in Leerraum oder Escapes sind für das Modell bedeutungslos.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Rohantwort byte-genau speichern und zurückspielen** — verworfen. Das Schema hat genau zwei Felder ohne Zusätze, die Rohantwort enthält nichts darüber hinaus; sie kostete eine Migration und einen Eingriff in den Exportkontrakt (ADR-0029).
 - **Pro Kern-Fassung umschalten** — verworfen. Wie bei ADR-0052 ist die Nachrichtenordnung Code und gilt ab dem Deploy für alle Fassungen, auch für gepinnte in laufenden Erhebungen; dass eine Datenspur Gespräche beider Ordnungen enthält, nehmen wir hin.
 - **Die Denkspur über ein natives Reasoning-Feld des Anbieters zurückgeben** — verworfen. Nicht jeder Anbieter kennt eins, und ADR-0005 führt Reasoning bewusst nicht über den nativen Weg.
 
-## Consequences
+## Folgen
 
 - Gilt gleich für Sitzung, Probelauf und Evalgespräch.
 - Die simulierte Lehrperson sieht die Schüler:in weiterhin nur über ihre Äußerungen; am Bewerter ändert sich nichts (ADR-0052).
-- Ein gescheiterter Gesprächsschritt bleibt wie bisher ganz aus dem Verlauf (ADR-0011).
+- Ein gescheiterter Gesprächsschritt bleibt wie bisher ganz aus dem Verlauf (ADR-0061).

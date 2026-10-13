@@ -1,4 +1,4 @@
-"""Kontrakttest zum App-Graphen aus ADR-0016.
+"""Kontrakttest zum App-Graphen aus ADR-0055.
 
 Die Apps liegen nebeneinander unter der Projektwurzel; ihre Quellen werden
 gelesen, nicht geladen. Gezählt wird jeder absolute Import, auch ein
@@ -13,7 +13,7 @@ from django.conf import settings
 
 _PROJEKTWURZEL: Path = Path(settings.BASE_DIR)
 
-# Wohin der Produktionscode jeder App zeigen darf (ADR-0016, ADR-0037). Die
+# Wohin der Produktionscode jeder App zeigen darf (ADR-0055, ADR-0037). Die
 # Tabelle ist die Kantenrichtung: Eine Kante hinzuzufügen ist eine Aussage über
 # die Architektur und gehört in ein ADR, nicht nur hierher. `konten` und
 # `config` zeigen auf keine App; `texte` ist Querschnitt und zeigt nur auf
@@ -122,7 +122,7 @@ def test_jede_app_steht_in_der_kantentabelle() -> None:
 
 @pytest.mark.parametrize("app", sorted(_KANTEN))
 def test_app_zeigt_nur_entlang_der_kantentabelle(app: str) -> None:
-    """Keine Kante gegen die Richtung aus ADR-0016, auch keine zyklische."""
+    """Keine Kante gegen die Richtung aus ADR-0055, auch keine zyklische."""
 
     quellen: list[Path] = _quellen(app, mit_tests=False)
     verboten: set[str] = _projekt_apps() - _KANTEN[app] - {app}

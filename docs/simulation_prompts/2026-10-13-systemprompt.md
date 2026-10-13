@@ -1,6 +1,6 @@
 # Entwurf eines Simulationskerns für native Gesprächsschritte (#466)
 
-Entwurf für die nächste Kern-Fassung, von Grund auf für die Nachrichtenordnung aus ADR-0052 und ADR-0054 geschrieben. Die Denkspur ist hier Regieperspektive (ADR „Denkspur ist Regieperspektive“). Der Entwurf kommt wie jede Kern-Fassung über die Kern-Verwaltung in eine Instanz: Entwurf aus der finalen Fassung anlegen, die System-Prompt-Vorlage unten einsetzen, die User-Prompt-Vorlage leer lassen, im Probelauf prüfen, finalisieren.
+Entwurf für die nächste Kern-Fassung, von Grund auf für die Nachrichtenordnung aus ADR-0052 und ADR-0062 geschrieben. Die Denkspur ist hier Regieperspektive (ADR-0063). Der Entwurf kommt wie jede Kern-Fassung über die Kern-Verwaltung in eine Instanz: Entwurf aus der finalen Fassung anlegen, die System-Prompt-Vorlage unten einsetzen, die User-Prompt-Vorlage leer lassen, im Probelauf prüfen, finalisieren.
 
 ## Überarbeitung vom 2026-10-13
 
@@ -8,7 +8,7 @@ Gegenüber dem ersten Wurf desselben Tages:
 
 1. **Denkspur als Regieperspektive** ausdrücklich gemacht: `<rolle>` trennt Äusserung (in der Rolle) und Denkspur (Regie), `<ausgabe>` benennt es.
 2. **Negationen zurückgebaut.** Die Liste verbotener Formulierungen («mein Fehler ist», «ich verwechsle» …) ist weg; stattdessen trägt der positive Satz „so, wie jemand spricht, der überzeugt ist, richtig vorzugehen“. Verbote stehen nur noch dort, wo kein positives Ziel formulierbar war.
-3. **«Ton:»** fragt nur noch „Wie klingt das für die Klassenstufe?“. Die frühere Fassung liess pro Zug die zu vermeidenden Fachwörter aufschreiben; seit ADR-0054 stünden sie damit im Verlauf.
+3. **«Ton:»** fragt nur noch „Wie klingt das für die Klassenstufe?“. Die frühere Fassung liess pro Zug die zu vermeidenden Fachwörter aufschreiben; seit ADR-0062 stünden sie damit im Verlauf.
 4. **Gedächtnis-Regel** und die Regel für Fragen abseits der Aufgabe stehen in `<situation>`; `<rollenschutz>` enthält nur den Rollenbruch (Befund aus #466 zur undichten Nachbarschaft).
 5. **Eine Quelle je Bedeutung.** Stabilität der Denkweise, „ein Schritt pro Äusserung“ und die Sprache der Klassenstufe stehen je einmal in `<denkweise>` beziehungsweise `<sprache>`; `<reaktion_auf_hinweise>` und `<ausgabe>` bauen darauf auf, statt es zu wiederholen.
 6. **Leitwort „Schritt“** ist in `<denkweise>` definiert.

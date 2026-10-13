@@ -8,7 +8,7 @@ App übertragen.
 
 Autor:innen schreiben **keine** Prompts: System-Prompt, User-Prompt und
 Rahmenhandlung kommen aus dem **Simulationskern** und sind für alle Vignetten und
-alle Fächer identisch (ADR-0004, ADR-0010). Der Assistent liefert deshalb
+alle Fächer identisch (ADR-0004, ADR-0054). Der Assistent liefert deshalb
 ausschließlich Inhaltsfelder.
 
 ## Dateien

@@ -742,7 +742,7 @@ class ModellvorschlaegeEndpunktTests(TestCase):
             )
 
     def test_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
-        """Der Abruf hängt an derselben Rolle wie die Seite (ADR-0033)."""
+        """Der Abruf hängt an derselben Rolle wie die Seite (ADR-0039)."""
         self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
         response: HttpResponse = self.client.post(
@@ -802,7 +802,7 @@ class ModellvorschlaegeEndpunktTests(TestCase):
         self.assertNotContains(response, "id_sprachmodell")
 
     def test_holt_infomaniaks_liste_allein_mit_dem_getippten_token(self) -> None:
-        """Beim Anlegen gibt es weder gespeichertes Token noch Basis-URL (ADR-0036)."""
+        """Beim Anlegen gibt es weder gespeichertes Token noch Basis-URL (ADR-0056)."""
         with patch("simulation.modellverzeichnis.httpx.Client") as httpx_client:
             httpx_client.return_value.get.return_value.json.return_value = {
                 "result": "success",

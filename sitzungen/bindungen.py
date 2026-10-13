@@ -2,7 +2,7 @@
 
 Trainingsbindung und Abschrift tragen ein Nutzerkonto, die Erhebungsbindung ein
 Teilnahme-Token. Beide Arten zeigen mit einer 1:1-Beziehung auf eine Teilnahme —
-zeigten sie auf dieselbe, wäre Konto ↔ Token ein Join über zwei Kanten. ADR-0018
+zeigten sie auf dieselbe, wäre Konto ↔ Token ein Join über zwei Kanten. ADR-0058
 nennt diese Verknüpfung nicht ausdrückbar; ausdrückbar ist sie sehr wohl, nur
 schreibt sie niemand. Hier wird sie abgewiesen: beim Anlegen, beim Ändern und
 beim Schreiben in Mengen.

@@ -9,6 +9,7 @@ Außerhalb von Sandcastle vor jedem Commit: `uv run pytest`, `uv run ruff format
 ## Agent skills
 
 - **Domain docs**: terminology in GLOSSARY.md, decisions in docs/adr/ (single-context). See docs/agents/domain.md.
+- **Writing or changing an ADR**: follow docs/adr/README.md; it overrides the domain-modeling skill's ADR-FORMAT.md.
 - **Issue tracker**: GitHub issues via `gh`. See docs/agents/issue-tracker.md.
 - **Triage labels**: canonical names plus `Spec`. See docs/agents/triage-labels.md.
 - **Image generation**: framing-story illustrations (`static/images/session/`) via the quota-limited `agy` CLI. See docs/agents/image-generation.md.

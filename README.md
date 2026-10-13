@@ -222,9 +222,9 @@ man vorher wissen muss:
 Ein Gesprächsschritt wartet synchron auf das Sprachmodell, eine Transkription
 auf ihren Anbieter; jede wartende Anfrage hält einen Thread. Der gunicorn-Dienst
 läuft deshalb mit Thread-Workern, ausgelegt auf 150 gleichzeitige Sitzungen
-(Aufteilung im Walkthrough, Begründung in ADR-0050). Beide Nähte begrenzen sich
-selbst: ein Gesprächsschritt auf höchstens 90 s über alle Versuche, eine
-Transkription auf höchstens 120 s.
+(Aufteilung im Walkthrough). Beide Nähte begrenzen sich selbst: ein
+Gesprächsschritt auf höchstens 90 s über alle Versuche, eine Transkription auf
+höchstens 120 s.
 
 Daneben läuft ein zweiter supervisord-Dienst, `manage.py evallaeufe_abarbeiten`.
 Er arbeitet die Evalläufe ab, die Autor:innen an ihren Vignetten starten, einen

@@ -4,6 +4,6 @@ from django.apps import AppConfig
 
 
 class EvalsConfig(AppConfig):
-    """Evallauf, Evalgespräch und Urteil; nichts zeigt auf diese App (ADR-0016)."""
+    """Evallauf, Evalgespräch und Urteil; nichts zeigt auf diese App (ADR-0055)."""
 
     name = "evals"

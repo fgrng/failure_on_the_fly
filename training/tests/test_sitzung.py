@@ -130,7 +130,7 @@ class TrainingssitzungTests(TestCase):
         self.assertEqual(Sitzung.objects.get().modell_konfiguration, self.konfiguration)
 
     def test_training_spielt_eine_vignette_mit_ueberholtem_kern(self) -> None:
-        """Gespielt wird, worauf gepinnt wurde (ADR-0003) — auch überholt."""
+        """Gespielt wird, worauf gepinnt wurde (ADR-0040) — auch überholt."""
 
         self._sitzung_starten([], kern_ueberholen=True)
 

@@ -2,7 +2,7 @@
 
 Was hier entsteht, ist ein Vorschlag und keine Gültigkeitsaussage: Die prüfende
 Instanz bleibt der Probelauf (ADR-0014), die einzige Prüfung am Modellnamen
-seine Anbieterbindung (ADR-0036).
+seine Anbieterbindung (ADR-0056).
 """
 
 from collections.abc import Iterable
@@ -125,7 +125,7 @@ def _alphabetisch(vorschlaege: Iterable[Modellvorschlag]) -> list[Modellvorschla
 
 # An welcher Naht der eingesetzte Wert das Anbieterpräfix trägt. Die
 # Sprachmodell-Naht läuft über LiteLLM, das die Anbieterbindung am Namen liest
-# (ADR-0036); die Transkription reicht den Namen roh an die Route des Anbieters
+# (ADR-0056); die Transkription reicht den Namen roh an die Route des Anbieters
 # durch, wo ein Präfix ein unbekanntes Modell wäre.
 _NAHT_MIT_PRAEFIX: frozenset[str] = frozenset({Naht.SPRACHMODELL})
 

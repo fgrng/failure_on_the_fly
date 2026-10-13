@@ -1,4 +1,4 @@
-"""Lebenszyklus versionierter Fassungen: Entwurf, final, überholt (ADR-0035).
+"""Lebenszyklus versionierter Fassungen: Entwurf, final, überholt (ADR-0040).
 
 Ein Artefakt mit eigener Linie erbt von `VersionierteFassung`, trägt selbst
 seine Historie als Fremdschlüssel `historie`, seine Inhaltsfelder, seinen

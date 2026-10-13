@@ -1,7 +1,7 @@
 """Tests der Exklusivität von konto-tragender und pseudonymer Bindung.
 
 Sie liegen in `training`, weil nur diese App beide Seiten kennen darf: Die Kante
-zeigt von `training` nach `erhebungen` und nie umgekehrt (ADR-0043).
+zeigt von `training` nach `erhebungen` und nie umgekehrt (ADR-0058).
 """
 
 import pytest

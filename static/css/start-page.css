@@ -1,5 +1,5 @@
 /* Startseite: Aussage links, Rollenspalten rechts.
-   Nur hier geladen (start.html); Farben nach Bereich aus tokens.css (ADR-0024). */
+   Nur hier geladen (start.html); Farben nach Bereich aus tokens.css (ADR-0060). */
 
 .welcome {
     display: grid;

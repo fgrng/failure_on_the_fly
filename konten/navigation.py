@@ -95,7 +95,7 @@ def navigation(request: HttpRequest) -> dict[str, bool]:
         "zeige_entwicklung": administration or AUTORIN_GRUPPE in rollen,
         "zeige_ausbildung_kuratieren": administration or AUSBILDERIN_GRUPPE in rollen,
         "zeige_teilnahme": not rollen and not administration,
-        # Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0043): Wer ein
+        # Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0058): Wer ein
         # Teilnahme-Token hat, holt sie sich — unabhängig von den Rollen des Kontos.
         "zeige_abschriften": True,
         "zeige_forschung": administration or FORSCHENDE_GRUPPE in rollen,

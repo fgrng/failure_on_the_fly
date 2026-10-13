@@ -1,10 +1,29 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0059, "#364"]
 ---
 
 # Der Eigentümer-Kreis ist eine gemeinsame Basis in `konten`
 
-Der Eigentümer-Kreis aus ADR-0022 und ADR-0032 wird **ein** Gegenstand: ein
+> **Nachgeführt durch ADR-0059, #364:**
+>
+> *ADR-0059:* Der Abschnitt „Nebenläufigkeit" unten ist in ADR-0059
+> aufgegangen; dort steht die Regel für das ganze Projekt. Die Aussage,
+> `select_for_update()` sei auf SQLite wirkungslos und der Austritt verlasse
+> sich auf `atomic()` mit sofortiger Schreibsperre, gilt unverändert.
+>
+> *#364:* Auch die Views sind gemeinsam. „Eigentümerin hinzufügen“ und
+> „Eigentümerin entfernen“ existieren einmal, in
+> `konten/eigentuemer_views.py` (aus dem Architektur-Review #255);
+> `eigentuemer_views()` baut das Paar, und jede Bestands-App bindet es mit
+> dem ein, was sich wirklich unterscheidet: ihrer Rollenprüfung, einer
+> Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg
+> liefert (bei Vignette und Fragebogen-Item trägt die Historie den Kreis),
+> und ihrer Liste als Ziel nach dem Selbstaustritt. Die Kante zeigt weiter von
+> den Apps auf `konten`; eine gemeinsame Lebenszyklus-Hülle folgt daraus
+> nicht, ADR-0040 gilt fort.
+
+Der Eigentümer-Kreis aus ADR-0039 wird **ein** Gegenstand: ein
 abstraktes Modell `EigentuemerKreis` samt einem QuerySet-Mixin im Modul
 `konten/eigentuemerschaft.py`. Von ihm erben die vier eigentümer-tragenden
 Bestände — Vignettenhistorie, Fragebogen-Item-Historie, Training und Erhebung.
@@ -16,14 +35,14 @@ Eigentümerin. Mehr nicht.
 
 Fachlich ändert sich nichts: Alle Eigentümerinnen bleiben gleichrangig,
 Eigentümerschaft bleibt alles-oder-nichts je Objekt, eine Übertragungs-Operation
-entsteht nicht (ADR-0032).
+entsteht nicht (ADR-0039).
 
-## Die Abgrenzung gegen ADR-0017
+## Die Abgrenzung gegen ADR-0040
 
-ADR-0017 verwirft eine gemeinsame Basis über die versionierten Artefakte und
+ADR-0040 verwirft eine gemeinsame Basis über die versionierten Artefakte und
 sagt voraus: „Ein späterer Architektur-Review wird die gemeinsame Basis erneut
 vorschlagen … Dieser ADR ist die Antwort darauf." Genau so ein Review hat dieses
-Vorhaben ausgelöst. Es ist trotzdem nicht der Vorschlag, den ADR-0017 abgelehnt
+Vorhaben ausgelöst. Es ist trotzdem nicht der Vorschlag, den ADR-0040 abgelehnt
 hat — und der Unterschied liegt in der Achse.
 
 **Die Basis trägt den Eigentümer-Kreis und nichts sonst. Sie spannt quer zur
@@ -31,36 +50,36 @@ Lebenszyklus-Achse — zwei Historien und zwei Objekte, die gar keinen
 Lebenszyklus haben —, weshalb aus ihr niemals eine Lebenszyklus-Basis erwachsen
 kann.**
 
-ADR-0017 hätte drei Artefakte zusammengespannt, deren Zustandsautomaten sich
+ADR-0040 hätte drei Artefakte zusammengespannt, deren Zustandsautomaten sich
 absehbar auseinanderentwickeln; jede Abweichung wäre später als Flaggenfeld
 durch die Basis gepresst worden. Hier ist es umgekehrt: Die vier
 Felddeklarationen sind heute **zeichengleich**, und ihre Erbinnen haben
 miteinander nichts gemein außer dem Kreis. Der Simulationskern — das dritte
-Artefakt aus ADR-0017 — erbt nicht: Er gehört der Administration und trägt
+Artefakt aus ADR-0040 — erbt nicht: Er gehört der Administration und trägt
 keinen Eigentümer-Kreis. Wer diese Basis um einen Zustand, ein `finalisiert_am`
 oder eine Vorgängerin erweitern wollte, müsste sie zwei Erbinnen aufzwingen, die
-keine Fassungen sind. ADR-0017 bleibt unangetastet und gilt für seine Achse
+keine Fassungen sind. ADR-0040 bleibt unangetastet und gilt für seine Achse
 fort.
 
-Für den Rückweg gilt, was ADR-0017 selbst ausrechnet: Abstrakt geerbte Felder
+Für den Rückweg gilt, was ADR-0040 selbst ausrechnet: Abstrakt geerbte Felder
 landen in denselben Spalten derselben Tabellen. Die Extraktion hat keine
 Migration erzeugt (`makemigrations --check`: keine Änderungen), und das
 Zurücknehmen kostete ebenso wenig.
 
-Das Wort **Naht** wird hier bewusst vermieden. Nach ADR-0016 ist eine Naht ein
-Austauschpunkt mit mindestens zwei Adaptern; davon gibt es weiterhin genau zwei,
-das Sprachmodell und den Sink. Hier wird nichts ausgetauscht.
+Das Wort **Naht** wird hier bewusst vermieden. Nach ADR-0055 ist eine Naht ein
+Austauschpunkt mit mindestens zwei Adaptern; die Nähte sind dort benannt. Hier
+wird nichts ausgetauscht.
 
 ## Der Ort ist `konten`
 
 Die Basis wohnt in `konten`, weil der Eigentümer-Kreis ein Kreis von Konten ist
 und alle vier Bestands-Apps ohnehin auf `konten` zeigen. Die Kantenrichtung aus
-ADR-0016 lautet Apps → `konten`; die Basis fügt keine neue Kante hinzu, sie
+ADR-0055 lautet Apps → `konten`; die Basis fügt keine neue Kante hinzu, sie
 benutzt die vorhandene.
 
-Damit führt dieser ADR **ADR-0016 in einem Punkt nach**: Die Gegenkante
+Damit führt dieser ADR **den App-Graphen in einem Punkt nach**: Die Gegenkante
 entfällt. `konten` importiert keine Modelle der vier Bestands-Apps mehr (siehe
-den Löschpfad unten), womit der Graph wieder azyklisch ist, wie ADR-0016 ihn
+den Löschpfad unten), womit der Graph wieder azyklisch ist, wie ADR-0055 ihn
 beschreibt.
 
 ## Zwei Invarianten für zwei Anlässe
@@ -74,7 +93,7 @@ verschiedene Aufrufer; es entsteht kein Parameter, der zwischen ihnen umschaltet
   nicht bei einem archivierten Bestand. Ein archivierter Bestand ist
   entarchivierbar und wäre danach aktiv und eigentümerlos.
 - **Kontolöschung** ist **archivierungsabhängig**: Ein archivierter Bestand
-  blockiert die Löschung eines Kontos nicht. ADR-0032 erlaubt eigentümerlose
+  blockiert die Löschung eines Kontos nicht. ADR-0039 erlaubt eigentümerlose
   archivierte Erhebungen ausdrücklich — und muss es, denn sonst gäbe es für die
   letzte Eigentümerin überhaupt keinen Weg: Austragen kann sie sich nicht.
 
@@ -82,7 +101,7 @@ verschiedene Aufrufer; es entsteht kein Parameter, der zwischen ihnen umschaltet
 angehört. Sie steht auf `True`; die Vignettenhistorie überschreibt sie über
 `archiviert`, die Erhebung über `Status.ARCHIVIERT`. Training und
 Fragebogen-Item-Historie kennen keine Stilllegung und erben das Ja — für
-Training hält ADR-0032 das ausdrücklich fest.
+Training hält ADR-0039 das ausdrücklich fest.
 
 ## Der Löschpfad läuft über die Modellregistrierung
 
@@ -98,7 +117,7 @@ Bestand deshalb selbst aus, die Basis hält nur einen neutralen Fallback.
 
 Das ist **bewusste Django-Introspektion, kein Trick**. Es wird hier und im Code
 benannt, weil eine Registry-Iteration sonst als Zauberei gelesen wird. Sie kauft
-dreierlei: Die Gegenkante nach ADR-0016 verschwindet, die bisher vergessene
+dreierlei: Die Gegenkante im App-Graphen verschwindet, die bisher vergessene
 Fragebogen-Item-Historie ist ohne eigenen Handgriff abgedeckt, und ein künftiges
 fünftes eigentümer-tragendes Modell ist am Tag seiner Einführung mitgeschützt —
 statt am Tag, an dem jemand den Fehler bemerkt.
@@ -117,7 +136,7 @@ Empfänger auf dem Konto der Weg.
 
 ## Nebenläufigkeit: `atomic()`, kein `select_for_update()`
 
-Das Projekt läuft auf SQLite (ADR-0016). Djangos SQLite-Backend meldet
+Das Projekt läuft auf SQLite (ADR-0059). Djangos SQLite-Backend meldet
 `has_select_for_update = False`, und der SQL-Compiler erzeugt die Klausel nur,
 wenn das Backend sie unterstützt: **`select_for_update()` erzeugt hier kein SQL
 und keinen Fehler — es tut schlicht nichts.** Serialisiert wird über die
@@ -139,13 +158,13 @@ einmal existiert.
 
 - **Vier weiterhin eigenständige Implementierungen** — verworfen. Der Preis war
   bereits fällig: Die Fragebogen-Item-Historie fehlte im Löschschutz, ihr
-  Austritt lief ohne Transaktion und ohne Redirect. Anders als bei ADR-0017 gibt
+  Austritt lief ohne Transaktion und ohne Redirect. Anders als bei ADR-0040 gibt
   es hier keine absehbare Divergenz, die die Duplikation aufwöge.
 - **Ein konkretes Modell mit `GenericForeignKey` für die Eigentümerschaft** —
-  verworfen, aus demselben Grund wie in ADR-0017: echte Fremdschlüssel gegen
+  verworfen, aus demselben Grund wie in ADR-0040: echte Fremdschlüssel gegen
   polymorphen Zugriff einzutauschen, kostet Integrität und eine schwer
   umkehrbare Datenmigration.
-- **`django-guardian`** — bereits von ADR-0032 verworfen: Die Eigentümerschaft
+- **`django-guardian`** — bereits von ADR-0039 verworfen: Die Eigentümerschaft
   ist kein Rechte-Gitter, sondern uniform und alles-oder-nichts.
 - **Die Aufnahmeregel als Datenbank-Constraint oder `m2m_changed`-Signal** —
   verworfen. Die Rollenzugehörigkeit ist eine Regel an der Tür, kein
@@ -163,15 +182,15 @@ einmal existiert.
 
 ## Folgen
 
-- ADR-0022 und ADR-0032 sind fortgeführt: Der Kreis gleichrangiger
-  Eigentümerinnen ist nun nicht nur überall derselbe Begriff, sondern derselbe
-  Code. ADR-0019 bleibt gewahrt — die Sichtbarkeitsregel wohnt weiter am
-  QuerySet, nur an einer Stelle statt an vier.
-- ADR-0016 ist in einem Punkt nachgeführt: Die Gegenkante von `konten` in die
-  Bestands-Apps entfällt. Die Zahl der Nähte bleibt zwei.
-- ADR-0017 bleibt in Kraft. Diese Basis ist kein Präzedenzfall für eine
-  Lebenszyklus-Basis; wer eine vorschlägt, argumentiert gegen ADR-0017, nicht
-  mit diesem ADR.
+- ADR-0039 ist fortgeführt: Der Kreis gleichrangiger Eigentümerinnen ist nun
+  nicht nur überall derselbe Begriff, sondern derselbe Code. Die
+  Sichtbarkeitsregel wohnt weiter am QuerySet, nur an einer Stelle statt an
+  vier.
+- Der App-Graph (ADR-0055) ist in einem Punkt nachgeführt: Die Gegenkante von
+  `konten` in die Bestands-Apps entfällt. Die Nähte bleiben unverändert.
+- Die eigenständige Implementierung je Artefakt aus ADR-0040 bleibt in Kraft.
+  Diese Basis ist kein Präzedenzfall für eine Lebenszyklus-Basis; wer eine
+  vorschlägt, argumentiert gegen ADR-0040, nicht mit diesem ADR.
 - Der Austritt schweigt, wenn die Invariante greift, und meldet über seinen
   Rückgabewert nur, ob entfernt wurde. Die Oberfläche zeigt die
   Entfernen-Schaltfläche ohnehin erst ab zwei Eigentümerinnen; der Fall entsteht
@@ -182,19 +201,3 @@ einmal existiert.
   Löschschutz und Vertragstest aufgenommen. Wer stattdessen ein eigenes M2M-Feld
   deklariert, fällt aus allen dreien heraus, ohne dass etwas rot wird — das ist
   die verbleibende Bruchstelle.
-
-## Nachtrag (2026-10): auch die Views sind gemeinsam
-
-Die Views „Eigentümerin hinzufügen“ und „Eigentümerin entfernen“ existieren
-einmal, in `konten/eigentuemer_views.py` (#364, aus dem Architektur-Review
-#255). `eigentuemer_views()` baut das Paar; jede Bestands-App bindet es mit
-dem ein, was sich wirklich unterscheidet: ihrer Rollenprüfung, einer
-Auflösung, die das sichtbare Objekt lädt und dessen Kreis samt Rückweg liefert
-(bei Vignette und Fragebogen-Item trägt die Historie den Kreis, der Rückweg
-führt auf die Fassung), und ihrer Liste als Ziel nach dem Selbstaustritt.
-URLs, Rollenprüfungen und Rückwege sind unverändert.
-
-Die Kante zeigt weiter von den Apps auf `konten`; der Importgraph-Wächter in
-`config/tests/test_importgraph.py` hält fest, dass `konten` keine andere App
-importiert. Eine gemeinsame Lebenszyklus-Hülle folgt daraus
-nicht: Sie ist in #255 ausdrücklich verworfen, ADR-0017 gilt fort.

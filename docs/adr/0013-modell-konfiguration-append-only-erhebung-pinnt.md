@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0056
 ---
 
 # Die Modell-Konfiguration ist append-only; die Erhebung pinnt sie bei Aktivierung
@@ -22,14 +23,8 @@ Die **Erhebung** pinnt die aktive Modell-Konfiguration bei ihrer Aktivierung. Da
 
 Der Kern kann diesen Pin nicht tragen: Die Modell-Konfiguration hängt ausdrücklich **nicht** an der Vignette, weil sie eine Betriebsgröße ist (ADR-0004). Ohne Pin an der Erhebung würde sie beim Sitzungsstart aufgelöst, und eine Administrator:in könnte mitten in einer laufenden Erhebung das Modell wechseln, weil der Anbieter das alte abkündigt oder es zu teuer wird. Die ersten dreißig Teilnahmen liefen dann auf einem Modell, die letzten zwanzig auf einem anderen. Die Datenspur wüsste es, aber die Erhebung wäre zerschnitten.
 
-## Consequences
+## Folgen
 
 - Wird ein Modell abgekündigt, während eine Erhebung läuft, muss jemand eingreifen und die Erhebung umstellen oder abschließen. Ein sichtbarer, entscheidbarer Vorgang statt eines stillen Bruchs.
 - Die Frage „welche Konfigurationen gab es je?" bleibt beantwortbar, und zwei Sitzungen sind über Fremdschlüssel vergleichbar statt über einen Textvergleich eingebetteter Werte.
 - Der Begriff „Fassung" aus dem Glossar meint bei der Modell-Konfiguration einen append-only Datensatz, bei den drei versionierten Artefakten eine Fassung mit Lebenszyklus.
-
-## Nachführung (Grilling, Issue #285): ein Zeiger je Verwendung, eine Bezeichnung
-
-Aus „genau eine ist aktiv“ wird **„genau eine je Verwendung“**. Die Zeigertabelle trägt statt der einen Singleton-Zeile eine Zeile je **Verwendung** — *Schüler:in*, *Lehrperson*, *Bewerter* —, und die Unique-Spalte wechselt vom konstanten Singleton-Feld zur Verwendung. Die Evals (ADR-0046) sollen simulierte Lehrperson und Bewerter mit anderen Modellen und Anbietern betreiben können als die Simulation; ein Bewerter auf demselben Modell wie die Geprüfte urteilt befangen. Was sich unterscheidet, ist die Verwendung, nicht das Ding — deshalb ein Zeiger mehr statt eines neuen Artefakts. Dieselbe Konfiguration darf mehreren Verwendungen dienen. Die bestehende aktive Konfiguration wird zur *Schüler:in*; alles, was hier über den Pin der Erhebung steht, meint diese Verwendung.
-
-Die Konfiguration selbst bleibt append-only. Sie bekommt eine **Bezeichnung**, beim Anlegen vergeben und danach unveränderlich wie alles an ihr, damit sie sich in drei Auswahlen wiederfinden lässt. Die Datenspur pinnt weiter per Fremdschlüssel.

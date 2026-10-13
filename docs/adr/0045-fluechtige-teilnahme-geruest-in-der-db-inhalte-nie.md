@@ -36,7 +36,7 @@ Das Gerüst ist technische Ablaufdaten im Sinne des Systemtexts zu c: welche
 Vignetten in welcher Reihenfolge wie lange gespielt wurden. Es wird normal
 exportiert (ADR-0029) und weder nachträglich reduziert noch gesperrt.
 
-## Considered Options
+## Erwogene Optionen
 
 - **Ganz in der Session, wie der Probelauf** — verworfen: Der Ablauf, der
   Wiedereinstieg per Token und der Export des Rücklaufs hängen an der DB.
@@ -51,7 +51,7 @@ exportiert (ADR-0029) und weder nachträglich reduziert noch gesperrt.
   Abfragen `Teilnahme.fluechtig_q`. Eine andere Formulierung der Regel gibt es
   nicht.
 
-## Consequences
+## Folgen
 
 - Das Sitzungssenken-Protokoll hat nun drei Adapter; die Zahl der Nähte bleibt
   gleich. `DBSink` und `FluechtigerSink` teilen Gerüst und Uhr über die

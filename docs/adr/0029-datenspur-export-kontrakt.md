@@ -1,8 +1,22 @@
 ---
-status: accepted
+status: amended
+amended-by: ["#278"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
+
+> **Nachgeführt durch #278:** Das Einwilligungstor einer Erhebung holt drei
+> Einwilligungen getrennt ein: Verarbeitung durch Sprachmodelle,
+> Spracherkennung und Speicherung für Forschungszwecke. `teilnahmen.csv` trägt
+> dafür `sprachmodell_eingewilligt`, `audioverarbeitung_eingewilligt` (in der
+> Oberfläche »Spracherkennung«) und `speicherung_eingewilligt`;
+> `einwilligung_erteilt` entfällt. Jede Spalte ist `True`, `False` oder `NA`;
+> `NA` heißt nicht entschieden oder, bei der Spracherkennung auf einer Instanz
+> ohne Transkription, nicht angeboten. So lassen sich »abgelehnt« und »nicht
+> gefragt« unterscheiden. Teilnahmen, die die Sprachmodelle abgelehnt haben,
+> erscheinen mit `False` und ohne Ziehung oder Sitzung. Der Export zeigt stets
+> den letzten Stand. Da noch keine Erhebung ausgeliefert war, war die
+> Formatänderung zulässig; die Tabelle unten zeigt den Stand danach.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
@@ -185,17 +199,3 @@ mehr rückwirkend sind, ist damit gewahrt.
   Bedarf über die Stichprobenspalte gruppieren.
 - Die vollständige Datenspur bleibt ohne Zugriff auf die Anwendungsdatenbank
   nachvollziehbar; Identitäten von Forschenden bleiben außerhalb des Exports.
-
-## Nachtrag: Drei Einwilligungsspalten statt `einwilligung_erteilt`
-
-Seit #278 holt das Einwilligungstor einer Erhebung drei Einwilligungen getrennt
-ein: Verarbeitung durch Sprachmodelle, Spracherkennung und Speicherung für
-Forschungszwecke. `teilnahmen.csv` trägt dafür `sprachmodell_eingewilligt`,
-`audioverarbeitung_eingewilligt` (in der Oberfläche »Spracherkennung«) und
-`speicherung_eingewilligt`; `einwilligung_erteilt` entfällt. Jede Spalte ist
-`True`, `False` oder `NA` — `NA` heißt nicht entschieden oder, bei der
-Spracherkennung auf einer Instanz ohne Transkription, nicht angeboten. So
-lassen sich »abgelehnt« und »nicht gefragt« unterscheiden. Teilnahmen, die die
-Sprachmodelle abgelehnt haben, erscheinen mit `False` und ohne Ziehung oder
-Sitzung. Der Export zeigt stets den letzten Stand. Da noch keine Erhebung
-ausgeliefert war, ist die Formatänderung zulässig.

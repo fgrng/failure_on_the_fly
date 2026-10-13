@@ -32,32 +32,14 @@ _Avoid_: Mentorin, Lehrkraft, Betreuerin
 Der Teil der Vignette, der den Gesprächsanlass liefert. Er gliedert sich in zwei gleich gebaute Teile: Lernauftrag und Arbeitsheft, jeweils bestehend aus Text, optionalem Bild, Bildbeschreibung und Simulationshinweisen.
 
 **Aufgabenkontextteil**:
-Einer der beiden gleich gebauten Teile des Aufgabenkontexts — der Lernauftrag oder das Arbeitsheft. Er trägt Text (zerlegt am Positionsmarker), Bild, Bildbeschreibung und Simulationshinweise und ist die Einheit, über die Anzeige, Vollständigkeitsprüfung und Prompt-Komposition arbeiten.
-_Avoid_: Kontextteil, Abschnitt, Block
+Einer der beiden gleich gebauten Teile des Aufgabenkontexts — der **Lernauftrag** (der Aufgabentext, den die simulierte Schüler:in bearbeitet hat) oder das **Arbeitsheft** (ihre abgetippte Bearbeitung). Er ist die Einheit, über die Anzeige, Vollständigkeitsprüfung und Prompt-Komposition arbeiten, und trägt vier Felder:
+- **Text**, für die Teilnehmer:in sichtbar; der Positionsmarker `[bild]` allein auf einer Zeile legt fest, wo das Bild erscheint, ohne Marker steht es unter dem Text.
+- **Bild**, optional, für die Teilnehmer:in sichtbar.
+- **Bildbeschreibung**, Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation; Pflicht, sobald ein Bild vorliegt.
+- **Simulationshinweise**, siehe eigener Eintrag.
 
-**Lernauftrag-Text**:
-Der Aufgabentext, den die simulierte Schüler:in bearbeitet hat. Mit dem Positionsmarker `[bild]` allein auf einer Zeile wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
-_Avoid_: Aufgabe, Auftrag, Übung
-
-**Lernauftrag-Bild**:
-Die optionale Abbildung zum Lernauftrag. Für Teilnehmer:in sichtbar.
-_Avoid_: Abbildung, Grafik, Lernauftragsbild
-
-**Lernauftrag-Bildbeschreibung**:
-Die textuelle Beschreibung dessen, was auf dem Lernauftrag-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation.
-_Avoid_: Bildtext, Bearbeitungsbeschreibung
-
-**Arbeitsheft-Text**:
-Der Textinhalt des Arbeitshefts der simulierten Schüler:in (die abgetippte Bearbeitung). Mit dem Positionsmarker `[bild]` allein auf einer Zeile wird festgelegt, an welcher Stelle das Bild erscheint; ohne Marker steht es unter dem Text. Für Teilnehmer:in sichtbar.
-_Avoid_: Schülerlösung, Lösung, Heft, Arbeitsheft-Inhalt
-
-**Arbeitsheft-Bild**:
-Die optionale Abbildung des Arbeitshefts der simulierten Schüler:in. Für Teilnehmer:in sichtbar.
-_Avoid_: Schülerarbeit, Heftseite, Abbildung
-
-**Arbeitsheft-Bildbeschreibung**:
-Die textuelle Beschreibung dessen, was auf dem Arbeitsheft-Bild zu sehen ist. Sie ist Alt-Text für Teilnehmer:innen und die textuelle Bildfassung für die Simulation.
-_Avoid_: Bearbeitungsbeschreibung
+Die Felder heißen nach ihrem Teil: Lernauftrag-Text, Arbeitsheft-Bild, Arbeitsheft-Bildbeschreibung.
+_Avoid_: Kontextteil, Abschnitt, Block; für die Felder: Aufgabe, Übung, Schülerlösung, Lösung, Heft, Abbildung, Grafik, Bildtext
 
 **Simulationshinweise**:
 Zusätzliche fachdidaktische oder verhaltensbezogene Hinweise zum Lernauftrag oder Arbeitsheft ausschließlich für die Simulation. Sie erreichen keinen Prompt der Teilnehmer:in und sind für diese nicht sichtbar.
@@ -117,14 +99,18 @@ _Avoid_: Diagnoseurteil, Befund, Einschätzung, Bewertung
 Der in Text überführte Verlauf des Diagnosegesprächs einer Sitzung. Es ist die alleinige Quelle der Wahrheit; Audio wird nicht aufbewahrt.
 _Avoid_: Protokoll, Chatverlauf, Mitschrift
 
+**Einwilligung**:
+Die Zustimmung der Teilnehmer:in, dass ihr Audio zur Transkription an den externen Anbieter geht. Sie wird je Teilnahme im Teilnahmefluss erteilt und gespeichert; ohne sie steht nur die Tastatureingabe zur Verfügung. Der Probelauf kennt keine Einwilligung, weil dort keine pseudonyme Teilnehmer:in spricht (ADR-0026).
+_Avoid_: Consent, Zustimmung, Opt-in
+
 ## Simulationsablauf
 
 **Anbieter**:
-Der Dienst, der eine Naht nach außen bedient — eine feste Auswahl aus `fake`, `openrouter` und `infomaniak` (ADR-0036). Aus ihm folgt, welches Präfix der Modellname trägt, ob Basis-URL und Token nötig sind und welche Stellschrauben in den Parametern erlaubt sind. Sprachmodell und Transkription wählen ihn je für sich; `fake` telefoniert nicht nach außen und braucht keine Zugangsdaten.
+Der externe Dienst hinter dem Sprachmodell oder der Transkription — eine feste Auswahl aus `fake`, `openrouter` und `infomaniak` (ADR-0056). Aus ihm folgt, welches Präfix der Modellname trägt, ob Basis-URL und Token nötig sind und welche Stellschrauben in den Parametern erlaubt sind. Sprachmodell und Transkription wählen ihn je für sich; `fake` telefoniert nicht nach außen und braucht keine Zugangsdaten.
 _Avoid_: Provider, Vendor, Backend, Hoster
 
 **Modell-Konfiguration**:
-Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036) — sowie eine Bezeichnung, unter der sie sich in den Auswahlen wiederfinden lässt. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; je Verwendung ist genau eine aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
+Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0056) — sowie eine Bezeichnung, unter der sie sich in den Auswahlen wiederfinden lässt. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; je Verwendung ist genau eine aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
 
 **Verwendung**:
@@ -132,16 +118,20 @@ Wofür eine Modell-Konfiguration aktiv ist: **Schüler:in** (Sitzungen, Probelä
 _Avoid_: Rolle — meint die Rechte eines Kontos; Zweck, Einsatz
 
 **Transkriptions-Konfiguration**:
-Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0036).
+Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0056).
 _Avoid_: Transkriptionseinstellungen, Whisper-Konfiguration, STT-Konfiguration
 
 **Modellvorschläge**:
-Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0036). Bei `fake` gibt es nichts abzurufen.
+Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0056). Bei `fake` gibt es nichts abzurufen.
 _Avoid_: Autovervollständigung, Autocomplete, Typeahead, Modellpicker, Modellauswahl — eine Auswahl schlösse aus, was hier nur vorgeschlagen wird.
 
 **Simulationskern**:
-Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
-_Avoid_: Prompt, Prompt-Vorlage, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
+Die zentrale, fach-agnostische Verhaltensspezifikation der Simulation: System-Prompt-Vorlage, User-Prompt-Vorlage und Rahmenhandlung. Er ist ein versioniertes Artefakt, und es gibt genau eine Kern-Historie für alle Vignetten und alle Fächer — aber mehrere Fassungen nebeneinander im Umlauf. Jede Vignettenfassung pinnt genau eine finale Kern-Fassung und spielt für immer gegen diese; ein Training oder eine Erhebung darf Vignetten mit verschiedenen gepinnten Kern-Fassungen mischen.
+_Avoid_: Prompt, Systemprompt, Engine — „ein Kern" meint eine Linie, nicht ein Objekt.
+
+**Prompt-Vorlage**:
+Eine der Textvorlagen einer Kern-Fassung — System-Prompt, User-Prompt sowie die drei Abschnitte der Rahmenhandlung —, aus der je Sitzung oder Gesprächsschritt der konkrete Text entsteht. Vorlagensprache ist `string.Template` (ADR-0020). Ihre **Platzhalter** (`$name`) sind benannte Leerstellen, die beim Rendern mit Vignetteninhalten gefüllt werden; welche es gibt, ist ein fester, im Code festgelegter Vertrag zwischen Vignette und Vorlage, den der Kern nicht erweitern kann (ADR-0054). Ein Platzhalter ist kein Positionsmarker: Der Marker `[bild]` steht innerhalb eines Platzhalterwerts (ADR-0054).
+_Avoid_: Template, Prompt, Variable, Slot
 
 **Arbeitskontext**:
 Der Aufgabenkontext, wie ihn die simulierte Schüler:in kennt: Lernauftrag, Arbeitsheft und deren Simulationshinweise. Er gehört zu ihrer Rolle, nicht zum Gespräch; was im Diagnosegespräch gesagt wurde, weiß sie zusätzlich.
@@ -152,7 +142,7 @@ Die im Code mitgeführte kanonische Erstfassung der fünf Inhaltsfelder des Simu
 _Avoid_: mitgelieferte Vorlagen, Standardvorlagen, Default-Kern, Seed-Kern, Werkseinstellung
 
 **Denkspur**:
-Die Regieperspektive der Simulation auf die nächste Äußerung: das interne Reasoning, das zu jeder Antwort der simulierten Schüler:in entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Sie darf Fachsprache nutzen und das Fehlermuster benennen; nur die Äußerung ist in der Rolle (ADR „Denkspur ist Regieperspektive“). Der Simulationskern verlangt sie. Im weiteren Diagnosegespräch kennt die simulierte Schüler:in ihre früheren Denkspuren (ADR-0054).
+Die Regieperspektive der Simulation auf die nächste Äußerung: das interne Reasoning, das zu jeder Antwort der simulierten Schüler:in entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Sie darf Fachsprache nutzen und das Fehlermuster benennen; nur die Äußerung ist in der Rolle (ADR-0063). Der Simulationskern verlangt sie. Im weiteren Diagnosegespräch kennt die simulierte Schüler:in ihre früheren Denkspuren (ADR-0062).
 _Avoid_: Chain-of-Thought, Reasoning, Gedankengang, Selbstgespräch, native Reasoning-Spur — das vom Modell selbst erzeugte Reasoning wird nicht aufbewahrt (ADR-0005).
 
 **Fehlversuch**:
@@ -164,7 +154,7 @@ Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwo
 _Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
 
 **Gesprächsbudget**:
-Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0012); es ist eine Obergrenze, kein Soll.
+Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0057); es ist eine Obergrenze, kein Soll.
 
 Wie weit eine Sitzung ihr Budget verbraucht hat, ist ihr **Budgetstand**: die Zahl der geglückten Gesprächsschritte oder die **verbrauchte Zeit**. Er gehört der Sitzung und überlebt einen Browserwechsel; die verbrauchte Zeit ist eine Größe der Datenspur. Bei Zeitbegrenzung misst die **Uhr** ausschließlich den **Zug** der Teilnehmer:in — die Zeit vom Anzeigen der Gesprächsseite bis zum Absenden ihrer Eingabe. Während die simulierte Schüler:in antwortet, steht die Uhr; Fehlversuche kosten keine Zeit. Bei schrittbasiertem Budget läuft keine Uhr: Dort wird die verbrauchte Zeit nicht gemessen, sondern bleibt null. Der laufende, noch nicht abgesendete Zug ist die **offene Spanne**; wer die Gesprächsseite erneut aufruft, setzt sie neu an, ohne dass bereits verbrauchte Zeit verloren geht oder die Spanne dazugerechnet wird. Erschöpft sich das Budget während eines Gesprächsschritts, wird dieser zu Ende geführt.
 _Avoid_: Limit, Zeitlimit, Nachrichtenbudget, Timer, Countdown, Restzeit, Restbudget, Zeitstand — es gibt keinen Rest, den jemand sieht; Denkzeit, Bearbeitungszeit, Sitzungsdauer — die Uhr misst den Zug, nicht die Sitzung.
@@ -172,7 +162,11 @@ _Avoid_: Limit, Zeitlimit, Nachrichtenbudget, Timer, Countdown, Restzeit, Restbu
 ## Versionierung
 
 **Versioniertes Artefakt**:
-Ein Objekt, das den Lebenszyklus Entwurf → final → archiviert durchläuft und von einer Historie gruppiert wird. Vignette, Simulationskern, Fragebogen-Item und Evalkatalog sind versionierte Artefakte.
+Ein Objekt, das den Lebenszyklus Entwurf → final → archiviert durchläuft und von einer Historie gruppiert wird. Vignette, Simulationskern, Fragebogen-Item und Evalkatalog sind versionierte Artefakte; Modell-Konfiguration, Erhebung und Training sind es nicht (ADR-0040).
+
+**Fassung**:
+Die einzelne Ausprägung eines versionierten Artefakts, die genau einen Zustand trägt: Entwurf, final oder archiviert. Eine Historie besteht aus Fassungen; jede außer der ersten referenziert ihre Vorgängerin. Der Begriff gilt für alle Artefakte gleich: Vignettenfassung, Kern-Fassung, Item-Fassung. Ohne Zusatz meint „Vignette" die Fassung, nicht die Identität über Fassungen hinweg — die heißt Vignettenhistorie. Was ein Training, eine Erhebung oder eine Sitzung einbindet und pinnt, ist immer eine Fassung (ADR-0040).
+_Avoid_: Version, Revision, Stand, Variante
 
 **Entwurf**:
 Der veränderliche Zustand eines versionierten Artefakts. Nur Entwürfe sind bearbeitbar, und nur sie sind physisch löschbar.
@@ -183,13 +177,13 @@ Der unveränderliche Zustand eines versionierten Artefakts. Nur finale Fassungen
 _Avoid_: veröffentlicht, publiziert, freigegeben — Vignetten sind privat, es gibt nichts zu veröffentlichen.
 
 **Archiviert**:
-Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar: Sie startet keine neue Sitzung und keinen Probelauf mehr, ein bereits laufender Probelauf läuft weiter. Aus jeder Datenspur heraus bleibt sie lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar. Beim Simulationskern und beim Evalkatalog heißt derselbe Zustand **überholt**: Dort entsteht er nur als Nebenwirkung des Finalisierens der Nachfolgerin und ist nicht umkehrbar (ADR-0035, ADR-0046).
+Der zurückgenommene Zustand einer finalen Fassung. Sie ist nicht mehr einbindbar und nicht mehr spielbar: Sie startet keine neue Sitzung und keinen Probelauf mehr, ein bereits laufender Probelauf läuft weiter. Aus jeder Datenspur heraus bleibt sie lesbar. Das einzige Löschen, das finale Fassungen kennen; umkehrbar. Beim Simulationskern und beim Evalkatalog heißt derselbe Zustand **überholt**: Dort entsteht er nur als Nebenwirkung des Finalisierens der Nachfolgerin und ist nicht umkehrbar (ADR-0040, ADR-0046).
 _Avoid_: gelöscht, deaktiviert, zurückgezogen
 
 **Historie**:
 Das Objekt, das die sequenziell entstandenen Fassungen eines versionierten Artefakts zusammenfasst. Sie bleibt linear und trägt höchstens einen Entwurf. Entsteht automatisch und wird erst ab der zweiten Fassung sichtbar und benennbar.
 
-Der vollausgestattete Fall ist die **Vignettenhistorie**: Sie trägt einen Eigentümer-Kreis und ist als Ganzes archivierbar. Die **Fragebogen-Item-Historie** trägt ebenfalls einen Eigentümer-Kreis, ist aber nicht als Ganzes archivierbar. Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0035) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Ebenso namenlos ist die **Evalkatalog-Historie**: die einzige Linie des Evalkatalogs, ebenfalls mit genau einer finalen Fassung und allein in der Hand der Administration. Was alle vier teilen, ist der Zustandsautomat, nicht die Ausstattung.
+**Vignettenhistorie** und **Fragebogen-Item-Historie** tragen je einen Eigentümer-Kreis und sind als Ganzes archivierbar: Das archiviert alle Fassungen und löscht den offenen Entwurf (ADR-0040). Die **Simulationskern-Historie** ist namenlos: Der Kern ist eine einzige Linie — ein partieller Unique-Index lässt je Historie nur eine finale Fassung zu (ADR-0040) —, gehört der Administration und braucht keinen Namen, um Historien voneinander zu unterscheiden. Ebenso namenlos ist die **Evalkatalog-Historie**: die einzige Linie des Evalkatalogs, ebenfalls mit genau einer finalen Fassung und allein in der Hand der Administration. Was alle vier teilen, ist der Zustandsautomat, nicht die Ausstattung.
 _Avoid_: Familie, Reihe, Strang, Lineage
 
 ## Anlässe für Sitzungen
@@ -203,8 +197,8 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, gena
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Abschrift**:
-Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
-_Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0058). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
+_Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0058 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
 Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten in einer empfohlenen Reihenfolge, die Teilnehmende unabhängig davon in freier Reihenfolge und beliebig oft spielen. Die empfohlene Reihenfolge gehört zur Konfiguration des Trainings; anders als die Vignettenposition einer Erhebungssitzung hält sie nicht fest, was gespielt wurde, und Trainingssitzungen tragen keine Vignettenposition. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem die Trainingsteilnehmenden ihre Abschriften freigeben. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
@@ -235,7 +229,7 @@ Der stabile Zugangsweg zu genau einer Stichprobe. Er ist für alle Teilnehmenden
 _Avoid_: Einladungslink, Studienlink, Erhebungslink, Stichprobenlink
 
 **Teilnahme-Token**:
-Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0043).
+Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0058).
 _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 
 **Teilnahmekennung**:
@@ -331,8 +325,12 @@ _Avoid_: Fragebogenseite, Block, Formular
 
 ## Rollen
 
+**Konto**:
+Das Nutzerkonto einer Person auf der Instanz. Es trägt ihre Rollen als Groups, ist Mitglied in Eigentümer-Kreisen und muss physisch löschbar sein, weil es personenbezogene Daten trägt. Teilnehmende einer Erhebung haben keines; sie treten über ein Teilnahme-Token auf (ADR-0039).
+_Avoid_: User, Nutzer, Account, Benutzer
+
 **Eigentümer-Kreis**:
-Die Menge gleichrangiger Konten, denen ein fachlicher Bestand gehört: eine Vignettenhistorie, eine Fragebogen-Item-Historie, ein Training oder eine Erhebung. Eigentümerschaft ist uniform und alles-oder-nichts je Objekt; bei Vignette und Fragebogen-Item hängt der Kreis an der Historie, bei Training und Erhebung am Objekt selbst (ADR-0032, ADR-0037). Ein Bestand ist sichtbar für seinen Kreis und die Administration, für niemanden sonst. Die Konten im Kreis heißen **Eigentümer:innen**. Ein aktiver Bestand hat mindestens eine Eigentümer:in; der **Austritt aus dem Kreis** ist für die letzte gesperrt. Eine Übertragung gibt es nicht, nur Aufnehmen und Austreten. **Ko-Autorschaft** ist der Weg in den Kreis, kein Synonym: Wer aufgenommen wird, ist Ko-Autor:in und damit Eigentümer:in (ADR-0022).
+Die Menge gleichrangiger Konten, denen ein fachlicher Bestand gehört: eine Vignettenhistorie, eine Fragebogen-Item-Historie, ein Training oder eine Erhebung. Eigentümerschaft ist uniform und alles-oder-nichts je Objekt; bei Vignette und Fragebogen-Item hängt der Kreis an der Historie, bei Training und Erhebung am Objekt selbst (ADR-0039, ADR-0037). Ein Bestand ist sichtbar für seinen Kreis und die Administration, für niemanden sonst. Die Konten im Kreis heißen **Eigentümer:innen**. Ein aktiver Bestand hat mindestens eine Eigentümer:in; der **Austritt aus dem Kreis** ist für die letzte gesperrt. Eine Übertragung gibt es nicht, nur Aufnehmen und Austreten. **Ko-Autorschaft** ist der Weg in den Kreis, kein Synonym: Wer aufgenommen wird, ist Ko-Autor:in und damit Eigentümer:in (ADR-0039).
 _Avoid_: Ko-Eigentümerin, Besitzerin, Inhaberin, Owner; Mitglied, Kreismitglied; Austritt (unqualifiziert)
 
 **Teilnehmer:in**:
@@ -355,8 +353,3 @@ _Avoid_: Wissenschaftler, Studienleiter
 Wer die Instanz betreibt, Nutzer und Rollen verwaltet, die Modell- und die Transkriptions-Konfiguration setzt und als Einzige den Simulationskern pflegt. Technisch ist sie ein Django-Superuser, keine Group.
 _Avoid_: Admin, Betreiber
 
-## Architektur
-
-**Naht**:
-Eine Stelle, an der Verhalten ausgetauscht werden kann, ohne den umgebenden Code zu ändern. Sie wird nur eingezogen, wo mindestens zwei Adapter tatsächlich existieren.
-_Avoid_: Seam, Port, Interface, Abstraktionsschicht

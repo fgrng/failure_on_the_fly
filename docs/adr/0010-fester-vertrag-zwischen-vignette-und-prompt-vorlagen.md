@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0054
 ---
 
 # Fester Vertrag zwischen Vignette und Prompt-Vorlagen
@@ -39,7 +40,7 @@ Nicht jedes Feld der Nutzeransicht-Spalte wird in die Rahmenhandlung substituier
 
 Weil die Rahmenhandlung Fließtext für Menschen ist, braucht sie Grammatik, die rohe Feldwerte nicht liefern. Der Code berechnet aus dem Geschlecht **abgeleitete grammatische Formen** und stellt sie als eigene Platzhalter in `VERTRAG_RAHMEN` bereit (Anrede, Pronomen, Possessiv). `VERTRAG_RAHMEN` hat damit mehr Einträge als die Nutzeransicht-Spalte Zeilen. Jede neue grammatische Form ist eine Code-Änderung — dieselbe Aussage wie unten über neue Leerstellen, nur über Ableitungen statt über Felder.
 
-## Consequences
+## Folgen
 
 - Eine Kern-Fassung lässt sich nur finalisieren, wenn jede ihrer Vorlagen ausschließlich Platzhalter *ihrer* Menge verwendet — Prompt-Vorlagen aus `VERTRAG_PROMPT`, Rahmenhandlungs-Vorlagen aus `VERTRAG_RAHMEN`. Die Prüfung ist ein Teilmengen-Test (`get_identifiers()` ⊆ Menge) und ruft **kein** Modell auf — eine Invariante, die vom Wohlwollen eines externen Anbieters abhinge, wäre keine. Der Vertrag ist eine Obergrenze: Eine Vorlage darf jede Teilmenge verwenden; kein Platzhalter ist verpflichtend.
 - Jede der beiden Mengen steht an zwei Orten: im Code, der die Platzhalter bereitstellt, und in der Validierung, die sie prüft. Das sind zwei Listen an je zwei Orten, und jede muss eine bleiben.
@@ -65,7 +66,5 @@ Drei Präzisierungen, die die abgeleiteten Formen und die Akteure konkretisieren
 ## Nachführung (Grilling, Issue #285): `VERTRAG_EVAL` als dritte Menge
 
 Der Evalkatalog (ADR-0046) trägt zwei Vorlagen: die **Lehrperson-Vorlage** und die **Bewerter-Vorlage**. Sie schöpfen aus einer dritten, ebenso im Code festgelegten Menge, `VERTRAG_EVAL`: alle Felder aus `VERTRAG_PROMPT` mit derselben Umhüllung, dazu drei Werte, die der Evallauf berechnet — `$inputstrategie` (nur Lehrperson-Vorlage, die Anweisung des aktuellen Inputschritts), `$kriterium` (nur Bewerter-Vorlage) und `$verlauf` (beide). Den Verlauf rendert der Code je Empfänger: für den Bewerter mit Denkspuren, für die simulierte Lehrperson ohne — sie darf die Denkspur nicht durch eine falsch geschriebene Vorlage sehen. Die Referenzdiagnose bleibt draußen wie hier.
-
-> **Nachgeführt durch ADR-0052 (Nachrichtenrollen):** `VERTRAG_EVAL` gibt es nicht mehr; jede Vorlage hat ihre eigene Menge. `VERTRAG_LEHRPERSON` ist `VERTRAG_PROMPT` plus `$inputstrategie`, `VERTRAG_BEWERTER` ist `VERTRAG_PROMPT` plus `$kriterium` und `$verlauf` (mit Denkspuren). `$verlauf` gehört nicht mehr zum Vertrag der Lehrperson: Sie erhält das Gespräch als native Nachrichten ohne Denkspur, und Altvorlagen bekommen `$verlauf` als leeren Text.
 
 Inputäußerungen, Inputstrategien und Kriterien sind reiner Text ohne Platzhalter: Sie sind fach-agnostisch, und was vignettenspezifisch sein muss, holt sich die Lehrperson über ihre Vorlage. Das Finalisieren des Katalogs prüft die beiden Vorlagen mit demselben Teilmengen-Test wie hier, ohne Modellaufruf.

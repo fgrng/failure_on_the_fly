@@ -40,7 +40,7 @@ PROMPT_PLATZHALTER_MIT_UMGEBUNG: frozenset[str] = frozenset(
     }
 )
 # Die Werte, die der Evallauf selbst berechnet, ergänzen den Promptvertrag;
-# jede Vorlage des Evalkatalogs erhält nur ihren eigenen (ADR-0010).
+# jede Vorlage des Evalkatalogs erhält nur ihren eigenen (ADR-0054).
 VERTRAG_LEHRPERSON: frozenset[str] = VERTRAG_PROMPT | {"inputstrategie"}
 VERTRAG_BEWERTER: frozenset[str] = VERTRAG_PROMPT | {"kriterium", "verlauf"}
 VERTRAG_RAHMEN: frozenset[str] = frozenset(

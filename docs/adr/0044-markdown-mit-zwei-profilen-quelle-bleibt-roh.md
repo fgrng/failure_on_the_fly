@@ -1,8 +1,21 @@
 ---
-status: accepted
+status: amended
+amended-by: ["#270"]
 ---
 
 # Markdown mit zwei Profilen, Quelle bleibt roh
+
+> **Nachgeführt durch #270:** Eingerückte Codeblöcke gehören zum Umfang
+> beider Profile: Nach einer Leerzeile wird ein um vier Leerzeichen
+> eingerückter Block zu `<pre><code>` und behält seine Einrückung, damit sich
+> Rechenschritte im Arbeitsheft untereinander ausrichten lassen; umzäunte
+> Codeblöcke und Inline-Backticks erscheinen weiterhin wörtlich.
+> `mailto:`-Links öffnen nicht in neuem Tab, weil das Mailprogramm übernimmt;
+> sie tragen einen Briefumschlag statt des Pfeils und kündigen sich
+> Screenreadern als „E-Mail“ an. `texte.markdown.PROFILE` bündelt je
+> Profilname Renderfunktion und Markdown-Hinweis des Editors;
+> Vorschau-Endpunkt und Template-Tag `{% markdown_hinweis profil %}` lesen
+> daraus. `informationstext()` und `szenentext()` bleiben die Einstiegspunkte.
 
 Acht Textfelder, die Teilnehmer:innen zu sehen bekommen, werden als basales Markdown gelesen und serverseitig zu HTML gerendert. Das Rendermodul `texte/markdown.py` hat genau zwei Einstiegspunkte, `informationstext(quelle)` und `szenentext(quelle)`, und gleichnamige Template-Filter (`{% load texte %}`). Es liegt in der eigenen App `texte`, die nichts kennt und von allen Apps genutzt werden darf; sie ist ein Blatt wie `fragebogen_items` und keine Naht im Sinne von ADR-0016, denn es gibt nur eine Implementierung.
 
@@ -10,7 +23,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 
 **Die Quelle bleibt roh.** Gespeichert wird der Markdown-Text, wie er eingegeben wurde. Das Sprachmodell erhält ihn unverändert, der Datenspur-Export (ADR-0029) ebenso; gerendert wird erst im Template.
 
-## Considered Options
+## Erwogene Optionen
 
 - **`markdown-it-py` mit abgeschalteten Regeln und ohne Sanitizer** — gewählt. Der CommonMark-Parser escaped rohes HTML ab Werk; was nicht gewünscht ist, wird als Regel abgeschaltet. Sicherheit entsteht dadurch, dass unerwünschtes HTML gar nicht erst erzeugt wird, statt dass ein zweites Werkzeug es nachträglich entfernt.
 - **Python-Markdown plus Sanitizer (bleach/nh3)** — verworfen. Zwei Werkzeuge, deren Umfänge sich decken müssen; was der Sanitizer entfernt, sähen Forschende in der Vorschau nicht als Text, sondern gar nicht.
@@ -18,7 +31,7 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - **Rendern beim Speichern, HTML in der Datenbank** — verworfen. Prompt und Export bräuchten dann die Quelle zusätzlich, und eine Änderung am Umfang verlangte eine Migration aller Texte.
 - **Überschriften so ausgeben, wie sie geschrieben sind** — verworfen. Ein `#` als `h1` bräche die Gliederung der Seite; Forschende sollen die Seitengliederung nicht kennen müssen.
 
-## Consequences
+## Folgen
 
 - Wer Schülernotation mit `*`, `_`, führendem `-` oder `1.` wörtlich zeigen will, escaped sie mit Backslash.
 - In der Rahmenhandlung werden die Platzhalterwerte der Vignette vor dem Einsetzen (ADR-0020) mit Backslash vor jedem ASCII-Satzzeichen escaped (`texte.markdown.woertlich`); erst der gefüllte Text wird gerendert. So wirkt nur das Markdown des Kerns.
@@ -26,9 +39,3 @@ Der **Informationstext** gilt für Instruktions-, Einwilligungs- und Abschlusste
 - Gerenderte Texte stehen in `<div class="markdown-text">` mit eigenem Stylesheet (`static/css/markdown-text.css`), das sich per doppeltem Klassenselektor gegen Seitenregeln wie `.page-field h3` abschirmt.
 - `&`-Entitäten werden nicht aufgelöst, sondern erscheinen wörtlich.
 - Die Editor-Vorschau holt das Fragment von `texte:vorschau` (POST mit `quelle` und `profil`), statt in JavaScript zu rendern. Für die Rollenprüfung (Autor:in, Forschende:r, Administration) kennt `texte` dafür `konten`, die Infrastruktur aller Apps; Domänen-Apps kennt es weiterhin nicht.
-
-## Nachtrag (2026-09): Eingerückte Codeblöcke, E-Mail-Links, Profil-Register
-
-- **Eingerückte Codeblöcke gehören zum Umfang beider Profile.** Nach einer Leerzeile wird ein um vier Leerzeichen eingerückter Block zu `<pre><code>` und behält seine Einrückung; so lassen sich Rechenschritte im Arbeitsheft untereinander ausrichten. Umzäunte Codeblöcke und Inline-Backticks erscheinen weiterhin wörtlich.
-- **`mailto:`-Links öffnen nicht in neuem Tab.** Ein neuer Tab bliebe leer, weil das Mailprogramm übernimmt. Sie tragen statt des Pfeils einen Briefumschlag und kündigen sich Screenreadern als „E-Mail“ an; `https:`/`http:` bleiben wie beschrieben.
-- **Profil-Register.** `texte.markdown.PROFILE` bündelt je Profilname die Renderfunktion und den Markdown-Hinweis des Editors. Vorschau-Endpunkt und Template-Tag `{% markdown_hinweis profil %}` lesen daraus, statt den Profilnamen je für sich auszuwerten. `informationstext()` und `szenentext()` bleiben die Einstiegspunkte der Anzeige.

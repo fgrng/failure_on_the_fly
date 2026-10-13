@@ -32,7 +32,7 @@ strikt von hinten, nur Hinterköpfe erzwingen.
 
 ## Bereichs-Farbcodierung (Entscheidung)
 
-Erweitert ADR-0023 (Sekundärpalette war „angelegt, aber ungenutzt"). Belegt jetzt:
+Regeln in ADR-0060; die Sekundärpalette ist so belegt:
 
 | Bereich | Farbe |
 |---|---|
@@ -45,7 +45,7 @@ Erweitert ADR-0023 (Sekundärpalette war „angelegt, aber ungenutzt"). Belegt j
 **Entschieden:** Bereichsfarbe tönt nur das **Chrome** (Header, Kacheln, Badges); interaktive
 Grün-Akzente (Buttons, Links) bleiben überall konsistent. Visualisiert in `farbpalette.html`.
 
-Die konkrete Zuordnung und die Gelb-Sonderregel sind in `docs/adr/0024` festgelegt.
+Die konkrete Zuordnung und die Gelb-Sonderregel stehen als Kommentar an den Bereichs-Tokens in `static/css/tokens.css`; welche Seite in welchem Bereich liegt, sagt `templates/includes/sidebar.html`.
 
 ## Herstellung
 

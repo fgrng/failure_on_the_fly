@@ -193,7 +193,7 @@ class GeruestSink(ABC):
         eingabemodus: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0011)."""
+        """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0061)."""
 
         with transaction.atomic():
             self._abbruchschritt_ablegen(

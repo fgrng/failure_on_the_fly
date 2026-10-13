@@ -28,12 +28,12 @@ class EigentuemerKreisQuerySet[Bestand: "EigentuemerKreis"]:
 
 
 class EigentuemerKreis(models.Model):
-    """Der Kreis gleichrangiger Eigentümerinnen eines Bestands (ADR-0032).
+    """Der Kreis gleichrangiger Eigentümerinnen eines Bestands (ADR-0039).
 
     Die Basis trägt den Eigentümer-Kreis und nichts sonst. Sie spannt quer zur
     Lebenszyklus-Achse: Zwei ihrer Erbinnen sind Historien ohne eigenen
     Lebenszyklus, zwei sind Objekte, die einen tragen. Deshalb darf aus ihr
-    niemals eine Lebenszyklus-Basis erwachsen (ADR-0017).
+    niemals eine Lebenszyklus-Basis erwachsen (ADR-0040).
     """
 
     # Welche Rolle in diesen Kreis eintragbar ist. Eine Aufnahmeregel an der
@@ -110,7 +110,7 @@ def bestandsmodelle() -> list[type[EigentuemerKreis]]:
     """Liefert jedes registrierte Modell, das einen Eigentümer-Kreis trägt.
 
     Hergeleitet aus Djangos Modellregistrierung statt aus Importen: So
-    importiert `konten` nicht in die Bestands-Apps zurück (ADR-0016), und ein
+    importiert `konten` nicht in die Bestands-Apps zurück (ADR-0055), und ein
     künftig hinzukommendes Bestandsmodell ist am Tag seiner Einführung dabei.
     """
     return [
