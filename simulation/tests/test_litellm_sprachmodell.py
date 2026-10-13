@@ -8,6 +8,7 @@ from litellm import ContentPolicyViolationError
 
 from simulation import (
     SPRACHMODELL_FRIST_SEKUNDEN,
+    Antwort,
     antwort_versuchen,
     ausgabe_versuchen,
 )
@@ -377,7 +378,9 @@ def _gesendete_nachrichten(kern: Simulationskern) -> list[dict[str, str]]:
                 sprachmodell="openrouter/openai/gpt-test",
                 anbieter_token="sk-or-geheim",
             ),
-            verlauf=[("Wie rechnest du?", "Ich addiere.")],
+            verlauf=[
+                ("Wie rechnest du?", Antwort("Zähler zu Zähler.", "Ich addiere."))
+            ],
             eingabe="Warum so?",
         )
     return completion.call_args.kwargs["messages"]
@@ -399,7 +402,10 @@ def test_antwort_versuchen_haengt_die_gefuellte_user_prompt_vorlage_an() -> None
             "content": "Rolle: Brüche werden addiert.\n\nAuftrag: Addiere.",
         },
         {"role": "user", "content": "Wie rechnest du?"},
-        {"role": "assistant", "content": "Ich addiere."},
+        {
+            "role": "assistant",
+            "content": '{"denkspur": "Zähler zu Zähler.", "aeusserung": "Ich addiere."}',
+        },
         {"role": "user", "content": "Warum so?"},
     ]
 
@@ -414,7 +420,10 @@ def test_antwort_versuchen_haengt_eine_leere_user_prompt_vorlage_nicht_an() -> N
     assert nachrichten == [
         {"role": "system", "content": "Rolle: Brüche werden addiert."},
         {"role": "user", "content": "Wie rechnest du?"},
-        {"role": "assistant", "content": "Ich addiere."},
+        {
+            "role": "assistant",
+            "content": '{"denkspur": "Zähler zu Zähler.", "aeusserung": "Ich addiere."}',
+        },
         {"role": "user", "content": "Warum so?"},
     ]
 

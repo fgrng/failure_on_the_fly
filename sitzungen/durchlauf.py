@@ -12,7 +12,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.utils.safestring import SafeString
 
-from simulation import Antwortversuch, antwort_versuchen, vorlage_rendern
+from simulation import Antwort, Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
 from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
@@ -43,29 +43,41 @@ def sitzung_starten(
     sink.sitzung_starten(vignette, simulationskern, modell_konfiguration)
 
 
-def modellverlauf(sink: SitzungSink) -> list[tuple[str, str]]:
-    """Projiziert die bisherigen Schritte auf die beiden sichtbaren Gesprächsseiten.
+def modellverlauf(sink: SitzungSink) -> list[tuple[str, Antwort]]:
+    """Projiziert die bisherigen Schritte auf Eingabe und Antwort samt Denkspur.
 
-    Die Denkspur bleibt draußen (ADR-0005), ebenso ein Schritt ohne Äußerung —
-    der dokumentiert im Transkript den Abbruch, nicht den Kontext (ADR-0011).
+    Ein Schritt ohne Äußerung bleibt draußen — er dokumentiert im Transkript
+    den Abbruch, nicht den Kontext (ADR-0011).
     """
 
-    verlauf: list[tuple[str, str]] = []
+    verlauf: list[tuple[str, Antwort]] = []
     for schritt in sink.gespraechsschritte:
-        eingabe, aeusserung = _gespraechsseiten(schritt)
-        if aeusserung is not None:
-            verlauf.append((eingabe, aeusserung))
+        eingabe, antwort = _gespraechsseiten(schritt)
+        if antwort is not None:
+            verlauf.append((eingabe, antwort))
     return verlauf
 
 
 def _gespraechsseiten(
     schritt: GespraechsschrittDaten | Gespraechsschritt,
-) -> tuple[str, str | None]:
+) -> tuple[str, Antwort | None]:
     # Liest beide Gesprächsseiten aus der Speicherform, in der ihr Sink sie hält.
 
     if isinstance(schritt, Mapping):
-        return schritt["eingabe"], schritt["aeusserung"]
-    return schritt.eingabe, schritt.aeusserung
+        eingabe, denkspur, aeusserung = (
+            schritt["eingabe"],
+            schritt["denkspur"],
+            schritt["aeusserung"],
+        )
+    else:
+        eingabe, denkspur, aeusserung = (
+            schritt.eingabe,
+            schritt.denkspur,
+            schritt.aeusserung,
+        )
+    if denkspur is None or aeusserung is None:
+        return eingabe, None
+    return eingabe, Antwort(denkspur, aeusserung)
 
 
 class Ausgang(Enum):

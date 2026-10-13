@@ -26,6 +26,8 @@ Der Verlauf reist als **native Konversationsnachrichten** des Anbieters, nicht a
 
 > **Nachgeführt durch ADR-0052 (Nachrichtenrollen):** Der Arbeitskontext steht im System-Prompt; jede `user`-Nachricht an die simulierte Schüler:in ist eine Ansprache der Teilnehmer:in.
 
+> **Abgelöst durch ADR-0054:** Die Denkspur fließt doch in den Verlauf zurück. Jede `assistant`-Nachricht trägt Denkspur und Äußerung als JSON-Objekt nach dem Ausgabeschema; die native Nachrichtenform bleibt.
+
 ## Sichtbarkeit
 
 Die Sichtbarkeit ist bewusst gestaffelt:

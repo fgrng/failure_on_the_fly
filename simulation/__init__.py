@@ -1,5 +1,6 @@
 """Modelle und Abläufe der Simulation."""
 
+import json
 import math
 import time
 from collections.abc import Mapping, Sequence
@@ -128,7 +129,7 @@ def antwort_versuchen(
     platzhalter: Mapping[str, str],
     kern: "Simulationskern",
     modell_konfiguration: "ModellKonfiguration",
-    verlauf: Sequence[tuple[str, str]],
+    verlauf: Sequence[tuple[str, Antwort]],
     eingabe: str,
     ausfuehrung: Ausfuehrung | None = None,
 ) -> Antwortversuch:
@@ -137,7 +138,8 @@ def antwort_versuchen(
     Die Prompt-Platzhalter (Name → Text) berechnet die Aufruferin aus ihrer
     Vignette; `simulation` kennt keine Vignette (ADR-0016). Der Arbeitskontext
     steht im System-Prompt: Eine gefüllte User-Prompt-Vorlage (Altbestand)
-    wird gerendert mit einer Leerzeile angehängt (ADR-0052).
+    wird gerendert mit einer Leerzeile angehängt (ADR-0052). Ihre früheren
+    Antworten sieht die Schüler:in samt Denkspur (ADR-0054).
     """
 
     system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)
@@ -146,7 +148,7 @@ def antwort_versuchen(
     ausgabeversuch: Ausgabeversuch = ausgabe_versuchen(
         system_prompt,
         modell_konfiguration,
-        verlauf,
+        [(frage, _als_ausgabe(antwort)) for frage, antwort in verlauf],
         eingabe,
         SCHUELERIN_SCHEMA,
         ausfuehrung,
@@ -158,6 +160,16 @@ def antwort_versuchen(
         aeusserung=str(ausgabeversuch.ausgabe["aeusserung"]),
     )
     return Antwortversuch(antwort, ausgabeversuch.fehlversuche)
+
+
+def _als_ausgabe(antwort: Antwort) -> str:
+    # Stellt eine frühere Antwort so dar, wie das Modell sie nach dem Schema
+    # ausgegeben hat; die Rohantwort selbst wird nicht aufbewahrt.
+
+    return json.dumps(
+        {"denkspur": antwort.denkspur, "aeusserung": antwort.aeusserung},
+        ensure_ascii=False,
+    )
 
 
 def ausgabe_versuchen(

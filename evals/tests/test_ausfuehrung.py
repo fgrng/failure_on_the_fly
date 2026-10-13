@@ -108,17 +108,15 @@ def zwei_schritte_ein_kriterium() -> None:
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
-def test_schuelerin_sieht_ihre_fruehere_antwort_ohne_denkspur() -> None:
-    """Der zweite Antwortversuch kennt die Äußerung, nicht die Denkspur."""
+def test_schuelerin_sieht_ihre_fruehere_antwort_samt_denkspur() -> None:
+    """Der zweite Antwortversuch kennt Äußerung und Denkspur (ADR-0054)."""
 
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
     _, zweite_schuelerin, _ = _anfragetexte(vignette)
 
-    assert ("Antwort 1" in zweite_schuelerin, "Denkspur 1" in zweite_schuelerin) == (
-        True,
-        False,
-    )
+    assert "Antwort 1" in zweite_schuelerin
+    assert "Denkspur 1" in zweite_schuelerin
 
 
 @pytest.mark.django_db
@@ -146,7 +144,10 @@ def _gesprochen(anfrage: list[dict[str, str]]) -> list[tuple[str, str]]:
 @pytest.mark.django_db
 @pytest.mark.usefixtures("zwei_schritte_ein_kriterium")
 def test_schuelerin_erhaelt_dieselbe_nachrichtenordnung_wie_in_der_sitzung() -> None:
-    """Jede user-Nachricht an die Schüler:in ist eine Äußerung der Lehrperson."""
+    """Jede user-Nachricht an die Schüler:in ist eine Äußerung der Lehrperson.
+
+    Ihre eigenen Züge sieht sie samt Denkspur (#467).
+    """
 
     vignette: Vignette = finale_vignette(konto_mit_rollen("ada", "Autor:in"))
 
@@ -154,7 +155,7 @@ def test_schuelerin_erhaelt_dieselbe_nachrichtenordnung_wie_in_der_sitzung() -> 
 
     assert _gesprochen(anfragen[1]) == [
         ("user", "Wie hast du gerechnet?"),
-        ("assistant", "Antwort 1"),
+        ("assistant", '{"denkspur": "Denkspur 1", "aeusserung": "Antwort 1"}'),
         ("user", "Warum so?"),
     ]
 

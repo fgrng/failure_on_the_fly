@@ -456,8 +456,11 @@ Sitzung, Probelauf und Evalgespräch gleich: Der System-Prompt ist die gerendert
 System-Prompt-Vorlage. Ist die User-Prompt-Vorlage der Kern-Fassung gefüllt,
 wird sie gerendert und mit einer Leerzeile angehängt; ist sie leer, hängt nichts
 an. Danach wechseln sich die Ansprachen der Teilnehmer:in (`user`) und die
-Äußerungen der Schüler:in (`assistant`) ab, die erste `user`-Nachricht ist die
+Antworten der Schüler:in (`assistant`) ab, die erste `user`-Nachricht ist die
 erste Ansprache. Jede `user`-Nachricht stammt von der Teilnehmer:in (ADR-0052).
+Jede `assistant`-Nachricht trägt die frühere Antwort vollständig als JSON-Objekt
+nach dem Ausgabeschema, `{"denkspur": "…", "aeusserung": "…"}` (ADR-0054). Ein
+Schritt ohne Antwort fehlt im Verlauf.
 
 ## Modell-Konfiguration
 

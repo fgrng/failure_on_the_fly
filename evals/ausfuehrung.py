@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
 from simulation import (
+    Antwort,
     Antwortversuch,
     Ausgabeversuch,
     Ausfuehrung,
@@ -69,8 +70,9 @@ def _gespraech_fuehren(
     )
     protokoll: list[_Protokollzeile] = []
     for position, schritt in enumerate(evalinput.schritte.all(), 1):
-        verlauf: list[tuple[str, str]] = [
-            (zeile.lehrperson, zeile.aeusserung) for zeile in protokoll
+        verlauf: list[tuple[str, Antwort]] = [
+            (zeile.lehrperson, Antwort(zeile.denkspur, zeile.aeusserung))
+            for zeile in protokoll
         ]
         lehrperson_aeusserung: str | None = schritt.text
         if schritt.gelenkt:
