@@ -682,7 +682,13 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
             gespraech,
             [
                 {"role": "user", "content": "Wie rechnest du?"},
-                {"role": "assistant", "content": "Ich addiere einfach alles."},
+                {
+                    "role": "assistant",
+                    "content": (
+                        '{"denkspur": "Mia addiert Zähler und Nenner.", '
+                        '"aeusserung": "Ich addiere einfach alles."}'
+                    ),
+                },
                 {"role": "user", "content": "Und warum so?"},
             ],
         )

@@ -7,6 +7,7 @@ from django.contrib.sessions.backends.db import SessionStore
 from time_machine import TimeMachineFixture
 
 from konten.models import Konto
+from simulation import Antwort
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import (
     Diagnose,
@@ -451,9 +452,9 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
             sink, vignette, kern, konfiguration, eingabe="Und dann?"
         )
 
-    erwartet: list[tuple[str, str]] = [
-        ("Warum?", "2/5."),
-        ("Und dann?", "2/5."),
+    erwartet: list[tuple[str, Antwort]] = [
+        ("Warum?", Antwort("Ich addiere alles.", "2/5.")),
+        ("Und dann?", Antwort("Ich addiere alles.", "2/5.")),
     ]
     assert modellverlauf(scratch) == erwartet
     assert modellverlauf(datenbank) == erwartet
@@ -494,7 +495,7 @@ def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
             sink, vignette, kern, konfiguration, eingabe="Erster Schritt"
         )
 
-        assert modellverlauf(sink) == [("Erster Schritt", "")]
+        assert modellverlauf(sink) == [("Erster Schritt", Antwort("still", ""))]
 
 
 @pytest.mark.django_db

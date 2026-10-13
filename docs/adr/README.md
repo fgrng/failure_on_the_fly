@@ -77,6 +77,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0052 Wem die Nachrichtenrollen gehören
 - ADR-0054 Fester Vertrag zwischen Vignette und Vorlagen, samt Positionsmarker
 - ADR-0056 Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung
+- ADR-0062 Die Denkspur fließt in den Verlauf zurück
 
 **Architektur und Betrieb**
 
