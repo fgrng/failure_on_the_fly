@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0040
 ---
 
 # Abgewiesene Schreibaktionen leiten mit Meldung weiter

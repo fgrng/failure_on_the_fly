@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0056
 ---
 
 # Die Anbieterbindung liegt an der Konfiguration

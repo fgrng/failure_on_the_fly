@@ -8,7 +8,8 @@ Dieses ADR fasst den Stand von ADR-0003, ADR-0017 und ADR-0021 zusammen und
 ersetzt sie. Die Kern-Sonderform steht in ADR-0035, die Erhebung als
 Nicht-Artefakt in ADR-0027; beide gelten fort. Von ADR-0028 bleibt die
 Privatheit des Items (heute in ADR-0039), die Ausnahme von der
-Historien-Archivierung wird hier aufgehoben.
+Historien-Archivierung wird hier aufgehoben. Von ADR-0051 übernimmt es die
+Weiterleitungsregel für abgewiesene Schreibaktionen und ersetzt es.
 
 ## Reproduzierbarkeit verlangt unveränderliche Fassungen
 
@@ -26,8 +27,8 @@ Kern-Fassung und Modell-Konfiguration, damit die Datenspur auch dann
 vollständig bleibt, wenn ein Artefakt später doch mutiert oder gelöscht wird.
 
 Nicht versioniert sind die **Modell-Konfiguration** (unveränderlich und
-append-only, ADR-0013), das **Gesprächsbudget** (ein Feld der Vignette, wird
-mit ihr eingefroren, ADR-0012) und die **Erhebung** (ein einzelnes Objekt, das
+append-only, ADR-0056), das **Gesprächsbudget** (ein Feld der Vignette, wird
+mit ihr eingefroren, ADR-0057) und die **Erhebung** (ein einzelnes Objekt, das
 nur die Statusnamen leiht, ADR-0027).
 
 Einen Status **„veröffentlicht"** gibt es nicht, weil es nichts zu
@@ -168,6 +169,18 @@ C fangen die View-Hüllen und zeigen sie als Meldung auf der Detail- bzw.
 Verwaltungsansicht. Die Hüllen lesen dazu `error.messages` und verbinden sie;
 `error.message` gibt es nur bei einer einzelnen Meldung.
 
+**Abgewiesene Schreibaktionen leiten mit Meldung weiter, nie mit 403.** Jede
+Schreibaktion auf einem Bestand, der kein eigener Entwurf ist, leitet auf die
+Seite zurück, von der die Nutzer:in kam (die Detailseite, beim Löschen die
+Liste), und zeigt dort über `django.contrib.messages`, warum nichts geändert
+wurde; auch der Wettlauf zweier Tabs nimmt diesen Weg. Wer auf eine veraltete
+Schaltfläche klickt, sieht so den aktuellen Stand und einen Grund statt einer
+Fehlerseite. Die Prüfung in der View ist Benutzerführung; durchgesetzt wird das
+Einfrieren im Modell. Auch der Erfolgspfad leitet weiter, damit kein Rendern in
+einer Transaktion liegt (ADR-0059). Ein **fremder** Bestand bleibt ein 404 über
+die Sichtbarkeitsauflösung (ADR-0039): Wer ihn nicht sehen darf, erfährt nicht,
+dass es ihn gibt.
+
 Ein Zustandsübergang wird in **einer bedingten Aktualisierung** geprüft und
 geschrieben (#365): „setze Zustand auf Ziel, wo Zustand = erwartet“. Trifft sie
 keine Zeile, folgt ein `ValidationError` mit der Meldung des Übergangs
@@ -215,6 +228,8 @@ gesperrt bleibt.
 - **Ein internes Flag, das Zustandswechsel an `save()` vorbeilässt** —
   verworfen. Der Übergang gehört in eine bedingte Aktualisierung, die den
   Wettlauf zweier Tabs als abgelehnten Übergang meldet.
+- **Durchgehend 403 für abgewiesene Schreibaktionen** — verworfen (ADR-0051).
+  Eine Fehlerseite statt des aktuellen Stands und eines Grundes.
 - **Invarianten als Modell-Prüfungen (`clean()`)** — verworfen. Sie hängen am
   Aufruf von `full_clean()` und lassen sich per `save()` oder Bulk-Write
   umgehen.

@@ -32,11 +32,11 @@ Konsequenzen, die den Rest der Anleitung erklären:
   supervisord-Dienst mit dem Thread-Worker. Ein Gesprächsschritt wartet synchron
   auf das Sprachmodell, eine Transkription auf ihren Anbieter; jede wartende
   Anfrage hält einen Thread. Ausgelegt ist das für 150 gleichzeitige Sitzungen
-  (ADR-0050).
+  (ADR-0059).
 - **Ein zweiter Dienst für Evalläufe.** Ein Evallauf dauert zwanzig bis vierzig
   Minuten. Ihn arbeitet ein eigener supervisord-Dienst ab, nicht gunicorn: Er
   holt ausgelöste Läufe aus der Datenbank, einen nach dem anderen, und belegt
-  dabei keinen Web-Thread (ADR-0047). Er liest dieselbe `.env` und schreibt in
+  dabei keinen Web-Thread (ADR-0059). Er liest dieselbe `.env` und schreibt in
   dieselbe SQLite-Datei; Gespräche und Urteile schreibt er in kurzen
   Einzelschritten, kein Modellaufruf hält eine Schreibsperre.
 - **SQLite, kein MySQL.** Die Datenbank ist eine Datei im Home. Sie läuft im
@@ -195,7 +195,7 @@ uv run python manage.py collectstatic --noinput
 `migrate` legt nebenbei die drei fachlichen Rollen als Django-Groups an
 (`konten/apps.py`, post_migrate) — `Autor:in`, `Ausbilder:in`, `Forschende:r`
 müssen also nicht von Hand erzeugt werden. Die Administration ist keine Group,
-sondern ein Superuser (ADR-0033).
+sondern ein Superuser (ADR-0039).
 
 Eine erste Kontrolle ohne laufenden Dienst:
 
@@ -397,7 +397,7 @@ Administration, der Simulationskern und die Modell-Konfiguration.
    Konfiguration mit Anbieter (`openrouter` oder `infomaniak`), Modellnamen und
    Token anlegen und aktivieren. Konfigurationen sind unveränderlich: Eine
    Schlüsselrotation ist immer *anlegen plus aktivieren*, nie bearbeiten
-   (ADR-0013).
+   (ADR-0056).
 
 4. **Transkription konfigurieren**, falls gesprochen werden soll. Unter
    `/system/transkription/` den Audio-Anbieter eintragen — er darf ein anderer
@@ -639,7 +639,7 @@ Häufige Stolpersteine:
   und Anzeige in der Oberfläche — etwa der Erhebungszeitraum einer Stichprobe —
   laufen dagegen in `TIME_ZONE` (voreingestellt `Europe/Berlin`).
 - **Teilnahme-Token sind ablesbar** und trennen die Forschungsdaten vom Konto
-  (ADR-0006, ADR-0018). Ein geteilter Teilnahme-Link ist folglich der Zugang zu
+  (ADR-0006, ADR-0058). Ein geteilter Teilnahme-Link ist folglich der Zugang zu
   genau dieser Teilnahme — Links gehören nicht in öffentliche Kanäle.
 - **Die Anmeldung hat keine Sperre gegen Passwort-Raten.** Weder
   `/accounts/login/` noch `/admin/` begrenzen Fehlversuche. Bis eine Sperre

@@ -23,7 +23,10 @@ den Status, einen Nachführungsblock und neue ADRs.
    - Ersetzt: `status: superseded` und `superseded-by`. Sein
      Nachführungsblock fällt weg, der Entscheidungstext bleibt.
 3. **Verweise umleiten.** Glossar, Code, Templates und Tests, die auf ein
-   ersetztes ADR zeigen, zeigen danach auf den Nachfolger.
+   ersetztes ADR zeigen, zeigen danach auf den Nachfolger. Der Text anderer
+   ADRs bleibt eingefroren: Ein Verweis aus einem angenommenen ADR auf ein
+   inzwischen ersetztes ist ein Lesepfad in die Historie und wird nicht
+   umgeschrieben. Migrationen bleiben ebenfalls unverändert (ADR-0031).
 
 Fertig, wenn das Frontmatter des alten ADRs auf den Anlass zeigt und
 `rg -g '!docs/**' 'ADR-NNNN'` für ein ersetztes ADR keinen Treffer mehr
@@ -77,7 +80,8 @@ nach seinem Arbeitstitel; so kollidieren zwei Branches nicht.
 - **Code und Templates**: dort, wo die Umsetzung sonst wie ein Fehler
   aussähe.
 - **Tests**: frei. Ein Test, der eine ADR-Regel bewacht, nennt sie.
-- **ADRs**: Vorwärtsverweise auf andere ADRs.
+- **ADRs**: Vorwärtsverweise auf andere ADRs. Ein Sammel-ADR nennt in seinem
+  ersten Absatz, welche ADRs es zusammenfasst und ersetzt.
 - **README**: keine. Ihre Leser:innen sind Nutzer:innen und Betreiber:innen.
 
 Glossar, Code und Tests zeigen auf ADRs mit `accepted` oder `amended`.

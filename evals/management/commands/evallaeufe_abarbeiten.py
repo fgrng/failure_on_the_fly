@@ -1,4 +1,4 @@
-"""Der Hintergrundprozess der Evalläufe (ADR-0047)."""
+"""Der Hintergrundprozess der Evalläufe (ADR-0059)."""
 
 import fcntl
 import logging
@@ -118,7 +118,7 @@ class Command(BaseCommand):
             evallauf_ausfuehren(lauf)
             ende = Evallauf.Zustand.FERTIG
         # Anbieterfehler fängt die Simulation selbst ab; was hier ankommt, ist
-        # unerwartet und soll den Lauf abgebrochen hinterlassen (ADR-0047).
+        # unerwartet und soll den Lauf abgebrochen hinterlassen (ADR-0059).
         except Exception:
             logger.exception("Unerwarteter Fehler in Evallauf %s.", lauf.pk)
         # Auch ein Stopp des Dienstes mitten im Lauf schließt ihn ab.

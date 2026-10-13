@@ -110,7 +110,7 @@ def bestandsmodelle() -> list[type[EigentuemerKreis]]:
     """Liefert jedes registrierte Modell, das einen Eigentümer-Kreis trägt.
 
     Hergeleitet aus Djangos Modellregistrierung statt aus Importen: So
-    importiert `konten` nicht in die Bestands-Apps zurück (ADR-0016), und ein
+    importiert `konten` nicht in die Bestands-Apps zurück (ADR-0055), und ein
     künftig hinzukommendes Bestandsmodell ist am Tag seiner Einführung dabei.
     """
     return [

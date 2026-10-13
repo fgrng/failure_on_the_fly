@@ -288,7 +288,7 @@ class ErhebungenAnlegenUndListeTests(TestCase):
         self.assertContains(liste, "sidebar-account")
 
     def test_administration_legt_eine_erhebung_an(self) -> None:
-        """Die Administration steht im Forschungsbereich nicht vor der Tür (ADR-0033)."""
+        """Die Administration steht im Forschungsbereich nicht vor der Tür (ADR-0039)."""
         administratorin: Konto = konto_mit_rollen("linus", is_superuser=True)
         self.client.force_login(administratorin)
 
@@ -1443,7 +1443,7 @@ def _zeilen(antwort: HttpResponse) -> dict[str, object]:
 def test_schreibaktion_ausserhalb_des_entwurfs_leitet_mit_meldung_zurueck(
     client: Client, route: str, status: str, badge: str
 ) -> None:
-    """Eine veraltete Schaltfläche führt auf die unveränderte Detailseite (ADR-0051)."""
+    """Eine veraltete Schaltfläche führt auf die unveränderte Detailseite (ADR-0040)."""
 
     ada: Konto = forschende("ada")
     erhebung: Erhebung = _erhebung_mit_design(ada)
@@ -2496,7 +2496,7 @@ class ErhebungsExportTests(TestCase):
         )
 
     def test_exportiert_die_verbrauchte_zeit_in_sekunden(self) -> None:
-        """Die verbrauchte Zeit ist Datenspur (ADR-0012)."""
+        """Die verbrauchte Zeit ist Datenspur (ADR-0057)."""
 
         ada: Konto = forschende("ada")
         konfiguration: ModellKonfiguration = _forschungskonfiguration()

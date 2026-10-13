@@ -73,7 +73,7 @@ class SitzungQuerySet(models.QuerySet["Sitzung"]):
         verschwinden so auch ältere Sitzungen, und die Freigaben ruhen. Beides
         liefert `Training.objects.fremd_einsehbare_sitzungen`; `sitzungen`
         kennt das Training nur über den Rückwärtszugriff der Bindungen
-        (ADR-0016).
+        (ADR-0055).
         """
         return self.filter(
             Q(

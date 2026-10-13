@@ -174,7 +174,7 @@ class Evallauf(models.Model):
     """Die Ausführung aller Evals des Katalogs über einer Vignettenfassung."""
 
     class Zustand(models.TextChoices):
-        """Der Zustand ist zugleich die Warteschlange (ADR-0047)."""
+        """Der Zustand ist zugleich die Warteschlange (ADR-0059)."""
 
         WARTET = "wartet", "Wartet"
         LAEUFT = "laeuft", "Läuft"

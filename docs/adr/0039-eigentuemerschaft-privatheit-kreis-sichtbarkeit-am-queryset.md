@@ -4,8 +4,8 @@ status: accepted
 
 # Eigentümerschaft: Privatheit, Kreis gleichrangiger Eigentümer:innen, Sichtbarkeit am QuerySet
 
-Dieses ADR fasst den Stand von ADR-0015, ADR-0019, ADR-0022 und ADR-0032
-zusammen und ersetzt sie. Es berücksichtigt die Ausnahmen, die ADR-0049 für die
+Dieses ADR fasst den Stand von ADR-0015, ADR-0019, ADR-0022, ADR-0032 und
+ADR-0033 zusammen und ersetzt sie. Es berücksichtigt die Ausnahmen, die ADR-0049 für die
 Einsicht in persistierte Sitzungen festlegt.
 
 ## Rollen sind additive Groups, Administration ist der Superuser
@@ -15,10 +15,18 @@ am eigenen Nutzer-Modell `konten.Konto`. Rollen sind **additiv**: Dieselbe
 Person schreibt Vignetten und leitet eine Erhebung. Ein einzelnes `rolle`-Feld
 zwänge sie zu zwei Konten und damit zu zwei getrennten Beständen.
 
-Die Administrator:in ist keine Group, sondern `Konto.is_superuser`
-(ADR-0033). Die Teilnehmer:in ist ebenfalls keine Group: In einer Erhebung ist
-sie ein Teilnahme-Token ohne Konto (ADR-0006, ADR-0018), in einem Training ist sie ein Konto,
-unabhängig von jeder anderen Rolle.
+Die Administrator:in ist keine Group, sondern **Djangos Superuser**
+(`Konto.is_superuser`). `Konto.save()` setzt dazu stets `is_staff`, damit der
+Django-Admin denselben Status für Tür und Innenraum nutzt; `manage.py
+createsuperuser` ist der idiomatische Bootstrap. `save()` ist der einzige
+Ableitungsort: Djangos `loaddata` umgeht es, ein aus einer Fixture geladener
+Superuser bliebe ohne `is_staff`. Das wird hingenommen, weil Konten nirgends
+per Fixture geladen werden; ein `post_save`-Signal für den `raw`-Pfad wäre ein
+zweiter Ableitungsort. Die Sidebar behandelt eine Administrator:in ohne
+Fachrolle nicht als Teilnehmer:in. Die Teilnehmer:in ist ebenfalls keine
+Group: In einer Erhebung ist sie ein Teilnahme-Token ohne Konto (ADR-0006,
+ADR-0058), in einem Training ist sie ein Konto, unabhängig von jeder anderen
+Rolle.
 
 Groups tragen keine Django-Permissions. Wer eine Rolle prüft, prüft
 Gruppenmitgliedschaft oder Superuser-Status, nie `has_perm`. Zwei Mechanismen
@@ -86,8 +94,9 @@ liefert. Sie ist ohne HTTP testbar, an einer Stelle korrigierbar, und eine View
 kann sie nicht umgehen, weil das ungefilterte QuerySet in keiner View vorkommt.
 Der Sonderfall Administration steht damit an genau einer Stelle.
 
-Analog liegt die Rolle-oder-Administration-Regel als benannte
-Konto-QuerySet-Methode vor (ADR-0033). Wer persistierte Sitzungen einsehen darf,
+Analog liegt die Rolle-oder-Administration-Regel (wer in einen Kreis
+aufgenommen werden darf: die jeweilige Fachrolle oder eine Administrator:in)
+als benannte Konto-QuerySet-Methode vor. Wer persistierte Sitzungen einsehen darf,
 regelt ADR-0049 nach demselben Muster: Die Einsicht läuft über den Anlass, also
 Trainingsbindung, freigegebene Abschrift oder Erhebung, nie über die Vignette.
 
@@ -116,6 +125,12 @@ bleibt änderbar. Eingefroren ist das Design, nicht die Verantwortung.
   Genau eine Rolle je Person, und die Sichtbarkeitsregel in jeder View erneut.
 - **Django-Permissions an den Groups** — verworfen. Eine zweite
   Rechtewahrheit neben der Gruppenmitgliedschaft.
+- **Administration als Group, mit eigener `AdminSite` oder über den
+  `default_site`-Haken** — verworfen. Das öffnet nur die Tür des Admins;
+  permissionfreie Groups sehen danach keinen Inhalt.
+- **`is_staff` per `m2m_changed` aus einer Group ableiten** — verworfen. Ein
+  Signal koppelt ein Türflag an eine fachliche Rolle und lässt `is_superuser`
+  und `is_staff` auseinanderlaufen.
 - **Einzelner Eigentümer-Fremdschlüssel plus Übertragung** — verworfen. Die
   Domäne will echte Ko-Autorschaft, nicht eine Person, die einer anderen
   Leserechte gibt. War der Ausgangszustand (ADR-0019) und wurde durch das M2M

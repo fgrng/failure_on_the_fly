@@ -1,4 +1,4 @@
-"""Die Ausführung eines Evallaufs, die der Hintergrundprozess aufruft (ADR-0047)."""
+"""Die Ausführung eines Evallaufs, die der Hintergrundprozess aufruft (ADR-0059)."""
 
 from collections.abc import Mapping, Sequence
 from typing import NamedTuple

@@ -27,7 +27,7 @@ def eigentuemer_views(
     Die App reicht herein, was sich unterscheidet: ihre Rollenprüfung, wie sie
     das sichtbare Objekt lädt, und ihre Liste als Rückweg nach dem
     Selbstaustritt. So zeigt die Kante weiter von der App auf `konten`
-    (ADR-0016, ADR-0037).
+    (ADR-0055, ADR-0037).
 
     Beispiel::
 

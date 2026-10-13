@@ -106,11 +106,11 @@ _Avoid_: Consent, Zustimmung, Opt-in
 ## Simulationsablauf
 
 **Anbieter**:
-Der externe Dienst hinter dem Sprachmodell oder der Transkription — eine feste Auswahl aus `fake`, `openrouter` und `infomaniak` (ADR-0036). Aus ihm folgt, welches Präfix der Modellname trägt, ob Basis-URL und Token nötig sind und welche Stellschrauben in den Parametern erlaubt sind. Sprachmodell und Transkription wählen ihn je für sich; `fake` telefoniert nicht nach außen und braucht keine Zugangsdaten.
+Der externe Dienst hinter dem Sprachmodell oder der Transkription — eine feste Auswahl aus `fake`, `openrouter` und `infomaniak` (ADR-0056). Aus ihm folgt, welches Präfix der Modellname trägt, ob Basis-URL und Token nötig sind und welche Stellschrauben in den Parametern erlaubt sind. Sprachmodell und Transkription wählen ihn je für sich; `fake` telefoniert nicht nach außen und braucht keine Zugangsdaten.
 _Avoid_: Provider, Vendor, Backend, Hoster
 
 **Modell-Konfiguration**:
-Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0036) — sowie eine Bezeichnung, unter der sie sich in den Auswahlen wiederfinden lässt. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; je Verwendung ist genau eine aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
+Das verwendete Sprachmodell samt seiner Parameter. Sie benennt auch den **Anbieter** und trägt dessen Zugangsdaten — Basis-URL und Token liegen an der Konfiguration, nicht in der Umgebung (ADR-0056) — sowie eine Bezeichnung, unter der sie sich in den Auswahlen wiederfinden lässt. Vom Simulationskern getrennt, unveränderlich und je Instanz von Administrator:innen gesetzt; je Verwendung ist genau eine aktiv. Die Fassung, unter der eine Erhebung lief, bleibt an ihr gepinnt und geht mit der Datenspur in den Export (ADR-0029); deshalb wird sie nie bearbeitet, sondern neu angelegt. Kein versioniertes Artefakt.
 _Avoid_: LLM-Einstellungen, KI-Konfiguration
 
 **Verwendung**:
@@ -118,11 +118,11 @@ Wofür eine Modell-Konfiguration aktiv ist: **Schüler:in** (Sitzungen, Probelä
 _Avoid_: Rolle — meint die Rechte eines Kontos; Zweck, Einsatz
 
 **Transkriptions-Konfiguration**:
-Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0036).
+Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0056).
 _Avoid_: Transkriptionseinstellungen, Whisper-Konfiguration, STT-Konfiguration
 
 **Modellvorschläge**:
-Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0036). Bei `fake` gibt es nichts abzurufen.
+Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0056). Bei `fake` gibt es nichts abzurufen.
 _Avoid_: Autovervollständigung, Autocomplete, Typeahead, Modellpicker, Modellauswahl — eine Auswahl schlösse aus, was hier nur vorgeschlagen wird.
 
 **Simulationskern**:
@@ -154,7 +154,7 @@ Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwo
 _Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
 
 **Gesprächsbudget**:
-Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0012); es ist eine Obergrenze, kein Soll.
+Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0057); es ist eine Obergrenze, kein Soll.
 
 Wie weit eine Sitzung ihr Budget verbraucht hat, ist ihr **Budgetstand**: die Zahl der geglückten Gesprächsschritte oder die **verbrauchte Zeit**. Er gehört der Sitzung und überlebt einen Browserwechsel; die verbrauchte Zeit ist eine Größe der Datenspur. Bei Zeitbegrenzung misst die **Uhr** ausschließlich den **Zug** der Teilnehmer:in — die Zeit vom Anzeigen der Gesprächsseite bis zum Absenden ihrer Eingabe. Während die simulierte Schüler:in antwortet, steht die Uhr; Fehlversuche kosten keine Zeit. Bei schrittbasiertem Budget läuft keine Uhr: Dort wird die verbrauchte Zeit nicht gemessen, sondern bleibt null. Der laufende, noch nicht abgesendete Zug ist die **offene Spanne**; wer die Gesprächsseite erneut aufruft, setzt sie neu an, ohne dass bereits verbrauchte Zeit verloren geht oder die Spanne dazugerechnet wird. Erschöpft sich das Budget während eines Gesprächsschritts, wird dieser zu Ende geführt.
 _Avoid_: Limit, Zeitlimit, Nachrichtenbudget, Timer, Countdown, Restzeit, Restbudget, Zeitstand — es gibt keinen Rest, den jemand sieht; Denkzeit, Bearbeitungszeit, Sitzungsdauer — die Uhr misst den Zug, nicht die Sitzung.
@@ -197,8 +197,8 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, gena
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Abschrift**:
-Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0043). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
-_Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0043 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0058). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
+_Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0058 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
 Ein von einem Eigentümer-Kreis der Ausbilder:innen kuratierter Satz finaler Vignetten in einer empfohlenen Reihenfolge, die Teilnehmende unabhängig davon in freier Reihenfolge und beliebig oft spielen. Die empfohlene Reihenfolge gehört zur Konfiguration des Trainings; anders als die Vignettenposition einer Erhebungssitzung hält sie nicht fest, was gespielt wurde, und Trainingssitzungen tragen keine Vignettenposition. Ohne Fragebogen-Items. Der Satz darf leer sein: Dann ist das Training allein der Anlass, unter dem die Trainingsteilnehmenden ihre Abschriften freigeben. Ein Training ist geschlossen: Zugang hat nur, wer ihm über seinen Trainings-Link mit Nutzerkonto beigetreten ist.
@@ -229,7 +229,7 @@ Der stabile Zugangsweg zu genau einer Stichprobe. Er ist für alle Teilnehmenden
 _Avoid_: Einladungslink, Studienlink, Erhebungslink, Stichprobenlink
 
 **Teilnahme-Token**:
-Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0043).
+Das pseudonyme Kennzeichen, das beim Öffnen eines Teilnahme-Links entsteht und die Forschungsdaten einer Teilnahme bündelt. Von jedem Nutzerkonto und jeder Trainingsaktivität strikt getrennt: Auch wer es zum Holen einer Abschrift eingibt, hinterlässt keine gespeicherte Verbindung zwischen Konto und Token (ADR-0058).
 _Avoid_: Teilnehmer-ID, Nutzer-ID, Pseudonym
 
 **Teilnahmekennung**:

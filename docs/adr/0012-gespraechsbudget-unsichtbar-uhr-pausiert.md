@@ -1,18 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0042, "#60"]
+status: superseded
+superseded-by: ADR-0057
 ---
 
 # Das Gesprächsbudget gehört der Vignette, ist unsichtbar, und seine Uhr pausiert
-
-> **Nachgeführt durch ADR-0042, #60:** »Der Teilnehmer:in wird der
-> Budgetstand nicht angezeigt« meint die Darstellung, nicht die Lebensdauer:
-> Die verbrauchte Zeit und der Startpunkt der offenen Spanne sind Felder der
-> Sitzung statt der Browser-Session, und die Zeitquelle ist die Wanduhr statt
-> `monotonic()` (ADR-0042). Die harte Obergrenze gegen ewig offene Sitzungen
-> ist für Erhebungen der Erhebungszeitraum: Nach dem Fenster gilt eine
-> unvollständige Teilnahme als *verfallen* und ist nicht fortsetzbar (#60).
-> Für Trainingssitzungen gibt es keine Obergrenze; das ist als #237 offen.
 
 Das **Gesprächsbudget** ist ein Feld der Vignette. Es wird mit ihr finalisiert und eingefroren; weder Erhebung noch Training dürfen es überschreiben. Das Budget ist eine didaktische Aussage über die Vignette: Ein Fehlermuster, das erst nach mehreren gezielten Nachfragen sichtbar wird, braucht mehr Gesprächsschritte als eines, das beim ersten Nachhaken auffällt. Wer es von außen verstellt, verstellt die Schwierigkeit der Vignette, ohne sie zu versionieren — und zwei Sitzungen derselben finalen Fassung wären nicht mehr gleich dargeboten.
 

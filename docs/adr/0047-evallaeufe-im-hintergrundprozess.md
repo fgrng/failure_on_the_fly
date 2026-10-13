@@ -1,11 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0050]
+status: superseded
+superseded-by: ADR-0059
 ---
 
 # Evalläufe laufen in einem eigenen Hintergrundprozess, eine Warteschlange in der Datenbank
-
-> **Nachgeführt durch ADR-0050:** Seit ADR-0050 läuft gunicorn mit dem Thread-Worker; die »drei gunicorn-Worker« oben sind drei Prozesse mit vielen Threads, und `--timeout` begrenzt keine einzelne Anfrage mehr. Die Entscheidung hält trotzdem: Eine Anfrage endet spätestens, wenn das Uberspace-Frontend sie nach drei Minuten ohne Daten schließt, und ein Evallauf dauert Dutzende Minuten.
 
 Bis hierher kam das Projekt ohne Hintergrundverarbeitung aus: Ein Gesprächsschritt wartet synchron auf das Sprachmodell, der Export ist ein synchroner Download (#104). Ein Evallauf (ADR-0046) sprengt das. Bei einer Handvoll Evals mit je zwei Evalinputs, *k* = 3 und drei Inputschritten kommen gut zweihundert Modellaufrufe zusammen — nacheinander eher zwanzig bis vierzig Minuten.
 

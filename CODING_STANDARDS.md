@@ -55,7 +55,7 @@ Build test setup through the public way: `config/tests/aufbau.py` provides accou
 - Bad: `assert "Selbsteinsicht" in Path("GLOSSARY.md").read_text()`
 - Good: no test; the commit updates GLOSSARY.md.
 
-**Never source code** (CSS declarations, JS expressions, Python AST). Exceptions: import-graph guards (ADR-0016) and lint-style rules over _all_ files of a kind (e.g. "feature CSS uses only semantic tokens").
+**Never source code** (CSS declarations, JS expressions, Python AST). Exceptions: import-graph guards (ADR-0055) and lint-style rules over _all_ files of a kind (e.g. "feature CSS uses only semantic tokens").
 
 - Bad: `assert "display: none" in Path("static/css/vignette.css").read_text()`
 - Good: render the page and assert on what the user gets, e.g. the element is missing from the response.

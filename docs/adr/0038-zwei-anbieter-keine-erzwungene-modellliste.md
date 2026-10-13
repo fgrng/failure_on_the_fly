@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0056
 ---
 
 # Zwei Anbieter, und der Modellname wird nicht gegen eine Liste geprüft

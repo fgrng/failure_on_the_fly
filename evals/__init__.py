@@ -1,1 +1,1 @@
-"""Evalläufe über Vignettenfassungen (ADR-0046, ADR-0047)."""
+"""Evalläufe über Vignettenfassungen (ADR-0046, ADR-0059)."""

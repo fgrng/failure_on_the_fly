@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0057
 ---
 
 # Die Uhr des Gesprächsbudgets wird an der Sitzung persistiert

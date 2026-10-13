@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0039
 ---
 
 # Administration ist Djangos Superuser, nicht eine Group

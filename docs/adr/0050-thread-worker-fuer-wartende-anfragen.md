@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0059
 ---
 
 # Wartende Anfragen halten einen Thread, keine Warteschlange

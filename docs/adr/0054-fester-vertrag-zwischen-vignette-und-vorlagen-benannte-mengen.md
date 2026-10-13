@@ -200,6 +200,6 @@ bleiben.
   simulierte Schüler:innen in einer Teilnahme sind ein Darstellungsproblem,
   kein Datenfehler.
 - Jede neue Leerstelle und jede neue grammatische Form berührt `vignetten` und
-  `simulation`, aber keine dritte App (ADR-0016).
+  `simulation`, aber keine dritte App (ADR-0055).
 - Eine Vorlage, die um die Grenzen des Katalogs herum formuliert, ist Teil des
   Prompt-Engineerings der Administrator:in, nicht ein Mangel des Codes.

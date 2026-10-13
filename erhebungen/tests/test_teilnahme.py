@@ -1411,7 +1411,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertEqual(Sitzung.objects.get().verbrauchte_zeit, 7)
 
     def test_schrittbudget_laesst_die_uhr_der_sitzung_stehen(self) -> None:
-        """Ein durchgespieltes Schrittbudget bucht keine Sekunden (ADR-0012)."""
+        """Ein durchgespieltes Schrittbudget bucht keine Sekunden (ADR-0057)."""
 
         self._vignette_anlegen(
             budget_typ=Vignette.BudgetTyp.SCHRITTE,
@@ -1433,7 +1433,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_erschoepfte_zeit_fuehrt_den_schritt_zu_ende_und_zeigt_den_debrief(
         self,
     ) -> None:
-        """Der auslösende Schritt wird noch beantwortet, danach folgt der Debrief (ADR-0012)."""
+        """Der auslösende Schritt wird noch beantwortet, danach folgt der Debrief (ADR-0057)."""
 
         self._vignette_anlegen(
             budget_typ=Vignette.BudgetTyp.ZEIT,

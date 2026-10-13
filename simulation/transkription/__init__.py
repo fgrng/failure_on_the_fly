@@ -15,7 +15,7 @@ PLATZHALTER_TRANSKRIPT: str = "Dies ist ein Platzhalter-Transkript."
 # gleich: als Timeout des synchronen Aufrufs, als Gesamtbudget des Pollings
 # einschließlich jeder einzelnen Anfrage darin. Die 120 s lassen 60 s Luft zu
 # den drei Minuten, nach denen das Uberspace-Frontend eine Verbindung ohne Daten
-# schließt (docs/DEPLOYMENT.md, ADR-0050), sodass ein hängender Anbieter einen
+# schließt (docs/DEPLOYMENT.md, ADR-0059), sodass ein hängender Anbieter einen
 # sauberen Fehlerstatus erzeugt statt einer abgerissenen Verbindung.
 TRANSKRIPTION_BUDGET_SEKUNDEN: float = 120.0
 

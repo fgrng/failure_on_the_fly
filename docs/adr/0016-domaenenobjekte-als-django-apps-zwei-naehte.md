@@ -1,40 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0041, ADR-0042, ADR-0046, ADR-0052]
+status: superseded
+superseded-by: ADR-0055
 ---
 
 # Domänenobjekte als Django-Apps, ein azyklischer Graph, genau zwei Nähte
-
-> **Nachgeführt durch ADR-0041, ADR-0042, ADR-0046, ADR-0052:**
->
-> *ADR-0041:* Drei
-> Aussagen dieses Textes gelten nicht mehr, alle drei außerhalb der unten als
-> bindend markierten Liste: Ein allgemeiner Ablauf-Schritt als Objekt wird doch
-> eingeführt, der Itemblock bekommt doch eine Tabelle, und der Sitzungs-Block
-> ist doch aus der Datenbank rekonstruierbar — sobald sein Erledigt-Marker
-> existiert. Der Grund, aus dem hier anders entschieden wurde, war die
-> Freiwilligkeit der Fragebogen-Items: Sie macht „nicht ausgefüllt" und „bewusst
-> leer gelassen" ununterscheidbar. Bindend bleiben der Schnitt entlang der
-> Domänenobjekte, die Azyklizität samt Kantenrichtung und die Zahl der Nähte;
-> eine dritte Naht kommt nicht hinzu.
->
-> *ADR-0042:* Der Sink
-> führt den Budgetstand über zwei Mitglieder seines Protokolls statt über vier.
-> Der Budgetstand hat genau eine Implementierung und einen Speicher je Adapter:
-> Sitzungsfelder im `DBSink`, Browser-Session im `ScratchSink`. Das erweitert den
-> Umfang der bestehenden Sink-Naht, schafft aber keine dritte; es bleiben zwei.
->
-> *ADR-0046:* Eine App kommt hinzu:
-> `evals` besitzt Evallauf, Evalgespräch und Urteil und zeigt auf `vignetten` und
-> `simulation`; nichts zeigt auf sie. `vignetten` liest den Stand eines
-> Evallaufs allein über den Reverse-Accessor, ohne Import. Der Evalkatalog kennt
-> keine Vignette und liegt deshalb in `simulation`. Die Sprachmodell-Naht bekommt
-> keine Schwester, sondern zwei weitere Aufrufer (simulierte Lehrperson,
-> Bewerter) mit eigenem Ausgabeschema; ihr Rückgabewert ist das geparste Objekt
-> *des übergebenen* Schemas. Der Evallauf hat nur einen Speicherort und braucht
-> keinen Sink. Es bleiben zwei Nähte.
->
-> *ADR-0052:* Die Methode nimmt keinen gesonderten User-Prompt mehr, nur System-Prompt, Verlauf, Eingabe und Ausgabeschema; jede `user`-Nachricht stammt vom Gegenüber der Rolle.
 
 Die Module des Projekts werden entlang der **Domänenobjekte aus `GLOSSARY.md`** geschnitten, nicht entlang der Rollen und nicht entlang technischer Schichten. Jede Django-App besitzt die Objekte, deren Namen sie trägt; die Rollen aus dem Glossar erscheinen als Sichtbarkeitsregeln auf diesen Objekten, nicht als eigene Module.
 

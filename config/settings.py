@@ -177,7 +177,7 @@ MEDIA_ROOT: Path = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 MEDIA_URL: str = "/media/"
 
 # Der Hintergrundprozess der Evalläufe hält diese Datei gesperrt, solange er
-# arbeitet (ADR-0047); das Betriebssystem gibt die Sperre frei, wenn er stirbt.
+# arbeitet (ADR-0059); das Betriebssystem gibt die Sperre frei, wenn er stirbt.
 EVALLAEUFE_SPERRE: Path = Path(
     os.environ.get("EVALLAEUFE_SPERRE", BASE_DIR / "evallaeufe.lock")
 )

@@ -1,16 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0049]
+status: superseded
+superseded-by: ADR-0058
 ---
 
 # Die Abschrift ist eine Kopie, keine Verknüpfung
-
-> **Nachgeführt durch ADR-0049:** Kontoprivat bleibt der
-> Ausgangszustand. Die Teilnehmer:in kann eine Abschrift aber ausdrücklich für
-> ein Training freigeben, dem sie beigetreten ist; dann sieht der Kreis dieses
-> Trainings sie in seiner Fremdeinsicht. Die Freigabe ist widerrufbar. Dass
-> Dritte die Abschrift so mit dem Erhebungsexport abgleichen können, ist
-> bewusst hingenommen.
 
 Wer an einer Erhebung teilgenommen hat, kann ihre Sitzungen mit dem Teilnahme-Token in das eigene Nutzerkonto holen. Der Import legt dafür eine **neue Teilnahme** an und kopiert Sitzungen, Gesprächsschritte, Fehlversuche, Diagnosen und Vignettenpositionen als echte Zeilen derselben Modelle hinein. Die bestehende `Erhebungsbindung` wird ausschließlich **gelesen**: kein Fremdschlüssel, kein gespeichertes Token, kein Hash, kein Merker auf der Erhebungsseite. Die entstehende `training.Abschrift` hält Teilnahme, Konto, den **Namen der Erhebung als Text** und den Importzeitpunkt.
 

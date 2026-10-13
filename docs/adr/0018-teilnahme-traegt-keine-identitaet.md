@@ -1,26 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0043, "#235"]
+status: superseded
+superseded-by: ADR-0058
 ---
 
 # Die Teilnahme trägt keine Identität; Bindung und Pseudonymität liegen getrennt
-
-> **Nachgeführt durch ADR-0043, #235:**
->
-> *ADR-0043:* Die unten stehende Aussage, die verbotene
-> Verknüpfung sei mit zwei Bindungstabellen *nicht ausdrückbar*, gilt so nicht.
-> Sie stimmt je Tabelle — aber beide Bindungen zeigen mit einer 1:1-Beziehung
-> auf dieselbe Art Teilnahme, und nichts hinderte sie daran, auf *dieselbe Zeile*
-> zu zeigen. Konto ↔ Token wäre dann ein Join über zwei Kanten. Die Abschrift
-> vermeidet diesen Pfad, indem sie eine eigene Teilnahme anlegt und die
-> Erhebungsbindung nur liest; die gemeinsame Basis `Bindung` weist zusätzlich
-> jede Bindung ab, die eine Teilnahme mit einer Bindung der anderen Art belegt.
-> Bindend bleibt der Schnitt in zwei Bindungstabellen und die Kantenrichtung
-> nach `sitzungen`; der Schutz sitzt im Schema **und** in dieser einen Prüfung.
-> Sie steht bei der Teilnahme, weil `erhebungen` nach ADR-0006 nichts von Konten
-> und damit nichts von `training` wissen darf.
->
-> *#235:* Eine App `datenspuren` gab es nie. Der Export der Datenspur lebt in `erhebungen/export.py`. Wo unten `datenspuren` steht, ist dieser Export gemeint: Er liest je Datenspur eine Teilnahme und joint genau eine Erhebungsbindung.
 
 Die **Teilnahme** ist genau ein Objekt, so wie `GLOSSARY.md` sie definiert: die Klammer, unter der alle Sitzungen einer Person in genau einem Training oder genau einer Erhebung zusammengefasst sind. Sie trägt ihre Identität und ihre Sitzungen — und sonst nichts. Weder Training noch Stichprobe, weder Nutzerkonto noch Teilnahme-Token.
 

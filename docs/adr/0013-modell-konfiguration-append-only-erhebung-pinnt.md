@@ -1,13 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0046]
+status: superseded
+superseded-by: ADR-0056
 ---
 
 # Die Modell-Konfiguration ist append-only; die Erhebung pinnt sie bei Aktivierung
-
-> **Nachgeführt durch ADR-0046:** Aus „genau eine ist aktiv“ wird **„genau eine je Verwendung“**. Die Zeigertabelle trägt statt der einen Singleton-Zeile eine Zeile je **Verwendung** — *Schüler:in*, *Lehrperson*, *Bewerter* —, und die Unique-Spalte wechselt vom konstanten Singleton-Feld zur Verwendung. Die Evals (ADR-0046) sollen simulierte Lehrperson und Bewerter mit anderen Modellen und Anbietern betreiben können als die Simulation; ein Bewerter auf demselben Modell wie die Geprüfte urteilt befangen. Was sich unterscheidet, ist die Verwendung, nicht das Ding — deshalb ein Zeiger mehr statt eines neuen Artefakts. Dieselbe Konfiguration darf mehreren Verwendungen dienen. Die bestehende aktive Konfiguration wird zur *Schüler:in*; alles, was hier über den Pin der Erhebung steht, meint diese Verwendung.
->
-> Die Konfiguration selbst bleibt append-only. Sie bekommt eine **Bezeichnung**, beim Anlegen vergeben und danach unveränderlich wie alles an ihr, damit sie sich in drei Auswahlen wiederfinden lässt. Die Datenspur pinnt weiter per Fremdschlüssel.
 
 Eine **Modell-Konfiguration** ist unveränderlich, sobald sie existiert. Eine Änderung legt einen neuen Datensatz an, der alte bleibt; genau eine ist aktiv. Sie ist **kein versioniertes Artefakt** im Sinne von ADR-0003: kein Entwurf, kein Finalisieren, keine benennbare Historie.
 

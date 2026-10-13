@@ -39,7 +39,7 @@ BILDFELDER: tuple[str, ...] = ("lernauftrag_bild", "arbeitsheft_bild")
 
 # Die Testkonten. Der Schlüssel ist der Anmeldename, der Wert die zugewiesenen
 # Rollen (Gruppennamen aus konten.navigation.KONTOROLLEN) und die Administration.
-# Die Administration ist keine Rolle mehr, sondern Djangos Superuser (ADR-0033).
+# Die Administration ist keine Rolle mehr, sondern Djangos Superuser (ADR-0039).
 # "autor" trägt alles gleichzeitig, "studi" ist ein reines Teilnehmerinnenkonto.
 TESTKONTEN: dict[str, tuple[list[str], bool]] = {
     "autor": (list(KONTOROLLEN), True),
