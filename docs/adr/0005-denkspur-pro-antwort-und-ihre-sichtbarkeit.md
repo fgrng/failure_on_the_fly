@@ -1,8 +1,11 @@
 ---
-status: accepted
+status: amended
+amended-by: ["denkspur-ist-regieperspektive", "#466"]
 ---
 
 # Denkspur entsteht pro Antwort; Teilnehmende sehen sie nie
+
+> **Nachgeführt durch ADR „Denkspur ist Regieperspektive“, #466:** Die Denkspur ist die Regieperspektive der Simulation auf die nächste Äußerung, nicht ein Selbstgespräch in der Rolle. Sie darf Fachsprache nutzen und das Fehlermuster benennen; nur die Äußerung ist in der Rolle.
 
 Die **Denkspur** — das interne Reasoning der simulierten Schüler:in — entsteht **zu jeder einzelnen Antwort**, nicht als zusammenfassende Selbstauskunft am Ende einer Sitzung. Nur so wird nachvollziehbar, ob das Fehlermuster *durchgängig* konsistent angewandt wurde; genau das ist der forschende und didaktische Kern des Instruments.
 
