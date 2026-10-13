@@ -105,7 +105,7 @@
   <header class="page">
     <p class="eyebrow">FailureOnTheFly · Bildsprache</p>
     <h1>Farbpalette: alle festgelegten Farben und ihre Rollen</h1>
-    <p class="lede">Sämtliche in <code>static/css/tokens.css</code> (ADR-0023) definierten Farben —
+    <p class="lede">Sämtliche in <code>static/css/tokens.css</code> (ADR-0060) definierten Farben —
       von den heute genutzten semantischen Rollen bis zur angelegten, noch ungenutzten
       Sekundärpalette. Farben werden nach <strong>Rolle</strong> vergeben, nicht nach Farbname.</p>
   </header>
@@ -198,7 +198,7 @@
   <section>
     <h2>Semantische Rollen <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— so werden Farben heute vergeben</span></h2>
     <p class="note">Feature-UIs verwenden ausschliesslich diese Tokens, nie direkt Hex-Werte oder
-      die <code>--phsg-*</code>-Primitive (ADR-0023, Consequences).</p>
+      die <code>--phsg-*</code>-Primitive (ADR-0060, Folgen).</p>
     <div class="demo">
       <button class="btn">Primär-Button</button>
       <button class="btn sec">Sekundär</button>
@@ -305,7 +305,7 @@
 
   <section>
     <h2>Sekundärpalette <span style="font-size:.8rem;color:var(--muted);font-family:var(--font-body)">— angelegt, noch ungenutzt</span></h2>
-    <p class="note">Reserviert für Kategorie-Kacheln u. Ä. ADR-0023 sieht dafür die
+    <p class="note">Reserviert für Kategorie-Kacheln u. Ä. ADR-0060 sieht dafür die
       <strong>Dark-Töne mit weisser Schrift</strong> vor. Das Badge je Feld zeigt den Kontrast
       weisser Schrift auf dem Ton (AA ≥ 4,5:1 · AA·L ≥ 3:1 für grosse Schrift).</p>
     <div class="sec-grid"><div class='sec-corner'></div><div class='sec-th'>Light</div><div class='sec-th'>Bright</div><div class='sec-th'>Dark</div><div class='sec-th'>Deep</div><div class='sec-rh'>Grün</div><div class="sec-cell" style="background:#d8ecd8;color:#111111">
@@ -384,7 +384,7 @@
   </section>
 
   <section>
-    <h2>Regeln aus ADR-0023</h2>
+    <h2>Regeln aus ADR-0060</h2>
     <div class="rules"><ul>
       <li>Text auf Farbflächen ist <strong>stets weiss</strong>.</li>
       <li>Farbige Boxen/Kacheln später aus den <strong>Dark</strong>-Tönen der Sekundärpalette.</li>
@@ -396,7 +396,7 @@
   </section>
 
   <footer class="page">
-    Quelle: <code>static/css/tokens.css</code> · <code>docs/adr/0023-ui-design-tokens-phsg-cd.md</code>.
+    Quelle: <code>static/css/tokens.css</code> · <code>docs/adr/0060-ui-cd-konform-als-tool-ui-semantische-tokens-eine-interaktionsfarbe-bereichsfarbe-im-chrome.md</code>.
     Kontrastwerte nach WCAG 2.x (relative Luminanz). Referenz zur Bildsprache-Exploration.
   </footer>
 </div>

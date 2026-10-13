@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0060
 ---
 
 # UI-Design-Tokens auf Basis des PHSG Corporate Design

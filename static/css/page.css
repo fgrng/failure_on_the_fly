@@ -42,7 +42,7 @@
     container: hauptbereich / inline-size;
 }
 
-/* ---- Nummerierter Abschnitt im Achterraster (ADR-0023): Kopf 2, Inhalt 6 Spalten ---- */
+/* ---- Nummerierter Abschnitt im Achterraster (ADR-0060): Kopf 2, Inhalt 6 Spalten ---- */
 .page-section {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -245,7 +245,7 @@ p.eigentuemerinnen__hinweis {
     margin: var(--space-1) 0 0;
 }
 
-/* Rot nur, weil Entfernen destruktiv ist (ADR-0024); als Textlink, nicht als Knopf. */
+/* Rot nur, weil Entfernen destruktiv ist (ADR-0060); als Textlink, nicht als Knopf. */
 .eigentuemerinnen__entfernen {
     width: auto;
     padding: 0;

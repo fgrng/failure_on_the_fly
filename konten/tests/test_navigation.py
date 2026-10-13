@@ -164,7 +164,7 @@ class SidebarNavigationTests(TestCase):
         self.assertNotIn("Training starten", sidebar)
 
     def test_jede_rolle_erreicht_die_abschriften(self) -> None:
-        """Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0043)."""
+        """Die Abschrift hängt am Konto, nicht an einer Rolle (ADR-0058)."""
         for rollen in ([], ["Autor:in"], ["Ausbilder:in"], ["Forschende:r"]):
             with self.subTest(rollen=rollen):
                 self.assertIn("Meine Abschriften", self._sidebar_fuer(*rollen))
@@ -208,7 +208,7 @@ class SidebarNavigationTests(TestCase):
 
 
 class BereichszuordnungTests(TestCase):
-    """Jede Seite trägt den Bereich ihrer Sidebar-Gruppe (ADR-0024)."""
+    """Jede Seite trägt den Bereich ihrer Sidebar-Gruppe (ADR-0060)."""
 
     def test_seiten_tragen_den_bereich_ihrer_sidebar_gruppe(self) -> None:
         """Seiten ohne eigene Farbe erben die Gruppe, unter der sie stehen."""

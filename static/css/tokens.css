@@ -1,5 +1,5 @@
 /* Design-Tokens – abgeleitet aus dem PHSG Corporate Design (Guidelines 2026).
-   Siehe docs/adr/0023-ui-design-tokens-phsg-cd.md.
+   Regeln in ADR-0060; die Werte hier sind die Quelle der Wahrheit.
 
    Grundhaltung: CD-konform, aber als eigenständiges Tool-UI. Farben werden
    nach ROLLE vergeben (semantische Tokens unten), nicht nach Farbname. Die
@@ -54,7 +54,7 @@
 
     /* ---- Semantisch: Farben nach Rolle ---- */
     --color-text: var(--phsg-gray-900);        /* primärer Lesetext */
-    --color-text-muted: var(--phsg-gray-700);  /* sekundär, ADR-0023 Option A */
+    --color-text-muted: var(--phsg-gray-700);  /* sekundär: Grayscale-700, nicht das Alt-CD-Grau #666 (ADR-0060) */
     --color-text-on-accent: var(--phsg-white); /* Text auf Farbflächen: weiss */
 
     --color-accent: var(--phsg-green-dark);      /* Links, Buttons, aktive Nav */
@@ -68,7 +68,17 @@
     --color-footer-bg: var(--phsg-deep-mint);
     --color-footer-text: var(--phsg-white);
 
-    /* ---- Semantisch: Bereichs- und Gefahrfarben (ADR-0024) ---- */
+    /* ---- Semantisch: Bereichs- und Gefahrfarben (ADR-0060) ----
+       Zuordnung der Funktionsbereiche (Sidebar-Gruppen in
+       templates/includes/sidebar.html, Bereichsklasse area--* je Seite):
+         participant  Grün/Mint  Teilnehmen & Trainingspraxis (Sitzung, Fragebogen, Trainings)
+         authoring    Gelb       Autor:in & Entwicklung (Vignetten-Editor, Simulationskern)
+         research     Violett    Forschung & Erhebung (Erhebungen, Items, Export)
+         system       Blau       System & Administration (Konten, Modell-Konfiguration)
+       Rot ist kein Bereich, sondern Gefahr. Bereichsfarbe tönt nur das Chrome;
+       Grün bleibt die einzige Interaktionsfarbe. Gelb-Sonderregel: yellow-dark
+       erreicht auf Weiß nur ~3:1, daher dunkle Schrift auf yellow-light statt
+       weiß auf yellow-dark. */
     --color-area-participant-solid: var(--phsg-mint-dark);
     --color-area-participant-on-solid: var(--phsg-white);
     --color-area-participant-tint: var(--phsg-green-light);

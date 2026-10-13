@@ -1,15 +1,9 @@
 ---
-status: amended
-amended-by: ["#168"]
+status: superseded
+superseded-by: ADR-0060
 ---
 
 # Farbcodierung nach Funktionsbereich
-
-> **Nachgeführt durch #168:** Die Verwaltung des Simulationskerns (Fassungen
-> anlegen, finalisieren) liegt im System-Bereich und ist **blau**; nur die
-> lesende Kern-Ansicht für Autor:innen bleibt **gelb**. Die Zuordnung unter
-> „Festlegungen" und „Folgen", der Kern wandere vollständig nach Gelb, gilt
-> so nicht mehr.
 
 Erweitert `docs/adr/0023`. Dort ist die Sekundärpalette (Grün, Mint, Blau, Rot, Violett, Gelb × Light/Bright/Dark/Deep) als Primitiv-Token angelegt, aber **ungenutzt** — „bis Kategorie-Kacheln o. Ä. gebaut werden". Diese Entscheidung belegt die Palette: Jeder große Funktionsbereich der Anwendung erhält eine eigene Farbfamilie, damit Teilnehmende, Autor:innen, Forschende und Administrator:innen auf einen Blick erkennen, in welchem Bereich sie sich befinden.
 
