@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0064
 ---
 
 # Die Denkspur fließt in den Verlauf zurück

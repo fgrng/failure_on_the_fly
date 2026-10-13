@@ -339,7 +339,7 @@ class TrainingssitzungTests(TestCase):
         self.assertFalse(Diagnose.objects.exists())
 
     def test_denkspur_bleibt_im_training_verborgen(self) -> None:
-        """Die Denkspur ist laut ADR-0005 ausschließlich im Probelauf sichtbar."""
+        """Die Denkspur ist laut ADR-0064 ausschließlich im Probelauf sichtbar."""
         self._sitzung_starten(
             [{"denkspur": "Interne Denkspur", "aeusserung": "Sichtbare Antwort."}]
         )

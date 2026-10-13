@@ -64,7 +64,6 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 
 **Sitzung und Datenspur**
 
-- ADR-0005 Denkspur pro Antwort; Teilnehmende sehen sie nie
 - ADR-0014 Der Probelauf ist eine schreibfreie Funktion über einem Tripel
 - ADR-0029 Die Datenspur wird long-relational, selbsttragend, pro Erhebung exportiert
 - ADR-0049 Einsicht folgt dem Anlass, nie der Vignette
@@ -77,8 +76,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0052 Wem die Nachrichtenrollen gehören
 - ADR-0054 Fester Vertrag zwischen Vignette und Vorlagen, samt Positionsmarker
 - ADR-0056 Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung
-- ADR-0062 Die Denkspur fließt in den Verlauf zurück
-- ADR-0063 Die Denkspur ist Regieperspektive, die Äußerung bleibt in der Rolle
+- ADR-0064 Die Denkspur: pro Antwort aus dem Ausgabeschema, Regieperspektive, im Verlauf, für Teilnehmende nie sichtbar
 
 **Architektur und Betrieb**
 

@@ -35,7 +35,7 @@ def _liste(*eintraege: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_openrouter_fragt_die_oeffentliche_liste_nach_structured_output() -> None:
-    """Die Sprachmodell-Naht verlangt Structured Output (ADR-0005)."""
+    """Die Sprachmodell-Naht verlangt Structured Output (ADR-0064)."""
 
     client = _client(_liste())
 

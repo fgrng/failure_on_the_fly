@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: ADR-0064
 ---
 
 # Die Denkspur ist Regieperspektive, die Äußerung bleibt in der Rolle

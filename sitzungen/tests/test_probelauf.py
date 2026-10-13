@@ -529,7 +529,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.assertContains(debrief, "Diagnose aufnehmen")
 
     def test_antwort_und_denkspur_werden_live_angezeigt(self) -> None:
-        """Eingabe, Äußerung und Denkspur stehen in der Antwort (ADR-0005)."""
+        """Eingabe, Äußerung und Denkspur stehen in der Antwort (ADR-0064)."""
 
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))

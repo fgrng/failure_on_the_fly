@@ -24,7 +24,7 @@ LEHRPERSON_SCHEMA: dict[str, object] = {
 }
 
 # Die Begründung steht vor dem Urteil, damit das Modell erst abwägt und dann
-# entscheidet — wie die Denkspur vor der Äußerung (ADR-0005).
+# entscheidet — wie die Denkspur vor der Äußerung (ADR-0064).
 BEWERTER_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -49,7 +49,7 @@ def nachrichten_bauen(
     Der System-Prompt steht einmal am Anfang; danach wechseln sich die
     Paare aus `user` und `assistant` ab, und die Eingabe ist die letzte
     `user`-Nachricht (ADR-0052). Die Denkspur erreicht keinen Eintrag
-    (ADR-0005).
+    (ADR-0064).
     """
 
     nachrichten: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]

@@ -561,7 +561,7 @@ def test_ansicht_rendert_lernauftrag_und_arbeitsheft_als_szenentext(
 
 @pytest.mark.django_db
 def test_ansicht_verschweigt_die_denkspur(client: Client) -> None:
-    """ADR-0005 gilt auch nachträglich und auch im Trainingsbereich."""
+    """ADR-0064 gilt auch nachträglich und auch im Trainingsbereich."""
 
     inhalt: str = _gelesene_ansicht(client)
 

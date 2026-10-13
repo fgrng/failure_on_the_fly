@@ -34,7 +34,7 @@ MAX_VERSUCHE: int = 3
 # eine einzelne Anfrage nicht selbst ab (docs/DEPLOYMENT.md, ADR-0059). 90 s
 # lassen dazu Luft, auch wenn mehrere Versuche in dieselbe Anfrage fallen und
 # der Endpunkt danach noch schreibt. Nach unten begrenzt die Denkspur, die das
-# Ausgabeschema vor der Äußerung erzwingt (ADR-0005): Ein Reasoning-Modell
+# Ausgabeschema vor der Äußerung erzwingt (ADR-0064): Ein Reasoning-Modell
 # liefert legitim erst nach 20-60 s. 90 s ist der schlechte Fall, nicht der
 # Normalfall.
 SPRACHMODELL_FRIST_SEKUNDEN: float = 90.0
@@ -139,7 +139,7 @@ def antwort_versuchen(
     Vignette; `simulation` kennt keine Vignette (ADR-0055). Der Arbeitskontext
     steht im System-Prompt: Eine gefüllte User-Prompt-Vorlage (Altbestand)
     wird gerendert mit einer Leerzeile angehängt (ADR-0052). Ihre früheren
-    Antworten sieht die Schüler:in samt Denkspur (ADR-0062).
+    Antworten sieht die Schüler:in samt Denkspur (ADR-0064).
     """
 
     system_prompt: str = vorlage_rendern(kern.system_prompt_vorlage, platzhalter)

@@ -273,7 +273,7 @@ def _gelesene_sitzungen(abschrift: Abschrift) -> list[dict[str, object]]:
     # Bereitet die kopierten Sitzungen zum Lesen auf. Die gespielte Folge steht
     # in der Vignettenposition; eine Sitzung ohne Position — die der Import
     # zulässt — hängt sich hinten an. Die Gesprächsschritte gehen vollständig in
-    # den Kontext, Denkspur eingeschlossen: Die Sichtbarkeitszusage aus ADR-0005
+    # den Kontext, Denkspur eingeschlossen: Die Sichtbarkeitszusage aus ADR-0064
     # hängt am Template, das die Denkspur nicht ausgibt.
 
     gespielte_folge: QuerySet[Sitzung] = (

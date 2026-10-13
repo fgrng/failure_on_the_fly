@@ -180,7 +180,7 @@ def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) ->
 
 def _schritt_kopieren(schritt: Gespraechsschritt, ziel: Sitzung) -> None:
     # Kopiert einen Gesprächsschritt einschließlich Denkspur: Der CheckConstraint
-    # lässt Äußerung ohne Denkspur nicht zu, die Sichtbarkeitszusage aus ADR-0005
+    # lässt Äußerung ohne Denkspur nicht zu, die Sichtbarkeitszusage aus ADR-0064
     # sitzt im Rendering.
 
     kopie: Gespraechsschritt = Gespraechsschritt.objects.create(

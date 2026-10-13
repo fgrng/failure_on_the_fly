@@ -108,7 +108,7 @@ def test_litellm_adapter_uebergibt_den_verlauf_als_konversationsnachrichten() ->
 def test_litellm_adapter_reicht_native_reasoning_felder_nicht_durch(
     feldname: str,
 ) -> None:
-    """Eine native Reasoning-Spur des Anbieters erreicht die Antwort nicht (ADR-0005)."""
+    """Eine native Reasoning-Spur des Anbieters erreicht die Antwort nicht (ADR-0064)."""
 
     completion = Mock(
         return_value=SimpleNamespace(
@@ -481,7 +481,7 @@ def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
 
 
 def test_antwort_versuchen_fordert_die_denkspur_vor_der_aeusserung_an() -> None:
-    """Das Ausgabeschema am Anbieter erzeugt die Denkspur zuerst (ADR-0005)."""
+    """Das Ausgabeschema am Anbieter erzeugt die Denkspur zuerst (ADR-0064)."""
 
     completion: Mock = _geglueckte_completion()
 

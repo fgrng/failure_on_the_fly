@@ -1,22 +1,9 @@
 ---
-status: amended
-amended-by: [ADR-0049, ADR-0052, ADR-0062, ADR-0063]
+status: superseded
+superseded-by: ADR-0064
 ---
 
 # Denkspur entsteht pro Antwort; Teilnehmende sehen sie nie
-
-> **Nachgeführt durch ADR-0049, ADR-0052, ADR-0062, ADR-0063:** Die Ausbilder:in sieht
-> die Denkspur nicht. Ihre Fremdeinsicht zeigt, was die Teilnehmer:in sieht;
-> die Denkspur bleibt Probelauf und Forschenden vorbehalten (ADR-0049). Der
-> Arbeitskontext steht im System-Prompt; jede `user`-Nachricht an die
-> simulierte Schüler:in ist eine Ansprache der Teilnehmer:in (ADR-0052). Der
-> Abschnitt „Die Denkspur fließt nicht in den Kontext zurück“ ist abgelöst:
-> Jede `assistant`-Nachricht trägt Denkspur und Äußerung als JSON-Objekt nach
-> dem Ausgabeschema; die native Nachrichtenform bleibt (ADR-0062).
->
-> Die Denkspur ist die Regieperspektive der Simulation auf die nächste
-> Äußerung, nicht ein Selbstgespräch in der Rolle. Sie darf Fachsprache nutzen
-> und das Fehlermuster benennen; nur die Äußerung ist in der Rolle (ADR-0063).
 
 Die **Denkspur** — das interne Reasoning der simulierten Schüler:in — entsteht **zu jeder einzelnen Antwort**, nicht als zusammenfassende Selbstauskunft am Ende einer Sitzung. Nur so wird nachvollziehbar, ob das Fehlermuster *durchgängig* konsistent angewandt wurde; genau das ist der forschende und didaktische Kern des Instruments.
 

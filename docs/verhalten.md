@@ -459,7 +459,7 @@ an. Danach wechseln sich die Ansprachen der Teilnehmer:in (`user`) und die
 Antworten der Schüler:in (`assistant`) ab, die erste `user`-Nachricht ist die
 erste Ansprache. Jede `user`-Nachricht stammt von der Teilnehmer:in (ADR-0052).
 Jede `assistant`-Nachricht trägt die frühere Antwort vollständig als JSON-Objekt
-nach dem Ausgabeschema, `{"denkspur": "…", "aeusserung": "…"}` (ADR-0062). Ein
+nach dem Ausgabeschema, `{"denkspur": "…", "aeusserung": "…"}` (ADR-0064). Ein
 Schritt ohne Antwort fehlt im Verlauf.
 
 ## Modell-Konfiguration
