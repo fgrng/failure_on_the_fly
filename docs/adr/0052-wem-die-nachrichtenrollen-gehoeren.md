@@ -26,4 +26,4 @@ Gepinnte Fassungen sind unveränderlich (ADR-0035), die Nachrichtenordnung ist C
 ## Consequences
 
 - Ob und wie sich die Schüler:in an das bisherige Gespräch erinnert, regelt allein der Prompttext einer Kern-Fassung, nicht der Code.
-- Der Standardkern behält seine gefüllte User-Prompt-Vorlage; frische Instanzen zeigen das Feld, bis eine neue Fassung es leert.
+- Der Standardkern trägt seit #438 den Arbeitskontext in der System-Prompt-Vorlage und lässt die User-Prompt-Vorlage leer. Frische Instanzen zeigen das Feld deshalb nicht; bestehende Instanzen übernehmen den neuen Text nur über eine neue Kern-Fassung.
