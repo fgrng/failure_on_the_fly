@@ -142,8 +142,8 @@ Die im Code mitgeführte kanonische Erstfassung der fünf Inhaltsfelder des Simu
 _Avoid_: mitgelieferte Vorlagen, Standardvorlagen, Default-Kern, Seed-Kern, Werkseinstellung
 
 **Denkspur**:
-Das interne Reasoning der simulierten Schüler:in, das zu jeder ihrer Antworten entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Der Simulationskern verlangt sie; sie gehört zur Rolle. Im weiteren Diagnosegespräch kennt die simulierte Schüler:in ihre früheren Denkspuren (ADR-0062).
-_Avoid_: Chain-of-Thought, Reasoning, Gedankengang, native Reasoning-Spur — das vom Modell selbst erzeugte Reasoning wird nicht aufbewahrt (ADR-0005).
+Die Regieperspektive der Simulation auf die nächste Äußerung: das interne Reasoning, das zu jeder Antwort der simulierten Schüler:in entsteht und getrennt von der sichtbaren Äußerung gespeichert wird. Sie darf Fachsprache nutzen und das Fehlermuster benennen; nur die Äußerung ist in der Rolle (ADR-0063). Der Simulationskern verlangt sie. Im weiteren Diagnosegespräch kennt die simulierte Schüler:in ihre früheren Denkspuren (ADR-0062).
+_Avoid_: Chain-of-Thought, Reasoning, Gedankengang, Selbstgespräch, native Reasoning-Spur — das vom Modell selbst erzeugte Reasoning wird nicht aufbewahrt (ADR-0005).
 
 **Fehlversuch**:
 Eine verworfene Antwort der simulierten Schüler:in samt ihrem Grund. Sie war nie Teil des Diagnosegesprächs und steht deshalb neben dem Transkript, nicht darin. Sie wird am Gesprächsschritt aufbewahrt, zu dem ihr Antwortversuch gehörte.
