@@ -866,9 +866,12 @@ das Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und
 das Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau
 eine Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
 anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
-(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
-Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und Basis-URL
-laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
+(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«,
+solange Anbieter und Basis-URL gleich bleiben. Wechselt eines von beiden, wird
+das alte Token nicht übernommen: Ein echter Anbieter meldet dann am Tokenfeld
+„Ohne Token bedient der Anbieter keinen Aufruf.“, der Wechsel auf `fake` leert
+das Token. Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und
+Basis-URL laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
 Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie nicht
 —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die Endpunktwurzel
 der Transkription, die bei diesem Anbieter unter einer anderen API-Version liegt

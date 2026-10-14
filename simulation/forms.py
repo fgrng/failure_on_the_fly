@@ -180,7 +180,7 @@ class TranskriptionsKonfigurationForm(ModelForm):
         help_texts: dict[str, str] = {
             "anbieter_token": (
                 "Der Ladeknopf unten braucht es. Leer lassen behält das "
-                "hinterlegte Token."
+                "hinterlegte Token, solange Anbieter und Basis-URL gleich bleiben."
             ),
             "anbieter_basis_url": BASIS_URL_HINWEIS,
             "transkriptionsmodell": "Mit dem Präfix des gewählten Anbieters.",
@@ -190,10 +190,20 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "anbieter_token": PasswordInput(render_value=False),
         }
 
-    def clean_anbieter_token(self) -> str:
-        """Liest eine leere Eingabe als »unverändert«, nicht als »löschen«.
+    def clean(self) -> dict[str, object]:
+        """Liest eine leere Eingabe am selben Endpunkt als »unverändert«.
 
         Das Feld zeigt den gesetzten Wert nie an; ohne diese Lesart wäre jede
-        Änderung an einem anderen Feld ein versehentlicher Tokenverlust.
+        Änderung an Modell oder Sprache ein versehentlicher Tokenverlust. Bei
+        neuem Anbieter oder neuer Basis-URL ginge das alte Token an einen
+        anderen Empfänger, also bleibt es dort leer.
         """
-        return self.cleaned_data["anbieter_token"] or self.instance.anbieter_token
+        cleaned_data: dict[str, object] = super().clean()
+        if (
+            not cleaned_data.get("anbieter_token")
+            and cleaned_data.get("anbieter") == self.instance.anbieter
+            and cleaned_data.get("anbieter_basis_url")
+            == self.instance.anbieter_basis_url
+        ):
+            cleaned_data["anbieter_token"] = self.instance.anbieter_token
+        return cleaned_data
