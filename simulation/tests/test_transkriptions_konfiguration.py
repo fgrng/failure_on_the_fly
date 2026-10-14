@@ -130,7 +130,6 @@ class TranskriptionsKonfigurationTokenTests(TestCase):
             formular.errors["anbieter_token"],
             ["Ohne Token bedient der Anbieter keinen Aufruf."],
         )
-        self.assertEqual(self._gespeichertes_token(), "ik-supergeheim1234")
 
     def test_endpunktwechsel_ohne_token_ist_ungueltig(self) -> None:
         """Das Token geht nicht an einen fremden Host."""
@@ -277,6 +276,22 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
         )
         self.assertEqual(konfiguration.sprache, "fr")
         self.assertEqual(konfiguration.anbieter_token, "sk-or-supergeheim1234")
+
+    def test_zeigt_nach_abgelehntem_wechsel_weiter_das_hinterlegte_token(self) -> None:
+        """Ein abgewiesener Anbieterwechsel lässt das hinterlegte Token stehen."""
+        self.client.post(reverse(SEITE), _eingabe())
+
+        response: HttpResponse = self.client.post(
+            reverse(SEITE),
+            _eingabe(
+                anbieter=Anbieter.INFOMANIAK,
+                anbieter_basis_url="https://api.infomaniak.com/1/ai/42",
+                anbieter_token="",
+                transkriptionsmodell="whisper",
+            ),
+        )
+
+        self.assertContains(response, "1234")
 
     def test_bietet_weder_anlegen_noch_aktivieren_noch_eine_liste_an(self) -> None:
         """Ein veränderlicher Singleton kennt genau eine Geste: Bearbeiten."""

@@ -1041,7 +1041,11 @@ def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
     )
     form: TranskriptionsKonfigurationForm
     if request.method == "POST":
-        form = TranskriptionsKonfigurationForm(request.POST, instance=konfiguration)
+        # Eine eigene Instanz, denn die Validierung schreibt die Eingabe
+        # hinein; die Anzeige des hinterlegten Tokens bleibt beim Gespeicherten.
+        form = TranskriptionsKonfigurationForm(
+            request.POST, instance=TranskriptionsKonfiguration.objects.aktuelle()
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Die Transkription ist neu eingestellt.")
