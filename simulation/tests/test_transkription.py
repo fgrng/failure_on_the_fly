@@ -4,7 +4,7 @@ from unittest.mock import ANY, Mock, patch
 
 import httpx
 import pytest
-from openai import APIConnectionError
+from openai import APIConnectionError, OpenAI
 
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import (
@@ -167,6 +167,7 @@ def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguratio
         base_url="https://openrouter.ai/api/v1",
         api_key="geheimes-token",
         timeout=120.0,
+        max_retries=0,
     )
     openai.return_value.audio.transcriptions.create.assert_called_once_with(
         model="whisper-large-v3",
@@ -191,6 +192,42 @@ def test_anbieterfunktion_gibt_openrouter_ohne_eigene_wurzel_die_vorgabe() -> No
         transkriptions_anbieter()
 
     assert openai.call_args.kwargs["base_url"] == "https://openrouter.ai/api/v1"
+
+
+@pytest.mark.django_db
+def test_anbieterfunktion_schickt_openrouter_jede_aufnahme_genau_einmal() -> None:
+    """Ohne Wiederholung des SDK bleibt eine Aufnahme im Budget (ADR-0059).
+
+    Das OpenAI-SDK wiederholt sonst zweimal, jeweils mit vollem Timeout, und
+    schickt dieselbe Aufnahme dreimal an den Auftragsverarbeiter (#491).
+    """
+
+    konfiguration: TranskriptionsKonfiguration = (
+        TranskriptionsKonfiguration.objects.aktuelle()
+    )
+    konfiguration.anbieter = Anbieter.OPENROUTER
+    konfiguration.anbieter_token = "geheimes-token"
+    konfiguration.transkriptionsmodell = "whisper-large-v3"
+    konfiguration.save()
+    anfragen: list[httpx.Request] = []
+
+    def anbieter(anfrage: httpx.Request) -> httpx.Response:
+        anfragen.append(anfrage)
+        return httpx.Response(500)
+
+    echter_client = OpenAI
+
+    def client_mit_zaehler(**kwargs: object) -> OpenAI:
+        return echter_client(
+            **kwargs, http_client=httpx.Client(transport=httpx.MockTransport(anbieter))
+        )
+
+    with patch("simulation.transkription.OpenAI", side_effect=client_mit_zaehler):
+        transkription = transkriptions_anbieter()
+    with pytest.raises(TranskriptionsAnbieterfehler):
+        transkription.transkribieren(b"aufgenommene-audiobytes")
+
+    assert len(anfragen) == 1
 
 
 class _Uhr:
