@@ -85,6 +85,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0044 Markdown mit zwei Profilen, Quelle bleibt roh
 - ADR-0055 Apps entlang der Domänenobjekte, azyklischer Importgraph, drei Nähte
 - ADR-0059 Nebenläufigkeit: SQLite, ein Thread je wartender Anfrage, ein Prozess für Evalläufe
+- ADR-0065 Betriebslog auf stderr, so vertraulich wie die Datenbank, keine Inhalte in Ausnahmetexten
 
 **UI**
 
