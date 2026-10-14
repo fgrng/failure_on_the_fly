@@ -150,8 +150,8 @@ Eine verworfene Antwort der simulierten Schüler:in samt ihrem Grund. Sie war ni
 _Avoid_: Fehler, Retry, Exception
 
 **Antwortversuch**:
-Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwort der simulierten Schüler:in zu erzeugen. Er setzt begrenzt oft an; jedes misslungene Ansetzen ist ein Fehlversuch. Er trägt, was dabei entsteht: die sichtbare Äußerung, die Denkspur und die angefallenen Fehlversuche. Er ist flüchtig und wird selbst nicht gespeichert. Aus ihm und der vorausgegangenen Eingabe entsteht ein Gesprächsschritt — mit Antwort, wenn er glückt; ohne Antwort, wenn er endgültig scheitert. Im zweiten Fall endet die Sitzung im Abbruch.
-_Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis.
+Das Bemühen der Simulation, auf eine Eingabe der Teilnehmer:in genau eine Antwort der simulierten Schüler:in zu erzeugen. Er setzt begrenzt oft an; jedes misslungene Ansetzen ist ein Fehlversuch. Er trägt, was dabei entsteht: die sichtbare Äußerung, die Denkspur und die angefallenen Fehlversuche. Er ist flüchtig und wird selbst nicht gespeichert. Aus ihm und der vorausgegangenen Eingabe entsteht ein Gesprächsschritt — mit Antwort, wenn er glückt; ohne Antwort, wenn er endgültig scheitert. Im zweiten Fall endet die Sitzung im Abbruch. Trifft ein Antwortversuch erst ein, wenn seine Sitzung schon beendet ist oder ein anderer Gesprächsschritt seinen Platz im Verlauf eingenommen hat, **verfällt** er: Es entsteht kein Gesprächsschritt, und nichts davon geht in die Datenspur.
+_Avoid_: Schrittergebnis, Ergebnis, Response, Modellantwort — ein Antwortversuch, der nur Fehlversuche enthält, ist ein gültiger Antwortversuch und hat kein Ergebnis; verworfener Gesprächsschritt — verworfen wird nur eine Antwort (Fehlversuch), und die bleibt erhalten.
 
 **Gesprächsbudget**:
 Die Grenze, an der das Diagnosegespräch einer Sitzung endet und der Debrief folgt. Pro Vignette ist genau ein Budget-Typ aktiv: Gesprächsschritte oder Zeitbegrenzung. Der Teilnehmer:in wird es nicht angezeigt (ADR-0057); es ist eine Obergrenze, kein Soll.
