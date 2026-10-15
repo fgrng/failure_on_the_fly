@@ -504,6 +504,9 @@ def test_finale_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> None:
         zuordnungen.update(position=9)
     with pytest.raises(ValidationError, match="eingefroren"):
         zuordnungen.delete()
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.get().delete()
+    assert zuordnungen.count() == 1
 
 
 @pytest.mark.django_db
@@ -523,6 +526,9 @@ def test_archivierte_erhebung_weist_jede_zuordnungsaenderung_ab(art: str) -> Non
         zuordnungen.update(position=9)
     with pytest.raises(ValidationError, match="eingefroren"):
         zuordnungen.delete()
+    with pytest.raises(ValidationError, match="eingefroren"):
+        zuordnungen.get().delete()
+    assert zuordnungen.count() == 1
 
 
 @pytest.mark.django_db
@@ -539,6 +545,7 @@ def test_entwurf_bleibt_in_seinen_zuordnungen_frei(art: str) -> None:
     zweite.save()
     zuordnungen.filter(pk=zweite.pk).update(position=8)
     zuordnungen.filter(pk=zweite.pk).delete()
+    _zuordnung_anlegen(erhebung, ada, art).delete()
 
     assert zuordnungen.count() == 1
 
@@ -557,6 +564,7 @@ def test_zurueckgezogene_erhebung_erlaubt_zuordnungen_wieder(art: str) -> None:
     zweite: models.Model = _zuordnung_anlegen(erhebung, ada, art)
     zuordnungen.filter(pk=zweite.pk).update(position=9)
     zuordnungen.filter(pk=zweite.pk).delete()
+    _zuordnung_anlegen(erhebung, ada, art).delete()
 
     assert zuordnungen.count() == 1
 

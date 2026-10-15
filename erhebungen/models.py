@@ -296,6 +296,13 @@ class Zuordnung(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
+    def delete(self, *args: object, **kwargs: object) -> tuple[int, dict[str, int]]:
+        """Löscht nur Zuordnungen von Entwürfen."""
+
+        if fehler := self._einfriersperre():
+            raise ValidationError(fehler)
+        return super().delete(*args, **kwargs)
+
 
 class Erhebungsvignette(Zuordnung):
     """Die finale Vignetten-Fassung einer Erhebung samt ihrer Listenposition.
