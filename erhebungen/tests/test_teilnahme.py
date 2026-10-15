@@ -1,11 +1,8 @@
 """HTTP-Tests für den pseudonymen Erhebungszugang."""
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
 from html.parser import HTMLParser
-from unittest.mock import patch
 
 import time_machine
 from django.db import models
@@ -16,7 +13,7 @@ from django.utils import timezone
 
 from config.tests.aufbau import finale_vignette
 from config.tests.formular import submit_knoepfe
-from config.tests.sprachmodell import anfragen_aufzeichnen
+from config.tests.sprachmodell import anfragen_aufzeichnen, vor_jedem_aufruf
 from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
@@ -30,9 +27,7 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation import Antwortversuch
 from simulation.models import ModellKonfiguration, Verwendung
-from sitzungen import durchlauf
 from sitzungen.sink import DBSink
 from sitzungen.models import (
     Diagnose,
@@ -1868,13 +1863,12 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen()
         self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten()
-        modellaufruf: Callable[..., Antwortversuch] = durchlauf.antwort_versuchen
 
-        def in_anderem_tab_abschliessen(*args: Any) -> Antwortversuch:
-            DBSink.fuer_sitzung(Sitzung.objects.get()).diagnose_setzen("Bruchfehler")
-            return modellaufruf(*args)
-
-        with patch.object(durchlauf, "antwort_versuchen", in_anderem_tab_abschliessen):
+        with vor_jedem_aufruf(
+            lambda _nachrichten: DBSink.fuer_sitzung(
+                Sitzung.objects.get()
+            ).diagnose_setzen("Bruchfehler")
+        ):
             antwort: HttpResponse = self.client.post(
                 reverse("erhebungen:gespraech", args=[bindung.token]),
                 {"eingabe": "Wie rechnest du?"},

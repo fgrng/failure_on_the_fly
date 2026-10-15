@@ -3,8 +3,6 @@
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime
-from typing import Any
-from unittest.mock import patch
 
 import time_machine
 from django.http import HttpResponse
@@ -13,10 +11,9 @@ from django.urls import reverse
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
+from config.tests.sprachmodell import vor_jedem_aufruf
 from konten.models import Konto
-from simulation import Antwortversuch
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
-from sitzungen import durchlauf
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -200,16 +197,10 @@ class TrainingssitzungTests(TestCase):
 
     def _waehrend_des_modellaufrufs(
         self, nebenher: Callable[[], object]
-    ) -> AbstractContextManager[object]:
+    ) -> AbstractContextManager[None]:
         """Lässt einen zweiten Tab handeln, während das Modell antwortet."""
 
-        modellaufruf: Callable[..., Antwortversuch] = durchlauf.antwort_versuchen
-
-        def aufruf(*args: Any) -> Antwortversuch:
-            nebenher()
-            return modellaufruf(*args)
-
-        return patch.object(durchlauf, "antwort_versuchen", aufruf)
+        return vor_jedem_aufruf(lambda _nachrichten: nebenher())
 
     def test_eingabe_auf_inzwischen_beendeter_sitzung_zeigt_den_stand(self) -> None:
         """Der verfallene Schritt führt zum Debrief samt Hinweis (ADR-0066)."""
@@ -302,6 +293,22 @@ class TrainingssitzungTests(TestCase):
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_abbrechen_einer_abgeschlossenen_sitzung_aendert_nichts(self) -> None:
+        """Der Abbruch gilt nur von `laufend` aus und zeigt den Stand (ADR-0066)."""
+        self._sitzung_starten([])
+        self.client.post(
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
+        )
+
+        response: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("abbrechen")
+        )
+
+        self.assertContains(response, "Bruchfehler")
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertEqual(Diagnose.objects.get(sitzung=sitzung).text, "Bruchfehler")
 
     def test_abgebrochene_sitzung_bietet_beim_beenden_keinen_debrief(self) -> None:
         """Über ihre Adresse führt eine abgebrochene Sitzung nicht zur Diagnose."""

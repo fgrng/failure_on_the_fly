@@ -1,15 +1,14 @@
 """Tests des Sitzungslaufs über seinen beiden Sinks."""
 
-from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
 
 import pytest
 from django.contrib.sessions.backends.db import SessionStore
 from time_machine import TimeMachineFixture
 
+from config.tests.sprachmodell import vor_jedem_aufruf
 from konten.models import Konto
-from simulation import Antwort, Antwortversuch
+from simulation import Antwort
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import (
     Diagnose,
@@ -18,7 +17,6 @@ from sitzungen.models import (
     Sitzung,
     Teilnahme,
 )
-from sitzungen import durchlauf
 from sitzungen.durchlauf import (
     Ausgang,
     gespraechsschritt_ausfuehren,
@@ -742,33 +740,25 @@ def test_beendete_sitzung_erhaelt_keinen_gespraechsschritt_mehr(beenden: str) ->
     ids=["geglueckt", "gescheitert"],
 )
 def test_schritt_auf_inzwischen_abgeschlossener_sitzung_verfaellt(
-    monkeypatch: pytest.MonkeyPatch, skript: list[dict[str, str]]
+    skript: list[dict[str, str]],
 ) -> None:
     """Weder Schritt noch `gescheitert`: Status und Diagnose bleiben (ADR-0066)."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(skript)
-    modellaufruf: Callable[..., Antwortversuch] = durchlauf.antwort_versuchen
 
     for sink in _geruestsenken():
         sitzung_starten(sink, vignette, konfiguration)
 
-        def waehrend_des_modellaufrufs_abschliessen(
-            *args: Any, sink: GeruestSink = sink
-        ) -> Antwortversuch:
-            _zweiter_tab(sink).diagnose_setzen("Zähler plus Zähler.")
-            return modellaufruf(*args)
-
-        monkeypatch.setattr(
-            durchlauf, "antwort_versuchen", waehrend_des_modellaufrufs_abschliessen
-        )
-
-        assert (
-            gespraechsschritt_ausfuehren(
+        with vor_jedem_aufruf(
+            lambda _nachrichten, sink=sink: _zweiter_tab(sink).diagnose_setzen(
+                "Zähler plus Zähler."
+            )
+        ):
+            ausgang: Ausgang = gespraechsschritt_ausfuehren(
                 sink, vignette, kern, konfiguration, eingabe="Warum?"
             )
-            is Ausgang.VERFALLEN
-        )
-        monkeypatch.undo()
+
+        assert ausgang is Ausgang.VERFALLEN
         nachher: GeruestSink = _zweiter_tab(sink)
         assert _sitzungszeile(sink).status == Sitzung.Status.ABGESCHLOSSEN
         assert nachher.abgegebene_diagnose == "Zähler plus Zähler."
