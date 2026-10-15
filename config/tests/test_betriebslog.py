@@ -27,21 +27,24 @@ urlpatterns = [path("scheitern/", _scheitern)]
 
 @contextmanager
 def _stderr_mitschneiden() -> Iterator[io.StringIO]:
-    """Leitet den stderr-Handler des Root-Loggers in einen Puffer um.
+    """Leitet alle konfigurierten Stream-Handler in einen gemeinsamen Puffer um.
 
-    Der Handler hält den Strom, den er beim Start von Django vorfand; ein
+    Jeder Handler hält den Strom, den er beim Start von Django vorfand; ein
     Umlenken von `sys.stderr` erreicht ihn nicht mehr.
     """
 
-    handler: logging.StreamHandler = next(
-        h for h in logging.getLogger().handlers if h.get_name() == "stderr"
-    )
+    handler: list[logging.StreamHandler] = [
+        h
+        for name in logging.getHandlerNames()
+        if isinstance(h := logging.getHandlerByName(name), logging.StreamHandler)
+    ]
     puffer: io.StringIO = io.StringIO()
-    vorher = handler.setStream(puffer)
+    vorher = [h.setStream(puffer) for h in handler]
     try:
         yield puffer
     finally:
-        handler.setStream(vorher)
+        for h, strom in zip(handler, vorher, strict=True):
+            h.setStream(strom)
 
 
 @override_settings(DEBUG=False, ROOT_URLCONF=__name__)
@@ -90,6 +93,14 @@ class BetriebslogTests(TestCase):
             logging.getLogger("evals.management").info("Evallauf gestartet")
 
         self.assertEqual(stderr.getvalue().count("Evallauf gestartet"), 1)
+
+    def test_runserver_meldet_jede_anfrage_genau_einmal(self) -> None:
+        """Die Anfragezeilen von runserver bleiben ab INFO erhalten, ohne Doppel."""
+
+        with _stderr_mitschneiden() as stderr:
+            logging.getLogger("django.server").info('"GET /start/ HTTP/1.1" 200 5')
+
+        self.assertEqual(stderr.getvalue().count('"GET /start/ HTTP/1.1" 200 5'), 1)
 
 
 @override_settings(DEBUG=False)

@@ -1,5 +1,6 @@
 """Strukturelle Tests des echten LiteLLM-Adapters ohne Netz."""
 
+import traceback
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -654,10 +655,20 @@ def test_litellm_adapter_schaltet_die_hilfe_banner_ab() -> None:
     import litellm
 
     with patch.object(litellm, "suppress_debug_info", False):
+        LiteLLMSprachmodell("openai/gpt-test", {})
+
+        assert litellm.suppress_debug_info is True
+
+
+def test_ein_formatbruch_traegt_die_rohantwort_nicht_im_ausnahmetext() -> None:
+    """Ausnahmetexte tragen keine Inhalte, die Rohantwort reist im Feld (ADR-0065)."""
+
+    with pytest.raises(Formatbruch) as exc_info:
         LiteLLMSprachmodell(
-            "openai/gpt-test", {}, _completion_mit('{"aeusserung": "Warum?"}')
+            "openai/gpt-test", {}, _completion_mit("Markante Antwort 7f3a")
         ).antworten(
             "System", [], "Eingabe", LEHRPERSON_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
         )
 
-        assert litellm.suppress_debug_info is True
+    assert "7f3a" not in "".join(traceback.format_exception(exc_info.value))
+    assert exc_info.value.rohantwort == "Markante Antwort 7f3a"

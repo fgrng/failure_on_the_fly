@@ -20,8 +20,9 @@ def test_fake_begrenzt_seine_verzoegerung_auf_die_anfragefrist(
 
     with patch("time.sleep", gewartet.append):
         if abgelaufen:
-            with pytest.raises(Anbieterfehler, match="Frist des Fake-Aufrufs"):
+            with pytest.raises(Anbieterfehler) as exc_info:
                 fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=3.0)
+            assert "Frist des Fake-Aufrufs" in exc_info.value.rohantwort
         else:
             assert fake.antworten("", [], "", LEHRPERSON_SCHEMA, timeout=3.0) == {
                 "aeusserung": "Erste"
