@@ -1040,16 +1040,15 @@ def debrief(request: HttpRequest, pk: int) -> HttpResponse:
     sitzung: Sitzung = training_sitzung(request, pk)
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
-        if sitzung.status == Sitzung.Status.GESCHEITERT:
-            return persistierten_fehler_anzeigen(
-                request, sitzung, _sitzungsnavigation(pk)
+        if sitzung.status == Sitzung.Status.LAUFEND:
+            DBSink.fuer_sitzung(sitzung).diagnose_setzen(
+                request.POST["diagnose"],
+                eingabemodus=Eingabemodus.aus_formular(
+                    request.POST.get("eingabemodus")
+                ),
             )
-        if sitzung.status != Sitzung.Status.LAUFEND:
-            return _zur_auswahl_zurueckkehren(sitzung)
-        DBSink.fuer_sitzung(sitzung).diagnose_setzen(
-            request.POST["diagnose"],
-            eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
-        )
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return persistierten_fehler_anzeigen(request, sitzung, _sitzungsnavigation(pk))
     return _zur_auswahl_zurueckkehren(sitzung)
 
 
