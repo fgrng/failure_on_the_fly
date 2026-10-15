@@ -29,7 +29,7 @@
     Die Texte zu den drei Einwilligungen sind systemseitig, wörtlich verbindlich
     (#278) und nicht abschaltbar. Keine Option ist vorausgewählt.
     {% endcomment %}
-    <form class="form" method="post">
+    <form class="form" method="post" action="{% url 'erhebungen:einwilligung' teilnahme_link %}">
         {% csrf_token %}
         <section class="page-section" aria-labelledby="section-sprachmodell">
             <header class="page-section__head">
@@ -102,7 +102,7 @@
     Ein eigenes Formular mit eigener Route: Die Tokeneingabe greift nicht in die
     Einwilligungen ein.
     {% endcomment %}
-    <form class="form" method="post" action="{% url 'erhebungen:fortsetzen' request.resolver_match.kwargs.teilnahme_link %}">
+    <form class="form" method="post" action="{% url 'erhebungen:fortsetzen' teilnahme_link %}">
         {% csrf_token %}
         <section class="page-section" aria-labelledby="section-fortsetzen">
             <header class="page-section__head">

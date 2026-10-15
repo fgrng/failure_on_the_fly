@@ -1113,6 +1113,7 @@ def _einwilligung_rendern(
             "spracherkennung_angeboten": (
                 "audioverarbeitung_eingewilligt" in _angebotene_einwilligungen()
             ),
+            "teilnahme_link": stichprobe.teilnahme_link,
             "token_formular": token_formular,
         },
     )
@@ -1132,14 +1133,15 @@ def fortsetzen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     if eigene is not None and eigene.teilnahme.sprachmodell_eingewilligt:
         return HttpResponseBadRequest("Die Einwilligungen wurden bereits festgehalten.")
     formular: TeilnahmeTokenFormular = TeilnahmeTokenFormular(request.POST)
-    bindung: Erhebungsbindung | None = None
-    if formular.is_valid():
-        bindung = _laufende_bindung_oder_none(formular.cleaned_data["token"])
-        if bindung is None:
-            # Dieselbe Meldung wie für leere Eingaben: Sie verrät nicht, ob das
-            # Token existiert.
-            formular.add_error("token", KEINE_FORTSETZUNG)
+    if not formular.is_valid():
+        return _einwilligung_rendern(request, stichprobe, formular)
+    bindung: Erhebungsbindung | None = _laufende_bindung_oder_none(
+        formular.cleaned_data["token"]
+    )
     if bindung is None:
+        # Dieselbe Meldung wie für leere Eingaben: Sie verrät nicht, ob das
+        # Token existiert.
+        formular.add_error("token", KEINE_FORTSETZUNG)
         return _einwilligung_rendern(request, stichprobe, formular)
     _bindung_in_session_speichern(request, bindung)
     return _ohne_zutritt(
