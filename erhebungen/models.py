@@ -272,8 +272,8 @@ class Zuordnung(models.Model):
     """Was eine Erhebung in ihr Design einbindet, solange sie Entwurf ist.
 
     Die Basis trägt die Einfrier-Sperre (ADR-0027) und nichts sonst: Jede Erbin
-    bringt ihr eigenes Feld `erhebung` mit, prüft dessen Status im `clean` und
-    lässt jeden Schreibweg über diese Prüfung laufen.
+    bringt ihr eigenes Feld `erhebung` mit und prüft dessen Status im `clean`;
+    `delete` prüft ihn ohne `clean` direkt in der Basis.
     """
 
     objects: models.Manager["Zuordnung"] = ZuordnungQuerySet.as_manager()
