@@ -169,7 +169,9 @@ Zustand listet. Eine archivierte Fassung ist nicht mehr spielbar; auch ein
 direkter Start über sie scheitert. Administrator:innen wählen im freien
 Probelauf Kern und Modell-Konfiguration beliebig, als Vignette nur eine finale.
 Wird die Fassung während eines laufenden Probelaufs archiviert, läuft er bis zum
-Debrief weiter.
+Debrief weiter. Eine archivierte Fassung bietet »Entarchivieren« nur an, solange
+ihre Vorgängerin keine andere nicht archivierte Nachfolgerin hat; ein Versuch
+führt sonst mit einer Meldung zurück auf ihre Detailansicht.
 
 ## Trainings verwalten
 

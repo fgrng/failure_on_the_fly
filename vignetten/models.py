@@ -583,9 +583,30 @@ class Vignette(models.Model):
         )
         vignette_archiviert.send(sender=type(self), instance=self)
 
+    def _hat_aktive_schwester(self) -> bool:
+        # Prüft, ob eine nicht archivierte Schwester dieselbe Vorgängerin belegt.
+        return (
+            self.vorgaengerin_id is not None
+            and type(self)
+            .objects.filter(vorgaengerin_id=self.vorgaengerin_id)
+            .exclude(pk=self.pk)
+            .exclude(zustand=self.Zustand.ARCHIVIERT)
+            .exists()
+        )
+
+    def kann_entarchiviert_werden(self) -> bool:
+        """Prüft, ob keine aktive Schwester dieselbe Vorgängerin belegt."""
+        return (
+            self.zustand == self.Zustand.ARCHIVIERT and not self._hat_aktive_schwester()
+        )
+
     @transaction.atomic
     def entarchivieren(self) -> None:
         """Macht eine archivierte Fassung wieder final."""
+        if self._hat_aktive_schwester():
+            raise ValidationError(
+                "Die Vorgängerin hat bereits eine aktive Nachfolgerin."
+            )
         self._zustand_wechseln(
             self.Zustand.ARCHIVIERT,
             self.Zustand.FINAL,
