@@ -79,7 +79,7 @@
                             {% else %}Fehlt.{% endif %}
                         </dd></div>
                     </dl>
-                    {% if not gewaehlt.ist_fake and not gewaehlt.zero_retention_erklaert %}
+                    {% if gewaehlt.erklaerbar %}
                         <form method="post" action="{% url 'simulation:modell_konfiguration_erklaeren' gewaehlt.pk %}" class="system-page-field-list">
                             {% csrf_token %}
                             {{ erklaerungsformular.non_field_errors }}

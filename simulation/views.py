@@ -802,6 +802,7 @@ class _Konfigurationszeile:
     parameter: object
     verwendungen: tuple[Verwendung, ...]
     ist_fake: bool
+    erklaerbar: bool
     zulaessig_fuer_schuelerin: bool
     zero_retention_erklaert: bool
     zero_retention_beleg: str
@@ -846,6 +847,7 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
                 if aktive.get(verwendung) == konfiguration.pk
             ),
             ist_fake=konfiguration.anbieter == Anbieter.FAKE,
+            erklaerbar=konfiguration.zero_retention_erklaerbar,
             zulaessig_fuer_schuelerin=konfiguration.zulaessig_fuer_schuelerin,
             zero_retention_erklaert=konfiguration.zero_retention_erklaert,
             zero_retention_beleg=konfiguration.zero_retention_beleg,
@@ -949,9 +951,7 @@ def modell_konfiguration_erklaeren(request: HttpRequest, pk: int) -> HttpRespons
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
     form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
     if not form.erklaeren(konfiguration, request.user):
-        if konfiguration.anbieter != Anbieter.FAKE and not (
-            konfiguration.zero_retention_erklaert
-        ):
+        if konfiguration.zero_retention_erklaerbar:
             return _liste_rendern(request, str(konfiguration.pk), form)
         # Hier steht kein Formular, an dem der Grund stehen könnte.
         for meldungen in form.errors.values():

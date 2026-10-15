@@ -1202,7 +1202,7 @@ class ZeroRetentionTorTests(TestCase):
             _aktivieren_url(konfiguration, Verwendung.SCHUELERIN), follow=True
         )
 
-        self.assertContains(response, "Zero-Retention-Erklärung aktivieren")
+        self.assertContains(response, "Diese trägt keine")
         self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
 
     def test_zeigt_den_schalter_der_schuelerin_gesperrt_samt_grund(self) -> None:
@@ -1254,6 +1254,7 @@ class ZeroRetentionUebersichtTests(TestCase):
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
     def _zeilen(self) -> list[str]:
+        # Die Tabellenzeilen der Übersicht, als HTML je Zeile.
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )

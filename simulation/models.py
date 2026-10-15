@@ -903,6 +903,12 @@ class ZeroRetentionFeldgruppe(models.Model):
 
         return self.zero_retention_erklaert_am is not None
 
+    @property
+    def zero_retention_erklaerbar(self) -> bool:
+        """Ob sich an dieser Fassung noch eine Erklärung abgeben lässt."""
+
+        return self.anbieter != Anbieter.FAKE and not self.zero_retention_erklaert
+
     def zero_retention_erklaeren(self, beleg: str, konto: models.Model) -> None:
         """Gibt die Erklärung ab: vor dem Anlegen mit, danach nachträglich.
 
@@ -935,6 +941,8 @@ class ZeroRetentionFeldgruppe(models.Model):
             .filter(pk=self.pk, zero_retention_erklaert_am=None)
             .update(**werte)
         ):
+            # Die gleichzeitige Erklärung gilt; die Fassung zeigt sie fortan.
+            self.refresh_from_db(fields=list(werte))
             raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
         for feld, wert in werte.items():
             setattr(self, feld, wert)

@@ -458,6 +458,22 @@ def test_eine_abgegebene_erklaerung_laesst_sich_nicht_aendern() -> None:
 
 
 @pytest.mark.django_db
+def test_eine_gleichzeitige_erklaerung_gewinnt_und_wird_sichtbar() -> None:
+    """Wer zu spät erklärt, überschreibt nichts und sieht die frühere Erklärung."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+    veraltet: ModellKonfiguration = ModellKonfiguration.objects.get(pk=konfiguration.pk)
+    konfiguration.zero_retention_erklaeren("AVV vom 01.10.2026", konto)
+
+    with pytest.raises(ValidationError):
+        veraltet.zero_retention_erklaeren("AVV vom 15.10.2026", konto)
+
+    assert veraltet.zero_retention_erklaert
+    assert veraltet.zero_retention_beleg == "AVV vom 01.10.2026"
+
+
+@pytest.mark.django_db
 def test_ohne_erklaerung_scheitert_die_aktivierung_fuer_die_schuelerin() -> None:
     """Das Tor sitzt in der Domäne, nicht nur in der Oberfläche."""
 

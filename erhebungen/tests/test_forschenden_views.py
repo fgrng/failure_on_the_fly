@@ -2299,7 +2299,8 @@ class ErhebungsExportTests(TestCase):
         """Der Anbieter macht den Modellnamen lesbar; Token und URL bleiben draußen."""
 
         ada: Konto = forschende("ada")
-        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         self.client.force_login(ada)
@@ -2328,9 +2329,7 @@ class ErhebungsExportTests(TestCase):
                     "parameter": '{"temperature": 0.2}',
                     "zero_retention_erklaert": "True",
                     "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
-                    "zero_retention_erklaert_am": timezone.localtime(
-                        konfiguration.zero_retention_erklaert_am, timezone.UTC
-                    ).isoformat(timespec="seconds"),
+                    "zero_retention_erklaert_am": "2026-07-01T08:00:00+00:00",
                 }
             ],
         )
