@@ -31,9 +31,13 @@ jobs:
       - run: uv run python manage.py makemigrations --check --dry-run
       - run: uv run pytest
 
-      # Schwachstellen-Audit der Produktivabhängigkeiten, derselbe Befehl wie
-      # in docs/DEPLOYMENT.md. Die Standard-Shell ist bash.
-      - run: uvx --python 3.14 pip-audit --no-deps --disable-pip -r <(uv export --frozen --no-dev --group deploy --no-hashes)
+      # Schwachstellen-Audit der Produktivabhängigkeiten wie in
+      # docs/DEPLOYMENT.md. Der Export läuft als eigener Befehl statt in
+      # <(…): Dort ginge sein Fehlschlag an bash -e vorbei, und pip-audit
+      # meldete über die leere Liste grün.
+      - run: |
+          uv export --frozen --no-dev --group deploy --no-hashes > "$RUNNER_TEMP/requirements.txt"
+          uvx --python 3.14 pip-audit --no-deps --disable-pip -r "$RUNNER_TEMP/requirements.txt"
 
       # ty läuft vorerst nur beratend: Befunde sind sichtbar, scheitern lässt
       # der Schritt die CI nicht (Spec #336, Ticket #347).

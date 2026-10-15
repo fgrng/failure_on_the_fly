@@ -570,7 +570,8 @@ uvx --python 3.14 pip-audit --no-deps --disable-pip -r <(uv export --frozen --no
 
 `--disable-pip` lässt pip-audit die gepinnten Versionen direkt prüfen, statt sie
 mit pip zu installieren; pip scheitert sonst an Paketen, deren `Requires-Python`
-Python 3.14 ausschließt. Die CI führt denselben Befehl aus.
+Python 3.14 ausschließt. Die CI führt dieselbe Prüfung aus, mit dem Export als
+eigenem Schritt.
 
 Meldet der Lauf Treffer, ist `uv lock --upgrade` plus Testlauf der Weg, danach
 ein Update wie oben.
