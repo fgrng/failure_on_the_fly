@@ -471,8 +471,12 @@ class VignetteConstraintTests(TestCase):
             lernauftrag_text="Lernauftrag",
             arbeitsheft_text="Bearbeitung",
         )
-        with self.assertRaises(IntegrityError), transaction.atomic():
+        with self.assertRaises(ValidationError):
             archivierte_schwester.entarchivieren()
+
+        archivierte_schwester.refresh_from_db()
+        self.assertEqual(archivierte_schwester.zustand, Vignette.Zustand.ARCHIVIERT)
+        self.assertFalse(archivierte_schwester.kann_entarchiviert_werden())
 
 
 @pytest.mark.django_db

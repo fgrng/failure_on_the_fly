@@ -2,7 +2,7 @@
 <section id="sitzung-debrief" class="sitzung-abschnitt sitzung-debrief" aria-labelledby="sitzung-debrief-titel">
     <header class="sitzung-abschnitt-kopf">
         <span>Rahmenhandlung · Debrief</span>
-        <h1 id="sitzung-debrief-titel">Ihre Diagnose</h1>
+        <h1 id="sitzung-debrief-titel" tabindex="-1" data-fokusziel>Ihre Diagnose</h1>
     </header>
     <img class="sitzung-illustration" src="{% static 'images/sitzung/rahmenhandlung-debrief-'|add:vignette.lehrperson_bildkuerzel|add:'.webp' %}" alt="Aquarell einer Lehrperson am Tisch im Gespräch, Gesicht bewusst unausgeformt; auf dem Tisch zwei Kaffeebecher und Notizblätter." width="800" height="800" loading="lazy" decoding="async">
     <div class="markdown-text sitzung-debrief__aufforderung">{{ debrief }}</div>

@@ -11,7 +11,7 @@ _VIEWS_MIT_TOKEN_IN_DER_URL: frozenset[str] = frozenset(
     {"gespraech", "gespraech_beenden", "debrief", "abbrechen", "itemblock"}
 )
 _VIEWS_MIT_TEILNAHME_LINK: frozenset[str] = frozenset(
-    {"einwilligung", "instruktion", "abschluss"}
+    {"einwilligung", "fortsetzen", "instruktion", "abschluss"}
 )
 
 

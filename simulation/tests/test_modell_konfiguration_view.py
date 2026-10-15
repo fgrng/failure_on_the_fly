@@ -91,13 +91,17 @@ class ModellKonfigurationRollenTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_weist_nicht_angemeldetes_konto_ab(self) -> None:
-        """Auch anonyme Anfragen erhalten die geforderte Zugriffsverweigerung."""
+    def test_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
+        """Anonyme Anfragen werden zur Anmeldung weitergeleitet (#476)."""
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/modell-konfiguration/",
+            fetch_redirect_response=False,
+        )
 
     def test_editor_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
         """Den Editor öffnet und nutzt nur die Administration."""
@@ -112,13 +116,17 @@ class ModellKonfigurationRollenTests(TestCase):
             self.assertEqual(response.status_code, 403)
         self.assertFalse(ModellKonfiguration.objects.exists())
 
-    def test_editor_weist_nicht_angemeldetes_konto_ab(self) -> None:
+    def test_editor_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
         """Ohne Anmeldung legt niemand eine Konfiguration an."""
         response: HttpResponse = self.client.post(
             reverse("simulation:modell_konfiguration_neu"), _anlegedaten()
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/modell-konfiguration/neu/",
+            fetch_redirect_response=False,
+        )
         self.assertFalse(ModellKonfiguration.objects.exists())
 
     def test_aktivieren_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
@@ -133,15 +141,16 @@ class ModellKonfigurationRollenTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.BEWERTER))
 
-    def test_aktivieren_weist_nicht_angemeldetes_konto_ab(self) -> None:
+    def test_aktivieren_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
         """Ohne Anmeldung schaltet niemand eine Verwendung um."""
         konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+        url: str = _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
 
-        response: HttpResponse = self.client.post(
-            _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
+        response: HttpResponse = self.client.post(url)
+
+        self.assertRedirects(
+            response, f"/accounts/login/?next={url}", fetch_redirect_response=False
         )
-
-        self.assertEqual(response.status_code, 403)
         self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
 
     def test_erklaeren_weist_autorin_ohne_administrationsrolle_ab(self) -> None:

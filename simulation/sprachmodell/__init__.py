@@ -48,14 +48,15 @@ def nachrichten_bauen(
 
     Der System-Prompt steht einmal am Anfang; danach wechseln sich die
     Paare aus `user` und `assistant` ab, und die Eingabe ist die letzte
-    `user`-Nachricht (ADR-0052). Die Denkspur erreicht keinen Eintrag
-    (ADR-0064).
+    `user`-Nachricht (ADR-0052). Welcher Inhalt in `assistant` steht,
+    bestimmt der Aufrufer; `antwort_versuchen` gibt dort bei der Schüler:in
+    die Denkspur mit (ADR-0064).
     """
 
     nachrichten: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    for frage, aeusserung in verlauf:
+    for frage, inhalt in verlauf:
         nachrichten.append({"role": "user", "content": frage})
-        nachrichten.append({"role": "assistant", "content": aeusserung})
+        nachrichten.append({"role": "assistant", "content": inhalt})
     nachrichten.append({"role": "user", "content": eingabe})
     return nachrichten
 
@@ -64,6 +65,9 @@ class _Modellantwortfehler(Exception):
     """Ein verworfener Modellaufruf mit seiner Rohantwort."""
 
     def __init__(self, rohantwort: str = "") -> None:
+        # Die Rohantwort ist Inhalt und bleibt aus dem Ausnahmetext, den ein
+        # Traceback ins Betriebslog schriebe (ADR-0065).
+        super().__init__()
         self.rohantwort: str = rohantwort
 
 
@@ -84,20 +88,27 @@ def _ausgabe_pruefen(
 ) -> dict[str, object]:
     """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
 
-    Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch.
+    Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch,
+    ebenso eine Zeichenkette, die leer ist oder nur aus Leerraum besteht: Jedes
+    Textfeld eines Ausgabeschemas ist Pflicht, so wie ein Gesprächsschritt ohne
+    Denkspur oder Äußerung unzulässig ist (ADR-0061). Der Inhalt bleibt dabei
+    unverändert.
     """
 
     eigenschaften: Mapping[str, Mapping[str, str]] = ausgabe_schema["properties"]
     if not isinstance(inhalt, dict) or set(inhalt) != set(eigenschaften):
         raise Formatbruch(rohantwort)
     for name, eigenschaft in eigenschaften.items():
-        if not isinstance(inhalt[name], _JSON_TYPEN[eigenschaft["type"]]):
+        wert: object = inhalt[name]
+        if not isinstance(wert, _JSON_TYPEN[eigenschaft["type"]]):
+            raise Formatbruch(rohantwort)
+        if isinstance(wert, str) and not wert.strip():
             raise Formatbruch(rohantwort)
     return inhalt
 
 
 class Sprachmodell(Protocol):
-    """Die einzige austauschbare Naht des Simulationskerns."""
+    """Die Sprachmodell-Naht; die Transkription ist die zweite Naht der App."""
 
     def antworten(
         self,
@@ -181,6 +192,9 @@ class LiteLLMSprachmodell:
             # Django-Start, also in jedem Test- und manage.py-Prozess.
             import litellm
 
+            # Die Hilfe-Banner, die LiteLLM bei Anbieterfehlern nach stdout
+            # druckt, verdecken die Fehlermeldungen im Betriebslog (ADR-0065).
+            litellm.suppress_debug_info = True
             completion = litellm.completion
         self.completion: Callable[..., Any] = completion
 

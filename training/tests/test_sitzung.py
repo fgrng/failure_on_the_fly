@@ -1,5 +1,7 @@
 """HTTP-Tests der persistierten Trainingssitzung."""
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 
 import time_machine
@@ -9,6 +11,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import finale_vignette, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
+from config.tests.sprachmodell import vor_jedem_aufruf
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from sitzungen.models import (
@@ -18,6 +21,7 @@ from sitzungen.models import (
     Sitzung,
     Vignettenposition,
 )
+from sitzungen.sink import DBSink
 from training.models import Training
 from training.tests.aufbau import route_der_letzten_sitzung
 from vignetten.models import Vignette
@@ -191,6 +195,80 @@ class TrainingssitzungTests(TestCase):
         self.client.post(route_der_letzten_sitzung("gespraech_beenden"))
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.GESCHEITERT)
 
+    def _waehrend_des_modellaufrufs(
+        self, nebenher: Callable[[], object]
+    ) -> AbstractContextManager[None]:
+        """Lässt einen zweiten Tab handeln, während das Modell antwortet."""
+
+        return vor_jedem_aufruf(lambda _nachrichten: nebenher())
+
+    def test_eingabe_auf_inzwischen_beendeter_sitzung_zeigt_den_stand(self) -> None:
+        """Der verfallene Schritt führt zum Debrief samt Hinweis (ADR-0066)."""
+        self._sitzung_starten([{"denkspur": "Meine Regel.", "aeusserung": "2/5."}])
+        gespraech: str = route_der_letzten_sitzung("gespraech")
+
+        with self._waehrend_des_modellaufrufs(
+            lambda: DBSink.fuer_sitzung(Sitzung.objects.get()).diagnose_setzen(
+                "Bruchfehler"
+            )
+        ):
+            response: HttpResponse = self.client.post(
+                gespraech, {"eingabe": "Wie rechnest du?"}, follow=True
+            )
+
+        self.assertRedirects(response, gespraech)
+        self.assertContains(
+            response, "Diese Sitzung wurde inzwischen an anderer Stelle beendet"
+        )
+        self.assertContains(response, "Bruchfehler")
+        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+
+    def test_verfallener_schritt_laedt_unter_htmx_die_ganze_seite_neu(self) -> None:
+        """Statt eines Fragments führt htmx zur Seite mit dem tatsächlichen Stand."""
+        self._sitzung_starten([{"denkspur": "Meine Regel.", "aeusserung": "2/5."}])
+        gespraech: str = route_der_letzten_sitzung("gespraech")
+
+        with self._waehrend_des_modellaufrufs(
+            lambda: DBSink.fuer_sitzung(Sitzung.objects.get()).status_setzen(
+                Sitzung.Status.ABGEBROCHEN
+            )
+        ):
+            response: HttpResponse = self.client.post(
+                gespraech,
+                {"eingabe": "Wie rechnest du?"},
+                headers={"HX-Request": "true"},
+            )
+
+        self.assertEqual(response["HX-Redirect"], gespraech)
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_doppelt_gesendete_eingabe_ergibt_einen_schritt(self) -> None:
+        """Der überholte Schritt verfällt still; das Gespräch zeigt den Gewinner."""
+        self._sitzung_starten([{"denkspur": "Meine Regel.", "aeusserung": "2/5."}])
+        gespraech: str = route_der_letzten_sitzung("gespraech")
+
+        with self._waehrend_des_modellaufrufs(
+            lambda: DBSink.fuer_sitzung(
+                Sitzung.objects.get()
+            ).gespraechsschritt_anhaengen(
+                eingabe="Zuerst gesendet",
+                eingabemodus=Eingabemodus.GETIPPT,
+                denkspur="Meine Regel.",
+                aeusserung="2/5.",
+                fehlversuche=[],
+            )
+        ):
+            response: HttpResponse = self.client.post(
+                gespraech, {"eingabe": "Wie rechnest du?"}, follow=True
+            )
+
+        self.assertRedirects(response, gespraech)
+        self.assertContains(response, "Zuerst gesendet")
+        self.assertNotContains(response, "an anderer Stelle beendet")
+        self.assertEqual(Gespraechsschritt.objects.count(), 1)
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
     def test_abbrechen_setzt_den_gewollten_status_ohne_diagnose(self) -> None:
         """Ein aktiver Abbruch bleibt vom technischen Scheitern unterscheidbar."""
         training: Training = self._sitzung_starten([])
@@ -215,6 +293,22 @@ class TrainingssitzungTests(TestCase):
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
         self.assertFalse(Diagnose.objects.filter(sitzung=sitzung).exists())
+
+    def test_abbrechen_einer_abgeschlossenen_sitzung_aendert_nichts(self) -> None:
+        """Der Abbruch gilt nur von `laufend` aus und zeigt den Stand (ADR-0066)."""
+        self._sitzung_starten([])
+        self.client.post(
+            route_der_letzten_sitzung("debrief"), {"diagnose": "Bruchfehler"}
+        )
+
+        response: HttpResponse = self.client.post(
+            route_der_letzten_sitzung("abbrechen")
+        )
+
+        self.assertContains(response, "Bruchfehler")
+        sitzung: Sitzung = Sitzung.objects.get()
+        self.assertEqual(sitzung.status, Sitzung.Status.ABGESCHLOSSEN)
+        self.assertEqual(Diagnose.objects.get(sitzung=sitzung).text, "Bruchfehler")
 
     def test_abgebrochene_sitzung_bietet_beim_beenden_keinen_debrief(self) -> None:
         """Über ihre Adresse führt eine abgebrochene Sitzung nicht zur Diagnose."""

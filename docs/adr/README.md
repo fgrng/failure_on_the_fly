@@ -70,6 +70,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0049 Einsicht folgt dem Anlass, nie der Vignette
 - ADR-0057 Das Gesprächsbudget gehört der Vignette, ist unsichtbar, Uhr an der Sitzung
 - ADR-0061 Höchstens eine laufende Sitzung je Teilnahme; der Gesprächsschritt ist atomar
+- ADR-0066 Sitzungsübergänge sind bedingt; ein verspäteter oder überholter Antwortversuch verfällt
 
 **Simulation, Vorlagen und Anbieter**
 

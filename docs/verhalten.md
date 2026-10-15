@@ -20,6 +20,14 @@ Passwörter, vergibt die drei fachlichen Rollen als Groups und kann weitere
 Superuser ernennen. Konten lassen sich dort bewusst nicht löschen, solange #156
 den Umgang mit Löschbegehren noch nicht festlegt.
 
+Jede kontogebundene Seite leitet anonyme Anfragen, etwa nach abgelaufener
+Session, auf den Login mit `next` um; erst ein angemeldetes Konto ohne passende
+Rolle bekommt 403. Das gilt auch für alle Seiten der Administration unter
+`/system/`. Endpunkte, die das Frontend per JavaScript aufruft, wie die
+Transkription einer Trainingssitzung, antworten anonym mit 403 statt mit einem
+Redirect. Die Teilnahme-Routen der Erhebungen hängen an einem Token, nicht an
+einem Konto, und leiten nicht um.
+
 Die Sidebar gliedert die Links in die Gruppen Entwicklung (gelb), Ausbildung
 (grün), Forschung (violett) und System (blau). Die aktive Seite trägt die Fläche
 und einen Balken links im Ton ihrer Gruppe, beim Überfahren erscheint die halbe
@@ -169,7 +177,14 @@ Zustand listet. Eine archivierte Fassung ist nicht mehr spielbar; auch ein
 direkter Start über sie scheitert. Administrator:innen wählen im freien
 Probelauf Kern und Modell-Konfiguration beliebig, als Vignette nur eine finale.
 Wird die Fassung während eines laufenden Probelaufs archiviert, läuft er bis zum
-Debrief weiter.
+Debrief weiter. Eine archivierte Fassung bietet »Entarchivieren« nur an, solange
+ihre Vorgängerin keine andere nicht archivierte Nachfolgerin hat; ein Versuch
+führt sonst mit einer Meldung zurück auf ihre Detailansicht.
+
+Probelauf-Auswahl und Probelauf-Start setzen die Rolle Autor:in voraus, wie der
+Vignetteneditor; ohne sie antworten beide mit 403, auch einer Eigentümer:in, der
+die Rolle entzogen wurde. Der Kreis der Vignette bleibt dabei unverändert; mit
+der Rolle zurück ist der Probelauf wieder erreichbar (ADR-0037).
 
 ## Trainings verwalten
 
@@ -220,10 +235,16 @@ Trainingsteilnehmende kommen weiter ins Training. Der aktuelle Eigentümer-Kreis
 und die Administration gelangen über offene wie gesperrte Trainings-Links direkt
 zur Trainingsseite, ohne beizutreten: Auch wiederholte Aufrufe erzeugen weder
 Trainingsbindung noch Teilnahme und erhöhen die Zahl der Beigetretenen nicht.
-Erst ein tatsächlicher Sitzungsstart legt bei Bedarf die erforderliche Bindung
-und Teilnahme an. Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf
-unverändert erhalten. Der Link eines Entwurfs bleibt für alle Konten unbekannt
-(404). Ein Training ohne Vignetten lässt sich veröffentlichen und beitreten.
+Der Kreiszugang setzt die Rolle Ausbilder:in voraus (ADR-0037): Einer
+Eigentümer:in, der die Rolle entzogen wurde, öffnet der Kreis weder
+Trainingsseite noch Vignettenwahl noch den Weg an der Beitrittssperre vorbei.
+Sie gilt dann wie jedes andere Konto, erreicht das Training nur über eine eigene
+aktive Trainingsbindung und tritt über den offenen Link bei. Mit der Rolle
+zurück gilt wieder der Kreiszugang. Erst ein tatsächlicher Sitzungsstart legt
+bei Bedarf die erforderliche Bindung und Teilnahme an. Bestehende Bindungen und
+Sitzungen bleiben beim Linkaufruf unverändert erhalten. Der Link eines Entwurfs
+bleibt für alle Konten unbekannt (404). Ein Training ohne Vignetten lässt sich
+veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
@@ -307,9 +328,10 @@ beitreten; wer fernbleiben soll, wird über die Sperre des Beitritts
 ferngehalten. Erst „Entfernen bestätigen“ entfernt (nur per POST, sonst 405) und
 führt mit der Meldung „… ist aus dem Training entfernt.“ zurück auf die
 Kuratierseite. Entfernen dürfen alle Eigentümer:innen des Trainings und die
-Administration in jedem Training; fremde Ausbilder:innen und
-Trainingsteilnehmende bekommen 404, ebenso ein Entfernen für ein Konto ohne
-aktive Bindung an dieses Training. Es ändert sich dann nichts.
+Administration in jedem Training; fremde Ausbilder:innen bekommen 404, ebenso
+ein Entfernen für ein Konto ohne aktive Bindung an dieses Training. Konten ohne
+Rolle Ausbilder:in bekommen 403, Trainingsteilnehmende ebenso wie
+Eigentümer:innen, denen die Rolle entzogen wurde. Es ändert sich dann nichts.
 
 Entfernen führt in denselben Zustand wie ein eigener Austritt (siehe oben): Die
 Person verschwindet für Kreis und Administration rückwirkend aus Fremdeinsicht,
@@ -352,14 +374,16 @@ Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
 
 Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
 Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
-alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor ihrer
-Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
-Sitzungen, Sitzungen derselben Person in einem fremden Training, jede Sitzung
-einer aus dem Training Ausgetretenen und jede Sitzung für aus dem Kreis
-ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der Vignette
-antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
-Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die Diagnose
-als Text, ohne Formular.
+alle aktuellen Eigentümer:innen des Trainings mit der Rolle Ausbilder:in, auch
+für Sitzungen von vor ihrer Aufnahme, und die Administration. Nach einem
+Rollenentzug ist eine fremde Sitzung auch für eine Eigentümer:in unbekannt
+(404); ihre eigenen Sitzungen bleiben lesbar. Laufende, abgebrochene und
+gescheiterte fremde Sitzungen, Sitzungen derselben Person in einem fremden
+Training, jede Sitzung einer aus dem Training Ausgetretenen und jede Sitzung für
+aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der
+Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in
+in jedem Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die
+Diagnose als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
@@ -913,9 +937,12 @@ das Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und
 das Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau
 eine Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
 anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
-(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«.
-Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und Basis-URL
-laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
+(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«,
+solange Anbieter und Basis-URL gleich bleiben. Wechselt eines von beiden, wird
+das alte Token nicht übernommen: Ein echter Anbieter meldet dann am Tokenfeld
+„Ohne Token bedient der Anbieter keinen Aufruf.“, der Wechsel auf `fake` leert
+das Token. Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und
+Basis-URL laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
 Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie nicht
 —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die Endpunktwurzel
 der Transkription, die bei diesem Anbieter unter einer anderen API-Version liegt
@@ -965,6 +992,42 @@ Antwort heißt der Knopf „Gespräch beenden und Debrief anzeigen“. Im Debrie
 es keine Aktionszeile. Auf schmalen Bildschirmen steht der Erklärsatz allein
 oben, Abbrechen und Beenden teilen sich die Zeile darunter.
 
+Solange eine Frage abgeschickt ist und beantwortet wird, sind Senden,
+Spracheingabe, „Gespräch beenden“ und „Sitzung abbrechen“ gesperrt und das Feld
+ist schreibgeschützt. Ein zweiter Klick auf „Senden“ löst keinen zweiten Schritt
+aus, auch ohne htmx. Kommt die Anfrage nicht an (Netzabriss, Serverfehler),
+erscheint unten auf der Seite rot und für Screenreader angesagt „Die Anfrage ist
+nicht angekommen. Bitte versuchen Sie es erneut.“; der Hinweis gilt für jede
+htmx-Anfrage der Plattform und verschwindet mit der nächsten gelungenen. Danach
+ist das Feld wieder beschreibbar, der Text steht noch darin, und alle Knöpfe
+sind wieder frei. Scheitert dagegen die Antwort des Sprachmodells, erscheint wie
+bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“. Eine
+leere oder nur aus Leerraum bestehende Denkspur oder Äußerung zählt dabei als
+ungültige Ausgabe und wird wie jede andere wiederholt; dasselbe gilt für die
+Äußerung der Lehrperson und die Begründung des Bewerters im Evallauf.
+
+Nach jedem Tausch in der Sitzung springt der Tastaturfokus auf den neuen Inhalt,
+damit Screenreader ihn ansagen: nach einem Gesprächsschritt auf den neuen
+Schritt mit Frage und Antwort, nach einer gescheiterten Antwort auf die
+Fehleranzeige, nach „Gespräch beenden“ auf die Überschrift „Ihre Diagnose“ und
+beim Fragebogen unter der Sitzung auf dessen Überschrift „Fragen zu dieser
+Sitzung“. Gescrollt wird dabei wie bisher; der Fokus erzeugt keinen zusätzlichen
+Sprung.
+
+Gilt eine Eingabe nicht mehr, wenn ihre Antwort eintrifft, verfällt sie: Sie
+wird kein Gesprächsschritt, und nichts davon bleibt gespeichert, auch kein
+Fehlschlag. Das geschieht, wenn die Sitzung inzwischen in einem anderen Tab oder
+auf einem anderen Gerät abgeschlossen oder abgebrochen wurde, und bei zwei
+gleichzeitig abgeschickten Eingaben derselben Sitzung für die später
+beantwortete. Die Seite lädt dann neu und zeigt den tatsächlichen Stand: im
+Training die beendete Sitzung, in der Erhebung die aktuelle Stelle des Ablaufs,
+bei zwei gleichzeitigen Eingaben das Gespräch mit der zuerst beantworteten. Nur
+wenn die Sitzung inzwischen beendet ist, steht oben der Hinweis „Diese Sitzung
+wurde inzwischen an anderer Stelle beendet; Ihre letzte Eingabe wurde nicht mehr
+verarbeitet.“ Eine beendete Sitzung wechselt ihren Status nicht mehr: Ein
+späteres Abbrechen, Abschließen oder Scheitern ändert nichts und zeigt ihren
+Stand, und die Uhr eines Zeitbudgets bucht danach keine Zeit mehr.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der
@@ -1001,7 +1064,20 @@ Ziehung noch Sitzung. Ihr Knopf »Zur Startseite der Erhebung« führt zurück z
 Einwilligungsformular ohne Vorauswahl; eine neue Entscheidung ersetzt die alte.
 Ist die Verarbeitung durch Sprachmodelle einmal erteilt, stehen alle drei
 Entscheidungen fest; ein erneuter Aufruf des Einwilligungsformulars führt dann
-in den Ablauf. Wer der Speicherung nicht zustimmt, macht eine flüchtige
+in den Ablauf. Solange die Teilnahme dieses Browsers nicht eingewilligt hat,
+bietet die Einwilligungsseite darunter in einem eigenen Formular einen zweiten
+Weg: »Sie haben schon ein Teilnahme-Token?« mit Feld und »Hier fortsetzen«.
+Groß- und Kleinschreibung, Leerzeichen und ein fehlender Bindestrich zählen
+nicht (`vc9h ynfr` gilt als `VC9H-YNFR`). Gehört das Token zu einer laufenden,
+nicht archivierten Stichprobe, wird es unter deren Teilnahme-Link an den Browser
+gebunden — auch wenn die Seite über einen anderen Link erreicht wurde —, und es
+geht dort weiter, wo die Teilnahme steht, nach abgelehnter Verarbeitung durch
+Sprachmodelle also auf der Abbruchseite. Die beim Link-Aufruf angelegte, noch
+einwilligungslose Teilnahme bleibt dabei unverbunden liegen. Ein unbekanntes
+Token, eines außerhalb des Fensters oder einer archivierten Stichprobe und eine
+leere Eingabe ergeben dieselbe Meldung „Zu diesem Token lässt sich keine
+Teilnahme fortsetzen.“ auf der Einwilligungsseite, ohne zu verraten, ob das
+Token existiert. Wer der Speicherung nicht zustimmt, macht eine flüchtige
 Teilnahme: Die Vignetten werden genauso gespielt, Verlauf, Debrief und Diagnose
 erscheinen wie gewohnt, und ein Neuladen im selben Browser setzt an derselben
 Stelle fort. Gesprächsschritte, Fehlversuche und Diagnose liegen dabei aber nur
@@ -1035,7 +1111,8 @@ Teilnahme mit dem Abschlusstext. Damit das Token jederzeit ablesbar ist, zeigt
 die Seitenleiste es auf allen Teilnahmeseiten — von der Einwilligung über
 Instruktion, Diagnosegespräch und Debrief bis zu Fragebogen- und Abschlussseite
 — an der Stelle, an der sonst Konto oder Anmeldelink stehen, in fester Laufweite
-und mit der Bitte, es zu notieren. Während einer Teilnahme erscheinen dort weder
+und mit der Bitte, es zu notieren, weil sich die Teilnahme damit in einem
+anderen Browser fortsetzen lässt. Während einer Teilnahme erscheinen dort weder
 Kontoblock noch Anmeldelink, auch nicht bei nebenbei angemeldetem Konto; in
 Forschenden-Ansichten erscheint umgekehrt kein Teilnahme-Token. Unter dem
 Abschlusstext steht auf der Abschlussseite zusätzlich ein systemseitiger
@@ -1054,7 +1131,9 @@ abgegeben, bleibt sie im Debrief sichtbar, lässt sich aber nicht mehr ändern;
 hängt an der Sitzung ein Fragebogenblock, erscheint er darunter als eigener
 Abschnitt. Scheitert ein Antwortversuch endgültig, bleibt der Gesprächsschritt
 ohne Antwort erhalten. Nach dem Teilnahmefenster sind unfertige Teilnahmen
-verfallen und nicht fortsetzbar.
+verfallen und nicht fortsetzbar. Außerhalb des laufenden Fensters oder bei
+archivierter Stichprobe gilt das Token als unbekannt: Es ergibt dasselbe 404 wie
+ein geratenes Token und verrät so nicht, ob es existiert.
 
 Einwilligungs-, Instruktions- und Abschlusstext erscheinen als gerendertes
 Markdown: Absätze durch Leerzeilen, jeder einfache Zeilenumbruch bleibt

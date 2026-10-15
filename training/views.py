@@ -93,7 +93,7 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 
 def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
     """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
-    return Training.objects.sichtbar_fuer(konto).fremd_einsehbare_sitzungen()
+    return Training.objects.kreiszugang_fuer(konto).fremd_einsehbare_sitzungen()
 
 
 def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
@@ -149,18 +149,16 @@ def katalog(request: HttpRequest) -> HttpResponse:
     trainingsabfrage: QuerySet[Training] = (
         Training.objects.veroeffentlicht().zugaenglich_fuer(request.user)
     )
-    sichtbare_pks: set[int] = set()
     eigene_trainings_pks: set[int] = set(
         Training.objects.filter(eigentuemerinnen=request.user).values_list(
             "pk", flat=True
         )
     )
-    if ist_ausbilderin:
-        sichtbare_trainings: QuerySet[Training] = Training.objects.sichtbar_fuer(
-            request.user
-        )
-        trainingsabfrage = trainingsabfrage | sichtbare_trainings
-        sichtbare_pks = set(sichtbare_trainings.values_list("pk", flat=True))
+    sichtbare_trainings: QuerySet[Training] = Training.objects.kreiszugang_fuer(
+        request.user
+    )
+    trainingsabfrage = trainingsabfrage | sichtbare_trainings
+    sichtbare_pks: set[int] = set(sichtbare_trainings.values_list("pk", flat=True))
 
     trainings: list[dict[str, object]] = []
     for training in trainingsabfrage.distinct():
@@ -483,13 +481,15 @@ def austreten(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def teilnehmerin_entfernen(
     request: HttpRequest, pk: int, konto_pk: int
 ) -> HttpResponse:
     """Entfernt eine Trainingsteilnehmerin auf demselben Weg wie ihr Austritt.
 
-    Nur Kreis und Administration; allen anderen ist das Training unbekannt (404),
-    ebenso ein Konto ohne aktive Bindung (ADR-0049).
+    Nur Kreis mit Rolle Ausbilder:in und Administration; ohne Rolle 403 (ADR-0037),
+    sonst ist das Training fremden Konten unbekannt (404), ebenso ein Konto ohne
+    aktive Bindung (ADR-0049).
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -737,14 +737,15 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
 
     Wer aktiv dabei ist, landet auch bei gesperrtem Beitritt im Training,
-    ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
+    ebenso Kreis (mit Rolle Ausbilder:in) und Administration, die das Training
+    ohne Beitritt sehen.
     Ausgetretene treten über den offenen Link wieder bei, auch aus dem Kreis.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
     kreis: bool = (
-        Training.objects.sichtbar_fuer(request.user).filter(pk=training.pk).exists()
+        Training.objects.kreiszugang_fuer(request.user).filter(pk=training.pk).exists()
     )
     gebunden: bool = training.trainingsbindung_set.filter(konto=request.user).exists()
     if kreis and not gebunden:
@@ -891,6 +892,8 @@ def training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
 def laufende_training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
     """Lässt nur eine eigene laufende Trainingssitzung transkribieren."""
 
+    if not request.user.is_authenticated:
+        raise PermissionDenied
     sitzung: Sitzung = training_sitzung(request, pk)
     if sitzung.status != Sitzung.Status.LAUFEND:
         raise PermissionDenied
@@ -1023,10 +1026,8 @@ def abbrechen(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung: Sitzung = training_sitzung(request, pk)
-    if sitzung.status != Sitzung.Status.LAUFEND:
+    if not sitzung_abbrechen(DBSink.fuer_sitzung(sitzung)):
         return _terminale_sitzung_anzeigen(request, sitzung, _sitzungsnavigation(pk))
-    sink: DBSink = DBSink.fuer_sitzung(sitzung)
-    sitzung_abbrechen(sink)
     return _zur_auswahl_zurueckkehren(sitzung)
 
 
@@ -1039,16 +1040,15 @@ def debrief(request: HttpRequest, pk: int) -> HttpResponse:
     sitzung: Sitzung = training_sitzung(request, pk)
     with transaction.atomic():
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
-        if sitzung.status == Sitzung.Status.GESCHEITERT:
-            return persistierten_fehler_anzeigen(
-                request, sitzung, _sitzungsnavigation(pk)
+        if sitzung.status == Sitzung.Status.LAUFEND:
+            DBSink.fuer_sitzung(sitzung).diagnose_setzen(
+                request.POST["diagnose"],
+                eingabemodus=Eingabemodus.aus_formular(
+                    request.POST.get("eingabemodus")
+                ),
             )
-        if sitzung.status != Sitzung.Status.LAUFEND:
-            return _zur_auswahl_zurueckkehren(sitzung)
-        DBSink.fuer_sitzung(sitzung).diagnose_setzen(
-            request.POST["diagnose"],
-            eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
-        )
+    if sitzung.status == Sitzung.Status.GESCHEITERT:
+        return persistierten_fehler_anzeigen(request, sitzung, _sitzungsnavigation(pk))
     return _zur_auswahl_zurueckkehren(sitzung)
 
 

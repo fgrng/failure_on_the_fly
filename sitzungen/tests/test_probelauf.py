@@ -1,8 +1,10 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+import re
 from datetime import UTC, datetime
 
 import time_machine
+from django.contrib.auth.models import Group
 from django.contrib.sessions.backends.base import SessionBase
 from django.http import HttpResponse
 from django.test import Client, TestCase, override_settings
@@ -15,7 +17,7 @@ from config.tests.aufbau import (
     konto_mit_rollen,
     vignetten_entwurf,
 )
-from config.tests.formular import submit_knoepfe
+from config.tests.formular import letztes_fokusziel, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen, modellaufrufe_dauern
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
@@ -237,6 +239,62 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         self.assertContains(response, "<em>Mia</em> zeigt.")
         self.assertContains(debrief, "<li>[Diagnose](https://example.org)</li>")
 
+    def test_seite_laedt_den_hinweis_auf_gescheiterte_anfragen(self) -> None:
+        """Das Basistemplate bindet die Fehlerbehandlung samt angesagtem Hinweis ein."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einleitung, "js/anfragen.js")
+        self.assertContains(einleitung, 'id="anfragefehler"')
+
+    def test_debriefkopf_ist_fokusziel_nach_dem_tausch(self) -> None:
+        """Nach „Gespräch beenden“ landet der Fokus auf der Überschrift des Debriefs."""
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden"), headers={"HX-Request": "true"}
+        )
+
+        kopf: str = letztes_fokusziel(debrief.content.decode())
+        self.assertIn('id="sitzung-debrief-titel"', kopf)
+        self.assertIn('tabindex="-1"', kopf)
+
+    def _gespraechsformular(self) -> str:
+        """Liefert das öffnende Tag des Gesprächsformulars nach dem Start."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        formular: re.Match[str] | None = re.search(
+            r'<form id="gespraechseingabe-formular"[^>]*>', einleitung.content.decode()
+        )
+        self.assertIsNotNone(formular)
+        return formular.group(0)
+
+    def test_laufender_gespraechsschritt_sperrt_die_aktionszeile(self) -> None:
+        """Während der htmx-Anfrage des Formulars sind auch die Aktionsknöpfe gesperrt."""
+
+        gesperrt: re.Match[str] | None = re.search(
+            r'hx-disabled-elt="([^"]*)"', self._gespraechsformular()
+        )
+
+        self.assertIn(
+            ".sitzung-aktionen button",
+            [ziel.strip() for ziel in gesperrt.group(1).split(",")],
+        )
+
+    def test_gespraechsformular_nutzt_schreibschutz_und_einmaliges_absenden(
+        self,
+    ) -> None:
+        """Das Formular meldet sich für Freigabe nach Fehlern und Doppelklickschutz an."""
+
+        formular: str = self._gespraechsformular()
+
+        self.assertIn(" data-schreibschutz-waehrend-anfrage", formular)
+        self.assertIn(" data-einmal-absenden", formular)
+
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
 
@@ -357,6 +415,34 @@ class ProbelaufStartTests(_ProbelaufAufbau):
             einleitung, "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose."
         )
         self.assertNotContains(einleitung, "Sitzung abbrechen")
+
+
+class ProbelaufRollenentzugTests(_ProbelaufAufbau):
+    """Der Kreis der Vignette öffnet den Probelauf nur mit der Rolle (ADR-0037)."""
+
+    def _status(self) -> tuple[int, int]:
+        # Statuscodes von Auswahl und Start der eigenen Vignette.
+        auswahl: HttpResponse = self.client.get(reverse("sitzungen:probelauf_auswahl"))
+        start: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        return auswahl.status_code, start.status_code
+
+    def test_ohne_rolle_autorin_sind_auswahl_und_start_verboten(self) -> None:
+        """Ohne Rolle 403 und kein Probelauf; mit Rolle zurück wieder 200."""
+        autorin: Group = Group.objects.get(name="Autor:in")
+        self.ada.groups.remove(autorin)
+
+        self.assertEqual(self._status(), (403, 403))
+        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.ada.groups.add(autorin)
+        self.assertEqual(self._status(), (200, 200))
+
+    def test_administration_ohne_rolle_startet_weiter(self) -> None:
+        """Administration erreicht Auswahl und Start wie bisher."""
+        self.client.force_login(konto_mit_rollen("root", is_superuser=True))
+
+        self.assertEqual(self._status(), (200, 200))
 
 
 class ProbelaufGespraechTests(_ProbelaufAufbau):
@@ -699,6 +785,30 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
+
+    def test_neuer_gespraechsschritt_ist_fokusziel(self) -> None:
+        """Nach einem geglückten Schritt bekommt der neue Gesprächsschritt den Fokus."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        response: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"),
+            {"eingabe": "Wie rechnest du?"},
+            headers={"HX-Request": "true"},
+        )
+
+        schritt: str = letztes_fokusziel(response.content.decode())
+        self.assertIn('id="gespraechsschritt-neu"', schritt)
+        self.assertIn('tabindex="-1"', schritt)
+
+    def test_fehleranzeige_ist_fokusziel_hinter_dem_letzten_schritt(self) -> None:
+        """Nach einem gescheiterten Schritt bekommt die Fehleranzeige den Fokus."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
+        fehler: str = letztes_fokusziel(response.content.decode())
+        self.assertIn("gespraechseingabe--fehler", fehler)
+        self.assertIn('tabindex="-1"', fehler)
 
     def test_endgueltiger_fehlschlag_zeigt_erneutes_senden(self) -> None:
         """Ein endgültiger Fehlschlag bietet das Wiederholen derselben Eingabe an."""

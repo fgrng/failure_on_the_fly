@@ -14,6 +14,7 @@
     {% block extra_head %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
+    <script src="{% static 'js/anfragen.js' %}" defer></script>
 </head>
 <body class="sidebar-layout">
     {% include "includes/sidebar.html" %}
@@ -27,6 +28,7 @@
             </ul>
         {% endif %}
         {% block content %}{% endblock %}
+        <p id="anfragefehler" class="message--error anfragefehler" role="alert" hidden></p>
     </main>
 
 </body>
