@@ -1878,12 +1878,9 @@ class ErhebungsteilnahmeTests(TestCase):
             403,
         )
 
-    def test_token_ausserhalb_des_fensters_gilt_als_unbekannt(self) -> None:
-        """Die Token-Routen verraten nicht, ob ein Token außerhalb des Fensters existiert."""
+    def _status_der_token_routen(self, token: str) -> dict[str, int]:
+        """Ruft jede Token-Route mit ihrer Methode auf und sammelt die Statuscodes."""
 
-        self._vignette_anlegen()
-        self._erhebung_fertigstellen()
-        token: str = self._laufende_sitzung_starten().token
         routen: dict[str, str] = {
             "gespraech": "get",
             "gespraech_beenden": "post",
@@ -1891,35 +1888,57 @@ class ErhebungsteilnahmeTests(TestCase):
             "debrief": "post",
             "itemblock": "post",
         }
+        return {
+            route: getattr(self.client, methode)(
+                reverse(f"erhebungen:{route}", args=[token])
+            ).status_code
+            for route, methode in routen.items()
+        }
 
-        def status_codes(token: str) -> dict[str, int]:
-            return {
-                route: getattr(self.client, methode)(
-                    reverse(f"erhebungen:{route}", args=[token])
-                ).status_code
-                for route, methode in routen.items()
-            }
+    def test_unbekanntes_token_ergibt_auf_jeder_token_route_404(self) -> None:
+        """Ein geratenes Token findet auf keiner Token-Route etwas."""
 
-        unbekannt: dict[str, int] = dict.fromkeys(routen, 404)
-        self.assertEqual(status_codes("ZZZZ-ZZZZ"), unbekannt)
+        self.assertEqual(
+            set(self._status_der_token_routen("ZZZZ-ZZZZ").values()), {404}
+        )
 
+    def test_token_nach_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Nach dem Fensterende verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
         self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
         self.stichprobe.save(update_fields=["ende"])
-        self.assertEqual(status_codes(token), unbekannt)
 
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_vor_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Vor dem Fensterbeginn verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
         self.stichprobe.beginn = timezone.now() + timedelta(days=1)
         self.stichprobe.ende = timezone.now() + timedelta(days=2)
         self.stichprobe.save(update_fields=["beginn", "ende"])
-        self.assertEqual(status_codes(token), unbekannt)
 
-        self.stichprobe.beginn = timezone.now()
-        self.stichprobe.save(update_fields=["beginn"])
-        # Das Modell archiviert keine datentragende Stichprobe; der Test umgeht
-        # die Sperre, weil die Route den Fall trotzdem abweisen muss.
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_einer_archivierten_stichprobe_gilt_als_unbekannt(self) -> None:
+        """Bei archivierter Stichprobe verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        # Das Modell archiviert keine datentragende Stichprobe, der Zustand ist
+        # regulär unerreichbar; der Test umgeht die Sperre, weil die Route ihn
+        # trotzdem abweisen muss.
         models.QuerySet.update(
             Stichprobe.objects.filter(pk=self.stichprobe.pk), archiviert=True
         )
-        self.assertEqual(status_codes(token), unbekannt)
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
 
     def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
         """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""

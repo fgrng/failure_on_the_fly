@@ -1485,8 +1485,8 @@ def _laufende_bindung(token: str) -> Erhebungsbindung:
         Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"),
         token=token,
     )
-    # Außerhalb des Fensters gilt das Token als unbekannt: Ein eigener Status
-    # verriete, dass es existiert (ADR-0040).
+    # Außerhalb des Fensters oder bei archivierter Stichprobe gilt das Token als
+    # unbekannt: Ein eigener Status verriete, dass es existiert (ADR-0040).
     if (
         bindung.stichprobe.archiviert
         or bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND
