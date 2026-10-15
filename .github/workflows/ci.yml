@@ -14,7 +14,9 @@ jobs:
       # Python-Version kommt aus .python-version.
       - uses: astral-sh/setup-uv@v6
 
-      - run: uv sync
+      # --locked: Passt uv.lock nicht zu pyproject.toml, scheitert die CI,
+      # statt den Lock still zu aktualisieren.
+      - run: uv sync --locked
 
       # config/settings.py liest SECRET_KEY aus .env; der Platzhalter aus
       # .env.example genügt für die Tests.
@@ -28,6 +30,10 @@ jobs:
       # Fehlt eine Migration zu einer Model-Änderung, scheitert die CI.
       - run: uv run python manage.py makemigrations --check --dry-run
       - run: uv run pytest
+
+      # Schwachstellen-Audit der Produktivabhängigkeiten, derselbe Befehl wie
+      # in docs/DEPLOYMENT.md. Die Standard-Shell ist bash.
+      - run: uvx --python 3.14 pip-audit --no-deps --disable-pip -r <(uv export --frozen --no-dev --group deploy --no-hashes)
 
       # ty läuft vorerst nur beratend: Befunde sind sichtbar, scheitern lässt
       # der Schritt die CI nicht (Spec #336, Ticket #347).
