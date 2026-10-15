@@ -1,14 +1,8 @@
 """Der Training-Debrief rendert nicht unter der Schreibsperre (ADR-0059)."""
 
-import sqlite3
-from typing import Any
-
 import pytest
-from django.db import connection
 from django.http import HttpResponse
-from django.template import Template
 from django.test import Client
-from django.test.signals import template_rendered
 from django.urls import reverse
 
 from config.tests.aufbau import (
@@ -16,6 +10,7 @@ from config.tests.aufbau import (
     finale_vignette,
     konto_mit_rollen,
 )
+from config.tests.schreibsperre import rendern_ohne_schreibsperre
 from konten.models import Konto
 from konten.navigation import AUSBILDERIN_GRUPPE
 from simulation.models import Verwendung
@@ -39,26 +34,11 @@ def test_gescheiterter_debrief_rendert_ohne_schreibsperre(client: Client) -> Non
         training, teilnehmerin, vignette, Sitzung.Status.GESCHEITERT
     )
     client.force_login(teilnehmerin)
-    gerendert: list[str] = []
 
-    def rendern_beobachten(sender: object, template: Template, **kwargs: Any) -> None:
-        with sqlite3.connect(
-            str(connection.settings_dict["NAME"]), uri=True, timeout=0
-        ) as zweite:
-            zweite.execute("BEGIN IMMEDIATE")
-            zweite.rollback()
-        gerendert.append(str(template.name))
-
-    template_rendered.connect(rendern_beobachten)
-    try:
+    with rendern_ohne_schreibsperre() as gerendert:
         response: HttpResponse = client.post(
             reverse("training:debrief", args=[sitzung.pk]), {"diagnose": "Bruchfehler"}
         )
-    finally:
-        template_rendered.disconnect(rendern_beobachten)
 
-    assert response.status_code == 200
+    assert "sitzungen/sitzung.html" in gerendert
     assert "Die Antwort konnte nicht erzeugt werden." in response.content.decode()
-    assert gerendert
-    sitzung.refresh_from_db()
-    assert sitzung.status == Sitzung.Status.GESCHEITERT

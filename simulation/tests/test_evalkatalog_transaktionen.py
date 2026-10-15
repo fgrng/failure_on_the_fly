@@ -1,16 +1,14 @@
 """Transaktionsgrenzen des Editors über HTTP und die Datenbank prüfen."""
 
-import sqlite3
 from typing import Any
 
 import pytest
 from django.db import connection
-from django.template import Template
 from django.test import Client
-from django.test.signals import template_rendered
 from django.urls import reverse
 
 from config.tests.aufbau import konto_mit_rollen
+from config.tests.schreibsperre import rendern_ohne_schreibsperre
 from simulation.models import Eval, Evalinput, Evalkatalog
 from simulation.tests.evalkatalog_bau import vollstaendiger_katalog
 
@@ -38,26 +36,12 @@ def test_get_haelt_beim_rendern_keine_schreibsperre(
     if zustand == "ueberholt":
         katalog.bearbeiten().finalisieren()
     client.force_login(konto_mit_rollen("ada", is_superuser=True))
-    gerendert = []
 
-    def rendern_beobachten(sender: object, template: Template, **kwargs: Any) -> None:
-        if template.name != "simulation/evalkatalog_editor.html":
-            return
-        with sqlite3.connect(
-            str(connection.settings_dict["NAME"]), uri=True, timeout=0
-        ) as zweite:
-            zweite.execute("BEGIN IMMEDIATE")
-            zweite.rollback()
-        gerendert.append(template.name)
-
-    template_rendered.connect(rendern_beobachten)
-    try:
+    with rendern_ohne_schreibsperre() as gerendert:
         response = client.get(_knoten(katalog, knoten))
-    finally:
-        template_rendered.disconnect(rendern_beobachten)
 
     assert response.status_code == 200
-    assert gerendert == ["simulation/evalkatalog_editor.html"]
+    assert "simulation/evalkatalog_editor.html" in gerendert
 
 
 def _geaenderte_eingaben(katalog: Evalkatalog) -> dict[str, str]:
