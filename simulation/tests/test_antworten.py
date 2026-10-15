@@ -112,6 +112,82 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "leer",
+    [
+        {"denkspur": "", "aeusserung": "x"},
+        {"denkspur": "Ich addiere.", "aeusserung": ""},
+        {"denkspur": "Ich addiere.", "aeusserung": "\n"},
+        {"denkspur": "  ", "aeusserung": "2/5."},
+    ],
+)
+def test_antwort_versuchen_verwirft_leere_denkspur_oder_aeusserung(
+    leer: dict[str, str],
+) -> None:
+    """Ein leeres Pflichtfeld ist ein Formatbruch, kein geglückter Schritt (ADR-0061)."""
+
+    antwortversuch = antwort_versuchen(
+        {"lernauftrag": "Addiere zwei Brüche."},
+        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        ModellKonfiguration(
+            sprachmodell="fake",
+            parameter={
+                "skript": [leer, {"denkspur": "Ich addiere.", "aeusserung": "2/5."}]
+            },
+        ),
+        verlauf=[],
+        eingabe="Wie hast du gerechnet?",
+    )
+
+    assert antwortversuch.antwort is not None
+    assert antwortversuch.antwort.aeusserung == "2/5."
+    assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
+        "Formatbruch"
+    ]
+
+
+def test_antwort_versuchen_scheitert_an_anhaltend_leerer_ausgabe() -> None:
+    """Bleibt die Ausgabe in allen Versuchen leer, entsteht kein Gesprächsschritt."""
+
+    antwortversuch = antwort_versuchen(
+        {"lernauftrag": "Addiere zwei Brüche."},
+        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        ModellKonfiguration(
+            sprachmodell="fake",
+            parameter={"skript": [{"denkspur": "", "aeusserung": ""}] * 3},
+        ),
+        verlauf=[],
+        eingabe="Wie hast du gerechnet?",
+    )
+
+    assert antwortversuch.antwort is None
+    assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
+        "Formatbruch"
+    ] * 3
+
+
+def test_antwort_versuchen_laesst_leerraum_um_den_inhalt_unveraendert() -> None:
+    """Nur ein leeres Feld bricht das Format; umgebender Leerraum bleibt stehen."""
+
+    antwortversuch = antwort_versuchen(
+        {"lernauftrag": "Addiere zwei Brüche."},
+        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        ModellKonfiguration(
+            sprachmodell="fake",
+            parameter={
+                "skript": [{"denkspur": " Ich addiere.\n", "aeusserung": "\n2/5. "}]
+            },
+        ),
+        verlauf=[],
+        eingabe="Wie hast du gerechnet?",
+    )
+
+    assert antwortversuch.antwort is not None
+    assert antwortversuch.antwort.denkspur == " Ich addiere.\n"
+    assert antwortversuch.antwort.aeusserung == "\n2/5. "
+    assert antwortversuch.fehlversuche == []
+
+
 def _fake_konfiguration(
     skript: list[dict[str, object]], **parameter: object
 ) -> ModellKonfiguration:
@@ -173,12 +249,14 @@ def test_ausgabe_versuchen_liefert_die_ausgabe_des_bewerters() -> None:
         {"begruendung": "Muster gezeigt.", "erfuellt": "ja"},
         {"begruendung": "Muster gezeigt.", "erfuellt": True, "note": 1},
         {"denkspur": "Ich addiere.", "aeusserung": "2/5."},
+        {"begruendung": "", "erfuellt": True},
+        {"begruendung": " \n", "erfuellt": False},
     ],
 )
 def test_ausgabe_versuchen_verwirft_eine_ausgabe_neben_dem_schema(
     eintrag: dict[str, object],
 ) -> None:
-    """Fehlende, falsch typisierte oder zusätzliche Felder sind ein Formatbruch."""
+    """Fehlende, falsch typisierte, zusätzliche oder leere Felder sind ein Formatbruch."""
 
     ausgabeversuch = ausgabe_versuchen(
         "Du bewertest.",
@@ -192,6 +270,22 @@ def test_ausgabe_versuchen_verwirft_eine_ausgabe_neben_dem_schema(
     assert [fehlversuch.grund for fehlversuch in ausgabeversuch.fehlversuche] == [
         "Formatbruch"
     ] * 3
+
+
+@pytest.mark.parametrize("leer", ["", "  ", "\n"])
+def test_ausgabe_versuchen_verwirft_eine_leere_aeusserung_der_lehrperson(
+    leer: str,
+) -> None:
+    """Auch die Lehrperson muss etwas sagen; sonst folgt der nächste Versuch."""
+
+    ausgabeversuch = _lehrperson_versuchen(
+        _fake_konfiguration([{"aeusserung": leer}, {"aeusserung": "Warum?"}])
+    )
+
+    assert ausgabeversuch.ausgabe == {"aeusserung": "Warum?"}
+    assert [fehlversuch.grund for fehlversuch in ausgabeversuch.fehlversuche] == [
+        "Formatbruch"
+    ]
 
 
 def test_ausgabe_versuchen_wiederholt_hoechstens_max_versuche_mal() -> None:

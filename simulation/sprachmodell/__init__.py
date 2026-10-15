@@ -88,14 +88,20 @@ def _ausgabe_pruefen(
 ) -> dict[str, object]:
     """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
 
-    Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch.
+    Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch,
+    ebenso eine Zeichenkette, die leer ist oder nur aus Leerraum besteht: Ein
+    Gesprächsschritt ohne Denkspur oder Äußerung ist unzulässig (ADR-0061).
+    Der Inhalt bleibt dabei unverändert.
     """
 
     eigenschaften: Mapping[str, Mapping[str, str]] = ausgabe_schema["properties"]
     if not isinstance(inhalt, dict) or set(inhalt) != set(eigenschaften):
         raise Formatbruch(rohantwort)
     for name, eigenschaft in eigenschaften.items():
-        if not isinstance(inhalt[name], _JSON_TYPEN[eigenschaft["type"]]):
+        wert: object = inhalt[name]
+        if not isinstance(wert, _JSON_TYPEN[eigenschaft["type"]]):
+            raise Formatbruch(rohantwort)
+        if isinstance(wert, str) and not wert.strip():
             raise Formatbruch(rohantwort)
     return inhalt
 

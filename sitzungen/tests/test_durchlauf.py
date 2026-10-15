@@ -489,11 +489,14 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
 
 
 @pytest.mark.django_db
-def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
-    """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
+def test_leere_aeusserung_weicht_dem_naechsten_versuch() -> None:
+    """Eine leere Äußerung wird verworfen; der Verlauf trägt den nächsten Versuch."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "still", "aeusserung": ""}]
+        [
+            {"denkspur": "still", "aeusserung": ""},
+            {"denkspur": "Meine Regel.", "aeusserung": "2/5."},
+        ]
     )
 
     for sink in _senken():
@@ -502,7 +505,9 @@ def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
             sink, vignette, kern, konfiguration, eingabe="Erster Schritt"
         )
 
-        assert modellverlauf(sink) == [("Erster Schritt", Antwort("still", ""))]
+        assert modellverlauf(sink) == [
+            ("Erster Schritt", Antwort("Meine Regel.", "2/5."))
+        ]
 
 
 @pytest.mark.django_db

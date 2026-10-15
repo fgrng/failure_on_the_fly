@@ -940,7 +940,10 @@ nicht angekommen. Bitte versuchen Sie es erneut.“; der Hinweis gilt für jede
 htmx-Anfrage der Plattform und verschwindet mit der nächsten gelungenen. Danach
 ist das Feld wieder beschreibbar, der Text steht noch darin, und alle Knöpfe
 sind wieder frei. Scheitert dagegen die Antwort des Sprachmodells, erscheint wie
-bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“.
+bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“. Eine
+leere oder nur aus Leerraum bestehende Denkspur oder Äußerung zählt dabei als
+ungültige Ausgabe und wird wie jede andere wiederholt; dasselbe gilt für die
+Äußerung der Lehrperson und die Begründung des Bewerters im Evallauf.
 
 Nach jedem Tausch in der Sitzung springt der Tastaturfokus auf den neuen Inhalt,
 damit Screenreader ihn ansagen: nach einem Gesprächsschritt auf den neuen
