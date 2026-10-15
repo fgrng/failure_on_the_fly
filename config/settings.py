@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.utils.log import DEFAULT_LOGGING
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -182,16 +183,32 @@ EVALLAEUFE_SPERRE: Path = Path(
     os.environ.get("EVALLAEUFE_SPERRE", BASE_DIR / "evallaeufe.lock")
 )
 
-# Start, Ende und Abbrüche des Hintergrundprozesses gehen nach stderr, wo
-# supervisord sie einsammelt; Djangos eigenes Logging bleibt unverändert.
+# Das Betriebslog geht nach stderr, wo supervisord es einsammelt (ADR-0065):
+# alles ab WARNING, Serverfehler aus `django.request` samt Traceback erst ab
+# ERROR, damit kein 404 seinen Pfad samt Token schreibt. `evals` meldet Start,
+# Ende und Abbrüche des Hintergrundprozesses schon ab INFO. Der Logger
+# `django` verliert Djangos eigene Handler: `console` schriebe mit DEBUG=True
+# jede Meldung doppelt, `mail_admins` schickte Tracebacks aus dem Haus. Weil
+# das Konfigurieren von `django` auch `django.server` zurücksetzt, bekommt
+# runserver seine Anfragezeilen aus Djangos Standard zurück.
 LOGGING: dict[str, object] = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "betrieb": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"}
+        "betrieb": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+        "django.server": DEFAULT_LOGGING["formatters"]["django.server"],
     },
-    "handlers": {"stderr": {"class": "logging.StreamHandler", "formatter": "betrieb"}},
-    "loggers": {"evals": {"handlers": ["stderr"], "level": "INFO"}},
+    "handlers": {
+        "stderr": {"class": "logging.StreamHandler", "formatter": "betrieb"},
+        "django.server": DEFAULT_LOGGING["handlers"]["django.server"],
+    },
+    "root": {"handlers": ["stderr"], "level": "WARNING"},
+    "loggers": {
+        "django": {"handlers": [], "level": "WARNING"},
+        "django.request": {"level": "ERROR"},
+        "django.server": DEFAULT_LOGGING["loggers"]["django.server"],
+        "evals": {"level": "INFO"},
+    },
 }
 
 # Default primary key field type

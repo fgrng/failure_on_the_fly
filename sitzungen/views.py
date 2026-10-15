@@ -3,16 +3,23 @@
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import UploadedFile
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.navigation import ist_administratorin
+from konten.navigation import autorin_erforderlich, ist_administratorin
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
@@ -186,6 +193,7 @@ def _probelauf_starten(
 
 
 @login_required
+@autorin_erforderlich
 def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
     """Zeigt einer Autorin ihre Entwürfe und finalen Fassungen zur Wahl."""
 
@@ -196,6 +204,7 @@ def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@autorin_erforderlich
 def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     """Fixiert das Autorinnen-Tripel in der Session und zeigt die Einleitung."""
 
@@ -471,11 +480,18 @@ def _kein_sitzungsblock() -> str | None:
     return None
 
 
+_VERFALLEN_HINWEIS: str = (
+    "Diese Sitzung wurde inzwischen an anderer Stelle beendet; Ihre letzte "
+    "Eingabe wurde nicht mehr verarbeitet."
+)
+
+
 def persistiertes_gespraech(
     request: HttpRequest,
     sitzung: Sitzung,
     navigation: Sitzungsnavigation,
     sitzungsblock: Callable[[], str | None] = _kein_sitzungsblock,
+    nach_verfall: Callable[[], HttpResponseRedirect] | None = None,
 ) -> HttpResponse:
     """Führt einen Gesprächsschritt über die gemeinsame persistierte Darstellung aus.
 
@@ -483,6 +499,8 @@ def persistiertes_gespraech(
     Sitzung hängt. Er wird erst gerufen, wenn die gewählte Darstellung ihn
     wirklich trägt, weil sein Anlegen zur Datenspur gehört (ADR-0029).
     Welche Senke die Inhalte hält, entscheidet die Teilnahme der Sitzung.
+    `nach_verfall` führt nach einem verfallenen Antwortversuch dorthin, wo
+    ein Neuladen hinführte; ohne sie zurück auf die Gesprächsseite.
     """
 
     if request.method not in {"GET", "POST"}:
@@ -517,6 +535,12 @@ def persistiertes_gespraech(
         request.POST["eingabe"],
         Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
     )
+    if ausgang is Ausgang.VERFALLEN:
+        return _zum_tatsaechlichen_stand(
+            request,
+            sitzung,
+            nach_verfall() if nach_verfall else redirect(navigation.gespraech_url),
+        )
     if ausgang is Ausgang.GESCHEITERT:
         return persistierten_fehler_anzeigen(
             request, sitzung, navigation, sitzungsblock()
@@ -525,3 +549,20 @@ def persistiertes_gespraech(
         return persistierten_debrief_anzeigen(request, sitzung, navigation)
     sink.zug_beginnen(durchlauf.jetzt())
     return _persistiertes_gespraech_anzeigen(request, sitzung, navigation=navigation)
+
+
+def _zum_tatsaechlichen_stand(
+    request: HttpRequest, sitzung: Sitzung, weiterleitung: HttpResponseRedirect
+) -> HttpResponse:
+    # Führt nach einem verfallenen Antwortversuch wie ein Neuladen zum
+    # tatsächlichen Stand; nur eine inzwischen beendete Sitzung bekommt einen
+    # Hinweis (ADR-0066). Unter htmx lädt der Browser die ganze Seite, statt
+    # ein Fragment einzusetzen.
+
+    if sitzung.status != Sitzung.Status.LAUFEND:
+        messages.info(request, _VERFALLEN_HINWEIS)
+    if not durchlauf.ist_htmx(request):
+        return weiterleitung
+    antwort: HttpResponse = HttpResponse()
+    antwort["HX-Redirect"] = weiterleitung.url
+    return antwort

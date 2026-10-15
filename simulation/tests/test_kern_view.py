@@ -671,13 +671,17 @@ class SimulationskernVerwaltungTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_weist_nicht_angemeldetes_konto_ab(self) -> None:
-        """Auch anonyme Anfragen erhalten die geforderte Zugriffsverweigerung."""
+    def test_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
+        """Anonyme Anfragen werden zur Anmeldung weitergeleitet (#476)."""
         self.client.logout()
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/kern/verwalten/",
+            fetch_redirect_response=False,
+        )
 
 
 class SimulationskernLangeTexteTests(TestCase):

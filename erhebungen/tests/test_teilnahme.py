@@ -3,16 +3,18 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from html.parser import HTMLParser
+from uuid import UUID
 
 import time_machine
+from django.db import models
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from config.tests.aufbau import finale_vignette
-from config.tests.formular import submit_knoepfe
-from config.tests.sprachmodell import anfragen_aufzeichnen
+from config.tests.formular import letztes_fokusziel, submit_knoepfe
+from config.tests.sprachmodell import anfragen_aufzeichnen, vor_jedem_aufruf
 from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
@@ -27,6 +29,7 @@ from erhebungen.models import (
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Verwendung
+from sitzungen.sink import DBSink
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -72,6 +75,9 @@ _NICHT_GESPEICHERT: str = (
     "Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, "
     "Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert."
 )
+
+# Die eine Meldung, mit der die Tokeneingabe jedes unbrauchbare Token abweist.
+_KEINE_FORTSETZUNG: str = "Zu diesem Token lässt sich keine Teilnahme fortsetzen."
 
 # Ein Erhebungstext mit Hervorhebung, Link und Rohhtml (Profil informationstext).
 _MARKDOWN: str = (
@@ -1276,7 +1282,7 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
 
-        self.assertEqual(antwort.status_code, 403)
+        self.assertEqual(antwort.status_code, 404)
         itemantwort.refresh_from_db()
         self.assertIsNone(itemantwort.freitext)
 
@@ -1541,6 +1547,10 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertContains(antwort, 'id="itemblock-formular"')
+        # Der Kopf des Anhangs ist das letzte Fokusziel und bekommt den Fokus.
+        kopf: str = letztes_fokusziel(antwort.content.decode())
+        self.assertIn('id="sitzung-anhang-titel"', kopf)
+        self.assertIn('tabindex="-1"', kopf)
 
     def test_wiedereinstieg_fuehrt_zum_offenen_sitzungsblock(self) -> None:
         """Ein späterer Link-Aufruf führt den noch offenen Sitzungsblock weiter."""
@@ -1855,6 +1865,34 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotContains(antwort, "Ihre nächste Frage")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
 
+    def test_eingabe_auf_inzwischen_beendeter_sitzung_folgt_dem_ablauf(self) -> None:
+        """Der verfallene Schritt führt zur aktuellen Stelle samt Hinweis (ADR-0066)."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        with vor_jedem_aufruf(
+            lambda _nachrichten: DBSink.fuer_sitzung(
+                Sitzung.objects.get()
+            ).diagnose_setzen("Bruchfehler")
+        ):
+            antwort: HttpResponse = self.client.post(
+                reverse("erhebungen:gespraech", args=[bindung.token]),
+                {"eingabe": "Wie rechnest du?"},
+                follow=True,
+            )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+        )
+        self.assertContains(
+            antwort, "Diese Sitzung wurde inzwischen an anderer Stelle beendet"
+        )
+        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
+
     def test_nach_fensterende_verfaellt_die_laufende_teilnahme(self) -> None:
         """Ein abgelaufenes Fenster sperrt die laufende Sitzung ohne Kulanz."""
 
@@ -1868,7 +1906,7 @@ class ErhebungsteilnahmeTests(TestCase):
             self.client.get(
                 reverse("erhebungen:gespraech", args=[bindung.token])
             ).status_code,
-            403,
+            404,
         )
         self.assertEqual(
             self.client.post(
@@ -1876,6 +1914,68 @@ class ErhebungsteilnahmeTests(TestCase):
             ).status_code,
             403,
         )
+
+    def _status_der_token_routen(self, token: str) -> dict[str, int]:
+        """Ruft jede Token-Route mit ihrer Methode auf und sammelt die Statuscodes."""
+
+        routen: dict[str, str] = {
+            "gespraech": "get",
+            "gespraech_beenden": "post",
+            "abbrechen": "post",
+            "debrief": "post",
+            "itemblock": "post",
+        }
+        return {
+            route: getattr(self.client, methode)(
+                reverse(f"erhebungen:{route}", args=[token])
+            ).status_code
+            for route, methode in routen.items()
+        }
+
+    def test_unbekanntes_token_ergibt_auf_jeder_token_route_404(self) -> None:
+        """Ein geratenes Token findet auf keiner Token-Route etwas."""
+
+        self.assertEqual(
+            set(self._status_der_token_routen("ZZZZ-ZZZZ").values()), {404}
+        )
+
+    def test_token_nach_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Nach dem Fensterende verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_vor_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Vor dem Fensterbeginn verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        self.stichprobe.beginn = timezone.now() + timedelta(days=1)
+        self.stichprobe.ende = timezone.now() + timedelta(days=2)
+        self.stichprobe.save(update_fields=["beginn", "ende"])
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_einer_archivierten_stichprobe_gilt_als_unbekannt(self) -> None:
+        """Bei archivierter Stichprobe verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        # Das Modell archiviert keine datentragende Stichprobe, der Zustand ist
+        # regulär unerreichbar; der Test umgeht die Sperre, weil die Route ihn
+        # trotzdem abweisen muss.
+        models.QuerySet.update(
+            Stichprobe.objects.filter(pk=self.stichprobe.pk), archiviert=True
+        )
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
 
     def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
         """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""
@@ -2222,3 +2322,317 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(ItemAntwort.objects.exists())
         self.assertEqual(Itemblock.objects.count(), 2)
         self.assertFalse(Itemblock.objects.filter(erledigt_am__isnull=True).exists())
+
+    def _tokeneingabe_vorbereiten(self) -> None:
+        # Öffnet eine Erhebung mit einer Vignette und einem zweiten Browser.
+
+        self._vignette_anlegen(budget_wert=3)
+        self._erhebung_fertigstellen()
+        self.browser_b: Client = Client()
+
+    def _fortsetzen(self, token: str, browser: Client | None = None) -> HttpResponse:
+        # Öffnet den Link in Browser B und gibt dort das Token ein.
+
+        browser = browser or self.browser_b
+        browser.get(self.url)
+        return browser.post(
+            reverse("erhebungen:fortsetzen", args=[self.stichprobe.teilnahme_link]),
+            {"token": token},
+        )
+
+    def _angezeigtes_token(self, browser: Client, teilnahme_link: UUID) -> str:
+        # Das Token, das die Seitenleiste diesem Browser unter dem Link nennt.
+
+        elemente: list[_Element] = _elemente(
+            browser.get(
+                reverse("erhebungen:einwilligung", args=[teilnahme_link]), follow=True
+            )
+        )
+        beschriftung: int = next(
+            i for i, e in enumerate(elemente) if e.text == "Ihr Teilnahme-Token"
+        )
+        return elemente[beschriftung + 1].text
+
+    def _fremde_bindung(self, **stichprobe: object) -> Erhebungsbindung:
+        # Legt eine Teilnahme in einer zweiten Stichprobe derselben Erhebung an.
+
+        andere: Stichprobe = Stichprobe.objects.create(
+            erhebung=self.erhebung,
+            beginn=timezone.now() - timedelta(days=1),
+            ende=timezone.now() + timedelta(days=1),
+        )
+        bindung: Erhebungsbindung = Erhebungsbindung.objects.anlegen(andere)
+        # Fenster und Archiv umgehen die Modellsperren, wie in den Token-Routen.
+        if stichprobe:
+            models.QuerySet.update(
+                Stichprobe.objects.filter(pk=andere.pk), **stichprobe
+            )
+        return bindung
+
+    def test_einwilligungsseite_bietet_die_tokeneingabe_als_eigenes_formular(
+        self,
+    ) -> None:
+        """Das Feld steht beschriftet in einem eigenen Formular unter den Einwilligungen."""
+
+        self._tokeneingabe_vorbereiten()
+
+        self.client.get(self.url)
+        seite: HttpResponse = self.client.get(self._einwilligung_url())
+
+        self.assertContains(seite, "Sie haben schon ein Teilnahme-Token?")
+        elemente: list[_Element] = _elemente(seite)
+        feld: _Element = next(
+            e
+            for e in elemente
+            if e.tag == "input" and e.attribute.get("name") == "token"
+        )
+        self.assertIn("form", feld.vorfahren)
+        self.assertEqual(feld.attribute.get("autocomplete"), "off")
+        self.assertEqual(feld.attribute.get("autocapitalize"), "characters")
+        self.assertEqual(feld.attribute.get("inputmode"), "text")
+        self.assertTrue(
+            any(
+                e.tag == "label" and e.attribute.get("for") == feld.attribute["id"]
+                for e in elemente
+            )
+        )
+        formulare: list[int] = [i for i, e in enumerate(elemente) if e.tag == "form"]
+        ende: int = next(
+            i
+            for i in formulare
+            if elemente[i].attribute.get("action")
+            == reverse("erhebungen:fortsetzen", args=[self.stichprobe.teilnahme_link])
+        )
+        # Die Elemente enden vor ihrem Formular, nach dem vorigen Formular.
+        anfang: int = max((i for i in formulare if i < ende), default=-1) + 1
+        self.assertEqual(
+            {
+                e.attribute.get("name")
+                for e in elemente[anfang:ende]
+                if e.tag in {"input", "select", "textarea"}
+            },
+            {"csrfmiddlewaretoken", "token"},
+        )
+        self.assertIn("Hier fortsetzen", elemente[ende].text)
+
+    def test_seitenleiste_nennt_wofuer_das_token_dient(self) -> None:
+        """Der Hinweis zum Notieren sagt, wozu das Token gut ist."""
+
+        self._tokeneingabe_vorbereiten()
+
+        self.client.get(self.url)
+        seite: HttpResponse = self.client.get(self._einwilligung_url())
+
+        self.assertContains(
+            seite,
+            "Mit dem Token setzen Sie die Teilnahme in einem anderen Browser fort.",
+        )
+
+    def test_token_setzt_die_teilnahme_im_anderen_browser_fort(self) -> None:
+        """Browser B landet im laufenden Gespräch von A; seine Leer-Bindung bleibt liegen."""
+
+        self._tokeneingabe_vorbereiten()
+
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        antwort: HttpResponse = self._fortsetzen(bindung.token)
+
+        self.assertRedirects(antwort, gespraech_url, fetch_redirect_response=False)
+        self.assertContains(self.browser_b.get(gespraech_url), "Wie rechnest du?")
+        self.assertRedirects(
+            self.browser_b.get(self.url), gespraech_url, fetch_redirect_response=False
+        )
+        leer: Erhebungsbindung = Erhebungsbindung.objects.exclude(pk=bindung.pk).get()
+        self.assertIsNone(leer.teilnahme.sprachmodell_eingewilligt)
+        self.assertNotEqual(leer.teilnahme_id, bindung.teilnahme_id)
+
+    def test_eingabe_ignoriert_schreibweise_leerzeichen_und_bindestrich(self) -> None:
+        """`vc9h ynfr` gilt als `VC9H-YNFR`."""
+
+        self._tokeneingabe_vorbereiten()
+
+        token: str = self._laufende_sitzung_starten().token
+        vorne, hinten = token.split("-")
+
+        for eingabe in (
+            f"{vorne} {hinten}".lower(),
+            f" {vorne}{hinten} ".lower(),
+            f"{vorne.lower()}-{hinten}",
+        ):
+            with self.subTest(eingabe=eingabe):
+                antwort: HttpResponse = self._fortsetzen(eingabe, Client())
+                self.assertRedirects(
+                    antwort,
+                    reverse("erhebungen:gespraech", args=[token]),
+                    fetch_redirect_response=False,
+                )
+
+    def test_unbrauchbares_token_ergibt_dieselbe_meldung_ohne_sessionaenderung(
+        self,
+    ) -> None:
+        """Unbekannt, geschlossen, archiviert oder leer: kein Orakel."""
+
+        self._tokeneingabe_vorbereiten()
+
+        geschlossen: str = self._fremde_bindung(
+            ende=timezone.now() - timedelta(seconds=1)
+        ).token
+        archiviert: str = self._fremde_bindung(archiviert=True).token
+
+        for eingabe in ("ZZZZ-ZZZZ", geschlossen, archiviert, "", "   "):
+            with self.subTest(eingabe=eingabe):
+                browser: Client = Client()
+                browser.get(self.url)
+                vorher: str = self._angezeigtes_token(
+                    browser, self.stichprobe.teilnahme_link
+                )
+
+                antwort: HttpResponse = self._fortsetzen(eingabe, browser)
+
+                self.assertEqual(antwort.status_code, 200)
+                self.assertContains(antwort, _KEINE_FORTSETZUNG)
+                self.assertContains(antwort, "sprachmodell_eingewilligt")
+                self.assertEqual(
+                    self._angezeigtes_token(browser, self.stichprobe.teilnahme_link),
+                    vorher,
+                )
+                feld: _Element = next(
+                    e
+                    for e in _elemente(antwort)
+                    if e.tag == "input" and e.attribute.get("name") == "token"
+                )
+                fehler: _Element = next(
+                    e
+                    for e in _elemente(antwort)
+                    if e.attribute.get("id") == feld.attribute.get("aria-describedby")
+                )
+                self.assertIn(_KEINE_FORTSETZUNG, fehler.text)
+
+    def test_token_einer_anderen_stichprobe_bindet_unter_deren_link(self) -> None:
+        """Das Token trägt seine Stichprobe selbst, auch über einen fremden Link."""
+
+        self._tokeneingabe_vorbereiten()
+
+        fremd: Erhebungsbindung = self._fremde_bindung()
+
+        antwort: HttpResponse = self._fortsetzen(fremd.token)
+
+        fremder_link: UUID = fremd.stichprobe.teilnahme_link
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:einwilligung", args=[fremder_link]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            self._angezeigtes_token(self.browser_b, fremder_link), fremd.token
+        )
+        self.assertNotEqual(
+            self._angezeigtes_token(self.browser_b, self.stichprobe.teilnahme_link),
+            fremd.token,
+        )
+
+    def test_abgelehnte_sprachmodelle_fuehren_auf_die_abbruchseite(self) -> None:
+        """Wie bei jedem Wiedereinstieg endet eine abgelehnte Teilnahme beim Abbruch."""
+
+        self._tokeneingabe_vorbereiten()
+
+        self.client.get(self.url)
+        self.client.post(
+            self._einwilligung_url(),
+            {**_ZUSTIMMUNG, "sprachmodell_eingewilligt": "nein"},
+        )
+        token: str = Erhebungsbindung.objects.get().token
+
+        antwort: HttpResponse = self._fortsetzen(token)
+
+        abbruch_url: str = reverse(
+            "erhebungen:abbruchseite", args=[self.stichprobe.teilnahme_link]
+        )
+        self.assertRedirects(antwort, abbruch_url, fetch_redirect_response=False)
+        self.assertContains(self.browser_b.get(abbruch_url), _ABBRUCHTEXT)
+
+    def test_fluechtige_teilnahme_bricht_die_sitzung_ohne_verlauf_ab(self) -> None:
+        """Wie beim URL-Wiedereinstieg endet die laufende Sitzung `abgebrochen`."""
+
+        self._tokeneingabe_vorbereiten()
+
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        antwort: HttpResponse = self._fortsetzen(bindung.token)
+        self.assertRedirects(antwort, gespraech_url, fetch_redirect_response=False)
+        self.browser_b.get(gespraech_url)
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+
+    def test_nach_der_einwilligung_gibt_es_keine_tokeneingabe(self) -> None:
+        """Die Instruktion zeigt kein Feld, und die Route nimmt kein Token mehr an."""
+
+        self._tokeneingabe_vorbereiten()
+
+        fremd: Erhebungsbindung = self._laufende_sitzung_starten()
+        self.client.get(self.url)
+        browser: Client = Client()
+        browser.get(self.url)
+        browser.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        instruktion = browser.get(
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link])
+        )
+        vorher: str = self._angezeigtes_token(browser, self.stichprobe.teilnahme_link)
+
+        antwort: HttpResponse = browser.post(
+            reverse("erhebungen:fortsetzen", args=[self.stichprobe.teilnahme_link]),
+            {"token": fremd.token},
+        )
+
+        self.assertNotContains(instruktion, "Sie haben schon ein Teilnahme-Token?")
+        self.assertEqual(antwort.status_code, 400)
+        self.assertEqual(
+            self._angezeigtes_token(browser, self.stichprobe.teilnahme_link), vorher
+        )
+
+    def test_route_nimmt_nur_post_an(self) -> None:
+        """Ein Aufruf per GET fortsetzt nichts."""
+
+        self._tokeneingabe_vorbereiten()
+
+        self.assertEqual(
+            self.client.get(
+                reverse("erhebungen:fortsetzen", args=[self.stichprobe.teilnahme_link])
+            ).status_code,
+            405,
+        )
+
+    def test_einwilligung_nach_abgewiesenem_token_wird_festgehalten(self) -> None:
+        """Wer nach einer Fehleingabe doch einwilligt, kommt zur Instruktion."""
+
+        self._tokeneingabe_vorbereiten()
+
+        fortsetzen_url: str = reverse(
+            "erhebungen:fortsetzen", args=[self.stichprobe.teilnahme_link]
+        )
+        seite: HttpResponse = self._fortsetzen("ZZZZ-ZZZZ")
+        elemente: list[_Element] = _elemente(seite)
+        # Ein Formular ohne action schickt der Browser an die Adresse der Seite.
+        ziel: str = next(
+            e.attribute.get("action") or fortsetzen_url
+            for i, e in enumerate(elemente)
+            if e.tag == "form"
+            and any(
+                k.attribute.get("name") == "sprachmodell_eingewilligt"
+                for k in elemente[:i]
+            )
+        )
+
+        antwort: HttpResponse = self.browser_b.post(ziel, _ZUSTIMMUNG)
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )

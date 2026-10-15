@@ -50,7 +50,12 @@ from .ablauf import (
     vignette_beginnen,
 )
 from .export import datenspur_zip
-from .forms import ErhebungAnlegenFormular, ItemblockFormular
+from .forms import (
+    KEINE_FORTSETZUNG,
+    ErhebungAnlegenFormular,
+    ItemblockFormular,
+    TeilnahmeTokenFormular,
+)
 from .models import (
     Erhebung,
     Erhebungsbindung,
@@ -1092,16 +1097,56 @@ def einwilligung(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
         )
     if bindung.teilnahme.sprachmodell_eingewilligt:
         return _weiter_im_ablauf(request, bindung)
+    return _einwilligung_rendern(request, stichprobe, TeilnahmeTokenFormular())
+
+
+def _einwilligung_rendern(
+    request: HttpRequest, stichprobe: Stichprobe, token_formular: TeilnahmeTokenFormular
+) -> HttpResponse:
+    # Die Einwilligungsseite samt Tokeneingabe, leer oder mit ihrer Ablehnung.
+
     return render(
         request,
         "erhebungen/einwilligung.html",
         {
             "erhebung": stichprobe.erhebung,
             "spracherkennung_angeboten": (
-                "audioverarbeitung_eingewilligt" in angeboten
+                "audioverarbeitung_eingewilligt" in _angebotene_einwilligungen()
             ),
+            "teilnahme_link": stichprobe.teilnahme_link,
+            "token_formular": token_formular,
         },
     )
+
+
+def fortsetzen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
+    """Setzt mit einem notierten Token eine Teilnahme in diesem Browser fort.
+
+    Das Token trägt seine Stichprobe selbst und wird unter deren Link gebunden.
+    Die beim Link-Aufruf angelegte, einwilligungslose Bindung bleibt liegen.
+    """
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    stichprobe: Stichprobe = _laufende_stichprobe(teilnahme_link)
+    eigene: Erhebungsbindung | None = _bindung_aus_session(request, stichprobe)
+    if eigene is not None and eigene.teilnahme.sprachmodell_eingewilligt:
+        return HttpResponseBadRequest("Die Einwilligungen wurden bereits festgehalten.")
+    formular: TeilnahmeTokenFormular = TeilnahmeTokenFormular(request.POST)
+    if not formular.is_valid():
+        return _einwilligung_rendern(request, stichprobe, formular)
+    bindung: Erhebungsbindung | None = _laufende_bindung_oder_none(
+        formular.cleaned_data["token"]
+    )
+    if bindung is None:
+        # Dieselbe Meldung wie für leere Eingaben: Sie verrät nicht, ob das
+        # Token existiert.
+        formular.add_error("token", KEINE_FORTSETZUNG)
+        return _einwilligung_rendern(request, stichprobe, formular)
+    _bindung_in_session_speichern(request, bindung)
+    return _ohne_zutritt(
+        bindung, bindung.stichprobe.teilnahme_link
+    ) or _weiter_im_ablauf(request, bindung)
 
 
 def abbruchseite(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
@@ -1251,6 +1296,7 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
         sitzung,
         _sitzungsnavigation(token),
         sitzungsblock=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
+        nach_verfall=lambda: _weiter_im_ablauf(request, bindung),
     )
 
 
@@ -1295,7 +1341,8 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
     sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
-    sitzung_abbrechen(sink)
+    if not sitzung_abbrechen(sink):
+        return _weiter_im_ablauf(request, bindung)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistiertes_gespraech(
@@ -1481,15 +1528,27 @@ def _bindung_in_session_speichern(
 def _laufende_bindung(token: str) -> Erhebungsbindung:
     """Löst eine Teilnahme über ihr Token innerhalb des laufenden Fensters auf."""
 
-    bindung: Erhebungsbindung = get_object_or_404(
-        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme"),
-        token=token,
+    bindung: Erhebungsbindung | None = _laufende_bindung_oder_none(token)
+    if bindung is None:
+        raise Http404
+    return bindung
+
+
+def _laufende_bindung_oder_none(token: str) -> Erhebungsbindung | None:
+    """Wie `_laufende_bindung`, aber ohne 404 für die Tokeneingabe."""
+
+    bindung: Erhebungsbindung | None = (
+        Erhebungsbindung.objects.select_related("stichprobe", "teilnahme")
+        .filter(token=token)
+        .first()
     )
-    if (
+    # Außerhalb des Fensters oder bei archivierter Stichprobe gilt das Token als
+    # unbekannt: Ein eigener Status verriete, dass es existiert (ADR-0040).
+    if bindung is None or (
         bindung.stichprobe.archiviert
         or bindung.stichprobe.phase != Stichprobe.Phase.LAUFEND
     ):
-        raise PermissionDenied
+        return None
     return bindung
 
 

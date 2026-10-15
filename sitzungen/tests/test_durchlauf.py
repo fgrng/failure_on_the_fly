@@ -6,6 +6,7 @@ import pytest
 from django.contrib.sessions.backends.db import SessionStore
 from time_machine import TimeMachineFixture
 
+from config.tests.sprachmodell import vor_jedem_aufruf
 from konten.models import Konto
 from simulation import Antwort
 from simulation.models import ModellKonfiguration, Simulationskern
@@ -32,6 +33,7 @@ from sitzungen.sink import (
     GeruestSink,
     ScratchSink,
     SitzungSink,
+    AntwortversuchVerfallen,
 )
 from vignetten.models import Vignette
 
@@ -67,8 +69,13 @@ def _senken() -> list[SitzungSink]:
 def _verbrauchte_zeit(sink: GeruestSink) -> float:
     # Liest den exportierten Budgetstand der Sitzungszeile.
 
-    sitzung: Sitzung = Sitzung.objects.get(teilnahme=sink.teilnahme)
-    return sitzung.verbrauchte_zeit
+    return _sitzungszeile(sink).verbrauchte_zeit
+
+
+def _sitzungszeile(sink: GeruestSink) -> Sitzung:
+    # Liest die Sitzungszeile frisch aus der DB.
+
+    return Sitzung.objects.get(teilnahme=sink.teilnahme)
 
 
 def _leeren_schritt_anhaengen(sink: SitzungSink) -> bool:
@@ -482,11 +489,14 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
 
 
 @pytest.mark.django_db
-def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
-    """Auch eine leere sichtbare Äußerung ist Teil des Verlaufs."""
+def test_leere_aeusserung_weicht_dem_naechsten_versuch() -> None:
+    """Eine leere Äußerung wird verworfen; der Verlauf trägt den nächsten Versuch."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
-        [{"denkspur": "still", "aeusserung": ""}]
+        [
+            {"denkspur": "still", "aeusserung": ""},
+            {"denkspur": "Meine Regel.", "aeusserung": "2/5."},
+        ]
     )
 
     for sink in _senken():
@@ -495,7 +505,9 @@ def test_leere_aeusserung_bleibt_im_modellverlauf() -> None:
             sink, vignette, kern, konfiguration, eingabe="Erster Schritt"
         )
 
-        assert modellverlauf(sink) == [("Erster Schritt", Antwort("still", ""))]
+        assert modellverlauf(sink) == [
+            ("Erster Schritt", Antwort("Meine Regel.", "2/5."))
+        ]
 
 
 @pytest.mark.django_db
@@ -682,3 +694,184 @@ def test_rahmenhandlung_link_syntax_des_kerns_bleibt_woertlich() -> None:
     html: str = rahmenhandlung_rendern("[$thema](https://example.org)", vignette)
 
     assert html == "<p>[Brüche](https://example.org)</p>\n"
+
+
+def _geruestsenken() -> list[GeruestSink]:
+    # Je eine frische Senke mit Gerüst in der DB.
+
+    return [
+        DBSink(Teilnahme.objects.create()),
+        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
+    ]
+
+
+def _zweiter_tab(sink: GeruestSink) -> GeruestSink:
+    # Stellt denselben Sink so wieder her, wie ihn eine zweite Anfrage lädt.
+
+    sitzung: Sitzung = _sitzungszeile(sink)
+    if isinstance(sink, FluechtigerSink):
+        return FluechtigerSink.fuer_sitzung(sitzung, sink.session)
+    return DBSink.fuer_sitzung(sitzung)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("beenden", ["diagnose", "abbrechen"])
+def test_beendete_sitzung_erhaelt_keinen_gespraechsschritt_mehr(beenden: str) -> None:
+    """Endet die Sitzung während des Modellaufrufs, verfällt der Antwortversuch (ADR-0066)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        sink.antwortversuch_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        if beenden == "diagnose":
+            _zweiter_tab(sink).diagnose_setzen("Zähler plus Zähler.")
+        else:
+            sitzung_abbrechen(_zweiter_tab(sink))
+
+        with pytest.raises(AntwortversuchVerfallen):
+            _leeren_schritt_anhaengen(sink)
+
+        assert list(_zweiter_tab(sink).gespraechsschritte) == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "skript",
+    [
+        [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}],
+        [{"fehler": "anbieterfehler"}] * 3,
+    ],
+    ids=["geglueckt", "gescheitert"],
+)
+def test_schritt_auf_inzwischen_abgeschlossener_sitzung_verfaellt(
+    skript: list[dict[str, str]],
+) -> None:
+    """Weder Schritt noch `gescheitert`: Status und Diagnose bleiben (ADR-0066)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel(skript)
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+
+        with vor_jedem_aufruf(
+            lambda _nachrichten, sink=sink: _zweiter_tab(sink).diagnose_setzen(
+                "Zähler plus Zähler."
+            )
+        ):
+            ausgang: Ausgang = gespraechsschritt_ausfuehren(
+                sink, vignette, kern, konfiguration, eingabe="Warum?"
+            )
+
+        assert ausgang is Ausgang.VERFALLEN
+        nachher: GeruestSink = _zweiter_tab(sink)
+        assert _sitzungszeile(sink).status == Sitzung.Status.ABGESCHLOSSEN
+        assert nachher.abgegebene_diagnose == "Zähler plus Zähler."
+        assert list(nachher.gespraechsschritte) == []
+
+
+@pytest.mark.django_db
+def test_von_zwei_parallelen_schritten_bleibt_genau_einer() -> None:
+    """Zwei Schritte auf derselben Schrittzahl: Der spätere verfällt (ADR-0066)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        zweiter: GeruestSink = _zweiter_tab(sink)
+        sink.antwortversuch_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        zweiter.antwortversuch_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        _leeren_schritt_anhaengen(sink)
+
+        with pytest.raises(AntwortversuchVerfallen):
+            _leeren_schritt_anhaengen(zweiter)
+
+        assert len(list(_zweiter_tab(sink).gespraechsschritte)) == 1
+        assert _sitzungszeile(sink).status == Sitzung.Status.LAUFEND
+
+
+@pytest.mark.django_db
+def test_gescheiterter_paralleler_schritt_verfaellt_ohne_status() -> None:
+    """Der überholte, endgültig gescheiterte Versuch setzt nicht `gescheitert`."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        zweiter: GeruestSink = _zweiter_tab(sink)
+        sink.antwortversuch_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        zweiter.antwortversuch_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        _leeren_schritt_anhaengen(sink)
+
+        with pytest.raises(AntwortversuchVerfallen):
+            zweiter.gescheiterten_schritt_behandeln(
+                eingabe="Warum?", eingabemodus="getippt", fehlversuche=[]
+            )
+
+        assert len(list(_zweiter_tab(sink).gespraechsschritte)) == 1
+        assert _sitzungszeile(sink).status == Sitzung.Status.LAUFEND
+
+
+@pytest.mark.django_db
+def test_veraltetes_sitzungsobjekt_setzt_die_gebuchte_zeit_nicht_zurueck() -> None:
+    """Ein zweiter Tab setzt nur die offene Spanne neu an (ADR-0066)."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
+    vignette.budget_wert = 600
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        veraltet: GeruestSink = _zweiter_tab(sink)
+        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 30, tzinfo=UTC))
+
+        veraltet.zug_beginnen(datetime(2026, 9, 22, 10, 1, tzinfo=UTC))
+
+        assert _verbrauchte_zeit(sink) == 30.0
+
+
+@pytest.mark.django_db
+def test_nach_dem_ende_der_sitzung_schreibt_die_uhr_nicht_mehr() -> None:
+    """Weder Beginn noch Ende eines Zuges bucht auf einer beendeten Sitzung."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+    vignette.budget_typ = Vignette.BudgetTyp.ZEIT
+    vignette.budget_wert = 600
+    vignette.save(update_fields=["budget_typ", "budget_wert"])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        veraltet: GeruestSink = _zweiter_tab(sink)
+        sink.zug_beginnen(datetime(2026, 9, 22, 10, 0, tzinfo=UTC))
+        sink.zug_beenden(datetime(2026, 9, 22, 10, 0, 4, tzinfo=UTC))
+        sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
+
+        veraltet.zug_beginnen(datetime(2026, 9, 22, 10, 1, tzinfo=UTC))
+        veraltet.zug_beenden(datetime(2026, 9, 22, 10, 5, tzinfo=UTC))
+
+        assert _verbrauchte_zeit(sink) == 4.0
+        assert _sitzungszeile(sink).offene_spanne_seit is None
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("ende", ["diagnose", "abbrechen"])
+def test_beendete_sitzung_wechselt_ihren_status_nicht_mehr(ende: str) -> None:
+    """Abbruch und Abschluss gelten nur von `laufend` aus und melden den Verlust."""
+
+    vignette, kern, konfiguration = _persistierbares_tripel([])
+
+    for sink in _geruestsenken():
+        sitzung_starten(sink, vignette, konfiguration)
+        veraltet: GeruestSink = _zweiter_tab(sink)
+        sink.diagnose_setzen("Erste Diagnose.")
+
+        if ende == "diagnose":
+            gelungen: bool = veraltet.diagnose_setzen("Zweite Diagnose.")
+        else:
+            gelungen = sitzung_abbrechen(veraltet)
+
+        assert not gelungen
+        assert _sitzungszeile(sink).status == Sitzung.Status.ABGESCHLOSSEN
+        assert _zweiter_tab(sink).abgegebene_diagnose == "Erste Diagnose."

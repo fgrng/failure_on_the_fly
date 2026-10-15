@@ -57,3 +57,14 @@ def text_ohne_tags(antwort: HttpResponse | str) -> str:
 
     html: str = antwort if isinstance(antwort, str) else antwort.content.decode()
     return " ".join(re.sub(r"<[^>]+>", "", html).split())
+
+
+def letztes_fokusziel(html: str) -> str:
+    """Liefert das öffnende Tag des letzten Elements mit ``data-fokusziel``.
+
+    Dieses Element bekommt nach dem htmx-Tausch den Fokus.
+    """
+
+    ziele: list[str] = re.findall(r"<[^<>]*\bdata-fokusziel\b[^<>]*>", html)
+    assert ziele, "kein Fokusziel"
+    return ziele[-1]

@@ -15,7 +15,12 @@ from django.utils.safestring import SafeString
 from simulation import Antwort, Antwortversuch, antwort_versuchen, vorlage_rendern
 from simulation.models import ModellKonfiguration, Simulationskern
 from sitzungen.models import Eingabemodus, Gespraechsschritt, Sitzung
-from sitzungen.sink import FehlversuchDaten, GespraechsschrittDaten, SitzungSink
+from sitzungen.sink import (
+    AntwortversuchVerfallen,
+    FehlversuchDaten,
+    GespraechsschrittDaten,
+    SitzungSink,
+)
 from texte.markdown import szenentext, woertlich
 from vignetten.models import Vignette, prompt_platzhalter, rahmen_platzhalter
 
@@ -86,6 +91,7 @@ class Ausgang(Enum):
     FORTGESETZT = auto()
     GESCHEITERT = auto()
     BUDGET_ERSCHOEPFT = auto()
+    VERFALLEN = auto()
 
 
 def gespraechsschritt_ausfuehren(
@@ -101,10 +107,12 @@ def gespraechsschritt_ausfuehren(
     Die Uhr steht still, solange das Modell antwortet (ADR-0057). Ob ein
     endgültig gescheiterter Schritt neben dem Transkript stehen bleibt
     (ADR-0061) und ob das erschöpfte Budget die Sitzung abschließt, entscheidet
-    der Sink hinter der Naht — nicht dieser Ablauf.
+    der Sink hinter der Naht — nicht dieser Ablauf. Ist die Sitzung beim
+    Schreiben beendet oder hat ein anderer Schritt den Verlauf verlängert,
+    verfällt der Antwortversuch ohne Spur (ADR-0066).
     """
 
-    sink.zug_beenden(jetzt())
+    sink.antwortversuch_beginnen(jetzt())
     antwortversuch: Antwortversuch = antwort_versuchen(
         prompt_platzhalter(vignette),
         simulationskern,
@@ -116,20 +124,23 @@ def gespraechsschritt_ausfuehren(
         {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
         for fehlversuch in antwortversuch.fehlversuche
     ]
-    if antwortversuch.antwort is None:
-        sink.gescheiterten_schritt_behandeln(
+    try:
+        if antwortversuch.antwort is None:
+            sink.gescheiterten_schritt_behandeln(
+                eingabe=eingabe,
+                eingabemodus=eingabemodus,
+                fehlversuche=fehlversuche,
+            )
+            return Ausgang.GESCHEITERT
+        budget_erschoepft: bool = sink.gespraechsschritt_anhaengen(
             eingabe=eingabe,
             eingabemodus=eingabemodus,
+            denkspur=antwortversuch.antwort.denkspur,
+            aeusserung=antwortversuch.antwort.aeusserung,
             fehlversuche=fehlversuche,
         )
-        return Ausgang.GESCHEITERT
-    budget_erschoepft: bool = sink.gespraechsschritt_anhaengen(
-        eingabe=eingabe,
-        eingabemodus=eingabemodus,
-        denkspur=antwortversuch.antwort.denkspur,
-        aeusserung=antwortversuch.antwort.aeusserung,
-        fehlversuche=fehlversuche,
-    )
+    except AntwortversuchVerfallen:
+        return Ausgang.VERFALLEN
     if budget_erschoepft:
         # Die Uhr bleibt stehen: Nach dem Budget verfasst niemand mehr eine Eingabe.
         return Ausgang.BUDGET_ERSCHOEPFT
@@ -142,11 +153,14 @@ def sitzung_beenden(sink: SitzungSink) -> None:
     sink.zug_beenden(jetzt())
 
 
-def sitzung_abbrechen(sink: SitzungSink) -> None:
-    """Hält die Uhr an und markiert die Sitzung als abgebrochen."""
+def sitzung_abbrechen(sink: SitzungSink) -> bool:
+    """Hält die Uhr an, markiert die Sitzung als abgebrochen und meldet, ob es galt.
+
+    Eine Sitzung, die nicht mehr läuft, bleibt unverändert (ADR-0066).
+    """
 
     sink.zug_beenden(jetzt())
-    sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
+    return sink.status_setzen(Sitzung.Status.ABGEBROCHEN)
 
 
 @dataclass(frozen=True)
@@ -174,7 +188,7 @@ def rahmenhandlung_rendern(vorlage: str, vignette: Vignette) -> SafeString:
     return szenentext(vorlage_rendern(vorlage, platzhalter))
 
 
-def _ist_htmx(request: HttpRequest) -> bool:
+def ist_htmx(request: HttpRequest) -> bool:
     """Erkennt einen partiellen Seitenaufbau durch die vorhandene HTMX-Naht."""
 
     return request.headers.get("HX-Request") == "true"
@@ -230,7 +244,7 @@ def sitzung_anzeigen(
     }
     template: str = (
         "sitzungen/includes/sitzung_fortsetzung.html"
-        if _ist_htmx(request)
+        if ist_htmx(request)
         else seitenvorlage
     )
     return render(request, template, context)

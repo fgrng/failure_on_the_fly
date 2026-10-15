@@ -255,6 +255,17 @@ select:focus {
     color: var(--color-text-on-accent);
 }
 
+/* Hinweis auf eine gescheiterte htmx-Anfrage (#486): unten fest im Blick,
+   auch wenn das Formular weit unten auf einer langen Seite liegt. */
+.anfragefehler {
+    position: fixed;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    left: var(--space-2);
+    max-width: 40rem;
+    margin: 0 auto;
+}
+
 /* ---- Datentabellen ---- */
 .table-toolbar {
     display: flex;

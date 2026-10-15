@@ -19,8 +19,8 @@
         <section class="diagnosegespraech-verlauf" aria-labelledby="diagnosegespraech-verlauf-titel">
             <h2 id="diagnosegespraech-verlauf-titel">Gespräch mit {{ vignette.schuelerin_name }}</h2>
             {% for schritt in gespraechsschritte %}
-                {# Ankermarke für das show:-Ziel der Eingabeformulare. #}
-                <article class="gespraechsschritt"{% if forloop.last %} id="gespraechsschritt-neu"{% endif %}>
+                {# Ankermarke für das show:-Ziel der Eingabeformulare und Fokusziel nach dem Tausch. #}
+                <article class="gespraechsschritt"{% if forloop.last %} id="gespraechsschritt-neu" tabindex="-1" data-fokusziel{% endif %}>
                     <div class="gespraechsschritt__eingabe">
                         <span>Sie</span>
                         <p>{{ schritt.eingabe }}</p>

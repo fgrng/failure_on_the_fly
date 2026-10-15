@@ -121,6 +121,7 @@ def kern(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 def kern_verwalten(request: HttpRequest) -> HttpResponse:
     """Zeigt alle Kern-Fassungen für die Administration."""
@@ -141,6 +142,7 @@ def kern_verwalten(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def kern_anlegen(request: HttpRequest, *, mit_vorlage: bool) -> HttpResponse:
@@ -159,6 +161,7 @@ def kern_anlegen(request: HttpRequest, *, mit_vorlage: bool) -> HttpResponse:
     return redirect("simulation:kern_verwalten")
 
 
+@login_required
 @administratorin_erforderlich
 def kern_bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     """Bearbeitet die Inhaltsfelder eines Kern-Entwurfs."""
@@ -181,6 +184,7 @@ def kern_bearbeiten(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
@@ -193,6 +197,7 @@ def neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
@@ -205,6 +210,7 @@ def finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
@@ -217,6 +223,7 @@ def verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 def evalkatalog(request: HttpRequest) -> HttpResponse:
     """Zeigt den Stand des Evalkatalogs; ohne Katalog bietet die Seite das Anlegen an."""
@@ -235,6 +242,7 @@ def evalkatalog(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def evalkatalog_anlegen(request: HttpRequest) -> HttpResponse:
@@ -293,6 +301,7 @@ def _editor_kontext(katalog: Evalkatalog, knoten: str) -> dict[str, object]:
     }
 
 
+@login_required
 @administratorin_erforderlich
 def evalkatalog_editor(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt den Knoten Durchlauf und Vorlagen; speichert nur in Entwürfe."""
@@ -406,6 +415,7 @@ def _listenzeilen(
     ]
 
 
+@login_required
 @administratorin_erforderlich
 def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
     """Zeigt den Knoten Übergreifende Kriterien; speichert nur in Entwürfe."""
@@ -431,6 +441,7 @@ def evalkatalog_kriterien(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -442,6 +453,7 @@ def evalkatalog_kriterium_anlegen(request: HttpRequest, pk: int) -> HttpResponse
     return redirect("simulation:evalkatalog_kriterien", pk=katalog.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -470,6 +482,7 @@ def _versatz(richtung: str) -> int:
     return _RICHTUNGEN[richtung]
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -496,6 +509,7 @@ def _eval_der_fassung(
     return katalog, get_object_or_404(katalog.evals, pk=eval_pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -507,6 +521,7 @@ def evalkatalog_eval_anlegen(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
+@login_required
 @administratorin_erforderlich
 def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpResponse:
     """Zeigt den Knoten eines Evals samt Evalkriterien; speichert nur in Entwürfe."""
@@ -537,6 +552,7 @@ def evalkatalog_eval(request: HttpRequest, pk: int, eval_pk: int) -> HttpRespons
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -551,6 +567,7 @@ def evalkatalog_eval_loeschen(
     return redirect("simulation:evalkatalog_editor", pk=katalog.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -565,6 +582,7 @@ def evalkatalog_eval_verschieben(
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -578,6 +596,7 @@ def evalkatalog_evalkriterium_anlegen(
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -593,6 +612,7 @@ def evalkatalog_evalkriterium_loeschen(
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -628,6 +648,7 @@ def _zum_evalinput(evalinput: Evalinput) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -641,6 +662,7 @@ def evalkatalog_evalinput_anlegen(
     return _zum_evalinput(evalinput)
 
 
+@login_required
 @administratorin_erforderlich
 def evalkatalog_evalinput(
     request: HttpRequest, pk: int, eval_pk: int, input_pk: int
@@ -680,6 +702,7 @@ def evalkatalog_evalinput(
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -694,6 +717,7 @@ def evalkatalog_evalinput_loeschen(
     return redirect("simulation:evalkatalog_eval", pk=katalog.pk, eval_pk=eval_.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -707,6 +731,7 @@ def evalkatalog_inputschritt_anlegen(
     return _zum_evalinput(evalinput)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -722,6 +747,7 @@ def evalkatalog_inputschritt_loeschen(
     return _zum_evalinput(evalinput)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -742,6 +768,7 @@ def evalkatalog_inputschritt_verschieben(
     return _zum_evalinput(evalinput)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 @transaction.atomic
@@ -762,6 +789,7 @@ def evalkatalog_finalisieren(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("simulation:evalkatalog")
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def evalkatalog_neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
@@ -777,6 +805,7 @@ def evalkatalog_neue_fassung(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("simulation:evalkatalog_editor", pk=entwurf.pk)
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def evalkatalog_verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
@@ -883,6 +912,7 @@ def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 def modell_konfiguration(request: HttpRequest) -> HttpResponse:
     """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
@@ -910,6 +940,7 @@ def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
     return get_object_or_404(ModellKonfiguration, pk=int(genannt))
 
 
+@login_required
 @administratorin_erforderlich
 def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
     """Legt eine neue Konfiguration an, auf Wunsch aus einer Vorlage.
@@ -979,6 +1010,7 @@ def _abgeleitete_wurzel(
         return ""
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def modellvorschlaege(request: HttpRequest) -> HttpResponse:
@@ -1020,6 +1052,7 @@ def modellvorschlaege(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 @administratorin_erforderlich
 @require_POST
 def modell_konfiguration_aktivieren(
@@ -1033,6 +1066,7 @@ def modell_konfiguration_aktivieren(
     return _zur_konfiguration(konfiguration)
 
 
+@login_required
 @administratorin_erforderlich
 def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
     """Bearbeitet den einen Anbieterzugang der Transkription."""
@@ -1041,7 +1075,11 @@ def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
     )
     form: TranskriptionsKonfigurationForm
     if request.method == "POST":
-        form = TranskriptionsKonfigurationForm(request.POST, instance=konfiguration)
+        # Eine eigene Instanz, denn die Validierung schreibt die Eingabe
+        # hinein; die Anzeige des hinterlegten Tokens bleibt beim Gespeicherten.
+        form = TranskriptionsKonfigurationForm(
+            request.POST, instance=TranskriptionsKonfiguration.objects.aktuelle()
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Die Transkription ist neu eingestellt.")

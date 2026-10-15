@@ -54,7 +54,7 @@
                 {% csrf_token %}
                 <button class="button button--danger" type="submit">Archivieren</button>
             </form>
-        {% elif vignette.zustand == "archiviert" %}
+        {% elif vignette.zustand == "archiviert" and kann_entarchiviert_werden %}
             <form method="post" action="{% url 'vignetten:entarchivieren' vignette.pk %}">
                 {% csrf_token %}
                 <button class="button" type="submit">Entarchivieren</button>

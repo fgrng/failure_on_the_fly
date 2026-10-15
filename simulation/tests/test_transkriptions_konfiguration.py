@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import konto_mit_rollen
 from config.tests.formular import submit_knoepfe
+from simulation.forms import TranskriptionsKonfigurationForm
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import transkriptions_anbieter
 
@@ -71,6 +72,103 @@ def test_infomaniak_verlangt_zusaetzlich_die_endpunktwurzel() -> None:
     assert set(fehler.value.message_dict) == {"anbieter_basis_url"}
 
 
+class TranskriptionsKonfigurationTokenTests(TestCase):
+    """Ein leeres Tokenfeld behält das Token nur am selben Endpunkt (#493)."""
+
+    def setUp(self) -> None:
+        """Hinterlegt eine Infomaniak-Konfiguration mit Token."""
+        konfiguration: TranskriptionsKonfiguration = (
+            TranskriptionsKonfiguration.objects.aktuelle()
+        )
+        konfiguration.anbieter = Anbieter.INFOMANIAK
+        konfiguration.anbieter_basis_url = "https://api.infomaniak.com/1/ai/42"
+        konfiguration.anbieter_token = "ik-supergeheim1234"
+        konfiguration.transkriptionsmodell = "whisper"
+        konfiguration.save()
+
+    def _formular(self, **werte: object) -> TranskriptionsKonfigurationForm:
+        # Das Bearbeitungsformular über der gespeicherten Zeile.
+
+        return TranskriptionsKonfigurationForm(
+            data=_eingabe(
+                **{
+                    "anbieter": Anbieter.INFOMANIAK,
+                    "anbieter_basis_url": "https://api.infomaniak.com/1/ai/42",
+                    "anbieter_token": "",
+                    "transkriptionsmodell": "whisper",
+                    **werte,
+                }
+            ),
+            instance=TranskriptionsKonfiguration.objects.aktuelle(),
+        )
+
+    def _gespeichertes_token(self) -> str:
+        # Das Token, wie es in der Datenbank steht.
+
+        return TranskriptionsKonfiguration.objects.aktuelle().anbieter_token
+
+    def test_gleicher_endpunkt_behaelt_das_token(self) -> None:
+        """Modell und Sprache ändern sich, Anbieter und Basis-URL nicht."""
+        formular: TranskriptionsKonfigurationForm = self._formular(
+            transkriptionsmodell="whisper-large-v3", sprache="fr"
+        )
+
+        self.assertTrue(formular.is_valid(), formular.errors)
+        formular.save()
+        self.assertEqual(self._gespeichertes_token(), "ik-supergeheim1234")
+
+    def test_anbieterwechsel_ohne_token_ist_ungueltig(self) -> None:
+        """Das Infomaniak-Token geht nicht an OpenRouter."""
+        formular: TranskriptionsKonfigurationForm = self._formular(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_basis_url="https://openrouter.ai/api/v1",
+            transkriptionsmodell="whisper-large-v3",
+        )
+
+        self.assertFalse(formular.is_valid())
+        self.assertEqual(
+            formular.errors["anbieter_token"],
+            ["Ohne Token bedient der Anbieter keinen Aufruf."],
+        )
+
+    def test_endpunktwechsel_ohne_token_ist_ungueltig(self) -> None:
+        """Das Token geht nicht an einen fremden Host."""
+        formular: TranskriptionsKonfigurationForm = self._formular(
+            anbieter_basis_url="https://fremd.example/1/ai/42"
+        )
+
+        self.assertFalse(formular.is_valid())
+        self.assertEqual(
+            formular.errors["anbieter_token"],
+            ["Ohne Token bedient der Anbieter keinen Aufruf."],
+        )
+
+    def test_wechsel_mit_neuem_token_speichert_es(self) -> None:
+        """Wer das Token bewusst neu einträgt, darf Anbieter und Endpunkt wechseln."""
+        formular: TranskriptionsKonfigurationForm = self._formular(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_basis_url="https://openrouter.ai/api/v1",
+            anbieter_token="sk-or-neu5678",
+            transkriptionsmodell="whisper-large-v3",
+        )
+
+        self.assertTrue(formular.is_valid(), formular.errors)
+        formular.save()
+        self.assertEqual(self._gespeichertes_token(), "sk-or-neu5678")
+
+    def test_wechsel_auf_fake_leert_das_token(self) -> None:
+        """Der Platzhalter bleibt über die Oberfläche erreichbar."""
+        formular: TranskriptionsKonfigurationForm = self._formular(
+            anbieter=Anbieter.FAKE,
+            anbieter_basis_url="",
+            transkriptionsmodell="",
+        )
+
+        self.assertTrue(formular.is_valid(), formular.errors)
+        formular.save()
+        self.assertEqual(self._gespeichertes_token(), "")
+
+
 class TranskriptionsKonfigurationRollenTests(TestCase):
     """Die Betriebseinstellungen liegen hinter der Administrationsrolle."""
 
@@ -80,9 +178,15 @@ class TranskriptionsKonfigurationRollenTests(TestCase):
 
         self.assertEqual(self.client.get(reverse(SEITE)).status_code, 403)
 
-    def test_weist_nicht_angemeldetes_konto_ab(self) -> None:
-        """Auch anonyme Anfragen erhalten die geforderte Zugriffsverweigerung."""
-        self.assertEqual(self.client.get(reverse(SEITE)).status_code, 403)
+    def test_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
+        """Anonyme Anfragen werden zur Anmeldung weitergeleitet (#476)."""
+        response: HttpResponse = self.client.get(reverse(SEITE))
+
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/transkription/",
+            fetch_redirect_response=False,
+        )
 
     def test_weist_autorin_auch_beim_speichern_ab(self) -> None:
         """Die Schreibroute trägt dieselbe Rollenprüfung wie die Anzeige."""
@@ -178,6 +282,22 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
         )
         self.assertEqual(konfiguration.sprache, "fr")
         self.assertEqual(konfiguration.anbieter_token, "sk-or-supergeheim1234")
+
+    def test_zeigt_nach_abgelehntem_wechsel_weiter_das_hinterlegte_token(self) -> None:
+        """Ein abgewiesener Anbieterwechsel lässt das hinterlegte Token stehen."""
+        self.client.post(reverse(SEITE), _eingabe())
+
+        response: HttpResponse = self.client.post(
+            reverse(SEITE),
+            _eingabe(
+                anbieter=Anbieter.INFOMANIAK,
+                anbieter_basis_url="https://api.infomaniak.com/1/ai/42",
+                anbieter_token="",
+                transkriptionsmodell="whisper",
+            ),
+        )
+
+        self.assertContains(response, "1234")
 
     def test_bietet_weder_anlegen_noch_aktivieren_noch_eine_liste_an(self) -> None:
         """Ein veränderlicher Singleton kennt genau eine Geste: Bearbeiten."""
