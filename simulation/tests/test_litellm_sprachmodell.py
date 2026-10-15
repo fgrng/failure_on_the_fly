@@ -646,3 +646,18 @@ def test_ein_aufruf_mit_aufgebrauchter_frist_bekommt_die_mindestfrist(
         )
 
     assert completion.call_args.kwargs["timeout"] == 1.0
+
+
+def test_litellm_adapter_schaltet_die_hilfe_banner_ab() -> None:
+    """Die Banner, die LiteLLM bei Fehlern druckt, verdecken das Log (ADR-0065)."""
+
+    import litellm
+
+    with patch.object(litellm, "suppress_debug_info", False):
+        LiteLLMSprachmodell(
+            "openai/gpt-test", {}, _completion_mit('{"aeusserung": "Warum?"}')
+        ).antworten(
+            "System", [], "Eingabe", LEHRPERSON_SCHEMA, SPRACHMODELL_FRIST_SEKUNDEN
+        )
+
+        assert litellm.suppress_debug_info is True

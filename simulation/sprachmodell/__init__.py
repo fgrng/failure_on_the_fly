@@ -202,6 +202,9 @@ class LiteLLMSprachmodell:
 
         import litellm
 
+        # Die Hilfe-Banner, die LiteLLM bei Anbieterfehlern nach stdout druckt,
+        # verdecken die Fehlermeldungen im Betriebslog (ADR-0065).
+        litellm.suppress_debug_info = True
         try:
             modellantwort = self.completion(
                 model=self.modell,

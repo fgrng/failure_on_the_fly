@@ -222,6 +222,9 @@ command=%(ENV_HOME)s/failure_on_the_fly/.venv/bin/gunicorn --error-logfile - --b
 startsecs=30
 autostart=yes
 autorestart=yes
+stderr_logfile=%(ENV_HOME)s/logs/failure-on-the-fly.err.log
+stderr_logfile_maxbytes=50MB
+stderr_logfile_backups=10
 EOF
 ```
 
@@ -256,7 +259,16 @@ Zu den Werten:
   über 120 s, damit ein Prozess, der gerade nur wartende Threads führt, nie als
   hängend gilt.
 - **`--error-logfile -`** — gunicorn schreibt seine Fehler nach stderr, wo
-  supervisord sie einsammelt.
+  supervisord sie einsammelt. Dorthin geht auch das Betriebslog der Anwendung:
+  Serverfehler mit Traceback und jede Warnung, aber kein 404 und kein 403
+  (ADR-0065).
+- **`stderr_logfile`** — supervisord schreibt stderr nach
+  `~/logs/failure-on-the-fly.err.log` und rotiert die Datei bei 50 MB; die zehn
+  jüngsten Vorgänger bleiben als `.err.log.1` bis `.err.log.10` liegen, ältere
+  löscht supervisord. Das sind die Standardwerte von supervisord, hier
+  ausdrücklich gesetzt, damit Ort und Rotation feststehen. Das Log ist so
+  vertraulich wie die Datenbank: Es kann Pfade mit Teilnahme-Tokens und
+  Ausnahmetexte enthalten.
 
 Dienst registrieren und starten:
 
@@ -268,7 +280,9 @@ supervisorctl status failure-on-the-fly
 
 Erwartet wird `RUNNING`. Bei `BACKOFF` oder `FATAL` zeigt
 `supervisorctl tail -f failure-on-the-fly stderr` den Grund — meist ein
-fehlender `SECRET_KEY` in der `.env` oder ein belegter Port.
+fehlender `SECRET_KEY` in der `.env` oder ein belegter Port. Läuft der Dienst
+und eine Seite antwortet mit einem Serverfehler (500), steht der Traceback im
+selben Log.
 
 Der zweite Dienst arbeitet die Evalläufe ab. Er ruft das Management-Command
 direkt mit dem Python der Umgebung auf, nicht über `uv run`, damit supervisord
@@ -284,6 +298,9 @@ autostart=yes
 autorestart=yes
 stopsignal=TERM
 stopwaitsecs=30
+stderr_logfile=%(ENV_HOME)s/logs/failure-on-the-fly-evals.err.log
+stderr_logfile_maxbytes=50MB
+stderr_logfile_backups=10
 EOF
 supervisorctl reread
 supervisorctl update
@@ -307,6 +324,8 @@ Zu den Werten:
   gestartetes `evallaeufe_abarbeiten`), endet er sofort mit „Ein anderer
   Hintergrundprozess arbeitet bereits.“ und landet nach einigen Versuchen in
   `FATAL`.
+- **`stderr_logfile`** — wie beim Webdienst, nach
+  `~/logs/failure-on-the-fly-evals.err.log` mit derselben Rotation.
 
 Instanzweit arbeitet nur ein Evallauf-Prozess. Er hält dafür die Sperrdatei
 `EVALLAEUFE_SPERRE`, die das Betriebssystem freigibt, sobald der Prozess endet
@@ -596,7 +615,11 @@ cd ~/failure_on_the_fly
 supervisorctl start failure-on-the-fly-evals
 ```
 
-Die Logs von supervisord liegen unter `~/logs/`.
+Die Logs von supervisord liegen unter `~/logs/`. Serverfehler (500) stehen mit
+Traceback in `~/logs/failure-on-the-fly.err.log`, Fehler des Evallauf-Dienstes
+in `~/logs/failure-on-the-fly-evals.err.log`; beide rotiert supervisord bei 50
+MB und behält zehn Vorgänger. Eine Mail an Admins gibt es nicht: Tracebacks
+verlassen den Host nicht (ADR-0065).
 
 **Webserver-Logs** sind standardmäßig aus und lassen sich bei Bedarf einschalten
 (<https://manual.uberspace.de/web-logs/>):
