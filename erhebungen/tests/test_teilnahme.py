@@ -5,6 +5,7 @@ from datetime import timedelta
 from html.parser import HTMLParser
 
 import time_machine
+from django.db import models
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -1276,7 +1277,7 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
 
-        self.assertEqual(antwort.status_code, 403)
+        self.assertEqual(antwort.status_code, 404)
         itemantwort.refresh_from_db()
         self.assertIsNone(itemantwort.freitext)
 
@@ -1868,7 +1869,7 @@ class ErhebungsteilnahmeTests(TestCase):
             self.client.get(
                 reverse("erhebungen:gespraech", args=[bindung.token])
             ).status_code,
-            403,
+            404,
         )
         self.assertEqual(
             self.client.post(
@@ -1876,6 +1877,49 @@ class ErhebungsteilnahmeTests(TestCase):
             ).status_code,
             403,
         )
+
+    def test_token_ausserhalb_des_fensters_gilt_als_unbekannt(self) -> None:
+        """Die Token-Routen verraten nicht, ob ein Token außerhalb des Fensters existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        routen: dict[str, str] = {
+            "gespraech": "get",
+            "gespraech_beenden": "post",
+            "abbrechen": "post",
+            "debrief": "post",
+            "itemblock": "post",
+        }
+
+        def status_codes(token: str) -> dict[str, int]:
+            return {
+                route: getattr(self.client, methode)(
+                    reverse(f"erhebungen:{route}", args=[token])
+                ).status_code
+                for route, methode in routen.items()
+            }
+
+        unbekannt: dict[str, int] = dict.fromkeys(routen, 404)
+        self.assertEqual(status_codes("ZZZZ-ZZZZ"), unbekannt)
+
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+        self.assertEqual(status_codes(token), unbekannt)
+
+        self.stichprobe.beginn = timezone.now() + timedelta(days=1)
+        self.stichprobe.ende = timezone.now() + timedelta(days=2)
+        self.stichprobe.save(update_fields=["beginn", "ende"])
+        self.assertEqual(status_codes(token), unbekannt)
+
+        self.stichprobe.beginn = timezone.now()
+        self.stichprobe.save(update_fields=["beginn"])
+        # Das Modell archiviert keine datentragende Stichprobe; der Test umgeht
+        # die Sperre, weil die Route den Fall trotzdem abweisen muss.
+        models.QuerySet.update(
+            Stichprobe.objects.filter(pk=self.stichprobe.pk), archiviert=True
+        )
+        self.assertEqual(status_codes(token), unbekannt)
 
     def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
         """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""
