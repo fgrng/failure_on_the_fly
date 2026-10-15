@@ -5,6 +5,7 @@ from datetime import timedelta
 from html.parser import HTMLParser
 
 import time_machine
+from django.db import models
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -1276,7 +1277,7 @@ class ErhebungsteilnahmeTests(TestCase):
             },
         )
 
-        self.assertEqual(antwort.status_code, 403)
+        self.assertEqual(antwort.status_code, 404)
         itemantwort.refresh_from_db()
         self.assertIsNone(itemantwort.freitext)
 
@@ -1868,7 +1869,7 @@ class ErhebungsteilnahmeTests(TestCase):
             self.client.get(
                 reverse("erhebungen:gespraech", args=[bindung.token])
             ).status_code,
-            403,
+            404,
         )
         self.assertEqual(
             self.client.post(
@@ -1876,6 +1877,68 @@ class ErhebungsteilnahmeTests(TestCase):
             ).status_code,
             403,
         )
+
+    def _status_der_token_routen(self, token: str) -> dict[str, int]:
+        """Ruft jede Token-Route mit ihrer Methode auf und sammelt die Statuscodes."""
+
+        routen: dict[str, str] = {
+            "gespraech": "get",
+            "gespraech_beenden": "post",
+            "abbrechen": "post",
+            "debrief": "post",
+            "itemblock": "post",
+        }
+        return {
+            route: getattr(self.client, methode)(
+                reverse(f"erhebungen:{route}", args=[token])
+            ).status_code
+            for route, methode in routen.items()
+        }
+
+    def test_unbekanntes_token_ergibt_auf_jeder_token_route_404(self) -> None:
+        """Ein geratenes Token findet auf keiner Token-Route etwas."""
+
+        self.assertEqual(
+            set(self._status_der_token_routen("ZZZZ-ZZZZ").values()), {404}
+        )
+
+    def test_token_nach_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Nach dem Fensterende verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        self.stichprobe.ende = timezone.now() - timedelta(seconds=1)
+        self.stichprobe.save(update_fields=["ende"])
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_vor_dem_fenster_gilt_als_unbekannt(self) -> None:
+        """Vor dem Fensterbeginn verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        self.stichprobe.beginn = timezone.now() + timedelta(days=1)
+        self.stichprobe.ende = timezone.now() + timedelta(days=2)
+        self.stichprobe.save(update_fields=["beginn", "ende"])
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
+
+    def test_token_einer_archivierten_stichprobe_gilt_als_unbekannt(self) -> None:
+        """Bei archivierter Stichprobe verrät keine Token-Route, dass das Token existiert."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        token: str = self._laufende_sitzung_starten().token
+        # Das Modell archiviert keine datentragende Stichprobe, der Zustand ist
+        # regulär unerreichbar; der Test umgeht die Sperre, weil die Route ihn
+        # trotzdem abweisen muss.
+        models.QuerySet.update(
+            Stichprobe.objects.filter(pk=self.stichprobe.pk), archiviert=True
+        )
+
+        self.assertEqual(set(self._status_der_token_routen(token).values()), {404})
 
     def test_abgeschlossene_teilnahme_traegt_die_vollstaendige_datenspur(self) -> None:
         """Nach dem Abschluss steht jeder Bestandteil außer den Item-Antworten (Slice 5)."""

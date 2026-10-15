@@ -1031,7 +1031,9 @@ abgegeben, bleibt sie im Debrief sichtbar, lässt sich aber nicht mehr ändern;
 hängt an der Sitzung ein Fragebogenblock, erscheint er darunter als eigener
 Abschnitt. Scheitert ein Antwortversuch endgültig, bleibt der Gesprächsschritt
 ohne Antwort erhalten. Nach dem Teilnahmefenster sind unfertige Teilnahmen
-verfallen und nicht fortsetzbar.
+verfallen und nicht fortsetzbar. Außerhalb des laufenden Fensters oder bei
+archivierter Stichprobe gilt das Token als unbekannt: Es ergibt dasselbe 404 wie
+ein geratenes Token und verrät so nicht, ob es existiert.
 
 Einwilligungs-, Instruktions- und Abschlusstext erscheinen als gerendertes
 Markdown: Absätze durch Leerzeilen, jeder einfache Zeilenumbruch bleibt
