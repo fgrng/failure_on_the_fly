@@ -237,6 +237,24 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         self.assertContains(response, "<em>Mia</em> zeigt.")
         self.assertContains(debrief, "<li>[Diagnose](https://example.org)</li>")
 
+    def test_fehlgeschlagene_anfrage_sperrt_und_meldet_ueber_das_skript(self) -> None:
+        """Das Basistemplate lädt die Fehlerbehandlung, das Formular sperrt die Aktionszeile."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einleitung, "js/anfragen.js")
+        self.assertContains(einleitung, 'id="anfragefehler"')
+        self.assertContains(
+            einleitung,
+            'hx-disabled-elt="find .gespraechseingabe__senden, '
+            'find .spracheingabe__steuerung, .sitzung-aktionen button"',
+        )
+        self.assertContains(einleitung, "data-schreibschutz-waehrend-anfrage")
+        self.assertContains(einleitung, "data-einmal-absenden")
+        self.assertNotContains(einleitung, "hx-on::before-request")
+
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
 

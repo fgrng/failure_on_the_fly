@@ -921,6 +921,17 @@ Antwort heißt der Knopf „Gespräch beenden und Debrief anzeigen“. Im Debrie
 es keine Aktionszeile. Auf schmalen Bildschirmen steht der Erklärsatz allein
 oben, Abbrechen und Beenden teilen sich die Zeile darunter.
 
+Solange eine Frage abgeschickt ist und beantwortet wird, sind Senden,
+Spracheingabe, „Gespräch beenden“ und „Sitzung abbrechen“ gesperrt und das Feld
+ist schreibgeschützt. Ein zweiter Klick auf „Senden“ löst keinen zweiten Schritt
+aus, auch ohne htmx. Kommt die Anfrage nicht an (Netzabriss, Serverfehler),
+erscheint unten auf der Seite rot und für Screenreader angesagt „Die Anfrage ist
+nicht angekommen. Bitte versuchen Sie es erneut.“; der Hinweis gilt für jede
+htmx-Anfrage der Plattform und verschwindet mit der nächsten gelungenen. Danach
+ist das Feld wieder beschreibbar, der Text steht noch darin, und alle Knöpfe
+sind wieder frei. Scheitert dagegen die Antwort des Sprachmodells, erscheint wie
+bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der
