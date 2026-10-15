@@ -4,6 +4,8 @@
 
 > **Nachtrag 2026-09-21** ([#226](https://github.com/fgrng/failure_on_the_fly/issues/226)): Infomaniaks Modellliste ist inzwischen an einem echten Konto abgerufen. Die Abschnitte 1.2 und 4.2 sind auf diesen verifizierten Stand gebracht; der frühere Vorbehalt »kein Konto vorhanden« und die Modellnamen aus der Drittquelle sind ersetzt. Die Empfehlung aus 4.3 — Autovervollständigung ja, harte Prüfung nein — bleibt davon unberührt.
 
+> **Nachtrag 2026-10-15** ([#500](https://github.com/fgrng/failure_on_the_fly/issues/500)): Der Umgebungsschalter der Zero-Retention, von dem 2.x, 3.5 und 6.1 sprechen, ist entfallen. Die Zusage steht jetzt als Zero-Retention-Erklärung mit Beleg an der Transkriptions-Fassung; ohne erklärte, aktive Fassung transkribiert die Instanz nicht. Die Haltung aus 3.5, die Zusage gehöre nicht ins Formular der Anbieterwahl, ist damit ausdrücklich umgekehrt (ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“).
+
 Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die damals offene Frage »Zulässige Anbieter und Modelle« (seit ADR-0038 entschieden):
 
 > Offen ist die konkrete Liste sowie die Frage, ob und bei welchen Anbietern Structured Output und natives Reasoning gleichzeitig möglich sind — die native Reasoning-Spur ist als optionales Feld am Gesprächsschritt vorgesehen.
@@ -98,7 +100,7 @@ Beide Anbieter bieten Whisper an, aber in **unterschiedlicher Bauform**.
 - **Passt nicht ohne Umbau:** Die Route ist **asynchron**. Sie antwortet mit `{"batch_id": "..."}`; das Ergebnis wird über `GET /1/ai/{product_id}/results/{batch_id}` geholt bzw. über `.../download` heruntergeladen. Der heutige synchrone SDK-Aufruf kann das nicht bedienen. Ein zweiter Adapter hinter dem bestehenden `Transkription`-Protokoll (Abschicken + Polling mit Timeout) hält die Naht intakt: die Signatur `transkribieren(audio) -> str` bleibt synchron, das Polling liegt im Adapter.
 - Der Größenbegrenzung des `file`-Parameters ist beim Aufnahme-Limit Rechnung zu tragen.
 
-In beiden Fällen bleibt `TRANSKRIPTION_ZERO_RETENTION` die Stelle, an der die vertragliche Zusage technisch wirksam wird.
+In beiden Fällen bleibt der Umgebungsschalter der Zero-Retention die Stelle, an der die vertragliche Zusage technisch wirksam wird.
 
 ## 3. Anbieter in der Konfiguration
 
@@ -177,7 +179,7 @@ Auf der Transkriptionsseite entsteht die Entsprechung: eine Funktion, die aus de
 
 `TRANSKRIPTION_ANBIETER` und `TRANSKRIPTION_MODELL` (`config/settings.py:181-182`) werden von der neuen Konfiguration abgelöst.
 
-`TRANSKRIPTION_ZERO_RETENTION` bleibt **Instanz-Einstellung** und wandert *nicht* mit. Es bezeugt eine vertragliche Zusage der Betreiber:in, keine Aufrufangabe — ein Tor, das eine Administrator:in im selben Formular anklicken kann, in dem sie den Anbieter wählt, ist keins mehr. Es gehört in die Deployment-Hoheit, so wie ADR-0026 es meint.
+Der Umgebungsschalter der Zero-Retention bleibt **Instanz-Einstellung** und wandert *nicht* mit. Es bezeugt eine vertragliche Zusage der Betreiber:in, keine Aufrufangabe — ein Tor, das eine Administrator:in im selben Formular anklicken kann, in dem sie den Anbieter wählt, ist keins mehr. Es gehört in die Deployment-Hoheit, so wie ADR-0026 es meint.
 
 ### 3.6 Sichtbarkeit und Geheimhaltung
 
@@ -260,7 +262,7 @@ Das Anbieterfeld aus Abschnitt 3 ist dagegen sehr wohl eine feste Liste — gepr
 ### 6.1 Entschieden (2026-09-18) und verifiziert (2026-09-21)
 
 - **`openai/gpt-4o` wird abgelöst.** Seeds (`seeds/.../entwicklungsdaten_anlegen.py:51`, `seeds/.../workshopdaten_anlegen.py:28`), README (`:266`) und die Bestandsdatensätze stellen auf **OpenRouter** um. Die Anbieterliste bleibt damit bei `fake`, `openrouter`, `infomaniak`; OpenAI-direkt wird nicht aufgenommen.
-- **`openrouter` darf als Transkriptionsanbieter gewählt werden.** `clean()` verbietet die Kombination nicht. Für die Zero-Retention-Zusage ist die **Administrator:in verantwortlich, die die Konfiguration anlegt** — dieselbe Verantwortung, die `TRANSKRIPTION_ZERO_RETENTION` schon heute bezeugt (3.5). Die offene Frage aus 6.2 bleibt damit eine Betriebsfrage, keine Sperre im Code.
+- **`openrouter` darf als Transkriptionsanbieter gewählt werden.** `clean()` verbietet die Kombination nicht. Für die Zero-Retention-Zusage ist die **Administrator:in verantwortlich, die die Konfiguration anlegt** — dieselbe Verantwortung, die der Umgebungsschalter der Zero-Retention schon heute bezeugt (3.5). Die offene Frage aus 6.2 bleibt damit eine Betriebsfrage, keine Sperre im Code.
 - **Infomaniaks Modellliste liegt vor (2026-09-21).** `GET /1/ai/models` ist mit gültigem Kontotoken abgerufen; Umfang, Typfeld und Verfügbarkeitsstatus stehen in 4.2. Damit ist der frühere offene Punkt geschlossen. Die Anschlussfrage, welche Infomaniak-Modelle Structured Output *und* Reasoning zugleich liefern, ist mit dem Wegfall der nativen Spur ([#174](https://github.com/fgrng/failure_on_the_fly/issues/174), Nachtrag oben) gegenstandslos.
 - **Die Repo-Abhängigkeiten werden umprogrammiert.** Sie sind in [#169](https://github.com/fgrng/failure_on_the_fly/issues/169) skizziert und werden dort genauer geplant; der Editor entsteht ebenfalls dort.
 

@@ -6,7 +6,14 @@ Aufgenommen ist nur, was in mindestens zwei Apps gebraucht wird.
 from django.contrib.auth.models import Group
 
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import (
+    Anbieter,
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+    Verwendung,
+    ZeroRetentionFeldgruppe,
+)
 from vignetten.models import Vignette
 
 
@@ -40,6 +47,46 @@ def aktive_modell_konfiguration(
             parameter={"skript": skript} if skript is not None else {},
         ),
         verwendung,
+    )
+
+
+def erklaerte[K: ZeroRetentionFeldgruppe](konfiguration: K) -> K:
+    """Gibt an der Konfiguration eine Zero-Retention-Erklärung ab.
+
+    Erklärt wird im Namen eines eigenen Administrationskontos, damit die
+    Erklärung keinem Konto des Tests in die Quere kommt.
+    """
+
+    konto: Konto
+    konto, _ = Konto.objects.get_or_create(
+        username="zero-retention-erklaerende", defaults={"is_superuser": True}
+    )
+    konfiguration.zero_retention_erklaeren("AVV mit dem Anbieter vom 01.10.2026", konto)
+    return konfiguration
+
+
+def transkriptions_fassung() -> TranskriptionsKonfiguration:
+    """Legt eine Transkriptions-Fassung mit echtem Anbieter an, ohne Erklärung.
+
+    Sie ist nicht aktiv; ihr Tor bleibt zu, bis sie erklärt ist.
+    """
+
+    return TranskriptionsKonfiguration.objects.create(
+        anbieter=Anbieter.OPENROUTER,
+        anbieter_token="sk-or-testtoken",
+        transkriptionsmodell="whisper-large-v3",
+    )
+
+
+def erklaerte_aktive_transkription() -> TranskriptionsKonfiguration:
+    """Legt eine erklärte Transkriptions-Fassung mit echtem Anbieter an und aktiviert sie.
+
+    Damit ist das Tor der Transkription offen. Den Adapter speisen Tests
+    weiter über die Naht `anbieter_bilden` als `FakeTranskription` ein.
+    """
+
+    return TranskriptionsKonfiguration.objects.aktivieren(
+        erklaerte(transkriptions_fassung())
     )
 
 

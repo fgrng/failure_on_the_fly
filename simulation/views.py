@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -14,6 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from konten.models import Konto
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
@@ -21,7 +23,10 @@ from .forms import (
     EvalkatalogDurchlaufForm,
     ModellKonfigurationForm,
     SimulationskernForm,
+    TokenRotationForm,
     TranskriptionsKonfigurationForm,
+    ZeroRetentionErklaerungForm,
+    ZeroRetentionWiderrufForm,
 )
 from .lebenszyklus import VersionierteFassung
 from .modellverzeichnis import (
@@ -816,7 +821,57 @@ def evalkatalog_verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @dataclass(frozen=True)
-class _Konfigurationszeile:
+class _Erklaerungsspalten:
+    # Der Erklärungsstand einer Konfiguration, wie ihn eine Listenzeile zeigt.
+
+    ist_fake: bool
+    erklaerbar: bool
+    widerrufbar: bool
+    widerrufen: bool
+    zero_retention_abgegeben: bool
+    zero_retention_erklaert: bool
+    zero_retention_beleg: str
+    zero_retention_erklaert_am: datetime | None
+    zero_retention_erklaert_von: str
+    zero_retention_widerrufen_am: datetime | None
+    zero_retention_widerrufen_von: str
+    zero_retention_widerrufsgrund: str
+
+    @property
+    def erklaerungsstand(self) -> str:
+        """Der Erklärungsstand in einem Wort, wie ihn die Tabelle zeigt."""
+        if self.ist_fake:
+            return "nicht nötig"
+        return "erklärt" if self.zero_retention_erklaert else "fehlt"
+
+
+def _erklaerungsspalten(
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration,
+) -> dict[str, Any]:
+    # Die Felder von `_Erklaerungsspalten`, gelesen aus der Konfiguration.
+
+    return {
+        "ist_fake": not konfiguration.hat_auftragsverarbeiter,
+        "erklaerbar": konfiguration.zero_retention_erklaerbar,
+        "widerrufbar": konfiguration.zero_retention_widerrufbar,
+        "widerrufen": konfiguration.zero_retention_ist_widerrufen,
+        "zero_retention_abgegeben": konfiguration.zero_retention_abgegeben,
+        "zero_retention_erklaert": konfiguration.zero_retention_erklaert,
+        "zero_retention_beleg": konfiguration.zero_retention_beleg,
+        "zero_retention_erklaert_am": konfiguration.zero_retention_erklaert_am,
+        "zero_retention_erklaert_von": str(
+            konfiguration.zero_retention_erklaert_von or ""
+        ),
+        "zero_retention_widerrufen_am": konfiguration.zero_retention_widerrufen_am,
+        "zero_retention_widerrufen_von": str(
+            konfiguration.zero_retention_widerrufen_von or ""
+        ),
+        "zero_retention_widerrufsgrund": konfiguration.zero_retention_widerrufsgrund,
+    }
+
+
+@dataclass(frozen=True)
+class _Konfigurationszeile(_Erklaerungsspalten):
     # Eine Zeile der Liste; das Token trägt sie nur maskiert.
 
     pk: int
@@ -828,6 +883,7 @@ class _Konfigurationszeile:
     anbieter_token_maskiert: str
     parameter: object
     verwendungen: tuple[Verwendung, ...]
+    zulaessig_fuer_schuelerin: bool
 
 
 @dataclass(frozen=True)
@@ -837,6 +893,7 @@ class _Schalter:
     verwendung: Verwendung
     ist_aktiv: bool
     statt: str
+    gesperrt: bool
 
 
 def _konfigurationszeilen() -> list[_Konfigurationszeile]:
@@ -858,8 +915,12 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
                 for verwendung in Verwendung
                 if aktive.get(verwendung) == konfiguration.pk
             ),
+            zulaessig_fuer_schuelerin=konfiguration.zulaessig_fuer_schuelerin,
+            **_erklaerungsspalten(konfiguration),
         )
-        for konfiguration in ModellKonfiguration.objects.order_by("-pk")
+        for konfiguration in ModellKonfiguration.objects.select_related(
+            "zero_retention_erklaert_von", "zero_retention_widerrufen_von"
+        ).order_by("-pk")
     ]
 
 
@@ -872,11 +933,10 @@ def _aktive_zeile(
 
 
 def _gewaehlte_zeile(
-    request: HttpRequest, zeilen: list[_Konfigurationszeile]
+    genannt: str, zeilen: list[_Konfigurationszeile]
 ) -> _Konfigurationszeile | None:
     # Die genannte Zeile, sonst die der Schüler:in, sonst die neueste.
 
-    genannt: str = request.GET.get("konfiguration", "")
     if genannt.isdigit():
         for zeile in zeilen:
             if zeile.pk == int(genannt):
@@ -899,6 +959,8 @@ def _schalter(
                 verwendung=verwendung,
                 ist_aktiv=aktiv is not None and aktiv.pk == gewaehlt.pk,
                 statt=aktiv.bezeichnung if aktiv else "",
+                gesperrt=verwendung == Verwendung.SCHUELERIN
+                and not gewaehlt.zulaessig_fuer_schuelerin,
             )
         )
     return schalter
@@ -912,12 +974,19 @@ def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
     )
 
 
-@login_required
-@administratorin_erforderlich
-def modell_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
+def _liste_rendern(
+    request: HttpRequest,
+    genannt: str,
+    erklaerungsformular: ZeroRetentionErklaerungForm | None = None,
+    widerrufsformular: ZeroRetentionWiderrufForm | None = None,
+) -> HttpResponse:
+    # Die Liste samt Detail; ein abgewiesenes Formular bleibt stehen.
+
     zeilen: list[_Konfigurationszeile] = _konfigurationszeilen()
-    gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(request, zeilen)
+    gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(genannt, zeilen)
+    schuelerin: _Konfigurationszeile | None = _aktive_zeile(
+        zeilen, Verwendung.SCHUELERIN
+    )
     return render(
         request,
         "simulation/modell_konfiguration.html",
@@ -925,8 +994,26 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
             "konfigurationen": zeilen,
             "gewaehlt": gewaehlt,
             "schalter": _schalter(gewaehlt, zeilen) if gewaehlt else [],
+            "erklaerungsformular": erklaerungsformular or ZeroRetentionErklaerungForm(),
+            "widerrufsformular": widerrufsformular or ZeroRetentionWiderrufForm(),
+            "schuelerin_ohne_erklaerung": schuelerin is not None
+            and not schuelerin.widerrufen
+            and not schuelerin.zulaessig_fuer_schuelerin,
+            # Ein Widerruf lässt die Zeiger stehen; hier fällt er auf.
+            "widerrufen_aktiv_fuer": [
+                verwendung.label
+                for verwendung in Verwendung
+                if (aktiv := _aktive_zeile(zeilen, verwendung)) and aktiv.widerrufen
+            ],
         },
     )
+
+
+@login_required
+@administratorin_erforderlich
+def modell_konfiguration(request: HttpRequest) -> HttpResponse:
+    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
+    return _liste_rendern(request, request.GET.get("konfiguration", ""))
 
 
 def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
@@ -952,7 +1039,7 @@ def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
     vorlage: ModellKonfiguration | None = _vorlage(request)
     form: ModellKonfigurationForm
     if request.method == "POST":
-        form = ModellKonfigurationForm(request.POST)
+        form = ModellKonfigurationForm(request.POST, konto=request.user)
         if form.is_valid():
             konfiguration: ModellKonfiguration = form.save()
             messages.success(
@@ -962,16 +1049,17 @@ def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
             return _zur_konfiguration(konfiguration)
     elif vorlage:
         form = ModellKonfigurationForm(
+            konto=request.user,
             initial={
                 "bezeichnung": f"{vorlage.bezeichnung} (Kopie)",
                 "anbieter": vorlage.anbieter,
                 "anbieter_basis_url": vorlage.anbieter_basis_url,
                 "sprachmodell": vorlage.sprachmodell,
                 "parameter": vorlage.parameter,
-            }
+            },
         )
     else:
-        form = ModellKonfigurationForm()
+        form = ModellKonfigurationForm(konto=request.user)
     # Nur Nummer und Bezeichnung, damit der Klartext des Tokens die Seite nie erreicht.
     vorlage_kopf: dict[str, object] | None = (
         {"pk": vorlage.pk, "bezeichnung": vorlage.bezeichnung} if vorlage else None
@@ -1062,34 +1150,264 @@ def modell_konfiguration_aktivieren(
     if verwendung not in Verwendung.values:
         raise Http404("Unbekannte Verwendung.")
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
+    try:
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
+    except ValidationError as fehler:
+        messages.error(request, " ".join(fehler.messages))
     return _zur_konfiguration(konfiguration)
+
+
+@dataclass(frozen=True)
+class _Transkriptionszeile(_Erklaerungsspalten):
+    # Eine Fassung der Transkription; das Token trägt sie nur maskiert.
+
+    pk: int
+    angelegt_am: datetime | None
+    anbieter: str
+    anbieter_basis_url: str
+    anbieter_token_maskiert: str
+    transkriptionsmodell: str
+    sprache: str
+    aktiv: bool
+
+
+def _transkriptionszeilen(
+    aktive: TranskriptionsKonfiguration,
+) -> list[_Transkriptionszeile]:
+    # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
+
+    return [
+        _Transkriptionszeile(
+            pk=konfiguration.pk,
+            angelegt_am=konfiguration.angelegt_am,
+            anbieter=konfiguration.get_anbieter_display(),
+            anbieter_basis_url=konfiguration.anbieter_basis_url,
+            anbieter_token_maskiert=konfiguration.anbieter_token_maskiert,
+            transkriptionsmodell=konfiguration.transkriptionsmodell,
+            sprache=konfiguration.sprache,
+            aktiv=konfiguration.pk == aktive.pk,
+            **_erklaerungsspalten(konfiguration),
+        )
+        for konfiguration in TranskriptionsKonfiguration.objects.select_related(
+            "zero_retention_erklaert_von", "zero_retention_widerrufen_von"
+        ).order_by("-pk")
+    ]
+
+
+def _neue_fassung_form(
+    aktive: TranskriptionsKonfiguration, konto: Konto
+) -> TranskriptionsKonfigurationForm:
+    # Füllt alles aus der aktiven Fassung vor außer Token und Erklärung.
+
+    return TranskriptionsKonfigurationForm(
+        vorlage=aktive,
+        konto=konto,
+        initial={
+            "anbieter": aktive.anbieter,
+            "anbieter_basis_url": aktive.anbieter_basis_url,
+            "transkriptionsmodell": aktive.transkriptionsmodell,
+            "sprache": aktive.sprache,
+        },
+    )
+
+
+def _zur_fassung(konfiguration: TranskriptionsKonfiguration) -> HttpResponse:
+    # Führt zurück zur Liste, die Fassung im Detail. Der Umweg über die
+    # Umleitung hält ein eingegebenes Token aus dem Antwortkörper heraus.
+
+    return redirect(
+        f"{reverse('simulation:transkriptions_konfiguration')}"
+        f"?fassung={konfiguration.pk}"
+    )
+
+
+# Das Rotationsfeld heißt wie das Tokenfeld der neuen Fassung; das Präfix
+# hält beide auf derselben Seite auseinander.
+_ROTATION: str = "rotation"
+
+
+def _transkription_rendern(
+    request: HttpRequest,
+    genannt: str,
+    form: TranskriptionsKonfigurationForm | None = None,
+    rotationsformular: TokenRotationForm | None = None,
+    erklaerungsformular: ZeroRetentionErklaerungForm | None = None,
+    widerrufsformular: ZeroRetentionWiderrufForm | None = None,
+) -> HttpResponse:
+    # Liste, Detail und Anlegen; ein abgewiesenes Formular bleibt stehen.
+
+    aktive: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktive()
+    zeilen: list[_Transkriptionszeile] = _transkriptionszeilen(aktive)
+    gewaehlt: _Transkriptionszeile = next(
+        (zeile for zeile in zeilen if str(zeile.pk) == genannt),
+        next(zeile for zeile in zeilen if zeile.aktiv),
+    )
+    return render(
+        request,
+        "simulation/transkriptions_konfiguration.html",
+        {
+            "fassungen": zeilen,
+            "gewaehlt": gewaehlt,
+            "form": form or _neue_fassung_form(aktive, request.user),
+            "rotationsformular": rotationsformular
+            or TokenRotationForm(prefix=_ROTATION),
+            "erklaerungsformular": erklaerungsformular or ZeroRetentionErklaerungForm(),
+            "widerrufsformular": widerrufsformular or ZeroRetentionWiderrufForm(),
+            "transkription_offen": aktive.transkription_offen,
+        },
+    )
 
 
 @login_required
 @administratorin_erforderlich
 def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Bearbeitet den einen Anbieterzugang der Transkription."""
-    konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
-    )
-    form: TranskriptionsKonfigurationForm
+    """Listet die Fassungen der Transkription und legt eine neue an.
+
+    Aktiviert wird allein in der Liste, wie bei der Modell-Konfiguration.
+    """
     if request.method == "POST":
-        # Eine eigene Instanz, denn die Validierung schreibt die Eingabe
-        # hinein; die Anzeige des hinterlegten Tokens bleibt beim Gespeicherten.
-        form = TranskriptionsKonfigurationForm(
-            request.POST, instance=TranskriptionsKonfiguration.objects.aktuelle()
+        form: TranskriptionsKonfigurationForm = TranskriptionsKonfigurationForm(
+            request.POST,
+            vorlage=TranskriptionsKonfiguration.objects.aktive(),
+            konto=request.user,
         )
         if form.is_valid():
-            form.save()
-            messages.success(request, "Die Transkription ist neu eingestellt.")
-            # Der Umweg über die Umleitung hält das gespeicherte Token
-            # aus dem Antwortkörper heraus.
-            return redirect("simulation:transkriptions_konfiguration")
-    else:
-        form = TranskriptionsKonfigurationForm(instance=konfiguration)
-    return render(
-        request,
-        "simulation/transkriptions_konfiguration.html",
-        {"form": form, "konfiguration": konfiguration},
+            konfiguration: TranskriptionsKonfiguration = form.save()
+            messages.success(
+                request,
+                f"Die Fassung Nr. {konfiguration.pk} ist angelegt. Aktiv wird "
+                "sie erst, wenn Sie sie aktivieren.",
+            )
+            return _zur_fassung(konfiguration)
+        return _transkription_rendern(request, "", form=form)
+    return _transkription_rendern(request, request.GET.get("fassung", ""))
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_aktivieren(
+    request: HttpRequest, pk: int
+) -> HttpResponse:
+    """Richtet den Zeiger auf eine Fassung; sie gilt ab der nächsten Sitzung."""
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
     )
+    try:
+        TranskriptionsKonfiguration.objects.aktivieren(konfiguration)
+    except ValidationError as fehler:
+        messages.error(request, " ".join(fehler.messages))
+        return _zur_fassung(konfiguration)
+    messages.success(
+        request,
+        f"Die Fassung Nr. {konfiguration.pk} ist aktiv. Laufende Sitzungen "
+        "transkribieren weiter mit ihrer bisherigen Fassung.",
+    )
+    return _zur_fassung(konfiguration)
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_token(request: HttpRequest, pk: int) -> HttpResponse:
+    """Rotiert das Token einer Fassung, ohne eine neue anzulegen."""
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
+    )
+    form: TokenRotationForm = TokenRotationForm(request.POST, prefix=_ROTATION)
+    if not form.rotieren(konfiguration):
+        return _transkription_rendern(
+            request, str(konfiguration.pk), rotationsformular=form
+        )
+    messages.success(
+        request, f"Das Token der Fassung Nr. {konfiguration.pk} ist ersetzt."
+    )
+    return _zur_fassung(konfiguration)
+
+
+@dataclass(frozen=True)
+class _Erklaerungsseite:
+    # Was Erklären und Widerrufen an beiden Konfigurationen unterscheidet:
+    # das Modell, die Seite, die ein abgewiesenes Formular erneut zeigt, der
+    # Weg zurück und wie die Erfolgsmeldung die Konfiguration nennt.
+
+    modell: type[ModellKonfiguration] | type[TranskriptionsKonfiguration]
+    rendern: Callable[..., HttpResponse]
+    zurueck: Callable[[Any], HttpResponse]
+    benennen: Callable[[Any], str]
+
+
+MODELL_ERKLAERUNGSSEITE: _Erklaerungsseite = _Erklaerungsseite(
+    modell=ModellKonfiguration,
+    rendern=_liste_rendern,
+    zurueck=_zur_konfiguration,
+    benennen=lambda konfiguration: f"»{konfiguration.bezeichnung}«",
+)
+TRANSKRIPTION_ERKLAERUNGSSEITE: _Erklaerungsseite = _Erklaerungsseite(
+    modell=TranskriptionsKonfiguration,
+    rendern=_transkription_rendern,
+    zurueck=_zur_fassung,
+    benennen=lambda konfiguration: f"die Fassung Nr. {konfiguration.pk}",
+)
+
+
+def _abgewiesen_melden(
+    request: HttpRequest, form: ZeroRetentionErklaerungForm | ZeroRetentionWiderrufForm
+) -> None:
+    # Zeigt die Seite das Formular nicht mehr, steht der Grund als Meldung
+    # über der Seite.
+
+    for meldungen in form.errors.values():
+        messages.error(request, " ".join(meldungen))
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def zero_retention_erklaeren(
+    request: HttpRequest, pk: int, seite: _Erklaerungsseite
+) -> HttpResponse:
+    """Gibt an einer bestehenden Konfiguration die Zero-Retention-Erklärung ab."""
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration = (
+        get_object_or_404(seite.modell, pk=pk)
+    )
+    form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
+    if form.erklaeren(konfiguration, request.user):
+        messages.success(
+            request,
+            f"Für {seite.benennen(konfiguration)} ist die Zero-Retention-Erklärung "
+            "abgegeben.",
+        )
+    elif konfiguration.zero_retention_erklaerbar:
+        return seite.rendern(request, str(konfiguration.pk), erklaerungsformular=form)
+    else:
+        _abgewiesen_melden(request, form)
+    return seite.zurueck(konfiguration)
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def zero_retention_widerrufen(
+    request: HttpRequest, pk: int, seite: _Erklaerungsseite
+) -> HttpResponse:
+    """Widerruft die Zero-Retention-Erklärung einer Konfiguration, mit Grund.
+
+    Ist eine Transkriptions-Fassung die aktive oder in laufenden Sitzungen
+    gepinnt, ist die Transkription dort ab der nächsten Aufnahme aus.
+    """
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration = (
+        get_object_or_404(seite.modell, pk=pk)
+    )
+    form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
+    if form.widerrufen(konfiguration, request.user):
+        messages.success(
+            request,
+            f"Für {seite.benennen(konfiguration)} ist die Zero-Retention-Erklärung "
+            "widerrufen.",
+        )
+    elif konfiguration.zero_retention_widerrufbar:
+        return seite.rendern(request, str(konfiguration.pk), widerrufsformular=form)
+    else:
+        _abgewiesen_melden(request, form)
+    return seite.zurueck(konfiguration)

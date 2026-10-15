@@ -161,7 +161,7 @@ class SeitenvokabularTests(TestCase):
                 reverse("simulation:transkriptions_konfiguration"),
                 "System / Transkriptions-Konfiguration",
                 "Transkriptions-Konfiguration",
-                "Änderungen speichern",
+                "Fassung anlegen",
             ),
         )
         for url, ueberzeile, titel, knopf in seiten:

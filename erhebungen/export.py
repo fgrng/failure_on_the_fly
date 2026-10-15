@@ -13,7 +13,11 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from fragebogen_items.models import FragebogenItem, LikertSkalenpol
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import (
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+)
 from sitzungen.models import (
     Diagnose,
     Fehlversuch,
@@ -72,6 +76,16 @@ def _csv_aus_objekten(
     return ausgabe.getvalue()
 
 
+# Der Erklärungsstand je Konfiguration, ohne das erklärende Konto (ADR-0029).
+_ERKLAERUNGSSPALTEN: tuple[str, ...] = (
+    "zero_retention_erklaert",
+    "zero_retention_beleg",
+    "zero_retention_erklaert_am",
+    "zero_retention_widerrufen_am",
+    "zero_retention_widerrufsgrund",
+)
+
+
 def datenspur_zip(erhebung: Erhebung) -> bytes:
     """Liefert den ersten Export-Durchstich für eine Erhebung als ZIP-Archiv."""
 
@@ -110,6 +124,11 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         Q(pk=erhebung.modell_konfiguration_id)
         | Q(pk__in=positionen.values("sitzung__modell_konfiguration_id"))
     ).order_by("pk")
+    transkriptionsfassungen: QuerySet[TranskriptionsKonfiguration] = (
+        TranskriptionsKonfiguration.objects.filter(
+            pk__in=positionen.values("sitzung__transkriptions_konfiguration_id")
+        ).order_by("pk")
+    )
     vorgelegte_items: QuerySet[FragebogenItem] = FragebogenItem.objects.filter(
         pk__in=antworten.values("erhebungsitem__item_id")
     ).order_by("pk")
@@ -167,6 +186,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "vignette_id",
                 "simulationskern_id",
                 "modell_konfiguration_id",
+                "transkriptions_konfiguration_id",
                 "erstellt_am",
                 "verbrauchte_zeit",
             ),
@@ -177,6 +197,9 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
             vignette_id=attrgetter("sitzung.vignette_id"),
             simulationskern_id=attrgetter("sitzung.simulationskern_id"),
             modell_konfiguration_id=attrgetter("sitzung.modell_konfiguration_id"),
+            transkriptions_konfiguration_id=attrgetter(
+                "sitzung.transkriptions_konfiguration_id"
+            ),
             erstellt_am=attrgetter("sitzung.erstellt_am"),
             verbrauchte_zeit=attrgetter("sitzung.verbrauchte_zeit"),
         ),
@@ -284,9 +307,28 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         ),
         "modellkonfigurationen.csv": _csv_aus_objekten(
             konfigurationen,
-            ("id", "bezeichnung", "anbieter", "sprachmodell", "parameter"),
+            (
+                "id",
+                "bezeichnung",
+                "anbieter",
+                "sprachmodell",
+                "parameter",
+                *_ERKLAERUNGSSPALTEN,
+            ),
             parameter=lambda konfiguration: json.dumps(
                 konfiguration.parameter, ensure_ascii=False
+            ),
+        ),
+        # Ohne Token und Basis-URL, wie die Modell-Konfigurationen (ADR-0029).
+        "transkriptionskonfigurationen.csv": _csv_aus_objekten(
+            transkriptionsfassungen,
+            (
+                "id",
+                "anbieter",
+                "transkriptionsmodell",
+                "sprache",
+                "angelegt_am",
+                *_ERKLAERUNGSSPALTEN,
             ),
         ),
         "fragebogen_items.csv": _csv_aus_objekten(

@@ -217,10 +217,6 @@ LOGGING: dict[str, object] = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-TRANSKRIPTION_ZERO_RETENTION: bool = (
-    os.environ.get("TRANSKRIPTION_ZERO_RETENTION", "False") == "True"
-)
-
 # Obergrenze je Aufnahme, in Bytes. Django lehnt hier von sich aus nichts ab:
 # DATA_UPLOAD_MAX_MEMORY_SIZE klammert hochgeladene Dateien aus, und
 # FILE_UPLOAD_MAX_MEMORY_SIZE entscheidet nur zwischen Speicher und Platte.

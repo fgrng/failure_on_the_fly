@@ -158,8 +158,42 @@ urlpatterns: list[URLPattern] = [
         name="modell_konfiguration_aktivieren",
     ),
     path(
+        "modell-konfiguration/<int:pk>/erklaeren/",
+        views.zero_retention_erklaeren,
+        {"seite": views.MODELL_ERKLAERUNGSSEITE},
+        name="modell_konfiguration_erklaeren",
+    ),
+    path(
+        "modell-konfiguration/<int:pk>/widerrufen/",
+        views.zero_retention_widerrufen,
+        {"seite": views.MODELL_ERKLAERUNGSSEITE},
+        name="modell_konfiguration_widerrufen",
+    ),
+    path(
         "transkription/",
         views.transkriptions_konfiguration,
         name="transkriptions_konfiguration",
+    ),
+    path(
+        "transkription/<int:pk>/aktivieren/",
+        views.transkriptions_konfiguration_aktivieren,
+        name="transkriptions_konfiguration_aktivieren",
+    ),
+    path(
+        "transkription/<int:pk>/token/",
+        views.transkriptions_konfiguration_token,
+        name="transkriptions_konfiguration_token",
+    ),
+    path(
+        "transkription/<int:pk>/erklaeren/",
+        views.zero_retention_erklaeren,
+        {"seite": views.TRANSKRIPTION_ERKLAERUNGSSEITE},
+        name="transkriptions_konfiguration_erklaeren",
+    ),
+    path(
+        "transkription/<int:pk>/widerrufen/",
+        views.zero_retention_widerrufen,
+        {"seite": views.TRANSKRIPTION_ERKLAERUNGSSEITE},
+        name="transkriptions_konfiguration_widerrufen",
     ),
 ]

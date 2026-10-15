@@ -1,6 +1,19 @@
 """Formulare der Simulation: Kern- und Evalkatalog-Entwurf, Modell- und Transkriptions-Konfiguration."""
 
-from django.forms import ModelForm, PasswordInput
+from collections.abc import Callable
+from typing import Any
+
+from django.core.exceptions import ValidationError
+from django.forms import (
+    BooleanField,
+    CharField,
+    Form,
+    ModelForm,
+    PasswordInput,
+    Textarea,
+)
+
+from konten.models import Konto
 
 from .models import (
     ANBIETER_PROFIL,
@@ -12,6 +25,7 @@ from .models import (
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    ZeroRetentionFeldgruppe,
 )
 
 # Das Feld heißt an beiden Nähten gleich und wird an beiden gleich gefüllt —
@@ -90,6 +104,132 @@ class EvalkatalogDurchlaufForm(ModelForm):
         fields: list[str] = ["k", "lehrperson_vorlage", "bewerter_vorlage"]
 
 
+# Beide Konfigurationen tragen dieselbe Erklärung, also denselben Wortlaut.
+ZERO_RETENTION_BELEG_LABEL: str = "Beleg der Zusage"
+ZERO_RETENTION_BELEG_HINWEIS: str = (
+    "Worauf sich die Zusage stützt, etwa „AVV mit Infomaniak vom …“ oder "
+    "„OpenRouter: Modell nur über ZDR-Endpunkte, Stand …“. Zeitpunkt und Konto "
+    "werden mitgeschrieben; danach ist die Erklärung nicht mehr änderbar."
+)
+
+
+def _beleg_feld() -> CharField:
+    """Das Belegfeld der Erklärung, gleich an beiden Konfigurationen."""
+    # Nicht Pflicht am Feld: Den leeren Beleg meldet die Domäne mit ihrem
+    # eigenen Wortlaut, damit beide Wege dieselbe Meldung zeigen.
+    return CharField(
+        label=ZERO_RETENTION_BELEG_LABEL,
+        help_text=ZERO_RETENTION_BELEG_HINWEIS,
+        required=False,
+        widget=Textarea(attrs={"rows": 3}),
+    )
+
+
+ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG: str = (
+    "Ein Beleg allein erklärt nichts. Setzen Sie das Häkchen, um die "
+    "Erklärung abzugeben, oder leeren Sie den Beleg."
+)
+
+
+class ZeroRetentionFeldgruppeForm(ModelForm):
+    """Die Erklärung beim Anlegen einer Fassung, für beide Konfigurationen.
+
+    Das Häkchen ist die Erklärung selbst; der Beleg allein erklärt nichts.
+    """
+
+    zero_retention_erklaert = BooleanField(
+        label="Zero-Retention-Erklärung abgeben",
+        help_text=(
+            "Für dieses Modell bei diesem Anbieter liegt eine Zusage vor, dass "
+            "Eingaben weder gespeichert noch zum Training genutzt werden."
+        ),
+        required=False,
+    )
+    zero_retention_beleg = _beleg_feld()
+
+    def __init__(self, *args: object, konto: Konto, **kwargs: object) -> None:
+        """Merkt sich das erklärende Konto."""
+        super().__init__(*args, **kwargs)
+        self._konto: Konto = konto
+
+    def clean(self) -> dict[str, object]:
+        """Gibt die Erklärung mit der Fassung ab, nach den Regeln der Domäne."""
+        daten: dict[str, object] = super().clean()
+        beleg: str = str(daten.get("zero_retention_beleg") or "")
+        # Ohne gültige Erklärung bleibt auch kein Beleg an der Fassung stehen.
+        daten["zero_retention_beleg"] = ""
+        if not daten.get("zero_retention_erklaert"):
+            if beleg.strip():
+                self.add_error(
+                    "zero_retention_erklaert",
+                    ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG,
+                )
+            return daten
+        if "anbieter" not in daten:
+            return daten
+        self.instance.anbieter = daten["anbieter"]
+        try:
+            self.instance.zero_retention_erklaeren(beleg, self._konto)
+        except ValidationError as fehler:
+            self.add_error(None, fehler)
+            return daten
+        daten["zero_retention_beleg"] = self.instance.zero_retention_beleg
+        return daten
+
+
+class ZeroRetentionErklaerungForm(Form):
+    """Die nachträgliche Erklärung an einer bestehenden Fassung."""
+
+    zero_retention_beleg = _beleg_feld()
+
+    def erklaeren(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
+        """Gibt die Erklärung ab; scheitert sie, stehen die Gründe am Formular."""
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.zero_retention_erklaeren(
+                daten["zero_retention_beleg"], konto
+            ),
+        )
+
+
+class ZeroRetentionWiderrufForm(Form):
+    """Der Widerruf einer abgegebenen Erklärung, an beiden Konfigurationen."""
+
+    # Nicht Pflicht am Feld: Den leeren Grund meldet die Domäne.
+    zero_retention_widerrufsgrund = CharField(
+        label="Grund des Widerrufs",
+        help_text=(
+            "Warum die Zusage nicht mehr gilt, etwa „Anbieter zieht die Zusage "
+            "zurück“ oder „Modell hat keinen ZDR-Endpunkt mehr“. Zeitpunkt und "
+            "Konto werden mitgeschrieben; der Widerruf ist endgültig."
+        ),
+        required=False,
+        widget=Textarea(attrs={"rows": 3}),
+    )
+
+    def widerrufen(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
+        """Widerruft die Erklärung; scheitert es, stehen die Gründe am Formular."""
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.zero_retention_widerrufen(
+                daten["zero_retention_widerrufsgrund"], konto
+            ),
+        )
+
+
+def _an_der_domaene(form: Form, aenderung: Callable[[dict[str, Any]], None]) -> bool:
+    # Führt die Änderung der Domäne mit den bereinigten Daten aus; was sie
+    # abweist, steht danach am Formular.
+    if not form.is_valid():
+        return False
+    try:
+        aenderung(form.cleaned_data)
+    except ValidationError as fehler:
+        form.add_error(None, fehler)
+        return False
+    return True
+
+
 def _stellschrauben_hinweis() -> str:
     """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
     echte: str = ", ".join(sorted(ANBIETER_PROFIL[Anbieter.OPENROUTER].stellschrauben))
@@ -97,7 +237,7 @@ def _stellschrauben_hinweis() -> str:
     return f"Erlaubt sind bei echten Anbietern: {echte}. Beim Anbieter »fake«: {fake}."
 
 
-class ModellKonfigurationForm(ModelForm):
+class ModellKonfigurationForm(ZeroRetentionFeldgruppeForm):
     """Die einzige Schreibgeste an einer append-only Modell-Konfiguration."""
 
     class Meta:
@@ -113,6 +253,7 @@ class ModellKonfigurationForm(ModelForm):
             "anbieter_basis_url",
             "sprachmodell",
             "parameter",
+            "zero_retention_beleg",
         ]
         labels: dict[str, str] = {
             "bezeichnung": "Bezeichnung",
@@ -154,11 +295,11 @@ class ModellKonfigurationForm(ModelForm):
         return {} if parameter is None else parameter
 
 
-class TranskriptionsKonfigurationForm(ModelForm):
-    """Der eine, veränderliche Anbieterzugang der Transkription."""
+class TranskriptionsKonfigurationForm(ZeroRetentionFeldgruppeForm):
+    """Die Schreibgeste an der append-only Transkription: eine neue Fassung."""
 
     class Meta:
-        """Führt die Felder der Konfiguration; das Token gibt sie nie zurück."""
+        """Führt die Felder einer Fassung; das Token gibt sie nie zurück."""
 
         model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
         # Dieselbe Eingabefolge wie in der Modell-Konfiguration: Das Token
@@ -169,6 +310,7 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "anbieter_basis_url",
             "transkriptionsmodell",
             "sprache",
+            "zero_retention_beleg",
         ]
         labels: dict[str, str] = {
             "anbieter": "Anbieter",
@@ -179,8 +321,8 @@ class TranskriptionsKonfigurationForm(ModelForm):
         }
         help_texts: dict[str, str] = {
             "anbieter_token": (
-                "Der Ladeknopf unten braucht es. Leer lassen behält das "
-                "hinterlegte Token, solange Anbieter und Basis-URL gleich bleiben."
+                "Der Ladeknopf unten braucht es. Leer lassen übernimmt das Token "
+                "der aktiven Fassung, solange Anbieter und Basis-URL gleich bleiben."
             ),
             "anbieter_basis_url": BASIS_URL_HINWEIS,
             "transkriptionsmodell": "Mit dem Präfix des gewählten Anbieters.",
@@ -190,20 +332,52 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "anbieter_token": PasswordInput(render_value=False),
         }
 
-    def clean(self) -> dict[str, object]:
-        """Liest eine leere Eingabe am selben Endpunkt als »unverändert«.
+    def __init__(
+        self, *args: object, vorlage: TranskriptionsKonfiguration, **kwargs: object
+    ) -> None:
+        """Merkt sich die aktive Fassung, deren Token eine leere Eingabe meint.
 
-        Das Feld zeigt den gesetzten Wert nie an; ohne diese Lesart wäre jede
-        Änderung an Modell oder Sprache ein versehentlicher Tokenverlust. Bei
-        neuem Anbieter oder neuer Basis-URL ginge das alte Token an einen
-        anderen Empfänger, also bleibt es dort leer.
+        Das erklärende Konto geht als `konto` an die Feldgruppe der Erklärung.
+        """
+        super().__init__(*args, **kwargs)
+        self._vorlage: TranskriptionsKonfiguration = vorlage
+
+    def clean(self) -> dict[str, object]:
+        """Liest eine leere Eingabe am selben Endpunkt als »Token der Vorlage«.
+
+        Das Feld zeigt das hinterlegte Token nie an; ohne diese Lesart hieße
+        jede neue Fassung mit anderem Modell oder anderer Sprache, das Token
+        neu zu beschaffen. Bei neuem Anbieter oder neuer Basis-URL ginge das
+        alte Token an einen anderen Empfänger, also bleibt es dort leer (#493).
         """
         cleaned_data: dict[str, object] = super().clean()
         if (
             not cleaned_data.get("anbieter_token")
-            and cleaned_data.get("anbieter") == self.instance.anbieter
+            and cleaned_data.get("anbieter") == self._vorlage.anbieter
             and cleaned_data.get("anbieter_basis_url")
-            == self.instance.anbieter_basis_url
+            == self._vorlage.anbieter_basis_url
         ):
-            cleaned_data["anbieter_token"] = self.instance.anbieter_token
+            cleaned_data["anbieter_token"] = self._vorlage.anbieter_token
         return cleaned_data
+
+
+class TokenRotationForm(Form):
+    """Ein neues Token für eine bestehende Fassung, ohne neue Fassung."""
+
+    # Nicht Pflicht am Feld: Das leere Token meldet die Domäne.
+    anbieter_token = CharField(
+        label="Neues Token",
+        help_text=(
+            "Ersetzt das hinterlegte Token dieser Fassung; Anbieter und "
+            "Basis-URL bleiben. Wird gespeichert, aber nie wieder angezeigt."
+        ),
+        required=False,
+        widget=PasswordInput(render_value=False),
+    )
+
+    def rotieren(self, konfiguration: TranskriptionsKonfiguration) -> bool:
+        """Rotiert das Token; scheitert es, stehen die Gründe am Formular."""
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.token_rotieren(daten["anbieter_token"]),
+        )

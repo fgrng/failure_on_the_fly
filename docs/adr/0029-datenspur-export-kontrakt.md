@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278"]
+amended-by: ["#278", "zero-retention-erklaerung-an-der-konfiguration", "#497", "#498", "#499", "#500"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
@@ -17,6 +17,42 @@ amended-by: ["#278"]
 > erscheinen mit `False` und ohne Ziehung oder Sitzung. Der Export zeigt stets
 > den letzten Stand. Da noch keine Erhebung ausgeliefert war, war die
 > Formatänderung zulässig; die Tabelle unten zeigt den Stand danach.
+>
+> **Nachgeführt durch #497:** `modellkonfigurationen.csv` trägt zusätzlich den
+> Erklärungsstand der Zero-Retention-Erklärung (ADR „Die
+> Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“):
+> `zero_retention_erklaert` (`True` oder `False`), `zero_retention_beleg` (leer
+> ohne Erklärung) und `zero_retention_erklaert_am` (`NA` ohne Erklärung). Das
+> erklärende Konto bleibt draußen, weil der Export keine Konten führt. Der
+> Export zeigt den Stand von heute; der Zeitpunkt zeigt, ob die Zusage zur Zeit
+> einer Sitzung schon galt. Die Tabelle unten zeigt den Stand danach.
+>
+> **Nachgeführt durch #498:** Dazu kommt der Widerruf:
+> `zero_retention_widerrufen_am` (`NA` ohne Widerruf) und
+> `zero_retention_widerrufsgrund` (leer ohne Widerruf). Nach einem Widerruf
+> steht `zero_retention_erklaert` auf `False`, Beleg und Zeitpunkt der
+> Erklärung bleiben stehen. Beide Zeitpunkte zusammen zeigen, ob die Zusage
+> zur Zeit einer Sitzung galt. Das widerrufende Konto bleibt draußen.
+>
+> **Nachgeführt durch #499:** Die Transkriptions-Konfiguration erscheint im
+> Export (ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht
+> an die Instanz“). Jede Sitzung pinnt beim Start ihre Fassung, und
+> `sitzungen.csv` trägt sie in `transkriptions_konfiguration_id`; `NA` heißt,
+> die Sitzung begann vor dem Pin. Die neue, sechzehnte Datei
+> `transkriptionskonfigurationen.csv` führt die referenzierten Fassungen mit
+> `id`, `anbieter`, `transkriptionsmodell`, `sprache` und `angelegt_am` (`NA`
+> für die bei der Umstellung übernommene Einzelzeile). Token und Basis-URL
+> bleiben aus denselben Gründen draußen wie an der Modell-Konfiguration. Der
+> Satz unten, die Transkriptions-Konfiguration erscheine gar nicht im Export,
+> gilt damit nicht mehr. Die Tabelle unten zeigt den Stand danach.
+>
+> **Nachgeführt durch #500:** `transkriptionskonfigurationen.csv` trägt
+> dieselben Spalten des Erklärungsstands wie `modellkonfigurationen.csv`:
+> `zero_retention_erklaert`, `zero_retention_beleg`,
+> `zero_retention_erklaert_am`, `zero_retention_widerrufen_am` und
+> `zero_retention_widerrufsgrund`, mit denselben Literalen. Erklärendes und
+> widerrufendes Konto bleiben draußen. Die Tabelle unten zeigt den Stand
+> danach.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
@@ -64,7 +100,7 @@ ersetzen und sofort abzuschicken.
 
 ## Dateiformat
 
-Der ZIP-Download enthält **fünfzehn Dateien**, auch wenn eine von ihnen keine
+Der ZIP-Download enthält **sechzehn Dateien**, auch wenn eine von ihnen keine
 Datenzeilen hat; sie enthält dann dennoch ihre Kopfzeile. Alle CSVs folgen RFC
 4180: Sie verwenden Kommas, UTF-8 ohne BOM und doppelte Anführungszeichen;
 Zeilenumbrüche innerhalb von Zellen bleiben erhalten. Wahrheitswerte erscheinen
@@ -78,7 +114,7 @@ Pfade statt als Inhalt.
 | `stichproben.csv` | `id`, `beginn`, `ende`, `archiviert` |
 | `teilnahmen.csv` | `token`, `teilnahmekennung`, `stichprobe_id`, `sprachmodell_eingewilligt`, `audioverarbeitung_eingewilligt`, `speicherung_eingewilligt`, `randomisierungs_seed`, `erstellt_am` |
 | `vignettenziehungen.csv` | `token`, `teilnahmekennung`, `vignette_id`, `position` |
-| `sitzungen.csv` | `id`, `token`, `teilnahmekennung`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
+| `sitzungen.csv` | `id`, `token`, `teilnahmekennung`, `position`, `status`, `vignette_id`, `simulationskern_id`, `modell_konfiguration_id`, `transkriptions_konfiguration_id`, `erstellt_am`, `verbrauchte_zeit` |
 | `gespraechsschritte.csv` | `id`, `sitzung_id`, `reihenfolge`, `eingabe`, `denkspur`, `aeusserung`, `erstellt_am`, `eingabemodus` |
 | `fehlversuche.csv` | `gespraechsschritt_id`, `grund`, `rohantwort` |
 | `diagnosen.csv` | `sitzung_id`, `text`, `erstellt_am`, `eingabemodus` |
@@ -86,7 +122,8 @@ Pfade statt als Inhalt.
 | `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `teilnahmekennung`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
-| `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter` |
+| `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter`, `zero_retention_erklaert`, `zero_retention_beleg`, `zero_retention_erklaert_am`, `zero_retention_widerrufen_am`, `zero_retention_widerrufsgrund` |
+| `transkriptionskonfigurationen.csv` | `id`, `anbieter`, `transkriptionsmodell`, `sprache`, `angelegt_am`, `zero_retention_erklaert`, `zero_retention_beleg`, `zero_retention_erklaert_am`, `zero_retention_widerrufen_am`, `zero_retention_widerrufsgrund` |
 | `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |
 | `likert_skala.csv` | `stufe`, `pol` |
 

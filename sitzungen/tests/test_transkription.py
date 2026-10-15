@@ -12,12 +12,14 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
     konto_mit_rollen,
+    transkriptions_fassung,
     vignetten_entwurf,
 )
 from konten.models import Konto
 from konten.navigation import AUTORIN_GRUPPE
-from simulation.models import Verwendung
+from simulation.models import TranskriptionsKonfiguration, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
@@ -34,12 +36,12 @@ from sitzungen.tests.aufnahme import audioaufnahme
 from vignetten.models import Vignette
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class ProbelaufTranskriptionTests(TestCase):
     """Der schreibfreie Probelauf transkribiert ohne Teilnahme und Einwilligung."""
 
     def setUp(self) -> None:
         """Meldet die Autor:in an und legt ihren spielbaren Entwurf an."""
+        self.fassung: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
         self.autorin: Konto = konto_mit_rollen("ada", AUTORIN_GRUPPE)
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         self.entwurf: Vignette = vignetten_entwurf(self.autorin)
@@ -63,11 +65,11 @@ class ProbelaufTranskriptionTests(TestCase):
         self, anbieter: FakeTranskription, aufnahme: SimpleUploadedFile | None = None
     ) -> HttpResponse:
         # Ruft den Endpunkt mit einer Fabrik auf, die diesen einen Anbieter gibt.
-        return self._anfragen_mit_fabrik(lambda: anbieter, aufnahme)
+        return self._anfragen_mit_fabrik(lambda _: anbieter, aufnahme)
 
     def _anfragen_mit_fabrik(
         self,
-        fabrik: Callable[[], Transkription],
+        fabrik: Callable[[TranskriptionsKonfiguration], Transkription],
         aufnahme: SimpleUploadedFile | None = None,
     ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
@@ -88,7 +90,7 @@ class ProbelaufTranskriptionTests(TestCase):
         self._probelauf_starten()
         gebildete: list[FakeTranskription] = []
 
-        def fabrik() -> FakeTranskription:
+        def fabrik(_: TranskriptionsKonfiguration) -> FakeTranskription:
             anbieter: FakeTranskription = FakeTranskription(["Wie hast du gerechnet?"])
             gebildete.append(anbieter)
             return anbieter
@@ -97,6 +99,24 @@ class ProbelaufTranskriptionTests(TestCase):
             self.assertEqual(self._anfragen_mit_fabrik(fabrik).status_code, 200)
 
         self.assertEqual(len(gebildete), 2)
+
+    def test_folgt_bei_jeder_anfrage_der_aktiven_fassung(self) -> None:
+        """Der Probelauf hat keine Sitzung, die eine Fassung pinnen könnte."""
+        self._probelauf_starten()
+        gebildet_aus: list[TranskriptionsKonfiguration] = []
+
+        def fabrik(konfiguration: TranskriptionsKonfiguration) -> FakeTranskription:
+            gebildet_aus.append(konfiguration)
+            return FakeTranskription(["Text"])
+
+        erste: TranskriptionsKonfiguration = (
+            TranskriptionsKonfiguration.objects.aktive()
+        )
+        self._anfragen_mit_fabrik(fabrik)
+        zweite: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
+        self._anfragen_mit_fabrik(fabrik)
+
+        self.assertEqual(gebildet_aus, [erste, zweite])
 
     def test_laufender_probelauf_transkribiert_ohne_teilnahme(self) -> None:
         """Die Autor:in spricht über eigenes Material, ohne einzuwilligen."""
@@ -136,17 +156,44 @@ class ProbelaufTranskriptionTests(TestCase):
                 self.assertEqual(response.status_code, status_code)
                 self.assertJSONEqual(response.content, {"status": status})
 
-    @override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
-    def test_zero_retention_bleibt_auch_im_probelauf_das_tor(self) -> None:
-        """Die vertragliche Zusicherung wird von keinem Weg umgangen."""
-        self._probelauf_starten()
-        anbieter = FakeTranskription(["Text"])
+    def _ist_zu(self) -> None:
+        # Das Tor ist zu: 503, und der Anbieter wird nicht gebildet.
+        gebildet: list[TranskriptionsKonfiguration] = []
 
-        response: HttpResponse = self._anfragen(anbieter)
+        def fabrik(konfiguration: TranskriptionsKonfiguration) -> FakeTranskription:
+            gebildet.append(konfiguration)
+            return FakeTranskription(["Text"])
+
+        response: HttpResponse = self._anfragen_mit_fabrik(fabrik)
 
         self.assertEqual(response.status_code, 503)
         self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
-        self.assertEqual(anbieter.skript, ["Text"])
+        self.assertEqual(gebildet, [])
+
+    def test_ohne_erklaerung_der_aktiven_fassung_bleibt_das_tor_zu(self) -> None:
+        """Die Erklärung an der Fassung ist das Tor, auch im Probelauf (ADR-0026)."""
+        TranskriptionsKonfiguration.objects.aktivieren(transkriptions_fassung())
+        self._probelauf_starten()
+
+        self._ist_zu()
+
+    def test_nach_dem_widerruf_bleibt_das_tor_zu(self) -> None:
+        """Ein Widerruf wirkt ab der nächsten Aufnahme."""
+        self._probelauf_starten()
+        self.fassung.zero_retention_widerrufen(
+            "Zusage zurückgezogen", konto_mit_rollen("linus", is_superuser=True)
+        )
+
+        self._ist_zu()
+
+    def test_mit_fake_als_aktiver_fassung_ist_die_transkription_aus(self) -> None:
+        """`fake` heißt »keine Transkription«, nicht »Platzhaltertext«."""
+        TranskriptionsKonfiguration.objects.aktivieren(
+            TranskriptionsKonfiguration.objects.create()
+        )
+        self._probelauf_starten()
+
+        self._ist_zu()
 
     @override_settings(TRANSKRIPTION_MAX_AUFNAHME_BYTES=8)
     def test_lehnt_aufnahme_ueber_der_grenze_mit_eigenem_status_ab(self) -> None:

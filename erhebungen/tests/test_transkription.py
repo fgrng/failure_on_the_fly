@@ -5,11 +5,15 @@ from datetime import timedelta
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.aufbau import aktive_modell_konfiguration, finale_vignette
+from config.tests.aufbau import (
+    aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
+    finale_vignette,
+)
 from erhebungen.models import Erhebung, Erhebungsbindung, Erhebungsvignette, Stichprobe
 from erhebungen.views import sitzung_fuer_transkription
 from konten.models import Konto
@@ -20,12 +24,12 @@ from sitzungen.views import transkriptions_endpunkt
 from sitzungen.tests.aufnahme import audioaufnahme
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class ErhebungsTranskriptionTests(TestCase):
     """Eine Erhebungsteilnahme autorisiert Audio ohne ein Nutzerkonto."""
 
     def setUp(self) -> None:
         """Startet eine laufende, pseudonyme Erhebungssitzung über den Teilnahme-Link."""
+        erklaerte_aktive_transkription()
         forscherin: Konto = Konto.objects.create_user(username="ada")
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         erhebung: Erhebung = Erhebung.objects.anlegen(forscherin, name="Audioerhebung")
@@ -62,7 +66,7 @@ class ErhebungsTranskriptionTests(TestCase):
         request.session = self.client.session
         try:
             return transkriptions_endpunkt(
-                lambda: anbieter, sitzung_fuer_transkription
+                lambda _: anbieter, sitzung_fuer_transkription
             )(request)
         finally:
             request.close()

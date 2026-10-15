@@ -14,18 +14,95 @@
         <div>
             <p>System / Transkriptions-Konfiguration</p>
             <h1>Transkriptions-Konfiguration</h1>
-            <span>Der eine Anbieterzugang der Spracheingabe.</span>
+            <span>Alle je angelegten Fassungen des Anbieterzugangs der Spracheingabe und die aktive.</span>
         </div>
     </header>
 
-    <section class="page-section" aria-label="Betriebsweise">
+    {% if not transkription_offen %}
+        <p class="system-page-warnung" role="status"><strong>Die Spracheingabe ist aus.</strong> Transkribiert wird nur mit einer aktiven Fassung, die einen echten Anbieter und eine nicht widerrufene Zero-Retention-Erklärung trägt. Bis dahin bietet keine Erhebung die Einwilligung in die Spracherkennung an, und der Endpunkt nimmt keine Aufnahme an. Geben Sie die Erklärung an der aktiven Fassung ab oder legen Sie eine erklärte an und aktivieren Sie sie.</p>
+    {% endif %}
+
+    <section class="page-section" aria-label="Betriebsfolge">
         <header class="page-section__head">
-            <b>01</b><span><h2>Betriebsweise</h2><small>Was eine Änderung bewirkt — und was hier nicht eingestellt wird</small></span>
+            <b>01</b><span><h2>Betriebsfolge</h2><small>Was ein Umschalten bewirkt — und was eine Rotation verlangt</small></span>
         </header>
         <div class="system-page-field-list">
-            <p>Es gibt genau einen Zugang, und er wird geändert, nicht neu angelegt: Eine Änderung wirkt <strong>bei der nächsten Aufnahme</strong>, auf laufende Sitzungen ebenso wie auf neue.</p>
-            <p>Eine Schlüsselrotation ist deshalb ein Feldupdate: Das neue Token wird hier eingetragen und ersetzt das hinterlegte.</p>
-            <p>Ob diese Instanz überhaupt extern transkribiert, ist eine Instanz-Einstellung der Umgebung und steht bewusst nicht auf dieser Seite. Bei OpenRouter liegt es in der Verantwortung der Administrator:in, dass der gewählte Endpunkt die Aufnahmen weder speichert noch zum Training nutzt (ADR-0026).</p>
+            <p>Eine Fassung wird angelegt und aktiviert, nie geändert. Jede Sitzung pinnt beim Start die aktive Fassung: Ein Umschalten wirkt <strong>ab der nächsten Sitzung</strong>, laufende Sitzungen transkribieren weiter mit ihrer Fassung. Der Probelauf nimmt bei jeder Aufnahme die aktive.</p>
+            <p>Eine Schlüsselrotation braucht keine neue Fassung: Das neue Token ersetzt das hinterlegte der gewählten Fassung, Anbieter und Basis-URL bleiben.</p>
+            <p>Transkribiert wird nur mit einer Fassung, die eine <strong>Zero-Retention-Erklärung</strong> trägt: Sie belegt, dass für dieses Modell bei diesem Anbieter eine Zusage vorliegt, dass Aufnahmen weder gespeichert noch zum Training genutzt werden (ADR-0026). Sie wird beim Anlegen oder nachträglich abgegeben und ist danach unveränderlich. Steht die aktive Fassung auf »fake«, gibt es keine Transkription.</p>
+            <p>Fällt die Zusage weg, wird die Erklärung mit Grund <strong>widerrufen</strong>. Der Widerruf wirkt <strong>sofort</strong>, auch in laufenden Sitzungen, die diese Fassung gepinnt haben: Dort geht es per Tastatur weiter. Eine widerrufene Fassung lässt sich nicht mehr aktivieren.</p>
+        </div>
+    </section>
+
+    <section class="page-section" aria-label="Angelegte Fassungen">
+        <header class="page-section__head">
+            <b>02</b><span><h2>Angelegte Fassungen</h2><small>Zeile wählen, rechts ansehen und aktivieren</small></span>
+        </header>
+        <div class="modell-konfigurationen">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr><th>Fassung</th><th>Anbieter</th><th>Angelegt</th><th>Zero Retention</th><th>Stand</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for fassung in fassungen %}
+                            <tr class="modell-konfigurationen__zeile{% if fassung.pk == gewaehlt.pk %} modell-konfigurationen__zeile--gewaehlt{% endif %}">
+                                <td>
+                                    <a href="?fassung={{ fassung.pk }}"{% if fassung.pk == gewaehlt.pk %} aria-current="true"{% endif %}><strong>Nr. {{ fassung.pk }}</strong></a>
+                                    <small>{{ fassung.transkriptionsmodell|default:"—" }}</small>
+                                </td>
+                                <td>{{ fassung.anbieter }}</td>
+                                <td>{{ fassung.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
+                                {% include "simulation/includes/zero_retention_stand.html" with zeile=fassung %}
+                                <td>{% if fassung.aktiv %}aktiv{% else %}—{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <aside class="modell-konfiguration-detail" aria-label="Gewählte Fassung">
+                <div>
+                    <small class="system-page-empty">angelegt {{ gewaehlt.angelegt_am|date:"d.m.Y H:i"|default:"—" }}</small>
+                    <h3>Fassung Nr. {{ gewaehlt.pk }}</h3>
+                </div>
+                <dl class="field-grid">
+                    <div><dt>Anbieter</dt><dd>{{ gewaehlt.anbieter }}</dd></div>
+                    <div><dt>Transkriptionsmodell</dt><dd><code>{{ gewaehlt.transkriptionsmodell|default:"—" }}</code></dd></div>
+                    <div><dt>Sprache</dt><dd>{{ gewaehlt.sprache }}</dd></div>
+                    <div><dt>Basis-URL</dt><dd>{{ gewaehlt.anbieter_basis_url|default:"—" }}</dd></div>
+                    <div><dt>Token</dt><dd>{{ gewaehlt.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
+                    {% include "simulation/includes/zero_retention_angaben.html" with zeile=gewaehlt fake_hinweis="Nicht nötig: Mit »fake« ist die Transkription aus." %}
+                </dl>
+                {% url 'simulation:transkriptions_konfiguration_erklaeren' gewaehlt.pk as erklaeren_url %}
+                {% url 'simulation:transkriptions_konfiguration_widerrufen' gewaehlt.pk as widerrufen_url %}
+                {% include "simulation/includes/zero_retention_gesten.html" with zeile=gewaehlt %}
+                {% if not gewaehlt.ist_fake %}
+                    <form method="post" action="{% url 'simulation:transkriptions_konfiguration_token' gewaehlt.pk %}" class="system-page-field-list">
+                        {% csrf_token %}
+                        {{ rotationsformular.non_field_errors }}
+                        {% include "vignetten/includes/form_field.html" with field=rotationsformular.anbieter_token %}
+                        <button class="button button--secondary" type="submit">Token ersetzen</button>
+                    </form>
+                {% else %}
+                    {{ rotationsformular.anbieter_token.errors }}
+                {% endif %}
+                <div class="modell-konfiguration-detail__schalter">
+                    {% if gewaehlt.aktiv %}
+                        <button class="button" type="button" disabled>Aktiv</button>
+                    {% elif gewaehlt.widerrufen %}
+                        <div>
+                            <button class="button button--secondary" type="button" disabled>Gesperrt: Erklärung widerrufen</button>
+                            <small class="system-page-hint">Eine Fassung mit widerrufener Zero-Retention-Erklärung lässt sich nicht mehr aktivieren.</small>
+                        </div>
+                    {% else %}
+                        <form method="post" action="{% url 'simulation:transkriptions_konfiguration_aktivieren' gewaehlt.pk %}">
+                            {% csrf_token %}
+                            <button class="button button--secondary" type="submit">Aktivieren</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </aside>
         </div>
     </section>
 
@@ -36,33 +113,26 @@
         Anbieterfeld und Modellfeld in zwei Abschnitten stehen.
     {% endcomment %}
     <form method="post"
+          action="{% url 'simulation:transkriptions_konfiguration' %}"
           x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
           @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
         {% csrf_token %}
         {{ form.non_field_errors }}
 
-        <section class="page-section" aria-label="Anbieterzugang">
+        <section class="page-section" aria-label="Neue Fassung: Anbieterzugang">
             <header class="page-section__head">
-                <b>02</b><span><h2>Anbieterzugang</h2><small>Wer die Aufnahmen entgegennimmt und unter welcher Wurzel</small></span>
+                <b>03</b><span><h2>Neue Fassung: Anbieterzugang</h2><small>Vorbelegt aus der aktiven Fassung, ohne Token</small></span>
             </header>
             <div class="system-page-field-list">
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
-                <p class="system-page-empty">
-                    Hinterlegtes Token:
-                    {% if konfiguration.anbieter_token_maskiert %}
-                        <code>{{ konfiguration.anbieter_token_maskiert }}</code>
-                    {% else %}
-                        Kein Token hinterlegt.
-                    {% endif %}
-                </p>
                 {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
             </div>
         </section>
 
-        <section class="page-section" aria-label="Modell und Sprache">
+        <section class="page-section" aria-label="Neue Fassung: Modell und Sprache">
             <header class="page-section__head">
-                <b>03</b><span><h2>Modell und Sprache</h2><small>Was die Aufnahme in Text überführt und in welcher Sprache</small></span>
+                <b>04</b><span><h2>Neue Fassung: Modell und Sprache</h2><small>Was die Aufnahme in Text überführt und in welcher Sprache</small></span>
             </header>
             <div class="system-page-field-list">
                 {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.transkriptionsmodell naht="transkription" %}
@@ -70,8 +140,17 @@
             </div>
         </section>
 
+        <section class="page-section" aria-label="Neue Fassung: Zero-Retention-Erklärung">
+            <header class="page-section__head">
+                <b>05</b><span><h2>Neue Fassung: Zero-Retention-Erklärung</h2><small>Ohne sie transkribiert die Fassung nicht; beim Anbieter »fake« entfällt sie</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {% include "simulation/includes/zero_retention_erklaerung_feld.html" %}
+            </div>
+        </section>
+
         <div class="vignette-form-actions">
-            <button class="button" type="submit">Änderungen speichern</button>
+            <button class="button" type="submit">Fassung anlegen</button>
         </div>
     </form>
 </section>

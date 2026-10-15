@@ -6,6 +6,8 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from config.tests.aufbau import erklaerte
+from konten.models import Konto
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -276,7 +278,9 @@ def test_nach_dem_aktivieren_liefert_die_verwendung_genau_diese() -> None:
 def test_unbelegte_verwendung_liefert_keine() -> None:
     """Solange die Administration nichts gesetzt hat, gibt es keine Konfiguration."""
 
-    ModellKonfiguration.objects.aktivieren(_openrouter(), Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(
+        erklaerte(_openrouter()), Verwendung.SCHUELERIN
+    )
 
     assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) is None
     with pytest.raises(AktiveModellKonfiguration.DoesNotExist):
@@ -287,7 +291,7 @@ def test_unbelegte_verwendung_liefert_keine() -> None:
 def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
     """Eine kleine Instanz braucht nicht drei gleiche Datensätze."""
 
-    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
     for verwendung in Verwendung:
         ModellKonfiguration.objects.aktivieren(konfiguration, verwendung)
 
@@ -299,7 +303,7 @@ def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
 def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
     """Je Verwendung ein Zeiger; ein Wechsel bewegt nur den eigenen."""
 
-    schuelerin: ModellKonfiguration = _openrouter()
+    schuelerin: ModellKonfiguration = erklaerte(_openrouter())
     bewerter: ModellKonfiguration = _openrouter(bezeichnung="Bewerter")
     ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.SCHUELERIN)
     ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.BEWERTER)
@@ -315,7 +319,7 @@ def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
 def test_aktive_je_verwendung_nennt_nur_belegte_verwendungen() -> None:
     """Die Tabelle erfährt in einer Abfrage, welche Verwendung wohin zeigt."""
 
-    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
 
@@ -362,3 +366,315 @@ def test_erlaubt_fortlesen_des_skripts_nur_beim_anbieter_fake() -> None:
 
     with pytest.raises(ValidationError, match="skript_fortlesen"):
         _openrouter(parameter={"skript_fortlesen": True})
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_haelt_beleg_zeitpunkt_und_konto_fest() -> None:
+    """Zeitpunkt und Konto schreibt die Erklärung selbst mit."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    konfiguration.zero_retention_erklaeren("AVV mit OpenRouter vom 01.10.2026", konto)
+
+    gespeichert: ModellKonfiguration = ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    )
+    assert gespeichert.zero_retention_erklaert
+    assert gespeichert.zero_retention_beleg == "AVV mit OpenRouter vom 01.10.2026"
+    assert gespeichert.zero_retention_erklaert_von == konto
+    assert gespeichert.zero_retention_erklaert_am is not None
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_laesst_sich_beim_anlegen_abgeben() -> None:
+    """Die Erklärung kann mit der Fassung zusammen entstehen."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = ModellKonfiguration(
+        bezeichnung="Test",
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell="openrouter/anthropic/claude-opus-4-8",
+        anbieter_token="sk-or-geheim",
+    )
+
+    konfiguration.zero_retention_erklaeren("AVV", konto)
+    konfiguration.save()
+
+    assert ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_verlangt_einen_beleg() -> None:
+    """Ein bloßes Häkchen ohne Grundlage ist keine Erklärung."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    with pytest.raises(ValidationError) as fehler:
+        konfiguration.zero_retention_erklaeren("  ", konto)
+
+    assert "zero_retention_beleg" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    ).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_bei_fake_ist_keine_erklaerung_zulaessig() -> None:
+    """Ohne Auftragsverarbeiter gibt es nichts zu erklären."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test", sprachmodell="fake"
+    )
+
+    with pytest.raises(ValidationError) as fehler:
+        konfiguration.zero_retention_erklaeren("AVV", konto)
+
+    assert "zero_retention_beleg" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    ).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_eine_abgegebene_erklaerung_laesst_sich_nicht_aendern() -> None:
+    """Eine zweite Erklärung überschriebe Beleg und Zeitpunkt der ersten."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration.zero_retention_erklaeren("AVV vom 01.10.2026", konto)
+
+    with pytest.raises(ValidationError):
+        ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_erklaeren(
+            "AVV vom 15.10.2026", konto
+        )
+
+    assert (
+        ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_beleg
+        == "AVV vom 01.10.2026"
+    )
+
+
+@pytest.mark.django_db
+def test_eine_gleichzeitige_erklaerung_gewinnt_und_wird_sichtbar() -> None:
+    """Wer zu spät erklärt, überschreibt nichts und sieht die frühere Erklärung."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+    veraltet: ModellKonfiguration = ModellKonfiguration.objects.get(pk=konfiguration.pk)
+    konfiguration.zero_retention_erklaeren("AVV vom 01.10.2026", konto)
+
+    with pytest.raises(ValidationError):
+        veraltet.zero_retention_erklaeren("AVV vom 15.10.2026", konto)
+
+    assert veraltet.zero_retention_erklaert
+    assert veraltet.zero_retention_beleg == "AVV vom 01.10.2026"
+
+
+@pytest.mark.django_db
+def test_ohne_erklaerung_scheitert_die_aktivierung_fuer_die_schuelerin() -> None:
+    """Das Tor sitzt in der Domäne, nicht nur in der Oberfläche."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    with pytest.raises(ValidationError):
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) is None
+
+
+@pytest.mark.django_db
+def test_mit_erklaerung_gelingt_die_aktivierung_fuer_die_schuelerin() -> None:
+    """Eine erklärte Fassung darf Eingaben echter Personen verarbeiten."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration.zero_retention_erklaeren(
+        "AVV", Konto.objects.create_user(username="linus", is_superuser=True)
+    )
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration
+
+
+@pytest.mark.django_db
+def test_lehrperson_und_bewerter_bleiben_ohne_erklaerung_frei() -> None:
+    """Evals verarbeiten nur simulierte Gespräche (ADR-0046)."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.LEHRPERSON)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) == konfiguration
+    assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) == konfiguration
+
+
+@pytest.mark.django_db
+def test_fake_laesst_sich_ohne_erklaerung_fuer_die_schuelerin_aktivieren() -> None:
+    """Entwicklung und Workshop laufen ohne externen Anbieter."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test", sprachmodell="fake"
+    )
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration
+
+
+@pytest.mark.django_db
+def test_der_widerruf_haelt_grund_zeitpunkt_und_konto_fest() -> None:
+    """Zeitpunkt und Konto schreibt der Widerruf selbst mit."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+
+    konfiguration.zero_retention_widerrufen("Kein ZDR-Endpunkt mehr", konto)
+
+    gespeichert: ModellKonfiguration = ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    )
+    assert not gespeichert.zero_retention_erklaert
+    assert gespeichert.zero_retention_widerrufsgrund == "Kein ZDR-Endpunkt mehr"
+    assert gespeichert.zero_retention_widerrufen_von == konto
+    assert gespeichert.zero_retention_widerrufen_am is not None
+    # Die Erklärung selbst bleibt als Nachweis stehen.
+    assert gespeichert.zero_retention_beleg == "AVV mit dem Anbieter vom 01.10.2026"
+
+
+@pytest.mark.django_db
+def test_der_widerruf_verlangt_einen_grund() -> None:
+    """Ein Widerruf ohne Grund ließe offen, was weggefallen ist."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+
+    with pytest.raises(ValidationError) as fehler:
+        konfiguration.zero_retention_widerrufen("  ", konto)
+
+    assert "zero_retention_widerrufsgrund" in fehler.value.message_dict
+    assert ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_eine_nie_abgegebene_erklaerung_laesst_sich_nicht_widerrufen() -> None:
+    """Ohne Erklärung gibt es nichts zurückzuziehen."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    with pytest.raises(ValidationError, match="nichts zu widerrufen"):
+        konfiguration.zero_retention_widerrufen("Grund", konto)
+
+    assert (
+        ModellKonfiguration.objects.get(
+            pk=konfiguration.pk
+        ).zero_retention_widerrufen_am
+        is None
+    )
+
+
+@pytest.mark.django_db
+def test_ein_widerruf_laesst_sich_nicht_wiederholen() -> None:
+    """Grund und Zeitpunkt des ersten Widerrufs bleiben stehen, auch gleichzeitig."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    veraltet: ModellKonfiguration = ModellKonfiguration.objects.get(pk=konfiguration.pk)
+    konfiguration.zero_retention_widerrufen("Erster Grund", konto)
+
+    for versuch in (
+        ModellKonfiguration.objects.get(pk=konfiguration.pk),
+        veraltet,
+    ):
+        with pytest.raises(ValidationError, match="ist widerrufen"):
+            versuch.zero_retention_widerrufen("Zweiter Grund", konto)
+        assert versuch.zero_retention_widerrufsgrund == "Erster Grund"
+
+
+@pytest.mark.django_db
+def test_nach_dem_widerruf_laesst_sich_nicht_neu_erklaeren() -> None:
+    """Wer die Zusage zurückhat, legt eine neue Fassung an."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    assert not konfiguration.zero_retention_erklaerbar
+    with pytest.raises(ValidationError, match="ist widerrufen"):
+        konfiguration.zero_retention_erklaeren("Neuer AVV", konto)
+
+
+@pytest.mark.django_db
+def test_eine_widerrufene_fassung_laesst_sich_fuer_keine_verwendung_aktivieren() -> (
+    None
+):
+    """Eine weggefallene Zusage kommt nicht versehentlich wieder in Gebrauch."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    for verwendung in Verwendung:
+        with pytest.raises(ValidationError, match="widerrufen"):
+            ModellKonfiguration.objects.aktivieren(konfiguration, verwendung)
+        assert ModellKonfiguration.objects.aktive(verwendung) is None
+
+
+@pytest.mark.django_db
+def test_ein_widerruf_nach_dem_laden_verhindert_die_aktivierung() -> None:
+    """Gilt der festgeschriebene Widerruf, nicht der Stand beim Laden der Seite."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    geladen: ModellKonfiguration = ModellKonfiguration.objects.get(pk=konfiguration.pk)
+    konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    with pytest.raises(ValidationError, match="widerrufen"):
+        ModellKonfiguration.objects.aktivieren(geladen, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) is None
+
+
+@pytest.mark.django_db
+def test_der_widerruf_laesst_den_zeiger_einer_aktiven_fassung_stehen() -> None:
+    """Der Widerruf schaltet nichts um; die Übersicht weist darauf hin."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration
+
+
+@pytest.mark.django_db
+def test_eine_fassung_laesst_sich_nicht_widerrufen_anlegen() -> None:
+    """Der Widerruf folgt einer gespeicherten Erklärung, auch aus Shell und Seeds."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    widerruf: dict[str, object] = {
+        "zero_retention_widerrufsgrund": "Zusage zurückgezogen",
+        "zero_retention_widerrufen_am": timezone.now(),
+        "zero_retention_widerrufen_von": konto,
+    }
+
+    for werte in (
+        {"zero_retention_widerrufen_am": timezone.now()},
+        widerruf,
+        {
+            "zero_retention_beleg": "AVV",
+            "zero_retention_erklaert_am": timezone.now(),
+            "zero_retention_erklaert_von": konto,
+            **widerruf,
+        },
+    ):
+        with pytest.raises(ValidationError) as fehler:
+            _openrouter(**werte)
+
+        assert "zero_retention_widerrufsgrund" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.exists()

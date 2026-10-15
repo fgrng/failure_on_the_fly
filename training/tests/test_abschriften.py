@@ -27,7 +27,11 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Verwendung
+from simulation.models import (
+    ModellKonfiguration,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -126,7 +130,10 @@ def test_holt_die_sitzungen_einer_abgeschlossenen_teilnahme_ins_konto() -> None:
     erhebung: Erhebung = _erhebung_anlegen(forschende)
     bindung: Erhebungsbindung = _gespielte_teilnahme(erhebung)
     # Vom Vorgabewert abweichende Werte, damit die Kopie sie sichtbar mitnimmt.
-    Sitzung.objects.filter(teilnahme=bindung.teilnahme).update(verbrauchte_zeit=42.5)
+    Sitzung.objects.filter(teilnahme=bindung.teilnahme).update(
+        verbrauchte_zeit=42.5,
+        transkriptions_konfiguration=TranskriptionsKonfiguration.objects.aktive(),
+    )
     Gespraechsschritt.objects.filter(sitzung__teilnahme=bindung.teilnahme).update(
         eingabemodus=Eingabemodus.TRANSKRIBIERT
     )
@@ -144,6 +151,7 @@ def test_holt_die_sitzungen_einer_abgeschlossenen_teilnahme_ins_konto() -> None:
     assert kopie.vignette == original.vignette
     assert kopie.simulationskern == original.simulationskern
     assert kopie.modell_konfiguration == original.modell_konfiguration
+    assert kopie.transkriptions_konfiguration == original.transkriptions_konfiguration
     assert kopie.status == original.status
     assert kopie.verbrauchte_zeit == 42.5
     kopierter_schritt: Gespraechsschritt = kopie.gespraechsschritte.get()

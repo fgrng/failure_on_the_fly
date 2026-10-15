@@ -8,6 +8,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
+from config.tests.aufbau import erklaerte
 from simulation import vorlage_rendern
 from simulation.models import (
     Anbieter,
@@ -435,7 +436,9 @@ def test_modell_konfiguration_kann_nicht_per_queryset_mutiert_werden() -> None:
 def test_aktive_modell_konfiguration_kann_nicht_geloescht_werden() -> None:
     """Der aktive Zeiger schützt seine Konfiguration vor dem Löschen."""
 
-    konfiguration: ModellKonfiguration = _openrouter_konfiguration("erstes-modell")
+    konfiguration: ModellKonfiguration = erklaerte(
+        _openrouter_konfiguration("erstes-modell")
+    )
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
 
     with pytest.raises(ProtectedError):
@@ -447,7 +450,7 @@ def test_transkriptions_konfiguration_beginnt_bei_fake_auf_deutsch() -> None:
     """Ohne Zutun telefoniert die Transkription nicht nach außen."""
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.aktive()
     )
 
     assert konfiguration.anbieter == Anbieter.FAKE

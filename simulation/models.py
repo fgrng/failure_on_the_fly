@@ -6,6 +6,7 @@ from string import Template
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from simulation.lebenszyklus import (
     FassungManager,
@@ -768,6 +769,10 @@ TOKEN_ERKENNBAR_AB: int = 12
 TOKEN_SICHTBARE_ZEICHEN: int = 4
 
 
+FAKE_TOKEN_FEHLERMELDUNG: str = "Der Anbieter »fake« braucht kein Token."
+TOKEN_FEHLT_FEHLERMELDUNG: str = "Ohne Token bedient der Anbieter keinen Aufruf."
+
+
 @dataclass(frozen=True)
 class Anbieterprofil:
     """Was ein Anbieter von seiner Konfiguration verlangt und was er ihr vorgibt."""
@@ -780,6 +785,9 @@ class Anbieterprofil:
     standard_basis_url: str
     # Die Allowlist der Parameter, die dieser Anbieter kennt.
     stellschrauben: frozenset[str]
+    # Ob Eingaben an einen externen Auftragsverarbeiter gehen; nur dann gibt
+    # es eine Zero-Retention-Erklärung, über die sich etwas sagen ließe.
+    hat_auftragsverarbeiter: bool = True
 
 
 ANBIETER_PROFIL: dict[str, Anbieterprofil] = {
@@ -788,6 +796,7 @@ ANBIETER_PROFIL: dict[str, Anbieterprofil] = {
         braucht_basis_url=False,
         standard_basis_url="",
         stellschrauben=FAKE_STELLSCHRAUBEN,
+        hat_auftragsverarbeiter=False,
     ),
     Anbieter.OPENROUTER: Anbieterprofil(
         praefix="openrouter/",
@@ -834,20 +843,26 @@ class AnbieterFeldgruppe(models.Model):
             return TOKEN_MASKE
         return TOKEN_MASKE + self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]
 
+    @property
+    def hat_auftragsverarbeiter(self) -> bool:
+        """Ob Eingaben an einen externen Auftragsverarbeiter gehen; bei `fake` nicht."""
+
+        return ANBIETER_PROFIL[self.anbieter].hat_auftragsverarbeiter
+
     def _zugangsfehler(self) -> dict[str, str]:
         # Prüft Endpunkt und Token gegen das Profil des gewählten Anbieters.
 
         fehler: dict[str, str] = {}
-        if self.anbieter == Anbieter.FAKE:
+        if not self.hat_auftragsverarbeiter:
             if self.anbieter_basis_url:
                 fehler["anbieter_basis_url"] = (
                     "Der Anbieter »fake« hat keinen Endpunkt."
                 )
             if self.anbieter_token:
-                fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
+                fehler["anbieter_token"] = FAKE_TOKEN_FEHLERMELDUNG
             return fehler
         if not self.anbieter_token:
-            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+            fehler["anbieter_token"] = TOKEN_FEHLT_FEHLERMELDUNG
         if (
             ANBIETER_PROFIL[self.anbieter].braucht_basis_url
             and not self.anbieter_basis_url
@@ -858,6 +873,208 @@ class AnbieterFeldgruppe(models.Model):
         return fehler
 
 
+ZERO_RETENTION_FAKE_FEHLERMELDUNG: str = (
+    "Beim Anbieter »fake« ist keine Zero-Retention-Erklärung zulässig: Es gibt "
+    "keinen Auftragsverarbeiter, über den sie etwas aussagen könnte."
+)
+ZERO_RETENTION_BELEG_FEHLERMELDUNG: str = (
+    "Ohne Beleg der Zusage ist die Erklärung nicht nachprüfbar."
+)
+
+ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung liegt schon vor und lässt sich nicht ändern."
+)
+ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung ist widerrufen und lässt sich weder neu "
+    "abgeben noch zurücknehmen. Legen Sie eine neue Konfiguration an."
+)
+ZERO_RETENTION_NICHT_WIDERRUFBAR_FEHLERMELDUNG: str = (
+    "Ohne abgegebene Zero-Retention-Erklärung gibt es nichts zu widerrufen."
+)
+ZERO_RETENTION_GRUND_FEHLERMELDUNG: str = (
+    "Ohne Grund ist der Widerruf nicht nachvollziehbar."
+)
+ZERO_RETENTION_WIDERRUF_BEIM_ANLEGEN_FEHLERMELDUNG: str = (
+    "Eine Fassung entsteht nicht widerrufen; widerrufen wird erst eine "
+    "abgegebene Erklärung."
+)
+
+
+class ZeroRetentionFeldgruppe(models.Model):
+    """Die Zero-Retention-Erklärung, die beide Konfigurationen gleichermaßen tragen.
+
+    Einmal abgegeben, ist sie unveränderlich wie der Rest der Fassung. Setzt
+    die Anbieter-Feldgruppe voraus.
+    """
+
+    zero_retention_beleg: models.TextField = models.TextField(blank=True, default="")
+    zero_retention_erklaert_am: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, editable=False
+    )
+    zero_retention_erklaert_von: models.ForeignKey = models.ForeignKey(
+        "konten.Konto",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    zero_retention_widerrufsgrund: models.TextField = models.TextField(
+        blank=True, default="", editable=False
+    )
+    zero_retention_widerrufen_am: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, editable=False
+    )
+    zero_retention_widerrufen_von: models.ForeignKey = models.ForeignKey(
+        "konten.Konto",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+
+    class Meta:
+        """Keine eigene Tabelle: Beide Konfigurationen tragen die Felder selbst."""
+
+        abstract: bool = True
+
+    @property
+    def zero_retention_abgegeben(self) -> bool:
+        """Ob je eine Erklärung abgegeben wurde, widerrufen oder nicht."""
+
+        return self.zero_retention_erklaert_am is not None
+
+    @property
+    def zero_retention_ist_widerrufen(self) -> bool:
+        """Ob die Erklärung dieser Fassung widerrufen ist."""
+
+        return self.zero_retention_widerrufen_am is not None
+
+    @property
+    def zero_retention_erklaert(self) -> bool:
+        """Ob eine Erklärung vorliegt und nicht widerrufen ist."""
+
+        return self.zero_retention_abgegeben and not self.zero_retention_ist_widerrufen
+
+    @property
+    def zero_retention_erklaerbar(self) -> bool:
+        """Ob sich an dieser Fassung noch eine Erklärung abgeben lässt."""
+
+        return self.hat_auftragsverarbeiter and not self.zero_retention_abgegeben
+
+    @property
+    def zero_retention_widerrufbar(self) -> bool:
+        """Ob sich die Erklärung dieser Fassung noch widerrufen lässt."""
+
+        return self.zero_retention_erklaert
+
+    def zero_retention_erklaeren(self, beleg: str, konto: models.Model) -> None:
+        """Gibt die Erklärung ab: vor dem Anlegen mit, danach nachträglich.
+
+        Zeitpunkt und Konto schreibt sie selbst mit. Eine vorliegende Erklärung
+        wird nie überschrieben.
+        """
+
+        beleg = beleg.strip()
+        if not self.hat_auftragsverarbeiter:
+            raise ValidationError(
+                {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
+            )
+        if not beleg:
+            raise ValidationError(
+                {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
+            )
+        if self.zero_retention_ist_widerrufen:
+            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
+        if self.zero_retention_abgegeben:
+            raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        werte: dict[str, object] = {
+            "zero_retention_beleg": beleg,
+            "zero_retention_erklaert_am": timezone.now(),
+            "zero_retention_erklaert_von": konto,
+        }
+        # Gelingt an einer gespeicherten Fassung nur, solange keine Erklärung
+        # vorliegt, auch gegen eine gleichzeitige.
+        if not self._state.adding:
+            self._einmal_schreiben(
+                werte,
+                ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG,
+                zero_retention_erklaert_am=None,
+            )
+        for feld, wert in werte.items():
+            setattr(self, feld, wert)
+
+    def zero_retention_widerrufen(self, grund: str, konto: models.Model) -> None:
+        """Widerruft die Erklärung, einmal und endgültig.
+
+        Zeitpunkt und Konto schreibt der Widerruf selbst mit. Die Erklärung
+        bleibt als Nachweis stehen; die Fassung gilt fortan als nicht erklärt.
+        """
+
+        grund = grund.strip()
+        if not grund:
+            raise ValidationError(
+                {"zero_retention_widerrufsgrund": ZERO_RETENTION_GRUND_FEHLERMELDUNG}
+            )
+        if self.zero_retention_ist_widerrufen:
+            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
+        if not self.zero_retention_abgegeben:
+            raise ValidationError(ZERO_RETENTION_NICHT_WIDERRUFBAR_FEHLERMELDUNG)
+        werte: dict[str, object] = {
+            "zero_retention_widerrufsgrund": grund,
+            "zero_retention_widerrufen_am": timezone.now(),
+            "zero_retention_widerrufen_von": konto,
+        }
+        # Gelingt nur, solange kein anderer Widerruf zuvorgekommen ist.
+        self._einmal_schreiben(
+            werte,
+            ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG,
+            zero_retention_erklaert_am__isnull=False,
+            zero_retention_widerrufen_am=None,
+        )
+        for feld, wert in werte.items():
+            setattr(self, feld, wert)
+
+    def _einmal_schreiben(
+        self, werte: dict[str, object], fehlermeldung: str, **bedingung: object
+    ) -> None:
+        # Erklärung und Widerruf sind an einer gespeicherten Fassung die
+        # einzigen Schreibvorgänge neben der Tokenrotation. Sie gehen am
+        # append-only QuerySet vorbei und gelingen nur, solange die Bedingung
+        # in der Datenbank gilt. Sonst gilt der zuvorgekommene Stand, und die
+        # Fassung zeigt ihn fortan.
+        if (
+            not models.QuerySet(model=type(self))
+            .filter(pk=self.pk, **bedingung)
+            .update(**werte)
+        ):
+            self.refresh_from_db(fields=list(werte))
+            raise ValidationError(fehlermeldung)
+
+    def _erklaerungsfehler(self) -> dict[str, str]:
+        # Hält eine beim Anlegen mitgegebene Erklärung an dieselben Regeln.
+
+        if not self.hat_auftragsverarbeiter and (
+            self.zero_retention_beleg or self.zero_retention_abgegeben
+        ):
+            return {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
+        if self.zero_retention_abgegeben != bool(self.zero_retention_beleg.strip()):
+            return {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
+        # Widerrufen wird nur eine gespeicherte Erklärung, nie beim Anlegen.
+        if (
+            self.zero_retention_ist_widerrufen
+            or self.zero_retention_widerrufsgrund
+            or self.zero_retention_widerrufen_von_id is not None
+        ):
+            return {
+                "zero_retention_widerrufsgrund": (
+                    ZERO_RETENTION_WIDERRUF_BEIM_ANLEGEN_FEHLERMELDUNG
+                )
+            }
+        return {}
+
+
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
     """QuerySets für unveränderliche Modell-Konfigurationen."""
 
@@ -865,6 +1082,17 @@ class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
         """Verhindert Massenänderungen an Modell-Konfigurationen."""
 
         raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
+
+
+SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG: str = (
+    "Für die Schüler:in lässt sich nur eine Konfiguration mit "
+    "Zero-Retention-Erklärung aktivieren. Diese trägt keine; geben Sie zuerst "
+    "die Erklärung ab."
+)
+WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung dieser Konfiguration ist widerrufen; sie lässt "
+    "sich für keine Verwendung mehr aktivieren."
+)
 
 
 class Verwendung(models.TextChoices):
@@ -920,16 +1148,32 @@ class ModellKonfigurationManager(
         konfiguration: "ModellKonfiguration",
         verwendung: Verwendung,
     ) -> "ModellKonfiguration":
-        """Richtet den Zeiger der Verwendung auf die Konfiguration."""
+        """Richtet den Zeiger der Verwendung auf die Konfiguration.
 
-        AktiveModellKonfiguration.objects.update_or_create(
-            verwendung=verwendung,
-            defaults={"konfiguration": konfiguration},
-        )
+        Für die Schüler:in nur eine erklärte Fassung oder `fake`: Dort gehen
+        Eingaben echter Personen an das Sprachmodell. Eine widerrufene Fassung
+        für keine Verwendung mehr.
+        """
+
+        # Geprüft wird der Stand in der Schreibtransaktion, nicht der beim
+        # Laden: Ein inzwischen festgeschriebener Widerruf gilt.
+        with transaction.atomic():
+            konfiguration = self.select_for_update().get(pk=konfiguration.pk)
+            if konfiguration.zero_retention_ist_widerrufen:
+                raise ValidationError(WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG)
+            if (
+                verwendung == Verwendung.SCHUELERIN
+                and not konfiguration.zulaessig_fuer_schuelerin
+            ):
+                raise ValidationError(SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG)
+            AktiveModellKonfiguration.objects.update_or_create(
+                verwendung=verwendung,
+                defaults={"konfiguration": konfiguration},
+            )
         return konfiguration
 
 
-class ModellKonfiguration(AnbieterFeldgruppe):
+class ModellKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
     """Unveränderliche Konfiguration eines Sprachmodells."""
 
     # Nicht eindeutig: Sie benennt eine Fassung für Menschen, der Primärschlüssel
@@ -964,9 +1208,16 @@ class ModellKonfiguration(AnbieterFeldgruppe):
             **self._zugangsfehler(),
             **self._modellnamenfehler(),
             **self._parameter_fehler(),
+            **self._erklaerungsfehler(),
         }
         if fehler:
             raise ValidationError(fehler)
+
+    @property
+    def zulaessig_fuer_schuelerin(self) -> bool:
+        """Ob die Fassung Eingaben echter Personen verarbeiten darf."""
+
+        return not self.hat_auftragsverarbeiter or self.zero_retention_erklaert
 
     def _modellnamenfehler(self) -> dict[str, str]:
         # Prüft den Modellnamen gegen das Routing des gewählten Anbieters.
@@ -1024,57 +1275,164 @@ def evals_verfuegbar() -> bool:
     ) == set(Verwendung.values)
 
 
-class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
-    """Zugang zur einzigen Transkriptions-Konfiguration."""
+_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
+    "Transkriptions-Konfigurationen sind append-only; nur das Token ist rotierbar."
+)
+WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung dieser Fassung ist widerrufen; sie lässt sich "
+    "nicht mehr aktivieren."
+)
 
-    def aktuelle(self) -> "TranskriptionsKonfiguration":
-        """Liefert die eine Zeile und legt sie beim ersten Zugriff an."""
 
-        konfiguration, _ = self.get_or_create(pk=1)
+class TranskriptionsKonfigurationQuerySet(
+    models.QuerySet["TranskriptionsKonfiguration"]
+):
+    """QuerySets für unveränderliche Transkriptions-Fassungen."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Massenänderungen an Transkriptions-Fassungen."""
+
+        raise RuntimeError(_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG)
+
+
+class TranskriptionsKonfigurationManager(
+    models.Manager.from_queryset(TranskriptionsKonfigurationQuerySet),
+):
+    """Zugang zur aktiven Transkriptions-Fassung."""
+
+    def aktive(self) -> "TranskriptionsKonfiguration":
+        """Liefert die aktive Fassung; eine frische Instanz bekommt `fake`.
+
+        `fake` heißt bei der Transkription »aus«: Ohne Zutun geht keine
+        Aufnahme nach außen.
+        """
+
+        # Die Vorgabe-Fassung entsteht erst, wenn der Zeiger fehlt, und im
+        # selben Savepoint wie er: Verliert eine gleichzeitige erste Anfrage
+        # das Rennen um den Zeiger, rollt ihre Fassung mit zurück.
+        zeiger: AktiveTranskriptionsKonfiguration
+        zeiger, _ = AktiveTranskriptionsKonfiguration.objects.select_related(
+            "konfiguration"
+        ).get_or_create(pk=1, defaults={"konfiguration": self.create})
+        return zeiger.konfiguration
+
+    def aktivieren(
+        self, konfiguration: "TranskriptionsKonfiguration"
+    ) -> "TranskriptionsKonfiguration":
+        """Richtet den Zeiger auf die Fassung; ab der nächsten Sitzung gilt sie.
+
+        Eine widerrufene Fassung nicht mehr: Ihre Zusage ist weggefallen.
+        """
+
+        # Wie bei der Modell-Konfiguration: Es gilt der Stand in der
+        # Schreibtransaktion, auch ein Widerruf seit dem Laden.
+        with transaction.atomic():
+            konfiguration = self.select_for_update().get(pk=konfiguration.pk)
+            if konfiguration.zero_retention_ist_widerrufen:
+                raise ValidationError(WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG)
+            AktiveTranskriptionsKonfiguration.objects.update_or_create(
+                pk=1, defaults={"konfiguration": konfiguration}
+            )
         return konfiguration
 
 
-class TranskriptionsKonfiguration(AnbieterFeldgruppe):
-    """Der einzige, veränderliche Anbieterzugang der Transkription.
+class TranskriptionsKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
+    """Eine unveränderliche Fassung des Anbieterzugangs der Transkription.
 
-    Anders als die Modell-Konfiguration wird sie nicht gepinnt und nicht
-    exportiert (ADR-0026); eine alte Fassung trüge deshalb keine Information.
+    Jede Sitzung pinnt beim Start die aktive Fassung (ADR-0056 in der
+    Nachführung durch #496). Nur das Token ist rotierbar, die Erklärung
+    nur abzugeben und zu widerrufen.
     """
 
-    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
-        primary_key=True,
-        default=1,
-        editable=False,
-    )
     transkriptionsmodell: models.CharField = models.CharField(
         max_length=255,
         blank=True,
         default="",
     )
     sprache: models.CharField = models.CharField(max_length=5, default="de")
+    # Die übernommene Einzelzeile bleibt leer: Ein erfundenes Datum wäre
+    # schlimmer als keines.
+    angelegt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True, null=True
+    )
 
     objects: TranskriptionsKonfigurationManager = TranskriptionsKonfigurationManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Verhindert jede Mutation und prüft die Fassung beim Anlegen."""
+
+        if not self._state.adding:
+            raise RuntimeError(_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         """Bindet Modellname und Zugangsdaten an den gewählten Anbieter."""
 
         if self.anbieter not in Anbieter.values:
             return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
-        fehler: dict[str, str] = self._zugangsfehler()
+        fehler: dict[str, str] = {
+            **self._zugangsfehler(),
+            **self._erklaerungsfehler(),
+        }
         # Der Platzhalter-Adapter braucht kein Modell; jeder echte Anbieter schon.
-        if self.anbieter != Anbieter.FAKE and not self.transkriptionsmodell:
+        if self.hat_auftragsverarbeiter and not self.transkriptionsmodell:
             fehler["transkriptionsmodell"] = (
                 "Ohne Modellnamen weiß der Anbieter nicht, was er laden soll."
             )
         if fehler:
             raise ValidationError(fehler)
 
+    @property
+    def transkription_offen(self) -> bool:
+        """Ob mit dieser Fassung transkribiert werden darf: das eine Tor.
+
+        `fake` heißt »aus«; ein echter Anbieter nur mit Erklärung, die nicht
+        widerrufen ist. Gelesen wird der Stand dieser Instanz, also bei jeder
+        Anfrage frisch geladen: Ein Widerruf schließt sofort, auch mitten in
+        einer Sitzung.
+        """
+
+        return self.hat_auftragsverarbeiter and self.zero_retention_erklaert
+
+    def token_rotieren(self, token: str) -> None:
+        """Ersetzt das Token, ohne eine neue Fassung anzulegen.
+
+        Anbieter und Endpunkt bleiben, also geht das neue Token an denselben
+        Empfänger wie das alte.
+        """
+
+        token = token.strip()
+        if not self.hat_auftragsverarbeiter:
+            raise ValidationError({"anbieter_token": FAKE_TOKEN_FEHLERMELDUNG})
+        if not token:
+            raise ValidationError({"anbieter_token": TOKEN_FEHLT_FEHLERMELDUNG})
+        # Am append-only QuerySet vorbei, wie die Erklärung (ZeroRetentionFeldgruppe).
+        models.QuerySet(model=type(self), using=self._state.db).filter(
+            pk=self.pk
+        ).update(anbieter_token=token)
+        self.anbieter_token = token
+
+
+class AktiveTranskriptionsKonfiguration(models.Model):
+    """Der veränderliche Zeiger auf die aktive Transkriptions-Fassung."""
+
+    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        primary_key=True,
+        default=1,
+        editable=False,
+    )
+    konfiguration: models.ForeignKey = models.ForeignKey(
+        TranskriptionsKonfiguration,
+        on_delete=models.PROTECT,
+    )
+
     class Meta:
-        """Hält die Transkriptions-Konfiguration als einzige Zeile."""
+        """Hält den Zeiger als einzige Zeile: Genau eine Fassung ist aktiv."""
 
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),
-                name="simulation_transkriptions_konfiguration_ist_singleton",
+                name="simulation_aktive_transkriptions_konfiguration_ist_singleton",
             ),
         ]

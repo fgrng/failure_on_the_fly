@@ -118,8 +118,12 @@ Wofür eine Modell-Konfiguration aktiv ist: **Schüler:in** (Sitzungen, Probelä
 _Avoid_: Rolle — meint die Rechte eines Kontos; Zweck, Einsatz
 
 **Transkriptions-Konfiguration**:
-Der eine Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration, ist aber veränderlich und einmalig — sie wird weder gepinnt noch exportiert (ADR-0026, ADR-0056).
+Der Anbieterzugang der Audio-Transkription: **Anbieter**, Basis-URL, Token, Transkriptionsmodell und Sprache. Sie trägt dieselbe Anbieter-Feldgruppe wie die Modell-Konfiguration und ist wie diese append-only: Fassungen werden neu angelegt, nie bearbeitet; nur das Token ist rotierbar. Genau eine Fassung ist aktiv, und jede Sitzung pinnt beim Start die aktive. Die referenzierten Fassungen gehen ohne Token in den Export. Steht die aktive Fassung auf `fake`, gibt es keine Transkription; sonst transkribiert sie nur, wenn sie erklärt ist (**Zero-Retention-Erklärung**) (ADR-0026, ADR-0056, ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“).
 _Avoid_: Transkriptionseinstellungen, Whisper-Konfiguration, STT-Konfiguration
+
+**Zero-Retention-Erklärung**:
+Die Aussage einer Administrator:in an einer Fassung der Modell- oder der Transkriptions-Konfiguration, dass der Anbieter für dieses Modell eine Zero-Retention-Zusage gibt. Sie besteht aus dem Beleg der Zusage, dem Zeitpunkt und dem erklärenden Konto. Einmal abgegeben, ist sie unveränderlich und nur noch zu widerrufen, mit Zeitpunkt, Konto und Grund. Eine Fassung ist **erklärt**, wenn eine Erklärung vorliegt und nicht widerrufen ist. Ohne sie ist eine Modell-Konfiguration nicht für **Schüler:in** aktivierbar und keine Erhebung mit ihr finalisierbar, und die Transkription bleibt zu. Bei `fake` gibt es keine: An der Modell-Konfiguration ist `fake` ohne Erklärung überall nutzbar, bei der Transkription heißt `fake` „aus“ (ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“).
+_Avoid_: ZDR-Häkchen, Zero-Retention-Schalter, Zusicherung
 
 **Modellvorschläge**:
 Die Liste der Modellnamen, die ein **Anbieter** auf Druck des Ladeknopfes zur Modell-Konfiguration und zur Transkriptions-Konfiguration liefert. Sie ist ein Vorschlag und keine Gültigkeitsaussage: Ein Name, den sie nicht führt, bleibt eintragbar, und ob ein eingesetzter an seiner Naht taugt, entlarvt erst der Probelauf (ADR-0014). Die einzige Prüfung, die am Modellnamen wirklich stattfindet, ist seine Anbieterbindung (ADR-0056). Bei `fake` gibt es nichts abzurufen.

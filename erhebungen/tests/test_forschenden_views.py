@@ -18,6 +18,7 @@ from django.utils import timezone
 from pytest_django.asserts import assertContains, assertNotContains, assertRedirects
 
 from config.tests.aufbau import (
+    erklaerte,
     aktive_modell_konfiguration,
     finale_vignette,
     finaler_kern,
@@ -41,7 +42,13 @@ from erhebungen.models import (
 )
 from erhebungen.teilnahme_session import TEILNAHME_TOKENS_SESSION_KEY
 from fragebogen_items.models import FragebogenItem
-from simulation.models import Anbieter, ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import (
+    Anbieter,
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -81,25 +88,29 @@ def _forschungskonfiguration(
 ) -> ModellKonfiguration:
     """Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt."""
 
-    return ModellKonfiguration.objects.create(
-        bezeichnung="Test",
-        anbieter=Anbieter.OPENROUTER,
-        sprachmodell=f"openrouter/{name}",
-        anbieter_token="sk-or-geheim",
-        parameter=parameter or {},
+    return erklaerte(
+        ModellKonfiguration.objects.create(
+            bezeichnung="Test",
+            anbieter=Anbieter.OPENROUTER,
+            sprachmodell=f"openrouter/{name}",
+            anbieter_token="sk-or-geheim",
+            parameter=parameter or {},
+        )
     )
 
 
 def _infomaniak_konfiguration() -> ModellKonfiguration:
     """Legt eine Konfiguration an, die Basis-URL und Token wirklich trägt."""
 
-    return ModellKonfiguration.objects.create(
-        bezeichnung="Mistral bei Infomaniak",
-        anbieter=Anbieter.INFOMANIAK,
-        sprachmodell="openai/mistral24b",
-        anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
-        anbieter_token="sk-infomaniak-geheim",
-        parameter={"temperature": 0.2},
+    return erklaerte(
+        ModellKonfiguration.objects.create(
+            bezeichnung="Mistral bei Infomaniak",
+            anbieter=Anbieter.INFOMANIAK,
+            sprachmodell="openai/mistral24b",
+            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+            anbieter_token="sk-infomaniak-geheim",
+            parameter={"temperature": 0.2},
+        )
     )
 
 
@@ -2294,7 +2305,8 @@ class ErhebungsExportTests(TestCase):
         """Der Anbieter macht den Modellnamen lesbar; Token und URL bleiben draußen."""
 
         ada: Konto = forschende("ada")
-        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
         erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
         self.client.force_login(ada)
@@ -2321,11 +2333,191 @@ class ErhebungsExportTests(TestCase):
                     "anbieter": "infomaniak",
                     "sprachmodell": "openai/mistral24b",
                     "parameter": '{"temperature": 0.2}',
+                    "zero_retention_erklaert": "True",
+                    "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
+                    "zero_retention_erklaert_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_widerrufen_am": "NA",
+                    "zero_retention_widerrufsgrund": "",
                 }
             ],
         )
         self.assertNotIn(konfiguration.anbieter_token, archivinhalt)
         self.assertNotIn(konfiguration.anbieter_basis_url, archivinhalt)
+        # Der Export führt keine Konten, auch nicht das erklärende.
+        self.assertNotIn(
+            konfiguration.zero_retention_erklaert_von.username, archivinhalt
+        )
+
+    def test_exportiert_die_gepinnte_transkriptions_fassung_ohne_token(self) -> None:
+        """Je Sitzung steht die Fassung, an die ihre Aufnahmen gingen; kein Token."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            fassung: TranskriptionsKonfiguration = erklaerte(
+                TranskriptionsKonfiguration.objects.create(
+                    anbieter=Anbieter.INFOMANIAK,
+                    anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+                    anbieter_token="ik-supergeheim1234",
+                    transkriptionsmodell="whisper",
+                    sprache="de",
+                )
+            )
+        with time_machine.travel(
+            datetime(2026, 10, 15, 12, 0, tzinfo=ZoneInfo("Europe/Berlin")), tick=False
+        ):
+            fassung.zero_retention_widerrufen(
+                "Zusage zurückgezogen", konto_mit_rollen("linus", is_superuser=True)
+            )
+        # Eine Fassung, mit der in dieser Erhebung niemand transkribiert hat.
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_token="sk-or-anderes",
+            transkriptionsmodell="whisper-large-v3",
+        )
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6781")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+            transkriptions_konfiguration=fassung,
+        )
+        Vignettenposition.objects.create(
+            teilnahme=bindung.teilnahme, sitzung=sitzung, vignette=vignette, position=1
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        archivinhalt: str = "\n".join(
+            wert
+            for zeilen in archiv.values()
+            for zeile in zeilen
+            for wert in zeile.values()
+        )
+        self.assertEqual(
+            [
+                zeile["transkriptions_konfiguration_id"]
+                for zeile in archiv["sitzungen.csv"]
+            ],
+            [str(fassung.pk)],
+        )
+        self.assertEqual(
+            archiv["transkriptionskonfigurationen.csv"],
+            [
+                {
+                    "id": str(fassung.pk),
+                    "anbieter": "infomaniak",
+                    "transkriptionsmodell": "whisper",
+                    "sprache": "de",
+                    "angelegt_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_erklaert": "False",
+                    "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
+                    "zero_retention_erklaert_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_widerrufen_am": "2026-10-15T10:00:00+00:00",
+                    "zero_retention_widerrufsgrund": "Zusage zurückgezogen",
+                }
+            ],
+        )
+        self.assertNotIn(fassung.anbieter_token, archivinhalt)
+        # Der Export führt keine Konten, weder das erklärende noch das widerrufende.
+        self.assertNotIn("zero-retention-erklaerende", archivinhalt)
+        self.assertNotIn("linus", archivinhalt)
+        self.assertNotIn(fassung.anbieter_basis_url, archivinhalt)
+
+    def test_eine_sitzung_von_vor_dem_pin_traegt_keine_fassung(self) -> None:
+        """Welche Fassung transkribierte, ist nicht belegt: NA, nicht die aktive."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6781")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=finaler_kern(),
+            modell_konfiguration=konfiguration,
+        )
+        Vignettenposition.objects.create(
+            teilnahme=bindung.teilnahme, sitzung=sitzung, vignette=vignette, position=1
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        self.assertEqual(
+            archiv["sitzungen.csv"][0]["transkriptions_konfiguration_id"], "NA"
+        )
+
+    def test_exportiert_den_widerruf_mit_zeitpunkt_und_grund(self) -> None:
+        """Die gepinnte Fassung zeigt den Widerruf, wie er heute ist, ohne Konto."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            konfiguration.zero_retention_widerrufen(
+                "Kein ZDR-Endpunkt mehr",
+                Konto.objects.create_user(username="widerrufende", is_superuser=True),
+            )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        [zeile] = archiv["modellkonfigurationen.csv"]
+        self.assertEqual(zeile["zero_retention_erklaert"], "False")
+        self.assertEqual(
+            zeile["zero_retention_beleg"], "AVV mit dem Anbieter vom 01.10.2026"
+        )
+        self.assertEqual(
+            zeile["zero_retention_widerrufen_am"], "2026-07-01T08:00:00+00:00"
+        )
+        self.assertEqual(
+            zeile["zero_retention_widerrufsgrund"], "Kein ZDR-Endpunkt mehr"
+        )
+        self.assertNotIn(
+            "widerrufende",
+            "\n".join(
+                wert
+                for zeilen in archiv.values()
+                for zeile in zeilen
+                for wert in zeile.values()
+            ),
+        )
+
+    def test_exportiert_den_erklaerungsstand_einer_fake_konfiguration(self) -> None:
+        """Ohne Erklärung bleibt der Zeitpunkt NA, nicht leer."""
+
+        ada: Konto = forschende("ada")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        [konfiguration] = export_lesen(response)["modellkonfigurationen.csv"]
+        self.assertEqual(konfiguration["zero_retention_erklaert"], "False")
+        self.assertEqual(konfiguration["zero_retention_beleg"], "")
+        self.assertEqual(konfiguration["zero_retention_erklaert_am"], "NA")
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
         """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""
