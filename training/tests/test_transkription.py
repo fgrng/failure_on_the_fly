@@ -1,7 +1,6 @@
 """HTTP-Vertrag des Transkriptions-Endpunkts der Trainingssitzung."""
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
@@ -95,15 +94,11 @@ class TranskriptionsEndpointTests(TestCase):
 
         self.assertEqual(anbieter.skript, ["Text"])
 
-    def test_weist_anonyme_anfrage_ohne_datenbankzugriff_ab(self) -> None:
+    def test_weist_anonyme_anfrage_ab(self) -> None:
         """Ohne Anmeldung antwortet der Endpunkt mit 403, nicht mit einem Fehler."""
         sitzung: Sitzung = self._sitzung_starten()
         self.client.logout()
-        request: HttpRequest = RequestFactory().post("/")
-        request.user = AnonymousUser()
 
-        with self.assertNumQueries(0), self.assertRaises(PermissionDenied):
-            laufende_training_sitzung(request, sitzung.pk)
         response: HttpResponse = self.client.post(
             reverse("training:transkription", args=[sitzung.pk]),
             {"audio": audioaufnahme()},

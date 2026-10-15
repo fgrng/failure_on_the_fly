@@ -75,7 +75,11 @@ class ModellKonfigurationRollenTests(TestCase):
             reverse("simulation:modell_konfiguration")
         )
 
-        self.assertTrue(response.url.startswith("/accounts/login/?next="))
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/modell-konfiguration/",
+            fetch_redirect_response=False,
+        )
 
     def test_editor_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
         """Den Editor öffnet und nutzt nur die Administration."""
@@ -96,7 +100,11 @@ class ModellKonfigurationRollenTests(TestCase):
             reverse("simulation:modell_konfiguration_neu"), _anlegedaten()
         )
 
-        self.assertTrue(response.url.startswith("/accounts/login/?next="))
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/modell-konfiguration/neu/",
+            fetch_redirect_response=False,
+        )
         self.assertFalse(ModellKonfiguration.objects.exists())
 
     def test_aktivieren_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
@@ -114,12 +122,13 @@ class ModellKonfigurationRollenTests(TestCase):
     def test_aktivieren_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
         """Ohne Anmeldung schaltet niemand eine Verwendung um."""
         konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+        url: str = _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
 
-        response: HttpResponse = self.client.post(
-            _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
+        response: HttpResponse = self.client.post(url)
+
+        self.assertRedirects(
+            response, f"/accounts/login/?next={url}", fetch_redirect_response=False
         )
-
-        self.assertTrue(response.url.startswith("/accounts/login/?next="))
         self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
 
 

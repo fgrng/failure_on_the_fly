@@ -677,7 +677,11 @@ class SimulationskernVerwaltungTests(TestCase):
 
         response: HttpResponse = self.client.get(reverse("simulation:kern_verwalten"))
 
-        self.assertTrue(response.url.startswith("/accounts/login/?next="))
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/kern/verwalten/",
+            fetch_redirect_response=False,
+        )
 
 
 class SimulationskernLangeTexteTests(TestCase):

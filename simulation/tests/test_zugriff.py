@@ -13,7 +13,9 @@ from simulation.urls import app_name, urlpatterns
 
 
 def _url(muster: URLPattern) -> str:
-    # Füllt jeden Pfadparameter mit einem Platzhalter passenden Typs.
+    # Füllt jeden Pfadparameter mit einem Platzhalter passenden Typs. Ein
+    # Text wie "x" ist kein gültiger Wert (etwa für die Richtung); er reicht,
+    # weil Anmeldung und Rolle vor der Auswertung der Parameter geprüft werden.
     kwargs: dict[str, int | str] = {
         name: 1 if isinstance(konverter, IntConverter) else "x"
         for name, konverter in muster.pattern.converters.items()
@@ -25,6 +27,7 @@ class AnonymerZugriffTests(TestCase):
     """Anonyme Anfragen an kontogebundene Seiten führen auf den Login."""
 
     def test_leitet_anonym_auf_den_login_um(self) -> None:
+        """Jede Route führt ohne Anmeldung auf den Login mit `next`."""
         for muster in urlpatterns:
             url: str = _url(muster)
             with self.subTest(route=muster.name):

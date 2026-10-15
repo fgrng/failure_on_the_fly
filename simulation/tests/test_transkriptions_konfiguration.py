@@ -182,7 +182,11 @@ class TranskriptionsKonfigurationRollenTests(TestCase):
         """Anonyme Anfragen werden zur Anmeldung weitergeleitet (#476)."""
         response: HttpResponse = self.client.get(reverse(SEITE))
 
-        self.assertTrue(response.url.startswith("/accounts/login/?next="))
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/system/transkription/",
+            fetch_redirect_response=False,
+        )
 
     def test_weist_autorin_auch_beim_speichern_ab(self) -> None:
         """Die Schreibroute trägt dieselbe Rollenprüfung wie die Anzeige."""
