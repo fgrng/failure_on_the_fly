@@ -9,7 +9,11 @@ from typing import Any, Protocol, TypedDict, cast
 from django.db import transaction
 from django.db.models import QuerySet
 
-from simulation.models import ModellKonfiguration, Simulationskern
+from simulation.models import (
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+)
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -170,13 +174,18 @@ class GeruestSink(ABC):
         simulationskern: Simulationskern,
         modell_konfiguration: ModellKonfiguration,
     ) -> None:
-        """Legt die identitätstragende Sitzung sofort an."""
+        """Legt die identitätstragende Sitzung sofort an.
+
+        Sie pinnt die aktive Transkriptions-Fassung: Alle ihre Aufnahmen gehen
+        an denselben Anbieter, ein Wechsel wirkt ab der nächsten Sitzung.
+        """
 
         self.sitzung = Sitzung.objects.create(
             teilnahme=self.teilnahme,
             vignette=vignette,
             simulationskern=simulationskern,
             modell_konfiguration=modell_konfiguration,
+            transkriptions_konfiguration=TranskriptionsKonfiguration.objects.aktive(),
         )
 
     def antwortversuch_beginnen(self, jetzt: datetime) -> None:

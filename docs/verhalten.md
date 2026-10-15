@@ -48,8 +48,9 @@ bearbeiten«, »Training anlegen«, »Erhebung anlegen«, »Fragebogen-Item anle
 Verb heißt überall »anlegen«, nie »erstellen«. Der Absendeknopf einer
 Anlegen-Seite wiederholt den Titel (»Vignette anlegen«, »Training anlegen«,
 »Erhebung anlegen«, »Fragebogen-Item anlegen«; im Editor der
-Modell-Konfiguration »Konfiguration anlegen«). Auf Bearbeiten-Seiten heißt er
-»Änderungen speichern«, ebenso auf der Transkriptions-Konfiguration.
+Modell-Konfiguration »Konfiguration anlegen«, auf der
+Transkriptions-Konfiguration »Fassung anlegen«). Auf Bearbeiten-Seiten heißt er
+»Änderungen speichern«.
 
 Die gesamte Oberfläche ist deutschsprachig, auch Djangos eigene Texte:
 Formularfehler (»Dieses Feld ist zwingend erforderlich.«), die Bedienelemente
@@ -932,17 +933,37 @@ Lauf ersetzt den alten samt Korrekturen; auf neue Urteile wird nichts
 ## Transkriptions-Konfiguration
 
 Die Transkription hängt an einer eigenen Konfiguration, die die Administration
-unter `/system/transkription/` bearbeitet — mit denselben Anbieterfeldern wie
-das Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und
-das Audio über den anderen Anbieter laufen. Es gibt genau eine Zeile und genau
-eine Geste, Bearbeiten; eine Tokenrotation überschreibt sie, statt eine Fassung
-anzulegen, denn diese Konfiguration wird weder gepinnt noch exportiert
-(ADR-0026). Ein leer gelassenes Tokenfeld heißt »unverändert«, nicht »löschen«,
-solange Anbieter und Basis-URL gleich bleiben. Wechselt eines von beiden, wird
-das alte Token nicht übernommen: Ein echter Anbieter meldet dann am Tokenfeld
-„Ohne Token bedient der Anbieter keinen Aufruf.“, der Wechsel auf `fake` leert
-das Token. Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und
-Basis-URL laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
+unter `/system/transkription/` führt — mit denselben Anbieterfeldern wie das
+Sprachmodell, aber unabhängig davon: Das Gespräch darf über den einen und das
+Audio über den anderen Anbieter laufen. Sie ist wie die Modell-Konfiguration
+append-only: Eine Fassung wird angelegt und aktiviert, nie bearbeitet. Die Seite
+listet alle Fassungen mit Nummer, Anbieter, Transkriptionsmodell, Anlagedatum
+und Stand; genau eine ist »aktiv«. Wer eine Zeile wählt, sieht rechts Anbieter,
+Modell, Sprache, Basis-URL und das maskierte Token und kann sie mit »Aktivieren«
+zur aktiven machen. Eine frische Instanz hat eine Fassung mit Anbieter `fake`,
+also keine Transkription. Die bei der Umstellung übernommene bisherige
+Einzelzeile ist die erste Fassung, aktiv und mit unveränderten Werten, aber ohne
+Anlagedatum.
+
+Jede Sitzung in Training und Erhebung pinnt beim Start die aktive Fassung. Alle
+ihre Aufnahmen gehen an diese Fassung; ein Umschalten wirkt erst ab der nächsten
+Sitzung. Der Probelauf hat keine Sitzung und nimmt bei jeder Aufnahme die gerade
+aktive Fassung. Eine Sitzung, die vor dem Pin begann, folgt ebenfalls der
+aktiven.
+
+Das Token einer Fassung lässt sich ohne neue Fassung ersetzen: »Token ersetzen«
+im Detail einer Fassung mit echtem Anbieter tauscht es aus, Anbieter und
+Basis-URL bleiben. Ein leeres Token weist die Seite ab („Ohne Token bedient der
+Anbieter keinen Aufruf.“); bei `fake` gibt es nichts zu ersetzen.
+
+Unter der Liste steht das Formular einer neuen Fassung, vorbelegt aus der
+aktiven außer dem Token; »Fassung anlegen« legt sie an, ohne sie zu aktivieren.
+Ein leer gelassenes Tokenfeld übernimmt das Token der aktiven Fassung, solange
+Anbieter und Basis-URL gleich bleiben. Wechselt eines von beiden, wird das alte
+Token nicht übernommen: Ein echter Anbieter meldet dann am Tokenfeld „Ohne Token
+bedient der Anbieter keinen Aufruf.“, eine `fake`-Fassung entsteht ohne Token.
+Neben dem Transkriptionsmodell steht derselbe Knopf „Modelle und Basis-URL
+laden“ wie an der Sprachmodell-Naht: bei `openrouter` die Modelle mit
 Transkriptions-Modalität — in der ungefilterten Modellliste erscheinen sie nicht
 —, bei `infomaniak` das eine Modell vom Typ `stt` und dazu die Endpunktwurzel
 der Transkription, die bei diesem Anbieter unter einer anderen API-Version liegt
@@ -950,10 +971,18 @@ als die des Sprachmodells. Der eingesetzte Wert trägt hier bei beiden Anbietern
 kein Präfix: Diese Naht läuft nicht über LiteLLM, sondern reicht den Namen roh
 an die Route des Anbieters durch. Abgefragt wird wie an der Sprachmodell-Naht:
 `openrouter` ohne Zugangsdaten, `infomaniak` gegen das getippte Token — auch
-dann, wenn schon eines hinterlegt ist. Ob überhaupt transkribiert wird,
-entscheidet weiterhin die Instanz über `TRANSKRIPTION_ZERO_RETENTION` in der
-Umgebung — die Zusage der Betreiber:in gehört nicht in dasselbe Formular wie die
-Anbieterwahl.
+dann, wenn schon eines hinterlegt ist.
+
+Anlegen, Aktivieren und Token ersetzen sind der Administration vorbehalten.
+
+Der Export einer Erhebung führt je Sitzung die Nummer ihrer gepinnten Fassung
+(`transkriptions_konfiguration_id` in `sitzungen.csv`, `NA` vor dem Pin) und in
+`transkriptionskonfigurationen.csv` die referenzierten Fassungen mit Anbieter,
+Transkriptionsmodell, Sprache und Anlagedatum, ohne Token und Basis-URL
+(ADR-0029).
+
+Ob überhaupt transkribiert wird, entscheidet vorerst weiterhin die Instanz über
+`TRANSKRIPTION_ZERO_RETENTION` in der Umgebung.
 
 ## Audioverarbeitung im Training
 

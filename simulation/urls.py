@@ -172,4 +172,14 @@ urlpatterns: list[URLPattern] = [
         views.transkriptions_konfiguration,
         name="transkriptions_konfiguration",
     ),
+    path(
+        "transkription/<int:pk>/aktivieren/",
+        views.transkriptions_konfiguration_aktivieren,
+        name="transkriptions_konfiguration_aktivieren",
+    ),
+    path(
+        "transkription/<int:pk>/token/",
+        views.transkriptions_konfiguration_token,
+        name="transkriptions_konfiguration_token",
+    ),
 ]

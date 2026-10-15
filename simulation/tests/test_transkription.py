@@ -117,12 +117,11 @@ def test_openai_transkription_kennzeichnet_ungueltige_antwort_als_anbieterfehler
         _openai_transkription(client).transkribieren(b"aufgenommene-audiobytes")
 
 
-@pytest.mark.django_db
 def test_anbieterfunktion_bildet_fuer_fake_einen_platzhalter_ohne_netz() -> None:
     """Der deterministische Adapter bekommt produktiv einen konstanten Text."""
 
     with patch("simulation.transkription.OpenAI") as openai:
-        anbieter = transkriptions_anbieter()
+        anbieter = transkriptions_anbieter(TranskriptionsKonfiguration())
 
     assert anbieter.transkribieren(b"aufgenommene-audiobytes") == (
         "Dies ist ein Platzhalter-Transkript."
@@ -130,15 +129,15 @@ def test_anbieterfunktion_bildet_fuer_fake_einen_platzhalter_ohne_netz() -> None
     openai.assert_not_called()
 
 
-@pytest.mark.django_db
 def test_anbieterfunktion_haelt_keinen_adapter_ueber_anfragen_hinweg() -> None:
     """Jede Anfrage bekommt einen frischen Adapter mit vollem Skript."""
 
-    transkriptions_anbieter().transkribieren(b"aufgenommene-audiobytes")
+    konfiguration: TranskriptionsKonfiguration = TranskriptionsKonfiguration()
+    transkriptions_anbieter(konfiguration).transkribieren(b"aufgenommene-audiobytes")
 
-    assert transkriptions_anbieter().transkribieren(b"aufgenommene-audiobytes") == (
-        "Dies ist ein Platzhalter-Transkript."
-    )
+    assert transkriptions_anbieter(konfiguration).transkribieren(
+        b"aufgenommene-audiobytes"
+    ) == ("Dies ist ein Platzhalter-Transkript.")
 
 
 @pytest.mark.django_db
@@ -148,20 +147,20 @@ def test_anbieterfunktion_bildet_fuer_openrouter_den_client_aus_der_konfiguratio
     """Zugangsdaten und Endpunktwurzel kommen aus der Datenbank, nicht der Umgebung."""
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_basis_url="https://openrouter.ai/api/v1",
+            anbieter_token="geheimes-token",
+            transkriptionsmodell="whisper-large-v3",
+            sprache="fr",
+        )
     )
-    konfiguration.anbieter = Anbieter.OPENROUTER
-    konfiguration.anbieter_basis_url = "https://openrouter.ai/api/v1"
-    konfiguration.anbieter_token = "geheimes-token"
-    konfiguration.transkriptionsmodell = "whisper-large-v3"
-    konfiguration.sprache = "fr"
-    konfiguration.save()
 
     audio = b"aufgenommene-audiobytes"
 
     with patch("simulation.transkription.OpenAI") as openai:
         openai.return_value.audio.transcriptions.create.return_value.text = "Bonjour."
-        transkriptions_anbieter().transkribieren(audio)
+        transkriptions_anbieter(konfiguration).transkribieren(audio)
 
     openai.assert_called_once_with(
         base_url="https://openrouter.ai/api/v1",
@@ -181,15 +180,15 @@ def test_anbieterfunktion_gibt_openrouter_ohne_eigene_wurzel_die_vorgabe() -> No
     """Ein OpenRouter-Token darf nie an die Vorgabe des Clients (OpenAI) gehen."""
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_token="geheimes-token",
+            transkriptionsmodell="whisper-large-v3",
+        )
     )
-    konfiguration.anbieter = Anbieter.OPENROUTER
-    konfiguration.anbieter_token = "geheimes-token"
-    konfiguration.transkriptionsmodell = "whisper-large-v3"
-    konfiguration.save()
 
     with patch("simulation.transkription.OpenAI") as openai:
-        transkriptions_anbieter()
+        transkriptions_anbieter(konfiguration)
 
     assert openai.call_args.kwargs["base_url"] == "https://openrouter.ai/api/v1"
 
@@ -203,12 +202,12 @@ def test_anbieterfunktion_schickt_openrouter_jede_aufnahme_genau_einmal() -> Non
     """
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_token="geheimes-token",
+            transkriptionsmodell="whisper-large-v3",
+        )
     )
-    konfiguration.anbieter = Anbieter.OPENROUTER
-    konfiguration.anbieter_token = "geheimes-token"
-    konfiguration.transkriptionsmodell = "whisper-large-v3"
-    konfiguration.save()
     anfragen: list[httpx.Request] = []
 
     def anbieter(anfrage: httpx.Request) -> httpx.Response:
@@ -223,7 +222,7 @@ def test_anbieterfunktion_schickt_openrouter_jede_aufnahme_genau_einmal() -> Non
         )
 
     with patch("simulation.transkription.OpenAI", side_effect=client_mit_zaehler):
-        transkription = transkriptions_anbieter()
+        transkription = transkriptions_anbieter(konfiguration)
     with pytest.raises(TranskriptionsAnbieterfehler):
         transkription.transkribieren(b"aufgenommene-audiobytes")
 
@@ -505,21 +504,21 @@ def test_anbieterfunktion_bildet_fuer_infomaniak_den_asynchronen_adapter() -> No
     """Die Fabrik bildet den Polling-Adapter aus der Konfiguration."""
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.INFOMANIAK,
+            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+            anbieter_token="geheimes-token",
+            transkriptionsmodell="whisper",
+            sprache="fr",
+        )
     )
-    konfiguration.anbieter = Anbieter.INFOMANIAK
-    konfiguration.anbieter_basis_url = "https://api.infomaniak.com/1/ai/4711/openai"
-    konfiguration.anbieter_token = "geheimes-token"
-    konfiguration.transkriptionsmodell = "whisper"
-    konfiguration.sprache = "fr"
-    konfiguration.save()
 
     audio = b"aufgenommene-audiobytes"
 
     with patch("simulation.transkription.httpx.Client") as httpx_client:
         httpx_client.return_value.post.return_value = _absende_antwort()
         httpx_client.return_value.get.return_value = _fertiger_stapel()
-        transkriptions_anbieter().transkribieren(audio)
+        transkriptions_anbieter(konfiguration).transkribieren(audio)
 
     httpx_client.assert_called_once_with(
         headers={"Authorization": "Bearer geheimes-token"},

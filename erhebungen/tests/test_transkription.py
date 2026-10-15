@@ -62,7 +62,7 @@ class ErhebungsTranskriptionTests(TestCase):
         request.session = self.client.session
         try:
             return transkriptions_endpunkt(
-                lambda: anbieter, sitzung_fuer_transkription
+                lambda _: anbieter, sitzung_fuer_transkription
             )(request)
         finally:
             request.close()

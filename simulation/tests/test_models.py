@@ -450,7 +450,7 @@ def test_transkriptions_konfiguration_beginnt_bei_fake_auf_deutsch() -> None:
     """Ohne Zutun telefoniert die Transkription nicht nach außen."""
 
     konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
+        TranskriptionsKonfiguration.objects.aktive()
     )
 
     assert konfiguration.anbieter == Anbieter.FAKE

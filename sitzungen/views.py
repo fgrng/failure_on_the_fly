@@ -20,7 +20,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from konten.navigation import autorin_erforderlich, ist_administratorin
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import (
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     LeeresTranskript,
@@ -351,14 +356,24 @@ def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None
     return None
 
 
+def _transkriptions_fassung(sitzung: Sitzung | None) -> TranskriptionsKonfiguration:
+    # Die gepinnte Fassung der Sitzung. Der Probelauf hat keine Sitzung und
+    # nimmt die aktive, ebenso eine Sitzung, die vor dem Pin begann.
+
+    if sitzung is not None and sitzung.transkriptions_konfiguration is not None:
+        return sitzung.transkriptions_konfiguration
+    return TranskriptionsKonfiguration.objects.aktive()
+
+
 def transkriptions_endpunkt(
-    anbieter_bilden: Callable[[], Transkription],
+    anbieter_bilden: Callable[[TranskriptionsKonfiguration], Transkription],
     sitzung_aufloesen: Callable[..., Sitzung | None],
 ) -> Callable[..., HttpResponse]:
     """Erzeugt den geschützten Endpunkt eines Prinzipals für seinen Anbieter.
 
-    `anbieter_bilden` wird je Anfrage gerufen: Die Anbieterkonfiguration liegt
-    in der Datenbank, und ein gehaltener Adapter überlebte ihre Änderung.
+    `anbieter_bilden` wird je Anfrage aus der geltenden Fassung gerufen: der
+    gepinnten der Sitzung, im Probelauf der aktiven. Ein gehaltener Adapter
+    überlebte ein rotiertes Token.
 
     `sitzung_aufloesen` trägt die Autorisierung des jeweiligen Prinzipals,
     erhält die URL-Parameter der Route und hat drei erlaubte Ausgänge:
@@ -391,7 +406,9 @@ def transkriptions_endpunkt(
             return JsonResponse({"status": "aufnahme_zu_gross"}, status=413)
         audio: bytes = aufnahme.read()
         try:
-            text: str = anbieter_bilden().transkribieren(audio)
+            text: str = anbieter_bilden(
+                _transkriptions_fassung(sitzung)
+            ).transkribieren(audio)
         except LeeresTranskript:
             return JsonResponse({"status": "leeres_transkript"}, status=422)
         except TranskriptionsAnbieterfehler:
