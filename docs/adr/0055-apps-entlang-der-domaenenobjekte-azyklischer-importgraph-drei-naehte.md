@@ -1,8 +1,19 @@
 ---
-status: accepted
+status: amended
+amended-by: [ADR-0064]
 ---
 
 # Apps entlang der Domänenobjekte, ein azyklischer Importgraph, drei benannte Nähte
+
+> **Nachgeführt durch ADR-0064:** Die Domänenseite übergibt der
+> Sprachmodell-Naht Paare aus Eingabe und Inhalt. Bei der simulierten
+> Schüler:in ist der Inhalt jede frühere Antwort so, wie das Modell sie nach
+> dem Ausgabeschema ausgegeben hat, also Denkspur und Äußerung; die Denkspur
+> reist im Verlauf mit (ADR-0064). Für „keine native Reasoning-Spur“ gilt
+> ADR-0064 statt ADR-0005. „`erhebungen` weiß nichts von Konten“ meint die
+> Datenspur: Der Export von `erhebungen` kennt keine Konten; Views und Modelle
+> von `erhebungen` nutzen Konto und Eigentümer-Kreis über die Kante nach
+> `konten`.
 
 Dieses ADR fasst den Stand von ADR-0016 und seinen Nachführungen durch
 ADR-0037, ADR-0041, ADR-0042, ADR-0044, ADR-0045, ADR-0046 und ADR-0052
