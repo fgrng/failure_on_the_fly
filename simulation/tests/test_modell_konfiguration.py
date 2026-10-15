@@ -566,7 +566,7 @@ def test_eine_nie_abgegebene_erklaerung_laesst_sich_nicht_widerrufen() -> None:
     konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
     konfiguration: ModellKonfiguration = _openrouter()
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="nichts zu widerrufen"):
         konfiguration.zero_retention_widerrufen("Grund", konto)
 
     assert (
@@ -590,7 +590,7 @@ def test_ein_widerruf_laesst_sich_nicht_wiederholen() -> None:
         ModellKonfiguration.objects.get(pk=konfiguration.pk),
         veraltet,
     ):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="ist widerrufen"):
             versuch.zero_retention_widerrufen("Zweiter Grund", konto)
         assert versuch.zero_retention_widerrufsgrund == "Erster Grund"
 
@@ -604,7 +604,7 @@ def test_nach_dem_widerruf_laesst_sich_nicht_neu_erklaeren() -> None:
     konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
 
     assert not konfiguration.zero_retention_erklaerbar
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="ist widerrufen"):
         konfiguration.zero_retention_erklaeren("Neuer AVV", konto)
 
 
@@ -635,3 +635,31 @@ def test_der_widerruf_laesst_den_zeiger_einer_aktiven_fassung_stehen() -> None:
     konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
 
     assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration
+
+
+@pytest.mark.django_db
+def test_eine_fassung_laesst_sich_nicht_widerrufen_anlegen() -> None:
+    """Der Widerruf folgt einer gespeicherten Erklärung, auch aus Shell und Seeds."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    widerruf: dict[str, object] = {
+        "zero_retention_widerrufsgrund": "Zusage zurückgezogen",
+        "zero_retention_widerrufen_am": timezone.now(),
+        "zero_retention_widerrufen_von": konto,
+    }
+
+    for werte in (
+        {"zero_retention_widerrufen_am": timezone.now()},
+        widerruf,
+        {
+            "zero_retention_beleg": "AVV",
+            "zero_retention_erklaert_am": timezone.now(),
+            "zero_retention_erklaert_von": konto,
+            **widerruf,
+        },
+    ):
+        with pytest.raises(ValidationError) as fehler:
+            _openrouter(**werte)
+
+        assert "zero_retention_widerrufsgrund" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.exists()

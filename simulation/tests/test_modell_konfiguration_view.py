@@ -2,9 +2,11 @@
 
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import httpx
+import time_machine
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import TestCase
@@ -1403,6 +1405,20 @@ class ZeroRetentionWiderrufTests(TestCase):
         self.assertEqual(konfiguration.zero_retention_widerrufen_von, self.linus)
         self.assertIsNotNone(konfiguration.zero_retention_widerrufen_am)
 
+    def test_bestaetigt_den_widerruf(self) -> None:
+        """Nach dem Widerruf liest die Administratorin, dass er gilt."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Kein ZDR-Endpunkt mehr"},
+            follow=True,
+        )
+
+        self.assertContains(response, "ist die Zero-Retention-Erklärung widerrufen")
+
     def test_meldet_den_fehlenden_grund_am_feld(self) -> None:
         """Ohne Grund kein Widerruf."""
         konfiguration: ModellKonfiguration = erklaerte(
@@ -1493,8 +1509,10 @@ class ZeroRetentionWiderrufTests(TestCase):
         self.assertContains(response, konfiguration.zero_retention_beleg)
         self.assertNotContains(response, _erklaeren_url(konfiguration))
 
-    def test_sperrt_jede_verwendung_einer_widerrufenen_fassung(self) -> None:
-        """Weder ein Schalter noch der direkte Aufruf aktivieren sie."""
+    def test_zeigt_jede_verwendung_einer_widerrufenen_fassung_gesperrt(
+        self,
+    ) -> None:
+        """Statt eines Schalters steht je Verwendung der Grund der Sperre."""
         konfiguration: ModellKonfiguration = _widerrufene(
             _openrouter("openrouter/gpt-test")
         )
@@ -1509,17 +1527,26 @@ class ZeroRetentionWiderrufTests(TestCase):
                 self.assertContains(
                     response, f"Für {verwendung.label} gesperrt: Erklärung widerrufen"
                 )
+
+    def test_weist_die_aktivierung_einer_widerrufenen_fassung_ab(self) -> None:
+        """Auch der direkte Aufruf aktiviert sie für keine Verwendung."""
+        konfiguration: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        for verwendung in Verwendung:
+            with self.subTest(verwendung=verwendung):
                 aktiviert: HttpResponse = self.client.post(
                     _aktivieren_url(konfiguration, verwendung), follow=True
                 )
+
                 self.assertContains(aktiviert, "für keine Verwendung mehr")
                 self.assertIsNone(ModellKonfiguration.objects.aktive(verwendung))
 
     def test_zeigt_den_widerruf_in_der_tabelle(self) -> None:
         """Der Erklärungsstand nennt den Widerruf samt Datum und Grund."""
-        konfiguration: ModellKonfiguration = _widerrufene(
-            _openrouter("openrouter/gpt-test")
-        )
+        with time_machine.travel(datetime(2026, 7, 1, 8, tzinfo=UTC), tick=False):
+            _widerrufene(_openrouter("openrouter/gpt-test"))
 
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
@@ -1528,17 +1555,11 @@ class ZeroRetentionWiderrufTests(TestCase):
             response.content.decode().split("<tbody>")[1].split("</tbody>")[0]
         )
 
-        self.assertIn(
-            "widerrufen am "
-            + timezone.localtime(konfiguration.zero_retention_widerrufen_am).strftime(
-                "%d.%m.%Y"
-            ),
-            tabelle,
-        )
+        self.assertIn("widerrufen am 01.07.2026", tabelle)
         self.assertIn("Kein ZDR-Endpunkt mehr", tabelle)
 
-    def test_warnt_deutlich_bei_aktiver_widerrufener_fassung(self) -> None:
-        """Der Zeiger bleibt stehen, aber nicht unbemerkt."""
+    def _aktiv_und_widerrufen(self) -> None:
+        # Eine Fassung, aktiv für Schüler:in und Bewerter, danach widerrufen.
         konfiguration: ModellKonfiguration = erklaerte(
             _openrouter("openrouter/gpt-test")
         )
@@ -1546,16 +1567,26 @@ class ZeroRetentionWiderrufTests(TestCase):
         ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
         konfiguration.zero_retention_widerrufen("Kein ZDR-Endpunkt mehr", self.linus)
 
+    def test_warnt_deutlich_bei_aktiver_widerrufener_fassung(self) -> None:
+        """Der Zeiger bleibt stehen, aber nicht unbemerkt."""
+        self._aktiv_und_widerrufen()
+
         response: HttpResponse = self.client.get(
             reverse("simulation:modell_konfiguration")
         )
 
-        self.assertEqual(
-            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), konfiguration
-        )
         self.assertContains(
             response,
             "Die Zero-Retention-Erklärung einer aktiven Konfiguration ist widerrufen",
         )
         self.assertContains(response, "Schüler:in, Bewerter")
+
+    def test_meldet_die_widerrufene_schuelerin_nicht_als_unerklaert(self) -> None:
+        """Der Widerruf hat seinen eigenen Hinweis, nicht den der fehlenden."""
+        self._aktiv_und_widerrufen()
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
         self.assertNotContains(response, "fehlt die Zero-Retention-Erklärung")

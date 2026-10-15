@@ -880,6 +880,10 @@ ZERO_RETENTION_NICHT_WIDERRUFBAR_FEHLERMELDUNG: str = (
 ZERO_RETENTION_GRUND_FEHLERMELDUNG: str = (
     "Ohne Grund ist der Widerruf nicht nachvollziehbar."
 )
+ZERO_RETENTION_WIDERRUF_BEIM_ANLEGEN_FEHLERMELDUNG: str = (
+    "Eine Fassung entsteht nicht widerrufen; widerrufen wird erst eine "
+    "abgegebene Erklärung."
+)
 
 
 class ZeroRetentionFeldgruppe(models.Model):
@@ -945,6 +949,12 @@ class ZeroRetentionFeldgruppe(models.Model):
 
         return self.anbieter != Anbieter.FAKE and not self.zero_retention_abgegeben
 
+    @property
+    def zero_retention_widerrufbar(self) -> bool:
+        """Ob sich die Erklärung dieser Fassung noch widerrufen lässt."""
+
+        return self.zero_retention_erklaert
+
     def zero_retention_erklaeren(self, beleg: str, konto: models.Model) -> None:
         """Gibt die Erklärung ab: vor dem Anlegen mit, danach nachträglich.
 
@@ -970,18 +980,14 @@ class ZeroRetentionFeldgruppe(models.Model):
             "zero_retention_erklaert_am": timezone.now(),
             "zero_retention_erklaert_von": konto,
         }
-        # An einer gespeicherten Fassung ist das der einzige Schreibvorgang
-        # neben der Tokenrotation. Er geht am append-only QuerySet vorbei und
-        # gelingt nur, solange keine Erklärung vorliegt, auch gegen eine
-        # gleichzeitige.
-        if not self._state.adding and not (
-            models.QuerySet(model=type(self))
-            .filter(pk=self.pk, zero_retention_erklaert_am=None)
-            .update(**werte)
-        ):
-            # Die gleichzeitige Erklärung gilt; die Fassung zeigt sie fortan.
-            self.refresh_from_db(fields=list(werte))
-            raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        # Gelingt an einer gespeicherten Fassung nur, solange keine Erklärung
+        # vorliegt, auch gegen eine gleichzeitige.
+        if not self._state.adding:
+            self._einmal_schreiben(
+                werte,
+                ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG,
+                zero_retention_erklaert_am=None,
+            )
         for feld, wert in werte.items():
             setattr(self, feld, wert)
 
@@ -1006,21 +1012,31 @@ class ZeroRetentionFeldgruppe(models.Model):
             "zero_retention_widerrufen_am": timezone.now(),
             "zero_retention_widerrufen_von": konto,
         }
-        # Wie die nachträgliche Erklärung am append-only QuerySet vorbei, und
-        # nur, solange kein anderer Widerruf zuvorgekommen ist.
-        if not (
-            models.QuerySet(model=type(self))
-            .filter(
-                pk=self.pk,
-                zero_retention_erklaert_am__isnull=False,
-                zero_retention_widerrufen_am=None,
-            )
+        # Gelingt nur, solange kein anderer Widerruf zuvorgekommen ist.
+        self._einmal_schreiben(
+            werte,
+            ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG,
+            zero_retention_erklaert_am__isnull=False,
+            zero_retention_widerrufen_am=None,
+        )
+        for feld, wert in werte.items():
+            setattr(self, feld, wert)
+
+    def _einmal_schreiben(
+        self, werte: dict[str, object], fehlermeldung: str, **bedingung: object
+    ) -> None:
+        # Erklärung und Widerruf sind an einer gespeicherten Fassung die
+        # einzigen Schreibvorgänge neben der Tokenrotation. Sie gehen am
+        # append-only QuerySet vorbei und gelingen nur, solange die Bedingung
+        # in der Datenbank gilt. Sonst gilt der zuvorgekommene Stand, und die
+        # Fassung zeigt ihn fortan.
+        if (
+            not models.QuerySet(model=type(self))
+            .filter(pk=self.pk, **bedingung)
             .update(**werte)
         ):
             self.refresh_from_db(fields=list(werte))
-            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
-        for feld, wert in werte.items():
-            setattr(self, feld, wert)
+            raise ValidationError(fehlermeldung)
 
     def _erklaerungsfehler(self) -> dict[str, str]:
         # Hält eine beim Anlegen mitgegebene Erklärung an dieselben Regeln.
@@ -1031,6 +1047,17 @@ class ZeroRetentionFeldgruppe(models.Model):
             return {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
         if self.zero_retention_abgegeben != bool(self.zero_retention_beleg.strip()):
             return {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
+        # Widerrufen wird nur eine gespeicherte Erklärung, nie beim Anlegen.
+        if (
+            self.zero_retention_ist_widerrufen
+            or self.zero_retention_widerrufsgrund
+            or self.zero_retention_widerrufen_von_id is not None
+        ):
+            return {
+                "zero_retention_widerrufsgrund": (
+                    ZERO_RETENTION_WIDERRUF_BEIM_ANLEGEN_FEHLERMELDUNG
+                )
+            }
         return {}
 
 

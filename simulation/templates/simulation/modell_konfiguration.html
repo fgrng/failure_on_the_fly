@@ -80,7 +80,7 @@
                         <div><dt>Parameter</dt><dd><pre>{{ gewaehlt.parameter }}</pre></dd></div>
                         <div><dt>Zero-Retention-Erklärung</dt><dd>
                             {% if gewaehlt.ist_fake %}Nicht nötig: Der Anbieter »fake« hat keinen Auftragsverarbeiter.
-                            {% elif gewaehlt.zero_retention_erklaert_am %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
+                            {% elif gewaehlt.zero_retention_abgegeben %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
                             {% else %}Fehlt.{% endif %}
                         </dd></div>
                         {% if gewaehlt.widerrufen %}

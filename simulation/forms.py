@@ -1,5 +1,8 @@
 """Formulare der Simulation: Kern- und Evalkatalog-Entwurf, Modell- und Transkriptions-Konfiguration."""
 
+from collections.abc import Callable
+from typing import Any
+
 from django.core.exceptions import ValidationError
 from django.forms import (
     BooleanField,
@@ -168,16 +171,12 @@ class ZeroRetentionErklaerungForm(Form):
 
     def erklaeren(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
         """Gibt die Erklärung ab; scheitert sie, stehen die Gründe am Formular."""
-        if not self.is_valid():
-            return False
-        try:
-            konfiguration.zero_retention_erklaeren(
-                self.cleaned_data["zero_retention_beleg"], konto
-            )
-        except ValidationError as fehler:
-            self.add_error(None, fehler)
-            return False
-        return True
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.zero_retention_erklaeren(
+                daten["zero_retention_beleg"], konto
+            ),
+        )
 
 
 class ZeroRetentionWiderrufForm(Form):
@@ -197,16 +196,25 @@ class ZeroRetentionWiderrufForm(Form):
 
     def widerrufen(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
         """Widerruft die Erklärung; scheitert es, stehen die Gründe am Formular."""
-        if not self.is_valid():
-            return False
-        try:
-            konfiguration.zero_retention_widerrufen(
-                self.cleaned_data["zero_retention_widerrufsgrund"], konto
-            )
-        except ValidationError as fehler:
-            self.add_error(None, fehler)
-            return False
-        return True
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.zero_retention_widerrufen(
+                daten["zero_retention_widerrufsgrund"], konto
+            ),
+        )
+
+
+def _an_der_domaene(form: Form, aenderung: Callable[[dict[str, Any]], None]) -> bool:
+    # Führt die Änderung der Domäne mit den bereinigten Daten aus; was sie
+    # abweist, steht danach am Formular.
+    if not form.is_valid():
+        return False
+    try:
+        aenderung(form.cleaned_data)
+    except ValidationError as fehler:
+        form.add_error(None, fehler)
+        return False
+    return True
 
 
 def _stellschrauben_hinweis() -> str:
