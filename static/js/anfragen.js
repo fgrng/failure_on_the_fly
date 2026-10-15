@@ -6,6 +6,9 @@
 //   während seiner htmx-Anfrage schreibgeschützt und danach wieder frei.
 // - data-einmal-absenden: Ohne htmx löst ein zweiter Klick keinen zweiten
 //   Post aus, solange der erste läuft.
+// - data-fokusziel: Nach einem htmx-Tausch bekommt das letzte Fokusziel im
+//   getauschten Bereich den Fokus, damit Screenreader den neuen Inhalt
+//   ansagen (#487). Gescrollt hat schon show:, deshalb preventScroll.
 (() => {
     const hinweisZeigen = () => {
         const hinweis = document.getElementById("anfragefehler");
@@ -31,6 +34,11 @@
             const hinweis = document.getElementById("anfragefehler");
             if (hinweis) hinweis.hidden = true;
         }
+    });
+
+    document.addEventListener("htmx:afterSettle", (ereignis) => {
+        const ziele = ereignis.detail.target?.querySelectorAll?.("[data-fokusziel]");
+        if (ziele?.length) ziele[ziele.length - 1].focus({ preventScroll: true });
     });
 
     const knoepfe = (formular) => formular.querySelectorAll("button[type=submit], button:not([type])");

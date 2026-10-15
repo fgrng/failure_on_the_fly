@@ -1,5 +1,5 @@
 {% if ist_gescheitert or erneute_eingabe is not None %}
-    <div class="gespraechseingabe gespraechseingabe--fehler" role="alert">
+    <div class="gespraechseingabe gespraechseingabe--fehler" role="alert" tabindex="-1" data-fokusziel>
         <p>Die Antwort konnte nicht erzeugt werden.</p>
         {% if erneute_eingabe is not None %}
             <form method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#gespraechsschritt-neu:top">

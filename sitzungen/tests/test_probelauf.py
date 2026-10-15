@@ -2,6 +2,7 @@
 
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 import time_machine
 from django.contrib.sessions.backends.base import SessionBase
@@ -16,7 +17,7 @@ from config.tests.aufbau import (
     konto_mit_rollen,
     vignetten_entwurf,
 )
-from config.tests.formular import submit_knoepfe
+from config.tests.formular import fokusziel_tag, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen, modellaufrufe_dauern
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
@@ -247,6 +248,31 @@ class ProbelaufStartTests(_ProbelaufAufbau):
 
         self.assertContains(einleitung, "js/anfragen.js")
         self.assertContains(einleitung, 'id="anfragefehler"')
+
+    def test_debriefkopf_ist_fokusziel_nach_dem_tausch(self) -> None:
+        """Nach „Gespräch beenden“ landet der Fokus auf der Überschrift des Debriefs."""
+
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        debrief: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_beenden"), headers={"HX-Request": "true"}
+        )
+
+        kopf: str = fokusziel_tag(
+            debrief.content.decode(), 'id="sitzung-debrief-titel"'
+        )
+        self.assertIn('tabindex="-1"', kopf)
+        self.assertIn("data-fokusziel", kopf)
+
+    def test_fokusfuehrung_nach_dem_tausch_ist_eingebunden(self) -> None:
+        """anfragen.js fokussiert nach jedem htmx-Tausch das letzte Fokusziel."""
+
+        skript: str = (
+            Path(__file__).resolve().parents[2] / "static" / "js" / "anfragen.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"htmx:afterSettle"', skript)
+        self.assertIn("[data-fokusziel]", skript)
+        self.assertIn("preventScroll: true", skript)
 
     def _gespraechsformular(self) -> str:
         """Liefert das öffnende Tag des Gesprächsformulars nach dem Start."""
@@ -744,6 +770,30 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
+
+    def test_neuer_gespraechsschritt_ist_fokusziel(self) -> None:
+        """Der neue Gesprächsschritt ist programmatisch fokussierbar und Fokusziel."""
+
+        response: HttpResponse = self._endgueltigen_fehlschlag_ausloesen()
+
+        schritt: str = fokusziel_tag(
+            response.content.decode(), 'id="gespraechsschritt-neu"'
+        )
+        self.assertIn('tabindex="-1"', schritt)
+        self.assertIn("data-fokusziel", schritt)
+
+    def test_fehleranzeige_ist_fokusziel_hinter_dem_letzten_schritt(self) -> None:
+        """Nach einem gescheiterten Schritt ist die Fehleranzeige das letzte Fokusziel."""
+
+        html: str = self._endgueltigen_fehlschlag_ausloesen().content.decode()
+
+        fehler: str = fokusziel_tag(html, "gespraechseingabe--fehler")
+        self.assertIn('tabindex="-1"', fehler)
+        self.assertIn("data-fokusziel", fehler)
+        self.assertEqual(
+            html.rindex("data-fokusziel"),
+            html.index(fehler) + fehler.index("data-fokusziel"),
+        )
 
     def test_endgueltiger_fehlschlag_zeigt_erneutes_senden(self) -> None:
         """Ein endgültiger Fehlschlag bietet das Wiederholen derselben Eingabe an."""

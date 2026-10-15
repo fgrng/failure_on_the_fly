@@ -57,3 +57,11 @@ def text_ohne_tags(antwort: HttpResponse | str) -> str:
 
     html: str = antwort if isinstance(antwort, str) else antwort.content.decode()
     return " ".join(re.sub(r"<[^>]+>", "", html).split())
+
+
+def fokusziel_tag(html: str, merkmal: str) -> str:
+    """Liefert das öffnende Tag des ersten Elements, das ``merkmal`` trägt."""
+
+    treffer: re.Match[str] | None = re.search(rf"<[^>]*{merkmal}[^>]*>", html)
+    assert treffer is not None, merkmal
+    return treffer.group(0)

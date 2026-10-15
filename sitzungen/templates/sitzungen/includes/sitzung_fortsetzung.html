@@ -11,9 +11,12 @@
     <section id="sitzung-anhang" class="sitzung-abschnitt sitzung-anhang" aria-labelledby="sitzung-anhang-titel">
         <header class="sitzung-abschnitt-kopf">
             <span>Erhebung · Fragebogen</span>
-            <h1 id="sitzung-anhang-titel">Fragen zu dieser Sitzung</h1>
+            <h1 id="sitzung-anhang-titel" tabindex="-1" data-fokusziel>Fragen zu dieser Sitzung</h1>
         </header>
         {{ anhang|safe }}
     </section>
-    <script>document.getElementById("sitzung-anhang").scrollIntoView({block: "start"});</script>
+    <script>
+        document.getElementById("sitzung-anhang").scrollIntoView({block: "start"});
+        document.getElementById("sitzung-anhang-titel").focus({preventScroll: true});
+    </script>
 {% endif %}

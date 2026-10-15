@@ -942,6 +942,14 @@ ist das Feld wieder beschreibbar, der Text steht noch darin, und alle Knöpfe
 sind wieder frei. Scheitert dagegen die Antwort des Sprachmodells, erscheint wie
 bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“.
 
+Nach jedem Tausch in der Sitzung springt der Tastaturfokus auf den neuen Inhalt,
+damit Screenreader ihn ansagen: nach einem Gesprächsschritt auf den neuen
+Schritt mit Frage und Antwort, nach einer gescheiterten Antwort auf die
+Fehleranzeige, nach „Gespräch beenden“ auf die Überschrift „Ihre Diagnose“ und
+beim Fragebogen unter der Sitzung auf dessen Überschrift „Fragen zu dieser
+Sitzung“. Gescrollt wird dabei wie bisher; der Fokus erzeugt keinen zusätzlichen
+Sprung.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der
