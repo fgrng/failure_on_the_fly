@@ -107,6 +107,11 @@ urlpatterns: list[URLPattern] = [
         name="einwilligung",
     ),
     path(
+        "teilnahme/<uuid:teilnahme_link>/fortsetzen/",
+        views.fortsetzen,
+        name="fortsetzen",
+    ),
+    path(
         "teilnahme/<uuid:teilnahme_link>/abbruch/",
         views.abbruchseite,
         name="abbruchseite",

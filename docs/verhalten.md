@@ -986,7 +986,20 @@ Ziehung noch Sitzung. Ihr Knopf »Zur Startseite der Erhebung« führt zurück z
 Einwilligungsformular ohne Vorauswahl; eine neue Entscheidung ersetzt die alte.
 Ist die Verarbeitung durch Sprachmodelle einmal erteilt, stehen alle drei
 Entscheidungen fest; ein erneuter Aufruf des Einwilligungsformulars führt dann
-in den Ablauf. Wer der Speicherung nicht zustimmt, macht eine flüchtige
+in den Ablauf. Solange die Teilnahme dieses Browsers nicht eingewilligt hat,
+bietet die Einwilligungsseite darunter in einem eigenen Formular einen zweiten
+Weg: »Sie haben schon ein Teilnahme-Token?« mit Feld und »Hier fortsetzen«.
+Groß- und Kleinschreibung, Leerzeichen und ein fehlender Bindestrich zählen
+nicht (`vc9h ynfr` gilt als `VC9H-YNFR`). Gehört das Token zu einer laufenden,
+nicht archivierten Stichprobe, wird es unter deren Teilnahme-Link an den Browser
+gebunden — auch wenn die Seite über einen anderen Link erreicht wurde —, und es
+geht dort weiter, wo die Teilnahme steht, nach abgelehnter Verarbeitung durch
+Sprachmodelle also auf der Abbruchseite. Die beim Link-Aufruf angelegte, noch
+einwilligungslose Teilnahme bleibt dabei unverbunden liegen. Ein unbekanntes
+Token, eines außerhalb des Fensters oder einer archivierten Stichprobe und eine
+leere Eingabe ergeben dieselbe Meldung „Zu diesem Token lässt sich keine
+Teilnahme fortsetzen.“ auf der Einwilligungsseite, ohne zu verraten, ob das
+Token existiert. Wer der Speicherung nicht zustimmt, macht eine flüchtige
 Teilnahme: Die Vignetten werden genauso gespielt, Verlauf, Debrief und Diagnose
 erscheinen wie gewohnt, und ein Neuladen im selben Browser setzt an derselben
 Stelle fort. Gesprächsschritte, Fehlversuche und Diagnose liegen dabei aber nur
@@ -1020,7 +1033,8 @@ Teilnahme mit dem Abschlusstext. Damit das Token jederzeit ablesbar ist, zeigt
 die Seitenleiste es auf allen Teilnahmeseiten — von der Einwilligung über
 Instruktion, Diagnosegespräch und Debrief bis zu Fragebogen- und Abschlussseite
 — an der Stelle, an der sonst Konto oder Anmeldelink stehen, in fester Laufweite
-und mit der Bitte, es zu notieren. Während einer Teilnahme erscheinen dort weder
+und mit der Bitte, es zu notieren, weil sich die Teilnahme damit in einem
+anderen Browser fortsetzen lässt. Während einer Teilnahme erscheinen dort weder
 Kontoblock noch Anmeldelink, auch nicht bei nebenbei angemeldetem Konto; in
 Forschenden-Ansichten erscheint umgekehrt kein Teilnahme-Token. Unter dem
 Abschlusstext steht auf der Abschlussseite zusätzlich ein systemseitiger
