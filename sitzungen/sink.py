@@ -1,7 +1,7 @@
 """Naht für die Ziele eines Sitzungslaufs."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Callable, Iterable, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol, TypedDict, cast
@@ -25,6 +25,14 @@ _PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
 _FLUECHTIGE_SITZUNGEN_SCHLUESSEL: str = "fluechtige_sitzungen"
 _VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "verbrauchte_zeit"
 _ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "zeit_laeuft_seit"
+
+
+class AntwortversuchVerfallen(Exception):
+    """Der Antwortversuch kam zu spät oder wurde überholt und wird kein Schritt.
+
+    Die Sitzung lief beim Schreiben nicht mehr, oder ein anderer Schritt hat
+    den Verlauf inzwischen verlängert (ADR-0066).
+    """
 
 
 class FehlversuchDaten(TypedDict):
@@ -91,6 +99,9 @@ class SitzungSink(Protocol):
     ) -> None:
         """Beginnt eine Sitzung über ihrem festgelegten Tripel."""
 
+    def antwortversuch_beginnen(self, jetzt: datetime) -> None:
+        """Hält die Uhr an und merkt sich den Verlauf, auf dem der Versuch aufsetzt."""
+
     @property
     def gespraechsschritte(
         self,
@@ -106,7 +117,10 @@ class SitzungSink(Protocol):
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> bool:
-        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung."""
+        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung.
+
+        Wirft `AntwortversuchVerfallen`, wenn der Schritt nicht mehr gilt.
+        """
 
     def gescheiterten_schritt_behandeln(
         self,
@@ -115,15 +129,18 @@ class SitzungSink(Protocol):
         eingabemodus: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        """Behält oder verwirft den endgültig fehlgeschlagenen Schritt."""
+        """Behält oder verwirft den endgültig fehlgeschlagenen Schritt.
+
+        Wirft `AntwortversuchVerfallen`, wenn der Schritt nicht mehr gilt.
+        """
 
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
-    ) -> None:
-        """Bewahrt die abschließende Diagnose auf."""
+    ) -> bool:
+        """Bewahrt die abschließende Diagnose auf und meldet, ob sie galt."""
 
-    def status_setzen(self, status: Sitzung.Status) -> None:
-        """Setzt den Lebenszyklusstatus der Sitzung."""
+    def status_setzen(self, status: Sitzung.Status) -> bool:
+        """Setzt den Lebenszyklusstatus der Sitzung und meldet, ob es gelang."""
 
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der angezeigten Gesprächsseite neu an."""
@@ -145,6 +162,7 @@ class GeruestSink(ABC):
 
         self.teilnahme: Teilnahme = teilnahme
         self.sitzung: Sitzung | None = None
+        self._begonnen_bei: int | None = None
 
     def sitzung_starten(
         self,
@@ -161,6 +179,12 @@ class GeruestSink(ABC):
             modell_konfiguration=modell_konfiguration,
         )
 
+    def antwortversuch_beginnen(self, jetzt: datetime) -> None:
+        """Hält die Uhr an und merkt sich die Schrittzahl, auf der der Versuch aufsetzt."""
+
+        self.zug_beenden(jetzt)
+        self._begonnen_bei = self._schrittzahl()
+
     def gespraechsschritt_anhaengen(
         self,
         *,
@@ -170,18 +194,22 @@ class GeruestSink(ABC):
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> bool:
-        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung."""
+        """Bewahrt einen geglückten Schritt und meldet die Budgeterschöpfung.
 
-        budgetstand: Budgetstand = self._budgetstand_laden()
-        self._geglueckten_schritt_ablegen(
-            eingabe=eingabe,
-            eingabemodus=eingabemodus,
-            denkspur=denkspur,
-            aeusserung=aeusserung,
-            fehlversuche=fehlversuche,
-        )
-        budgetstand.gespraechsschritt_anhaengen()
-        self._budgetstand_speichern(budgetstand)
+        Läuft die Sitzung nicht mehr oder hat ein anderer Schritt den Verlauf
+        verlängert, verfällt der Antwortversuch (ADR-0066).
+        """
+
+        with transaction.atomic():
+            self._antwortversuch_pruefen()
+            self._geglueckten_schritt_ablegen(
+                eingabe=eingabe,
+                eingabemodus=eingabemodus,
+                denkspur=denkspur,
+                aeusserung=aeusserung,
+                fehlversuche=fehlversuche,
+            )
+            budgetstand: Budgetstand = self._budgetstand_laden()
         return budgetstand.ist_erschoepft(
             self._sitzung.vignette.budget_typ, self._sitzung.vignette.budget_wert
         )
@@ -193,9 +221,14 @@ class GeruestSink(ABC):
         eingabemodus: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0061)."""
+        """Behält den Abbruchschritt und schreibt den gescheiterten Status atomar (ADR-0061).
+
+        Ein verfallener Antwortversuch hinterlässt weder Schritt noch Status
+        (ADR-0066).
+        """
 
         with transaction.atomic():
+            self._antwortversuch_pruefen()
             self._abbruchschritt_ablegen(
                 eingabe=eingabe, eingabemodus=eingabemodus, fehlversuche=fehlversuche
             )
@@ -203,18 +236,33 @@ class GeruestSink(ABC):
 
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
-    ) -> None:
-        """Bewahrt die Diagnose und schließt die Sitzung gemeinsam ab."""
+    ) -> bool:
+        """Schließt die Sitzung ab und bewahrt die Diagnose, nur solange sie läuft."""
 
         with transaction.atomic():
+            if not self.status_setzen(Sitzung.Status.ABGESCHLOSSEN):
+                return False
             self._diagnose_ablegen(text, eingabemodus=eingabemodus)
-            self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        return True
 
-    def status_setzen(self, status: Sitzung.Status) -> None:
-        """Persistiert einen Statusübergang sofort."""
+    def status_setzen(self, status: Sitzung.Status) -> bool:
+        """Vollzieht einen Statusübergang nur von `laufend` aus (ADR-0066).
 
-        self._sitzung.status = status
-        self._sitzung.save(update_fields=["status"])
+        Ein verlorener Übergang überschreibt nichts; der Sink kennt danach den
+        tatsächlichen Status.
+        """
+
+        gelungen: bool = (
+            Sitzung.objects.filter(
+                pk=self._sitzung.pk, status=Sitzung.Status.LAUFEND
+            ).update(status=status)
+            == 1
+        )
+        if gelungen:
+            self._sitzung.status = status
+        else:
+            self._sitzung.refresh_from_db(fields=["status"])
+        return gelungen
 
     @property
     @abstractmethod
@@ -284,20 +332,48 @@ class GeruestSink(ABC):
     def zug_beginnen(self, jetzt: datetime) -> None:
         """Setzt die offene Spanne der Teilnehmerin neu an."""
 
-        if not self._sitzung.vignette.uhr_laeuft:
-            return
-        budgetstand: Budgetstand = self._budgetstand_laden()
-        budgetstand.zug_beginnen(jetzt)
-        self._budgetstand_speichern(budgetstand)
+        self._uhr_stellen(lambda budgetstand: budgetstand.zug_beginnen(jetzt))
 
     def zug_beenden(self, jetzt: datetime) -> None:
         """Bucht die offene Spanne vor einem Modellaufruf."""
 
+        self._uhr_stellen(lambda budgetstand: budgetstand.zug_beenden(jetzt))
+
+    def _uhr_stellen(self, uebergang: Callable[[Budgetstand], None]) -> None:
+        # Stellt die Uhr auf dem frisch gelesenen Stand der Sitzungszeile und
+        # nur, solange die Sitzung läuft: Ein veraltetes Sitzungsobjekt einer
+        # anderen Anfrage setzt so keine gebuchte Zeit zurück (ADR-0066).
+
         if not self._sitzung.vignette.uhr_laeuft:
             return
-        budgetstand: Budgetstand = self._budgetstand_laden()
-        budgetstand.zug_beenden(jetzt)
-        self._budgetstand_speichern(budgetstand)
+        with transaction.atomic():
+            if not self._sitzungszeile_frisch_lesen():
+                return
+            budgetstand: Budgetstand = self._budgetstand_laden()
+            uebergang(budgetstand)
+            self._budgetstand_speichern(budgetstand)
+
+    def _sitzungszeile_frisch_lesen(self) -> bool:
+        # Liest Status und Uhr in der laufenden Transaktion neu und meldet, ob
+        # die Sitzung noch läuft. Auf SQLite serialisiert schon das BEGIN
+        # IMMEDIATE, die Sperre wirkt auf Backends mit `select_for_update`.
+
+        self._sitzung.refresh_from_db(
+            fields=["status", "verbrauchte_zeit", "offene_spanne_seit"],
+            from_queryset=Sitzung.objects.select_for_update(),
+        )
+        return self._sitzung.status == Sitzung.Status.LAUFEND
+
+    def _antwortversuch_pruefen(self) -> None:
+        # Lässt den Antwortversuch verfallen, wenn die Sitzung nicht mehr läuft
+        # oder ein anderer Schritt den Verlauf seit seinem Beginn verlängert hat.
+
+        begonnen_bei: int | None = self._begonnen_bei
+        self._begonnen_bei = None
+        if not self._sitzungszeile_frisch_lesen():
+            raise AntwortversuchVerfallen
+        if begonnen_bei is not None and self._schrittzahl() != begonnen_bei:
+            raise AntwortversuchVerfallen
 
     def _budgetstand_laden(self) -> Budgetstand:
         # Rekonstruiert den Stand aus den Feldern der zugehörigen Sitzung.
@@ -673,6 +749,11 @@ class ScratchSink:
             MutableMapping[str, Any], self.session[_PROBELAUF_SESSION_SCHLUESSEL]
         )
 
+    def antwortversuch_beginnen(self, jetzt: datetime) -> None:
+        """Hält die Uhr an; der Probelauf hat nur einen Tab und nichts zu verwerfen."""
+
+        self.zug_beenden(jetzt)
+
     def gespraechsschritt_anhaengen(
         self,
         *,
@@ -719,7 +800,7 @@ class ScratchSink:
 
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
-    ) -> None:
+    ) -> bool:
         """Hält die im Probelauf verworfene Diagnose in der Session.
 
         Der Modus reist bis hierher, wird aber nicht festgehalten: Der
@@ -727,13 +808,14 @@ class ScratchSink:
         """
 
         self._zustand["diagnose"] = text
-        self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
+        return self.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
 
-    def status_setzen(self, status: Sitzung.Status) -> None:
+    def status_setzen(self, status: Sitzung.Status) -> bool:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
         self._zustand["status"] = status
         _session_als_geaendert_markieren(self.session)
+        return True
 
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""

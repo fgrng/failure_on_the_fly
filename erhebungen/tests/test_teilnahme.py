@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from config.tests.aufbau import finale_vignette
 from config.tests.formular import letztes_fokusziel, submit_knoepfe
-from config.tests.sprachmodell import anfragen_aufzeichnen
+from config.tests.sprachmodell import anfragen_aufzeichnen, vor_jedem_aufruf
 from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
     Erhebung,
@@ -29,6 +29,7 @@ from erhebungen.models import (
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import ModellKonfiguration, Verwendung
+from sitzungen.sink import DBSink
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -1863,6 +1864,34 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(antwort, "Was ist Ihnen aufgefallen?")
         self.assertNotContains(antwort, "Ihre nächste Frage")
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
+    def test_eingabe_auf_inzwischen_beendeter_sitzung_folgt_dem_ablauf(self) -> None:
+        """Der verfallene Schritt führt zur aktuellen Stelle samt Hinweis (ADR-0066)."""
+
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten()
+
+        with vor_jedem_aufruf(
+            lambda _nachrichten: DBSink.fuer_sitzung(
+                Sitzung.objects.get()
+            ).diagnose_setzen("Bruchfehler")
+        ):
+            antwort: HttpResponse = self.client.post(
+                reverse("erhebungen:gespraech", args=[bindung.token]),
+                {"eingabe": "Wie rechnest du?"},
+                follow=True,
+            )
+
+        self.assertRedirects(
+            antwort,
+            reverse("erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]),
+        )
+        self.assertContains(
+            antwort, "Diese Sitzung wurde inzwischen an anderer Stelle beendet"
+        )
+        self.assertFalse(Gespraechsschritt.objects.exists())
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGESCHLOSSEN)
 
     def test_nach_fensterende_verfaellt_die_laufende_teilnahme(self) -> None:
         """Ein abgelaufenes Fenster sperrt die laufende Sitzung ohne Kulanz."""
