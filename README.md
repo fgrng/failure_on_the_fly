@@ -213,9 +213,11 @@ man vorher wissen muss:
   und aktiviert sie. Das ist dieselbe Folge, die jede Schlüsselrotation
   verlangt: anlegen und aktivieren, nie bearbeiten. Soll auch gesprochen werden,
   trägt `/system/transkription/` den Anbieterzugang für das Audio ein.
-- **Transkription ist ein Tor der Betreiber:in.** Sie bleibt gesperrt, solange
-  `TRANSKRIPTION_ZERO_RETENTION=True` nicht in der Umgebung steht — die Zusage,
-  dass der Auftragsverarbeiter kein Audio behält, gehört nicht ins Formular.
+- **Transkription braucht eine Zero-Retention-Erklärung.** Sie bleibt aus,
+  solange die aktive Transkriptions-Fassung keine Erklärung mit Beleg der Zusage
+  trägt, dass der Auftragsverarbeiter kein Audio behält. Nach einem Update, das
+  die Erklärung einführt, ist die Spracheingabe deshalb aus, bis die
+  Administration sie unter `/system/transkription/` abgibt.
 - **Vignettenbilder unter `/media/` sind ohne Anmeldung abrufbar**, wer ihre URL
   kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber ungeschützt.
 

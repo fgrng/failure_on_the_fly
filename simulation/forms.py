@@ -282,7 +282,7 @@ class ModellKonfigurationForm(ZeroRetentionFeldgruppeForm):
         return {} if parameter is None else parameter
 
 
-class TranskriptionsKonfigurationForm(ModelForm):
+class TranskriptionsKonfigurationForm(ZeroRetentionFeldgruppeForm):
     """Die Schreibgeste an der append-only Transkription: eine neue Fassung."""
 
     class Meta:
@@ -297,6 +297,7 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "anbieter_basis_url",
             "transkriptionsmodell",
             "sprache",
+            "zero_retention_beleg",
         ]
         labels: dict[str, str] = {
             "anbieter": "Anbieter",
@@ -321,7 +322,10 @@ class TranskriptionsKonfigurationForm(ModelForm):
     def __init__(
         self, *args: object, vorlage: TranskriptionsKonfiguration, **kwargs: object
     ) -> None:
-        """Merkt sich die aktive Fassung, deren Token eine leere Eingabe meint."""
+        """Merkt sich die aktive Fassung, deren Token eine leere Eingabe meint.
+
+        Das erklärende Konto geht als `konto` an die Feldgruppe der Erklärung.
+        """
         super().__init__(*args, **kwargs)
         self._vorlage: TranskriptionsKonfiguration = vorlage
 

@@ -2358,7 +2358,7 @@ class ErhebungsExportTests(TestCase):
         kern: Simulationskern = finaler_kern()
         vignette: Vignette = finale_vignette(ada, fach="Mathematik")
         with time_machine.travel(_SOMMERZEIT, tick=False):
-            fassung: TranskriptionsKonfiguration = (
+            fassung: TranskriptionsKonfiguration = erklaerte(
                 TranskriptionsKonfiguration.objects.create(
                     anbieter=Anbieter.INFOMANIAK,
                     anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
@@ -2366,6 +2366,12 @@ class ErhebungsExportTests(TestCase):
                     transkriptionsmodell="whisper",
                     sprache="de",
                 )
+            )
+        with time_machine.travel(
+            datetime(2026, 10, 15, 12, 0, tzinfo=ZoneInfo("Europe/Berlin")), tick=False
+        ):
+            fassung.zero_retention_widerrufen(
+                "Zusage zurückgezogen", konto_mit_rollen("linus", is_superuser=True)
             )
         # Eine Fassung, mit der in dieser Erhebung niemand transkribiert hat.
         TranskriptionsKonfiguration.objects.create(
@@ -2413,10 +2419,18 @@ class ErhebungsExportTests(TestCase):
                     "transkriptionsmodell": "whisper",
                     "sprache": "de",
                     "angelegt_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_erklaert": "False",
+                    "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
+                    "zero_retention_erklaert_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_widerrufen_am": "2026-10-15T10:00:00+00:00",
+                    "zero_retention_widerrufsgrund": "Zusage zurückgezogen",
                 }
             ],
         )
         self.assertNotIn(fassung.anbieter_token, archivinhalt)
+        # Der Export führt keine Konten, weder das erklärende noch das widerrufende.
+        self.assertNotIn("zero-retention-erklaerende", archivinhalt)
+        self.assertNotIn("linus", archivinhalt)
         self.assertNotIn(fassung.anbieter_basis_url, archivinhalt)
 
     def test_eine_sitzung_von_vor_dem_pin_traegt_keine_fassung(self) -> None:

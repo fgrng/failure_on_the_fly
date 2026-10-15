@@ -5,7 +5,6 @@ from functools import partial, wraps
 from typing import Callable, Iterable
 from uuid import UUID
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -71,6 +70,7 @@ from .teilnahme_session import (
     tokens_im_browser,
 )
 from fragebogen_items.models import FragebogenItem
+from simulation.models import TranskriptionsKonfiguration
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     sitzung_abbrechen,
@@ -1040,9 +1040,10 @@ def _ohne_zutritt(
 
 
 def _angebotene_einwilligungen() -> list[str]:
-    # Die Spracherkennung wird nur gefragt, wenn die Instanz transkribiert.
+    # Die Spracherkennung wird nur gefragt, wenn die Instanz transkribiert:
+    # dasselbe Tor wie am Endpunkt, für die aktive Fassung.
 
-    if settings.TRANSKRIPTION_ZERO_RETENTION:
+    if TranskriptionsKonfiguration.objects.aktive().transkription_offen:
         return [
             "sprachmodell_eingewilligt",
             "audioverarbeitung_eingewilligt",

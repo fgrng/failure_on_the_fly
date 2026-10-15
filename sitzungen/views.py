@@ -384,7 +384,8 @@ def transkriptions_endpunkt(
       Probelauf (ADR-0026).
     - `PermissionDenied`: Die Auflösung verweigert den Zugriff selbst.
 
-    Das Zero-Retention-Tor aus ADR-0026 liegt dahinter und gilt für alle.
+    Das Zero-Retention-Tor aus ADR-0026 liegt dahinter und gilt für alle:
+    die Erklärung an der geltenden Fassung, gelesen bei jeder Anfrage.
     """
 
     def endpunkt(request: HttpRequest, **url_parameter: object) -> HttpResponse:
@@ -397,7 +398,8 @@ def transkriptions_endpunkt(
             and not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt
         ):
             return JsonResponse({"status": "einwilligung_verweigert"}, status=403)
-        if not settings.TRANSKRIPTION_ZERO_RETENTION:
+        fassung: TranskriptionsKonfiguration = _transkriptions_fassung(sitzung)
+        if not fassung.transkription_offen:
             return JsonResponse({"status": "zero_retention_fehlt"}, status=503)
         aufnahme: UploadedFile = request.FILES["audio"]
         # Die Größe steht vor dem Einlesen fest: Eine zu große Aufnahme wird
@@ -406,9 +408,7 @@ def transkriptions_endpunkt(
             return JsonResponse({"status": "aufnahme_zu_gross"}, status=413)
         audio: bytes = aufnahme.read()
         try:
-            text: str = anbieter_bilden(
-                _transkriptions_fassung(sitzung)
-            ).transkribieren(audio)
+            text: str = anbieter_bilden(fassung).transkribieren(audio)
         except LeeresTranskript:
             return JsonResponse({"status": "leeres_transkript"}, status=422)
         except TranskriptionsAnbieterfehler:

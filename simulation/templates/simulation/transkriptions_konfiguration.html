@@ -18,6 +18,10 @@
         </div>
     </header>
 
+    {% if not transkription_offen %}
+        <p class="system-page-warnung" role="status"><strong>Die Spracheingabe ist aus.</strong> Transkribiert wird nur mit einer aktiven Fassung, die einen echten Anbieter und eine nicht widerrufene Zero-Retention-Erklärung trägt. Bis dahin bietet keine Erhebung die Einwilligung in die Spracherkennung an, und der Endpunkt nimmt keine Aufnahme an. Geben Sie die Erklärung an der aktiven Fassung ab oder legen Sie eine erklärte an und aktivieren Sie sie.</p>
+    {% endif %}
+
     <section class="page-section" aria-label="Betriebsfolge">
         <header class="page-section__head">
             <b>01</b><span><h2>Betriebsfolge</h2><small>Was ein Umschalten bewirkt — und was eine Rotation verlangt</small></span>
@@ -25,7 +29,8 @@
         <div class="system-page-field-list">
             <p>Eine Fassung wird angelegt und aktiviert, nie geändert. Jede Sitzung pinnt beim Start die aktive Fassung: Ein Umschalten wirkt <strong>ab der nächsten Sitzung</strong>, laufende Sitzungen transkribieren weiter mit ihrer Fassung. Der Probelauf nimmt bei jeder Aufnahme die aktive.</p>
             <p>Eine Schlüsselrotation braucht keine neue Fassung: Das neue Token ersetzt das hinterlegte der gewählten Fassung, Anbieter und Basis-URL bleiben.</p>
-            <p>Steht die aktive Fassung auf »fake«, gibt es keine Transkription. Ob diese Instanz überhaupt extern transkribiert, ist eine Instanz-Einstellung der Umgebung und steht bewusst nicht auf dieser Seite. Bei OpenRouter liegt es in der Verantwortung der Administrator:in, dass der gewählte Endpunkt die Aufnahmen weder speichert noch zum Training nutzt (ADR-0026).</p>
+            <p>Transkribiert wird nur mit einer Fassung, die eine <strong>Zero-Retention-Erklärung</strong> trägt: Sie belegt, dass für dieses Modell bei diesem Anbieter eine Zusage vorliegt, dass Aufnahmen weder gespeichert noch zum Training genutzt werden (ADR-0026). Sie wird beim Anlegen oder nachträglich abgegeben und ist danach unveränderlich. Steht die aktive Fassung auf »fake«, gibt es keine Transkription.</p>
+            <p>Fällt die Zusage weg, wird die Erklärung mit Grund <strong>widerrufen</strong>. Der Widerruf wirkt <strong>sofort</strong>, auch in laufenden Sitzungen, die diese Fassung gepinnt haben: Dort geht es per Tastatur weiter. Eine widerrufene Fassung lässt sich nicht mehr aktivieren.</p>
         </div>
     </section>
 
@@ -37,7 +42,7 @@
             <div class="table-wrap">
                 <table class="table">
                     <thead>
-                        <tr><th>Fassung</th><th>Anbieter</th><th>Angelegt</th><th>Stand</th></tr>
+                        <tr><th>Fassung</th><th>Anbieter</th><th>Angelegt</th><th>Zero Retention</th><th>Stand</th></tr>
                     </thead>
                     <tbody>
                         {% for fassung in fassungen %}
@@ -48,6 +53,7 @@
                                 </td>
                                 <td>{{ fassung.anbieter }}</td>
                                 <td>{{ fassung.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
+                                <td>{% if fassung.widerrufen %}widerrufen am {{ fassung.zero_retention_widerrufen_am|date:"d.m.Y" }}<small>{{ fassung.zero_retention_widerrufsgrund }}</small>{% else %}{{ fassung.erklaerungsstand }}{% endif %}</td>
                                 <td>{% if fassung.aktiv %}aktiv{% else %}—{% endif %}</td>
                             </tr>
                         {% endfor %}
@@ -66,7 +72,31 @@
                     <div><dt>Sprache</dt><dd>{{ gewaehlt.sprache }}</dd></div>
                     <div><dt>Basis-URL</dt><dd>{{ gewaehlt.anbieter_basis_url|default:"—" }}</dd></div>
                     <div><dt>Token</dt><dd>{{ gewaehlt.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
+                    <div><dt>Zero-Retention-Erklärung</dt><dd>
+                        {% if gewaehlt.ist_fake %}Nicht nötig: Mit »fake« ist die Transkription aus.
+                        {% elif gewaehlt.zero_retention_abgegeben %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
+                        {% else %}Fehlt.{% endif %}
+                    </dd></div>
+                    {% if gewaehlt.widerrufen %}
+                        <div><dt>Widerruf</dt><dd>{{ gewaehlt.zero_retention_widerrufsgrund|linebreaksbr }}<small class="system-page-empty">Widerrufen am {{ gewaehlt.zero_retention_widerrufen_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_widerrufen_von }}</small></dd></div>
+                    {% endif %}
                 </dl>
+                {% if gewaehlt.erklaerbar %}
+                    <form method="post" action="{% url 'simulation:transkriptions_konfiguration_erklaeren' gewaehlt.pk %}" class="system-page-field-list">
+                        {% csrf_token %}
+                        {{ erklaerungsformular.non_field_errors }}
+                        {% include "vignetten/includes/form_field.html" with field=erklaerungsformular.zero_retention_beleg %}
+                        <button class="button button--secondary" type="submit">Zero-Retention-Erklärung abgeben</button>
+                    </form>
+                {% endif %}
+                {% if gewaehlt.widerrufbar %}
+                    <form method="post" action="{% url 'simulation:transkriptions_konfiguration_widerrufen' gewaehlt.pk %}" class="system-page-field-list">
+                        {% csrf_token %}
+                        {{ widerrufsformular.non_field_errors }}
+                        {% include "vignetten/includes/form_field.html" with field=widerrufsformular.zero_retention_widerrufsgrund %}
+                        <button class="button button--secondary" type="submit">Zero-Retention-Erklärung widerrufen</button>
+                    </form>
+                {% endif %}
                 {% if not gewaehlt.ist_fake %}
                     <form method="post" action="{% url 'simulation:transkriptions_konfiguration_token' gewaehlt.pk %}" class="system-page-field-list">
                         {% csrf_token %}
@@ -80,6 +110,11 @@
                 <div class="modell-konfiguration-detail__schalter">
                     {% if gewaehlt.aktiv %}
                         <button class="button" type="button" disabled>Aktiv</button>
+                    {% elif gewaehlt.widerrufen %}
+                        <div>
+                            <button class="button button--secondary" type="button" disabled>Gesperrt: Erklärung widerrufen</button>
+                            <small class="system-page-hint">Eine Fassung mit widerrufener Zero-Retention-Erklärung lässt sich nicht mehr aktivieren.</small>
+                        </div>
                     {% else %}
                         <form method="post" action="{% url 'simulation:transkriptions_konfiguration_aktivieren' gewaehlt.pk %}">
                             {% csrf_token %}
@@ -122,6 +157,18 @@
             <div class="system-page-field-list">
                 {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.transkriptionsmodell naht="transkription" %}
                 {% include "vignetten/includes/form_field.html" with field=form.sprache %}
+            </div>
+        </section>
+
+        <section class="page-section" aria-label="Neue Fassung: Zero-Retention-Erklärung">
+            <header class="page-section__head">
+                <b>05</b><span><h2>Neue Fassung: Zero-Retention-Erklärung</h2><small>Ohne sie transkribiert die Fassung nicht; beim Anbieter »fake« entfällt sie</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {{ form.zero_retention_erklaert.errors }}
+                <label><input type="checkbox" name="{{ form.zero_retention_erklaert.html_name }}" id="{{ form.zero_retention_erklaert.id_for_label }}"{% if form.zero_retention_erklaert.value %} checked{% endif %}> {{ form.zero_retention_erklaert.label }}</label>
+                <small class="system-page-hint">{{ form.zero_retention_erklaert.help_text }}</small>
+                {% include "vignetten/includes/form_field.html" with field=form.zero_retention_beleg %}
             </div>
         </section>
 

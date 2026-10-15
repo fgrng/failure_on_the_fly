@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278", "#497", "#498", "#499"]
+amended-by: ["#278", "#497", "#498", "#499", "#500"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
@@ -45,6 +45,14 @@ amended-by: ["#278", "#497", "#498", "#499"]
 > bleiben aus denselben Gründen draußen wie an der Modell-Konfiguration. Der
 > Satz unten, die Transkriptions-Konfiguration erscheine gar nicht im Export,
 > gilt damit nicht mehr. Die Tabelle unten zeigt den Stand danach.
+>
+> **Nachgeführt durch #500:** `transkriptionskonfigurationen.csv` trägt
+> dieselben Spalten des Erklärungsstands wie `modellkonfigurationen.csv`:
+> `zero_retention_erklaert`, `zero_retention_beleg`,
+> `zero_retention_erklaert_am`, `zero_retention_widerrufen_am` und
+> `zero_retention_widerrufsgrund`, mit denselben Literalen. Erklärendes und
+> widerrufendes Konto bleiben draußen. Die Tabelle unten zeigt den Stand
+> danach.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
@@ -115,7 +123,7 @@ Pfade statt als Inhalt.
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
 | `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter`, `zero_retention_erklaert`, `zero_retention_beleg`, `zero_retention_erklaert_am`, `zero_retention_widerrufen_am`, `zero_retention_widerrufsgrund` |
-| `transkriptionskonfigurationen.csv` | `id`, `anbieter`, `transkriptionsmodell`, `sprache`, `angelegt_am` |
+| `transkriptionskonfigurationen.csv` | `id`, `anbieter`, `transkriptionsmodell`, `sprache`, `angelegt_am`, `zero_retention_erklaert`, `zero_retention_beleg`, `zero_retention_erklaert_am`, `zero_retention_widerrufen_am`, `zero_retention_widerrufsgrund` |
 | `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |
 | `likert_skala.csv` | `stufe`, `pol` |
 

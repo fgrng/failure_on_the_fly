@@ -316,7 +316,18 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
         # Ohne Token und Basis-URL, wie die Modell-Konfigurationen (ADR-0029).
         "transkriptionskonfigurationen.csv": _csv_aus_objekten(
             transkriptionsfassungen,
-            ("id", "anbieter", "transkriptionsmodell", "sprache", "angelegt_am"),
+            (
+                "id",
+                "anbieter",
+                "transkriptionsmodell",
+                "sprache",
+                "angelegt_am",
+                "zero_retention_erklaert",
+                "zero_retention_beleg",
+                "zero_retention_erklaert_am",
+                "zero_retention_widerrufen_am",
+                "zero_retention_widerrufsgrund",
+            ),
         ),
         "fragebogen_items.csv": _csv_aus_objekten(
             vorgelegte_items, ("id", "typ", "wortlaut")

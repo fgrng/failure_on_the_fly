@@ -1,5 +1,6 @@
 """HTTP-Tests für den pseudonymen Erhebungszugang."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from html.parser import HTMLParser
@@ -8,11 +9,11 @@ from uuid import UUID
 import time_machine
 from django.db import models
 from django.http import HttpResponse, HttpResponseBase
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.aufbau import finale_vignette
+from config.tests.aufbau import erklaerte_aktive_transkription, finale_vignette
 from config.tests.formular import letztes_fokusziel, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen, vor_jedem_aufruf
 from erhebungen.ablauf import block_vorlegen
@@ -28,7 +29,12 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import ModellKonfiguration, Verwendung
+from simulation.models import (
+    Anbieter,
+    ModellKonfiguration,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.sink import DBSink
 from sitzungen.models import (
     Diagnose,
@@ -153,8 +159,6 @@ _ZUSTIMMUNG: dict[str, str] = {
 }
 
 
-# Die lokale .env darf nicht bestimmen, welche Einwilligungen angeboten werden.
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=False)
 class ErhebungsteilnahmeTests(TestCase):
     """Teilnahmen entstehen ausschließlich über den Teilnahme-Link."""
 
@@ -461,12 +465,12 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertNotContains(formular, "checked")
         self.assertContains(formular, "Weiter")
 
-    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_spracherkennung_wird_nur_bei_aktiver_transkription_gefragt(
         self,
     ) -> None:
-        """Mit Zero-Retention-Zusage ist b eine weitere Pflichtwahl."""
+        """Mit erklärter aktiver Fassung ist b eine weitere Pflichtwahl."""
 
+        erklaerte_aktive_transkription()
         self._erhebung_fertigstellen()
         self.client.get(self.url)
 
@@ -489,6 +493,40 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(
             Erhebungsbindung.objects.get().teilnahme.audioverarbeitung_eingewilligt
         )
+
+    def test_bietet_die_spracherkennung_bei_geschlossenem_tor_nicht_an(
+        self,
+    ) -> None:
+        """Ohne erklärte, aktive Fassung mit echtem Anbieter keine Einwilligung b."""
+
+        self._erhebung_fertigstellen()
+        self.client.get(self.url)
+        linus: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+        faelle: dict[str, Callable[[], object]] = {
+            "fake": lambda: TranskriptionsKonfiguration.objects.aktivieren(
+                TranskriptionsKonfiguration.objects.create()
+            ),
+            "ohne Erklärung": lambda: TranskriptionsKonfiguration.objects.aktivieren(
+                TranskriptionsKonfiguration.objects.create(
+                    anbieter=Anbieter.OPENROUTER,
+                    anbieter_token="sk-or-geheim",
+                    transkriptionsmodell="whisper-large-v3",
+                )
+            ),
+            "widerrufen": lambda: (
+                erklaerte_aktive_transkription().zero_retention_widerrufen(
+                    "Zusage zurückgezogen", linus
+                )
+            ),
+        }
+
+        for name, herstellen in faelle.items():
+            with self.subTest(fassung=name):
+                herstellen()
+
+                formular: HttpResponse = self.client.get(self._einwilligung_url())
+
+                self.assertNotContains(formular, _SYSTEMTEXT_SPRACHERKENNUNG)
 
     def test_ohne_transkription_bleibt_die_spracherkennung_unentschieden(
         self,
@@ -528,12 +566,12 @@ class ErhebungsteilnahmeTests(TestCase):
                 self.assertIsNone(teilnahme.sprachmodell_eingewilligt)
                 self.assertIsNone(teilnahme.speicherung_eingewilligt)
 
-    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_audioeinwilligung_aktiviert_spracheingabe_in_gespraech_und_debrief(
         self,
     ) -> None:
         """Eine Audiozusage schaltet die Aufnahme in beiden Eingabephasen frei."""
 
+        erklaerte_aktive_transkription()
         self._vignette_anlegen()
         self._erhebung_fertigstellen()
         bindung: Erhebungsbindung = self._laufende_sitzung_starten(
@@ -579,12 +617,12 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         self.assertNotContains(debrief, erklaersatz)
 
-    @override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
     def test_nach_zustimmung_zu_sprachmodellen_ist_die_entscheidung_endgueltig(
         self,
     ) -> None:
         """Mit a = ja bleiben alle drei Entscheidungen Teil der Datenspur."""
 
+        erklaerte_aktive_transkription()
         self._erhebung_fertigstellen()
         self.client.get(self.url)
         self.client.post(

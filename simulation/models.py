@@ -1264,6 +1264,10 @@ def evals_verfuegbar() -> bool:
 _TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
     "Transkriptions-Konfigurationen sind append-only; nur das Token ist rotierbar."
 )
+WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung dieser Fassung ist widerrufen; sie lässt sich "
+    "nicht mehr aktivieren."
+)
 
 
 class TranskriptionsKonfigurationQuerySet(
@@ -1301,19 +1305,25 @@ class TranskriptionsKonfigurationManager(
     def aktivieren(
         self, konfiguration: "TranskriptionsKonfiguration"
     ) -> "TranskriptionsKonfiguration":
-        """Richtet den Zeiger auf die Fassung; ab der nächsten Sitzung gilt sie."""
+        """Richtet den Zeiger auf die Fassung; ab der nächsten Sitzung gilt sie.
 
+        Eine widerrufene Fassung nicht mehr: Ihre Zusage ist weggefallen.
+        """
+
+        if konfiguration.zero_retention_ist_widerrufen:
+            raise ValidationError(WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG)
         AktiveTranskriptionsKonfiguration.objects.update_or_create(
             pk=1, defaults={"konfiguration": konfiguration}
         )
         return konfiguration
 
 
-class TranskriptionsKonfiguration(AnbieterFeldgruppe):
+class TranskriptionsKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
     """Eine unveränderliche Fassung des Anbieterzugangs der Transkription.
 
     Jede Sitzung pinnt beim Start die aktive Fassung (ADR-0056 in der
-    Nachführung durch #496). Nur das Token ist rotierbar.
+    Nachführung durch #496). Nur das Token ist rotierbar, die Erklärung
+    nur abzugeben und zu widerrufen.
     """
 
     transkriptionsmodell: models.CharField = models.CharField(
@@ -1343,7 +1353,10 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
 
         if self.anbieter not in Anbieter.values:
             return  # Den unbekannten Anbieter meldet bereits die Feldprüfung.
-        fehler: dict[str, str] = self._zugangsfehler()
+        fehler: dict[str, str] = {
+            **self._zugangsfehler(),
+            **self._erklaerungsfehler(),
+        }
         # Der Platzhalter-Adapter braucht kein Modell; jeder echte Anbieter schon.
         if self.anbieter != Anbieter.FAKE and not self.transkriptionsmodell:
             fehler["transkriptionsmodell"] = (
@@ -1351,6 +1364,18 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
             )
         if fehler:
             raise ValidationError(fehler)
+
+    @property
+    def transkription_offen(self) -> bool:
+        """Ob mit dieser Fassung transkribiert werden darf: das eine Tor.
+
+        `fake` heißt »aus«; ein echter Anbieter nur mit Erklärung, die nicht
+        widerrufen ist. Gelesen wird der Stand dieser Instanz, also bei jeder
+        Anfrage frisch geladen: Ein Widerruf schließt sofort, auch mitten in
+        einer Sitzung.
+        """
+
+        return self.anbieter != Anbieter.FAKE and self.zero_retention_erklaert
 
     def token_rotieren(self, token: str) -> None:
         """Ersetzt das Token, ohne eine neue Fassung anzulegen.

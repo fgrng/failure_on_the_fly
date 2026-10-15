@@ -159,26 +159,24 @@ DATABASE_PFAD=/home/isabell/failure_on_the_fly/db.sqlite3
 STATIC_ROOT=/home/isabell/html/static
 MEDIA_ROOT=/home/isabell/html/media
 TIME_ZONE=Europe/Berlin
-TRANSKRIPTION_ZERO_RETENTION=False
 EOF
 chmod 600 ~/failure_on_the_fly/.env
 ```
 
 Was die Werte bedeuten:
 
-| Variable                       | Bedeutung                                                                                                                                                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SECRET_KEY`                   | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git.                                                                                                           |
-| `DEBUG`                        | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen.                                                                |
-| `ALLOWED_HOSTS`                | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400.                                                                                        |
-| `CSRF_TRUSTED_ORIGINS`         | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“.                                                                                  |
-| `DATABASE_PFAD`                | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst.                                                                          |
-| `STATIC_ROOT`                  | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot.                                                                                                                                            |
-| `MEDIA_ROOT`                   | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                    |
-| `TIME_ZONE`                    | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
-| `TRANSKRIPTION_ZERO_RETENTION` | Schaltet die Audio-Transkription frei. Erst auf `True` setzen, wenn die Zero-Retention des Anbieters vertraglich zugesichert ist.                                                                         |
-| `EVALLAEUFE_SPERRE`            | Optional. Sperrdatei, mit der höchstens ein Evallauf-Dienst arbeitet; voreingestellt `evallaeufe.lock` im Projektverzeichnis. Nur ändern, wenn das Projektverzeichnis nicht beschreibbar ist.             |
-| `SECURE_SSL_REDIRECT`          | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                             |
+| Variable               | Bedeutung                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SECRET_KEY`           | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git.                                                                                                           |
+| `DEBUG`                | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen.                                                                |
+| `ALLOWED_HOSTS`        | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400.                                                                                        |
+| `CSRF_TRUSTED_ORIGINS` | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“.                                                                                  |
+| `DATABASE_PFAD`        | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst.                                                                          |
+| `STATIC_ROOT`          | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot.                                                                                                                                            |
+| `MEDIA_ROOT`           | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                    |
+| `TIME_ZONE`            | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
+| `EVALLAEUFE_SPERRE`    | Optional. Sperrdatei, mit der höchstens ein Evallauf-Dienst arbeitet; voreingestellt `evallaeufe.lock` im Projektverzeichnis. Nur ändern, wenn das Projektverzeichnis nicht beschreibbar ist.             |
+| `SECURE_SSL_REDIRECT`  | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                             |
 
 Bei einer eigenen Domain (Schritt 8) gehören deren Namen zusätzlich in
 `ALLOWED_HOSTS` und `CSRF_TRUSTED_ORIGINS`.
@@ -420,9 +418,10 @@ Administration, der Simulationskern und die Modell-Konfiguration.
 
 4. **Transkription konfigurieren**, falls gesprochen werden soll. Unter
    `/system/transkription/` den Audio-Anbieter eintragen — er darf ein anderer
-   sein als der des Sprachmodells. Zusätzlich in der `.env`
-   `TRANSKRIPTION_ZERO_RETENTION=True` setzen und den Dienst neu starten; ohne
-   diesen Schalter bleibt das Mikrofon bewusst gesperrt.
+   sein als der des Sprachmodells. Erst wenn die Zero-Retention des Anbieters
+   vertraglich zugesichert ist, an der Fassung die Zero-Retention-Erklärung mit
+   Beleg abgeben und die Fassung aktivieren; ohne Erklärung bleibt das Mikrofon
+   bewusst gesperrt.
 
 5. **Konten und Rollen vergeben.** Unter `/admin/` weitere Konten anlegen,
    Passwörter setzen und die Groups `Autor:in`, `Ausbilder:in` und
@@ -575,6 +574,14 @@ Migrationen sind unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg
 führt über das Backup: Dienst stoppen, Sicherung an den `DATABASE_PFAD`
 kopieren, alten Stand auschecken, Dienst starten.
 
+**Nach dem Update auf die Zero-Retention-Erklärung an der Transkription:** Der
+frühere Umgebungsschalter der Transkription entfällt und kann aus der `.env`
+gestrichen werden. Die übernommene Transkriptions-Fassung trägt keine Erklärung,
+also ist die Spracheingabe nach dem Update aus. Unter `/system/transkription/`
+an der aktiven Fassung die Zero-Retention-Erklärung mit Beleg der Zusage
+abgeben, sonst bleibt sie aus. Die alte Zusage der Umgebung wird bewusst nicht
+ungeprüft übertragen.
+
 Unabhängig von neuen Funktionen sollten die Abhängigkeiten regelmäßig auf
 bekannte Schwachstellen geprüft werden — auf dem Entwicklungsrechner, nicht auf
 dem Server:
@@ -655,10 +662,10 @@ Häufige Stolpersteine:
 - **Vignettenbilder unter `/media/` sind ohne Anmeldung abrufbar**, wer ihre URL
   kennt. Die Dateinamen sind nicht erratbar, die Auslieferung aber ungeschützt.
   Bildmaterial, das das nicht verträgt, gehört nicht in eine Vignette.
-- **Die Transkription gibt Audio an einen externen Auftragsverarbeiter.**
-  `TRANSKRIPTION_ZERO_RETENTION=True` ist die Zusage der Betreiber:in, nicht
-  eine technische Prüfung (ADR-0026). Ohne Vertrag bleibt der Schalter auf
-  `False`; das Training ist über die Tastatur uneingeschränkt spielbar.
+- **Die Transkription gibt Audio an einen externen Auftragsverarbeiter.** Die
+  Zero-Retention-Erklärung an der Transkriptions-Fassung ist eine Zusage der
+  Administration mit Beleg, keine technische Prüfung (ADR-0026). Ohne Vertrag
+  bleibt sie aus; das Training ist über die Tastatur uneingeschränkt spielbar.
 - **Der Datenspur-Export ist immer UTC**, unabhängig von `TIME_ZONE`. Eingabe
   und Anzeige in der Oberfläche — etwa der Erhebungszeitraum einer Stichprobe —
   laufen dagegen in `TIME_ZONE` (voreingestellt `Europe/Berlin`).

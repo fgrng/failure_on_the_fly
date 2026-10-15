@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from konten.models import Konto
 from konten.navigation import administratorin_erforderlich, autorin_erforderlich
 
 
@@ -999,6 +1000,30 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
     return _liste_rendern(request, request.GET.get("konfiguration", ""))
 
 
+def _geste_abschliessen(
+    request: HttpRequest,
+    form: ZeroRetentionErklaerungForm | ZeroRetentionWiderrufForm,
+    *,
+    gelungen: bool,
+    formular_steht: bool,
+    neu_rendern: Callable[[], HttpResponse],
+    zurueck: HttpResponse,
+    erfolg: str,
+) -> HttpResponse:
+    # Schließt Erklären oder Widerrufen an beiden Konfigurationen gleich ab:
+    # Ein abgewiesenes Formular bleibt stehen, solange die Seite es noch
+    # zeigt; sonst steht der Grund als Meldung über der Seite.
+
+    if gelungen:
+        messages.success(request, erfolg)
+        return zurueck
+    if formular_steht:
+        return neu_rendern()
+    for meldungen in form.errors.values():
+        messages.error(request, " ".join(meldungen))
+    return zurueck
+
+
 @login_required
 @administratorin_erforderlich
 @require_POST
@@ -1006,19 +1031,17 @@ def modell_konfiguration_erklaeren(request: HttpRequest, pk: int) -> HttpRespons
     """Gibt an einer bestehenden Konfiguration die Zero-Retention-Erklärung ab."""
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
     form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
-    if not form.erklaeren(konfiguration, request.user):
-        if konfiguration.zero_retention_erklaerbar:
-            return _liste_rendern(request, str(konfiguration.pk), form)
-        # Hier steht kein Formular, an dem der Grund stehen könnte.
-        for meldungen in form.errors.values():
-            messages.error(request, " ".join(meldungen))
-        return _zur_konfiguration(konfiguration)
-    messages.success(
+    gelungen: bool = form.erklaeren(konfiguration, request.user)
+    return _geste_abschliessen(
         request,
-        f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
+        form,
+        gelungen=gelungen,
+        formular_steht=konfiguration.zero_retention_erklaerbar,
+        neu_rendern=lambda: _liste_rendern(request, str(konfiguration.pk), form),
+        zurueck=_zur_konfiguration(konfiguration),
+        erfolg=f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
         "abgegeben.",
     )
-    return _zur_konfiguration(konfiguration)
 
 
 @login_required
@@ -1028,21 +1051,19 @@ def modell_konfiguration_widerrufen(request: HttpRequest, pk: int) -> HttpRespon
     """Widerruft die Zero-Retention-Erklärung einer Konfiguration, mit Grund."""
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
     form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
-    if not form.widerrufen(konfiguration, request.user):
-        if konfiguration.zero_retention_widerrufbar:
-            return _liste_rendern(
-                request, str(konfiguration.pk), widerrufsformular=form
-            )
-        # Hier steht kein Formular, an dem der Grund stehen könnte.
-        for meldungen in form.errors.values():
-            messages.error(request, " ".join(meldungen))
-        return _zur_konfiguration(konfiguration)
-    messages.success(
+    gelungen: bool = form.widerrufen(konfiguration, request.user)
+    return _geste_abschliessen(
         request,
-        f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
+        form,
+        gelungen=gelungen,
+        formular_steht=konfiguration.zero_retention_widerrufbar,
+        neu_rendern=lambda: _liste_rendern(
+            request, str(konfiguration.pk), widerrufsformular=form
+        ),
+        zurueck=_zur_konfiguration(konfiguration),
+        erfolg=f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
         "widerrufen.",
     )
-    return _zur_konfiguration(konfiguration)
 
 
 def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
@@ -1199,6 +1220,24 @@ class _Transkriptionszeile:
     transkriptionsmodell: str
     sprache: str
     aktiv: bool
+    erklaerbar: bool
+    widerrufbar: bool
+    widerrufen: bool
+    zero_retention_abgegeben: bool
+    zero_retention_erklaert: bool
+    zero_retention_beleg: str
+    zero_retention_erklaert_am: datetime | None
+    zero_retention_erklaert_von: str
+    zero_retention_widerrufen_am: datetime | None
+    zero_retention_widerrufen_von: str
+    zero_retention_widerrufsgrund: str
+
+    @property
+    def erklaerungsstand(self) -> str:
+        """Der Erklärungsstand in einem Wort, wie ihn die Tabelle zeigt."""
+        if self.ist_fake:
+            return "nicht nötig"
+        return "erklärt" if self.zero_retention_erklaert else "fehlt"
 
 
 def _transkriptionszeilen(
@@ -1217,18 +1256,36 @@ def _transkriptionszeilen(
             transkriptionsmodell=konfiguration.transkriptionsmodell,
             sprache=konfiguration.sprache,
             aktiv=konfiguration.pk == aktive.pk,
+            erklaerbar=konfiguration.zero_retention_erklaerbar,
+            widerrufbar=konfiguration.zero_retention_widerrufbar,
+            widerrufen=konfiguration.zero_retention_ist_widerrufen,
+            zero_retention_abgegeben=konfiguration.zero_retention_abgegeben,
+            zero_retention_erklaert=konfiguration.zero_retention_erklaert,
+            zero_retention_beleg=konfiguration.zero_retention_beleg,
+            zero_retention_erklaert_am=konfiguration.zero_retention_erklaert_am,
+            zero_retention_erklaert_von=str(
+                konfiguration.zero_retention_erklaert_von or ""
+            ),
+            zero_retention_widerrufen_am=konfiguration.zero_retention_widerrufen_am,
+            zero_retention_widerrufen_von=str(
+                konfiguration.zero_retention_widerrufen_von or ""
+            ),
+            zero_retention_widerrufsgrund=konfiguration.zero_retention_widerrufsgrund,
         )
-        for konfiguration in TranskriptionsKonfiguration.objects.order_by("-pk")
+        for konfiguration in TranskriptionsKonfiguration.objects.select_related(
+            "zero_retention_erklaert_von", "zero_retention_widerrufen_von"
+        ).order_by("-pk")
     ]
 
 
 def _neue_fassung_form(
-    aktive: TranskriptionsKonfiguration,
+    aktive: TranskriptionsKonfiguration, konto: Konto
 ) -> TranskriptionsKonfigurationForm:
-    # Füllt alles aus der aktiven Fassung vor außer dem Token.
+    # Füllt alles aus der aktiven Fassung vor außer Token und Erklärung.
 
     return TranskriptionsKonfigurationForm(
         vorlage=aktive,
+        konto=konto,
         initial={
             "anbieter": aktive.anbieter,
             "anbieter_basis_url": aktive.anbieter_basis_url,
@@ -1258,6 +1315,8 @@ def _transkription_rendern(
     genannt: str,
     form: TranskriptionsKonfigurationForm | None = None,
     rotationsformular: TokenRotationForm | None = None,
+    erklaerungsformular: ZeroRetentionErklaerungForm | None = None,
+    widerrufsformular: ZeroRetentionWiderrufForm | None = None,
 ) -> HttpResponse:
     # Liste, Detail und Anlegen; ein abgewiesenes Formular bleibt stehen.
 
@@ -1273,9 +1332,12 @@ def _transkription_rendern(
         {
             "fassungen": zeilen,
             "gewaehlt": gewaehlt,
-            "form": form or _neue_fassung_form(aktive),
+            "form": form or _neue_fassung_form(aktive, request.user),
             "rotationsformular": rotationsformular
             or TokenRotationForm(prefix=_ROTATION),
+            "erklaerungsformular": erklaerungsformular or ZeroRetentionErklaerungForm(),
+            "widerrufsformular": widerrufsformular or ZeroRetentionWiderrufForm(),
+            "transkription_offen": aktive.transkription_offen,
         },
     )
 
@@ -1289,7 +1351,9 @@ def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
     """
     if request.method == "POST":
         form: TranskriptionsKonfigurationForm = TranskriptionsKonfigurationForm(
-            request.POST, vorlage=TranskriptionsKonfiguration.objects.aktive()
+            request.POST,
+            vorlage=TranskriptionsKonfiguration.objects.aktive(),
+            konto=request.user,
         )
         if form.is_valid():
             konfiguration: TranskriptionsKonfiguration = form.save()
@@ -1313,7 +1377,11 @@ def transkriptions_konfiguration_aktivieren(
     konfiguration: TranskriptionsKonfiguration = get_object_or_404(
         TranskriptionsKonfiguration, pk=pk
     )
-    TranskriptionsKonfiguration.objects.aktivieren(konfiguration)
+    try:
+        TranskriptionsKonfiguration.objects.aktivieren(konfiguration)
+    except ValidationError as fehler:
+        messages.error(request, " ".join(fehler.messages))
+        return _zur_fassung(konfiguration)
     messages.success(
         request,
         f"Die Fassung Nr. {konfiguration.pk} ist aktiv. Laufende Sitzungen "
@@ -1339,3 +1407,59 @@ def transkriptions_konfiguration_token(request: HttpRequest, pk: int) -> HttpRes
         request, f"Das Token der Fassung Nr. {konfiguration.pk} ist ersetzt."
     )
     return _zur_fassung(konfiguration)
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_erklaeren(
+    request: HttpRequest, pk: int
+) -> HttpResponse:
+    """Gibt an einer bestehenden Fassung die Zero-Retention-Erklärung ab."""
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
+    )
+    form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
+    gelungen: bool = form.erklaeren(konfiguration, request.user)
+    return _geste_abschliessen(
+        request,
+        form,
+        gelungen=gelungen,
+        formular_steht=konfiguration.zero_retention_erklaerbar,
+        neu_rendern=lambda: _transkription_rendern(
+            request, str(konfiguration.pk), erklaerungsformular=form
+        ),
+        zurueck=_zur_fassung(konfiguration),
+        erfolg=f"Für die Fassung Nr. {konfiguration.pk} ist die "
+        "Zero-Retention-Erklärung abgegeben.",
+    )
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_widerrufen(
+    request: HttpRequest, pk: int
+) -> HttpResponse:
+    """Widerruft die Zero-Retention-Erklärung einer Fassung, mit Grund.
+
+    Ist sie die aktive oder in laufenden Sitzungen gepinnt, ist die
+    Transkription dort ab der nächsten Aufnahme aus.
+    """
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
+    )
+    form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
+    gelungen: bool = form.widerrufen(konfiguration, request.user)
+    return _geste_abschliessen(
+        request,
+        form,
+        gelungen=gelungen,
+        formular_steht=konfiguration.zero_retention_widerrufbar,
+        neu_rendern=lambda: _transkription_rendern(
+            request, str(konfiguration.pk), widerrufsformular=form
+        ),
+        zurueck=_zur_fassung(konfiguration),
+        erfolg=f"Für die Fassung Nr. {konfiguration.pk} ist die "
+        "Zero-Retention-Erklärung widerrufen.",
+    )

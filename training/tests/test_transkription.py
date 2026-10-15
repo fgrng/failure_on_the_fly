@@ -5,11 +5,13 @@ from collections.abc import Callable
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte,
+    erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
 )
@@ -25,17 +27,22 @@ from vignetten.models import Vignette
 
 
 def _openrouter_fassung() -> TranskriptionsKonfiguration:
-    # Eine zweite Fassung mit echtem Anbieter, noch nicht aktiv.
-    return TranskriptionsKonfiguration.objects.create(
-        anbieter=Anbieter.OPENROUTER,
-        anbieter_token="sk-or-geheim",
-        transkriptionsmodell="whisper-large-v3",
+    # Eine zweite erklärte Fassung mit echtem Anbieter, noch nicht aktiv.
+    return erklaerte(
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_token="sk-or-geheim",
+            transkriptionsmodell="whisper-large-v3",
+        )
     )
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class TranskriptionsEndpointTests(TestCase):
     """Eine eingewilligte Trainingssitzung kann Audio transkribieren lassen."""
+
+    def setUp(self) -> None:
+        """Öffnet das Tor: Eine erklärte Fassung ist aktiv."""
+        self.fassung: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
 
     def _sitzung_starten(self) -> Sitzung:
         # Startet die zur Transkription berechtigte Trainingssitzung über HTTP.
@@ -121,6 +128,36 @@ class TranskriptionsEndpointTests(TestCase):
         )
 
         self.assertEqual(self._fassung_der_anfrage(sitzung), neue)
+
+    def test_ein_widerruf_schliesst_das_tor_mitten_in_der_sitzung(self) -> None:
+        """Maßgeblich ist der Erklärungsstand bei der Anfrage, nicht beim Start."""
+        sitzung: Sitzung = self._sitzung_starten()
+        self.fassung.zero_retention_widerrufen(
+            "Zusage zurückgezogen", konto_mit_rollen("linus", is_superuser=True)
+        )
+        anbieter = FakeTranskription(["Text"])
+
+        response: HttpResponse = self._anfragen(sitzung, anbieter)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertJSONEqual(response.content, {"status": "zero_retention_fehlt"})
+        self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_ein_wechsel_auf_eine_erklaerte_fassung_oeffnet_die_sitzung_nicht(
+        self,
+    ) -> None:
+        """Die gepinnte Fassung entscheidet, nicht die inzwischen aktive."""
+        TranskriptionsKonfiguration.objects.aktivieren(
+            TranskriptionsKonfiguration.objects.create()
+        )
+        sitzung: Sitzung = self._sitzung_starten()
+        TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
+        anbieter = FakeTranskription(["Text"])
+
+        response: HttpResponse = self._anfragen(sitzung, anbieter)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(anbieter.skript, ["Text"])
 
     def test_liefert_das_transkript_einer_aufnahme(self) -> None:
         """Audio wird nur in der Anfrage zum Text für das Frontend überführt."""

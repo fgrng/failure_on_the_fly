@@ -1,11 +1,12 @@
 """HTTP-Tests für Austritt und Entfernen aus dem Training (ADR-0049)."""
 
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
 )
@@ -330,11 +331,12 @@ class AustrittTests(TestCase):
         self.assertEqual([zeile["ausgetreten"] for zeile in self._historie()], [True])
 
 
-@override_settings(TRANSKRIPTION_ZERO_RETENTION=True)
 class LaufendeSitzungNachAustrittTests(TestCase):
     """Eine beim Austritt laufende Sitzung bleibt liegen."""
 
     def setUp(self) -> None:
+        # Mit offenem Tor zeigt die 404, dass der Austritt verschließt.
+        erklaerte_aktive_transkription()
         aktive_modell_konfiguration(
             Verwendung.SCHUELERIN,
             skript=[{"denkspur": "Bruchfehler", "aeusserung": "Ich addiere alles."}],

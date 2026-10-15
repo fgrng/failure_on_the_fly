@@ -207,6 +207,7 @@ class TranskriptionsKonfigurationTokenTests(TestCase):
                 }
             ),
             vorlage=self.vorlage,
+            konto=konto_mit_rollen("linus", is_superuser=True),
         )
 
     def test_gleicher_endpunkt_uebernimmt_das_token(self) -> None:

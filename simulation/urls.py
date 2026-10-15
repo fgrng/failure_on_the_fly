@@ -182,4 +182,14 @@ urlpatterns: list[URLPattern] = [
         views.transkriptions_konfiguration_token,
         name="transkriptions_konfiguration_token",
     ),
+    path(
+        "transkription/<int:pk>/erklaeren/",
+        views.transkriptions_konfiguration_erklaeren,
+        name="transkriptions_konfiguration_erklaeren",
+    ),
+    path(
+        "transkription/<int:pk>/widerrufen/",
+        views.transkriptions_konfiguration_widerrufen,
+        name="transkriptions_konfiguration_widerrufen",
+    ),
 ]
