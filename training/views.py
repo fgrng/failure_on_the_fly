@@ -891,6 +891,8 @@ def training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
 def laufende_training_sitzung(request: HttpRequest, pk: int) -> Sitzung:
     """Lässt nur eine eigene laufende Trainingssitzung transkribieren."""
 
+    if not request.user.is_authenticated:
+        raise PermissionDenied
     sitzung: Sitzung = training_sitzung(request, pk)
     if sitzung.status != Sitzung.Status.LAUFEND:
         raise PermissionDenied

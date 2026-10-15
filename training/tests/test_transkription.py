@@ -93,3 +93,15 @@ class TranskriptionsEndpointTests(TestCase):
             self._anfragen(sitzung, anbieter)
 
         self.assertEqual(anbieter.skript, ["Text"])
+
+    def test_weist_anonyme_anfrage_ab(self) -> None:
+        """Ohne Anmeldung antwortet der Endpunkt mit 403, nicht mit einem Fehler."""
+        sitzung: Sitzung = self._sitzung_starten()
+        self.client.logout()
+
+        response: HttpResponse = self.client.post(
+            reverse("training:transkription", args=[sitzung.pk]),
+            {"audio": audioaufnahme()},
+        )
+
+        self.assertEqual(response.status_code, 403)

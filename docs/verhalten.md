@@ -20,6 +20,14 @@ Passwörter, vergibt die drei fachlichen Rollen als Groups und kann weitere
 Superuser ernennen. Konten lassen sich dort bewusst nicht löschen, solange #156
 den Umgang mit Löschbegehren noch nicht festlegt.
 
+Jede kontogebundene Seite leitet anonyme Anfragen, etwa nach abgelaufener
+Session, auf den Login mit `next` um; erst ein angemeldetes Konto ohne passende
+Rolle bekommt 403. Das gilt auch für alle Seiten der Administration unter
+`/system/`. Endpunkte, die das Frontend per JavaScript aufruft, wie die
+Transkription einer Trainingssitzung, antworten anonym mit 403 statt mit einem
+Redirect. Die Teilnahme-Routen der Erhebungen hängen an einem Token, nicht an
+einem Konto, und leiten nicht um.
+
 Die Sidebar gliedert die Links in die Gruppen Entwicklung (gelb), Ausbildung
 (grün), Forschung (violett) und System (blau). Die aktive Seite trägt die Fläche
 und einen Balken links im Ton ihrer Gruppe, beim Überfahren erscheint die halbe
