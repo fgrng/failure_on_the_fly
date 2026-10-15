@@ -65,6 +65,9 @@ class _Modellantwortfehler(Exception):
     """Ein verworfener Modellaufruf mit seiner Rohantwort."""
 
     def __init__(self, rohantwort: str = "") -> None:
+        # Die Rohantwort ist Inhalt und bleibt aus dem Ausnahmetext, den ein
+        # Traceback ins Betriebslog schriebe (ADR-0065).
+        super().__init__()
         self.rohantwort: str = rohantwort
 
 
@@ -182,6 +185,9 @@ class LiteLLMSprachmodell:
             # Django-Start, also in jedem Test- und manage.py-Prozess.
             import litellm
 
+            # Die Hilfe-Banner, die LiteLLM bei Anbieterfehlern nach stdout
+            # druckt, verdecken die Fehlermeldungen im Betriebslog (ADR-0065).
+            litellm.suppress_debug_info = True
             completion = litellm.completion
         self.completion: Callable[..., Any] = completion
 
