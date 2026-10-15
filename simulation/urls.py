@@ -158,6 +158,11 @@ urlpatterns: list[URLPattern] = [
         name="modell_konfiguration_aktivieren",
     ),
     path(
+        "modell-konfiguration/<int:pk>/erklaeren/",
+        views.modell_konfiguration_erklaeren,
+        name="modell_konfiguration_erklaeren",
+    ),
+    path(
         "transkription/",
         views.transkriptions_konfiguration,
         name="transkriptions_konfiguration",

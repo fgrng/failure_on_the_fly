@@ -63,6 +63,14 @@
     font-size: .75rem;
 }
 
+/* Ein Mangel, der den Betrieb nicht stoppt, aber nicht unbemerkt bleiben darf. */
+.system-page-warnung {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-left: 3px solid var(--color-danger);
+    background: var(--color-surface-muted);
+}
+
 /* Die geladene Modellliste: ein Vorschlag neben dem Feld, kein zweites Formular. */
 .modellvorschlaege input[type="search"] { width: 100%; margin-top: var(--space-1); }
 .modellvorschlaege__liste { max-height: 18rem; overflow-y: auto; }

@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import konto_mit_rollen
+from config.tests.aufbau import erklaerte, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from konten.models import Konto
 from simulation.models import (
@@ -74,7 +74,9 @@ class SimulationskernAnsichtMitKernTests(TestCase):
             anbieter_token="sk-or-geheim",
             parameter={"temperature": 0.2},
         )
-        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        ModellKonfiguration.objects.aktivieren(
+            erklaerte(konfiguration), Verwendung.SCHUELERIN
+        )
         self.client.force_login(konto)
 
     def test_zeigt_den_system_prompt_der_neuesten_finalen_fassung(self) -> None:
@@ -215,7 +217,7 @@ class ModellKonfigurationAnzeigeTests(TestCase):
             parameter={"temperature": 0.2},
         )
         ModellKonfiguration.objects.aktivieren(
-            self.konfiguration, Verwendung.SCHUELERIN
+            erklaerte(self.konfiguration), Verwendung.SCHUELERIN
         )
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 

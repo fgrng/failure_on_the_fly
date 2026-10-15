@@ -12,6 +12,7 @@ from django.utils import timezone
 from time_machine import TimeMachineFixture
 
 from config.tests.aufbau import (
+    erklaerte,
     aktive_modell_konfiguration,
     finale_vignette,
     finaler_kern,
@@ -28,7 +29,12 @@ from erhebungen.models import (
 )
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
-from simulation.models import Anbieter, ModellKonfiguration, Verwendung
+from simulation.models import (
+    AktiveModellKonfiguration,
+    Anbieter,
+    ModellKonfiguration,
+    Verwendung,
+)
 from sitzungen.models import Sitzung, Teilnahme
 from vignetten.models import Vignette
 
@@ -632,15 +638,62 @@ def test_zurueckziehen_und_erneutes_finalisieren_pinnt_aktuelle_konfiguration() 
         sprachmodell="openrouter/zweite",
         anbieter_token="sk-or-geheim",
     )
-    ModellKonfiguration.objects.aktivieren(erste, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(erklaerte(erste), Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     erhebung.zurueckziehen()
-    ModellKonfiguration.objects.aktivieren(zweite, Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(erklaerte(zweite), Verwendung.SCHUELERIN)
     erhebung.finalisieren()
 
     assert erhebung.status == Erhebung.Status.FINAL
     assert erhebung.modell_konfiguration == zweite
+
+
+def _openrouter_fuer_schuelerin() -> ModellKonfiguration:
+    # Eine Konfiguration aus dem Bestand: für die Schüler:in aktiv, nicht erklärt.
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Bestand",
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell="openrouter/bestand",
+        anbieter_token="sk-or-geheim",
+    )
+    AktiveModellKonfiguration.objects.create(
+        konfiguration=konfiguration, verwendung=Verwendung.SCHUELERIN
+    )
+    return konfiguration
+
+
+@pytest.mark.django_db
+def test_finalisieren_scheitert_ohne_erklaerte_schuelerin_konfiguration() -> None:
+    """Die gepinnte Fassung einer Erhebung trägt eine nachgewiesene Zusage."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    _openrouter_fuer_schuelerin()
+
+    with pytest.raises(ValidationError, match="Administrator:in"):
+        erhebung.finalisieren()
+
+    erhebung.refresh_from_db()
+    assert erhebung.status == Erhebung.Status.ENTWURF
+    assert erhebung.modell_konfiguration is None
+
+
+@pytest.mark.django_db
+def test_finalisieren_gelingt_mit_erklaerter_schuelerin_konfiguration() -> None:
+    """Eine nachträglich abgegebene Erklärung öffnet das Finalisieren."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter_fuer_schuelerin())
+
+    erhebung.finalisieren()
+
+    assert erhebung.status == Erhebung.Status.FINAL
+    assert erhebung.modell_konfiguration == konfiguration
 
 
 @pytest.mark.django_db

@@ -43,6 +43,21 @@ def aktive_modell_konfiguration(
     )
 
 
+def erklaerte(konfiguration: ModellKonfiguration) -> ModellKonfiguration:
+    """Gibt an der Konfiguration eine Zero-Retention-Erklärung ab.
+
+    Erklärt wird im Namen eines eigenen Administrationskontos, damit die
+    Erklärung keinem Konto des Tests in die Quere kommt.
+    """
+
+    konto: Konto
+    konto, _ = Konto.objects.get_or_create(
+        username="zero-retention-erklaerende", defaults={"is_superuser": True}
+    )
+    konfiguration.zero_retention_erklaeren("AVV mit dem Anbieter vom 01.10.2026", konto)
+    return konfiguration
+
+
 def finaler_kern() -> Simulationskern:
     """Liefert den finalen Simulationskern und legt ihn beim ersten Aufruf an."""
 

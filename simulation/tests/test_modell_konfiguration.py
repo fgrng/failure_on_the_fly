@@ -6,6 +6,8 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from config.tests.aufbau import erklaerte
+from konten.models import Konto
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -276,7 +278,9 @@ def test_nach_dem_aktivieren_liefert_die_verwendung_genau_diese() -> None:
 def test_unbelegte_verwendung_liefert_keine() -> None:
     """Solange die Administration nichts gesetzt hat, gibt es keine Konfiguration."""
 
-    ModellKonfiguration.objects.aktivieren(_openrouter(), Verwendung.SCHUELERIN)
+    ModellKonfiguration.objects.aktivieren(
+        erklaerte(_openrouter()), Verwendung.SCHUELERIN
+    )
 
     assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) is None
     with pytest.raises(AktiveModellKonfiguration.DoesNotExist):
@@ -287,7 +291,7 @@ def test_unbelegte_verwendung_liefert_keine() -> None:
 def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
     """Eine kleine Instanz braucht nicht drei gleiche Datensätze."""
 
-    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
     for verwendung in Verwendung:
         ModellKonfiguration.objects.aktivieren(konfiguration, verwendung)
 
@@ -299,7 +303,7 @@ def test_dieselbe_konfiguration_dient_mehreren_verwendungen() -> None:
 def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
     """Je Verwendung ein Zeiger; ein Wechsel bewegt nur den eigenen."""
 
-    schuelerin: ModellKonfiguration = _openrouter()
+    schuelerin: ModellKonfiguration = erklaerte(_openrouter())
     bewerter: ModellKonfiguration = _openrouter(bezeichnung="Bewerter")
     ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.SCHUELERIN)
     ModellKonfiguration.objects.aktivieren(schuelerin, Verwendung.BEWERTER)
@@ -315,7 +319,7 @@ def test_umschalten_einer_verwendung_laesst_die_anderen_unberuehrt() -> None:
 def test_aktive_je_verwendung_nennt_nur_belegte_verwendungen() -> None:
     """Die Tabelle erfährt in einer Abfrage, welche Verwendung wohin zeigt."""
 
-    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
     ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
 
@@ -362,3 +366,144 @@ def test_erlaubt_fortlesen_des_skripts_nur_beim_anbieter_fake() -> None:
 
     with pytest.raises(ValidationError, match="skript_fortlesen"):
         _openrouter(parameter={"skript_fortlesen": True})
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_haelt_beleg_zeitpunkt_und_konto_fest() -> None:
+    """Zeitpunkt und Konto schreibt die Erklärung selbst mit."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    konfiguration.zero_retention_erklaeren("AVV mit OpenRouter vom 01.10.2026", konto)
+
+    gespeichert: ModellKonfiguration = ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    )
+    assert gespeichert.zero_retention_erklaert
+    assert gespeichert.zero_retention_beleg == "AVV mit OpenRouter vom 01.10.2026"
+    assert gespeichert.zero_retention_erklaert_von == konto
+    assert gespeichert.zero_retention_erklaert_am is not None
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_laesst_sich_beim_anlegen_abgeben() -> None:
+    """Die Erklärung kann mit der Fassung zusammen entstehen."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = ModellKonfiguration(
+        bezeichnung="Test",
+        anbieter=Anbieter.OPENROUTER,
+        sprachmodell="openrouter/anthropic/claude-opus-4-8",
+        anbieter_token="sk-or-geheim",
+    )
+
+    konfiguration.zero_retention_erklaeren("AVV", konto)
+    konfiguration.save()
+
+    assert ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_die_erklaerung_verlangt_einen_beleg() -> None:
+    """Ein bloßes Häkchen ohne Grundlage ist keine Erklärung."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    with pytest.raises(ValidationError) as fehler:
+        konfiguration.zero_retention_erklaeren("  ", konto)
+
+    assert "zero_retention_beleg" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    ).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_bei_fake_ist_keine_erklaerung_zulaessig() -> None:
+    """Ohne Auftragsverarbeiter gibt es nichts zu erklären."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test", sprachmodell="fake"
+    )
+
+    with pytest.raises(ValidationError) as fehler:
+        konfiguration.zero_retention_erklaeren("AVV", konto)
+
+    assert "zero_retention_beleg" in fehler.value.message_dict
+    assert not ModellKonfiguration.objects.get(
+        pk=konfiguration.pk
+    ).zero_retention_erklaert
+
+
+@pytest.mark.django_db
+def test_eine_abgegebene_erklaerung_laesst_sich_nicht_aendern() -> None:
+    """Eine zweite Erklärung überschriebe Beleg und Zeitpunkt der ersten."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration.zero_retention_erklaeren("AVV vom 01.10.2026", konto)
+
+    with pytest.raises(ValidationError):
+        ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_erklaeren(
+            "AVV vom 15.10.2026", konto
+        )
+
+    assert (
+        ModellKonfiguration.objects.get(pk=konfiguration.pk).zero_retention_beleg
+        == "AVV vom 01.10.2026"
+    )
+
+
+@pytest.mark.django_db
+def test_ohne_erklaerung_scheitert_die_aktivierung_fuer_die_schuelerin() -> None:
+    """Das Tor sitzt in der Domäne, nicht nur in der Oberfläche."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    with pytest.raises(ValidationError):
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) is None
+
+
+@pytest.mark.django_db
+def test_mit_erklaerung_gelingt_die_aktivierung_fuer_die_schuelerin() -> None:
+    """Eine erklärte Fassung darf Eingaben echter Personen verarbeiten."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+    konfiguration.zero_retention_erklaeren(
+        "AVV", Konto.objects.create_user(username="linus", is_superuser=True)
+    )
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration
+
+
+@pytest.mark.django_db
+def test_lehrperson_und_bewerter_bleiben_ohne_erklaerung_frei() -> None:
+    """Evals verarbeiten nur simulierte Gespräche (ADR-0046)."""
+
+    konfiguration: ModellKonfiguration = _openrouter()
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.LEHRPERSON)
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.LEHRPERSON) == konfiguration
+    assert ModellKonfiguration.objects.aktive(Verwendung.BEWERTER) == konfiguration
+
+
+@pytest.mark.django_db
+def test_fake_laesst_sich_ohne_erklaerung_fuer_die_schuelerin_aktivieren() -> None:
+    """Entwicklung und Workshop laufen ohne externen Anbieter."""
+
+    konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+        bezeichnung="Test", sprachmodell="fake"
+    )
+
+    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) == konfiguration

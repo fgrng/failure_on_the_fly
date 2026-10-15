@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.aufbau import konto_mit_rollen
+from config.tests.aufbau import erklaerte, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
 from simulation.forms import ModellKonfigurationForm
 from simulation.models import (
@@ -54,6 +54,11 @@ def _anlegedaten(**werte: object) -> dict[str, object]:
         "parameter": '{"temperature": 0.2}',
         **werte,
     }
+
+
+def _erklaeren_url(konfiguration: ModellKonfiguration) -> str:
+    """Liefert die Route, die an der Konfiguration die Erklärung abgibt."""
+    return reverse("simulation:modell_konfiguration_erklaeren", args=[konfiguration.pk])
 
 
 class ModellKonfigurationRollenTests(TestCase):
@@ -122,14 +127,43 @@ class ModellKonfigurationRollenTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
 
+    def test_erklaeren_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
+        """Nur die Administration gibt eine Zero-Retention-Erklärung ab."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in", "Forschende:r"))
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration), {"zero_retention_beleg": "AVV"}
+        )
+
+        self.assertEqual(response.status_code, 403)
+        konfiguration.refresh_from_db()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+
+    def test_erklaeren_weist_nicht_angemeldetes_konto_ab(self) -> None:
+        """Ohne Anmeldung erklärt niemand eine Zusage."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration), {"zero_retention_beleg": "AVV"}
+        )
+
+        self.assertEqual(response.status_code, 403)
+        konfiguration.refresh_from_db()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+
 
 class ZweiFassungenTestCase(TestCase):
     """Zwei angelegte Fassungen, die ältere aktiv, als Administratorin gesehen."""
 
     def setUp(self) -> None:
-        """Legt zwei Konfigurationen an und aktiviert die ältere."""
-        self.aeltere: ModellKonfiguration = _openrouter("openrouter/altes-modell")
-        self.neuere: ModellKonfiguration = _openrouter("openrouter/neues-modell")
+        """Legt zwei erklärte Konfigurationen an und aktiviert die ältere."""
+        self.aeltere: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/altes-modell")
+        )
+        self.neuere: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/neues-modell")
+        )
         ModellKonfiguration.objects.aktivieren(self.aeltere, Verwendung.SCHUELERIN)
         self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
 
@@ -974,3 +1008,307 @@ class ModellvorschlaegeSeitenTests(TestCase):
             self._seite()
 
         httpx_client.assert_not_called()
+
+
+class ZeroRetentionErklaerungTests(TestCase):
+    """Die Zero-Retention-Erklärung entsteht beim Anlegen oder nachträglich."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.linus = konto_mit_rollen("linus", is_superuser=True)
+        self.client.force_login(self.linus)
+
+    def test_gibt_die_erklaerung_beim_anlegen_ab(self) -> None:
+        """Zeitpunkt und Konto schreibt die Anlegen-Geste selbst mit."""
+        self.client.post(
+            reverse("simulation:modell_konfiguration_neu"),
+            _anlegedaten(
+                zero_retention_erklaert="on",
+                zero_retention_beleg="OpenRouter: nur ZDR-Endpunkte, Stand 10/2026",
+            ),
+        )
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertTrue(konfiguration.zero_retention_erklaert)
+        self.assertEqual(
+            konfiguration.zero_retention_beleg,
+            "OpenRouter: nur ZDR-Endpunkte, Stand 10/2026",
+        )
+        self.assertEqual(konfiguration.zero_retention_erklaert_von, self.linus)
+        self.assertIsNotNone(konfiguration.zero_retention_erklaert_am)
+
+    def test_legt_ohne_haekchen_eine_nicht_erklaerte_konfiguration_an(self) -> None:
+        """Die Erklärung ist eine eigene Geste, kein Nebenprodukt des Belegs."""
+        self.client.post(
+            reverse("simulation:modell_konfiguration_neu"),
+            _anlegedaten(zero_retention_beleg="AVV"),
+        )
+
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+        self.assertEqual(konfiguration.zero_retention_beleg, "")
+
+    def test_meldet_den_fehlenden_beleg_beim_anlegen_am_feld(self) -> None:
+        """Ein Häkchen ohne Beleg ist nicht nachprüfbar."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:modell_konfiguration_neu"),
+            _anlegedaten(zero_retention_erklaert="on", zero_retention_beleg=""),
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "zero_retention_beleg",
+            "Ohne Beleg der Zusage ist die Erklärung nicht nachprüfbar.",
+        )
+        self.assertFalse(ModellKonfiguration.objects.exists())
+
+    def test_weist_die_erklaerung_bei_fake_beim_anlegen_ab(self) -> None:
+        """Über einen Auftragsverarbeiter, den es nicht gibt, wird nichts erklärt."""
+        response: HttpResponse = self.client.post(
+            reverse("simulation:modell_konfiguration_neu"),
+            _anlegedaten(
+                anbieter=Anbieter.FAKE,
+                sprachmodell="fake",
+                anbieter_token="",
+                parameter="",
+                zero_retention_erklaert="on",
+                zero_retention_beleg="AVV",
+            ),
+        )
+
+        self.assertIn("zero_retention_beleg", response.context["form"].errors)
+        self.assertFalse(ModellKonfiguration.objects.exists())
+
+    def test_gibt_die_erklaerung_nachtraeglich_ab(self) -> None:
+        """Eine Fassung ohne Erklärung bekommt sie im Detail der Liste."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration), {"zero_retention_beleg": "AVV vom 01.10."}
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('simulation:modell_konfiguration')}"
+            f"?konfiguration={konfiguration.pk}",
+        )
+        konfiguration.refresh_from_db()
+        self.assertTrue(konfiguration.zero_retention_erklaert)
+        self.assertEqual(konfiguration.zero_retention_beleg, "AVV vom 01.10.")
+        self.assertEqual(konfiguration.zero_retention_erklaert_von, self.linus)
+
+    def test_meldet_den_fehlenden_beleg_beim_nachtraeglichen_erklaeren(self) -> None:
+        """Auch nachträglich gibt es keine Erklärung ohne Beleg."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration), {"zero_retention_beleg": "  "}
+        )
+
+        self.assertFormError(
+            response.context["erklaerungsformular"],
+            "zero_retention_beleg",
+            "Ohne Beleg der Zusage ist die Erklärung nicht nachprüfbar.",
+        )
+        konfiguration.refresh_from_db()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+
+    def test_weist_die_nachtraegliche_erklaerung_bei_fake_ab(self) -> None:
+        """Die Regel gilt auch, wenn jemand die Geste ohne Formular aufruft."""
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Offline", sprachmodell="fake"
+        )
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration), {"zero_retention_beleg": "AVV"}, follow=True
+        )
+
+        self.assertContains(response, "keine Zero-Retention-Erklärung zulässig")
+        konfiguration.refresh_from_db()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+
+    def test_aendert_eine_abgegebene_erklaerung_nicht(self) -> None:
+        """Beleg und Zeitpunkt der ersten Erklärung bleiben stehen."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+        beleg: str = konfiguration.zero_retention_beleg
+
+        response: HttpResponse = self.client.post(
+            _erklaeren_url(konfiguration),
+            {"zero_retention_beleg": "Neuer Beleg"},
+            follow=True,
+        )
+
+        self.assertContains(response, "lässt sich nicht ändern")
+        konfiguration.refresh_from_db()
+        self.assertEqual(konfiguration.zero_retention_beleg, beleg)
+
+    def test_bietet_die_erklaerung_nur_an_einer_nicht_erklaerten_fassung_an(
+        self,
+    ) -> None:
+        """Erklärte und `fake`-Fassungen zeigen kein Erklärungsformular."""
+        offen: ModellKonfiguration = _openrouter("openrouter/offen")
+        erklaert: ModellKonfiguration = erklaerte(_openrouter("openrouter/erklaert"))
+        fake: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Offline", sprachmodell="fake"
+        )
+
+        for konfiguration, angeboten in (
+            (offen, True),
+            (erklaert, False),
+            (fake, False),
+        ):
+            with self.subTest(konfiguration=konfiguration.sprachmodell):
+                response: HttpResponse = self.client.get(
+                    reverse("simulation:modell_konfiguration"),
+                    {"konfiguration": konfiguration.pk},
+                )
+
+                if angeboten:
+                    self.assertContains(response, _erklaeren_url(konfiguration))
+                else:
+                    self.assertNotContains(response, _erklaeren_url(konfiguration))
+
+    def test_zeigt_den_beleg_einer_erklaerten_fassung_im_detail(self) -> None:
+        """Wer die Liste liest, sieht, worauf sich die Zusage stützt."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": konfiguration.pk},
+        )
+
+        self.assertContains(response, konfiguration.zero_retention_beleg)
+        self.assertContains(response, "zero-retention-erklaerende")
+
+
+class ZeroRetentionTorTests(TestCase):
+    """Für die Schüler:in braucht es eine erklärte Fassung oder `fake`."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
+
+    def test_sperrt_die_aktivierung_fuer_die_schuelerin_mit_sichtbarem_grund(
+        self,
+    ) -> None:
+        """Wer die Geste dennoch aufruft, liest, warum sie gesperrt ist."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _aktivieren_url(konfiguration, Verwendung.SCHUELERIN), follow=True
+        )
+
+        self.assertContains(response, "Zero-Retention-Erklärung aktivieren")
+        self.assertIsNone(ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN))
+
+    def test_zeigt_den_schalter_der_schuelerin_gesperrt_samt_grund(self) -> None:
+        """Der Grund steht schon vor dem Klick am Schalter."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": konfiguration.pk},
+        )
+
+        self.assertNotContains(
+            response, _aktivieren_url(konfiguration, Verwendung.SCHUELERIN)
+        )
+        self.assertContains(
+            response, _aktivieren_url(konfiguration, Verwendung.BEWERTER)
+        )
+        self.assertContains(response, "Für Schüler:in erst nach der Erklärung")
+
+    def test_aktiviert_lehrperson_und_bewerter_ohne_erklaerung(self) -> None:
+        """Evals verarbeiten nur simulierte Gespräche."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        for verwendung in (Verwendung.LEHRPERSON, Verwendung.BEWERTER):
+            self.client.post(_aktivieren_url(konfiguration, verwendung))
+
+            self.assertEqual(
+                ModellKonfiguration.objects.aktive(verwendung), konfiguration
+            )
+
+    def test_aktiviert_fake_fuer_die_schuelerin(self) -> None:
+        """Entwicklung und Workshop laufen ohne externen Anbieter."""
+        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Offline", sprachmodell="fake"
+        )
+
+        self.client.post(_aktivieren_url(konfiguration, Verwendung.SCHUELERIN))
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), konfiguration
+        )
+
+
+class ZeroRetentionUebersichtTests(TestCase):
+    """Die Liste zeigt den Erklärungsstand und warnt beim Bestand."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
+
+    def _zeilen(self) -> list[str]:
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+        tabelle: str = (
+            response.content.decode().split("<tbody>")[1].split("</tbody>")[0]
+        )
+        return tabelle.split("</tr>")[:-1]
+
+    def test_zeigt_den_erklaerungsstand_je_zeile(self) -> None:
+        """Erklärt, fehlend oder ohne Auftragsverarbeiter, auf einen Blick."""
+        ModellKonfiguration.objects.create(bezeichnung="Offline", sprachmodell="fake")
+        erklaerte(_openrouter("openrouter/erklaert"))
+        _openrouter("openrouter/offen")
+
+        offen, erklaert, fake = self._zeilen()
+
+        self.assertIn("fehlt", offen)
+        self.assertIn("erklärt", erklaert)
+        self.assertIn("nicht nötig", fake)
+
+    def test_warnt_bei_nicht_erklaerter_aktiver_schuelerin_konfiguration(
+        self,
+    ) -> None:
+        """Eine Konfiguration aus dem Bestand bleibt aktiv, aber nicht unbemerkt."""
+        AktiveModellKonfiguration.objects.create(
+            konfiguration=_openrouter("openrouter/bestand"),
+            verwendung=Verwendung.SCHUELERIN,
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertContains(
+            response,
+            "Der aktiven Konfiguration der Schüler:in fehlt die Zero-Retention-Erklärung",
+        )
+
+    def test_warnt_nicht_bei_erklaerter_oder_fake_schuelerin_konfiguration(
+        self,
+    ) -> None:
+        """Der Hinweis erscheint nur, wo wirklich etwas fehlt."""
+        for konfiguration in (
+            erklaerte(_openrouter("openrouter/erklaert")),
+            ModellKonfiguration.objects.create(
+                bezeichnung="Offline", sprachmodell="fake"
+            ),
+        ):
+            with self.subTest(konfiguration=konfiguration.sprachmodell):
+                ModellKonfiguration.objects.aktivieren(
+                    konfiguration, Verwendung.SCHUELERIN
+                )
+
+                response: HttpResponse = self.client.get(
+                    reverse("simulation:modell_konfiguration")
+                )
+
+                self.assertNotContains(response, "fehlt die Zero-Retention-Erklärung")

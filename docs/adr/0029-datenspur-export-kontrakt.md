@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278"]
+amended-by: ["#278", "#497"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
@@ -17,6 +17,15 @@ amended-by: ["#278"]
 > erscheinen mit `False` und ohne Ziehung oder Sitzung. Der Export zeigt stets
 > den letzten Stand. Da noch keine Erhebung ausgeliefert war, war die
 > Formatänderung zulässig; die Tabelle unten zeigt den Stand danach.
+>
+> **Nachgeführt durch #497:** `modellkonfigurationen.csv` trägt zusätzlich den
+> Erklärungsstand der Zero-Retention-Erklärung (ADR „Die
+> Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“):
+> `zero_retention_erklaert` (`True` oder `False`), `zero_retention_beleg` (leer
+> ohne Erklärung) und `zero_retention_erklaert_am` (`NA` ohne Erklärung). Das
+> erklärende Konto bleibt draußen, weil der Export keine Konten führt. Der
+> Export zeigt den Stand von heute; der Zeitpunkt zeigt, ob die Zusage zur Zeit
+> einer Sitzung schon galt. Die Tabelle unten zeigt den Stand danach.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
@@ -86,7 +95,7 @@ Pfade statt als Inhalt.
 | `item_antworten.csv` | `itemblock_id`, `teilnahme_token`, `teilnahmekennung`, `item_id`, `item_typ`, `andockpunkt`, `sitzung_id`, `position`, `freitext`, `likert_stufe` |
 | `vignettenfassungen.csv` | `id`, `historie_id`, `finalisiert_am`, `fehlermuster_beschreibung`, `lernauftrag_text`, `lernauftrag_bild`, `lernauftrag_bildbeschreibung`, `lernauftrag_simulationshinweise`, `arbeitsheft_text`, `arbeitsheft_bild`, `arbeitsheft_bildbeschreibung`, `arbeitsheft_simulationshinweise`, `schuelerin_name`, `schuelerin_geschlecht`, `lehrperson_name`, `lehrperson_geschlecht`, `fach`, `thema`, `klassenstufe`, `referenzdiagnose`, `budget_typ`, `budget_wert` |
 | `simulationskerne.csv` | `id`, `historie_id`, `finalisiert_am`, `system_prompt_vorlage`, `user_prompt_vorlage`, `rahmenhandlung_einleitung`, `rahmenhandlung_gespraechseinleitung`, `rahmenhandlung_debrief` |
-| `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter` |
+| `modellkonfigurationen.csv` | `id`, `bezeichnung`, `anbieter`, `sprachmodell`, `parameter`, `zero_retention_erklaert`, `zero_retention_beleg`, `zero_retention_erklaert_am` |
 | `fragebogen_items.csv` | `id`, `typ`, `wortlaut` |
 | `likert_skala.csv` | `stufe`, `pol` |
 

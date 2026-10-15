@@ -1,6 +1,16 @@
 """Formulare der Simulation: Kern- und Evalkatalog-Entwurf, Modell- und Transkriptions-Konfiguration."""
 
-from django.forms import ModelForm, PasswordInput
+from django.core.exceptions import ValidationError
+from django.forms import (
+    BooleanField,
+    CharField,
+    Form,
+    ModelForm,
+    PasswordInput,
+    Textarea,
+)
+
+from konten.models import Konto
 
 from .models import (
     ANBIETER_PROFIL,
@@ -12,6 +22,7 @@ from .models import (
     ModellKonfiguration,
     Simulationskern,
     TranskriptionsKonfiguration,
+    ZeroRetentionFeldgruppe,
 )
 
 # Das Feld heißt an beiden Nähten gleich und wird an beiden gleich gefüllt —
@@ -90,6 +101,85 @@ class EvalkatalogDurchlaufForm(ModelForm):
         fields: list[str] = ["k", "lehrperson_vorlage", "bewerter_vorlage"]
 
 
+# Beide Konfigurationen tragen dieselbe Erklärung, also denselben Wortlaut.
+ZERO_RETENTION_BELEG_LABEL: str = "Beleg der Zusage"
+ZERO_RETENTION_BELEG_HINWEIS: str = (
+    "Worauf sich die Zusage stützt, etwa „AVV mit Infomaniak vom …“ oder "
+    "„OpenRouter: Modell nur über ZDR-Endpunkte, Stand …“. Zeitpunkt und Konto "
+    "werden mitgeschrieben; danach ist die Erklärung nicht mehr änderbar."
+)
+
+
+def _beleg_feld() -> CharField:
+    """Das Belegfeld der Erklärung, gleich an beiden Konfigurationen."""
+    # Nicht Pflicht am Feld: Den leeren Beleg meldet die Domäne mit ihrem
+    # eigenen Wortlaut, damit beide Wege dieselbe Meldung zeigen.
+    return CharField(
+        label=ZERO_RETENTION_BELEG_LABEL,
+        help_text=ZERO_RETENTION_BELEG_HINWEIS,
+        required=False,
+        widget=Textarea(attrs={"rows": 3}),
+    )
+
+
+class ZeroRetentionFeldgruppeForm(ModelForm):
+    """Die Erklärung beim Anlegen einer Fassung, für beide Konfigurationen.
+
+    Das Häkchen ist die Erklärung selbst; der Beleg allein erklärt nichts.
+    """
+
+    zero_retention_erklaert = BooleanField(
+        label="Zero-Retention-Erklärung abgeben",
+        help_text=(
+            "Für dieses Modell bei diesem Anbieter liegt eine Zusage vor, dass "
+            "Eingaben weder gespeichert noch zum Training genutzt werden."
+        ),
+        required=False,
+    )
+    zero_retention_beleg = _beleg_feld()
+
+    def __init__(self, *args: object, konto: Konto, **kwargs: object) -> None:
+        """Merkt sich das erklärende Konto."""
+        super().__init__(*args, **kwargs)
+        self._konto: Konto = konto
+
+    def clean(self) -> dict[str, object]:
+        """Gibt die Erklärung mit der Fassung ab, nach den Regeln der Domäne."""
+        daten: dict[str, object] = super().clean()
+        beleg: str = str(daten.get("zero_retention_beleg") or "")
+        # Ohne gültige Erklärung bleibt auch kein Beleg an der Fassung stehen.
+        daten["zero_retention_beleg"] = ""
+        if not daten.get("zero_retention_erklaert") or "anbieter" not in daten:
+            return daten
+        self.instance.anbieter = daten["anbieter"]
+        try:
+            self.instance.zero_retention_erklaeren(beleg, self._konto)
+        except ValidationError as fehler:
+            self.add_error(None, fehler)
+            return daten
+        daten["zero_retention_beleg"] = self.instance.zero_retention_beleg
+        return daten
+
+
+class ZeroRetentionErklaerungForm(Form):
+    """Die nachträgliche Erklärung an einer bestehenden Fassung."""
+
+    zero_retention_beleg = _beleg_feld()
+
+    def erklaeren(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
+        """Gibt die Erklärung ab; scheitert sie, stehen die Gründe am Formular."""
+        if not self.is_valid():
+            return False
+        try:
+            konfiguration.zero_retention_erklaeren(
+                self.cleaned_data["zero_retention_beleg"], konto
+            )
+        except ValidationError as fehler:
+            self.add_error(None, fehler)
+            return False
+        return True
+
+
 def _stellschrauben_hinweis() -> str:
     """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
     echte: str = ", ".join(sorted(ANBIETER_PROFIL[Anbieter.OPENROUTER].stellschrauben))
@@ -97,7 +187,7 @@ def _stellschrauben_hinweis() -> str:
     return f"Erlaubt sind bei echten Anbietern: {echte}. Beim Anbieter »fake«: {fake}."
 
 
-class ModellKonfigurationForm(ModelForm):
+class ModellKonfigurationForm(ZeroRetentionFeldgruppeForm):
     """Die einzige Schreibgeste an einer append-only Modell-Konfiguration."""
 
     class Meta:
@@ -113,6 +203,7 @@ class ModellKonfigurationForm(ModelForm):
             "anbieter_basis_url",
             "sprachmodell",
             "parameter",
+            "zero_retention_beleg",
         ]
         labels: dict[str, str] = {
             "bezeichnung": "Bezeichnung",

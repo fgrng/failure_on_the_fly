@@ -43,9 +43,10 @@ SPRACHMODELL_FRIST_SEKUNDEN: float = 90.0
 # damit er sauber scheitert, statt mit einem Timeout von null zu hängen.
 SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 
-# Die datenschutzrechtliche Zusage aus ADR-0026 steht in keiner Konfiguration:
-# Ein Tor, das im selben Formular abschaltbar wäre, in dem man den Anbieter
-# wählt, ist keins.
+# Die technische Sicherung bei OpenRouter: Die Zusage selbst trägt die
+# Zero-Retention-Erklärung an der Modell-Konfiguration; der Filter fängt, was
+# eine fehlerhafte Erklärung durchließe (ADR „Die Zero-Retention-Erklärung
+# gehört an die Konfiguration, nicht an die Instanz“).
 OPENROUTER_PROVIDER_FILTER: dict[str, object] = {
     "require_parameters": True,
     "data_collection": "deny",

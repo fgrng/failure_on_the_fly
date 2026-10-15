@@ -22,6 +22,7 @@ from .forms import (
     ModellKonfigurationForm,
     SimulationskernForm,
     TranskriptionsKonfigurationForm,
+    ZeroRetentionErklaerungForm,
 )
 from .lebenszyklus import VersionierteFassung
 from .modellverzeichnis import (
@@ -37,6 +38,7 @@ from .models import (
     VERTRAG_BEWERTER,
     VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
+    Anbieter,
     Eval,
     Evalinput,
     Evalkatalog,
@@ -799,6 +801,19 @@ class _Konfigurationszeile:
     anbieter_token_maskiert: str
     parameter: object
     verwendungen: tuple[Verwendung, ...]
+    ist_fake: bool
+    zulaessig_fuer_schuelerin: bool
+    zero_retention_erklaert: bool
+    zero_retention_beleg: str
+    zero_retention_erklaert_am: datetime | None
+    zero_retention_erklaert_von: str
+
+    @property
+    def erklaerungsstand(self) -> str:
+        """Der Erklärungsstand in einem Wort, wie ihn die Tabelle zeigt."""
+        if self.ist_fake:
+            return "nicht nötig"
+        return "erklärt" if self.zero_retention_erklaert else "fehlt"
 
 
 @dataclass(frozen=True)
@@ -808,6 +823,7 @@ class _Schalter:
     verwendung: Verwendung
     ist_aktiv: bool
     statt: str
+    gesperrt: bool
 
 
 def _konfigurationszeilen() -> list[_Konfigurationszeile]:
@@ -829,8 +845,18 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
                 for verwendung in Verwendung
                 if aktive.get(verwendung) == konfiguration.pk
             ),
+            ist_fake=konfiguration.anbieter == Anbieter.FAKE,
+            zulaessig_fuer_schuelerin=konfiguration.zulaessig_fuer_schuelerin,
+            zero_retention_erklaert=konfiguration.zero_retention_erklaert,
+            zero_retention_beleg=konfiguration.zero_retention_beleg,
+            zero_retention_erklaert_am=konfiguration.zero_retention_erklaert_am,
+            zero_retention_erklaert_von=str(
+                konfiguration.zero_retention_erklaert_von or ""
+            ),
         )
-        for konfiguration in ModellKonfiguration.objects.order_by("-pk")
+        for konfiguration in ModellKonfiguration.objects.select_related(
+            "zero_retention_erklaert_von"
+        ).order_by("-pk")
     ]
 
 
@@ -843,11 +869,10 @@ def _aktive_zeile(
 
 
 def _gewaehlte_zeile(
-    request: HttpRequest, zeilen: list[_Konfigurationszeile]
+    genannt: str, zeilen: list[_Konfigurationszeile]
 ) -> _Konfigurationszeile | None:
     # Die genannte Zeile, sonst die der Schüler:in, sonst die neueste.
 
-    genannt: str = request.GET.get("konfiguration", "")
     if genannt.isdigit():
         for zeile in zeilen:
             if zeile.pk == int(genannt):
@@ -870,6 +895,8 @@ def _schalter(
                 verwendung=verwendung,
                 ist_aktiv=aktiv is not None and aktiv.pk == gewaehlt.pk,
                 statt=aktiv.bezeichnung if aktiv else "",
+                gesperrt=verwendung == Verwendung.SCHUELERIN
+                and not gewaehlt.zulaessig_fuer_schuelerin,
             )
         )
     return schalter
@@ -883,11 +910,18 @@ def _zur_konfiguration(konfiguration: ModellKonfiguration) -> HttpResponse:
     )
 
 
-@administratorin_erforderlich
-def modell_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
+def _liste_rendern(
+    request: HttpRequest,
+    genannt: str,
+    erklaerungsformular: ZeroRetentionErklaerungForm | None = None,
+) -> HttpResponse:
+    # Die Liste samt Detail; ein abgewiesenes Erklärungsformular bleibt stehen.
+
     zeilen: list[_Konfigurationszeile] = _konfigurationszeilen()
-    gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(request, zeilen)
+    gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(genannt, zeilen)
+    schuelerin: _Konfigurationszeile | None = _aktive_zeile(
+        zeilen, Verwendung.SCHUELERIN
+    )
     return render(
         request,
         "simulation/modell_konfiguration.html",
@@ -895,8 +929,40 @@ def modell_konfiguration(request: HttpRequest) -> HttpResponse:
             "konfigurationen": zeilen,
             "gewaehlt": gewaehlt,
             "schalter": _schalter(gewaehlt, zeilen) if gewaehlt else [],
+            "erklaerungsformular": erklaerungsformular or ZeroRetentionErklaerungForm(),
+            "schuelerin_ohne_erklaerung": schuelerin is not None
+            and not schuelerin.zulaessig_fuer_schuelerin,
         },
     )
+
+
+@administratorin_erforderlich
+def modell_konfiguration(request: HttpRequest) -> HttpResponse:
+    """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
+    return _liste_rendern(request, request.GET.get("konfiguration", ""))
+
+
+@administratorin_erforderlich
+@require_POST
+def modell_konfiguration_erklaeren(request: HttpRequest, pk: int) -> HttpResponse:
+    """Gibt an einer bestehenden Konfiguration die Zero-Retention-Erklärung ab."""
+    konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
+    form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
+    if not form.erklaeren(konfiguration, request.user):
+        if konfiguration.anbieter != Anbieter.FAKE and not (
+            konfiguration.zero_retention_erklaert
+        ):
+            return _liste_rendern(request, str(konfiguration.pk), form)
+        # Hier steht kein Formular, an dem der Grund stehen könnte.
+        for meldungen in form.errors.values():
+            messages.error(request, " ".join(meldungen))
+        return _zur_konfiguration(konfiguration)
+    messages.success(
+        request,
+        f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
+        "abgegeben.",
+    )
+    return _zur_konfiguration(konfiguration)
 
 
 def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
@@ -921,7 +987,7 @@ def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
     vorlage: ModellKonfiguration | None = _vorlage(request)
     form: ModellKonfigurationForm
     if request.method == "POST":
-        form = ModellKonfigurationForm(request.POST)
+        form = ModellKonfigurationForm(request.POST, konto=request.user)
         if form.is_valid():
             konfiguration: ModellKonfiguration = form.save()
             messages.success(
@@ -931,16 +997,17 @@ def modell_konfiguration_neu(request: HttpRequest) -> HttpResponse:
             return _zur_konfiguration(konfiguration)
     elif vorlage:
         form = ModellKonfigurationForm(
+            konto=request.user,
             initial={
                 "bezeichnung": f"{vorlage.bezeichnung} (Kopie)",
                 "anbieter": vorlage.anbieter,
                 "anbieter_basis_url": vorlage.anbieter_basis_url,
                 "sprachmodell": vorlage.sprachmodell,
                 "parameter": vorlage.parameter,
-            }
+            },
         )
     else:
-        form = ModellKonfigurationForm()
+        form = ModellKonfigurationForm(konto=request.user)
     # Nur Nummer und Bezeichnung, damit der Klartext des Tokens die Seite nie erreicht.
     vorlage_kopf: dict[str, object] | None = (
         {"pk": vorlage.pk, "bezeichnung": vorlage.bezeichnung} if vorlage else None
@@ -1029,7 +1096,10 @@ def modell_konfiguration_aktivieren(
     if verwendung not in Verwendung.values:
         raise Http404("Unbekannte Verwendung.")
     konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
-    ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
+    try:
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung(verwendung))
+    except ValidationError as fehler:
+        messages.error(request, " ".join(fehler.messages))
     return _zur_konfiguration(konfiguration)
 
 

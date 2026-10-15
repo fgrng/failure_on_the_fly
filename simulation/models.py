@@ -6,6 +6,7 @@ from string import Template
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from simulation.lebenszyklus import (
     FassungManager,
@@ -858,6 +859,98 @@ class AnbieterFeldgruppe(models.Model):
         return fehler
 
 
+ZERO_RETENTION_FAKE_FEHLERMELDUNG: str = (
+    "Beim Anbieter »fake« ist keine Zero-Retention-Erklärung zulässig: Es gibt "
+    "keinen Auftragsverarbeiter, über den sie etwas aussagen könnte."
+)
+ZERO_RETENTION_BELEG_FEHLERMELDUNG: str = (
+    "Ohne Beleg der Zusage ist die Erklärung nicht nachprüfbar."
+)
+
+ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung liegt schon vor und lässt sich nicht ändern."
+)
+
+
+class ZeroRetentionFeldgruppe(models.Model):
+    """Die Zero-Retention-Erklärung, die beide Konfigurationen gleichermaßen tragen.
+
+    Einmal abgegeben, ist sie unveränderlich wie der Rest der Fassung. Setzt
+    die Anbieter-Feldgruppe voraus.
+    """
+
+    zero_retention_beleg: models.TextField = models.TextField(blank=True, default="")
+    zero_retention_erklaert_am: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, editable=False
+    )
+    zero_retention_erklaert_von: models.ForeignKey = models.ForeignKey(
+        "konten.Konto",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+
+    class Meta:
+        """Keine eigene Tabelle: Beide Konfigurationen tragen die Felder selbst."""
+
+        abstract: bool = True
+
+    @property
+    def zero_retention_erklaert(self) -> bool:
+        """Ob für diese Fassung eine Zero-Retention-Erklärung vorliegt."""
+
+        return self.zero_retention_erklaert_am is not None
+
+    def zero_retention_erklaeren(self, beleg: str, konto: models.Model) -> None:
+        """Gibt die Erklärung ab: vor dem Anlegen mit, danach nachträglich.
+
+        Zeitpunkt und Konto schreibt sie selbst mit. Eine vorliegende Erklärung
+        wird nie überschrieben.
+        """
+
+        beleg = beleg.strip()
+        if self.anbieter == Anbieter.FAKE:
+            raise ValidationError(
+                {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
+            )
+        if not beleg:
+            raise ValidationError(
+                {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
+            )
+        if self.zero_retention_erklaert:
+            raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        werte: dict[str, object] = {
+            "zero_retention_beleg": beleg,
+            "zero_retention_erklaert_am": timezone.now(),
+            "zero_retention_erklaert_von": konto,
+        }
+        # An einer gespeicherten Fassung ist das der einzige Schreibvorgang
+        # neben der Tokenrotation. Er geht am append-only QuerySet vorbei und
+        # gelingt nur, solange keine Erklärung vorliegt, auch gegen eine
+        # gleichzeitige.
+        if not self._state.adding and not (
+            models.QuerySet(model=type(self))
+            .filter(pk=self.pk, zero_retention_erklaert_am=None)
+            .update(**werte)
+        ):
+            raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        for feld, wert in werte.items():
+            setattr(self, feld, wert)
+
+    def _erklaerungsfehler(self) -> dict[str, str]:
+        # Hält eine beim Anlegen mitgegebene Erklärung an dieselben Regeln.
+
+        if self.anbieter == Anbieter.FAKE and (
+            self.zero_retention_beleg or self.zero_retention_erklaert
+        ):
+            return {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
+        if self.zero_retention_erklaert != bool(self.zero_retention_beleg.strip()):
+            return {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
+        return {}
+
+
 class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
     """QuerySets für unveränderliche Modell-Konfigurationen."""
 
@@ -865,6 +958,13 @@ class ModellKonfigurationQuerySet(models.QuerySet["ModellKonfiguration"]):
         """Verhindert Massenänderungen an Modell-Konfigurationen."""
 
         raise RuntimeError(_UNVERAENDERLICH_FEHLERMELDUNG)
+
+
+SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG: str = (
+    "Für die Schüler:in lässt sich nur eine Konfiguration mit "
+    "Zero-Retention-Erklärung aktivieren. Diese trägt keine; geben Sie zuerst "
+    "die Erklärung ab."
+)
 
 
 class Verwendung(models.TextChoices):
@@ -920,8 +1020,17 @@ class ModellKonfigurationManager(
         konfiguration: "ModellKonfiguration",
         verwendung: Verwendung,
     ) -> "ModellKonfiguration":
-        """Richtet den Zeiger der Verwendung auf die Konfiguration."""
+        """Richtet den Zeiger der Verwendung auf die Konfiguration.
 
+        Für die Schüler:in nur eine erklärte Fassung oder `fake`: Dort gehen
+        Eingaben echter Personen an das Sprachmodell.
+        """
+
+        if (
+            verwendung == Verwendung.SCHUELERIN
+            and not konfiguration.zulaessig_fuer_schuelerin
+        ):
+            raise ValidationError(SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG)
         AktiveModellKonfiguration.objects.update_or_create(
             verwendung=verwendung,
             defaults={"konfiguration": konfiguration},
@@ -929,7 +1038,7 @@ class ModellKonfigurationManager(
         return konfiguration
 
 
-class ModellKonfiguration(AnbieterFeldgruppe):
+class ModellKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
     """Unveränderliche Konfiguration eines Sprachmodells."""
 
     # Nicht eindeutig: Sie benennt eine Fassung für Menschen, der Primärschlüssel
@@ -964,9 +1073,16 @@ class ModellKonfiguration(AnbieterFeldgruppe):
             **self._zugangsfehler(),
             **self._modellnamenfehler(),
             **self._parameter_fehler(),
+            **self._erklaerungsfehler(),
         }
         if fehler:
             raise ValidationError(fehler)
+
+    @property
+    def zulaessig_fuer_schuelerin(self) -> bool:
+        """Ob die Fassung Eingaben echter Personen verarbeiten darf."""
+
+        return self.anbieter == Anbieter.FAKE or self.zero_retention_erklaert
 
     def _modellnamenfehler(self) -> dict[str, str]:
         # Prüft den Modellnamen gegen das Routing des gewählten Anbieters.

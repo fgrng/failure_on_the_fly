@@ -53,6 +53,18 @@
             </div>
         </section>
 
+        <section class="page-section" aria-label="Zero-Retention-Erklärung">
+            <header class="page-section__head">
+                <b>03</b><span><h2>Zero-Retention-Erklärung</h2><small>Ohne sie lässt sich die Konfiguration nicht für die Schüler:in aktivieren; beim Anbieter »fake« entfällt sie</small></span>
+            </header>
+            <div class="system-page-field-list">
+                {{ form.zero_retention_erklaert.errors }}
+                <label><input type="checkbox" name="{{ form.zero_retention_erklaert.html_name }}" id="{{ form.zero_retention_erklaert.id_for_label }}"{% if form.zero_retention_erklaert.value %} checked{% endif %}> {{ form.zero_retention_erklaert.label }}</label>
+                <small class="system-page-hint">{{ form.zero_retention_erklaert.help_text }}</small>
+                {% include "vignetten/includes/form_field.html" with field=form.zero_retention_beleg %}
+            </div>
+        </section>
+
         <div class="vignette-form-actions">
             <a class="button button--secondary" href="{% url 'simulation:modell_konfiguration' %}">Abbrechen</a>
             <button class="button" type="submit">Konfiguration anlegen</button>

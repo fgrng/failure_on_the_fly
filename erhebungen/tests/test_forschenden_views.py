@@ -18,6 +18,7 @@ from django.utils import timezone
 from pytest_django.asserts import assertContains, assertNotContains, assertRedirects
 
 from config.tests.aufbau import (
+    erklaerte,
     aktive_modell_konfiguration,
     finale_vignette,
     finaler_kern,
@@ -81,25 +82,29 @@ def _forschungskonfiguration(
 ) -> ModellKonfiguration:
     """Legt eine gültige Konfiguration an, die sich am Namen wiedererkennen lässt."""
 
-    return ModellKonfiguration.objects.create(
-        bezeichnung="Test",
-        anbieter=Anbieter.OPENROUTER,
-        sprachmodell=f"openrouter/{name}",
-        anbieter_token="sk-or-geheim",
-        parameter=parameter or {},
+    return erklaerte(
+        ModellKonfiguration.objects.create(
+            bezeichnung="Test",
+            anbieter=Anbieter.OPENROUTER,
+            sprachmodell=f"openrouter/{name}",
+            anbieter_token="sk-or-geheim",
+            parameter=parameter or {},
+        )
     )
 
 
 def _infomaniak_konfiguration() -> ModellKonfiguration:
     """Legt eine Konfiguration an, die Basis-URL und Token wirklich trägt."""
 
-    return ModellKonfiguration.objects.create(
-        bezeichnung="Mistral bei Infomaniak",
-        anbieter=Anbieter.INFOMANIAK,
-        sprachmodell="openai/mistral24b",
-        anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
-        anbieter_token="sk-infomaniak-geheim",
-        parameter={"temperature": 0.2},
+    return erklaerte(
+        ModellKonfiguration.objects.create(
+            bezeichnung="Mistral bei Infomaniak",
+            anbieter=Anbieter.INFOMANIAK,
+            sprachmodell="openai/mistral24b",
+            anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+            anbieter_token="sk-infomaniak-geheim",
+            parameter={"temperature": 0.2},
+        )
     )
 
 
@@ -2321,11 +2326,37 @@ class ErhebungsExportTests(TestCase):
                     "anbieter": "infomaniak",
                     "sprachmodell": "openai/mistral24b",
                     "parameter": '{"temperature": 0.2}',
+                    "zero_retention_erklaert": "True",
+                    "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
+                    "zero_retention_erklaert_am": timezone.localtime(
+                        konfiguration.zero_retention_erklaert_am, timezone.UTC
+                    ).isoformat(timespec="seconds"),
                 }
             ],
         )
         self.assertNotIn(konfiguration.anbieter_token, archivinhalt)
         self.assertNotIn(konfiguration.anbieter_basis_url, archivinhalt)
+        # Der Export führt keine Konten, auch nicht das erklärende.
+        self.assertNotIn(
+            konfiguration.zero_retention_erklaert_von.username, archivinhalt
+        )
+
+    def test_exportiert_den_erklaerungsstand_einer_fake_konfiguration(self) -> None:
+        """Ohne Erklärung bleibt der Zeitpunkt NA, nicht leer."""
+
+        ada: Konto = forschende("ada")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        [konfiguration] = export_lesen(response)["modellkonfigurationen.csv"]
+        self.assertEqual(konfiguration["zero_retention_erklaert"], "False")
+        self.assertEqual(konfiguration["zero_retention_beleg"], "")
+        self.assertEqual(konfiguration["zero_retention_erklaert_am"], "NA")
 
     def test_exportiert_ziehungen_und_alle_erhebungssitzungen(self) -> None:
         """Die Ziehung zeigt den Plan, Sitzungen zeigen jeden tatsächlichen Ausgang."""

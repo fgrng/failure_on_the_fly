@@ -145,13 +145,23 @@ class Erhebung(EigentuemerKreis):
 
     @transaction.atomic
     def finalisieren(self) -> None:
-        """Finalisiert einen Entwurf und pinnt die Konfiguration der Schüler:in."""
+        """Finalisiert einen Entwurf und pinnt die Konfiguration der Schüler:in.
+
+        Gepinnt wird nur eine erklärte Fassung oder `fake`, damit die Datenspur
+        eine nachgewiesene Zero-Retention-Zusage trägt.
+        """
 
         from simulation.models import ModellKonfiguration, Verwendung
 
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.belegte(
             Verwendung.SCHUELERIN
         )
+        if not konfiguration.zulaessig_fuer_schuelerin:
+            raise ValidationError(
+                "Die aktive Modell-Konfiguration der Schüler:in trägt keine "
+                "Zero-Retention-Erklärung. Eine Administrator:in muss zuerst eine "
+                "erklärte Konfiguration für die Schüler:in aktivieren."
+            )
         self._status_wechseln(
             erwarteter_status=self.Status.ENTWURF,
             zielstatus=self.Status.FINAL,
