@@ -1,5 +1,6 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+import re
 from datetime import UTC, datetime
 
 import time_machine
@@ -237,8 +238,8 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         self.assertContains(response, "<em>Mia</em> zeigt.")
         self.assertContains(debrief, "<li>[Diagnose](https://example.org)</li>")
 
-    def test_fehlgeschlagene_anfrage_sperrt_und_meldet_ueber_das_skript(self) -> None:
-        """Das Basistemplate lädt die Fehlerbehandlung, das Formular sperrt die Aktionszeile."""
+    def test_seite_laedt_den_hinweis_auf_gescheiterte_anfragen(self) -> None:
+        """Das Basistemplate bindet die Fehlerbehandlung samt angesagtem Hinweis ein."""
 
         einleitung: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
@@ -246,14 +247,40 @@ class ProbelaufStartTests(_ProbelaufAufbau):
 
         self.assertContains(einleitung, "js/anfragen.js")
         self.assertContains(einleitung, 'id="anfragefehler"')
-        self.assertContains(
-            einleitung,
-            'hx-disabled-elt="find .gespraechseingabe__senden, '
-            'find .spracheingabe__steuerung, .sitzung-aktionen button"',
+
+    def _gespraechsformular(self) -> str:
+        """Liefert das öffnende Tag des Gesprächsformulars nach dem Start."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
-        self.assertContains(einleitung, "data-schreibschutz-waehrend-anfrage")
-        self.assertContains(einleitung, "data-einmal-absenden")
-        self.assertNotContains(einleitung, "hx-on::before-request")
+        formular: re.Match[str] | None = re.search(
+            r'<form id="gespraechseingabe-formular"[^>]*>', einleitung.content.decode()
+        )
+        self.assertIsNotNone(formular)
+        return formular.group(0)
+
+    def test_laufender_gespraechsschritt_sperrt_die_aktionszeile(self) -> None:
+        """Während der htmx-Anfrage des Formulars sind auch die Aktionsknöpfe gesperrt."""
+
+        gesperrt: re.Match[str] | None = re.search(
+            r'hx-disabled-elt="([^"]*)"', self._gespraechsformular()
+        )
+
+        self.assertIn(
+            ".sitzung-aktionen button",
+            [ziel.strip() for ziel in gesperrt.group(1).split(",")],
+        )
+
+    def test_gespraechsformular_nutzt_schreibschutz_und_einmaliges_absenden(
+        self,
+    ) -> None:
+        """Das Formular meldet sich für Freigabe nach Fehlern und Doppelklickschutz an."""
+
+        formular: str = self._gespraechsformular()
+
+        self.assertIn(" data-schreibschutz-waehrend-anfrage", formular)
+        self.assertIn(" data-einmal-absenden", formular)
 
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
