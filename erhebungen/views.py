@@ -1251,6 +1251,7 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
         sitzung,
         _sitzungsnavigation(token),
         sitzungsblock=lambda: _sitzungsblock_rendern(request, bindung, sitzung),
+        nach_verfall=lambda: _weiter_im_ablauf(request, bindung),
     )
 
 
@@ -1295,7 +1296,8 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
     sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
-    sitzung_abbrechen(sink)
+    if not sitzung_abbrechen(sink):
+        return _weiter_im_ablauf(request, bindung)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
     if anhang:
         return persistiertes_gespraech(

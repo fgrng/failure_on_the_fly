@@ -942,6 +942,20 @@ ist das Feld wieder beschreibbar, der Text steht noch darin, und alle Knöpfe
 sind wieder frei. Scheitert dagegen die Antwort des Sprachmodells, erscheint wie
 bisher „Die Antwort konnte nicht erzeugt werden.“ mit „Erneut senden“.
 
+Gilt eine Eingabe nicht mehr, wenn ihre Antwort eintrifft, verfällt sie: Sie
+wird kein Gesprächsschritt, und nichts davon bleibt gespeichert, auch kein
+Fehlschlag. Das geschieht, wenn die Sitzung inzwischen in einem anderen Tab oder
+auf einem anderen Gerät abgeschlossen oder abgebrochen wurde, und bei zwei
+gleichzeitig abgeschickten Eingaben derselben Sitzung für die später
+beantwortete. Die Seite lädt dann neu und zeigt den tatsächlichen Stand: im
+Training die beendete Sitzung, in der Erhebung die aktuelle Stelle des Ablaufs,
+bei zwei gleichzeitigen Eingaben das Gespräch mit der zuerst beantworteten. Nur
+wenn die Sitzung inzwischen beendet ist, steht oben der Hinweis „Diese Sitzung
+wurde inzwischen an anderer Stelle beendet; Ihre letzte Eingabe wurde nicht mehr
+verarbeitet.“ Eine beendete Sitzung wechselt ihren Status nicht mehr: Ein
+späteres Abbrechen, Abschließen oder Scheitern ändert nichts und zeigt ihren
+Stand, und die Uhr eines Zeitbudgets bucht danach keine Zeit mehr.
+
 Eine einzelne Aufnahme ist auf 15 MB begrenzt — je nach Kodierung grob 15 bis 60
 Minuten Sprache. Ist die Grenze erreicht, endet die Aufnahme von selbst und wird
 transkribiert; das bereits Gesagte geht nicht verloren. Dieselbe Grenze hält der
