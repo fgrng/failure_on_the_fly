@@ -76,6 +76,7 @@ class RollenentzugImKreisTests(FremdeinsichtTestCase):
         self.assertEqual(self.client.get(self._wahl_url()).status_code, 404)
         self._rolle_zurueckgeben()
         self.assertEqual(self.client.get(detail_url).status_code, 200)
+        self.assertEqual(self.client.get(self._wahl_url()).status_code, 200)
 
     def test_mit_eigener_bindung_wie_jede_teilnehmerin(self) -> None:
         """Mit aktiver Trainingsbindung erreicht sie Detail und Wahl."""
@@ -105,16 +106,16 @@ class RollenentzugImKreisTests(FremdeinsichtTestCase):
         )
 
     def test_offener_beitritt_bindet_wie_jede_teilnehmerin(self) -> None:
-        """Ohne Rolle legt der offene Link eine Trainingsbindung an."""
-        self.client.get(
-            reverse("training:beitreten", args=[self.training.trainings_link])
-        )
+        """Ohne Rolle führt der offene Link über die Bindung ins Training."""
+        detail_url: str = reverse("training:detail", args=[self.training.pk])
 
-        self.assertTrue(
-            self.training.trainingsbindung_set.aktiv()
-            .filter(konto=self.ausbilderin)
-            .exists()
+        self.assertRedirects(
+            self.client.get(
+                reverse("training:beitreten", args=[self.training.trainings_link])
+            ),
+            detail_url,
         )
+        self.assertEqual(self.client.get(self._wahl_url()).status_code, 200)
 
     def test_administration_bleibt_zugelassen(self) -> None:
         """Administration ohne Fachrolle liest, öffnet und entfernt weiter."""

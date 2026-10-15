@@ -67,7 +67,7 @@ class TrainingQuerySet(
         Der Kreis öffnet nur mit der Rolle Ausbilder:in oder der Administration;
         nach einem Rollenentzug bleibt die Eigentümerschaft, die Tür nicht.
         """
-        if not rolle_oder_administration(AUSBILDERIN_GRUPPE)(konto):
+        if not rolle_oder_administration(self.model.ROLLENGRUPPE)(konto):
             return self.none()
         return self.sichtbar_fuer(konto)
 

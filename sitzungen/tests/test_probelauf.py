@@ -442,9 +442,7 @@ class ProbelaufRollenentzugTests(_ProbelaufAufbau):
         """Administration erreicht Auswahl und Start wie bisher."""
         self.client.force_login(konto_mit_rollen("root", is_superuser=True))
 
-        self.assertEqual(
-            self.client.get(reverse("sitzungen:probelauf_auswahl")).status_code, 200
-        )
+        self.assertEqual(self._status(), (200, 200))
 
 
 class ProbelaufGespraechTests(_ProbelaufAufbau):

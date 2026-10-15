@@ -149,18 +149,16 @@ def katalog(request: HttpRequest) -> HttpResponse:
     trainingsabfrage: QuerySet[Training] = (
         Training.objects.veroeffentlicht().zugaenglich_fuer(request.user)
     )
-    sichtbare_pks: set[int] = set()
     eigene_trainings_pks: set[int] = set(
         Training.objects.filter(eigentuemerinnen=request.user).values_list(
             "pk", flat=True
         )
     )
-    if ist_ausbilderin:
-        sichtbare_trainings: QuerySet[Training] = Training.objects.sichtbar_fuer(
-            request.user
-        )
-        trainingsabfrage = trainingsabfrage | sichtbare_trainings
-        sichtbare_pks = set(sichtbare_trainings.values_list("pk", flat=True))
+    sichtbare_trainings: QuerySet[Training] = Training.objects.kreiszugang_fuer(
+        request.user
+    )
+    trainingsabfrage = trainingsabfrage | sichtbare_trainings
+    sichtbare_pks: set[int] = set(sichtbare_trainings.values_list("pk", flat=True))
 
     trainings: list[dict[str, object]] = []
     for training in trainingsabfrage.distinct():

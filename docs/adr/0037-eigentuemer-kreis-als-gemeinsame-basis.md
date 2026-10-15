@@ -5,7 +5,7 @@ amended-by: [ADR-0059, "#364", "#477"]
 
 # Der Eigentümer-Kreis ist eine gemeinsame Basis in `konten`
 
-> **Nachgeführt durch ADR-0059, #364:**
+> **Nachgeführt durch ADR-0059, #364, #477:**
 >
 > *ADR-0059:* Der Abschnitt „Nebenläufigkeit" unten ist in ADR-0059
 > aufgegangen; dort steht die Regel für das ganze Projekt. Die Aussage,
