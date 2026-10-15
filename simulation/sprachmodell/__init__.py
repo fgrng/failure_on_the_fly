@@ -49,14 +49,14 @@ def nachrichten_bauen(
     Der System-Prompt steht einmal am Anfang; danach wechseln sich die
     Paare aus `user` und `assistant` ab, und die Eingabe ist die letzte
     `user`-Nachricht (ADR-0052). Welcher Inhalt in `assistant` steht,
-    bestimmt der Aufrufer; der Simulationskern gibt dort bei der Schüler:in
+    bestimmt der Aufrufer; `antwort_versuchen` gibt dort bei der Schüler:in
     die Denkspur mit (ADR-0064).
     """
 
     nachrichten: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    for frage, aeusserung in verlauf:
+    for frage, inhalt in verlauf:
         nachrichten.append({"role": "user", "content": frage})
-        nachrichten.append({"role": "assistant", "content": aeusserung})
+        nachrichten.append({"role": "assistant", "content": inhalt})
     nachrichten.append({"role": "user", "content": eingabe})
     return nachrichten
 
