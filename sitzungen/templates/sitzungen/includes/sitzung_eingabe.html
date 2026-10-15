@@ -12,7 +12,7 @@
     </div>
 {% else %}
     <div class="gespraechseingabe">
-        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#gespraechsschritt-neu:top" hx-disabled-elt="find .gespraechseingabe__senden, find .spracheingabe__steuerung" hx-on::before-request="this.elements.eingabe.readOnly = true">
+        <form id="gespraechseingabe-formular" class="gespraechseingabe__formular" method="post" action="{{ navigation.gespraech_url }}" hx-post="{{ navigation.gespraech_url }}" hx-target="#sitzung-fortsetzung" hx-swap="innerHTML show:#gespraechsschritt-neu:top" hx-disabled-elt="find .gespraechseingabe__senden, find .spracheingabe__steuerung, .sitzung-aktionen button" data-schreibschutz-waehrend-anfrage data-einmal-absenden>
             {% csrf_token %}
             <label for="eingabe">Ihre nächste Frage</label>
             <textarea id="eingabe" name="eingabe" rows="3" placeholder="Frage an die Schüler:in formulieren …" required></textarea>

@@ -1,5 +1,6 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
+import re
 from datetime import UTC, datetime
 
 import time_machine
@@ -236,6 +237,50 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         self.assertContains(response, "<strong>_Brüche_</strong>")
         self.assertContains(response, "<em>Mia</em> zeigt.")
         self.assertContains(debrief, "<li>[Diagnose](https://example.org)</li>")
+
+    def test_seite_laedt_den_hinweis_auf_gescheiterte_anfragen(self) -> None:
+        """Das Basistemplate bindet die Fehlerbehandlung samt angesagtem Hinweis ein."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+
+        self.assertContains(einleitung, "js/anfragen.js")
+        self.assertContains(einleitung, 'id="anfragefehler"')
+
+    def _gespraechsformular(self) -> str:
+        """Liefert das öffnende Tag des Gesprächsformulars nach dem Start."""
+
+        einleitung: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        formular: re.Match[str] | None = re.search(
+            r'<form id="gespraechseingabe-formular"[^>]*>', einleitung.content.decode()
+        )
+        self.assertIsNotNone(formular)
+        return formular.group(0)
+
+    def test_laufender_gespraechsschritt_sperrt_die_aktionszeile(self) -> None:
+        """Während der htmx-Anfrage des Formulars sind auch die Aktionsknöpfe gesperrt."""
+
+        gesperrt: re.Match[str] | None = re.search(
+            r'hx-disabled-elt="([^"]*)"', self._gespraechsformular()
+        )
+
+        self.assertIn(
+            ".sitzung-aktionen button",
+            [ziel.strip() for ziel in gesperrt.group(1).split(",")],
+        )
+
+    def test_gespraechsformular_nutzt_schreibschutz_und_einmaliges_absenden(
+        self,
+    ) -> None:
+        """Das Formular meldet sich für Freigabe nach Fehlern und Doppelklickschutz an."""
+
+        formular: str = self._gespraechsformular()
+
+        self.assertIn(" data-schreibschutz-waehrend-anfrage", formular)
+        self.assertIn(" data-einmal-absenden", formular)
 
     def test_sitzung_waechst_per_htmx_unter_der_bleibenden_einleitung(self) -> None:
         """Die Sitzung wächst auf einer Seite, statt zwischen Seiten zu wechseln."""
