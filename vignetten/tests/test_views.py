@@ -1300,6 +1300,33 @@ class VignetteArchivierenViewTests(TestCase):
         archivierte.refresh_from_db()
         self.assertEqual(archivierte.zustand, Vignette.Zustand.ARCHIVIERT)
 
+    def test_entarchiviert_neben_archivierter_schwester_ueber_post(self) -> None:
+        """Eine ebenfalls archivierte Schwester lässt das Entarchivieren zu."""
+        ada: Konto = _autorin("ada")
+        vorgaengerin: Vignette = finale_vignette(ada)
+        archivierte: Vignette = vorgaengerin.bearbeiten()
+        archivierte.finalisieren()
+        archivierte.archivieren()
+        schwester: Vignette = vorgaengerin.bearbeiten()
+        schwester.finalisieren()
+        schwester.archivieren()
+        self.client.force_login(ada)
+
+        detail: HttpResponse = self.client.get(
+            reverse("vignetten:detail", args=[archivierte.pk])
+        )
+        response: HttpResponse = self.client.post(
+            reverse("vignetten:entarchivieren", args=[archivierte.pk]), follow=True
+        )
+
+        self.assertIn("Entarchivieren", [knopf for knopf, _ in submit_knoepfe(detail)])
+        self.assertRedirects(
+            response, reverse("vignetten:detail", args=[archivierte.pk])
+        )
+        self.assertContains(
+            response, '<span class="badge badge--final">Final</span>', html=True
+        )
+
     def test_aktionen_sind_post_only_und_fuer_fremde_historien_unsichtbar(self) -> None:
         """Jede Aktion schützt Methode und Eigentümer-Kreis an der HTTP-Naht."""
         ada: Konto = _autorin("ada")

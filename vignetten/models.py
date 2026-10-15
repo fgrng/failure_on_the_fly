@@ -595,7 +595,7 @@ class Vignette(models.Model):
         )
 
     def kann_entarchiviert_werden(self) -> bool:
-        """Prüft, ob keine aktive Schwester dieselbe Vorgängerin belegt."""
+        """Prüft, ob die Fassung archiviert ist und keine aktive Schwester hat."""
         return (
             self.zustand == self.Zustand.ARCHIVIERT and not self._hat_aktive_schwester()
         )
