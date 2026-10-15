@@ -1,8 +1,19 @@
 ---
-status: accepted
+status: amended
+amended-by: ["zero-retention-erklaerung-an-der-konfiguration", "#496"]
 ---
 
 # Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung, Anbieterbindung statt Modellliste
+
+> **Nachgeführt durch ADR „Die Zero-Retention-Erklärung gehört an die
+> Konfiguration, nicht an die Instanz“, #496:** Die Transkriptions-Konfiguration
+> ist kein veränderlicher Singleton mehr, sondern append-only wie die
+> Modell-Konfiguration: Fassungen werden neu angelegt, nur das Token ist
+> rotierbar, genau eine ist aktiv. Jede Sitzung pinnt die aktive Fassung, und
+> die referenzierten Fassungen gehen ohne Token in den Export. Beide
+> Konfigurationen tragen eine Zero-Retention-Erklärung; für die Verwendung
+> *Schüler:in* ist nur eine erklärte Fassung oder `fake` aktivierbar. Der
+> Provider-Filter bleibt als technische Sicherung.
 
 Dieses ADR fasst den Stand von ADR-0013 (samt Nachführung durch ADR-0046),
 ADR-0036 und ADR-0038 zusammen und ersetzt sie. Die Transkription als
