@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.tests.aufbau import finale_vignette
-from config.tests.formular import fokusziel_tag, submit_knoepfe
+from config.tests.formular import letztes_fokusziel, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen
 from erhebungen.ablauf import block_vorlegen
 from erhebungen.models import (
@@ -1543,13 +1543,9 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(antwort, "Wie war die Sitzung?")
         self.assertContains(antwort, 'id="itemblock-formular"')
         # Der Kopf des Anhangs ist das letzte Fokusziel und bekommt den Fokus.
-        html: str = antwort.content.decode()
-        kopf: str = fokusziel_tag(html, 'id="sitzung-anhang-titel"')
+        kopf: str = letztes_fokusziel(antwort.content.decode())
+        self.assertIn('id="sitzung-anhang-titel"', kopf)
         self.assertIn('tabindex="-1"', kopf)
-        self.assertEqual(
-            html.rindex("data-fokusziel"),
-            html.index(kopf) + kopf.index("data-fokusziel"),
-        )
 
     def test_wiedereinstieg_fuehrt_zum_offenen_sitzungsblock(self) -> None:
         """Ein späterer Link-Aufruf führt den noch offenen Sitzungsblock weiter."""

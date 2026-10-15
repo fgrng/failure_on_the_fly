@@ -7,7 +7,7 @@
     {% include "sitzungen/includes/sitzung_debrief.html" %}
 {% endif %}
 {% if anhang %}
-    {# Der Anhang hängt unter der Sitzung; nach einem vollen Seitenwechsel steht man sonst wieder oben und übersieht ihn. #}
+    {# Der Anhang hängt unter der Sitzung; nach einem vollen Seitenwechsel steht man sonst wieder oben und übersieht ihn. Der Fokus folgt ohne zweiten Sprung, damit Screenreader den Kopf ansagen. #}
     <section id="sitzung-anhang" class="sitzung-abschnitt sitzung-anhang" aria-labelledby="sitzung-anhang-titel">
         <header class="sitzung-abschnitt-kopf">
             <span>Erhebung · Fragebogen</span>
