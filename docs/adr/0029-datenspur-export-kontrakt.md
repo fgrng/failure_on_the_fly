@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278", "zero-retention-erklaerung-an-der-konfiguration", "#497", "#498", "#499", "#500"]
+amended-by: ["#278", ADR-0067, "#497", "#498", "#499", "#500"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
@@ -19,8 +19,7 @@ amended-by: ["#278", "zero-retention-erklaerung-an-der-konfiguration", "#497", "
 > Formatänderung zulässig; die Tabelle unten zeigt den Stand danach.
 >
 > **Nachgeführt durch #497:** `modellkonfigurationen.csv` trägt zusätzlich den
-> Erklärungsstand der Zero-Retention-Erklärung (ADR „Die
-> Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“):
+> Erklärungsstand der Zero-Retention-Erklärung (ADR-0067):
 > `zero_retention_erklaert` (`True` oder `False`), `zero_retention_beleg` (leer
 > ohne Erklärung) und `zero_retention_erklaert_am` (`NA` ohne Erklärung). Das
 > erklärende Konto bleibt draußen, weil der Export keine Konten führt. Der
@@ -35,8 +34,7 @@ amended-by: ["#278", "zero-retention-erklaerung-an-der-konfiguration", "#497", "
 > zur Zeit einer Sitzung galt. Das widerrufende Konto bleibt draußen.
 >
 > **Nachgeführt durch #499:** Die Transkriptions-Konfiguration erscheint im
-> Export (ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht
-> an die Instanz“). Jede Sitzung pinnt beim Start ihre Fassung, und
+> Export (ADR-0067). Jede Sitzung pinnt beim Start ihre Fassung, und
 > `sitzungen.csv` trägt sie in `transkriptions_konfiguration_id`; `NA` heißt,
 > die Sitzung begann vor dem Pin. Die neue, sechzehnte Datei
 > `transkriptionskonfigurationen.csv` führt die referenzierten Fassungen mit

@@ -1,12 +1,11 @@
 ---
 status: amended
-amended-by: ["zero-retention-erklaerung-an-der-konfiguration", "#496"]
+amended-by: [ADR-0067, "#496"]
 ---
 
 # Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung, Anbieterbindung statt Modellliste
 
-> **Nachgeführt durch ADR „Die Zero-Retention-Erklärung gehört an die
-> Konfiguration, nicht an die Instanz“, #496:** Die Transkriptions-Konfiguration
+> **Nachgeführt durch ADR-0067, #496:** Die Transkriptions-Konfiguration
 > ist kein veränderlicher Singleton mehr, sondern append-only wie die
 > Modell-Konfiguration: Fassungen werden neu angelegt, nur das Token ist
 > rotierbar, genau eine ist aktiv. Jede Sitzung pinnt die aktive Fassung, und

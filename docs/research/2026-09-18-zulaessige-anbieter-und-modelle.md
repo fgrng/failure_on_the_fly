@@ -4,7 +4,7 @@
 
 > **Nachtrag 2026-09-21** ([#226](https://github.com/fgrng/failure_on_the_fly/issues/226)): Infomaniaks Modellliste ist inzwischen an einem echten Konto abgerufen. Die Abschnitte 1.2 und 4.2 sind auf diesen verifizierten Stand gebracht; der frühere Vorbehalt »kein Konto vorhanden« und die Modellnamen aus der Drittquelle sind ersetzt. Die Empfehlung aus 4.3 — Autovervollständigung ja, harte Prüfung nein — bleibt davon unberührt.
 
-> **Nachtrag 2026-10-15** ([#500](https://github.com/fgrng/failure_on_the_fly/issues/500)): Der Umgebungsschalter der Zero-Retention, von dem 2.x, 3.5 und 6.1 sprechen, ist entfallen. Die Zusage steht jetzt als Zero-Retention-Erklärung mit Beleg an der Transkriptions-Fassung; ohne erklärte, aktive Fassung transkribiert die Instanz nicht. Die Haltung aus 3.5, die Zusage gehöre nicht ins Formular der Anbieterwahl, ist damit ausdrücklich umgekehrt (ADR „Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz“).
+> **Nachtrag 2026-10-15** ([#500](https://github.com/fgrng/failure_on_the_fly/issues/500)): Der Umgebungsschalter der Zero-Retention, von dem 2.x, 3.5 und 6.1 sprechen, ist entfallen. Die Zusage steht jetzt als Zero-Retention-Erklärung mit Beleg an der Transkriptions-Fassung; ohne erklärte, aktive Fassung transkribiert die Instanz nicht. Die Haltung aus 3.5, die Zusage gehöre nicht ins Formular der Anbieterwahl, ist damit ausdrücklich umgekehrt (ADR-0067).
 
 Recherche zu [#166](https://github.com/fgrng/failure_on_the_fly/issues/166). Beantwortet die damals offene Frage »Zulässige Anbieter und Modelle« (seit ADR-0038 entschieden):
 

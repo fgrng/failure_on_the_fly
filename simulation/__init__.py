@@ -45,8 +45,7 @@ SPRACHMODELL_MINDEST_ANFRAGEFRIST_SEKUNDEN: float = 1.0
 
 # Die technische Sicherung bei OpenRouter: Die Zusage selbst trägt die
 # Zero-Retention-Erklärung an der Modell-Konfiguration; der Filter fängt, was
-# eine fehlerhafte Erklärung durchließe (ADR „Die Zero-Retention-Erklärung
-# gehört an die Konfiguration, nicht an die Instanz“).
+# eine fehlerhafte Erklärung durchließe (ADR-0067).
 OPENROUTER_PROVIDER_FILTER: dict[str, object] = {
     "require_parameters": True,
     "data_collection": "deny",

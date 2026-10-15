@@ -1,12 +1,11 @@
 ---
 status: amended
-amended-by: ["zero-retention-erklaerung-an-der-konfiguration", "#496"]
+amended-by: [ADR-0067, "#496"]
 ---
 
 # Transkription läuft über einen externen Auftragsverarbeiter mit Zero-Retention
 
-> **Nachgeführt durch ADR „Die Zero-Retention-Erklärung gehört an die
-> Konfiguration, nicht an die Instanz“, #496:** Der Kern gilt weiter: externer
+> **Nachgeführt durch ADR-0067, #496:** Der Kern gilt weiter: externer
 > Auftragsverarbeiter, Zero Retention als Voraussetzung, Einwilligung b und die
 > Ausnahme für den Probelauf. Nur der Ort des Tors wechselt. Statt des
 > Umgebungsschalters `TRANSKRIPTION_ZERO_RETENTION`, der entfällt, entscheidet
