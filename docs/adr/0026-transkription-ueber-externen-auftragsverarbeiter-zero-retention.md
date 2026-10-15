@@ -12,7 +12,10 @@ amended-by: ["zero-retention-erklaerung-an-der-konfiguration", "#496"]
 > Umgebungsschalters `TRANSKRIPTION_ZERO_RETENTION`, der entfällt, entscheidet
 > die Zero-Retention-Erklärung an der Transkriptions-Fassung, die eine Sitzung
 > pinnt oder die für den Probelauf aktiv ist. Steht sie auf `fake`, wird nicht
-> transkribiert. Die Wahl des Auftragsverarbeiters geht damit in die Datenspur.
+> transkribiert. Die Erklärung gibt eine Administrator:in mit Beleg an der
+> Fassung ab, nicht mehr die Betreiber:in über die Umgebung; die Kontrolle
+> bleibt organisatorisch. Die Wahl des Auftragsverarbeiters geht damit in die
+> Datenspur.
 
 ADR-0007 macht die Spracheingabe zum primären Eingabeweg und verlangt, dass das Audio **unmittelbar in ein Transkript überführt und verworfen** wird, weil die Stimme ein biometrisches, personenbezogenes Datum ist und die in ADR-0006 gebaute Pseudonymität nicht unterlaufen darf. ADR-0007 lässt offen, **wo** transkribiert wird. Diese Entscheidung schließt die Lücke: Die Transkription läuft über eine **externe API**.
 

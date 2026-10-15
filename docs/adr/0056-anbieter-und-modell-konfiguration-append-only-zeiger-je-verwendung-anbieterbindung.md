@@ -13,7 +13,10 @@ amended-by: ["zero-retention-erklaerung-an-der-konfiguration", "#496"]
 > die referenzierten Fassungen gehen ohne Token in den Export. Beide
 > Konfigurationen tragen eine Zero-Retention-Erklärung; für die Verwendung
 > *Schüler:in* ist nur eine erklärte Fassung oder `fake` aktivierbar. Der
-> Provider-Filter bleibt als technische Sicherung.
+> Provider-Filter bleibt als technische Sicherung, trägt die Zusage aber nicht
+> mehr allein: Der Satz in Regel 3, ein Tor im selben Formular wie die
+> Anbieterwahl sei keins, gilt für die Erklärung nicht, denn sie hängt an einer
+> unveränderlichen Fassung und ist nur zu widerrufen.
 
 Dieses ADR fasst den Stand von ADR-0013 (samt Nachführung durch ADR-0046),
 ADR-0036 und ADR-0038 zusammen und ersetzt sie. Die Transkription als

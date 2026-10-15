@@ -16,8 +16,9 @@ worauf sich eine Zusage stützt (#495).
 Dieses ADR legt die **Zero-Retention-Erklärung** an die **Modell-Konfiguration**
 und an die **Transkriptions-Konfiguration**. Es kehrt damit die bisherige
 Haltung ausdrücklich um, nach der die Zusage nicht in dasselbe Formular gehört
-wie die Anbieterwahl (ADR-0026, ADR-0056, `docs/verhalten.md`). Zwei Gründe
-tragen die Umkehr:
+wie die Anbieterwahl (`docs/verhalten.md`; ADR-0026 legt das Tor deshalb in
+die Umgebung, ADR-0056 hält es als Provider-Filter aus dem Anbieterformular).
+Zwei Gründe tragen die Umkehr:
 
 - **Die Zusage hängt am Modell, nicht an der Instanz.** Bei OpenRouter gibt es
   Modelle mit und ohne Zero Retention. Eine Erklärung je Instanz kann das nicht
@@ -98,7 +99,8 @@ Jede **Sitzung pinnt** beim Start die aktive Transkriptions-Fassung, und alle
 ihre Transkriptionen laufen über diese Fassung. Ein Wechsel wirkt ab der
 nächsten Sitzung; die Aufnahmen einer Teilnehmer:in gehen innerhalb einer
 Sitzung immer an denselben Anbieter. Der Probelauf ist schreibfrei und hat
-keine Sitzung (ADR-0014); er folgt bei jeder Anfrage der aktiven Fassung.
+keine Sitzung (ADR-0014, ADR-0026); er folgt bei jeder Anfrage der aktiven
+Fassung.
 
 Der Erklärungsstand beider Konfigurationen geht in den Export (ADR-0029): an
 den Modell-Konfigurationen und an den referenzierten Transkriptions-Fassungen,
@@ -113,8 +115,8 @@ die Kennung ihrer gepinnten Transkriptions-Fassung.
   Erklärung an der Fassung abgibt. Das ist beabsichtigt.
 - Eine aktive Schüler:in-Konfiguration ohne Erklärung **bleibt aktiv**.
   Training und Probelauf laufen weiter; die Übersicht weist auf die fehlende
-  Erklärung hin. Eine Erhebung lässt sich erst finalisieren, wenn eine erklärte
-  Fassung aktiv ist.
+  Erklärung hin. Eine Erhebung lässt sich erst finalisieren, wenn für
+  *Schüler:in* eine erklärte Fassung oder `fake` aktiv ist.
 
 ## Der Provider-Filter bleibt
 
