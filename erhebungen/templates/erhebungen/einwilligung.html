@@ -97,5 +97,31 @@
             <button class="button" type="submit">Weiter</button>
         </div>
     </form>
+
+    {% comment %}
+    Ein eigenes Formular mit eigener Route: Die Tokeneingabe greift nicht in die
+    Einwilligungen ein.
+    {% endcomment %}
+    <form class="form" method="post" action="{% url 'erhebungen:fortsetzen' request.resolver_match.kwargs.teilnahme_link %}">
+        {% csrf_token %}
+        <section class="page-section" aria-labelledby="section-fortsetzen">
+            <header class="page-section__head">
+                <b>{% if spracherkennung_angeboten %}05{% else %}04{% endif %}</b><span><h2 id="section-fortsetzen">Sie haben schon ein Teilnahme-Token?</h2></span>
+            </header>
+            <div class="page-field">
+                <p>Mit dem notierten Token setzen Sie Ihre Teilnahme in diesem Browser dort fort, wo sie steht.</p>
+                {% with feld=token_formular.token %}
+                <div class="vignette-field">
+                    <label for="{{ feld.id_for_label }}">{{ feld.label }}</label>
+                    {{ feld }}
+                    {{ feld.errors }}
+                </div>
+                {% endwith %}
+            </div>
+        </section>
+        <div class="vignette-form-actions">
+            <button class="button" type="submit">Hier fortsetzen</button>
+        </div>
+    </form>
 </section>
 {% endblock %}

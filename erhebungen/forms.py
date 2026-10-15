@@ -1,4 +1,4 @@
-"""Formulare zum Anlegen einer Erhebung und zum Beantworten eines Itemblocks."""
+"""Formulare zum Anlegen einer Erhebung, zur Tokeneingabe und zu Itemblöcken."""
 
 from typing import Any
 
@@ -25,6 +25,38 @@ class ErhebungAnlegenFormular(forms.Form):
             "max_length": "Höchstens 255 Zeichen.",
         },
     )
+
+
+KEINE_FORTSETZUNG: str = "Zu diesem Token lässt sich keine Teilnahme fortsetzen."
+
+
+class TeilnahmeTokenFormular(forms.Form):
+    """Nimmt ein notiertes Teilnahme-Token entgegen, gleich wie geschrieben.
+
+    Groß- und Kleinschreibung, Leerzeichen und ein fehlender Bindestrich
+    zählen nicht: `vc9h ynfr` wird zu `VC9H-YNFR`.
+    """
+
+    token = forms.CharField(
+        label="Teilnahme-Token",
+        max_length=32,
+        error_messages={"required": KEINE_FORTSETZUNG, "max_length": KEINE_FORTSETZUNG},
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "autocapitalize": "characters",
+                "inputmode": "text",
+                "spellcheck": "false",
+                "placeholder": "XXXX-XXXX",
+            }
+        ),
+    )
+
+    def clean_token(self) -> str:
+        """Bringt die Eingabe in die Form `XXXX-XXXX`."""
+
+        zeichen: str = "".join(self.cleaned_data["token"].split()).replace("-", "")
+        return f"{zeichen[:4]}-{zeichen[4:]}".upper()
 
 
 def _feldname(antwort: ItemAntwort) -> str:
