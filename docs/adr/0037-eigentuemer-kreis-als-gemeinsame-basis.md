@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: [ADR-0059, "#364"]
+amended-by: [ADR-0059, "#364", "#477"]
 ---
 
 # Der Eigentümer-Kreis ist eine gemeinsame Basis in `konten`
@@ -22,6 +22,22 @@ amended-by: [ADR-0059, "#364"]
 > und ihrer Liste als Ziel nach dem Selbstaustritt. Die Kante zeigt weiter von
 > den Apps auf `konten`; eine gemeinsame Lebenszyklus-Hülle folgt daraus
 > nicht, ADR-0040 gilt fort.
+>
+> *#477:* Was ein Konto im Kreis **ohne** die Rolle noch darf: nichts über
+> den Bestand. Der Kreis sichert die Eigentümerschaft; der Zugang zu den
+> Views eines Bereichs setzt zusätzlich dessen Rolle voraus (Administration
+> bleibt überall zugelassen). Ein Rollenentzug sperrt den Zugang, ohne den
+> Kreis zu ändern; eine Rückgabe der Rolle öffnet ihn wieder. Einen Weg, den
+> Kreis nach dem Entzug zu räumen, braucht es deshalb nicht. Die Prüfung sitzt
+> nach zwei Regeln, auch für künftige Views: Eine View, die allein einem
+> Bereich gehört, trägt den Rollen-Decorator aus `konten.navigation` (so jetzt
+> auch Probelauf-Auswahl und -Start mit `autorin_erforderlich` und das
+> Entfernen aus dem Training). Eine View, die zwei Prinzipale bedient,
+> Teilnehmende ohne Rolle und den Kreis, prüft die Rolle im Kreis-Zweig:
+> `Training.objects.kreiszugang_fuer` liefert den Kreis nur mit der Rolle
+> Ausbilder:in oder der Administration, und `zugaenglich_fuer`, der Beitritt
+> und die Fremdeinsicht in `sitzung_ansehen` lösen den Kreis darüber auf.
+> `sichtbar_fuer` bleibt rollenfrei, ADR-0039 gilt unverändert.
 
 Der Eigentümer-Kreis aus ADR-0039 wird **ein** Gegenstand: ein
 abstraktes Modell `EigentuemerKreis` samt einem QuerySet-Mixin im Modul

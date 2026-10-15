@@ -93,7 +93,7 @@ def _sichtbares_training(request: HttpRequest, pk: int) -> Training:
 
 def _fremd_einsehbare_sitzungen(konto: Konto) -> QuerySet[Sitzung]:
     """Liefert die Sitzungen, die das Konto fremd einsehen darf (ADR-0049)."""
-    return Training.objects.sichtbar_fuer(konto).fremd_einsehbare_sitzungen()
+    return Training.objects.kreiszugang_fuer(konto).fremd_einsehbare_sitzungen()
 
 
 def _zugaengliches_training(request: HttpRequest, pk: int) -> Training:
@@ -483,13 +483,15 @@ def austreten(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@_ausbilderin_erforderlich
 def teilnehmerin_entfernen(
     request: HttpRequest, pk: int, konto_pk: int
 ) -> HttpResponse:
     """Entfernt eine Trainingsteilnehmerin auf demselben Weg wie ihr Austritt.
 
-    Nur Kreis und Administration; allen anderen ist das Training unbekannt (404),
-    ebenso ein Konto ohne aktive Bindung (ADR-0049).
+    Nur Kreis mit Rolle Ausbilder:in und Administration; ohne Rolle 403 (ADR-0037),
+    sonst ist das Training fremden Konten unbekannt (404), ebenso ein Konto ohne
+    aktive Bindung (ADR-0049).
     """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -737,14 +739,15 @@ def beitreten(request: HttpRequest, trainings_link: UUID) -> HttpResponse:
     """Tritt einem veröffentlichten Training über seinen Trainings-Link bei.
 
     Wer aktiv dabei ist, landet auch bei gesperrtem Beitritt im Training,
-    ebenso Kreis und Administration, die das Training ohne Beitritt sehen.
+    ebenso Kreis (mit Rolle Ausbilder:in) und Administration, die das Training
+    ohne Beitritt sehen.
     Ausgetretene treten über den offenen Link wieder bei, auch aus dem Kreis.
     """
     training: Training = get_object_or_404(
         Training.objects.veroeffentlicht(), trainings_link=trainings_link
     )
     kreis: bool = (
-        Training.objects.sichtbar_fuer(request.user).filter(pk=training.pk).exists()
+        Training.objects.kreiszugang_fuer(request.user).filter(pk=training.pk).exists()
     )
     gebunden: bool = training.trainingsbindung_set.filter(konto=request.user).exists()
     if kreis and not gebunden:

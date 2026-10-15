@@ -581,15 +581,18 @@ class EntfernenTests(FremdeinsichtTestCase):
         self._entfernen_bestaetigt(konto_mit_rollen("root", is_superuser=True))
 
     def test_kreisfremde_und_teilnehmende_koennen_nicht_entfernen(self) -> None:
-        """Nur der Kreis entscheidet über seine Liste."""
+        """Nur der Kreis entscheidet über seine Liste; ohne Rolle schon 403."""
         margaret: Konto = Konto.objects.create_user(username="margaret")
         self.training.beitreten(margaret)
 
-        for konto in (konto_mit_rollen("linus", AUSBILDERIN_GRUPPE), margaret):
+        for konto, status in (
+            (konto_mit_rollen("linus", AUSBILDERIN_GRUPPE), 404),
+            (margaret, 403),
+        ):
             with self.subTest(konto=konto.username):
                 self.client.force_login(konto)
                 antwort: HttpResponse = self.client.post(self._entfernen_url())
-                self.assertEqual(antwort.status_code, 404)
+                self.assertEqual(antwort.status_code, status)
         self.assertIn(
             "Grace Hopper",
             kuratierseite(self.client, self.training, self.ausbilderin),

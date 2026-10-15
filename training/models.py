@@ -9,7 +9,7 @@ from django.db.models import F, Max
 from django.db.models.signals import post_delete
 
 from konten.eigentuemerschaft import EigentuemerKreis, EigentuemerKreisQuerySet
-from konten.navigation import AUSBILDERIN_GRUPPE
+from konten.navigation import AUSBILDERIN_GRUPPE, rolle_oder_administration
 from sitzungen.bindungen import Bindung, BindungQuerySet
 from vignetten.models import vignette_archiviert
 
@@ -50,7 +50,7 @@ class TrainingQuerySet(
         """Liefert die Trainings, die das Konto betreten darf (ADR-0049).
 
         Teilnehmende erreichen ein Training nur über ihre aktive
-        Trainingsbindung; Kreis und Administration erreichen es wie bisher über `sichtbar_fuer`.
+        Trainingsbindung; Kreis und Administration erreichen es über `kreiszugang_fuer`.
         """
         return self.filter(
             models.Q(
@@ -58,8 +58,18 @@ class TrainingQuerySet(
                 .filter(konto=konto)
                 .values("training")
             )
-            | models.Q(pk__in=Training.objects.sichtbar_fuer(konto).values("pk"))
+            | models.Q(pk__in=Training.objects.kreiszugang_fuer(konto).values("pk"))
         )
+
+    def kreiszugang_fuer(self, konto: "Konto") -> models.QuerySet["Training"]:
+        """Liefert die Trainings, die der Kreis des Kontos öffnet (ADR-0037).
+
+        Der Kreis öffnet nur mit der Rolle Ausbilder:in oder der Administration;
+        nach einem Rollenentzug bleibt die Eigentümerschaft, die Tür nicht.
+        """
+        if not rolle_oder_administration(AUSBILDERIN_GRUPPE)(konto):
+            return self.none()
+        return self.sichtbar_fuer(konto)
 
     def fremd_einsehbare_sitzungen(self) -> "SitzungQuerySet":
         """Liefert die Sitzungen, die der Kreis dieser Trainings lesen darf (ADR-0049)."""
