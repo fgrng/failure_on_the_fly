@@ -55,18 +55,16 @@ class TranskriptionsEndpointTests(TestCase):
         )
         return Sitzung.objects.get()
 
-    def _anfragen(
+    def _anfragen(self, sitzung: Sitzung, anbieter: FakeTranskription) -> HttpResponse:
+        # Ruft den Endpunkt mit einer Fabrik auf, die diesen einen Anbieter gibt.
+        return self._anfragen_mit_fabrik(sitzung, lambda _: anbieter)
+
+    def _anfragen_mit_fabrik(
         self,
         sitzung: Sitzung,
-        anbieter: FakeTranskription
-        | Callable[[TranskriptionsKonfiguration], Transkription],
+        fabrik: Callable[[TranskriptionsKonfiguration], Transkription],
     ) -> HttpResponse:
-        # Ruft den Endpunkt mit dem Anbieter oder einer Fabrik auf.
-        fabrik: Callable[[TranskriptionsKonfiguration], Transkription] = (
-            (lambda _: anbieter)
-            if isinstance(anbieter, FakeTranskription)
-            else anbieter
-        )
+        # Ruft den Endpunkt mit einer Fabrik auf, die den Anbieter je Fassung bildet.
         request: HttpRequest = RequestFactory().post(
             reverse("training:transkription", args=[sitzung.pk]),
             {"audio": audioaufnahme()},
@@ -88,7 +86,7 @@ class TranskriptionsEndpointTests(TestCase):
             gebildet_aus.append(konfiguration)
             return FakeTranskription(["Text"])
 
-        self.assertEqual(self._anfragen(sitzung, fabrik).status_code, 200)
+        self.assertEqual(self._anfragen_mit_fabrik(sitzung, fabrik).status_code, 200)
         return gebildet_aus[0]
 
     def test_transkribiert_nach_einem_wechsel_mit_der_gepinnten_fassung(self) -> None:
@@ -109,6 +107,18 @@ class TranskriptionsEndpointTests(TestCase):
         )
 
         sitzung: Sitzung = self._sitzung_starten()
+
+        self.assertEqual(self._fassung_der_anfrage(sitzung), neue)
+
+    def test_eine_sitzung_von_vor_dem_pin_folgt_der_aktiven_fassung(self) -> None:
+        """Ohne gepinnte Fassung gilt, was gerade aktiv ist."""
+        sitzung: Sitzung = self._sitzung_starten()
+        Sitzung.objects.filter(pk=sitzung.pk).update(transkriptions_konfiguration=None)
+        sitzung.refresh_from_db()
+
+        neue: TranskriptionsKonfiguration = (
+            TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
+        )
 
         self.assertEqual(self._fassung_der_anfrage(sitzung), neue)
 

@@ -1289,22 +1289,14 @@ class TranskriptionsKonfigurationManager(
         Aufnahme nach außen.
         """
 
-        zeiger: AktiveTranskriptionsKonfiguration | None = (
-            AktiveTranskriptionsKonfiguration.objects.select_related(
-                "konfiguration"
-            ).first()
-        )
-        if zeiger is not None:
-            return zeiger.konfiguration
-        # Erst nachsehen, dann schreiben: Gelesen wird bei jeder Aufnahme, und
-        # nur die allererste Anfrage einer Instanz braucht die Schreibsperre.
-        with transaction.atomic():
-            zeiger = AktiveTranskriptionsKonfiguration.objects.select_related(
-                "konfiguration"
-            ).first()
-            if zeiger is not None:
-                return zeiger.konfiguration
-            return self.aktivieren(self.create())
+        # Die Vorgabe-Fassung entsteht erst, wenn der Zeiger fehlt, und im
+        # selben Savepoint wie er: Verliert eine gleichzeitige erste Anfrage
+        # das Rennen um den Zeiger, rollt ihre Fassung mit zurück.
+        zeiger: AktiveTranskriptionsKonfiguration
+        zeiger, _ = AktiveTranskriptionsKonfiguration.objects.select_related(
+            "konfiguration"
+        ).get_or_create(pk=1, defaults={"konfiguration": self.create})
+        return zeiger.konfiguration
 
     def aktivieren(
         self, konfiguration: "TranskriptionsKonfiguration"
@@ -1373,9 +1365,9 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
         if not token:
             raise ValidationError({"anbieter_token": TOKEN_FEHLT_FEHLERMELDUNG})
         # Am append-only QuerySet vorbei, wie die Erklärung (ZeroRetentionFeldgruppe).
-        models.QuerySet(model=type(self)).filter(pk=self.pk).update(
-            anbieter_token=token
-        )
+        models.QuerySet(model=type(self), using=self._state.db).filter(
+            pk=self.pk
+        ).update(anbieter_token=token)
         self.anbieter_token = token
 
 

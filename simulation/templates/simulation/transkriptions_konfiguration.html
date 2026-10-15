@@ -74,6 +74,8 @@
                         {% include "vignetten/includes/form_field.html" with field=rotationsformular.anbieter_token %}
                         <button class="button button--secondary" type="submit">Token ersetzen</button>
                     </form>
+                {% else %}
+                    {{ rotationsformular.anbieter_token.errors }}
                 {% endif %}
                 <div class="modell-konfiguration-detail__schalter">
                     {% if gewaehlt.aktiv %}

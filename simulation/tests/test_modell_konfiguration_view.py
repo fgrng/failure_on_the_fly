@@ -166,15 +166,16 @@ class ModellKonfigurationRollenTests(TestCase):
         konfiguration.refresh_from_db()
         self.assertFalse(konfiguration.zero_retention_erklaert)
 
-    def test_erklaeren_weist_nicht_angemeldetes_konto_ab(self) -> None:
+    def test_erklaeren_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
         """Ohne Anmeldung erklärt niemand eine Zusage."""
         konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+        url: str = _erklaeren_url(konfiguration)
 
-        response: HttpResponse = self.client.post(
-            _erklaeren_url(konfiguration), {"zero_retention_beleg": "AVV"}
+        response: HttpResponse = self.client.post(url, {"zero_retention_beleg": "AVV"})
+
+        self.assertRedirects(
+            response, f"/accounts/login/?next={url}", fetch_redirect_response=False
         )
-
-        self.assertEqual(response.status_code, 403)
         konfiguration.refresh_from_db()
         self.assertFalse(konfiguration.zero_retention_erklaert)
 
@@ -194,18 +195,20 @@ class ModellKonfigurationRollenTests(TestCase):
         konfiguration.refresh_from_db()
         self.assertTrue(konfiguration.zero_retention_erklaert)
 
-    def test_widerrufen_weist_nicht_angemeldetes_konto_ab(self) -> None:
+    def test_widerrufen_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
         """Ohne Anmeldung widerruft niemand eine Zusage."""
         konfiguration: ModellKonfiguration = erklaerte(
             _openrouter("openrouter/gpt-test")
         )
+        url: str = _widerrufen_url(konfiguration)
 
         response: HttpResponse = self.client.post(
-            _widerrufen_url(konfiguration),
-            {"zero_retention_widerrufsgrund": "Zusage zurückgezogen"},
+            url, {"zero_retention_widerrufsgrund": "Zusage zurückgezogen"}
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(
+            response, f"/accounts/login/?next={url}", fetch_redirect_response=False
+        )
         konfiguration.refresh_from_db()
         self.assertTrue(konfiguration.zero_retention_erklaert)
 

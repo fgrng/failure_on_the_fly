@@ -459,6 +459,16 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
 
         self.assertNotContains(response, "Token ersetzen")
 
+    def test_meldet_die_abgewiesene_rotation_an_einer_fake_fassung(self) -> None:
+        """Auch ohne Rotationsformular sieht die Administrator:in den Grund."""
+        fake: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktive()
+
+        response: HttpResponse = self.client.post(
+            reverse(TOKEN, args=[fake.pk]), {"rotation-anbieter_token": "sk-neu"}
+        )
+
+        self.assertContains(response, "Der Anbieter »fake« braucht kein Token.")
+
     def test_meldet_die_verletzte_anbieterbindung_am_feld(self) -> None:
         """Ein fehlendes Token wird dort gemeldet, wo es hingehört."""
         response: HttpResponse = self.client.post(

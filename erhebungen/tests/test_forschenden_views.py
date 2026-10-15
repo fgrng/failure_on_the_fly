@@ -2419,6 +2419,35 @@ class ErhebungsExportTests(TestCase):
         self.assertNotIn(fassung.anbieter_token, archivinhalt)
         self.assertNotIn(fassung.anbieter_basis_url, archivinhalt)
 
+    def test_eine_sitzung_von_vor_dem_pin_traegt_keine_fassung(self) -> None:
+        """Welche Fassung transkribierte, ist nicht belegt: NA, nicht die aktive."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6781")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=finaler_kern(),
+            modell_konfiguration=konfiguration,
+        )
+        Vignettenposition.objects.create(
+            teilnahme=bindung.teilnahme, sitzung=sitzung, vignette=vignette, position=1
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        self.assertEqual(
+            archiv["sitzungen.csv"][0]["transkriptions_konfiguration_id"], "NA"
+        )
+
     def test_exportiert_den_widerruf_mit_zeitpunkt_und_grund(self) -> None:
         """Die gepinnte Fassung zeigt den Widerruf, wie er heute ist, ohne Konto."""
 
