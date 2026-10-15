@@ -42,7 +42,13 @@ from erhebungen.models import (
 )
 from erhebungen.teilnahme_session import TEILNAHME_TOKENS_SESSION_KEY
 from fragebogen_items.models import FragebogenItem
-from simulation.models import Anbieter, ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import (
+    Anbieter,
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -2341,6 +2347,77 @@ class ErhebungsExportTests(TestCase):
         self.assertNotIn(
             konfiguration.zero_retention_erklaert_von.username, archivinhalt
         )
+
+    def test_exportiert_die_gepinnte_transkriptions_fassung_ohne_token(self) -> None:
+        """Je Sitzung steht die Fassung, an die ihre Aufnahmen gingen; kein Token."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _forschungskonfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        kern: Simulationskern = finaler_kern()
+        vignette: Vignette = finale_vignette(ada, fach="Mathematik")
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            fassung: TranskriptionsKonfiguration = (
+                TranskriptionsKonfiguration.objects.create(
+                    anbieter=Anbieter.INFOMANIAK,
+                    anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+                    anbieter_token="ik-supergeheim1234",
+                    transkriptionsmodell="whisper",
+                    sprache="de",
+                )
+            )
+        # Eine Fassung, mit der in dieser Erhebung niemand transkribiert hat.
+        TranskriptionsKonfiguration.objects.create(
+            anbieter=Anbieter.OPENROUTER,
+            anbieter_token="sk-or-anderes",
+            transkriptionsmodell="whisper-large-v3",
+        )
+        bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6781")
+        sitzung: Sitzung = Sitzung.objects.create(
+            teilnahme=bindung.teilnahme,
+            vignette=vignette,
+            simulationskern=kern,
+            modell_konfiguration=konfiguration,
+            transkriptions_konfiguration=fassung,
+        )
+        Vignettenposition.objects.create(
+            teilnahme=bindung.teilnahme, sitzung=sitzung, vignette=vignette, position=1
+        )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        archivinhalt: str = "\n".join(
+            wert
+            for zeilen in archiv.values()
+            for zeile in zeilen
+            for wert in zeile.values()
+        )
+        self.assertEqual(
+            [
+                zeile["transkriptions_konfiguration_id"]
+                for zeile in archiv["sitzungen.csv"]
+            ],
+            [str(fassung.pk)],
+        )
+        self.assertEqual(
+            archiv["transkriptionskonfigurationen.csv"],
+            [
+                {
+                    "id": str(fassung.pk),
+                    "anbieter": "infomaniak",
+                    "transkriptionsmodell": "whisper",
+                    "sprache": "de",
+                    "angelegt_am": "2026-07-01T08:00:00+00:00",
+                }
+            ],
+        )
+        self.assertNotIn(fassung.anbieter_token, archivinhalt)
+        self.assertNotIn(fassung.anbieter_basis_url, archivinhalt)
 
     def test_exportiert_den_widerruf_mit_zeitpunkt_und_grund(self) -> None:
         """Die gepinnte Fassung zeigt den Widerruf, wie er heute ist, ohne Konto."""

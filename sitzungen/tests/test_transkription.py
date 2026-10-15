@@ -17,7 +17,7 @@ from config.tests.aufbau import (
 )
 from konten.models import Konto
 from konten.navigation import AUTORIN_GRUPPE
-from simulation.models import Verwendung
+from simulation.models import Anbieter, TranskriptionsKonfiguration, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
@@ -63,11 +63,11 @@ class ProbelaufTranskriptionTests(TestCase):
         self, anbieter: FakeTranskription, aufnahme: SimpleUploadedFile | None = None
     ) -> HttpResponse:
         # Ruft den Endpunkt mit einer Fabrik auf, die diesen einen Anbieter gibt.
-        return self._anfragen_mit_fabrik(lambda: anbieter, aufnahme)
+        return self._anfragen_mit_fabrik(lambda _: anbieter, aufnahme)
 
     def _anfragen_mit_fabrik(
         self,
-        fabrik: Callable[[], Transkription],
+        fabrik: Callable[[TranskriptionsKonfiguration], Transkription],
         aufnahme: SimpleUploadedFile | None = None,
     ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
@@ -88,7 +88,7 @@ class ProbelaufTranskriptionTests(TestCase):
         self._probelauf_starten()
         gebildete: list[FakeTranskription] = []
 
-        def fabrik() -> FakeTranskription:
+        def fabrik(_: TranskriptionsKonfiguration) -> FakeTranskription:
             anbieter: FakeTranskription = FakeTranskription(["Wie hast du gerechnet?"])
             gebildete.append(anbieter)
             return anbieter
@@ -97,6 +97,32 @@ class ProbelaufTranskriptionTests(TestCase):
             self.assertEqual(self._anfragen_mit_fabrik(fabrik).status_code, 200)
 
         self.assertEqual(len(gebildete), 2)
+
+    def test_folgt_bei_jeder_anfrage_der_aktiven_fassung(self) -> None:
+        """Der Probelauf hat keine Sitzung, die eine Fassung pinnen könnte."""
+        self._probelauf_starten()
+        gebildet_aus: list[TranskriptionsKonfiguration] = []
+
+        def fabrik(konfiguration: TranskriptionsKonfiguration) -> FakeTranskription:
+            gebildet_aus.append(konfiguration)
+            return FakeTranskription(["Text"])
+
+        erste: TranskriptionsKonfiguration = (
+            TranskriptionsKonfiguration.objects.aktive()
+        )
+        self._anfragen_mit_fabrik(fabrik)
+        zweite: TranskriptionsKonfiguration = (
+            TranskriptionsKonfiguration.objects.aktivieren(
+                TranskriptionsKonfiguration.objects.create(
+                    anbieter=Anbieter.OPENROUTER,
+                    anbieter_token="sk-or-geheim",
+                    transkriptionsmodell="whisper-large-v3",
+                )
+            )
+        )
+        self._anfragen_mit_fabrik(fabrik)
+
+        self.assertEqual(gebildet_aus, [erste, zweite])
 
     def test_laufender_probelauf_transkribiert_ohne_teilnahme(self) -> None:
         """Die Autor:in spricht über eigenes Material, ohne einzuwilligen."""

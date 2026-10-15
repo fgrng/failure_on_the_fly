@@ -769,6 +769,10 @@ TOKEN_ERKENNBAR_AB: int = 12
 TOKEN_SICHTBARE_ZEICHEN: int = 4
 
 
+FAKE_TOKEN_FEHLERMELDUNG: str = "Der Anbieter »fake« braucht kein Token."
+TOKEN_FEHLT_FEHLERMELDUNG: str = "Ohne Token bedient der Anbieter keinen Aufruf."
+
+
 @dataclass(frozen=True)
 class Anbieterprofil:
     """Was ein Anbieter von seiner Konfiguration verlangt und was er ihr vorgibt."""
@@ -845,10 +849,10 @@ class AnbieterFeldgruppe(models.Model):
                     "Der Anbieter »fake« hat keinen Endpunkt."
                 )
             if self.anbieter_token:
-                fehler["anbieter_token"] = "Der Anbieter »fake« braucht kein Token."
+                fehler["anbieter_token"] = FAKE_TOKEN_FEHLERMELDUNG
             return fehler
         if not self.anbieter_token:
-            fehler["anbieter_token"] = "Ohne Token bedient der Anbieter keinen Aufruf."
+            fehler["anbieter_token"] = TOKEN_FEHLT_FEHLERMELDUNG
         if (
             ANBIETER_PROFIL[self.anbieter].braucht_basis_url
             and not self.anbieter_basis_url
@@ -1257,36 +1261,90 @@ def evals_verfuegbar() -> bool:
     ) == set(Verwendung.values)
 
 
-class TranskriptionsKonfigurationManager(models.Manager["TranskriptionsKonfiguration"]):
-    """Zugang zur einzigen Transkriptions-Konfiguration."""
+_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
+    "Transkriptions-Konfigurationen sind append-only; nur das Token ist rotierbar."
+)
 
-    def aktuelle(self) -> "TranskriptionsKonfiguration":
-        """Liefert die eine Zeile und legt sie beim ersten Zugriff an."""
 
-        konfiguration, _ = self.get_or_create(pk=1)
+class TranskriptionsKonfigurationQuerySet(
+    models.QuerySet["TranskriptionsKonfiguration"]
+):
+    """QuerySets für unveränderliche Transkriptions-Fassungen."""
+
+    def update(self, **kwargs: object) -> int:
+        """Verhindert Massenänderungen an Transkriptions-Fassungen."""
+
+        raise RuntimeError(_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG)
+
+
+class TranskriptionsKonfigurationManager(
+    models.Manager.from_queryset(TranskriptionsKonfigurationQuerySet),
+):
+    """Zugang zur aktiven Transkriptions-Fassung."""
+
+    def aktive(self) -> "TranskriptionsKonfiguration":
+        """Liefert die aktive Fassung; eine frische Instanz bekommt `fake`.
+
+        `fake` heißt bei der Transkription »aus«: Ohne Zutun geht keine
+        Aufnahme nach außen.
+        """
+
+        zeiger: AktiveTranskriptionsKonfiguration | None = (
+            AktiveTranskriptionsKonfiguration.objects.select_related(
+                "konfiguration"
+            ).first()
+        )
+        if zeiger is not None:
+            return zeiger.konfiguration
+        # Erst nachsehen, dann schreiben: Gelesen wird bei jeder Aufnahme, und
+        # nur die allererste Anfrage einer Instanz braucht die Schreibsperre.
+        with transaction.atomic():
+            zeiger = AktiveTranskriptionsKonfiguration.objects.select_related(
+                "konfiguration"
+            ).first()
+            if zeiger is not None:
+                return zeiger.konfiguration
+            return self.aktivieren(self.create())
+
+    def aktivieren(
+        self, konfiguration: "TranskriptionsKonfiguration"
+    ) -> "TranskriptionsKonfiguration":
+        """Richtet den Zeiger auf die Fassung; ab der nächsten Sitzung gilt sie."""
+
+        AktiveTranskriptionsKonfiguration.objects.update_or_create(
+            pk=1, defaults={"konfiguration": konfiguration}
+        )
         return konfiguration
 
 
 class TranskriptionsKonfiguration(AnbieterFeldgruppe):
-    """Der einzige, veränderliche Anbieterzugang der Transkription.
+    """Eine unveränderliche Fassung des Anbieterzugangs der Transkription.
 
-    Anders als die Modell-Konfiguration wird sie nicht gepinnt und nicht
-    exportiert (ADR-0026); eine alte Fassung trüge deshalb keine Information.
+    Jede Sitzung pinnt beim Start die aktive Fassung (ADR-0056 in der
+    Nachführung durch #496). Nur das Token ist rotierbar.
     """
 
-    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
-        primary_key=True,
-        default=1,
-        editable=False,
-    )
     transkriptionsmodell: models.CharField = models.CharField(
         max_length=255,
         blank=True,
         default="",
     )
     sprache: models.CharField = models.CharField(max_length=5, default="de")
+    # Die übernommene Einzelzeile bleibt leer: Ein erfundenes Datum wäre
+    # schlimmer als keines.
+    angelegt_am: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True, null=True
+    )
 
     objects: TranskriptionsKonfigurationManager = TranskriptionsKonfigurationManager()
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Verhindert jede Mutation und prüft die Fassung beim Anlegen."""
+
+        if not self._state.adding:
+            raise RuntimeError(_TRANSKRIPTION_UNVERAENDERLICH_FEHLERMELDUNG)
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         """Bindet Modellname und Zugangsdaten an den gewählten Anbieter."""
@@ -1302,12 +1360,44 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe):
         if fehler:
             raise ValidationError(fehler)
 
+    def token_rotieren(self, token: str) -> None:
+        """Ersetzt das Token, ohne eine neue Fassung anzulegen.
+
+        Anbieter und Endpunkt bleiben, also geht das neue Token an denselben
+        Empfänger wie das alte.
+        """
+
+        token = token.strip()
+        if self.anbieter == Anbieter.FAKE:
+            raise ValidationError({"anbieter_token": FAKE_TOKEN_FEHLERMELDUNG})
+        if not token:
+            raise ValidationError({"anbieter_token": TOKEN_FEHLT_FEHLERMELDUNG})
+        # Am append-only QuerySet vorbei, wie die Erklärung (ZeroRetentionFeldgruppe).
+        models.QuerySet(model=type(self)).filter(pk=self.pk).update(
+            anbieter_token=token
+        )
+        self.anbieter_token = token
+
+
+class AktiveTranskriptionsKonfiguration(models.Model):
+    """Der veränderliche Zeiger auf die aktive Transkriptions-Fassung."""
+
+    id: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        primary_key=True,
+        default=1,
+        editable=False,
+    )
+    konfiguration: models.ForeignKey = models.ForeignKey(
+        TranskriptionsKonfiguration,
+        on_delete=models.PROTECT,
+    )
+
     class Meta:
-        """Hält die Transkriptions-Konfiguration als einzige Zeile."""
+        """Hält den Zeiger als einzige Zeile: Genau eine Fassung ist aktiv."""
 
         constraints: list[models.BaseConstraint] = [
             models.CheckConstraint(
                 condition=Q(id=1),
-                name="simulation_transkriptions_konfiguration_ist_singleton",
+                name="simulation_aktive_transkriptions_konfiguration_ist_singleton",
             ),
         ]

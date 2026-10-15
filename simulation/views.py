@@ -21,6 +21,7 @@ from .forms import (
     EvalkatalogDurchlaufForm,
     ModellKonfigurationForm,
     SimulationskernForm,
+    TokenRotationForm,
     TranskriptionsKonfigurationForm,
     ZeroRetentionErklaerungForm,
     ZeroRetentionWiderrufForm,
@@ -1185,30 +1186,156 @@ def modell_konfiguration_aktivieren(
     return _zur_konfiguration(konfiguration)
 
 
-@login_required
-@administratorin_erforderlich
-def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
-    """Bearbeitet den einen Anbieterzugang der Transkription."""
-    konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
-    )
-    form: TranskriptionsKonfigurationForm
-    if request.method == "POST":
-        # Eine eigene Instanz, denn die Validierung schreibt die Eingabe
-        # hinein; die Anzeige des hinterlegten Tokens bleibt beim Gespeicherten.
-        form = TranskriptionsKonfigurationForm(
-            request.POST, instance=TranskriptionsKonfiguration.objects.aktuelle()
+@dataclass(frozen=True)
+class _Transkriptionszeile:
+    # Eine Fassung der Transkription; das Token trägt sie nur maskiert.
+
+    pk: int
+    angelegt_am: datetime | None
+    anbieter: str
+    ist_fake: bool
+    anbieter_basis_url: str
+    anbieter_token_maskiert: str
+    transkriptionsmodell: str
+    sprache: str
+    aktiv: bool
+
+
+def _transkriptionszeilen(
+    aktive: TranskriptionsKonfiguration,
+) -> list[_Transkriptionszeile]:
+    # Baut die Liste so, dass der Klartext des Tokens die Vorlage nie erreicht.
+
+    return [
+        _Transkriptionszeile(
+            pk=konfiguration.pk,
+            angelegt_am=konfiguration.angelegt_am,
+            anbieter=konfiguration.get_anbieter_display(),
+            ist_fake=konfiguration.anbieter == Anbieter.FAKE,
+            anbieter_basis_url=konfiguration.anbieter_basis_url,
+            anbieter_token_maskiert=konfiguration.anbieter_token_maskiert,
+            transkriptionsmodell=konfiguration.transkriptionsmodell,
+            sprache=konfiguration.sprache,
+            aktiv=konfiguration.pk == aktive.pk,
         )
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Die Transkription ist neu eingestellt.")
-            # Der Umweg über die Umleitung hält das gespeicherte Token
-            # aus dem Antwortkörper heraus.
-            return redirect("simulation:transkriptions_konfiguration")
-    else:
-        form = TranskriptionsKonfigurationForm(instance=konfiguration)
+        for konfiguration in TranskriptionsKonfiguration.objects.order_by("-pk")
+    ]
+
+
+def _neue_fassung_form(
+    aktive: TranskriptionsKonfiguration,
+) -> TranskriptionsKonfigurationForm:
+    # Füllt alles aus der aktiven Fassung vor außer dem Token.
+
+    return TranskriptionsKonfigurationForm(
+        vorlage=aktive,
+        initial={
+            "anbieter": aktive.anbieter,
+            "anbieter_basis_url": aktive.anbieter_basis_url,
+            "transkriptionsmodell": aktive.transkriptionsmodell,
+            "sprache": aktive.sprache,
+        },
+    )
+
+
+def _zur_fassung(konfiguration: TranskriptionsKonfiguration) -> HttpResponse:
+    # Führt zurück zur Liste, die Fassung im Detail. Der Umweg über die
+    # Umleitung hält ein eingegebenes Token aus dem Antwortkörper heraus.
+
+    return redirect(
+        f"{reverse('simulation:transkriptions_konfiguration')}"
+        f"?fassung={konfiguration.pk}"
+    )
+
+
+# Das Rotationsfeld heißt wie das Tokenfeld der neuen Fassung; das Präfix
+# hält beide auf derselben Seite auseinander.
+_ROTATION: str = "rotation"
+
+
+def _transkription_rendern(
+    request: HttpRequest,
+    genannt: str,
+    form: TranskriptionsKonfigurationForm | None = None,
+    rotationsformular: TokenRotationForm | None = None,
+) -> HttpResponse:
+    # Liste, Detail und Anlegen; ein abgewiesenes Formular bleibt stehen.
+
+    aktive: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktive()
+    zeilen: list[_Transkriptionszeile] = _transkriptionszeilen(aktive)
+    gewaehlt: _Transkriptionszeile = next(
+        (zeile for zeile in zeilen if str(zeile.pk) == genannt),
+        next(zeile for zeile in zeilen if zeile.aktiv),
+    )
     return render(
         request,
         "simulation/transkriptions_konfiguration.html",
-        {"form": form, "konfiguration": konfiguration},
+        {
+            "fassungen": zeilen,
+            "gewaehlt": gewaehlt,
+            "form": form or _neue_fassung_form(aktive),
+            "rotationsformular": rotationsformular
+            or TokenRotationForm(prefix=_ROTATION),
+        },
     )
+
+
+@login_required
+@administratorin_erforderlich
+def transkriptions_konfiguration(request: HttpRequest) -> HttpResponse:
+    """Listet die Fassungen der Transkription und legt eine neue an.
+
+    Aktiviert wird allein in der Liste, wie bei der Modell-Konfiguration.
+    """
+    if request.method == "POST":
+        form: TranskriptionsKonfigurationForm = TranskriptionsKonfigurationForm(
+            request.POST, vorlage=TranskriptionsKonfiguration.objects.aktive()
+        )
+        if form.is_valid():
+            konfiguration: TranskriptionsKonfiguration = form.save()
+            messages.success(
+                request,
+                f"Die Fassung Nr. {konfiguration.pk} ist angelegt. Aktiv wird "
+                "sie erst, wenn Sie sie aktivieren.",
+            )
+            return _zur_fassung(konfiguration)
+        return _transkription_rendern(request, "", form=form)
+    return _transkription_rendern(request, request.GET.get("fassung", ""))
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_aktivieren(
+    request: HttpRequest, pk: int
+) -> HttpResponse:
+    """Richtet den Zeiger auf eine Fassung; sie gilt ab der nächsten Sitzung."""
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
+    )
+    TranskriptionsKonfiguration.objects.aktivieren(konfiguration)
+    messages.success(
+        request,
+        f"Die Fassung Nr. {konfiguration.pk} ist aktiv. Laufende Sitzungen "
+        "transkribieren weiter mit ihrer bisherigen Fassung.",
+    )
+    return _zur_fassung(konfiguration)
+
+
+@login_required
+@administratorin_erforderlich
+@require_POST
+def transkriptions_konfiguration_token(request: HttpRequest, pk: int) -> HttpResponse:
+    """Rotiert das Token einer Fassung, ohne eine neue anzulegen."""
+    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
+        TranskriptionsKonfiguration, pk=pk
+    )
+    form: TokenRotationForm = TokenRotationForm(request.POST, prefix=_ROTATION)
+    if not form.rotieren(konfiguration):
+        return _transkription_rendern(
+            request, str(konfiguration.pk), rotationsformular=form
+        )
+    messages.success(
+        request, f"Das Token der Fassung Nr. {konfiguration.pk} ist ersetzt."
+    )
+    return _zur_fassung(konfiguration)

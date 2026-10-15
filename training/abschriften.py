@@ -159,6 +159,7 @@ def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) ->
         vignette_id=quelle.vignette_id,
         simulationskern_id=quelle.simulationskern_id,
         modell_konfiguration_id=quelle.modell_konfiguration_id,
+        transkriptions_konfiguration_id=quelle.transkriptions_konfiguration_id,
         status=quelle.status,
         verbrauchte_zeit=quelle.verbrauchte_zeit,
     )

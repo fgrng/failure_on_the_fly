@@ -283,10 +283,10 @@ class ModellKonfigurationForm(ZeroRetentionFeldgruppeForm):
 
 
 class TranskriptionsKonfigurationForm(ModelForm):
-    """Der eine, veränderliche Anbieterzugang der Transkription."""
+    """Die Schreibgeste an der append-only Transkription: eine neue Fassung."""
 
     class Meta:
-        """Führt die Felder der Konfiguration; das Token gibt sie nie zurück."""
+        """Führt die Felder einer Fassung; das Token gibt sie nie zurück."""
 
         model: type[TranskriptionsKonfiguration] = TranskriptionsKonfiguration
         # Dieselbe Eingabefolge wie in der Modell-Konfiguration: Das Token
@@ -307,8 +307,8 @@ class TranskriptionsKonfigurationForm(ModelForm):
         }
         help_texts: dict[str, str] = {
             "anbieter_token": (
-                "Der Ladeknopf unten braucht es. Leer lassen behält das "
-                "hinterlegte Token, solange Anbieter und Basis-URL gleich bleiben."
+                "Der Ladeknopf unten braucht es. Leer lassen übernimmt das Token "
+                "der aktiven Fassung, solange Anbieter und Basis-URL gleich bleiben."
             ),
             "anbieter_basis_url": BASIS_URL_HINWEIS,
             "transkriptionsmodell": "Mit dem Präfix des gewählten Anbieters.",
@@ -318,20 +318,49 @@ class TranskriptionsKonfigurationForm(ModelForm):
             "anbieter_token": PasswordInput(render_value=False),
         }
 
-    def clean(self) -> dict[str, object]:
-        """Liest eine leere Eingabe am selben Endpunkt als »unverändert«.
+    def __init__(
+        self, *args: object, vorlage: TranskriptionsKonfiguration, **kwargs: object
+    ) -> None:
+        """Merkt sich die aktive Fassung, deren Token eine leere Eingabe meint."""
+        super().__init__(*args, **kwargs)
+        self._vorlage: TranskriptionsKonfiguration = vorlage
 
-        Das Feld zeigt den gesetzten Wert nie an; ohne diese Lesart wäre jede
-        Änderung an Modell oder Sprache ein versehentlicher Tokenverlust. Bei
-        neuem Anbieter oder neuer Basis-URL ginge das alte Token an einen
-        anderen Empfänger, also bleibt es dort leer.
+    def clean(self) -> dict[str, object]:
+        """Liest eine leere Eingabe am selben Endpunkt als »Token der Vorlage«.
+
+        Das Feld zeigt das hinterlegte Token nie an; ohne diese Lesart hieße
+        jede neue Fassung mit anderem Modell oder anderer Sprache, das Token
+        neu zu beschaffen. Bei neuem Anbieter oder neuer Basis-URL ginge das
+        alte Token an einen anderen Empfänger, also bleibt es dort leer (#493).
         """
         cleaned_data: dict[str, object] = super().clean()
         if (
             not cleaned_data.get("anbieter_token")
-            and cleaned_data.get("anbieter") == self.instance.anbieter
+            and cleaned_data.get("anbieter") == self._vorlage.anbieter
             and cleaned_data.get("anbieter_basis_url")
-            == self.instance.anbieter_basis_url
+            == self._vorlage.anbieter_basis_url
         ):
-            cleaned_data["anbieter_token"] = self.instance.anbieter_token
+            cleaned_data["anbieter_token"] = self._vorlage.anbieter_token
         return cleaned_data
+
+
+class TokenRotationForm(Form):
+    """Ein neues Token für eine bestehende Fassung, ohne neue Fassung."""
+
+    # Nicht Pflicht am Feld: Das leere Token meldet die Domäne.
+    anbieter_token = CharField(
+        label="Neues Token",
+        help_text=(
+            "Ersetzt das hinterlegte Token dieser Fassung; Anbieter und "
+            "Basis-URL bleiben. Wird gespeichert, aber nie wieder angezeigt."
+        ),
+        required=False,
+        widget=PasswordInput(render_value=False),
+    )
+
+    def rotieren(self, konfiguration: TranskriptionsKonfiguration) -> bool:
+        """Rotiert das Token; scheitert es, stehen die Gründe am Formular."""
+        return _an_der_domaene(
+            self,
+            lambda daten: konfiguration.token_rotieren(daten["anbieter_token"]),
+        )

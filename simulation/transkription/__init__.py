@@ -241,16 +241,17 @@ class InfomaniakTranskription:
         return nutzlast
 
 
-def transkriptions_anbieter() -> Transkription:
-    """Bildet je Anfrage den in der Datenbank konfigurierten Anbieter.
+def transkriptions_anbieter(
+    konfiguration: TranskriptionsKonfiguration,
+) -> Transkription:
+    """Bildet je Anfrage den Anbieter der übergebenen Fassung.
 
-    Ein gehaltener Adapter überlebte eine rotierte Konfiguration im
-    Prozessgedächtnis; deshalb wird hier jedes Mal neu gebildet.
+    Welche Fassung gilt, entscheidet der Endpunkt: die gepinnte der Sitzung
+    oder im Probelauf die aktive. Ein gehaltener Adapter überlebte ein
+    rotiertes Token im Prozessgedächtnis; deshalb wird hier jedes Mal neu
+    gebildet.
     """
 
-    konfiguration: TranskriptionsKonfiguration = (
-        TranskriptionsKonfiguration.objects.aktuelle()
-    )
     anbieter: str = konfiguration.anbieter
     if anbieter == Anbieter.FAKE:
         # Der deterministische Adapter verbraucht sein Skript; produktiv trägt
