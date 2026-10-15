@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 
 import time_machine
+from django.contrib.auth.models import Group
 from django.contrib.sessions.backends.base import SessionBase
 from django.http import HttpResponse
 from django.test import Client, TestCase, override_settings
@@ -414,6 +415,34 @@ class ProbelaufStartTests(_ProbelaufAufbau):
             einleitung, "Genug gefragt? Danach folgt der Debrief mit Ihrer Diagnose."
         )
         self.assertNotContains(einleitung, "Sitzung abbrechen")
+
+
+class ProbelaufRollenentzugTests(_ProbelaufAufbau):
+    """Der Kreis der Vignette öffnet den Probelauf nur mit der Rolle (ADR-0037)."""
+
+    def _status(self) -> tuple[int, int]:
+        # Statuscodes von Auswahl und Start der eigenen Vignette.
+        auswahl: HttpResponse = self.client.get(reverse("sitzungen:probelauf_auswahl"))
+        start: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        return auswahl.status_code, start.status_code
+
+    def test_ohne_rolle_autorin_sind_auswahl_und_start_verboten(self) -> None:
+        """Ohne Rolle 403 und kein Probelauf; mit Rolle zurück wieder 200."""
+        autorin: Group = Group.objects.get(name="Autor:in")
+        self.ada.groups.remove(autorin)
+
+        self.assertEqual(self._status(), (403, 403))
+        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.ada.groups.add(autorin)
+        self.assertEqual(self._status(), (200, 200))
+
+    def test_administration_ohne_rolle_startet_weiter(self) -> None:
+        """Administration erreicht Auswahl und Start wie bisher."""
+        self.client.force_login(konto_mit_rollen("root", is_superuser=True))
+
+        self.assertEqual(self._status(), (200, 200))
 
 
 class ProbelaufGespraechTests(_ProbelaufAufbau):

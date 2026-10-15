@@ -19,7 +19,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from konten.navigation import ist_administratorin
+from konten.navigation import autorin_erforderlich, ist_administratorin
 from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
@@ -193,6 +193,7 @@ def _probelauf_starten(
 
 
 @login_required
+@autorin_erforderlich
 def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
     """Zeigt einer Autorin ihre Entwürfe und finalen Fassungen zur Wahl."""
 
@@ -203,6 +204,7 @@ def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@autorin_erforderlich
 def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
     """Fixiert das Autorinnen-Tripel in der Session und zeigt die Einleitung."""
 

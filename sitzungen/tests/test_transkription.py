@@ -16,6 +16,7 @@ from config.tests.aufbau import (
     vignetten_entwurf,
 )
 from konten.models import Konto
+from konten.navigation import AUTORIN_GRUPPE
 from simulation.models import Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
@@ -39,7 +40,7 @@ class ProbelaufTranskriptionTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet die Autor:in an und legt ihren spielbaren Entwurf an."""
-        self.autorin: Konto = konto_mit_rollen("ada")
+        self.autorin: Konto = konto_mit_rollen("ada", AUTORIN_GRUPPE)
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         self.entwurf: Vignette = vignetten_entwurf(self.autorin)
         # Die Rahmenhandlung braucht beide Akteure für ihre Grammatikformen.

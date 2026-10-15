@@ -181,6 +181,11 @@ Debrief weiter. Eine archivierte Fassung bietet »Entarchivieren« nur an, solan
 ihre Vorgängerin keine andere nicht archivierte Nachfolgerin hat; ein Versuch
 führt sonst mit einer Meldung zurück auf ihre Detailansicht.
 
+Probelauf-Auswahl und Probelauf-Start setzen die Rolle Autor:in voraus, wie der
+Vignetteneditor; ohne sie antworten beide mit 403, auch einer Eigentümer:in, der
+die Rolle entzogen wurde. Der Kreis der Vignette bleibt dabei unverändert; mit
+der Rolle zurück ist der Probelauf wieder erreichbar (ADR-0037).
+
 ## Trainings verwalten
 
 Ausbilder:innen sehen die Trainings ihres Eigentümer-Kreises;
@@ -230,10 +235,16 @@ Trainingsteilnehmende kommen weiter ins Training. Der aktuelle Eigentümer-Kreis
 und die Administration gelangen über offene wie gesperrte Trainings-Links direkt
 zur Trainingsseite, ohne beizutreten: Auch wiederholte Aufrufe erzeugen weder
 Trainingsbindung noch Teilnahme und erhöhen die Zahl der Beigetretenen nicht.
-Erst ein tatsächlicher Sitzungsstart legt bei Bedarf die erforderliche Bindung
-und Teilnahme an. Bestehende Bindungen und Sitzungen bleiben beim Linkaufruf
-unverändert erhalten. Der Link eines Entwurfs bleibt für alle Konten unbekannt
-(404). Ein Training ohne Vignetten lässt sich veröffentlichen und beitreten.
+Der Kreiszugang setzt die Rolle Ausbilder:in voraus (ADR-0037): Einer
+Eigentümer:in, der die Rolle entzogen wurde, öffnet der Kreis weder
+Trainingsseite noch Vignettenwahl noch den Weg an der Beitrittssperre vorbei.
+Sie gilt dann wie jedes andere Konto, erreicht das Training nur über eine eigene
+aktive Trainingsbindung und tritt über den offenen Link bei. Mit der Rolle
+zurück gilt wieder der Kreiszugang. Erst ein tatsächlicher Sitzungsstart legt
+bei Bedarf die erforderliche Bindung und Teilnahme an. Bestehende Bindungen und
+Sitzungen bleiben beim Linkaufruf unverändert erhalten. Der Link eines Entwurfs
+bleibt für alle Konten unbekannt (404). Ein Training ohne Vignetten lässt sich
+veröffentlichen und beitreten.
 
 Die Trainingsseite trägt unter dem Titel den festen Hinweis „Die Ausbilder:innen
 dieses Trainings sehen Ihre abgeschlossenen Sitzungen namentlich.“
@@ -317,9 +328,10 @@ beitreten; wer fernbleiben soll, wird über die Sperre des Beitritts
 ferngehalten. Erst „Entfernen bestätigen“ entfernt (nur per POST, sonst 405) und
 führt mit der Meldung „… ist aus dem Training entfernt.“ zurück auf die
 Kuratierseite. Entfernen dürfen alle Eigentümer:innen des Trainings und die
-Administration in jedem Training; fremde Ausbilder:innen und
-Trainingsteilnehmende bekommen 404, ebenso ein Entfernen für ein Konto ohne
-aktive Bindung an dieses Training. Es ändert sich dann nichts.
+Administration in jedem Training; fremde Ausbilder:innen bekommen 404, ebenso
+ein Entfernen für ein Konto ohne aktive Bindung an dieses Training. Konten ohne
+Rolle Ausbilder:in bekommen 403, Trainingsteilnehmende ebenso wie
+Eigentümer:innen, denen die Rolle entzogen wurde. Es ändert sich dann nichts.
 
 Entfernen führt in denselben Zustand wie ein eigener Austritt (siehe oben): Die
 Person verschwindet für Kreis und Administration rückwirkend aus Fremdeinsicht,
@@ -362,14 +374,16 @@ Training ohne Vignetten zeigt statt der Tabelle einen Hinweis.
 
 Ein Kreis öffnet die Sitzung lesend, so wie die Teilnehmer:in sie sieht: Szene,
 Transkript, Ausgang, Debrief und Diagnose, nie die Denkspur. Einsehen dürfen
-alle aktuellen Eigentümer:innen des Trainings, auch für Sitzungen von vor ihrer
-Aufnahme, und die Administration. Laufende, abgebrochene und gescheiterte fremde
-Sitzungen, Sitzungen derselben Person in einem fremden Training, jede Sitzung
-einer aus dem Training Ausgetretenen und jede Sitzung für aus dem Kreis
-ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der Vignette
-antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in in jedem
-Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die Diagnose
-als Text, ohne Formular.
+alle aktuellen Eigentümer:innen des Trainings mit der Rolle Ausbilder:in, auch
+für Sitzungen von vor ihrer Aufnahme, und die Administration. Nach einem
+Rollenentzug ist eine fremde Sitzung auch für eine Eigentümer:in unbekannt
+(404); ihre eigenen Sitzungen bleiben lesbar. Laufende, abgebrochene und
+gescheiterte fremde Sitzungen, Sitzungen derselben Person in einem fremden
+Training, jede Sitzung einer aus dem Training Ausgetretenen und jede Sitzung für
+aus dem Kreis ausgetretene Eigentümer:innen, fremde Konten oder die Autor:in der
+Vignette antworten mit 404. Die eigenen Sitzungen bleiben für die Teilnehmer:in
+in jedem Status lesbar, ebenfalls ohne Denkspur. Die lesende Ansicht zeigt die
+Diagnose als Text, ohne Formular.
 
 Unter der Tabelle folgt die Liste „Freigegebene Abschriften“ mit den Spalten
 Teilnehmer:in, Erhebung, Geholt am und Sitzungen, nach Namen sortiert. Sie zeigt
