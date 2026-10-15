@@ -279,6 +279,9 @@ def transkriptions_anbieter() -> Transkription:
             # fällt bewusst nicht auf OPENAI_API_KEY aus der Umgebung zurück.
             api_key=konfiguration.anbieter_token,
             timeout=TRANSKRIPTION_BUDGET_SEKUNDEN,
+            # Jede Wiederholung des SDK bekäme wieder das volle Budget und
+            # schickte die Aufnahme erneut an den Auftragsverarbeiter.
+            max_retries=0,
         ),
         modell=konfiguration.transkriptionsmodell,
         sprache=konfiguration.sprache,
