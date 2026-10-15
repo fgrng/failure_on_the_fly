@@ -178,9 +178,11 @@ class TranskriptionsKonfigurationRollenTests(TestCase):
 
         self.assertEqual(self.client.get(reverse(SEITE)).status_code, 403)
 
-    def test_weist_nicht_angemeldetes_konto_ab(self) -> None:
-        """Auch anonyme Anfragen erhalten die geforderte Zugriffsverweigerung."""
-        self.assertEqual(self.client.get(reverse(SEITE)).status_code, 403)
+    def test_leitet_nicht_angemeldetes_konto_zur_anmeldung(self) -> None:
+        """Anonyme Anfragen werden zur Anmeldung weitergeleitet (#476)."""
+        response: HttpResponse = self.client.get(reverse(SEITE))
+
+        self.assertTrue(response.url.startswith("/accounts/login/?next="))
 
     def test_weist_autorin_auch_beim_speichern_ab(self) -> None:
         """Die Schreibroute trägt dieselbe Rollenprüfung wie die Anzeige."""
