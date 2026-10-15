@@ -409,12 +409,8 @@ Administration, der Simulationskern und die Modell-Konfiguration.
    Passwörter setzen und die Groups `Autor:in`, `Ausbilder:in` und
    `Forschende:r` zuweisen. Konten lassen sich dort bewusst nicht löschen.
 
-Für eine reine Autor:innen-Workshop-Instanz gibt es stattdessen
-`uv run python manage.py workshopdaten_anlegen` — der Seed läuft auch mit
-`DEBUG=False` und richtet Konten, Kern und eine `fake`-Modell-Konfiguration ein,
-also ganz ohne Zugangsdaten. Der Entwicklungs-Seed `entwicklungsdaten_anlegen`
-läuft dagegen nur mit `DEBUG=True` und hat auf einer Produktivinstanz nichts zu
-suchen.
+Der Entwicklungs-Seed `entwicklungsdaten_anlegen` läuft nur mit `DEBUG=True` und
+hat auf einer Produktivinstanz nichts zu suchen.
 
 ## 10. Abnahme
 
@@ -649,8 +645,7 @@ Häufige Stolpersteine:
 - **Die Anmeldung hat keine Sperre gegen Passwort-Raten.** Weder
   `/accounts/login/` noch `/admin/` begrenzen Fehlversuche. Bis eine Sperre
   eingebaut ist, sind lange, zufällige Passwörter für alle Konten die einzige
-  Verteidigung — auch für Workshop-Konten, deren Anmeldenamen (`workshop01`, …)
-  erratbar sind.
+  Verteidigung.
 - **Die Anwendung begrenzt keine Anbieterkosten.** Wer einen Teilnahme-Link hat,
   kann beliebig viele Gesprächsschritte und Transkriptionen auslösen. Ein
   Ausgabenlimit gehört deshalb in das Konto beim Anbieter, nicht nur in die

@@ -1,1 +1,1 @@
-"""Commands zum Anlegen von Entwicklungs- und Workshopdaten."""
+"""Commands zum Anlegen von Entwicklungsdaten."""
