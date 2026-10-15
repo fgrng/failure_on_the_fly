@@ -625,6 +625,21 @@ def test_eine_widerrufene_fassung_laesst_sich_fuer_keine_verwendung_aktivieren()
 
 
 @pytest.mark.django_db
+def test_ein_widerruf_nach_dem_laden_verhindert_die_aktivierung() -> None:
+    """Gilt der festgeschriebene Widerruf, nicht der Stand beim Laden der Seite."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter())
+    geladen: ModellKonfiguration = ModellKonfiguration.objects.get(pk=konfiguration.pk)
+    konfiguration.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    with pytest.raises(ValidationError, match="widerrufen"):
+        ModellKonfiguration.objects.aktivieren(geladen, Verwendung.SCHUELERIN)
+
+    assert ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN) is None
+
+
+@pytest.mark.django_db
 def test_der_widerruf_laesst_den_zeiger_einer_aktiven_fassung_stehen() -> None:
     """Der Widerruf schaltet nichts um; die Übersicht weist darauf hin."""
 

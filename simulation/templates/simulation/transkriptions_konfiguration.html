@@ -53,7 +53,7 @@
                                 </td>
                                 <td>{{ fassung.anbieter }}</td>
                                 <td>{{ fassung.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
-                                <td>{% if fassung.widerrufen %}widerrufen am {{ fassung.zero_retention_widerrufen_am|date:"d.m.Y" }}<small>{{ fassung.zero_retention_widerrufsgrund }}</small>{% else %}{{ fassung.erklaerungsstand }}{% endif %}</td>
+                                {% include "simulation/includes/zero_retention_stand.html" with zeile=fassung %}
                                 <td>{% if fassung.aktiv %}aktiv{% else %}—{% endif %}</td>
                             </tr>
                         {% endfor %}
@@ -145,10 +145,7 @@
                 <b>05</b><span><h2>Neue Fassung: Zero-Retention-Erklärung</h2><small>Ohne sie transkribiert die Fassung nicht; beim Anbieter »fake« entfällt sie</small></span>
             </header>
             <div class="system-page-field-list">
-                {{ form.zero_retention_erklaert.errors }}
-                <label><input type="checkbox" name="{{ form.zero_retention_erklaert.html_name }}" id="{{ form.zero_retention_erklaert.id_for_label }}"{% if form.zero_retention_erklaert.value %} checked{% endif %}> {{ form.zero_retention_erklaert.label }}</label>
-                <small class="system-page-hint">{{ form.zero_retention_erklaert.help_text }}</small>
-                {% include "vignetten/includes/form_field.html" with field=form.zero_retention_beleg %}
+                {% include "simulation/includes/zero_retention_erklaerung_feld.html" %}
             </div>
         </section>
 

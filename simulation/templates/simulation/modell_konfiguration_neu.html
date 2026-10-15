@@ -58,10 +58,7 @@
                 <b>03</b><span><h2>Zero-Retention-Erklärung</h2><small>Ohne sie lässt sich die Konfiguration nicht für die Schüler:in aktivieren; beim Anbieter »fake« entfällt sie</small></span>
             </header>
             <div class="system-page-field-list">
-                {{ form.zero_retention_erklaert.errors }}
-                <label><input type="checkbox" name="{{ form.zero_retention_erklaert.html_name }}" id="{{ form.zero_retention_erklaert.id_for_label }}"{% if form.zero_retention_erklaert.value %} checked{% endif %}> {{ form.zero_retention_erklaert.label }}</label>
-                <small class="system-page-hint">{{ form.zero_retention_erklaert.help_text }}</small>
-                {% include "vignetten/includes/form_field.html" with field=form.zero_retention_beleg %}
+                {% include "simulation/includes/zero_retention_erklaerung_feld.html" %}
             </div>
         </section>
 

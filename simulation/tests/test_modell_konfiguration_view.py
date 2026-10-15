@@ -15,7 +15,10 @@ from django.utils import timezone
 
 from config.tests.aufbau import erklaerte, konto_mit_rollen
 from config.tests.formular import submit_knoepfe
-from simulation.forms import ModellKonfigurationForm
+from simulation.forms import (
+    ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG,
+    ModellKonfigurationForm,
+)
 from simulation.models import (
     AktiveModellKonfiguration,
     Anbieter,
@@ -1100,16 +1103,19 @@ class ZeroRetentionErklaerungTests(TestCase):
         self.assertEqual(konfiguration.zero_retention_erklaert_von, self.linus)
         self.assertIsNotNone(konfiguration.zero_retention_erklaert_am)
 
-    def test_legt_ohne_haekchen_eine_nicht_erklaerte_konfiguration_an(self) -> None:
-        """Die Erklärung ist eine eigene Geste, kein Nebenprodukt des Belegs."""
-        self.client.post(
+    def test_meldet_den_beleg_ohne_haekchen_am_haekchen(self) -> None:
+        """Die Erklärung ist eine eigene Geste; ein Beleg allein geht nicht verloren."""
+        response: HttpResponse = self.client.post(
             reverse("simulation:modell_konfiguration_neu"),
             _anlegedaten(zero_retention_beleg="AVV"),
         )
 
-        konfiguration: ModellKonfiguration = ModellKonfiguration.objects.get()
-        self.assertFalse(konfiguration.zero_retention_erklaert)
-        self.assertEqual(konfiguration.zero_retention_beleg, "")
+        self.assertFormError(
+            response.context["form"],
+            "zero_retention_erklaert",
+            ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG,
+        )
+        self.assertContains(response, "AVV</textarea>")
 
     def test_meldet_den_fehlenden_beleg_beim_anlegen_am_feld(self) -> None:
         """Ein Häkchen ohne Beleg ist nicht nachprüfbar."""

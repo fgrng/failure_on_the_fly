@@ -572,7 +572,7 @@ Zusage vorliegt, dass Eingaben weder gespeichert noch zum Training genutzt
 werden. Im Editor steht sie als dritter Abschnitt: ein Häkchen
 „Zero-Retention-Erklärung abgeben“ und der Beleg der Zusage als Freitext, etwa
 „AVV mit Infomaniak vom …“. Erst das Häkchen erklärt; ein Beleg ohne Häkchen
-wird verworfen, ein Häkchen ohne Beleg ergibt einen Fehler am Feld. Eine
+ergibt einen Fehler am Häkchen, ein Häkchen ohne Beleg einen am Belegfeld. Eine
 Konfiguration ohne Erklärung bekommt sie nachträglich im Detail der Liste, über
 dasselbe Belegfeld und „Zero-Retention-Erklärung abgeben“; auch dort ist der
 Beleg Pflicht. Zeitpunkt und erklärendes Konto werden mitgeschrieben. Danach ist

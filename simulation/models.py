@@ -785,6 +785,9 @@ class Anbieterprofil:
     standard_basis_url: str
     # Die Allowlist der Parameter, die dieser Anbieter kennt.
     stellschrauben: frozenset[str]
+    # Ob Eingaben an einen externen Auftragsverarbeiter gehen; nur dann gibt
+    # es eine Zero-Retention-Erklärung, über die sich etwas sagen ließe.
+    hat_auftragsverarbeiter: bool = True
 
 
 ANBIETER_PROFIL: dict[str, Anbieterprofil] = {
@@ -793,6 +796,7 @@ ANBIETER_PROFIL: dict[str, Anbieterprofil] = {
         braucht_basis_url=False,
         standard_basis_url="",
         stellschrauben=FAKE_STELLSCHRAUBEN,
+        hat_auftragsverarbeiter=False,
     ),
     Anbieter.OPENROUTER: Anbieterprofil(
         praefix="openrouter/",
@@ -839,11 +843,17 @@ class AnbieterFeldgruppe(models.Model):
             return TOKEN_MASKE
         return TOKEN_MASKE + self.anbieter_token[-TOKEN_SICHTBARE_ZEICHEN:]
 
+    @property
+    def hat_auftragsverarbeiter(self) -> bool:
+        """Ob Eingaben an einen externen Auftragsverarbeiter gehen; bei `fake` nicht."""
+
+        return ANBIETER_PROFIL[self.anbieter].hat_auftragsverarbeiter
+
     def _zugangsfehler(self) -> dict[str, str]:
         # Prüft Endpunkt und Token gegen das Profil des gewählten Anbieters.
 
         fehler: dict[str, str] = {}
-        if self.anbieter == Anbieter.FAKE:
+        if not self.hat_auftragsverarbeiter:
             if self.anbieter_basis_url:
                 fehler["anbieter_basis_url"] = (
                     "Der Anbieter »fake« hat keinen Endpunkt."
@@ -951,7 +961,7 @@ class ZeroRetentionFeldgruppe(models.Model):
     def zero_retention_erklaerbar(self) -> bool:
         """Ob sich an dieser Fassung noch eine Erklärung abgeben lässt."""
 
-        return self.anbieter != Anbieter.FAKE and not self.zero_retention_abgegeben
+        return self.hat_auftragsverarbeiter and not self.zero_retention_abgegeben
 
     @property
     def zero_retention_widerrufbar(self) -> bool:
@@ -967,7 +977,7 @@ class ZeroRetentionFeldgruppe(models.Model):
         """
 
         beleg = beleg.strip()
-        if self.anbieter == Anbieter.FAKE:
+        if not self.hat_auftragsverarbeiter:
             raise ValidationError(
                 {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
             )
@@ -1045,7 +1055,7 @@ class ZeroRetentionFeldgruppe(models.Model):
     def _erklaerungsfehler(self) -> dict[str, str]:
         # Hält eine beim Anlegen mitgegebene Erklärung an dieselben Regeln.
 
-        if self.anbieter == Anbieter.FAKE and (
+        if not self.hat_auftragsverarbeiter and (
             self.zero_retention_beleg or self.zero_retention_abgegeben
         ):
             return {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
@@ -1145,17 +1155,21 @@ class ModellKonfigurationManager(
         für keine Verwendung mehr.
         """
 
-        if konfiguration.zero_retention_ist_widerrufen:
-            raise ValidationError(WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG)
-        if (
-            verwendung == Verwendung.SCHUELERIN
-            and not konfiguration.zulaessig_fuer_schuelerin
-        ):
-            raise ValidationError(SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG)
-        AktiveModellKonfiguration.objects.update_or_create(
-            verwendung=verwendung,
-            defaults={"konfiguration": konfiguration},
-        )
+        # Geprüft wird der Stand in der Schreibtransaktion, nicht der beim
+        # Laden: Ein inzwischen festgeschriebener Widerruf gilt.
+        with transaction.atomic():
+            konfiguration = self.select_for_update().get(pk=konfiguration.pk)
+            if konfiguration.zero_retention_ist_widerrufen:
+                raise ValidationError(WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG)
+            if (
+                verwendung == Verwendung.SCHUELERIN
+                and not konfiguration.zulaessig_fuer_schuelerin
+            ):
+                raise ValidationError(SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG)
+            AktiveModellKonfiguration.objects.update_or_create(
+                verwendung=verwendung,
+                defaults={"konfiguration": konfiguration},
+            )
         return konfiguration
 
 
@@ -1203,7 +1217,7 @@ class ModellKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
     def zulaessig_fuer_schuelerin(self) -> bool:
         """Ob die Fassung Eingaben echter Personen verarbeiten darf."""
 
-        return self.anbieter == Anbieter.FAKE or self.zero_retention_erklaert
+        return not self.hat_auftragsverarbeiter or self.zero_retention_erklaert
 
     def _modellnamenfehler(self) -> dict[str, str]:
         # Prüft den Modellnamen gegen das Routing des gewählten Anbieters.
@@ -1310,11 +1324,15 @@ class TranskriptionsKonfigurationManager(
         Eine widerrufene Fassung nicht mehr: Ihre Zusage ist weggefallen.
         """
 
-        if konfiguration.zero_retention_ist_widerrufen:
-            raise ValidationError(WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG)
-        AktiveTranskriptionsKonfiguration.objects.update_or_create(
-            pk=1, defaults={"konfiguration": konfiguration}
-        )
+        # Wie bei der Modell-Konfiguration: Es gilt der Stand in der
+        # Schreibtransaktion, auch ein Widerruf seit dem Laden.
+        with transaction.atomic():
+            konfiguration = self.select_for_update().get(pk=konfiguration.pk)
+            if konfiguration.zero_retention_ist_widerrufen:
+                raise ValidationError(WIDERRUFENE_TRANSKRIPTION_FEHLERMELDUNG)
+            AktiveTranskriptionsKonfiguration.objects.update_or_create(
+                pk=1, defaults={"konfiguration": konfiguration}
+            )
         return konfiguration
 
 
@@ -1358,7 +1376,7 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
             **self._erklaerungsfehler(),
         }
         # Der Platzhalter-Adapter braucht kein Modell; jeder echte Anbieter schon.
-        if self.anbieter != Anbieter.FAKE and not self.transkriptionsmodell:
+        if self.hat_auftragsverarbeiter and not self.transkriptionsmodell:
             fehler["transkriptionsmodell"] = (
                 "Ohne Modellnamen weiß der Anbieter nicht, was er laden soll."
             )
@@ -1375,7 +1393,7 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
         einer Sitzung.
         """
 
-        return self.anbieter != Anbieter.FAKE and self.zero_retention_erklaert
+        return self.hat_auftragsverarbeiter and self.zero_retention_erklaert
 
     def token_rotieren(self, token: str) -> None:
         """Ersetzt das Token, ohne eine neue Fassung anzulegen.
@@ -1385,7 +1403,7 @@ class TranskriptionsKonfiguration(AnbieterFeldgruppe, ZeroRetentionFeldgruppe):
         """
 
         token = token.strip()
-        if self.anbieter == Anbieter.FAKE:
+        if not self.hat_auftragsverarbeiter:
             raise ValidationError({"anbieter_token": FAKE_TOKEN_FEHLERMELDUNG})
         if not token:
             raise ValidationError({"anbieter_token": TOKEN_FEHLT_FEHLERMELDUNG})

@@ -6,10 +6,11 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 from django.http import HttpResponse
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import konto_mit_rollen
+from config.tests.aufbau import erklaerte, konto_mit_rollen
+from konten.models import Konto
 from simulation.forms import TranskriptionsKonfigurationForm
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 from simulation.transkription import transkriptions_anbieter
@@ -75,6 +76,23 @@ def test_aktivieren_wechselt_die_aktive_fassung() -> None:
 
     assert TranskriptionsKonfiguration.objects.aktive() == neue
     assert TranskriptionsKonfiguration.objects.filter(pk=vorige.pk).exists()
+
+
+@pytest.mark.django_db
+def test_ein_widerruf_nach_dem_laden_verhindert_die_aktivierung() -> None:
+    """Gilt der festgeschriebene Widerruf, nicht der Stand beim Laden der Seite."""
+
+    konto: Konto = Konto.objects.create_user(username="linus", is_superuser=True)
+    fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+    geladen: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.get(
+        pk=fassung.pk
+    )
+    fassung.zero_retention_widerrufen("Zusage zurückgezogen", konto)
+
+    with pytest.raises(ValidationError, match="widerrufen"):
+        TranskriptionsKonfiguration.objects.aktivieren(geladen)
+
+    assert TranskriptionsKonfiguration.objects.aktive().pk != fassung.pk
 
 
 @pytest.mark.django_db
@@ -269,6 +287,17 @@ class TranskriptionsKonfigurationTokenTests(TestCase):
         self.assertEqual(formular.save().anbieter_token, "")
 
 
+def _fassungen_auf_der_seite(
+    client: Client,
+) -> list[tuple[int, str]]:
+    # Nummer und Modell jeder Fassung, wie die Liste der Seite sie zeigt.
+
+    return [
+        (zeile.pk, zeile.transkriptionsmodell)
+        for zeile in client.get(reverse(SEITE)).context["fassungen"]
+    ]
+
+
 class TranskriptionsKonfigurationRollenTests(TestCase):
     """Die Betriebseinstellungen liegen hinter der Administrationsrolle."""
 
@@ -298,7 +327,13 @@ class TranskriptionsKonfigurationRollenTests(TestCase):
         response: HttpResponse = self.client.post(reverse(SEITE), _eingabe())
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(TranskriptionsKonfiguration.objects.count(), 1)
+        # Neben der vorhandenen steht nur die Vorgabe-Fassung, die das
+        # Öffnen der Seite anlegt.
+        self.client.force_login(konto_mit_rollen("linus", is_superuser=True))
+        self.assertEqual(
+            [modell for _, modell in _fassungen_auf_der_seite(self.client)],
+            ["", "whisper-large-v3"],
+        )
 
     def test_weist_autorin_beim_aktivieren_ab(self) -> None:
         """Nur die Administration wechselt die aktive Fassung."""
@@ -378,12 +413,11 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
 
         self.client.post(reverse(SEITE), _eingabe(transkriptionsmodell="whisper-1"))
 
-        self.assertEqual(TranskriptionsKonfiguration.objects.count(), 3)
         self.assertEqual(
-            TranskriptionsKonfiguration.objects.get(pk=erste.pk).transkriptionsmodell,
-            "whisper-large-v3",
+            _fassungen_auf_der_seite(self.client)[:2],
+            [(erste.pk + 1, "whisper-1"), (erste.pk, "whisper-large-v3")],
         )
-        self.assertEqual(self._neueste().transkriptionsmodell, "whisper-1")
+        self.assertEqual(len(_fassungen_auf_der_seite(self.client)), 3)
 
     def test_aktiviert_die_gewaehlte_fassung(self) -> None:
         """Der Zeiger wandert; die Seite zeigt den neuen Stand."""
@@ -434,7 +468,7 @@ class TranskriptionsKonfigurationSeiteTests(TestCase):
             TranskriptionsKonfiguration.objects.get(pk=fassung.pk).anbieter_token,
             "sk-or-neu5678",
         )
-        self.assertEqual(TranskriptionsKonfiguration.objects.count(), 2)
+        self.assertEqual(len(response.context["fassungen"]), 2)
         self.assertContains(
             response, f"Das Token der Fassung Nr. {fassung.pk} ist ersetzt."
         )

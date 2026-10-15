@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278", "#497", "#498", "#499", "#500"]
+amended-by: ["#278", "zero-retention-erklaerung-an-der-konfiguration", "#497", "#498", "#499", "#500"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert

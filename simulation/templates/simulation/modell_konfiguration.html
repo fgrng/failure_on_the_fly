@@ -60,7 +60,7 @@
                                     </td>
                                     <td>{{ konfiguration.anbieter }}</td>
                                     <td>{{ konfiguration.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
-                                    <td>{% if konfiguration.widerrufen %}widerrufen am {{ konfiguration.zero_retention_widerrufen_am|date:"d.m.Y" }}<small>{{ konfiguration.zero_retention_widerrufsgrund }}</small>{% else %}{{ konfiguration.erklaerungsstand }}{% endif %}</td>
+                                    {% include "simulation/includes/zero_retention_stand.html" with zeile=konfiguration %}
                                 </tr>
                             {% endfor %}
                         </tbody>

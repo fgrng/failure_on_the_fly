@@ -125,6 +125,12 @@ def _beleg_feld() -> CharField:
     )
 
 
+ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG: str = (
+    "Ein Beleg allein erklärt nichts. Setzen Sie das Häkchen, um die "
+    "Erklärung abzugeben, oder leeren Sie den Beleg."
+)
+
+
 class ZeroRetentionFeldgruppeForm(ModelForm):
     """Die Erklärung beim Anlegen einer Fassung, für beide Konfigurationen.
 
@@ -152,7 +158,14 @@ class ZeroRetentionFeldgruppeForm(ModelForm):
         beleg: str = str(daten.get("zero_retention_beleg") or "")
         # Ohne gültige Erklärung bleibt auch kein Beleg an der Fassung stehen.
         daten["zero_retention_beleg"] = ""
-        if not daten.get("zero_retention_erklaert") or "anbieter" not in daten:
+        if not daten.get("zero_retention_erklaert"):
+            if beleg.strip():
+                self.add_error(
+                    "zero_retention_erklaert",
+                    ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG,
+                )
+            return daten
+        if "anbieter" not in daten:
             return daten
         self.instance.anbieter = daten["anbieter"]
         try:

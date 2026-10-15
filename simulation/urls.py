@@ -159,12 +159,14 @@ urlpatterns: list[URLPattern] = [
     ),
     path(
         "modell-konfiguration/<int:pk>/erklaeren/",
-        views.modell_konfiguration_erklaeren,
+        views.zero_retention_erklaeren,
+        {"seite": views.MODELL_ERKLAERUNGSSEITE},
         name="modell_konfiguration_erklaeren",
     ),
     path(
         "modell-konfiguration/<int:pk>/widerrufen/",
-        views.modell_konfiguration_widerrufen,
+        views.zero_retention_widerrufen,
+        {"seite": views.MODELL_ERKLAERUNGSSEITE},
         name="modell_konfiguration_widerrufen",
     ),
     path(
@@ -184,12 +186,14 @@ urlpatterns: list[URLPattern] = [
     ),
     path(
         "transkription/<int:pk>/erklaeren/",
-        views.transkriptions_konfiguration_erklaeren,
+        views.zero_retention_erklaeren,
+        {"seite": views.TRANSKRIPTION_ERKLAERUNGSSEITE},
         name="transkriptions_konfiguration_erklaeren",
     ),
     path(
         "transkription/<int:pk>/widerrufen/",
-        views.transkriptions_konfiguration_widerrufen,
+        views.zero_retention_widerrufen,
+        {"seite": views.TRANSKRIPTION_ERKLAERUNGSSEITE},
         name="transkriptions_konfiguration_widerrufen",
     ),
 ]

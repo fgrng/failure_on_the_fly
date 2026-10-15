@@ -42,7 +42,6 @@ from .models import (
     VERTRAG_BEWERTER,
     VERTRAG_LEHRPERSON,
     VERTRAG_RAHMEN,
-    Anbieter,
     Eval,
     Evalinput,
     Evalkatalog,
@@ -852,7 +851,7 @@ def _erklaerungsspalten(
     # Die Felder von `_Erklaerungsspalten`, gelesen aus der Konfiguration.
 
     return {
-        "ist_fake": konfiguration.anbieter == Anbieter.FAKE,
+        "ist_fake": not konfiguration.hat_auftragsverarbeiter,
         "erklaerbar": konfiguration.zero_retention_erklaerbar,
         "widerrufbar": konfiguration.zero_retention_widerrufbar,
         "widerrufen": konfiguration.zero_retention_ist_widerrufen,
@@ -1015,72 +1014,6 @@ def _liste_rendern(
 def modell_konfiguration(request: HttpRequest) -> HttpResponse:
     """Listet alle Modell-Konfigurationen, das Detail der gewählten daneben."""
     return _liste_rendern(request, request.GET.get("konfiguration", ""))
-
-
-def _geste_abschliessen(
-    request: HttpRequest,
-    form: ZeroRetentionErklaerungForm | ZeroRetentionWiderrufForm,
-    *,
-    gelungen: bool,
-    formular_steht: bool,
-    neu_rendern: Callable[[], HttpResponse],
-    zurueck: HttpResponse,
-    erfolg: str,
-) -> HttpResponse:
-    # Schließt Erklären oder Widerrufen an beiden Konfigurationen gleich ab:
-    # Ein abgewiesenes Formular bleibt stehen, solange die Seite es noch
-    # zeigt; sonst steht der Grund als Meldung über der Seite.
-
-    if gelungen:
-        messages.success(request, erfolg)
-        return zurueck
-    if formular_steht:
-        return neu_rendern()
-    for meldungen in form.errors.values():
-        messages.error(request, " ".join(meldungen))
-    return zurueck
-
-
-@login_required
-@administratorin_erforderlich
-@require_POST
-def modell_konfiguration_erklaeren(request: HttpRequest, pk: int) -> HttpResponse:
-    """Gibt an einer bestehenden Konfiguration die Zero-Retention-Erklärung ab."""
-    konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
-    form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
-    gelungen: bool = form.erklaeren(konfiguration, request.user)
-    return _geste_abschliessen(
-        request,
-        form,
-        gelungen=gelungen,
-        formular_steht=konfiguration.zero_retention_erklaerbar,
-        neu_rendern=lambda: _liste_rendern(request, str(konfiguration.pk), form),
-        zurueck=_zur_konfiguration(konfiguration),
-        erfolg=f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
-        "abgegeben.",
-    )
-
-
-@login_required
-@administratorin_erforderlich
-@require_POST
-def modell_konfiguration_widerrufen(request: HttpRequest, pk: int) -> HttpResponse:
-    """Widerruft die Zero-Retention-Erklärung einer Konfiguration, mit Grund."""
-    konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
-    form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
-    gelungen: bool = form.widerrufen(konfiguration, request.user)
-    return _geste_abschliessen(
-        request,
-        form,
-        gelungen=gelungen,
-        formular_steht=konfiguration.zero_retention_widerrufbar,
-        neu_rendern=lambda: _liste_rendern(
-            request, str(konfiguration.pk), widerrufsformular=form
-        ),
-        zurueck=_zur_konfiguration(konfiguration),
-        erfolg=f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
-        "widerrufen.",
-    )
 
 
 def _vorlage(request: HttpRequest) -> ModellKonfiguration | None:
@@ -1392,57 +1325,89 @@ def transkriptions_konfiguration_token(request: HttpRequest, pk: int) -> HttpRes
     return _zur_fassung(konfiguration)
 
 
+@dataclass(frozen=True)
+class _Erklaerungsseite:
+    # Was Erklären und Widerrufen an beiden Konfigurationen unterscheidet:
+    # das Modell, die Seite, die ein abgewiesenes Formular erneut zeigt, der
+    # Weg zurück und wie die Erfolgsmeldung die Konfiguration nennt.
+
+    modell: type[ModellKonfiguration] | type[TranskriptionsKonfiguration]
+    rendern: Callable[..., HttpResponse]
+    zurueck: Callable[[Any], HttpResponse]
+    benennen: Callable[[Any], str]
+
+
+MODELL_ERKLAERUNGSSEITE: _Erklaerungsseite = _Erklaerungsseite(
+    modell=ModellKonfiguration,
+    rendern=_liste_rendern,
+    zurueck=_zur_konfiguration,
+    benennen=lambda konfiguration: f"»{konfiguration.bezeichnung}«",
+)
+TRANSKRIPTION_ERKLAERUNGSSEITE: _Erklaerungsseite = _Erklaerungsseite(
+    modell=TranskriptionsKonfiguration,
+    rendern=_transkription_rendern,
+    zurueck=_zur_fassung,
+    benennen=lambda konfiguration: f"die Fassung Nr. {konfiguration.pk}",
+)
+
+
+def _abgewiesen_melden(
+    request: HttpRequest, form: ZeroRetentionErklaerungForm | ZeroRetentionWiderrufForm
+) -> None:
+    # Zeigt die Seite das Formular nicht mehr, steht der Grund als Meldung
+    # über der Seite.
+
+    for meldungen in form.errors.values():
+        messages.error(request, " ".join(meldungen))
+
+
 @login_required
 @administratorin_erforderlich
 @require_POST
-def transkriptions_konfiguration_erklaeren(
-    request: HttpRequest, pk: int
+def zero_retention_erklaeren(
+    request: HttpRequest, pk: int, seite: _Erklaerungsseite
 ) -> HttpResponse:
-    """Gibt an einer bestehenden Fassung die Zero-Retention-Erklärung ab."""
-    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
-        TranskriptionsKonfiguration, pk=pk
+    """Gibt an einer bestehenden Konfiguration die Zero-Retention-Erklärung ab."""
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration = (
+        get_object_or_404(seite.modell, pk=pk)
     )
     form: ZeroRetentionErklaerungForm = ZeroRetentionErklaerungForm(request.POST)
-    gelungen: bool = form.erklaeren(konfiguration, request.user)
-    return _geste_abschliessen(
-        request,
-        form,
-        gelungen=gelungen,
-        formular_steht=konfiguration.zero_retention_erklaerbar,
-        neu_rendern=lambda: _transkription_rendern(
-            request, str(konfiguration.pk), erklaerungsformular=form
-        ),
-        zurueck=_zur_fassung(konfiguration),
-        erfolg=f"Für die Fassung Nr. {konfiguration.pk} ist die "
-        "Zero-Retention-Erklärung abgegeben.",
-    )
+    if form.erklaeren(konfiguration, request.user):
+        messages.success(
+            request,
+            f"Für {seite.benennen(konfiguration)} ist die Zero-Retention-Erklärung "
+            "abgegeben.",
+        )
+    elif konfiguration.zero_retention_erklaerbar:
+        return seite.rendern(request, str(konfiguration.pk), erklaerungsformular=form)
+    else:
+        _abgewiesen_melden(request, form)
+    return seite.zurueck(konfiguration)
 
 
 @login_required
 @administratorin_erforderlich
 @require_POST
-def transkriptions_konfiguration_widerrufen(
-    request: HttpRequest, pk: int
+def zero_retention_widerrufen(
+    request: HttpRequest, pk: int, seite: _Erklaerungsseite
 ) -> HttpResponse:
-    """Widerruft die Zero-Retention-Erklärung einer Fassung, mit Grund.
+    """Widerruft die Zero-Retention-Erklärung einer Konfiguration, mit Grund.
 
-    Ist sie die aktive oder in laufenden Sitzungen gepinnt, ist die
-    Transkription dort ab der nächsten Aufnahme aus.
+    Ist eine Transkriptions-Fassung die aktive oder in laufenden Sitzungen
+    gepinnt, ist die Transkription dort ab der nächsten Aufnahme aus.
     """
-    konfiguration: TranskriptionsKonfiguration = get_object_or_404(
-        TranskriptionsKonfiguration, pk=pk
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration = (
+        get_object_or_404(seite.modell, pk=pk)
     )
     form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
-    gelungen: bool = form.widerrufen(konfiguration, request.user)
-    return _geste_abschliessen(
-        request,
-        form,
-        gelungen=gelungen,
-        formular_steht=konfiguration.zero_retention_widerrufbar,
-        neu_rendern=lambda: _transkription_rendern(
-            request, str(konfiguration.pk), widerrufsformular=form
-        ),
-        zurueck=_zur_fassung(konfiguration),
-        erfolg=f"Für die Fassung Nr. {konfiguration.pk} ist die "
-        "Zero-Retention-Erklärung widerrufen.",
-    )
+    if form.widerrufen(konfiguration, request.user):
+        messages.success(
+            request,
+            f"Für {seite.benennen(konfiguration)} ist die Zero-Retention-Erklärung "
+            "widerrufen.",
+        )
+    elif konfiguration.zero_retention_widerrufbar:
+        return seite.rendern(request, str(konfiguration.pk), widerrufsformular=form)
+    else:
+        _abgewiesen_melden(request, form)
+    return seite.zurueck(konfiguration)

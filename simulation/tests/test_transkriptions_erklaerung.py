@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import erklaerte, konto_mit_rollen, transkriptions_fassung
 from konten.models import Konto
+from simulation.forms import ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 
 SEITE: str = "simulation:transkriptions_konfiguration"
@@ -102,7 +103,20 @@ class TranskriptionsErklaerungTests(TestCase):
             "zero_retention_beleg",
             "Ohne Beleg der Zusage ist die Erklärung nicht nachprüfbar.",
         )
-        self.assertEqual(TranskriptionsKonfiguration.objects.count(), 1)
+        self.assertEqual(len(response.context["fassungen"]), 1)
+
+    def test_meldet_den_beleg_ohne_haekchen_am_haekchen(self) -> None:
+        """Die Erklärung ist eine eigene Geste; ein Beleg allein geht nicht verloren."""
+        response: HttpResponse = self.client.post(
+            reverse(SEITE), _eingabe(zero_retention_beleg="AVV")
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "zero_retention_erklaert",
+            ZERO_RETENTION_HAEKCHEN_FEHLT_FEHLERMELDUNG,
+        )
+        self.assertEqual(len(response.context["fassungen"]), 1)
 
     def test_weist_die_erklaerung_bei_fake_beim_anlegen_ab(self) -> None:
         """Über einen Auftragsverarbeiter, den es nicht gibt, wird nichts erklärt."""
@@ -118,7 +132,7 @@ class TranskriptionsErklaerungTests(TestCase):
         )
 
         self.assertIn("zero_retention_beleg", response.context["form"].errors)
-        self.assertEqual(TranskriptionsKonfiguration.objects.count(), 1)
+        self.assertEqual(len(response.context["fassungen"]), 1)
 
     def test_gibt_die_erklaerung_nachtraeglich_ab(self) -> None:
         """Eine Fassung ohne Erklärung bekommt sie im Detail."""
