@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 
 from simulation import (
+    Antwortversuch,
     Ausfuehrung,
     Ausgabeversuch,
     antwort_versuchen,
@@ -112,6 +113,18 @@ def test_antwort_versuchen_kennzeichnet_drei_verworfene_versuche() -> None:
     ]
 
 
+def _schuelerin_versuchen(skript: list[dict[str, object]]) -> Antwortversuch:
+    # Ein Antwortversuch der simulierten Schüler:in gegen ein Fake-Skript.
+
+    return antwort_versuchen(
+        {"lernauftrag": "Addiere zwei Brüche."},
+        Simulationskern(user_prompt_vorlage="$lernauftrag"),
+        _fake_konfiguration(skript),
+        verlauf=[],
+        eingabe="Wie hast du gerechnet?",
+    )
+
+
 @pytest.mark.parametrize(
     "leer",
     [
@@ -126,17 +139,8 @@ def test_antwort_versuchen_verwirft_leere_denkspur_oder_aeusserung(
 ) -> None:
     """Ein leeres Pflichtfeld ist ein Formatbruch, kein geglückter Schritt (ADR-0061)."""
 
-    antwortversuch = antwort_versuchen(
-        {"lernauftrag": "Addiere zwei Brüche."},
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={
-                "skript": [leer, {"denkspur": "Ich addiere.", "aeusserung": "2/5."}]
-            },
-        ),
-        verlauf=[],
-        eingabe="Wie hast du gerechnet?",
+    antwortversuch = _schuelerin_versuchen(
+        [leer, {"denkspur": "Ich addiere.", "aeusserung": "2/5."}]
     )
 
     assert antwortversuch.antwort is not None
@@ -149,16 +153,7 @@ def test_antwort_versuchen_verwirft_leere_denkspur_oder_aeusserung(
 def test_antwort_versuchen_scheitert_an_anhaltend_leerer_ausgabe() -> None:
     """Bleibt die Ausgabe in allen Versuchen leer, entsteht kein Gesprächsschritt."""
 
-    antwortversuch = antwort_versuchen(
-        {"lernauftrag": "Addiere zwei Brüche."},
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={"skript": [{"denkspur": "", "aeusserung": ""}] * 3},
-        ),
-        verlauf=[],
-        eingabe="Wie hast du gerechnet?",
-    )
+    antwortversuch = _schuelerin_versuchen([{"denkspur": "", "aeusserung": ""}] * 3)
 
     assert antwortversuch.antwort is None
     assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
@@ -169,17 +164,8 @@ def test_antwort_versuchen_scheitert_an_anhaltend_leerer_ausgabe() -> None:
 def test_antwort_versuchen_laesst_leerraum_um_den_inhalt_unveraendert() -> None:
     """Nur ein leeres Feld bricht das Format; umgebender Leerraum bleibt stehen."""
 
-    antwortversuch = antwort_versuchen(
-        {"lernauftrag": "Addiere zwei Brüche."},
-        Simulationskern(user_prompt_vorlage="$lernauftrag"),
-        ModellKonfiguration(
-            sprachmodell="fake",
-            parameter={
-                "skript": [{"denkspur": " Ich addiere.\n", "aeusserung": "\n2/5. "}]
-            },
-        ),
-        verlauf=[],
-        eingabe="Wie hast du gerechnet?",
+    antwortversuch = _schuelerin_versuchen(
+        [{"denkspur": " Ich addiere.\n", "aeusserung": "\n2/5. "}]
     )
 
     assert antwortversuch.antwort is not None

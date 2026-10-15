@@ -89,9 +89,10 @@ def _ausgabe_pruefen(
     """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
 
     Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch,
-    ebenso eine Zeichenkette, die leer ist oder nur aus Leerraum besteht: Ein
-    Gesprächsschritt ohne Denkspur oder Äußerung ist unzulässig (ADR-0061).
-    Der Inhalt bleibt dabei unverändert.
+    ebenso eine Zeichenkette, die leer ist oder nur aus Leerraum besteht: Jedes
+    Textfeld eines Ausgabeschemas ist Pflicht, so wie ein Gesprächsschritt ohne
+    Denkspur oder Äußerung unzulässig ist (ADR-0061). Der Inhalt bleibt dabei
+    unverändert.
     """
 
     eigenschaften: Mapping[str, Mapping[str, str]] = ausgabe_schema["properties"]
