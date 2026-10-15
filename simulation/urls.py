@@ -163,6 +163,11 @@ urlpatterns: list[URLPattern] = [
         name="modell_konfiguration_erklaeren",
     ),
     path(
+        "modell-konfiguration/<int:pk>/widerrufen/",
+        views.modell_konfiguration_widerrufen,
+        name="modell_konfiguration_widerrufen",
+    ),
+    path(
         "transkription/",
         views.transkriptions_konfiguration,
         name="transkriptions_konfiguration",

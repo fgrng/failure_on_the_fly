@@ -2330,6 +2330,8 @@ class ErhebungsExportTests(TestCase):
                     "zero_retention_erklaert": "True",
                     "zero_retention_beleg": "AVV mit dem Anbieter vom 01.10.2026",
                     "zero_retention_erklaert_am": "2026-07-01T08:00:00+00:00",
+                    "zero_retention_widerrufen_am": "NA",
+                    "zero_retention_widerrufsgrund": "",
                 }
             ],
         )
@@ -2338,6 +2340,46 @@ class ErhebungsExportTests(TestCase):
         # Der Export führt keine Konten, auch nicht das erklärende.
         self.assertNotIn(
             konfiguration.zero_retention_erklaert_von.username, archivinhalt
+        )
+
+    def test_exportiert_den_widerruf_mit_zeitpunkt_und_grund(self) -> None:
+        """Die gepinnte Fassung zeigt den Widerruf, wie er heute ist, ohne Konto."""
+
+        ada: Konto = forschende("ada")
+        konfiguration: ModellKonfiguration = _infomaniak_konfiguration()
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        erhebung: Erhebung = finale_erhebung(ada, name="Brüche")
+        with time_machine.travel(_SOMMERZEIT, tick=False):
+            konfiguration.zero_retention_widerrufen(
+                "Kein ZDR-Endpunkt mehr",
+                Konto.objects.create_user(username="widerrufende", is_superuser=True),
+            )
+        self.client.force_login(ada)
+
+        response: HttpResponse = self.client.get(
+            reverse("erhebungen:export", args=[erhebung.pk])
+        )
+
+        archiv: dict[str, list[dict[str, str]]] = export_lesen(response)
+        [zeile] = archiv["modellkonfigurationen.csv"]
+        self.assertEqual(zeile["zero_retention_erklaert"], "False")
+        self.assertEqual(
+            zeile["zero_retention_beleg"], "AVV mit dem Anbieter vom 01.10.2026"
+        )
+        self.assertEqual(
+            zeile["zero_retention_widerrufen_am"], "2026-07-01T08:00:00+00:00"
+        )
+        self.assertEqual(
+            zeile["zero_retention_widerrufsgrund"], "Kein ZDR-Endpunkt mehr"
+        )
+        self.assertNotIn(
+            "widerrufende",
+            "\n".join(
+                wert
+                for zeilen in archiv.values()
+                for zeile in zeilen
+                for wert in zeile.values()
+            ),
         )
 
     def test_exportiert_den_erklaerungsstand_einer_fake_konfiguration(self) -> None:

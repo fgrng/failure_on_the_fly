@@ -293,6 +293,8 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "zero_retention_erklaert",
                 "zero_retention_beleg",
                 "zero_retention_erklaert_am",
+                "zero_retention_widerrufen_am",
+                "zero_retention_widerrufsgrund",
             ),
             parameter=lambda konfiguration: json.dumps(
                 konfiguration.parameter, ensure_ascii=False

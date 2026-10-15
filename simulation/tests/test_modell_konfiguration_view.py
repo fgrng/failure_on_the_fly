@@ -61,6 +61,21 @@ def _erklaeren_url(konfiguration: ModellKonfiguration) -> str:
     return reverse("simulation:modell_konfiguration_erklaeren", args=[konfiguration.pk])
 
 
+def _widerrufen_url(konfiguration: ModellKonfiguration) -> str:
+    """Liefert die Route, die an der Konfiguration die Erklärung widerruft."""
+    return reverse(
+        "simulation:modell_konfiguration_widerrufen", args=[konfiguration.pk]
+    )
+
+
+def _widerrufene(konfiguration: ModellKonfiguration) -> ModellKonfiguration:
+    """Erklärt die Konfiguration und widerruft die Erklärung gleich wieder."""
+    erklaerte(konfiguration).zero_retention_widerrufen(
+        "Kein ZDR-Endpunkt mehr", konfiguration.zero_retention_erklaert_von
+    )
+    return konfiguration
+
+
 class ModellKonfigurationRollenTests(TestCase):
     """Die Betriebseinstellungen der Instanz hängen an der Administrationsrolle."""
 
@@ -151,6 +166,37 @@ class ModellKonfigurationRollenTests(TestCase):
         self.assertEqual(response.status_code, 403)
         konfiguration.refresh_from_db()
         self.assertFalse(konfiguration.zero_retention_erklaert)
+
+    def test_widerrufen_weist_autorin_ohne_administrationsrolle_ab(self) -> None:
+        """Nur die Administration widerruft eine Zero-Retention-Erklärung."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+        self.client.force_login(konto_mit_rollen("ada", "Autor:in", "Forschende:r"))
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Zusage zurückgezogen"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        konfiguration.refresh_from_db()
+        self.assertTrue(konfiguration.zero_retention_erklaert)
+
+    def test_widerrufen_weist_nicht_angemeldetes_konto_ab(self) -> None:
+        """Ohne Anmeldung widerruft niemand eine Zusage."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Zusage zurückgezogen"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        konfiguration.refresh_from_db()
+        self.assertTrue(konfiguration.zero_retention_erklaert)
 
 
 class ZweiFassungenTestCase(TestCase):
@@ -345,7 +391,10 @@ class ModellKonfigurationDetailTests(ZweiFassungenTestCase):
         ]
         self.assertTrue(gesten)
         for beschriftung in gesten:
-            self.assertRegex(beschriftung, r"^Für .+ aktivieren")
+            self.assertRegex(
+                beschriftung,
+                r"^(Für .+ aktivieren|Zero-Retention-Erklärung widerrufen)",
+            )
 
     def test_zeigt_das_token_nur_maskiert(self) -> None:
         """Der Klartext des Tokens erscheint nirgends im Antwortkörper."""
@@ -1313,3 +1362,200 @@ class ZeroRetentionUebersichtTests(TestCase):
                 )
 
                 self.assertNotContains(response, "fehlt die Zero-Retention-Erklärung")
+
+
+class ZeroRetentionWiderrufTests(TestCase):
+    """Eine abgegebene Erklärung lässt sich mit Grund widerrufen, einmal."""
+
+    def setUp(self) -> None:
+        """Meldet eine Administratorin an."""
+        self.linus = konto_mit_rollen("linus", is_superuser=True)
+        self.client.force_login(self.linus)
+
+    def _detail(self, konfiguration: ModellKonfiguration) -> HttpResponse:
+        # Die Liste mit der Konfiguration im Detail.
+        return self.client.get(
+            reverse("simulation:modell_konfiguration"),
+            {"konfiguration": konfiguration.pk},
+        )
+
+    def test_widerruft_die_erklaerung_mit_grund(self) -> None:
+        """Grund, Zeitpunkt und Konto stehen danach an der Fassung."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Kein ZDR-Endpunkt mehr"},
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('simulation:modell_konfiguration')}"
+            f"?konfiguration={konfiguration.pk}",
+        )
+        konfiguration.refresh_from_db()
+        self.assertFalse(konfiguration.zero_retention_erklaert)
+        self.assertEqual(
+            konfiguration.zero_retention_widerrufsgrund, "Kein ZDR-Endpunkt mehr"
+        )
+        self.assertEqual(konfiguration.zero_retention_widerrufen_von, self.linus)
+        self.assertIsNotNone(konfiguration.zero_retention_widerrufen_am)
+
+    def test_meldet_den_fehlenden_grund_am_feld(self) -> None:
+        """Ohne Grund kein Widerruf."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration), {"zero_retention_widerrufsgrund": "  "}
+        )
+
+        self.assertFormError(
+            response.context["widerrufsformular"],
+            "zero_retention_widerrufsgrund",
+            "Ohne Grund ist der Widerruf nicht nachvollziehbar.",
+        )
+        konfiguration.refresh_from_db()
+        self.assertTrue(konfiguration.zero_retention_erklaert)
+
+    def test_weist_den_widerruf_ohne_abgegebene_erklaerung_ab(self) -> None:
+        """Eine nie abgegebene Erklärung lässt sich nicht widerrufen."""
+        konfiguration: ModellKonfiguration = _openrouter("openrouter/gpt-test")
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Zusage zurückgezogen"},
+            follow=True,
+        )
+
+        self.assertContains(response, "gibt es nichts zu widerrufen")
+        konfiguration.refresh_from_db()
+        self.assertIsNone(konfiguration.zero_retention_widerrufen_am)
+
+    def test_weist_einen_zweiten_widerruf_ab(self) -> None:
+        """Grund und Zeitpunkt des ersten Widerrufs bleiben stehen."""
+        konfiguration: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.post(
+            _widerrufen_url(konfiguration),
+            {"zero_retention_widerrufsgrund": "Anderer Grund"},
+            follow=True,
+        )
+
+        self.assertContains(response, "ist widerrufen")
+        konfiguration.refresh_from_db()
+        self.assertEqual(
+            konfiguration.zero_retention_widerrufsgrund, "Kein ZDR-Endpunkt mehr"
+        )
+
+    def test_bietet_den_widerruf_nur_an_einer_erklaerten_fassung_an(self) -> None:
+        """Offene, widerrufene und `fake`-Fassungen zeigen kein Widerrufsformular."""
+        offen: ModellKonfiguration = _openrouter("openrouter/offen")
+        erklaert: ModellKonfiguration = erklaerte(_openrouter("openrouter/erklaert"))
+        widerrufen: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/widerrufen")
+        )
+        fake: ModellKonfiguration = ModellKonfiguration.objects.create(
+            bezeichnung="Offline", sprachmodell="fake"
+        )
+
+        for konfiguration, angeboten in (
+            (offen, False),
+            (erklaert, True),
+            (widerrufen, False),
+            (fake, False),
+        ):
+            with self.subTest(konfiguration=konfiguration.sprachmodell):
+                response: HttpResponse = self._detail(konfiguration)
+
+                if angeboten:
+                    self.assertContains(response, _widerrufen_url(konfiguration))
+                else:
+                    self.assertNotContains(response, _widerrufen_url(konfiguration))
+
+    def test_zeigt_den_widerruf_im_detail_und_bietet_keine_erklaerung_an(
+        self,
+    ) -> None:
+        """Wer die Liste liest, sieht, warum die Zusage weggefallen ist."""
+        konfiguration: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self._detail(konfiguration)
+
+        self.assertContains(response, "Kein ZDR-Endpunkt mehr")
+        self.assertContains(response, "Widerrufen am")
+        self.assertContains(response, konfiguration.zero_retention_beleg)
+        self.assertNotContains(response, _erklaeren_url(konfiguration))
+
+    def test_sperrt_jede_verwendung_einer_widerrufenen_fassung(self) -> None:
+        """Weder ein Schalter noch der direkte Aufruf aktivieren sie."""
+        konfiguration: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self._detail(konfiguration)
+
+        for verwendung in Verwendung:
+            with self.subTest(verwendung=verwendung):
+                self.assertNotContains(
+                    response, _aktivieren_url(konfiguration, verwendung)
+                )
+                self.assertContains(
+                    response, f"Für {verwendung.label} gesperrt: Erklärung widerrufen"
+                )
+                aktiviert: HttpResponse = self.client.post(
+                    _aktivieren_url(konfiguration, verwendung), follow=True
+                )
+                self.assertContains(aktiviert, "für keine Verwendung mehr")
+                self.assertIsNone(ModellKonfiguration.objects.aktive(verwendung))
+
+    def test_zeigt_den_widerruf_in_der_tabelle(self) -> None:
+        """Der Erklärungsstand nennt den Widerruf samt Datum und Grund."""
+        konfiguration: ModellKonfiguration = _widerrufene(
+            _openrouter("openrouter/gpt-test")
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+        tabelle: str = (
+            response.content.decode().split("<tbody>")[1].split("</tbody>")[0]
+        )
+
+        self.assertIn(
+            "widerrufen am "
+            + timezone.localtime(konfiguration.zero_retention_widerrufen_am).strftime(
+                "%d.%m.%Y"
+            ),
+            tabelle,
+        )
+        self.assertIn("Kein ZDR-Endpunkt mehr", tabelle)
+
+    def test_warnt_deutlich_bei_aktiver_widerrufener_fassung(self) -> None:
+        """Der Zeiger bleibt stehen, aber nicht unbemerkt."""
+        konfiguration: ModellKonfiguration = erklaerte(
+            _openrouter("openrouter/gpt-test")
+        )
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.SCHUELERIN)
+        ModellKonfiguration.objects.aktivieren(konfiguration, Verwendung.BEWERTER)
+        konfiguration.zero_retention_widerrufen("Kein ZDR-Endpunkt mehr", self.linus)
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:modell_konfiguration")
+        )
+
+        self.assertEqual(
+            ModellKonfiguration.objects.aktive(Verwendung.SCHUELERIN), konfiguration
+        )
+        self.assertContains(
+            response,
+            "Die Zero-Retention-Erklärung einer aktiven Konfiguration ist widerrufen",
+        )
+        self.assertContains(response, "Schüler:in, Bewerter")
+        self.assertNotContains(response, "fehlt die Zero-Retention-Erklärung")

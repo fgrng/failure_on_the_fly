@@ -157,10 +157,16 @@ class Erhebung(EigentuemerKreis):
             Verwendung.SCHUELERIN
         )
         if not konfiguration.zulaessig_fuer_schuelerin:
+            mangel: str = (
+                "Die Zero-Retention-Erklärung der aktiven Modell-Konfiguration der "
+                "Schüler:in ist widerrufen."
+                if konfiguration.zero_retention_ist_widerrufen
+                else "Die aktive Modell-Konfiguration der Schüler:in trägt keine "
+                "Zero-Retention-Erklärung."
+            )
             raise ValidationError(
-                "Die aktive Modell-Konfiguration der Schüler:in trägt keine "
-                "Zero-Retention-Erklärung. Eine Administrator:in muss zuerst eine "
-                "erklärte Konfiguration für die Schüler:in aktivieren."
+                f"{mangel} Eine Administrator:in muss zuerst eine erklärte "
+                "Konfiguration für die Schüler:in aktivieren."
             )
         self._status_wechseln(
             erwarteter_status=self.Status.ENTWURF,

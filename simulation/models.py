@@ -870,6 +870,16 @@ ZERO_RETENTION_BELEG_FEHLERMELDUNG: str = (
 ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG: str = (
     "Die Zero-Retention-Erklärung liegt schon vor und lässt sich nicht ändern."
 )
+ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung ist widerrufen und lässt sich weder neu "
+    "abgeben noch zurücknehmen. Legen Sie eine neue Konfiguration an."
+)
+ZERO_RETENTION_NICHT_WIDERRUFBAR_FEHLERMELDUNG: str = (
+    "Ohne abgegebene Zero-Retention-Erklärung gibt es nichts zu widerrufen."
+)
+ZERO_RETENTION_GRUND_FEHLERMELDUNG: str = (
+    "Ohne Grund ist der Widerruf nicht nachvollziehbar."
+)
 
 
 class ZeroRetentionFeldgruppe(models.Model):
@@ -891,6 +901,20 @@ class ZeroRetentionFeldgruppe(models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
+    zero_retention_widerrufsgrund: models.TextField = models.TextField(
+        blank=True, default="", editable=False
+    )
+    zero_retention_widerrufen_am: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, editable=False
+    )
+    zero_retention_widerrufen_von: models.ForeignKey = models.ForeignKey(
+        "konten.Konto",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
 
     class Meta:
         """Keine eigene Tabelle: Beide Konfigurationen tragen die Felder selbst."""
@@ -898,16 +922,28 @@ class ZeroRetentionFeldgruppe(models.Model):
         abstract: bool = True
 
     @property
-    def zero_retention_erklaert(self) -> bool:
-        """Ob für diese Fassung eine Zero-Retention-Erklärung vorliegt."""
+    def zero_retention_abgegeben(self) -> bool:
+        """Ob je eine Erklärung abgegeben wurde, widerrufen oder nicht."""
 
         return self.zero_retention_erklaert_am is not None
+
+    @property
+    def zero_retention_ist_widerrufen(self) -> bool:
+        """Ob die Erklärung dieser Fassung widerrufen ist."""
+
+        return self.zero_retention_widerrufen_am is not None
+
+    @property
+    def zero_retention_erklaert(self) -> bool:
+        """Ob eine Erklärung vorliegt und nicht widerrufen ist."""
+
+        return self.zero_retention_abgegeben and not self.zero_retention_ist_widerrufen
 
     @property
     def zero_retention_erklaerbar(self) -> bool:
         """Ob sich an dieser Fassung noch eine Erklärung abgeben lässt."""
 
-        return self.anbieter != Anbieter.FAKE and not self.zero_retention_erklaert
+        return self.anbieter != Anbieter.FAKE and not self.zero_retention_abgegeben
 
     def zero_retention_erklaeren(self, beleg: str, konto: models.Model) -> None:
         """Gibt die Erklärung ab: vor dem Anlegen mit, danach nachträglich.
@@ -925,7 +961,9 @@ class ZeroRetentionFeldgruppe(models.Model):
             raise ValidationError(
                 {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
             )
-        if self.zero_retention_erklaert:
+        if self.zero_retention_ist_widerrufen:
+            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
+        if self.zero_retention_abgegeben:
             raise ValidationError(ZERO_RETENTION_UNVERAENDERLICH_FEHLERMELDUNG)
         werte: dict[str, object] = {
             "zero_retention_beleg": beleg,
@@ -947,14 +985,51 @@ class ZeroRetentionFeldgruppe(models.Model):
         for feld, wert in werte.items():
             setattr(self, feld, wert)
 
+    def zero_retention_widerrufen(self, grund: str, konto: models.Model) -> None:
+        """Widerruft die Erklärung, einmal und endgültig.
+
+        Zeitpunkt und Konto schreibt der Widerruf selbst mit. Die Erklärung
+        bleibt als Nachweis stehen; die Fassung gilt fortan als nicht erklärt.
+        """
+
+        grund = grund.strip()
+        if not grund:
+            raise ValidationError(
+                {"zero_retention_widerrufsgrund": ZERO_RETENTION_GRUND_FEHLERMELDUNG}
+            )
+        if self.zero_retention_ist_widerrufen:
+            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
+        if not self.zero_retention_abgegeben:
+            raise ValidationError(ZERO_RETENTION_NICHT_WIDERRUFBAR_FEHLERMELDUNG)
+        werte: dict[str, object] = {
+            "zero_retention_widerrufsgrund": grund,
+            "zero_retention_widerrufen_am": timezone.now(),
+            "zero_retention_widerrufen_von": konto,
+        }
+        # Wie die nachträgliche Erklärung am append-only QuerySet vorbei, und
+        # nur, solange kein anderer Widerruf zuvorgekommen ist.
+        if not (
+            models.QuerySet(model=type(self))
+            .filter(
+                pk=self.pk,
+                zero_retention_erklaert_am__isnull=False,
+                zero_retention_widerrufen_am=None,
+            )
+            .update(**werte)
+        ):
+            self.refresh_from_db(fields=list(werte))
+            raise ValidationError(ZERO_RETENTION_WIDERRUFEN_FEHLERMELDUNG)
+        for feld, wert in werte.items():
+            setattr(self, feld, wert)
+
     def _erklaerungsfehler(self) -> dict[str, str]:
         # Hält eine beim Anlegen mitgegebene Erklärung an dieselben Regeln.
 
         if self.anbieter == Anbieter.FAKE and (
-            self.zero_retention_beleg or self.zero_retention_erklaert
+            self.zero_retention_beleg or self.zero_retention_abgegeben
         ):
             return {"zero_retention_beleg": ZERO_RETENTION_FAKE_FEHLERMELDUNG}
-        if self.zero_retention_erklaert != bool(self.zero_retention_beleg.strip()):
+        if self.zero_retention_abgegeben != bool(self.zero_retention_beleg.strip()):
             return {"zero_retention_beleg": ZERO_RETENTION_BELEG_FEHLERMELDUNG}
         return {}
 
@@ -972,6 +1047,10 @@ SCHUELERIN_OHNE_ERKLAERUNG_FEHLERMELDUNG: str = (
     "Für die Schüler:in lässt sich nur eine Konfiguration mit "
     "Zero-Retention-Erklärung aktivieren. Diese trägt keine; geben Sie zuerst "
     "die Erklärung ab."
+)
+WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG: str = (
+    "Die Zero-Retention-Erklärung dieser Konfiguration ist widerrufen; sie lässt "
+    "sich für keine Verwendung mehr aktivieren."
 )
 
 
@@ -1031,9 +1110,12 @@ class ModellKonfigurationManager(
         """Richtet den Zeiger der Verwendung auf die Konfiguration.
 
         Für die Schüler:in nur eine erklärte Fassung oder `fake`: Dort gehen
-        Eingaben echter Personen an das Sprachmodell.
+        Eingaben echter Personen an das Sprachmodell. Eine widerrufene Fassung
+        für keine Verwendung mehr.
         """
 
+        if konfiguration.zero_retention_ist_widerrufen:
+            raise ValidationError(WIDERRUFENE_AKTIVIERUNG_FEHLERMELDUNG)
         if (
             verwendung == Verwendung.SCHUELERIN
             and not konfiguration.zulaessig_fuer_schuelerin

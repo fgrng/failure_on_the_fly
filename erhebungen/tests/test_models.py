@@ -697,6 +697,27 @@ def test_finalisieren_gelingt_mit_erklaerter_schuelerin_konfiguration() -> None:
 
 
 @pytest.mark.django_db
+def test_finalisieren_scheitert_mit_widerrufener_schuelerin_konfiguration() -> None:
+    """Der Zeiger bleibt nach dem Widerruf stehen, das Finalisieren nicht offen."""
+
+    erhebung: Erhebung = Erhebung.objects.anlegen(
+        Konto.objects.create_user(username="ada"), name="Brüche"
+    )
+    konfiguration: ModellKonfiguration = erklaerte(_openrouter_fuer_schuelerin())
+    konfiguration.zero_retention_widerrufen(
+        "Zusage zurückgezogen",
+        Konto.objects.create_user(username="linus", is_superuser=True),
+    )
+
+    with pytest.raises(ValidationError, match="widerrufen"):
+        erhebung.finalisieren()
+
+    erhebung.refresh_from_db()
+    assert erhebung.status == Erhebung.Status.ENTWURF
+    assert erhebung.modell_konfiguration is None
+
+
+@pytest.mark.django_db
 def test_zurueckziehen_ist_mit_nicht_archivierter_stichprobe_gesperrt() -> None:
     """Eine aktive Stichprobe hält die finale Erhebung fest."""
 

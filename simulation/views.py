@@ -23,6 +23,7 @@ from .forms import (
     SimulationskernForm,
     TranskriptionsKonfigurationForm,
     ZeroRetentionErklaerungForm,
+    ZeroRetentionWiderrufForm,
 )
 from .lebenszyklus import VersionierteFassung
 from .modellverzeichnis import (
@@ -803,17 +804,28 @@ class _Konfigurationszeile:
     verwendungen: tuple[Verwendung, ...]
     ist_fake: bool
     erklaerbar: bool
+    widerrufbar: bool
     zulaessig_fuer_schuelerin: bool
     zero_retention_erklaert: bool
     zero_retention_beleg: str
     zero_retention_erklaert_am: datetime | None
     zero_retention_erklaert_von: str
+    zero_retention_widerrufen_am: datetime | None
+    zero_retention_widerrufen_von: str
+    zero_retention_widerrufsgrund: str
+
+    @property
+    def widerrufen(self) -> bool:
+        """Ob die Erklärung widerrufen ist; dann ist keine Verwendung aktivierbar."""
+        return self.zero_retention_widerrufen_am is not None
 
     @property
     def erklaerungsstand(self) -> str:
         """Der Erklärungsstand in einem Wort, wie ihn die Tabelle zeigt."""
         if self.ist_fake:
             return "nicht nötig"
+        if self.widerrufen:
+            return "widerrufen"
         return "erklärt" if self.zero_retention_erklaert else "fehlt"
 
 
@@ -848,6 +860,7 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
             ),
             ist_fake=konfiguration.anbieter == Anbieter.FAKE,
             erklaerbar=konfiguration.zero_retention_erklaerbar,
+            widerrufbar=konfiguration.zero_retention_erklaert,
             zulaessig_fuer_schuelerin=konfiguration.zulaessig_fuer_schuelerin,
             zero_retention_erklaert=konfiguration.zero_retention_erklaert,
             zero_retention_beleg=konfiguration.zero_retention_beleg,
@@ -855,9 +868,14 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
             zero_retention_erklaert_von=str(
                 konfiguration.zero_retention_erklaert_von or ""
             ),
+            zero_retention_widerrufen_am=konfiguration.zero_retention_widerrufen_am,
+            zero_retention_widerrufen_von=str(
+                konfiguration.zero_retention_widerrufen_von or ""
+            ),
+            zero_retention_widerrufsgrund=konfiguration.zero_retention_widerrufsgrund,
         )
         for konfiguration in ModellKonfiguration.objects.select_related(
-            "zero_retention_erklaert_von"
+            "zero_retention_erklaert_von", "zero_retention_widerrufen_von"
         ).order_by("-pk")
     ]
 
@@ -916,8 +934,9 @@ def _liste_rendern(
     request: HttpRequest,
     genannt: str,
     erklaerungsformular: ZeroRetentionErklaerungForm | None = None,
+    widerrufsformular: ZeroRetentionWiderrufForm | None = None,
 ) -> HttpResponse:
-    # Die Liste samt Detail; ein abgewiesenes Erklärungsformular bleibt stehen.
+    # Die Liste samt Detail; ein abgewiesenes Formular bleibt stehen.
 
     zeilen: list[_Konfigurationszeile] = _konfigurationszeilen()
     gewaehlt: _Konfigurationszeile | None = _gewaehlte_zeile(genannt, zeilen)
@@ -932,8 +951,16 @@ def _liste_rendern(
             "gewaehlt": gewaehlt,
             "schalter": _schalter(gewaehlt, zeilen) if gewaehlt else [],
             "erklaerungsformular": erklaerungsformular or ZeroRetentionErklaerungForm(),
+            "widerrufsformular": widerrufsformular or ZeroRetentionWiderrufForm(),
             "schuelerin_ohne_erklaerung": schuelerin is not None
+            and not schuelerin.widerrufen
             and not schuelerin.zulaessig_fuer_schuelerin,
+            # Ein Widerruf lässt die Zeiger stehen; hier fällt er auf.
+            "widerrufen_aktiv_fuer": [
+                verwendung.label
+                for verwendung in Verwendung
+                if (aktiv := _aktive_zeile(zeilen, verwendung)) and aktiv.widerrufen
+            ],
         },
     )
 
@@ -961,6 +988,29 @@ def modell_konfiguration_erklaeren(request: HttpRequest, pk: int) -> HttpRespons
         request,
         f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
         "abgegeben.",
+    )
+    return _zur_konfiguration(konfiguration)
+
+
+@administratorin_erforderlich
+@require_POST
+def modell_konfiguration_widerrufen(request: HttpRequest, pk: int) -> HttpResponse:
+    """Widerruft die Zero-Retention-Erklärung einer Konfiguration, mit Grund."""
+    konfiguration: ModellKonfiguration = get_object_or_404(ModellKonfiguration, pk=pk)
+    form: ZeroRetentionWiderrufForm = ZeroRetentionWiderrufForm(request.POST)
+    if not form.widerrufen(konfiguration, request.user):
+        if konfiguration.zero_retention_erklaert:
+            return _liste_rendern(
+                request, str(konfiguration.pk), widerrufsformular=form
+            )
+        # Hier steht kein Formular, an dem der Grund stehen könnte.
+        for meldungen in form.errors.values():
+            messages.error(request, " ".join(meldungen))
+        return _zur_konfiguration(konfiguration)
+    messages.success(
+        request,
+        f"Für »{konfiguration.bezeichnung}« ist die Zero-Retention-Erklärung "
+        "widerrufen.",
     )
     return _zur_konfiguration(konfiguration)
 

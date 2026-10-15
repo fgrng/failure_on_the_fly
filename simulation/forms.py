@@ -180,6 +180,35 @@ class ZeroRetentionErklaerungForm(Form):
         return True
 
 
+class ZeroRetentionWiderrufForm(Form):
+    """Der Widerruf einer abgegebenen Erklärung, an beiden Konfigurationen."""
+
+    # Nicht Pflicht am Feld: Den leeren Grund meldet die Domäne.
+    zero_retention_widerrufsgrund = CharField(
+        label="Grund des Widerrufs",
+        help_text=(
+            "Warum die Zusage nicht mehr gilt, etwa „Anbieter zieht die Zusage "
+            "zurück“ oder „Modell hat keinen ZDR-Endpunkt mehr“. Zeitpunkt und "
+            "Konto werden mitgeschrieben; der Widerruf ist endgültig."
+        ),
+        required=False,
+        widget=Textarea(attrs={"rows": 3}),
+    )
+
+    def widerrufen(self, konfiguration: ZeroRetentionFeldgruppe, konto: Konto) -> bool:
+        """Widerruft die Erklärung; scheitert es, stehen die Gründe am Formular."""
+        if not self.is_valid():
+            return False
+        try:
+            konfiguration.zero_retention_widerrufen(
+                self.cleaned_data["zero_retention_widerrufsgrund"], konto
+            )
+        except ValidationError as fehler:
+            self.add_error(None, fehler)
+            return False
+        return True
+
+
 def _stellschrauben_hinweis() -> str:
     """Erklärt die anbieterabhängige Allowlist unmittelbar am Parameter-Feld."""
     echte: str = ", ".join(sorted(ANBIETER_PROFIL[Anbieter.OPENROUTER].stellschrauben))

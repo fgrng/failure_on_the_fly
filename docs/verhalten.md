@@ -520,26 +520,26 @@ Konfiguration; bei einer unbelegten Verwendung entfällt der „statt“-Teil. I
 die gewählte Konfiguration für eine Verwendung schon aktiv, steht dort ein
 deaktivierter Knopf „Aktiv für …“. Das Umschalten fragt nicht nach, bewegt nur
 den Zeiger der genannten Verwendung und führt zurück auf dieselbe Konfiguration;
-eine unbekannte Verwendung ergibt 404. Die Seite bietet genau drei Gesten:
-Anlegen, Aktivieren und die Zero-Retention-Erklärung (unten). Angelegt wird in
-einem getrennten Editor unter `/system/modell-konfiguration/neu/`, erreichbar
-über „Neue Konfiguration“ im Kopf der Liste. Die Bezeichnung steht dort zuerst.
-„Als Vorlage für eine neue Konfiguration“ im Detail öffnet den Editor mit
-Anbieter, Basis-URL, Sprachmodell und Parametern der gewählten Zeile und der
-Bezeichnung mit dem Zusatz „(Kopie)“; eine unbekannte Vorlage ergibt 404. Das
-Token übernimmt die Vorlage nie, es wird jedes Mal neu eingegeben. Die Vorlage
-bleibt unverändert, angelegt wird immer eine neue Zeile. Der Editor prüft die
-Anbieterbindung wie zuvor am Feld und aktiviert nichts: Nach dem Anlegen führt
-er mit einer Meldung zurück zur Liste, die neue Konfiguration im Detail, und
-alle Verwendungen bleiben, wie sie waren. Bearbeiten und Löschen gibt es nicht —
-eine Konfiguration ist unveränderlich, weil jede Erhebung ihre Fassung pinnt.
-Ein Umschalten der Schüler:in trifft laufende Trainings sofort und laufende
-Erhebungen gar nicht; eine Schlüsselrotation ist deshalb kein Feldupdate,
-sondern Anlegen plus Aktivieren für jede Verwendung der alten Fassung. Das Token
-wird eingegeben, aber nie zurückgegeben: Das Detail zeigt es nur maskiert mit
-seinen letzten vier Zeichen, kurze Werte ausschließlich als Punkte. Im freien
-Probelauf der Administration steht jede Konfiguration zur Auswahl als
-»Bezeichnung (Sprachmodell)«.
+eine unbekannte Verwendung ergibt 404. Die Seite bietet genau vier Gesten:
+Anlegen, Aktivieren sowie Abgeben und Widerrufen der Zero-Retention-Erklärung
+(unten). Angelegt wird in einem getrennten Editor unter
+`/system/modell-konfiguration/neu/`, erreichbar über „Neue Konfiguration“ im
+Kopf der Liste. Die Bezeichnung steht dort zuerst. „Als Vorlage für eine neue
+Konfiguration“ im Detail öffnet den Editor mit Anbieter, Basis-URL, Sprachmodell
+und Parametern der gewählten Zeile und der Bezeichnung mit dem Zusatz „(Kopie)“;
+eine unbekannte Vorlage ergibt 404. Das Token übernimmt die Vorlage nie, es wird
+jedes Mal neu eingegeben. Die Vorlage bleibt unverändert, angelegt wird immer
+eine neue Zeile. Der Editor prüft die Anbieterbindung wie zuvor am Feld und
+aktiviert nichts: Nach dem Anlegen führt er mit einer Meldung zurück zur Liste,
+die neue Konfiguration im Detail, und alle Verwendungen bleiben, wie sie waren.
+Bearbeiten und Löschen gibt es nicht — eine Konfiguration ist unveränderlich,
+weil jede Erhebung ihre Fassung pinnt. Ein Umschalten der Schüler:in trifft
+laufende Trainings sofort und laufende Erhebungen gar nicht; eine
+Schlüsselrotation ist deshalb kein Feldupdate, sondern Anlegen plus Aktivieren
+für jede Verwendung der alten Fassung. Das Token wird eingegeben, aber nie
+zurückgegeben: Das Detail zeigt es nur maskiert mit seinen letzten vier Zeichen,
+kurze Werte ausschließlich als Punkte. Im freien Probelauf der Administration
+steht jede Konfiguration zur Auswahl als »Bezeichnung (Sprachmodell)«.
 
 An einer Konfiguration gibt eine Administrator:in die
 **Zero-Retention-Erklärung** ab: dass für dieses Modell bei diesem Anbieter eine
@@ -561,14 +561,31 @@ Erklärung, steht im Detail statt des Knopfs ein deaktivierter „Für Schüler:
 erst nach der Erklärung“ samt Grund; wer die Aktivierung dennoch aufruft, liest
 den Grund als Meldung, und der Zeiger bleibt, wo er war. Lehrperson und Bewerter
 bleiben ohne Erklärung aktivierbar, denn Evals verarbeiten nur simulierte
-Gespräche. Die Tabelle zeigt je Zeile in der Spalte „Zero Retention“ den
-Erklärungsstand: „erklärt“, „fehlt“ oder bei `fake` „nicht nötig“. Trägt die
-aktive Konfiguration der Schüler:in keine Erklärung — etwa eine aus der Zeit vor
-der Erklärung —, bleibt sie aktiv, Training und Probelauf laufen weiter, und
-über der Seite steht ein deutlicher Hinweis, dass ihr die Erklärung fehlt und
-eine Erhebung sich erst danach finalisieren lässt. Bei OpenRouter sichert der
-Provider-Filter Zero Retention zusätzlich technisch ab; die Erklärung ersetzt
-ihn nicht.
+Gespräche. Fällt die Zusage weg, etwa weil der Anbieter sie zurückzieht oder das
+Modell keinen ZDR-Endpunkt mehr hat, widerruft eine Administrator:in die
+Erklärung im Detail der Liste: Unter „Grund des Widerrufs“ steht ein Freitext,
+der Pflicht ist; ohne ihn gibt es einen Fehler am Feld. Zeitpunkt und
+widerrufendes Konto werden mitgeschrieben. Den Widerruf bietet das Detail nur an
+einer Konfiguration mit gültiger Erklärung an; eine nie abgegebene oder schon
+widerrufene Erklärung lässt sich nicht widerrufen, ein Aufruf ohne Formular wird
+mit einer Meldung abgewiesen. Der Widerruf ist endgültig: Er lässt sich nicht
+zurücknehmen, und an derselben Konfiguration lässt sich keine neue Erklärung
+abgeben — wer die Zusage zurückhat, legt eine neue Konfiguration an. Beleg und
+Zeitpunkt der Erklärung bleiben stehen, das Detail zeigt darunter Grund,
+Zeitpunkt und Konto des Widerrufs. Eine widerrufene Konfiguration gilt als nicht
+erklärt und lässt sich für **keine** Verwendung mehr aktivieren, auch nicht für
+Lehrperson und Bewerter: Statt der Knöpfe stehen deaktivierte „Für … gesperrt:
+Erklärung widerrufen“, und wer die Aktivierung dennoch aufruft, liest den Grund
+als Meldung. Ist sie gerade aktiv, bleibt der Zeiger bestehen, und über der
+Seite steht ein deutlicher Hinweis mit den betroffenen Verwendungen. Erhebungen,
+die sie schon gepinnt haben, behalten sie. Die Tabelle zeigt je Zeile in der
+Spalte „Zero Retention“ den Erklärungsstand: „erklärt“, „fehlt“, „widerrufen am
+…“ samt Grund oder bei `fake` „nicht nötig“. Trägt die aktive Konfiguration der
+Schüler:in keine Erklärung — etwa eine aus der Zeit vor der Erklärung —, bleibt
+sie aktiv, Training und Probelauf laufen weiter, und über der Seite steht ein
+deutlicher Hinweis, dass ihr die Erklärung fehlt und eine Erhebung sich erst
+danach finalisieren lässt. Bei OpenRouter sichert der Provider-Filter Zero
+Retention zusätzlich technisch ab; die Erklärung ersetzt ihn nicht.
 
 ## Evalkatalog
 
@@ -1133,35 +1150,35 @@ Texte gerendert als Leseansicht, ein leerer Text erscheint als »—«. Reine
 Entwürfe lassen sich löschen; das Design finaler Erhebungen bleibt
 unveränderlich, ihr Eigentümer-Kreis änderbar. Das Finalisieren pinnt die
 Modell-Konfiguration der Verwendung Schüler:in sichtbar. Es gelingt nur, wenn
-diese eine Zero-Retention-Erklärung trägt oder den Anbieter `fake` hat; sonst
-bleibt die Erhebung Entwurf, und die Meldung verweist darauf, dass eine
-Administrator:in zuerst eine erklärte Konfiguration für Schüler:in aktivieren
-muss. Ein Rückzug ist nur ohne nicht-archivierte oder datentragende Stichprobe
-möglich. Finale Erhebungen lassen sich archivieren und wieder entarchivieren,
-sofern keine Stichprobe läuft und mindestens eine Eigentümerin eingetragen ist.
-Eigentümer:innen teilen und übergeben eine Erhebung über die Detailansicht; auch
-bei finalen und laufenden Erhebungen bleibt dieser Kreis änderbar. Unter einer
-finalen Erhebung lassen sich Stichproben mit Beginn und Ende anlegen; ein
-fehlender oder ungültiger Zeitpunkt oder ein Ende vor dem Beginn führt zurück
-auf die Detailseite, die den Grund als Meldung zeigt, und die Eingabe bleibt
-nicht stehen. Die Detailseite zeigt ihren kopierbaren Teilnahme-Link, ihre aus
-dem Zeitraum abgeleitete Phase — geplant, läuft oder abgeschlossen — und die
-Zahl ihrer Teilnahmen. Daneben stehen, nach dem aktuellen Stand der
-Einwilligungen, die Zahl der Teilnahmen, die die Verarbeitung durch
-Sprachmodelle abgelehnt haben, und die Zahl der Teilnahmen ohne Speicherung.
-Datenfreie Stichproben lassen sich archivieren; die Phasenspalte weist sie
-danach als archiviert aus. Der optionale Fragebogen eines Entwurfs besteht aus
-eigenen finalen Items an zwei getrennten Andockpunkten: nach jeder
-Vignettensitzung oder am Ende. Eine Fassung kann an beiden Stellen, je Stelle
-aber nur einmal vorkommen. Vignetten und beide Andockpunkte sind je eine Liste;
-ihre Reihenfolge ist die Reihenfolge der Erhebung, ein eigenes Positionsfeld
-gibt es nicht. Über jeder Liste wählt man unter »Hinzufügen …« eine Fassung und
-die Stelle, an der sie eingefügt wird (»am Ende«, »am Anfang« oder »nach …«).
-Jede Zeile trägt Symbolknöpfe mit Beschriftung für Hilfstechnik: ↑ und ↓
-verschieben um eine Stelle, der Papierkorb entfernt; ein Item hat zusätzlich ⇄
-zum Umhängen ans Ende des anderen Andockpunkts, solange es dort nicht schon
-hängt. Umsortieren lässt sich auch durch Ziehen am Griff, mit Maus wie mit
-Touch, aber nur innerhalb einer Liste; ohne Maus reichen die Knöpfe und
+diese eine nicht widerrufene Zero-Retention-Erklärung trägt oder den Anbieter
+`fake` hat; sonst bleibt die Erhebung Entwurf, und die Meldung verweist darauf,
+dass eine Administrator:in zuerst eine erklärte Konfiguration für Schüler:in
+aktivieren muss. Ein Rückzug ist nur ohne nicht-archivierte oder datentragende
+Stichprobe möglich. Finale Erhebungen lassen sich archivieren und wieder
+entarchivieren, sofern keine Stichprobe läuft und mindestens eine Eigentümerin
+eingetragen ist. Eigentümer:innen teilen und übergeben eine Erhebung über die
+Detailansicht; auch bei finalen und laufenden Erhebungen bleibt dieser Kreis
+änderbar. Unter einer finalen Erhebung lassen sich Stichproben mit Beginn und
+Ende anlegen; ein fehlender oder ungültiger Zeitpunkt oder ein Ende vor dem
+Beginn führt zurück auf die Detailseite, die den Grund als Meldung zeigt, und
+die Eingabe bleibt nicht stehen. Die Detailseite zeigt ihren kopierbaren
+Teilnahme-Link, ihre aus dem Zeitraum abgeleitete Phase — geplant, läuft oder
+abgeschlossen — und die Zahl ihrer Teilnahmen. Daneben stehen, nach dem
+aktuellen Stand der Einwilligungen, die Zahl der Teilnahmen, die die
+Verarbeitung durch Sprachmodelle abgelehnt haben, und die Zahl der Teilnahmen
+ohne Speicherung. Datenfreie Stichproben lassen sich archivieren; die
+Phasenspalte weist sie danach als archiviert aus. Der optionale Fragebogen eines
+Entwurfs besteht aus eigenen finalen Items an zwei getrennten Andockpunkten:
+nach jeder Vignettensitzung oder am Ende. Eine Fassung kann an beiden Stellen,
+je Stelle aber nur einmal vorkommen. Vignetten und beide Andockpunkte sind je
+eine Liste; ihre Reihenfolge ist die Reihenfolge der Erhebung, ein eigenes
+Positionsfeld gibt es nicht. Über jeder Liste wählt man unter »Hinzufügen …«
+eine Fassung und die Stelle, an der sie eingefügt wird (»am Ende«, »am Anfang«
+oder »nach …«). Jede Zeile trägt Symbolknöpfe mit Beschriftung für Hilfstechnik:
+↑ und ↓ verschieben um eine Stelle, der Papierkorb entfernt; ein Item hat
+zusätzlich ⇄ zum Umhängen ans Ende des anderen Andockpunkts, solange es dort
+nicht schon hängt. Umsortieren lässt sich auch durch Ziehen am Griff, mit Maus
+wie mit Touch, aber nur innerhalb einer Liste; ohne Maus reichen die Knöpfe und
 Auswahlfelder. Jede Änderung gilt sofort, beim Entfernen und Umhängen schließt
 sich die Reihenfolge. Ist eine Fassung bereits am anderen Andockpunkt gebunden,
 kennzeichnet die Auswahl dies, ohne ihre Aufnahme zu verhindern. Der Schalter
@@ -1195,21 +1212,23 @@ Vignettenfassung zu lesen. Die verwendeten Vignettenfassungen,
 Simulationskern-Fassungen und Modell-Konfigurationen liegen mit ihrem
 vollständigen Inhalt als eigene Tabellen bei, damit der Export ohne
 Datenbankzugriff interpretierbar bleibt. Jede Modell-Konfiguration nennt dort
-ihren Erklärungsstand: ob eine Zero-Retention-Erklärung vorliegt, ihren Beleg
-und den Zeitpunkt der Erklärung (ohne Erklärung `NA`), so wie er heute ist; das
-erklärende Konto steht nicht darin. Für den Fragebogen-Teil gilt dasselbe: Die
-tatsächlich vorgelegten Fassungen der Fragebogen-Items liegen mit ihrem vollen
-Wortlaut bei; eine zugeordnete, aber nie vorgelegte Fassung erscheint nicht.
-Eine eigene Tabelle nennt die Kodierung der Likert-Skala, deren Stufe von 1
-»Stimme gar nicht zu« bis 6 »Stimme voll zu« mit der Zustimmung steigt, und die
-vorgelegten Itemblöcke stehen mit ihrem Andockpunkt sowie den Zeitstempeln der
-Vorlage und der Erledigung darin — ein übersprungener Block bleibt so als
-vorgelegt erkennbar. Die Antworten selbst liegen als eigene Tabelle bei, eine
-Zeile je vorgelegtem Fragebogen-Item, mit getrennten Spalten für Freitext und
-Likert-Stufe. Eine vorgelegte, aber unbeantwortete Zeile bleibt mit leeren
-Werten erhalten; nur so unterscheidet die Auswertung »freiwillig übersprungen«
-von »nie gesehen«. Flüchtige Teilnahmen haben Itemblöcke, aber keine
-Antwortzeilen.
+ihren Erklärungsstand: ob eine gültige Zero-Retention-Erklärung vorliegt, ihren
+Beleg und den Zeitpunkt der Erklärung (ohne Erklärung `NA`) sowie Zeitpunkt und
+Grund eines Widerrufs (ohne Widerruf `NA` und leer), so wie er heute ist. Nach
+einem Widerruf steht „erklärt“ auf `False`, Beleg und Zeitpunkt der Erklärung
+bleiben. Erklärendes und widerrufendes Konto stehen nicht darin. Für den
+Fragebogen-Teil gilt dasselbe: Die tatsächlich vorgelegten Fassungen der
+Fragebogen-Items liegen mit ihrem vollen Wortlaut bei; eine zugeordnete, aber
+nie vorgelegte Fassung erscheint nicht. Eine eigene Tabelle nennt die Kodierung
+der Likert-Skala, deren Stufe von 1 »Stimme gar nicht zu« bis 6 »Stimme voll zu«
+mit der Zustimmung steigt, und die vorgelegten Itemblöcke stehen mit ihrem
+Andockpunkt sowie den Zeitstempeln der Vorlage und der Erledigung darin — ein
+übersprungener Block bleibt so als vorgelegt erkennbar. Die Antworten selbst
+liegen als eigene Tabelle bei, eine Zeile je vorgelegtem Fragebogen-Item, mit
+getrennten Spalten für Freitext und Likert-Stufe. Eine vorgelegte, aber
+unbeantwortete Zeile bleibt mit leeren Werten erhalten; nur so unterscheidet die
+Auswertung »freiwillig übersprungen« von »nie gesehen«. Flüchtige Teilnahmen
+haben Itemblöcke, aber keine Antwortzeilen.
 
 ## Einsicht in die Erhebung
 

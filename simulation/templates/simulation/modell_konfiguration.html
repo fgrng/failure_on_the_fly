@@ -18,6 +18,10 @@
         <a class="button" href="{% url 'simulation:modell_konfiguration_neu' %}">Neue Konfiguration</a>
     </header>
 
+    {% if widerrufen_aktiv_fuer %}
+        <p class="system-page-warnung" role="status"><strong>Die Zero-Retention-Erklärung einer aktiven Konfiguration ist widerrufen ({{ widerrufen_aktiv_fuer|join:", " }}).</strong> Der Widerruf schaltet nichts um: Die Konfiguration bleibt aktiv, bis Sie für diese Verwendungen eine andere aktivieren. Solange die Schüler:in betroffen ist, lässt sich keine Erhebung finalisieren.</p>
+    {% endif %}
+
     {% if schuelerin_ohne_erklaerung %}
         <p class="system-page-warnung" role="status"><strong>Der aktiven Konfiguration der Schüler:in fehlt die Zero-Retention-Erklärung.</strong> Training und Probelauf laufen weiter; eine Erhebung lässt sich erst finalisieren, wenn für die Schüler:in eine erklärte Konfiguration aktiv ist. Geben Sie die Erklärung an dieser Konfiguration ab oder legen Sie eine erklärte an und aktivieren Sie sie.</p>
     {% endif %}
@@ -31,6 +35,7 @@
             <p>Die Konfiguration der <strong>Schüler:in</strong> spielt in Sitzungen und Probeläufen. Ihr Umschalten trifft <strong>laufende Trainings sofort</strong> und <strong>laufende Erhebungen gar nicht</strong>. <strong>Lehrperson</strong> und <strong>Bewerter</strong> sind den Evals vorbehalten.</p>
             <p>Eine Schlüsselrotation ist deshalb kein Feldupdate, sondern <strong>Anlegen plus Aktivieren</strong>: Die neue Fassung trägt das neue Token und wird anschließend für jede ihrer Verwendungen aktiviert.</p>
             <p>Für die <strong>Schüler:in</strong> lässt sich nur eine Konfiguration mit <strong>Zero-Retention-Erklärung</strong> aktivieren, oder eine mit Anbieter »fake«. Die Erklärung belegt, dass für dieses Modell bei diesem Anbieter eine Zusage vorliegt; sie wird beim Anlegen oder nachträglich abgegeben und ist danach unveränderlich.</p>
+            <p>Fällt die Zusage weg, wird die Erklärung mit Grund <strong>widerrufen</strong>. Der Widerruf ist endgültig: Die Konfiguration lässt sich danach für <strong>keine Verwendung</strong> mehr aktivieren, bleibt aber aktiv, wo sie es gerade ist, bis eine andere sie ablöst.</p>
         </div>
     </section>
 
@@ -55,7 +60,7 @@
                                     </td>
                                     <td>{{ konfiguration.anbieter }}</td>
                                     <td>{{ konfiguration.angelegt_am|date:"d.m.Y"|default:"—" }}</td>
-                                    <td>{{ konfiguration.erklaerungsstand }}</td>
+                                    <td>{% if konfiguration.widerrufen %}widerrufen am {{ konfiguration.zero_retention_widerrufen_am|date:"d.m.Y" }}<small>{{ konfiguration.zero_retention_widerrufsgrund }}</small>{% else %}{{ konfiguration.erklaerungsstand }}{% endif %}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -75,9 +80,12 @@
                         <div><dt>Parameter</dt><dd><pre>{{ gewaehlt.parameter }}</pre></dd></div>
                         <div><dt>Zero-Retention-Erklärung</dt><dd>
                             {% if gewaehlt.ist_fake %}Nicht nötig: Der Anbieter »fake« hat keinen Auftragsverarbeiter.
-                            {% elif gewaehlt.zero_retention_erklaert %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
+                            {% elif gewaehlt.zero_retention_erklaert_am %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
                             {% else %}Fehlt.{% endif %}
                         </dd></div>
+                        {% if gewaehlt.widerrufen %}
+                            <div><dt>Widerruf</dt><dd>{{ gewaehlt.zero_retention_widerrufsgrund|linebreaksbr }}<small class="system-page-empty">Widerrufen am {{ gewaehlt.zero_retention_widerrufen_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_widerrufen_von }}</small></dd></div>
+                        {% endif %}
                     </dl>
                     {% if gewaehlt.erklaerbar %}
                         <form method="post" action="{% url 'simulation:modell_konfiguration_erklaeren' gewaehlt.pk %}" class="system-page-field-list">
@@ -87,10 +95,23 @@
                             <button class="button button--secondary" type="submit">Zero-Retention-Erklärung abgeben</button>
                         </form>
                     {% endif %}
+                    {% if gewaehlt.widerrufbar %}
+                        <form method="post" action="{% url 'simulation:modell_konfiguration_widerrufen' gewaehlt.pk %}" class="system-page-field-list">
+                            {% csrf_token %}
+                            {{ widerrufsformular.non_field_errors }}
+                            {% include "vignetten/includes/form_field.html" with field=widerrufsformular.zero_retention_widerrufsgrund %}
+                            <button class="button button--secondary" type="submit">Zero-Retention-Erklärung widerrufen</button>
+                        </form>
+                    {% endif %}
                     <div class="modell-konfiguration-detail__schalter">
                         {% for eintrag in schalter %}
                             {% if eintrag.ist_aktiv %}
                                 <button class="button" type="button" disabled>Aktiv für {{ eintrag.verwendung.label }}</button>
+                            {% elif gewaehlt.widerrufen %}
+                                <div>
+                                    <button class="button button--secondary" type="button" disabled>Für {{ eintrag.verwendung.label }} gesperrt: Erklärung widerrufen</button>
+                                    <small class="system-page-hint">Eine Konfiguration mit widerrufener Zero-Retention-Erklärung lässt sich für keine Verwendung mehr aktivieren.</small>
+                                </div>
                             {% elif eintrag.gesperrt %}
                                 <div>
                                     <button class="button button--secondary" type="button" disabled>Für {{ eintrag.verwendung.label }} erst nach der Erklärung</button>
