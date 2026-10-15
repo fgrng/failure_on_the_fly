@@ -1,0 +1,8 @@
+<div><dt>Zero-Retention-Erklärung</dt><dd>
+    {% if zeile.ist_fake %}{{ fake_hinweis }}
+    {% elif zeile.zero_retention_abgegeben %}{{ zeile.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ zeile.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ zeile.zero_retention_erklaert_von }}</small>
+    {% else %}Fehlt.{% endif %}
+</dd></div>
+{% if zeile.widerrufen %}
+    <div><dt>Widerruf</dt><dd>{{ zeile.zero_retention_widerrufsgrund|linebreaksbr }}<small class="system-page-empty">Widerrufen am {{ zeile.zero_retention_widerrufen_am|date:"d.m.Y H:i" }} von {{ zeile.zero_retention_widerrufen_von }}</small></dd></div>
+{% endif %}

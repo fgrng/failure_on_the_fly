@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import erklaerte, konto_mit_rollen
+from config.tests.aufbau import erklaerte, konto_mit_rollen, transkriptions_fassung
 from konten.models import Konto
 from simulation.models import Anbieter, TranskriptionsKonfiguration
 
@@ -12,16 +12,6 @@ SEITE: str = "simulation:transkriptions_konfiguration"
 ERKLAEREN: str = "simulation:transkriptions_konfiguration_erklaeren"
 WIDERRUFEN: str = "simulation:transkriptions_konfiguration_widerrufen"
 AKTIVIEREN: str = "simulation:transkriptions_konfiguration_aktivieren"
-
-
-def _openrouter_fassung() -> TranskriptionsKonfiguration:
-    # Eine gespeicherte OpenRouter-Fassung ohne Erklärung.
-
-    return TranskriptionsKonfiguration.objects.create(
-        anbieter=Anbieter.OPENROUTER,
-        anbieter_token="sk-or-supergeheim1234",
-        transkriptionsmodell="whisper-large-v3",
-    )
 
 
 def _eingabe(**werte: object) -> dict[str, object]:
@@ -47,7 +37,7 @@ class TranskriptionsErklaerungRollenTests(TestCase):
 
     def setUp(self) -> None:
         """Meldet eine Autorin ohne Administrationsrolle an."""
-        self.fassung: TranskriptionsKonfiguration = _openrouter_fassung()
+        self.fassung: TranskriptionsKonfiguration = transkriptions_fassung()
         self.client.force_login(konto_mit_rollen("ada", "Autor:in"))
 
     def test_weist_autorin_beim_erklaeren_ab(self) -> None:
@@ -132,7 +122,7 @@ class TranskriptionsErklaerungTests(TestCase):
 
     def test_gibt_die_erklaerung_nachtraeglich_ab(self) -> None:
         """Eine Fassung ohne Erklärung bekommt sie im Detail."""
-        fassung: TranskriptionsKonfiguration = _openrouter_fassung()
+        fassung: TranskriptionsKonfiguration = transkriptions_fassung()
 
         response: HttpResponse = self.client.post(
             reverse(ERKLAEREN, args=[fassung.pk]),
@@ -152,7 +142,7 @@ class TranskriptionsErklaerungTests(TestCase):
 
     def test_meldet_den_fehlenden_beleg_beim_nachtraeglichen_erklaeren(self) -> None:
         """Auch nachträglich gibt es keine Erklärung ohne Beleg."""
-        fassung: TranskriptionsKonfiguration = _openrouter_fassung()
+        fassung: TranskriptionsKonfiguration = transkriptions_fassung()
 
         response: HttpResponse = self.client.post(
             reverse(ERKLAEREN, args=[fassung.pk]), {"zero_retention_beleg": "  "}
@@ -182,7 +172,7 @@ class TranskriptionsErklaerungTests(TestCase):
 
     def test_aendert_eine_abgegebene_erklaerung_nicht(self) -> None:
         """Beleg und Zeitpunkt der ersten Erklärung bleiben stehen."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
         beleg: str = fassung.zero_retention_beleg
 
         response: HttpResponse = self.client.post(
@@ -200,8 +190,8 @@ class TranskriptionsErklaerungTests(TestCase):
     ) -> None:
         """Erklärte und `fake`-Fassungen zeigen kein Erklärungsformular."""
         fake: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktive()
-        offen: TranskriptionsKonfiguration = _openrouter_fassung()
-        erklaert: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        offen: TranskriptionsKonfiguration = transkriptions_fassung()
+        erklaert: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
 
         for fassung, angeboten in ((offen, True), (erklaert, False), (fake, False)):
             with self.subTest(fassung=fassung.pk):
@@ -216,18 +206,18 @@ class TranskriptionsErklaerungTests(TestCase):
 
     def test_zeigt_beleg_und_erklaerendes_konto_im_detail(self) -> None:
         """Wer die Seite liest, sieht, worauf sich die Zusage stützt."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
 
         response: HttpResponse = self.client.get(_detail_url(fassung))
 
         self.assertContains(response, fassung.zero_retention_beleg)
-        self.assertContains(response, "zero-retention-erklaerende")
+        self.assertContains(response, str(fassung.zero_retention_erklaert_von))
 
     def test_zeigt_den_erklaerungsstand_je_fassung(self) -> None:
         """Die Liste nennt je Fassung, ob die Erklärung vorliegt, fehlt oder entfällt."""
         fake: TranskriptionsKonfiguration = TranskriptionsKonfiguration.objects.aktive()
-        offen: TranskriptionsKonfiguration = _openrouter_fassung()
-        erklaert: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        offen: TranskriptionsKonfiguration = transkriptions_fassung()
+        erklaert: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
 
         response: HttpResponse = self.client.get(reverse(SEITE))
 
@@ -264,7 +254,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_widerruft_die_erklaerung_mit_grund(self) -> None:
         """Grund, Zeitpunkt und Konto stehen danach an der Fassung."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
 
         response: HttpResponse = self._widerrufen(fassung)
 
@@ -278,7 +268,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_meldet_den_fehlenden_grund_am_feld(self) -> None:
         """Ohne Grund kein Widerruf."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
 
         response: HttpResponse = self.client.post(
             reverse(WIDERRUFEN, args=[fassung.pk]),
@@ -295,7 +285,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_weist_den_widerruf_ohne_abgegebene_erklaerung_ab(self) -> None:
         """Eine nie abgegebene Erklärung lässt sich nicht widerrufen."""
-        fassung: TranskriptionsKonfiguration = _openrouter_fassung()
+        fassung: TranskriptionsKonfiguration = transkriptions_fassung()
 
         response: HttpResponse = self._widerrufen(fassung)
 
@@ -305,7 +295,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_zeigt_den_widerruf_im_detail_und_in_der_liste(self) -> None:
         """Der Widerruf bleibt mit Grund sichtbar; erklären lässt sich nicht mehr."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
         self._widerrufen(fassung, "Kein ZDR mehr")
 
         response: HttpResponse = self.client.get(_detail_url(fassung))
@@ -317,7 +307,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_weist_die_aktivierung_einer_widerrufenen_fassung_ab(self) -> None:
         """Eine weggefallene Zusage kommt nicht versehentlich wieder in Gebrauch."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
         self._widerrufen(fassung)
 
         response: HttpResponse = self.client.post(
@@ -330,7 +320,7 @@ class TranskriptionsWiderrufTests(TestCase):
 
     def test_warnt_bei_widerrufener_aktiver_fassung(self) -> None:
         """Der Widerruf schließt das Tor; die Seite sagt es deutlich."""
-        fassung: TranskriptionsKonfiguration = erklaerte(_openrouter_fassung())
+        fassung: TranskriptionsKonfiguration = erklaerte(transkriptions_fassung())
         TranskriptionsKonfiguration.objects.aktivieren(fassung)
         self._widerrufen(fassung)
 

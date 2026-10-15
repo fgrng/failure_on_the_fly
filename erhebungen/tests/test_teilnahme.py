@@ -13,7 +13,11 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from config.tests.aufbau import erklaerte_aktive_transkription, finale_vignette
+from config.tests.aufbau import (
+    erklaerte_aktive_transkription,
+    finale_vignette,
+    transkriptions_fassung,
+)
 from config.tests.formular import letztes_fokusziel, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen, vor_jedem_aufruf
 from erhebungen.ablauf import block_vorlegen
@@ -30,7 +34,6 @@ from erhebungen.models import (
 from konten.models import Konto
 from fragebogen_items.models import FragebogenItem
 from simulation.models import (
-    Anbieter,
     ModellKonfiguration,
     TranskriptionsKonfiguration,
     Verwendung,
@@ -507,11 +510,7 @@ class ErhebungsteilnahmeTests(TestCase):
                 TranskriptionsKonfiguration.objects.create()
             ),
             "ohne Erklärung": lambda: TranskriptionsKonfiguration.objects.aktivieren(
-                TranskriptionsKonfiguration.objects.create(
-                    anbieter=Anbieter.OPENROUTER,
-                    anbieter_token="sk-or-geheim",
-                    transkriptionsmodell="whisper-large-v3",
-                )
+                transkriptions_fassung()
             ),
             "widerrufen": lambda: (
                 erklaerte_aktive_transkription().zero_retention_widerrufen(

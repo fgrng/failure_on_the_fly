@@ -65,6 +65,19 @@ def erklaerte[K: ZeroRetentionFeldgruppe](konfiguration: K) -> K:
     return konfiguration
 
 
+def transkriptions_fassung() -> TranskriptionsKonfiguration:
+    """Legt eine Transkriptions-Fassung mit echtem Anbieter an, ohne Erklärung.
+
+    Sie ist nicht aktiv; ihr Tor bleibt zu, bis sie erklärt ist.
+    """
+
+    return TranskriptionsKonfiguration.objects.create(
+        anbieter=Anbieter.OPENROUTER,
+        anbieter_token="sk-or-testtoken",
+        transkriptionsmodell="whisper-large-v3",
+    )
+
+
 def erklaerte_aktive_transkription() -> TranskriptionsKonfiguration:
     """Legt eine erklärte Transkriptions-Fassung mit echtem Anbieter an und aktiviert sie.
 
@@ -73,13 +86,7 @@ def erklaerte_aktive_transkription() -> TranskriptionsKonfiguration:
     """
 
     return TranskriptionsKonfiguration.objects.aktivieren(
-        erklaerte(
-            TranskriptionsKonfiguration.objects.create(
-                anbieter=Anbieter.OPENROUTER,
-                anbieter_token="sk-or-testtoken",
-                transkriptionsmodell="whisper-large-v3",
-            )
-        )
+        erklaerte(transkriptions_fassung())
     )
 
 

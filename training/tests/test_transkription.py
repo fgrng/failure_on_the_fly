@@ -10,13 +10,12 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
-    erklaerte,
     erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
 )
 from konten.models import Konto
-from simulation.models import Anbieter, TranskriptionsKonfiguration, Verwendung
+from simulation.models import TranskriptionsKonfiguration, Verwendung
 from simulation.transkription import FakeTranskription, Transkription
 from sitzungen.models import Gespraechsschritt, Sitzung
 from sitzungen.views import transkriptions_endpunkt
@@ -24,17 +23,6 @@ from sitzungen.tests.aufnahme import audioaufnahme
 from training.models import Training
 from training.views import laufende_training_sitzung
 from vignetten.models import Vignette
-
-
-def _openrouter_fassung() -> TranskriptionsKonfiguration:
-    # Eine zweite erklärte Fassung mit echtem Anbieter, noch nicht aktiv.
-    return erklaerte(
-        TranskriptionsKonfiguration.objects.create(
-            anbieter=Anbieter.OPENROUTER,
-            anbieter_token="sk-or-geheim",
-            transkriptionsmodell="whisper-large-v3",
-        )
-    )
 
 
 class TranskriptionsEndpointTests(TestCase):
@@ -103,15 +91,13 @@ class TranskriptionsEndpointTests(TestCase):
             TranskriptionsKonfiguration.objects.aktive()
         )
 
-        TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
+        erklaerte_aktive_transkription()
 
         self.assertEqual(self._fassung_der_anfrage(sitzung), gepinnt)
 
     def test_eine_danach_gestartete_sitzung_nimmt_die_neue_fassung(self) -> None:
         """Ein Wechsel wirkt ab der nächsten Sitzung."""
-        neue: TranskriptionsKonfiguration = (
-            TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
-        )
+        neue: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
 
         sitzung: Sitzung = self._sitzung_starten()
 
@@ -123,9 +109,7 @@ class TranskriptionsEndpointTests(TestCase):
         Sitzung.objects.filter(pk=sitzung.pk).update(transkriptions_konfiguration=None)
         sitzung.refresh_from_db()
 
-        neue: TranskriptionsKonfiguration = (
-            TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
-        )
+        neue: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
 
         self.assertEqual(self._fassung_der_anfrage(sitzung), neue)
 
@@ -151,7 +135,7 @@ class TranskriptionsEndpointTests(TestCase):
             TranskriptionsKonfiguration.objects.create()
         )
         sitzung: Sitzung = self._sitzung_starten()
-        TranskriptionsKonfiguration.objects.aktivieren(_openrouter_fassung())
+        erklaerte_aktive_transkription()
         anbieter = FakeTranskription(["Text"])
 
         response: HttpResponse = self._anfragen(sitzung, anbieter)

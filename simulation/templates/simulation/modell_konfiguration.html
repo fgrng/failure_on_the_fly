@@ -78,31 +78,11 @@
                         <div><dt>Basis-URL</dt><dd>{{ gewaehlt.anbieter_basis_url|default:"—" }}</dd></div>
                         <div><dt>Token</dt><dd>{{ gewaehlt.anbieter_token_maskiert|default:"Kein Token hinterlegt." }}</dd></div>
                         <div><dt>Parameter</dt><dd><pre>{{ gewaehlt.parameter }}</pre></dd></div>
-                        <div><dt>Zero-Retention-Erklärung</dt><dd>
-                            {% if gewaehlt.ist_fake %}Nicht nötig: Der Anbieter »fake« hat keinen Auftragsverarbeiter.
-                            {% elif gewaehlt.zero_retention_abgegeben %}{{ gewaehlt.zero_retention_beleg|linebreaksbr }}<small class="system-page-empty">Erklärt am {{ gewaehlt.zero_retention_erklaert_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_erklaert_von }}</small>
-                            {% else %}Fehlt.{% endif %}
-                        </dd></div>
-                        {% if gewaehlt.widerrufen %}
-                            <div><dt>Widerruf</dt><dd>{{ gewaehlt.zero_retention_widerrufsgrund|linebreaksbr }}<small class="system-page-empty">Widerrufen am {{ gewaehlt.zero_retention_widerrufen_am|date:"d.m.Y H:i" }} von {{ gewaehlt.zero_retention_widerrufen_von }}</small></dd></div>
-                        {% endif %}
+                        {% include "simulation/includes/zero_retention_angaben.html" with zeile=gewaehlt fake_hinweis="Nicht nötig: Der Anbieter »fake« hat keinen Auftragsverarbeiter." %}
                     </dl>
-                    {% if gewaehlt.erklaerbar %}
-                        <form method="post" action="{% url 'simulation:modell_konfiguration_erklaeren' gewaehlt.pk %}" class="system-page-field-list">
-                            {% csrf_token %}
-                            {{ erklaerungsformular.non_field_errors }}
-                            {% include "vignetten/includes/form_field.html" with field=erklaerungsformular.zero_retention_beleg %}
-                            <button class="button button--secondary" type="submit">Zero-Retention-Erklärung abgeben</button>
-                        </form>
-                    {% endif %}
-                    {% if gewaehlt.widerrufbar %}
-                        <form method="post" action="{% url 'simulation:modell_konfiguration_widerrufen' gewaehlt.pk %}" class="system-page-field-list">
-                            {% csrf_token %}
-                            {{ widerrufsformular.non_field_errors }}
-                            {% include "vignetten/includes/form_field.html" with field=widerrufsformular.zero_retention_widerrufsgrund %}
-                            <button class="button button--secondary" type="submit">Zero-Retention-Erklärung widerrufen</button>
-                        </form>
-                    {% endif %}
+                    {% url 'simulation:modell_konfiguration_erklaeren' gewaehlt.pk as erklaeren_url %}
+                    {% url 'simulation:modell_konfiguration_widerrufen' gewaehlt.pk as widerrufen_url %}
+                    {% include "simulation/includes/zero_retention_gesten.html" with zeile=gewaehlt %}
                     <div class="modell-konfiguration-detail__schalter">
                         {% for eintrag in schalter %}
                             {% if eintrag.ist_aktiv %}

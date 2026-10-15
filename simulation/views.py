@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -821,23 +822,13 @@ def evalkatalog_verwerfen(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @dataclass(frozen=True)
-class _Konfigurationszeile:
-    # Eine Zeile der Liste; das Token trägt sie nur maskiert.
+class _Erklaerungsspalten:
+    # Der Erklärungsstand einer Konfiguration, wie ihn eine Listenzeile zeigt.
 
-    pk: int
-    bezeichnung: str
-    angelegt_am: datetime | None
-    anbieter: str
-    sprachmodell: str
-    anbieter_basis_url: str
-    anbieter_token_maskiert: str
-    parameter: object
-    verwendungen: tuple[Verwendung, ...]
     ist_fake: bool
     erklaerbar: bool
     widerrufbar: bool
     widerrufen: bool
-    zulaessig_fuer_schuelerin: bool
     zero_retention_abgegeben: bool
     zero_retention_erklaert: bool
     zero_retention_beleg: str
@@ -853,6 +844,47 @@ class _Konfigurationszeile:
         if self.ist_fake:
             return "nicht nötig"
         return "erklärt" if self.zero_retention_erklaert else "fehlt"
+
+
+def _erklaerungsspalten(
+    konfiguration: ModellKonfiguration | TranskriptionsKonfiguration,
+) -> dict[str, Any]:
+    # Die Felder von `_Erklaerungsspalten`, gelesen aus der Konfiguration.
+
+    return {
+        "ist_fake": konfiguration.anbieter == Anbieter.FAKE,
+        "erklaerbar": konfiguration.zero_retention_erklaerbar,
+        "widerrufbar": konfiguration.zero_retention_widerrufbar,
+        "widerrufen": konfiguration.zero_retention_ist_widerrufen,
+        "zero_retention_abgegeben": konfiguration.zero_retention_abgegeben,
+        "zero_retention_erklaert": konfiguration.zero_retention_erklaert,
+        "zero_retention_beleg": konfiguration.zero_retention_beleg,
+        "zero_retention_erklaert_am": konfiguration.zero_retention_erklaert_am,
+        "zero_retention_erklaert_von": str(
+            konfiguration.zero_retention_erklaert_von or ""
+        ),
+        "zero_retention_widerrufen_am": konfiguration.zero_retention_widerrufen_am,
+        "zero_retention_widerrufen_von": str(
+            konfiguration.zero_retention_widerrufen_von or ""
+        ),
+        "zero_retention_widerrufsgrund": konfiguration.zero_retention_widerrufsgrund,
+    }
+
+
+@dataclass(frozen=True)
+class _Konfigurationszeile(_Erklaerungsspalten):
+    # Eine Zeile der Liste; das Token trägt sie nur maskiert.
+
+    pk: int
+    bezeichnung: str
+    angelegt_am: datetime | None
+    anbieter: str
+    sprachmodell: str
+    anbieter_basis_url: str
+    anbieter_token_maskiert: str
+    parameter: object
+    verwendungen: tuple[Verwendung, ...]
+    zulaessig_fuer_schuelerin: bool
 
 
 @dataclass(frozen=True)
@@ -884,23 +916,8 @@ def _konfigurationszeilen() -> list[_Konfigurationszeile]:
                 for verwendung in Verwendung
                 if aktive.get(verwendung) == konfiguration.pk
             ),
-            ist_fake=konfiguration.anbieter == Anbieter.FAKE,
-            erklaerbar=konfiguration.zero_retention_erklaerbar,
-            widerrufbar=konfiguration.zero_retention_widerrufbar,
-            widerrufen=konfiguration.zero_retention_ist_widerrufen,
             zulaessig_fuer_schuelerin=konfiguration.zulaessig_fuer_schuelerin,
-            zero_retention_abgegeben=konfiguration.zero_retention_abgegeben,
-            zero_retention_erklaert=konfiguration.zero_retention_erklaert,
-            zero_retention_beleg=konfiguration.zero_retention_beleg,
-            zero_retention_erklaert_am=konfiguration.zero_retention_erklaert_am,
-            zero_retention_erklaert_von=str(
-                konfiguration.zero_retention_erklaert_von or ""
-            ),
-            zero_retention_widerrufen_am=konfiguration.zero_retention_widerrufen_am,
-            zero_retention_widerrufen_von=str(
-                konfiguration.zero_retention_widerrufen_von or ""
-            ),
-            zero_retention_widerrufsgrund=konfiguration.zero_retention_widerrufsgrund,
+            **_erklaerungsspalten(konfiguration),
         )
         for konfiguration in ModellKonfiguration.objects.select_related(
             "zero_retention_erklaert_von", "zero_retention_widerrufen_von"
@@ -1208,36 +1225,17 @@ def modell_konfiguration_aktivieren(
 
 
 @dataclass(frozen=True)
-class _Transkriptionszeile:
+class _Transkriptionszeile(_Erklaerungsspalten):
     # Eine Fassung der Transkription; das Token trägt sie nur maskiert.
 
     pk: int
     angelegt_am: datetime | None
     anbieter: str
-    ist_fake: bool
     anbieter_basis_url: str
     anbieter_token_maskiert: str
     transkriptionsmodell: str
     sprache: str
     aktiv: bool
-    erklaerbar: bool
-    widerrufbar: bool
-    widerrufen: bool
-    zero_retention_abgegeben: bool
-    zero_retention_erklaert: bool
-    zero_retention_beleg: str
-    zero_retention_erklaert_am: datetime | None
-    zero_retention_erklaert_von: str
-    zero_retention_widerrufen_am: datetime | None
-    zero_retention_widerrufen_von: str
-    zero_retention_widerrufsgrund: str
-
-    @property
-    def erklaerungsstand(self) -> str:
-        """Der Erklärungsstand in einem Wort, wie ihn die Tabelle zeigt."""
-        if self.ist_fake:
-            return "nicht nötig"
-        return "erklärt" if self.zero_retention_erklaert else "fehlt"
 
 
 def _transkriptionszeilen(
@@ -1250,27 +1248,12 @@ def _transkriptionszeilen(
             pk=konfiguration.pk,
             angelegt_am=konfiguration.angelegt_am,
             anbieter=konfiguration.get_anbieter_display(),
-            ist_fake=konfiguration.anbieter == Anbieter.FAKE,
             anbieter_basis_url=konfiguration.anbieter_basis_url,
             anbieter_token_maskiert=konfiguration.anbieter_token_maskiert,
             transkriptionsmodell=konfiguration.transkriptionsmodell,
             sprache=konfiguration.sprache,
             aktiv=konfiguration.pk == aktive.pk,
-            erklaerbar=konfiguration.zero_retention_erklaerbar,
-            widerrufbar=konfiguration.zero_retention_widerrufbar,
-            widerrufen=konfiguration.zero_retention_ist_widerrufen,
-            zero_retention_abgegeben=konfiguration.zero_retention_abgegeben,
-            zero_retention_erklaert=konfiguration.zero_retention_erklaert,
-            zero_retention_beleg=konfiguration.zero_retention_beleg,
-            zero_retention_erklaert_am=konfiguration.zero_retention_erklaert_am,
-            zero_retention_erklaert_von=str(
-                konfiguration.zero_retention_erklaert_von or ""
-            ),
-            zero_retention_widerrufen_am=konfiguration.zero_retention_widerrufen_am,
-            zero_retention_widerrufen_von=str(
-                konfiguration.zero_retention_widerrufen_von or ""
-            ),
-            zero_retention_widerrufsgrund=konfiguration.zero_retention_widerrufsgrund,
+            **_erklaerungsspalten(konfiguration),
         )
         for konfiguration in TranskriptionsKonfiguration.objects.select_related(
             "zero_retention_erklaert_von", "zero_retention_widerrufen_von"

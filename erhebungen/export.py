@@ -76,6 +76,16 @@ def _csv_aus_objekten(
     return ausgabe.getvalue()
 
 
+# Der Erklärungsstand je Konfiguration, ohne das erklärende Konto (ADR-0029).
+_ERKLAERUNGSSPALTEN: tuple[str, ...] = (
+    "zero_retention_erklaert",
+    "zero_retention_beleg",
+    "zero_retention_erklaert_am",
+    "zero_retention_widerrufen_am",
+    "zero_retention_widerrufsgrund",
+)
+
+
 def datenspur_zip(erhebung: Erhebung) -> bytes:
     """Liefert den ersten Export-Durchstich für eine Erhebung als ZIP-Archiv."""
 
@@ -303,11 +313,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "anbieter",
                 "sprachmodell",
                 "parameter",
-                "zero_retention_erklaert",
-                "zero_retention_beleg",
-                "zero_retention_erklaert_am",
-                "zero_retention_widerrufen_am",
-                "zero_retention_widerrufsgrund",
+                *_ERKLAERUNGSSPALTEN,
             ),
             parameter=lambda konfiguration: json.dumps(
                 konfiguration.parameter, ensure_ascii=False
@@ -322,11 +328,7 @@ def datenspur_zip(erhebung: Erhebung) -> bytes:
                 "transkriptionsmodell",
                 "sprache",
                 "angelegt_am",
-                "zero_retention_erklaert",
-                "zero_retention_beleg",
-                "zero_retention_erklaert_am",
-                "zero_retention_widerrufen_am",
-                "zero_retention_widerrufsgrund",
+                *_ERKLAERUNGSSPALTEN,
             ),
         ),
         "fragebogen_items.csv": _csv_aus_objekten(

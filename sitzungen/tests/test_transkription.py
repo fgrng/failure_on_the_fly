@@ -12,14 +12,14 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
-    erklaerte,
     erklaerte_aktive_transkription,
     konto_mit_rollen,
+    transkriptions_fassung,
     vignetten_entwurf,
 )
 from konten.models import Konto
 from konten.navigation import AUTORIN_GRUPPE
-from simulation.models import Anbieter, TranskriptionsKonfiguration, Verwendung
+from simulation.models import TranskriptionsKonfiguration, Verwendung
 from simulation.transkription import (
     AnbieterNichtErreichbar,
     FakeTranskription,
@@ -113,17 +113,7 @@ class ProbelaufTranskriptionTests(TestCase):
             TranskriptionsKonfiguration.objects.aktive()
         )
         self._anfragen_mit_fabrik(fabrik)
-        zweite: TranskriptionsKonfiguration = (
-            TranskriptionsKonfiguration.objects.aktivieren(
-                erklaerte(
-                    TranskriptionsKonfiguration.objects.create(
-                        anbieter=Anbieter.OPENROUTER,
-                        anbieter_token="sk-or-geheim",
-                        transkriptionsmodell="whisper-large-v3",
-                    )
-                )
-            )
-        )
+        zweite: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
         self._anfragen_mit_fabrik(fabrik)
 
         self.assertEqual(gebildet_aus, [erste, zweite])
@@ -182,13 +172,7 @@ class ProbelaufTranskriptionTests(TestCase):
 
     def test_ohne_erklaerung_der_aktiven_fassung_bleibt_das_tor_zu(self) -> None:
         """Die Erklärung an der Fassung ist das Tor, auch im Probelauf (ADR-0026)."""
-        TranskriptionsKonfiguration.objects.aktivieren(
-            TranskriptionsKonfiguration.objects.create(
-                anbieter=Anbieter.OPENROUTER,
-                anbieter_token="sk-or-geheim",
-                transkriptionsmodell="whisper-large-v3",
-            )
-        )
+        TranskriptionsKonfiguration.objects.aktivieren(transkriptions_fassung())
         self._probelauf_starten()
 
         self._ist_zu()
