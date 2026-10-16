@@ -59,11 +59,19 @@ Konsequenzen, die den Rest der Anleitung erklären:
   (<https://manual.uberspace.de/lang-python/>). Fehlt die Version auf dem Host,
   beschafft `uv python install 3.14` einen eigenen Interpreter ins Home;
   `uv sync` findet ihn dann ohne `--python`-Angabe.
-- Uberspace 7 läuft auf CentOS 7 mit glibc 2.17. Deshalb ist `litellm` in
-  `pyproject.toml` auf `< 1.92` festgehalten: Ab 1.92 enthält litellm einen
-  Rust-Teil und liefert für Linux nur Wheels für glibc ≥ 2.28; auf dem Host
-  müsste `uv sync` sonst aus dem Quellpaket bauen, was am dortigen GCC 9.3
-  scheitert. Der Pin fällt erst, wenn der Produktivhost eine neuere glibc hat.
+- Uberspace 7 läuft auf CentOS 7 mit glibc 2.17. Viele Pakete liefern für Python
+  3.14 unter Linux nur noch Wheels für glibc ≥ 2.28; das betrifft drei
+  Abhängigkeiten, deren Sonderwege erst mit einer neueren glibc auf dem
+  Produktivhost fallen:
+  - `litellm` ist in `pyproject.toml` auf `< 1.92` festgehalten: Ab 1.92 enthält
+    litellm einen Rust-Teil, dessen Quellbau am GCC 9.3 des Hosts scheitert.
+  - `pillow` und `tiktoken` (über litellm) baut `uv sync` auf dem Host aus dem
+    Quellpaket. Das gelingt mit dem System-Rust unter `/usr/bin` und den
+    vorhandenen Bibliotheks-Headern und dauert rund drei Minuten; uv legt die
+    Bauten im Cache ab, spätere Läufe mit denselben Versionen bauen nicht neu.
+    **Kein rustup installieren:** Der Installer wird beim Entpacken vom
+    Speicherlimit des Uberspace beendet und hinterlässt Einträge in den
+    Shell-Startdateien.
 - Zugriff auf das Git-Repository vom Uberspace aus (öffentliches HTTPS-Clone
   oder ein Deploy-Key, siehe Schritt 3).
 - Optional eine eigene Domain samt Zugriff auf deren DNS (Schritt 8).
@@ -123,9 +131,12 @@ gunicorn, und exakt nach `uv.lock`:
 
 ```bash
 cd ~/failure_on_the_fly
-uv sync --frozen --no-dev --group deploy --python python3.14
+CARGO_BUILD_JOBS=1 UV_CONCURRENT_BUILDS=1 \
+  uv sync --frozen --no-dev --group deploy --python python3.14
 ```
 
+Die beiden Variablen lassen Pillow und tiktoken nacheinander und mit nur einem
+Compiler-Job bauen (Abschnitt 2), damit der Bau unter dem Speicherlimit bleibt.
 `--frozen` erzwingt, dass genau die gelockten Versionen installiert werden;
 schlägt der Lauf mit einem Hinweis auf eine veraltete Lockdatei fehl, ist das
 Repository nicht sauber ausgecheckt — dann nicht mit `uv lock` nachbessern,
@@ -557,7 +568,8 @@ Der Ablauf für eine neue Version:
 cd ~/failure_on_the_fly
 supervisorctl stop failure-on-the-fly failure-on-the-fly-evals
 git pull
-uv sync --frozen --no-dev --group deploy --python python3.14
+CARGO_BUILD_JOBS=1 UV_CONCURRENT_BUILDS=1 \
+  uv sync --frozen --no-dev --group deploy --python python3.14
 uv run python manage.py migrate
 uv run python manage.py collectstatic --noinput
 uv run python manage.py check --deploy
