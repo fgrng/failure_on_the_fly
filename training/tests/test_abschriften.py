@@ -1,7 +1,7 @@
 """Tests des Import-Kommandos und der Token-Eingabe für Abschriften."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import time_machine
@@ -341,7 +341,7 @@ def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
             erhebung.finalisieren()
             erhebung.archivieren()
         case "fluechtig_abgelaufen":
-            with time_machine.travel(datetime(2026, 7, 1, 10, 0, tzinfo=UTC)):
+            with time_machine.travel(timezone.now() - timedelta(days=1, minutes=1)):
                 _fluechtig_gespielte_teilnahme(erhebung)
 
     with pytest.raises(ValidationError) as abgelehnt:
@@ -449,24 +449,27 @@ def test_import_verschiebt_die_frist_der_fluechtigen_inhalte_nicht() -> None:
     assert Abschrift.objects.count() == 2
 
 
-@pytest.mark.django_db
-def test_abschrift_einer_fluechtigen_teilnahme_wird_gelesen_freigegeben_geloescht(
-    client: Client,
-) -> None:
-    """Über das Token-Formular geholt, verhält sie sich wie jede Abschrift."""
+def _fluechtige_abschrift_ueber_das_formular(client: Client, konto: Konto) -> Abschrift:
+    """Holt die Abschrift einer flüchtigen Teilnahme über das Token-Formular."""
 
-    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
     erhebung: Erhebung = _erhebung_anlegen(Konto.objects.create_user(username="ada"))
     bindung: Erhebungsbindung = _fluechtig_gespielte_teilnahme(erhebung)
-    training: Training = Training.objects.anlegen(
-        konto_mit_rollen("barbara", AUSBILDERIN_GRUPPE), name="Bruchrechnung"
-    )
-    training.veroeffentlichen()
-    training.beitreten(teilnehmerin)
-    client.force_login(teilnehmerin)
-
+    client.force_login(konto)
     client.post(reverse("training:abschriften"), {"token": bindung.token})
-    abschrift: Abschrift = Abschrift.objects.get(konto=teilnehmerin)
+    return Abschrift.objects.get(konto=konto)
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_zeigt_transkript_ohne_denkspur(
+    client: Client,
+) -> None:
+    """Die Ansicht zeigt Transkript, Ausgang und Diagnose, die Denkspur nicht."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
     inhalt: str = client.get(
         reverse("training:abschrift", args=[abschrift.pk])
     ).content.decode()
@@ -476,9 +479,42 @@ def test_abschrift_einer_fluechtigen_teilnahme_wird_gelesen_freigegeben_geloesch
     assert "Zähler und Nenner addiert." in inhalt
     assert "Abgeschlossen" in inhalt
     assert "Flüchtige Denkspur." not in inhalt
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_laesst_sich_freigeben(
+    client: Client,
+) -> None:
+    """Wie jede Abschrift geht sie an ein Training, dem das Konto angehört."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    training: Training = Training.objects.anlegen(
+        konto_mit_rollen("barbara", AUSBILDERIN_GRUPPE), name="Bruchrechnung"
+    )
+    training.veroeffentlichen()
+    training.beitreten(teilnehmerin)
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
     abschrift_freigeben(abschrift, [training.pk])
+
     assert list(abschrift.freigegeben_fuer.all()) == [training]
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_laesst_sich_loeschen(
+    client: Client,
+) -> None:
+    """Wie jede Abschrift verschwindet sie mit allem Kopierten."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
     client.post(reverse("training:abschrift_loeschen", args=[abschrift.pk]))
+
     assert not Abschrift.objects.exists()
     assert not Sitzung.objects.filter(teilnahme_id=abschrift.teilnahme_id).exists()
 

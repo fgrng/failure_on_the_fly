@@ -46,7 +46,7 @@ def abschrift_holen(konto: Konto, token: str) -> Abschrift:
     """
 
     bindung: Erhebungsbindung = _holbare_bindung(token)
-    inhalte: list[tuple[Sitzung, Sitzungsinhalte]] = _inhalte(bindung.teilnahme)
+    inhalte: list[tuple[Sitzung, Sitzungsinhalte]] = _inhalte_lesen(bindung.teilnahme)
     abschrift: Abschrift = Abschrift.objects.create(
         teilnahme=Teilnahme.objects.create(),
         konto=konto,
@@ -140,7 +140,7 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
     return bindung
 
 
-def _inhalte(teilnahme: Teilnahme) -> list[tuple[Sitzung, Sitzungsinhalte]]:
+def _inhalte_lesen(teilnahme: Teilnahme) -> list[tuple[Sitzung, Sitzungsinhalte]]:
     # Liest die Inhalte aller Sitzungen in ihrer Anlagereihenfolge. Fehlt auch
     # nur eine, sind die flüchtigen Inhalte abgelaufen: dieselbe Ablehnung.
 
@@ -166,8 +166,8 @@ def _sitzungen_kopieren(
         position.sitzung_id: position.position
         for position in quelle.vignettenpositionen.all()
     }
-    for sitzung, sitzungs_inhalte in inhalte:
-        _sitzung_kopieren(sitzung, sitzungs_inhalte, ziel, positionen.get(sitzung.pk))
+    for sitzung, sitzung_inhalte in inhalte:
+        _sitzung_kopieren(sitzung, sitzung_inhalte, ziel, positionen.get(sitzung.pk))
 
 
 def _sitzung_kopieren(
@@ -191,8 +191,8 @@ def _sitzung_kopieren(
     if inhalte.diagnose is not None:
         Diagnose.objects.create(
             sitzung=kopie,
-            text=inhalte.diagnose,
-            eingabemodus=inhalte.diagnose_eingabemodus,
+            text=inhalte.diagnose["text"],
+            eingabemodus=inhalte.diagnose["eingabemodus"],
         )
     if position is not None:
         Vignettenposition.objects.create(

@@ -56,6 +56,21 @@ class GespraechsschrittDaten(TypedDict):
     fehlversuche: list[FehlversuchDaten]
 
 
+class DiagnoseDaten(TypedDict):
+    """Eine abgegebene Diagnose samt dem Weg, auf dem sie entstand."""
+
+    text: str
+    eingabemodus: str
+
+
+@dataclass(frozen=True)
+class Sitzungsinhalte:
+    """Was eine Sitzung über ihr Gerüst hinaus trägt, gleich wo es liegt."""
+
+    gespraechsschritte: list[GespraechsschrittDaten]
+    diagnose: DiagnoseDaten | None
+
+
 @dataclass
 class Budgetstand:
     """Der speicherlose Verbrauch eines Gesprächsbudgets."""
@@ -289,6 +304,14 @@ class GeruestSink(ABC):
     def abgegebene_diagnose(self) -> str | None:
         """Liefert den Text der bereits abgegebenen Diagnose, sonst nichts."""
 
+    @property
+    @abstractmethod
+    def inhalte(self) -> Sitzungsinhalte | None:
+        """Liefert Schritte samt Denkspur und Fehlversuchen und die Diagnose.
+
+        Gelesen wird nur; fehlt der Verlauf, gibt es nichts.
+        """
+
     @abstractmethod
     def _geglueckten_schritt_ablegen(
         self,
@@ -433,6 +456,38 @@ class DBSink(GeruestSink):
             .first()
         )
 
+    @property
+    def inhalte(self) -> Sitzungsinhalte:
+        """Liefert die gespeicherten Schritte und die Diagnose in der Speicherform."""
+
+        diagnose: Diagnose | None = Diagnose.objects.filter(
+            sitzung=self._sitzung
+        ).first()
+        return Sitzungsinhalte(
+            gespraechsschritte=[
+                _schrittdaten(
+                    schritt.reihenfolge,
+                    schritt.eingabe,
+                    schritt.eingabemodus,
+                    schritt.denkspur,
+                    schritt.aeusserung,
+                    [
+                        {
+                            "grund": fehlversuch.grund,
+                            "rohantwort": fehlversuch.rohantwort,
+                        }
+                        for fehlversuch in schritt.fehlversuch_set.all()
+                    ],
+                )
+                for schritt in self.gespraechsschritte
+            ],
+            diagnose=(
+                None
+                if diagnose is None
+                else {"text": diagnose.text, "eingabemodus": diagnose.eingabemodus}
+            ),
+        )
+
     def _geglueckten_schritt_ablegen(
         self,
         *,
@@ -540,6 +595,25 @@ class FluechtigerSink(GeruestSink):
 
         return cast(str | None, self._inhalt().get("diagnose"))
 
+    @property
+    def inhalte(self) -> Sitzungsinhalte | None:
+        """Liefert die vorgehaltenen Inhalte, ohne ihre Frist zu verschieben."""
+
+        inhalt: dict[str, Any] | None = self._inhalt_laden()
+        if inhalt is None:
+            return None
+        return Sitzungsinhalte(
+            gespraechsschritte=inhalt["gespraechsschritte"],
+            diagnose=(
+                None
+                if "diagnose" not in inhalt
+                else {
+                    "text": inhalt["diagnose"],
+                    "eingabemodus": inhalt["diagnose_eingabemodus"],
+                }
+            ),
+        )
+
     def _geglueckten_schritt_ablegen(
         self,
         *,
@@ -641,59 +715,6 @@ def fluechtige_inhalte_vorhalten(teilnahme: Teilnahme) -> None:
         kurzlebiger_speicher.vorhalten(_fluechtiger_schluessel(sitzung_pk))
 
 
-@dataclass(frozen=True)
-class Sitzungsinhalte:
-    """Was eine Sitzung über ihr Gerüst hinaus trägt, gleich wo es liegt."""
-
-    gespraechsschritte: list[GespraechsschrittDaten]
-    diagnose: str | None
-    diagnose_eingabemodus: str
-
-
-def sitzungsinhalte(sitzung: Sitzung) -> Sitzungsinhalte | None:
-    """Liefert Gesprächsschritte samt Denkspur und Fehlversuchen und die Diagnose.
-
-    Die Inhalte einer flüchtigen Sitzung kommen aus dem kurzlebigen Speicher;
-    gelesen wird nur, die Frist bleibt, wo sie ist. Sind sie abgelaufen, gibt
-    es nichts.
-    """
-
-    if sitzung.teilnahme.ist_fluechtig:
-        inhalt: dict[str, Any] | None = kurzlebiger_speicher.lesen(
-            _fluechtiger_schluessel(sitzung.pk)
-        )
-        if inhalt is None:
-            return None
-        return Sitzungsinhalte(
-            gespraechsschritte=inhalt["gespraechsschritte"],
-            diagnose=inhalt.get("diagnose"),
-            diagnose_eingabemodus=inhalt.get(
-                "diagnose_eingabemodus", Eingabemodus.GETIPPT
-            ),
-        )
-    diagnose: Diagnose | None = Diagnose.objects.filter(sitzung=sitzung).first()
-    return Sitzungsinhalte(
-        gespraechsschritte=[
-            _schrittdaten(
-                schritt.reihenfolge,
-                schritt.eingabe,
-                schritt.eingabemodus,
-                schritt.denkspur,
-                schritt.aeusserung,
-                [
-                    {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
-                    for fehlversuch in schritt.fehlversuch_set.all()
-                ],
-            )
-            for schritt in sitzung.gespraechsschritte
-        ],
-        diagnose=None if diagnose is None else diagnose.text,
-        diagnose_eingabemodus=(
-            Eingabemodus.GETIPPT if diagnose is None else diagnose.eingabemodus
-        ),
-    )
-
-
 def _fluechtiger_schluessel(sitzung_pk: int) -> str:
     # Der Schlüssel der Inhalte einer flüchtigen Sitzung im Speicher.
 
@@ -708,7 +729,7 @@ def _schrittdaten(
     aeusserung: str | None,
     fehlversuche: list[FehlversuchDaten],
 ) -> GespraechsschrittDaten:
-    # Baut die gemeinsame Speicherform von flüchtigem Sink und Probelauf.
+    # Baut die gemeinsame Speicherform der Sinks und des Probelaufs.
 
     return {
         "reihenfolge": reihenfolge,
@@ -734,6 +755,17 @@ def sink_fuer_sitzung(sitzung: Sitzung) -> GeruestSink:
     if sitzung.teilnahme.ist_fluechtig:
         return FluechtigerSink.fuer_sitzung(sitzung)
     return DBSink.fuer_sitzung(sitzung)
+
+
+def sitzungsinhalte(sitzung: Sitzung) -> Sitzungsinhalte | None:
+    """Liefert die Inhalte einer Sitzung, gleich wo sie liegen.
+
+    Die Inhalte einer flüchtigen Sitzung kommen aus dem kurzlebigen Speicher;
+    gelesen wird nur, die Frist bleibt, wo sie ist. Sind sie abgelaufen, gibt
+    es nichts.
+    """
+
+    return sink_fuer_sitzung(sitzung).inhalte
 
 
 class ScratchSink:
