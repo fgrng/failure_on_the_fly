@@ -10,7 +10,8 @@ from simulation.models import (
     Simulationskern,
 )
 from sitzungen.durchlauf import rahmenhandlung_rendern
-from vignetten.models import Vignette, prompt_platzhalter
+from vignetten.models import Vignette
+from vignetten.prompt import prompt_platzhalter
 
 
 def _vorlage(vertrag: frozenset[str]) -> str:

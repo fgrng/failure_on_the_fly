@@ -17,12 +17,11 @@ from config.tests.aufbau import (
 )
 from konten.models import Konto
 from simulation.models import Simulationskern
+from vignetten.prompt import prompt_platzhalter, rahmen_platzhalter
 from vignetten.models import (
     Aufgabenkontextteil,
     Vignette,
     Vignettenhistorie,
-    prompt_platzhalter,
-    rahmen_platzhalter,
 )
 
 

@@ -22,7 +22,8 @@ from sitzungen.sink import (
     SitzungSink,
 )
 from texte.markdown import szenentext, woertlich
-from vignetten.models import Vignette, prompt_platzhalter, rahmen_platzhalter
+from vignetten.models import Vignette
+from vignetten.prompt import prompt_platzhalter, rahmen_platzhalter
 
 
 def jetzt() -> datetime:

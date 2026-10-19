@@ -26,7 +26,8 @@ from simulation.models import (
     Verwendung,
     evals_verfuegbar,
 )
-from vignetten.models import Vignette, prompt_platzhalter
+from vignetten.models import Vignette
+from vignetten.prompt import prompt_platzhalter
 
 if TYPE_CHECKING:
     from konten.models import Konto

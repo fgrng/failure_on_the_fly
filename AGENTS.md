@@ -12,4 +12,5 @@ Außerhalb von Sandcastle vor jedem Commit: `uv run pytest`, `uv run ruff format
 - **Writing or changing an ADR**: follow docs/adr/README.md; it overrides the domain-modeling skill's ADR-FORMAT.md.
 - **Issue tracker**: GitHub issues via `gh`. See docs/agents/issue-tracker.md.
 - **Triage labels**: canonical names plus `Spec`. See docs/agents/triage-labels.md.
+- **Simulation ohne App**: einen Gesprächsschritt mit Vignette und Prompt-Entwurf per `uv run scripts/simulieren.py` durchspielen. See docs/agents/simulieren.md.
 - **Image generation**: framing-story illustrations (`static/images/session/`) via the quota-limited `agy` CLI. See docs/agents/image-generation.md.
