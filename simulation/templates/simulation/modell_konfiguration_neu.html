@@ -29,7 +29,7 @@
                 <b>01</b><span><h2>Bezeichnung</h2><small>Unter ihr findet man die Konfiguration in den Auswahlen wieder</small></span>
             </header>
             <div class="system-page-field-list">
-                {% include "vignetten/includes/form_field.html" with field=form.bezeichnung %}
+                {% include "includes/form_field.html" with field=form.bezeichnung %}
             </div>
         </section>
 
@@ -45,11 +45,11 @@
             <div class="system-page-field-list"
                  x-data="{ anbieter: '{{ form.anbieter.value|escapejs }}' }"
                  @change="if ($event.target.name === 'anbieter') { anbieter = $event.target.value; $refs.modellvorschlaege.innerHTML = '' }">
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "includes/form_field.html" with field=form.anbieter %}
+                {% include "includes/form_field.html" with field=form.anbieter_token %}
+                {% include "includes/form_field.html" with field=form.anbieter_basis_url %}
                 {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.sprachmodell naht="sprachmodell" %}
-                {% include "vignetten/includes/form_field.html" with field=form.parameter %}
+                {% include "includes/form_field.html" with field=form.parameter %}
             </div>
         </section>
 

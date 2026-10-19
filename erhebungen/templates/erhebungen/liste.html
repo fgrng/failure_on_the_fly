@@ -39,7 +39,7 @@
                                 {% if erhebung.status == erhebung.Status.ENTWURF %}
                                     <form method="post" action="{% url 'erhebungen:loeschen' erhebung.pk %}">
                                         {% csrf_token %}
-                                        <button class="zeilenaktion zeilenaktion--gefahr" type="submit" aria-label="{{ erhebung.name }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                                        <button class="zeilenaktion zeilenaktion--gefahr" type="submit" aria-label="{{ erhebung.name }} löschen" title="Löschen">{% include "includes/icon.html" with name="muell" %}</button>
                                     </form>
                                 {% endif %}
                             </td>

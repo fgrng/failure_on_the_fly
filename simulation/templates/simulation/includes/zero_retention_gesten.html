@@ -2,7 +2,7 @@
     <form method="post" action="{{ erklaeren_url }}" class="system-page-field-list">
         {% csrf_token %}
         {{ erklaerungsformular.non_field_errors }}
-        {% include "vignetten/includes/form_field.html" with field=erklaerungsformular.zero_retention_beleg %}
+        {% include "includes/form_field.html" with field=erklaerungsformular.zero_retention_beleg %}
         <button class="button button--secondary" type="submit">Zero-Retention-Erklärung abgeben</button>
     </form>
 {% endif %}
@@ -10,7 +10,7 @@
     <form method="post" action="{{ widerrufen_url }}" class="system-page-field-list">
         {% csrf_token %}
         {{ widerrufsformular.non_field_errors }}
-        {% include "vignetten/includes/form_field.html" with field=widerrufsformular.zero_retention_widerrufsgrund %}
+        {% include "includes/form_field.html" with field=widerrufsformular.zero_retention_widerrufsgrund %}
         <button class="button button--secondary" type="submit">Zero-Retention-Erklärung widerrufen</button>
     </form>
 {% endif %}

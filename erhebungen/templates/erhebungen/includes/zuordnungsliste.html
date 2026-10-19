@@ -15,7 +15,7 @@
         {% endif %}
     </div>
     {% if reihenfolge and not nur_lesen %}
-        <p class="zuordnungsliste__hinweis" x-show="!geordnet" x-cloak>{% include "erhebungen/includes/icon.html" with name="mischen" %} Wird je Teilnahme gemischt. Die Anordnung hier spielt keine Rolle.</p>
+        <p class="zuordnungsliste__hinweis" x-show="!geordnet" x-cloak>{% include "includes/icon.html" with name="mischen" %} Wird je Teilnahme gemischt. Die Anordnung hier spielt keine Rolle.</p>
     {% endif %}
 
     {% if not nur_lesen %}
@@ -43,19 +43,19 @@
         <template x-for="(zeile, i) in rows" :key="zeile.pk">
             <li class="zuordnungsliste__zeile" :data-pk="zeile.pk">
                 <span class="zuordnungsliste__nummer" x-show="geordnet" x-text="i + 1"></span>
-                {% if reihenfolge %}<span class="zuordnungsliste__nummer" x-show="!geordnet" title="Gemischt">{% include "erhebungen/includes/icon.html" with name="mischen" %}</span>{% endif %}
+                {% if reihenfolge %}<span class="zuordnungsliste__nummer" x-show="!geordnet" title="Gemischt">{% include "includes/icon.html" with name="mischen" %}</span>{% endif %}
                 <span class="zuordnungsliste__text" x-text="zeile.label"></span>
                 {% if not nur_lesen %}
                     <span class="zuordnungsliste__leiste" role="group" :aria-label="'Aktionen für ' + zeile.label">
                         <span class="zuordnungsliste__leiste" x-show="geordnet">
-                            <button type="button" class="zuordnung-iconknopf" :disabled="i === 0" @click="verschieben(zeile, i, 'Nach oben')" :aria-label="zeile.label + ' nach oben'" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
-                            <button type="button" class="zuordnung-iconknopf" :disabled="i === rows.length - 1" @click="verschieben(zeile, i + 2, 'Nach unten')" :aria-label="zeile.label + ' nach unten'" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
-                            <span class="zuordnung-griff" data-griff aria-hidden="true" title="Ziehen zum Umsortieren">{% include "erhebungen/includes/icon.html" with name="griff" %}</span>
+                            <button type="button" class="zuordnung-iconknopf" :disabled="i === 0" @click="verschieben(zeile, i, 'Nach oben')" :aria-label="zeile.label + ' nach oben'" title="Nach oben">{% include "includes/icon.html" with name="hoch" %}</button>
+                            <button type="button" class="zuordnung-iconknopf" :disabled="i === rows.length - 1" @click="verschieben(zeile, i + 2, 'Nach unten')" :aria-label="zeile.label + ' nach unten'" title="Nach unten">{% include "includes/icon.html" with name="runter" %}</button>
+                            <span class="zuordnung-griff" data-griff aria-hidden="true" title="Ziehen zum Umsortieren">{% include "includes/icon.html" with name="griff" %}</span>
                         </span>
                         {% if andere %}
-                            <button type="button" class="zuordnung-iconknopf" x-show="zeile.umhaengen_url" @click="senden(zeile.umhaengen_url, {}, zeile.label + ' hängt jetzt an »{{ andere }}«.')" :aria-label="zeile.label + ' nach »{{ andere }}« umhängen'" title="Nach »{{ andere }}« umhängen">{% include "erhebungen/includes/icon.html" with name="tausch" %}</button>
+                            <button type="button" class="zuordnung-iconknopf" x-show="zeile.umhaengen_url" @click="senden(zeile.umhaengen_url, {}, zeile.label + ' hängt jetzt an »{{ andere }}«.')" :aria-label="zeile.label + ' nach »{{ andere }}« umhängen'" title="Nach »{{ andere }}« umhängen">{% include "includes/icon.html" with name="tausch" %}</button>
                         {% endif %}
-                        <button type="button" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" @click="senden(zeile.entfernen_url, {}, zeile.label + ' entfernt.')" :aria-label="zeile.label + ' entfernen'" title="Entfernen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                        <button type="button" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" @click="senden(zeile.entfernen_url, {}, zeile.label + ' entfernt.')" :aria-label="zeile.label + ' entfernen'" title="Entfernen">{% include "includes/icon.html" with name="muell" %}</button>
                     </span>
                 {% endif %}
             </li>

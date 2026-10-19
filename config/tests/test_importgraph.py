@@ -16,19 +16,21 @@ _PROJEKTWURZEL: Path = Path(settings.BASE_DIR)
 # Wohin der Produktionscode jeder App zeigen darf (ADR-0055, ADR-0037). Die
 # Tabelle ist die Kantenrichtung: Eine Kante hinzuzufügen ist eine Aussage über
 # die Architektur und gehört in ein ADR, nicht nur hierher. `konten` und
-# `config` zeigen auf keine App; `texte` ist Querschnitt und zeigt nur auf
-# `konten`; `seeds` ist das Blatt, das alle Domänen-Apps kennen darf.
+# `config` zeigen auf keine App; `texte` ist Querschnitt, zeigt nur auf
+# `konten` und darf von jeder App außer `konten` gezeigt werden (ADR-0068);
+# `seeds` ist das Blatt, das alle Domänen-Apps kennen darf. Dieselbe Tabelle
+# bewacht die Templates (`test_templategraph.py`).
 _KANTEN: dict[str, frozenset[str]] = {
     "config": frozenset(),
     "konten": frozenset(),
     "texte": frozenset({"konten"}),
-    "fragebogen_items": frozenset({"konten"}),
-    "simulation": frozenset({"konten"}),
-    "vignetten": frozenset({"konten", "simulation"}),
+    "fragebogen_items": frozenset({"konten", "texte"}),
+    "simulation": frozenset({"konten", "texte"}),
+    "vignetten": frozenset({"konten", "texte", "simulation"}),
     "sitzungen": frozenset({"konten", "texte", "simulation", "vignetten"}),
     # Nichts zeigt auf `evals`; `vignetten` liest den Evallauf allein über den
     # Reverse-Accessor und verlinkt per URL-Name (ADR-0046).
-    "evals": frozenset({"konten", "simulation", "vignetten"}),
+    "evals": frozenset({"konten", "texte", "simulation", "vignetten"}),
     "erhebungen": frozenset(
         {
             "config",
