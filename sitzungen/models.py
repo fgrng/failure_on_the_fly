@@ -155,8 +155,8 @@ class Sitzung(models.Model):
         "simulation.ModellKonfiguration",
         on_delete=models.PROTECT,
     )
-    # Leer nur für Sitzungen, die vor dem Pin begannen: Mit welcher Fassung sie
-    # transkribierten, ist nicht belegt.
+    # Leer nur für Sitzungen, die vor dem Pin endeten: Mit welcher Fassung sie
+    # transkribierten, ist nicht belegt. Die damals laufenden pinnte 0018.
     transkriptions_konfiguration: models.ForeignKey = models.ForeignKey(
         "simulation.TranskriptionsKonfiguration",
         null=True,

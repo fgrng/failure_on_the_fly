@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: ["#278", ADR-0067, "#497", "#498", "#499", "#500"]
+amended-by: ["#278", ADR-0067, "#497", "#498", "#499", "#500", "#506"]
 ---
 
 # Die Datenspur wird long-relational, selbsttragend und pro Erhebung exportiert
@@ -51,6 +51,11 @@ amended-by: ["#278", ADR-0067, "#497", "#498", "#499", "#500"]
 > `zero_retention_widerrufsgrund`, mit denselben Literalen. Erklärendes und
 > widerrufendes Konto bleiben draußen. Die Tabelle unten zeigt den Stand
 > danach.
+>
+> **Nachgeführt durch #506:** Sitzungen, die bei der Umstellung auf Fassungen
+> noch liefen, tragen die damals aktive Fassung. `NA` in
+> `transkriptions_konfiguration_id` steht damit nur für Sitzungen, die vor der
+> Umstellung endeten.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
