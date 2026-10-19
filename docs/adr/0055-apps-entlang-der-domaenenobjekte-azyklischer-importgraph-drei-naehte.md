@@ -1,6 +1,6 @@
 ---
 status: amended
-amended-by: [ADR-0064]
+amended-by: [ADR-0064, "kantenrichtung-gilt-auch-fuer-templates"]
 ---
 
 # Apps entlang der Domänenobjekte, ein azyklischer Importgraph, drei benannte Nähte
@@ -14,6 +14,13 @@ amended-by: [ADR-0064]
 > Datenspur: Der Export von `erhebungen` kennt keine Konten; Views und Modelle
 > von `erhebungen` nutzen Konto und Eigentümer-Kreis über die Kante nach
 > `konten`.
+>
+> **Nachgeführt durch ADR „Die Kantenrichtung gilt auch für Templates, Links
+> sind frei, und `texte` ist Querschnitt für alle Apps“:** Die Kantenrichtung
+> gilt auch für `{% include %}`, `{% extends %}` und `{% load %}` in Templates;
+> Links per URL-Name bleiben frei. Jede App außer `konten` darf auf `texte`
+> zeigen, in Python wie in Templates. Generische Bausteine liegen unter
+> `templates/includes/`, und die globalen Templates binden keine App ein.
 
 Dieses ADR fasst den Stand von ADR-0016 und seinen Nachführungen durch
 ADR-0037, ADR-0041, ADR-0042, ADR-0044, ADR-0045, ADR-0046 und ADR-0052
