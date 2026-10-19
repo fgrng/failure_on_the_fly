@@ -31,7 +31,7 @@ Read the actual changes per file with `git diff origin/main...HEAD -- <path>`.
 Call the Skill tool with `pr` and write the body with its template. Write in German, in the domain language of `GLOSSARY.md`.
 
 - The title names the spec in a few words and ends with `(Spec #{{SPEC}})`.
-- Do not run tests. The merger and, if there were findings, the spec fix ran `uv run pytest` green on this branch (or skipped it because only Markdown files changed), and CI runs it on the pull request. State that as evidence.
+- Do not run tests. Every change reached this branch through a green `uv run pytest` (or skipped it because only Markdown files changed); a `RALPH: Spec-Review -` commit in <commits> means the spec fix ran it too. CI runs it again on the pull request. State that as evidence, without naming who ran it.
 - Leave out open points and any `Closes` line. The driver script appends the spec review's open points and `Closes #{{SPEC}}` to your body.
 
 # OUTPUT

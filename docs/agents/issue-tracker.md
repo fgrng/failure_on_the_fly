@@ -2,7 +2,7 @@
 
 Issues und Specs liegen als GitHub-Issues in diesem Repo; Zugriff über die `gh`-CLI.
 
-- **Lesen**: `gh issue view <n> --comments`.
+- **Lesen**: `gh issue view <n>` für den Text, `gh issue view <n> --comments` für die Kommentare. `--comments` allein lässt außerhalb eines Terminals den Text weg.
 - **Auflisten**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`, gefiltert mit `--label` / `--state`.
 - **Arbeit abschließen**: `gh issue close <n> --comment "..."`, nach den Regeln unter [Abschluss von Arbeit](#abschluss-von-arbeit).
 - **PRs as a request surface: no.** _(`/triage` liest dieses Flag.)_ PRs kommen hier aus Integrations-Branches und sind Arbeit der Maintainerin bzw. des Maintainers, keine Anfragen von außen.

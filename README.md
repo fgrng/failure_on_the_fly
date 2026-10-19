@@ -163,7 +163,8 @@ Für Sandcastle gilt:
   werden dorthin gemergt; das Skript legt ihn bei Bedarf von `main` an. Tickets
   ohne Spec sammeln sich auf `sandcastle/standalone`.
 - Zu Beginn jedes Laufs mergt das Skript `main` in jeden aktiven
-  Integrations-Branch; nur bei einem Konflikt löst ein Merger-Agent auf.
+  Integrations-Branch. Bringt das neue Commits, muss danach `uv run pytest` grün
+  sein. Bei einem Konflikt oder roten Tests übernimmt ein Merger-Agent.
 - Gemergt und geschlossen werden nur Tickets, deren Implementer sein
   Abschlusssignal gegeben hat und deren Branch nachweislich im
   Integrations-Branch liegt. Ein einzelner Branch, der per Fast-Forward passt,

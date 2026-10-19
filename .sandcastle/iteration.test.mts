@@ -305,6 +305,60 @@ test("bei einem Konflikt mit main löst der Merger auf genau diesem Branch auf",
   );
 });
 
+test("nach einem sauberen Merge von main laufen die Tests auf genau diesem Branch", async () => {
+  const { tracker, repo, agents, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commitOnOrigin("main");
+
+  await update();
+
+  assert.deepEqual({ tested: repo.tested, merged: agents.mergedWith }, { tested: ["spec/30"], merged: [] });
+});
+
+test("bringt main nichts Neues, laufen keine Tests", async () => {
+  const { tracker, repo, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+
+  await update();
+
+  assert.deepEqual(repo.tested, []);
+});
+
+test("sind die Tests nach dem sauberen Merge rot, merged der Merger main neu und behebt", async () => {
+  const { tracker, repo, agents, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commitOnOrigin("main");
+  repo.red.add("spec/30");
+
+  const result = await update();
+
+  assert.deepEqual(
+    { specHasMain: await repo.contains("spec/30", "origin/main"), merged: agents.mergedWith, failed: result.failed },
+    { specHasMain: true, merged: [{ into: "spec/30", branches: ["origin/main"] }], failed: [] },
+  );
+});
+
+test("sind die Tests rot und scheitert der Merger, bleibt der Branch auf dem grünen Stand davor", async () => {
+  const { tracker, repo, agents, update } = setup();
+  tracker.addSpec(30);
+  await repo.createBranch("spec/30", "origin/main");
+  repo.commit("spec/30");
+  repo.commitOnOrigin("main");
+  repo.red.add("spec/30");
+  agents.unmergeable.add("origin/main");
+  const before = await repo.head("spec/30");
+
+  const result = await update();
+
+  assert.deepEqual(
+    { head: await repo.head("spec/30"), failed: result.failed },
+    { head: before, failed: ["spec/30"] },
+  );
+});
+
 test("scheitert die Auflösung, bleibt der Branch unverändert und der Lauf meldet ihn", async () => {
   const { tracker, repo, agents, update } = setup();
   tracker.addSpec(30);
@@ -859,7 +913,7 @@ test("die Abschlussphase reviewt, behebt Standards- und Korrektheitsbefunde, sch
     },
     {
       steps: ["review #30", "fix #30", "pr-text #30"],
-      fixedWith: [{ spec: 30, findings: ["Docstring fehlt", "Grenzfall falsch"] }],
+      fixedWith: [{ spec: 30, standards: ["Docstring fehlt"], correctness: ["Grenzfall falsch"] }],
       prs: 1,
       pushedWithFix: true,
     },

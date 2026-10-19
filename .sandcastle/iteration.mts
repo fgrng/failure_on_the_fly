@@ -93,6 +93,11 @@ export interface Repo {
   resetBranch(branch: string, head: string): Promise<void>;
   /** Ob `branch` genau auf seinem Stand in origin steht. */
   isPushed(branch: string): Promise<boolean>;
+  /**
+   * Ob `uv run pytest` auf dem Stand von `branch` grün ist, in einem eigenen
+   * Worktree; der Checkout des Hosts bleibt unberührt.
+   */
+  testsPass(branch: string): Promise<boolean>;
   /** Die Dateien, die `branch` gegenüber MAIN_REF neu anlegt. */
   addedFiles(branch: string): Promise<string[]>;
   /** Pusht `branch` nach origin; nur sandcastle/standalone darf dabei Historie ersetzen. */
@@ -124,8 +129,8 @@ export interface Agents {
   merge(into: string, branches: string[]): Promise<AgentRun>;
   /** Reviewt `branch` gegen MAIN_REF mit `code-review`, Maßstab ist die Spec. */
   reviewSpec(spec: number, branch: string): Promise<SpecReview>;
-  /** Ein Implementer behebt die Befunde auf `branch`. */
-  fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun>;
+  /** Ein Implementer behebt die Standards- und Korrektheitsbefunde auf `branch`. */
+  fixFindings(spec: number, branch: string, findings: FixableFindings): Promise<AgentRun>;
   /** Ein Implementer streicht die Tests, die `migrations` vor- und zurückmigrieren. */
   removeMigrationTests(spec: number, branch: string, migrations: string[]): Promise<AgentRun>;
   /** Titel und Text des PRs von `branch`, geschrieben mit dem Skill `pr`. */
@@ -137,6 +142,9 @@ export interface Agents {
  * Spec-Befunde gehen als offene Punkte in den PR-Text.
  */
 export type SpecReview = { standards: string[]; correctness: string[]; spec: string[] };
+
+/** Die Befunde, die der Fix ohne Entscheidung eines Menschen behebt. */
+export type FixableFindings = Pick<SpecReview, "standards" | "correctness">;
 
 /** Ziel jedes PRs. */
 export const MAIN_BRANCH = "main";
@@ -260,13 +268,29 @@ function checkedOutByHost(branch: string): string {
   return `${branch} is checked out in the host checkout - skipped in this run.`;
 }
 
-// Mergt MAIN_REF in `branch`, bei Konflikt über den Merger. Liefert, ob
-// MAIN_REF danach enthalten ist; sonst steht `branch` wieder auf seinem alten Stand.
+// Mergt MAIN_REF in `branch`, bei Konflikt über den Merger. Ein sauberer
+// Merge, der etwas Neues bringt, muss die Testsuite bestehen: Tickets zweigen
+// von hier ab, und die Prompts setzen einen grünen Stand voraus. Bei roten
+// Tests übernimmt ebenfalls der Merger, der nach dem Merge testet und behebt.
+// Liefert, ob MAIN_REF danach enthalten ist; sonst steht `branch` wieder auf
+// seinem alten Stand.
 async function mergeMainInto(deps: WithLog<UpdateDeps>, branch: string): Promise<boolean> {
   const { repo, log } = deps;
-  if ((await repo.mergeMain(branch)) === "clean") return true;
-
-  log(`  ${branch}: conflict with ${MAIN_REF}, starting the merger.`);
+  const before = await repo.head(branch);
+  if ((await repo.mergeMain(branch)) === "clean") {
+    let green: boolean;
+    try {
+      green = (await repo.head(branch)) === before || (await repo.testsPass(branch));
+    } catch (error) {
+      await repo.resetBranch(branch, before);
+      throw error;
+    }
+    if (green) return true;
+    log(`  ${branch}: tests fail after merging ${MAIN_REF}, starting the merger.`);
+    await repo.resetBranch(branch, before);
+  } else {
+    log(`  ${branch}: conflict with ${MAIN_REF}, starting the merger.`);
+  }
   return mergeOrReset(deps, branch, [MAIN_REF], () => repo.contains(branch, MAIN_REF));
 }
 
@@ -666,9 +690,8 @@ async function finishSpec(deps: WithLog<IterationDeps>, spec: number): Promise<v
   log(`\n=== Finishing spec #${spec} on ${branch} ===`);
 
   const review = await agents.reviewSpec(spec, branch);
-  const toFix = [...review.standards, ...review.correctness];
-  if (toFix.length > 0) {
-    const fix = await agents.fixFindings(spec, branch, toFix);
+  if (review.standards.length + review.correctness.length > 0) {
+    const fix = await agents.fixFindings(spec, branch, review);
     if (!fix.completed) {
       log(`  ! ${branch}: findings not fixed (no completion signal) - no pull request yet.`);
       return;

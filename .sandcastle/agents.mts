@@ -9,6 +9,7 @@ import { z } from "zod";
 import type {
   AgentRun,
   Agents,
+  FixableFindings,
   PlannedIssue,
   PullRequestText,
   SpecReview,
@@ -306,7 +307,7 @@ export function sandcastleAgents(lineup: Lineup): Agents {
       return review.output;
     },
 
-    async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
+    async fixFindings(spec: number, branch: string, findings: FixableFindings): Promise<AgentRun> {
       return agentRun(
         await sandcastle.run({
           ...runSettings(branch),
@@ -317,7 +318,8 @@ export function sandcastleAgents(lineup: Lineup): Agents {
           promptArgs: {
             SPEC: spec,
             INTEGRATION_BRANCH: branch,
-            FINDINGS: bulletList(findings),
+            STANDARDS: bulletList(findings.standards),
+            CORRECTNESS: bulletList(findings.correctness),
           },
         }),
       );

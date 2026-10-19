@@ -1,6 +1,9 @@
 // Repo über `git` im Checkout des Hosts.
 
 import { execFileSync } from "node:child_process";
+import { copyFileSync, mkdtempSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { MAIN_REF, type Repo, STANDALONE_BRANCH } from "./iteration.mts";
 
 /** Das Repo des Hosts; kein Aufruf ändert dessen Checkout oder Arbeitsverzeichnis. */
@@ -103,6 +106,23 @@ export const gitRepo: Repo = {
     }
   },
 
+  async testsPass(branch: string): Promise<boolean> {
+    // Ohne Branch ausgecheckt, damit `branch` für Agents und Merger frei
+    // bleibt. .env fehlt wie in jedem frischen Worktree (siehe agents.mts);
+    // das Platzhalter-Secret aus .env.example reicht der Testsuite.
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sandcastle-tests-"));
+    git(["worktree", "add", "--detach", dir, branch]);
+    try {
+      copyFileSync(path.join(dir, ".env.example"), path.join(dir, ".env"));
+      execFileSync("uv", ["run", "pytest", "-q", "-x"], { cwd: dir, stdio: "ignore", timeout: TEST_TIMEOUT_MS });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      git(["worktree", "remove", "--force", dir]);
+    }
+  },
+
   async addedFiles(branch: string): Promise<string[]> {
     // Drei Punkte: gemessen ab der Merge-Basis, nicht gegen den heutigen Stand von main.
     // Ohne Umbenennungen bleibt eine Datei, die eine gelöschte ersetzt, neu;
@@ -120,6 +140,9 @@ export const gitRepo: Repo = {
     git(["push", ...force, "origin", `${branch}:${branch}`]);
   },
 };
+
+// Die Testsuite läuft in etwa einer Minute; ein Hänger soll den Lauf nicht anhalten.
+const TEST_TIMEOUT_MS = 15 * 60_000;
 
 // Führt git aus und liefert stdout; wirft bei einem Exit-Code ungleich 0.
 function git(args: string[]): string {

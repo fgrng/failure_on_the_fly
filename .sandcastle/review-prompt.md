@@ -8,6 +8,8 @@ You improve the code on this branch yourself; a review that only lists findings 
 
 <issue>
 
+!`gh issue view {{TASK_ID}}`
+
 !`gh issue view {{TASK_ID}} --comments`
 
 </issue>
@@ -51,7 +53,7 @@ If you cannot start sub-agents, run the two axes one after the other and keep th
 
 # EXECUTION
 
-The implementer left the branch green, so there is no starting run.
+There is no starting run: `{{INTEGRATION_BRANCH}}` was green when this branch came off it, and the implementer ran the tests of the apps it touched.
 
 1. Make the changes and commit them in one commit whose message starts with `RALPH: Review -`.
 2. Run `uv run pytest` and fix whatever fails, so the branch ends green, also when you made no commit: a branch that fast-forwards lands without another test run. Skip this only if the branch changes only Markdown files.

@@ -5,6 +5,7 @@
 import type {
   AgentRun,
   Agents,
+  FixableFindings,
   IssueSummary,
   PlannedIssue,
   PullRequest,
@@ -151,6 +152,10 @@ export class FakeRepo implements Repo {
   pushFails = false;
   /** Branches, deren Merge mit origin/main einen Konflikt ergibt. */
   readonly conflicting = new Set<string>();
+  /** Branches, deren Testsuite rot ist. */
+  readonly red = new Set<string>();
+  /** Jeder Testlauf mit seinem Branch, in Aufrufreihenfolge. */
+  readonly tested: string[] = [];
   /** Der Branch, den der Checkout des Hosts gerade ausgecheckt hat. */
   checkedOut = "main";
   /** Branches, die ein Worktree ausgecheckt hat, etwa der eines Mergers. */
@@ -261,6 +266,11 @@ export class FakeRepo implements Repo {
     this.refs.set(branch, new Set(head ? head.split(",") : []));
   }
 
+  async testsPass(branch: string): Promise<boolean> {
+    this.tested.push(branch);
+    return !this.red.has(branch);
+  }
+
   // Die Dateien aus den Commits von `branch`, die origin/main fehlen.
   async addedFiles(branch: string): Promise<string[]> {
     const main = this.commits("origin/main");
@@ -319,7 +329,7 @@ export class FakeAgents implements Agents {
   /** Die Agent-Schritte der Abschlussphasen, etwa `review #30`, in Aufrufreihenfolge. */
   readonly specSteps: string[] = [];
   /** Die Befunde, die jeder Fix-Implementer bekam. */
-  readonly fixedWith: { spec: number; findings: string[] }[] = [];
+  readonly fixedWith: ({ spec: number } & FixableFindings)[] = [];
   /** Befunde des Spec-Reviews je Spec. Default: keine. */
   readonly specReviews = new Map<number, SpecReview>();
   /** Specs, deren Fix-Implementer ohne Abschlusssignal endet. */
@@ -383,9 +393,9 @@ export class FakeAgents implements Agents {
     return this.specReviews.get(spec) ?? { standards: [], correctness: [], spec: [] };
   }
 
-  async fixFindings(spec: number, branch: string, findings: string[]): Promise<AgentRun> {
+  async fixFindings(spec: number, branch: string, findings: FixableFindings): Promise<AgentRun> {
     this.specSteps.push(`fix #${spec}`);
-    this.fixedWith.push({ spec, findings });
+    this.fixedWith.push({ spec, standards: findings.standards, correctness: findings.correctness });
     return { commits: [this.repo.commit(branch)], completed: !this.unfixable.has(spec) };
   }
 

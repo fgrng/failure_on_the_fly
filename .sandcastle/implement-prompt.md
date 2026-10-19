@@ -2,7 +2,7 @@
 
 Fix issue {{TASK_ID}}: {{ISSUE_TITLE}}
 
-Pull in the issue using `gh issue view <ID>`. If it has a parent PRD, pull that in too.
+Pull in the issue with `gh issue view <ID>` and its comments with `gh issue view <ID> --comments`; `--comments` alone omits the issue text. If it has a parent PRD, pull that in too.
 
 Only work on the issue specified.
 
@@ -54,6 +54,8 @@ Make a git commit. The commit message must:
 Keep it concise.
 
 # THE ISSUE
+
+Before you output COMPLETE, check every acceptance criterion of the issue against your change. A criterion you did not meet, met only in part, or deliberately left out goes into one comment on the issue, in German, quoting the criterion and saying why: `gh issue comment <ID> --body-file -`. A note in the commit message does not reach the person who decides.
 
 If the task is not complete, leave a comment on the issue with what was done.
 

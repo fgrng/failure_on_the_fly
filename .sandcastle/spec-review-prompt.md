@@ -8,6 +8,8 @@ You only analyse. Do not change, commit or comment on anything: a fix-implemente
 
 <spec>
 
+!`gh issue view {{SPEC}}`
+
 !`gh issue view {{SPEC}} --comments`
 
 </spec>
@@ -18,7 +20,7 @@ You only analyse. Do not change, commit or comment on anything: a fix-implemente
 
 </sub-issues>
 
-Read each closed sub-issue with `gh issue view <n> --comments`.
+Read each closed sub-issue with `gh issue view <n>` and its comments with `gh issue view <n> --comments`; `--comments` alone omits the issue text.
 
 <diff-stat>
 
@@ -48,11 +50,11 @@ If you cannot start sub-agents, run the two axes one after the other and keep th
 
 Sort the findings of the report into three lists, each finding one self-contained sentence in German with the file (and line, where it helps):
 
-- `standards`: findings of the Standards axis.
-- `correctness`: bugs, including Spec findings where a requirement looks implemented but the implementation is wrong.
-- `spec`: missing or partial requirements and work nobody asked for. Quote the spec line.
+- `standards`: findings of the Standards axis whose fix leaves the behaviour exactly as it is.
+- `correctness`: bugs: the spec or a sub-issue settles the behaviour, and the code does something else.
+- `spec`: everything a human decides: missing or partial requirements, work nobody asked for, open spec questions, and every finding the report marks as a judgement call or as needing a decision. Quote the spec line.
 
-Leave out findings that are judgement calls you would not act on. Output the lists as a JSON object wrapped in `<spec-review>` tags:
+A fix-implementer acts on `standards` and `correctness` without asking anyone, so a finding goes there only when its right fix is unambiguous; when in doubt, it goes to `spec`. Leave out judgement calls you would not act on. Output the lists as a JSON object wrapped in `<spec-review>` tags:
 
 <spec-review>
 {"standards": ["..."], "correctness": ["..."], "spec": ["..."]}
