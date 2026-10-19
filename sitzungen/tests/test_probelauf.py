@@ -16,12 +16,18 @@ from config.tests.aufbau import (
     finale_vignette,
     finaler_kern,
     konto_mit_rollen,
+    transkriptions_fassung,
     vignetten_entwurf,
 )
 from config.tests.formular import letztes_fokusziel, submit_knoepfe
 from config.tests.sprachmodell import anfragen_aufzeichnen, modellaufrufe_dauern
 from konten.models import Konto
-from simulation.models import ModellKonfiguration, Simulationskern, Verwendung
+from simulation.models import (
+    ModellKonfiguration,
+    Simulationskern,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.durchlauf import Ausgang, gespraechsschritt_ausfuehren
 from sitzungen.models import (
     Diagnose,
@@ -618,9 +624,8 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         self.assertContains(debrief, "data-spracheingabe")
         self.assertContains(debrief, "Diagnose aufnehmen")
 
-    def test_ohne_erklaerte_fassung_zeigt_der_probelauf_kein_mikrofon(self) -> None:
-        """Start, Gespräch und Debrief folgen dem Tor der aktiven Fassung."""
-
+    def _probelauf_durchlaufen(self) -> tuple[HttpResponse, ...]:
+        # Start, ein Gesprächsschritt und Debrief eines Probelaufs.
         self._erfolgreiche_antwort_konfigurieren()
         einstieg: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
@@ -629,8 +634,20 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
             reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
         )
         debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+        return einstieg, gespraech, debrief
 
-        for antwort in (einstieg, gespraech, debrief):
+    def test_bei_fake_fassung_zeigt_der_probelauf_kein_mikrofon(self) -> None:
+        """Start, Gespräch und Debrief folgen dem Tor der aktiven Fassung."""
+
+        for antwort in self._probelauf_durchlaufen():
+            self.assertNotContains(antwort, "data-spracheingabe")
+
+    def test_ohne_erklaerung_zeigt_der_probelauf_kein_mikrofon(self) -> None:
+        """Ein echter Anbieter ohne Erklärung hält das Tor ebenso zu."""
+
+        TranskriptionsKonfiguration.objects.aktivieren(transkriptions_fassung())
+
+        for antwort in self._probelauf_durchlaufen():
             self.assertNotContains(antwort, "data-spracheingabe")
 
     def test_antwort_und_denkspur_werden_live_angezeigt(self) -> None:
