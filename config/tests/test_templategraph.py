@@ -8,18 +8,23 @@ nicht: Navigation ist frei. Template-Namen aus Variablen sieht der Test nicht.
 """
 
 import re
+from functools import cache
 from pathlib import Path
 
 import pytest
 
 from config.tests.test_importgraph import _KANTEN, _PROJEKTWURZEL, _projekt_apps
 
-_EINBINDUNG: re.Pattern[str] = re.compile(
-    r"""\{%-?\s*(include|extends)\s+["']([^"']+)["']"""
+_KOMMENTAR: re.Pattern[str] = re.compile(
+    r"\{#.*?#\}|\{%\s*comment\b.*?%\}.*?\{%\s*endcomment\s*%\}", re.DOTALL
 )
-_LADEN: re.Pattern[str] = re.compile(r"\{%-?\s*load\s+(.+?)\s*-?%\}")
+_EINBINDUNG: re.Pattern[str] = re.compile(
+    r"""\{%\s*(include|extends)\s+["']([^"']+)["']"""
+)
+_LADEN: re.Pattern[str] = re.compile(r"\{%\s*load\s+(.+?)\s*%\}")
 
 
+@cache
 def _bibliotheken() -> dict[str, str]:
     # Jede Tag-Bibliothek gehört der App, in deren `templatetags` sie liegt.
 
@@ -46,7 +51,8 @@ def _ziele(datei: Path) -> list[tuple[str, str, str | None]]:
 
     apps: set[str] = _projekt_apps()
     bibliotheken: dict[str, str] = _bibliotheken()
-    text: str = datei.read_text(encoding="utf-8")
+    # Auskommentierte Tags rendern nicht und sind keine Kante.
+    text: str = _KOMMENTAR.sub("", datei.read_text(encoding="utf-8"))
     ziele: list[tuple[str, str, str | None]] = []
     for art, name in _EINBINDUNG.findall(text):
         erster_teil: str = name.split("/")[0]
@@ -58,6 +64,8 @@ def _ziele(datei: Path) -> list[tuple[str, str, str | None]]:
 
 
 def _templates(wurzel: Path) -> list[Path]:
+    # Sammelt jede Datei unter einem Template-Verzeichnis; fehlt es, keine.
+
     return sorted(datei for datei in wurzel.rglob("*") if datei.is_file())
 
 
@@ -108,3 +116,24 @@ def test_globale_templates_zeigen_auf_keine_app() -> None:
     dateien: list[Path] = _templates(_PROJEKTWURZEL / "templates")
 
     assert _verstoesse(None, dateien) == []
+
+
+def test_waechter_sieht_einbindungen_aber_keine_kommentare(tmp_path: Path) -> None:
+    """Eine auskommentierte Einbindung ist keine Kante, eine aktive schon."""
+
+    datei: Path = tmp_path / "seite.html"
+    datei.write_text(
+        '{% include "erhebungen/a.html" %}\n'
+        '{# {% include "vignetten/b.html" %} #}\n'
+        "{% comment %}\n"
+        '  {% extends "training/c.html" %}{% load texte %}\n'
+        "{% endcomment %}\n"
+        "{% load static texte %}\n",
+        encoding="utf-8",
+    )
+
+    assert _ziele(datei) == [
+        ("include", "erhebungen/a.html", "erhebungen"),
+        ("load", "static", None),
+        ("load", "texte", "texte"),
+    ]
