@@ -136,7 +136,7 @@ def _gespraech_anzeigen(
         navigation=_sitzungsnavigation(),
         erneute_eingabe=erneute_eingabe,
         erneuter_eingabemodus=erneuter_eingabemodus,
-        spracheingabe_verfuegbar=True,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(None),
     )
 
 
@@ -156,7 +156,7 @@ def _debrief_anzeigen(
         zeigt_denkspur=True,
         navigation=_sitzungsnavigation(),
         zeigt_debrief=True,
-        spracheingabe_verfuegbar=True,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(None),
     )
 
 
@@ -193,7 +193,7 @@ def _probelauf_starten(
         gespraechsschritte=sink.gespraechsschritte,
         zeigt_denkspur=True,
         navigation=_sitzungsnavigation(),
-        spracheingabe_verfuegbar=True,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(None),
     )
 
 
@@ -365,6 +365,22 @@ def _transkriptions_fassung(sitzung: Sitzung | None) -> TranskriptionsKonfigurat
     return TranskriptionsKonfiguration.objects.aktive()
 
 
+def spracheingabe_verfuegbar(sitzung: Sitzung | None) -> bool:
+    """Ob die Sitzungsansicht das Mikrofon zeigt: dieselbe Regel wie am Endpunkt.
+
+    Eine Sitzung braucht die Einwilligung ihrer Teilnahme, der Probelauf
+    (`None`) keine (ADR-0026). Dahinter gilt das Tor der geltenden Fassung,
+    bei jedem Rendern frisch gelesen.
+    """
+
+    if (
+        sitzung is not None
+        and not sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt
+    ):
+        return False
+    return _transkriptions_fassung(sitzung).transkription_offen
+
+
 def transkriptions_endpunkt(
     anbieter_bilden: Callable[[TranskriptionsKonfiguration], Transkription],
     sitzung_aufloesen: Callable[..., Sitzung | None],
@@ -439,7 +455,7 @@ def persistierten_debrief_anzeigen(
         zeigt_denkspur=False,
         zeigt_debrief=True,
         navigation=navigation,
-        spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(sitzung),
         sitzung_pk=sitzung.pk,
         anhang=anhang,
         abgegebene_diagnose=sink.abgegebene_diagnose,
@@ -485,7 +501,7 @@ def _persistiertes_gespraech_anzeigen(
         ist_gescheitert=ist_gescheitert,
         ist_lesend=ist_lesend,
         navigation=navigation,
-        spracheingabe_verfuegbar=sitzung.teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(sitzung),
         sitzung_pk=sitzung.pk,
         anhang=anhang,
     )

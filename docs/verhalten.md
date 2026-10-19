@@ -1004,7 +1004,9 @@ das Tor also sofort, auch in laufenden Sitzungen; die nächste Aufnahme wird
 abgewiesen, das Mikrofon schaltet ab („Die Transkription ist nicht verfügbar.
 Nutzen Sie die Tastatureingabe.“), und es geht per Tastatur weiter. Ist das Tor
 der aktiven Fassung zu, steht über der Seite „Die Spracheingabe ist aus.“, und
-keine Erhebung bietet die Einwilligung in die Spracherkennung an. Nach der
+weder Erhebung noch Training bieten die Einwilligung in die Spracherkennung an.
+Das Mikrofon zeigt jede Sitzungsseite nur bei offenem Tor derselben Fassung wie
+am Endpunkt; nach einem Widerruf fehlt es ab der nächsten Seite. Nach der
 Umstellung trägt die übernommene Fassung keine Erklärung: Bis eine
 Administrator:in sie abgibt, ist die Spracheingabe aus.
 
@@ -1018,15 +1020,19 @@ Konten (ADR-0029).
 Vor dem ersten Start eines Trainings entscheiden Teilnehmende einmalig, ob ihr
 Audio zur Transkription an einen externen Auftragsverarbeiter übermittelt werden
 darf. Das Audio wird danach nicht gespeichert. Bei Ablehnung bleibt das Training
-uneingeschränkt über die Tastatur spielbar.
+uneingeschränkt über die Tastatur spielbar. Gefragt wird nur, wenn das
+Transkriptions-Tor der aktiven Fassung offen ist (erklärt, nicht `fake`). Ist es
+zu, startet die Sitzung direkt mit Tastatureingabe, und die Entscheidung bleibt
+offen; nach dem Öffnen des Tors wird beim nächsten Start gefragt.
 
-Nach Einwilligung lässt sich jede Frage im Diagnosegespräch per Tastatur oder
-über „Spracheingabe starten“ eingeben. Die Aufnahme wird bewusst beendet, direkt
-transkribiert und anschließend automatisch als Gesprächsschritt abgeschickt; das
-Transkript wird davor nicht bearbeitet. Im Debrief kann die Diagnose ebenfalls
-in mehreren Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie
-bewusst und unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen
-Transkription kann die Aufnahme wiederholt werden.
+Nach Einwilligung und bei offenem Tor der gepinnten Fassung lässt sich jede
+Frage im Diagnosegespräch per Tastatur oder über „Spracheingabe starten“
+eingeben. Die Aufnahme wird bewusst beendet, direkt transkribiert und
+anschließend automatisch als Gesprächsschritt abgeschickt; das Transkript wird
+davor nicht bearbeitet. Im Debrief kann die Diagnose ebenfalls in mehreren
+Aufnahmen ergänzt werden; erst „Training beenden“ schickt sie bewusst und
+unwiderruflich ab. Bei einer leeren oder fehlgeschlagenen Transkription kann die
+Aufnahme wiederholt werden.
 
 In Gespräch und Debrief steht das Feld in voller Breite. Darunter liegt die
 Eingabezeile: links der umrandete Knopf der Spracheingabe mit Mikrofon-Symbol,
@@ -1095,8 +1101,8 @@ einliest.
 Im **Probelauf** der Autor:innen gibt es keinen Einwilligungsschritt: Dort
 spricht die angemeldete Autor:in über ihr eigenes Material, nicht eine
 pseudonyme Teilnehmer:in. Das Mikrofon steht im Diagnosegespräch und im Debrief
-unmittelbar bereit; ob eine Aufnahme transkribiert wird, hängt allein an der
-Zero-Retention-Erklärung der aktiven Transkriptions-Fassung.
+genau dann bereit, wenn das Tor der aktiven Transkriptions-Fassung offen ist
+(erklärt, nicht `fake`); sonst bleibt nur die Tastatur.
 
 ## Erhebungsteilnahme
 

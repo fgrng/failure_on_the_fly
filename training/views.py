@@ -27,7 +27,11 @@ from konten.navigation import (
 )
 
 from .forms import TrainingForm
-from simulation.models import ModellKonfiguration, Verwendung
+from simulation.models import (
+    ModellKonfiguration,
+    TranskriptionsKonfiguration,
+    Verwendung,
+)
 from sitzungen.durchlauf import (
     Sitzungsnavigation,
     sitzung_abbrechen,
@@ -41,6 +45,7 @@ from sitzungen.views import (
     persistierten_debrief_anzeigen,
     persistierten_fehler_anzeigen,
     persistiertes_gespraech,
+    spracheingabe_verfuegbar,
 )
 
 from vignetten.models import Vignette
@@ -823,9 +828,17 @@ def _nach_einwilligung_starten(
     *,
     abzubrechen: int | None = None,
 ) -> HttpResponse:
-    """Fragt zuerst die Audioverarbeitung ab und startet dann."""
+    """Fragt zuerst die Audioverarbeitung ab und startet dann.
+
+    Gefragt wird nur, wenn die Instanz transkribiert: dasselbe Tor wie am
+    Endpunkt, für die aktive Fassung. Sonst bleibt die Einwilligung offen
+    und wird beim ersten Start nach dem Öffnen des Tors erfragt.
+    """
     bindung: Trainingsbindung = _aktive_bindung(training, request.user)
-    if bindung.teilnahme.audioverarbeitung_eingewilligt is None:
+    if (
+        bindung.teilnahme.audioverarbeitung_eingewilligt is None
+        and TranskriptionsKonfiguration.objects.aktive().transkription_offen
+    ):
         return render(
             request,
             "training/einwilligung.html",
@@ -990,7 +1003,7 @@ def _sitzung_starten(
         gespraechsschritte=[],
         zeigt_denkspur=False,
         navigation=_sitzungsnavigation(sink.sitzung.pk),
-        spracheingabe_verfuegbar=teilnahme.hat_in_audioverarbeitung_eingewilligt,
+        spracheingabe_verfuegbar=spracheingabe_verfuegbar(sink.sitzung),
         sitzung_pk=sink.sitzung.pk,
     )
 
