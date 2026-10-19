@@ -586,6 +586,27 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertContains(gespraech, "Spracheingabe starten")
         self.assertContains(debrief, "Spracheingabe starten")
 
+    def test_ein_widerruf_nimmt_der_naechsten_seite_das_mikrofon(self) -> None:
+        """Bei eingewilligter Teilnahme entscheidet das Tor der gepinnten Fassung."""
+
+        fassung: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
+        self._vignette_anlegen()
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            audioverarbeitung_eingewilligt="ja"
+        )
+        fassung.zero_retention_widerrufen(
+            "Zusage zurückgezogen",
+            Konto.objects.create_user(username="linus", is_superuser=True),
+        )
+
+        gespraech: HttpResponse = self.client.get(
+            reverse("erhebungen:gespraech", args=[bindung.token])
+        )
+
+        self.assertContains(gespraech, "Ihre nächste Frage")
+        self.assertNotContains(gespraech, "data-spracheingabe")
+
     def test_gespraech_zeigt_die_abgesetzte_aktionszeile(self) -> None:
         """Beenden, Erklärsatz und Abbrechen der Erhebung; im Debrief keine Zeile."""
 

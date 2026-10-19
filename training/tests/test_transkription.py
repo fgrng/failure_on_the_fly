@@ -13,6 +13,7 @@ from config.tests.aufbau import (
     erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
+    transkriptions_fassung,
 )
 from konten.models import Konto
 from simulation.models import TranskriptionsKonfiguration, Verwendung
@@ -190,3 +191,76 @@ class TranskriptionsEndpointTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+
+class SpracheingabeTorTests(TestCase):
+    """Training fragt und zeigt die Spracheingabe nur bei offenem Tor."""
+
+    def setUp(self) -> None:
+        """Eine Teilnehmer:in ist einem Training mit einer Vignette beigetreten."""
+        ausbilderin: Konto = konto_mit_rollen("ada")
+        aktive_modell_konfiguration(Verwendung.SCHUELERIN)
+        vignette: Vignette = finale_vignette(ausbilderin)
+        training: Training = Training.objects.anlegen(ausbilderin, name="Bruchrechnung")
+        training.vignette_aufnehmen(vignette)
+        training.veroeffentlichen()
+        self.client.force_login(konto_mit_rollen("grace"))
+        self.client.get(reverse("training:beitreten", args=[training.trainings_link]))
+        self.wahl_url: str = reverse("training:wahl", args=[training.pk, vignette.pk])
+        self.einwilligung_url: str = reverse(
+            "training:einwilligung", args=[training.pk, vignette.pk]
+        )
+
+    def test_startet_bei_fake_fassung_ohne_einwilligungsseite(self) -> None:
+        """Eine frische Instanz transkribiert nicht und fragt deshalb nicht."""
+        start: HttpResponse = self.client.post(self.wahl_url)
+
+        self.assertContains(start, "Die Ausgangslage")
+        self.assertNotContains(start, "data-spracheingabe")
+        self.assertIsNone(
+            Sitzung.objects.get().teilnahme.audioverarbeitung_eingewilligt
+        )
+
+    def test_startet_bei_unerklaerter_fassung_ohne_einwilligungsseite(self) -> None:
+        """Ein echter Anbieter ohne Erklärung hält das Tor ebenso zu."""
+        TranskriptionsKonfiguration.objects.aktivieren(transkriptions_fassung())
+
+        start: HttpResponse = self.client.post(self.wahl_url)
+
+        self.assertContains(start, "Die Ausgangslage")
+        self.assertNotContains(start, "data-spracheingabe")
+        self.assertIsNone(
+            Sitzung.objects.get().teilnahme.audioverarbeitung_eingewilligt
+        )
+
+    def test_fragt_bei_erklaerter_fassung_und_zeigt_nach_ja_das_mikrofon(
+        self,
+    ) -> None:
+        """Mit offenem Tor gilt der bisherige Ablauf."""
+        erklaerte_aktive_transkription()
+
+        frage: HttpResponse = self.client.post(self.wahl_url)
+        start: HttpResponse = self.client.post(
+            self.einwilligung_url, {"audioverarbeitung_eingewilligt": "ja"}
+        )
+
+        self.assertContains(frage, "Audio zur Transkription")
+        self.assertContains(start, "data-spracheingabe")
+
+    def test_ein_widerruf_nimmt_der_naechsten_seite_das_mikrofon(self) -> None:
+        """Die laufende Sitzung zeigt bei geschlossenem Tor nur die Tastatur."""
+        fassung: TranskriptionsKonfiguration = erklaerte_aktive_transkription()
+        self.client.post(self.wahl_url)
+        self.client.post(
+            self.einwilligung_url, {"audioverarbeitung_eingewilligt": "ja"}
+        )
+        fassung.zero_retention_widerrufen(
+            "Zusage zurückgezogen", konto_mit_rollen("linus", is_superuser=True)
+        )
+
+        gespraech: HttpResponse = self.client.get(
+            reverse("training:gespraech", args=[Sitzung.objects.get().pk])
+        )
+
+        self.assertContains(gespraech, "Ihre nächste Frage")
+        self.assertNotContains(gespraech, "data-spracheingabe")

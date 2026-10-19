@@ -12,6 +12,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
     finale_vignette,
     finaler_kern,
     konto_mit_rollen,
@@ -577,6 +578,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
     def test_spracheingabe_steht_schon_beim_ersten_schritt_bereit(self) -> None:
         """Auch das erste Eingabefeld trägt bereits den Aufnahme-Knopf."""
 
+        erklaerte_aktive_transkription()
         einstieg: HttpResponse = self.client.post(
             reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
         )
@@ -589,6 +591,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
     ) -> None:
         """Der Browser zählt gegen die Grenze, die der Endpunkt danach hält."""
 
+        erklaerte_aktive_transkription()
         with override_settings(TRANSKRIPTION_MAX_AUFNAHME_BYTES=1234):
             einstieg: HttpResponse = self.client.post(
                 reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
@@ -599,6 +602,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
     def test_spracheingabe_steht_im_gespraech_und_im_debrief_bereit(self) -> None:
         """Der Probelauf bietet das Mikrofon ohne Einwilligungsschritt an."""
 
+        erklaerte_aktive_transkription()
         self._erfolgreiche_antwort_konfigurieren()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
@@ -613,6 +617,21 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
 
         self.assertContains(debrief, "data-spracheingabe")
         self.assertContains(debrief, "Diagnose aufnehmen")
+
+    def test_ohne_erklaerte_fassung_zeigt_der_probelauf_kein_mikrofon(self) -> None:
+        """Start, Gespräch und Debrief folgen dem Tor der aktiven Fassung."""
+
+        self._erfolgreiche_antwort_konfigurieren()
+        einstieg: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk])
+        )
+        gespraech: HttpResponse = self.client.post(
+            reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie rechnest du?"}
+        )
+        debrief: HttpResponse = self.client.post(reverse("sitzungen:probelauf_beenden"))
+
+        for antwort in (einstieg, gespraech, debrief):
+            self.assertNotContains(antwort, "data-spracheingabe")
 
     def test_antwort_und_denkspur_werden_live_angezeigt(self) -> None:
         """Eingabe, Äußerung und Denkspur stehen in der Antwort (ADR-0064)."""
