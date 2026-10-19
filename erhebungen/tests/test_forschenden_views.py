@@ -2760,7 +2760,7 @@ class ErhebungsExportTests(TestCase):
         bindung: Erhebungsbindung = _laufende_bindung(erhebung, "2345-6789")
         bindung.teilnahme.speicherung_eingewilligt = False
         bindung.teilnahme.save(update_fields=["speicherung_eingewilligt"])
-        sink: FluechtigerSink = FluechtigerSink(bindung.teilnahme, {})
+        sink: FluechtigerSink = FluechtigerSink(bindung.teilnahme)
         sitzung_starten(sink, vignette, konfiguration, simulationskern=kern)
         Vignettenposition.objects.create(
             teilnahme=bindung.teilnahme,

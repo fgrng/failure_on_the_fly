@@ -444,7 +444,7 @@ def persistierten_debrief_anzeigen(
 ) -> HttpResponse:
     """Rendert den Debrief einer persistierten Sitzung."""
 
-    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung)
     # Liegt die Diagnose bereits vor, zeigt das Formular sie nur noch an:
     # Sie ist je Sitzung einmalig und darf sich nicht nachträglich ändern.
     return sitzung_anzeigen(
@@ -494,9 +494,7 @@ def _persistiertes_gespraech_anzeigen(
         request,
         vignette=sitzung.vignette,
         kern=sitzung.simulationskern,
-        gespraechsschritte=sink_fuer_sitzung(
-            sitzung, request.session
-        ).gespraechsschritte,
+        gespraechsschritte=sink_fuer_sitzung(sitzung).gespraechsschritte,
         zeigt_denkspur=False,
         ist_gescheitert=ist_gescheitert,
         ist_lesend=ist_lesend,
@@ -554,7 +552,7 @@ def persistiertes_gespraech(
             navigation=navigation,
             anhang=sitzungsblock(),
         )
-    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung)
     if request.method == "GET":
         sink.zug_beginnen(durchlauf.jetzt())
         return _persistiertes_gespraech_anzeigen(

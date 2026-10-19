@@ -184,6 +184,10 @@ EVALLAEUFE_SPERRE: Path = Path(
     os.environ.get("EVALLAEUFE_SPERRE", BASE_DIR / "evallaeufe.lock")
 )
 
+# Der kurzlebige Speicher hält die Inhalte flüchtiger Teilnahmen außerhalb der
+# Datenbank vor; im Betrieb liegt er unter einem `no_backup`-Ordner.
+FLUECHTIG_PFAD: Path = Path(os.environ.get("FLUECHTIG_PFAD", BASE_DIR / "fluechtig"))
+
 # Das Betriebslog geht nach stderr, wo supervisord es einsammelt (ADR-0065):
 # alles ab WARNING, Serverfehler aus `django.request` samt Traceback erst ab
 # ERROR, damit kein 404 seinen Pfad samt Token schreibt. `evals` meldet Start,

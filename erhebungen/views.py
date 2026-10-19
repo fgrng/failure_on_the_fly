@@ -78,7 +78,12 @@ from sitzungen.durchlauf import (
     sitzung_beenden,
 )
 from sitzungen.models import Eingabemodus, Sitzung, Teilnahme
-from sitzungen.sink import DBSink, GeruestSink, sink_fuer_sitzung
+from sitzungen.sink import (
+    DBSink,
+    GeruestSink,
+    fluechtige_inhalte_vorhalten,
+    sink_fuer_sitzung,
+)
 from sitzungen.views import (
     persistiertes_gespraech,
     persistierten_debrief_anzeigen,
@@ -1189,7 +1194,7 @@ def spielen(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
     tor: HttpResponseRedirect | None = _ohne_zutritt(bindung, teilnahme_link)
     if tor is not None:
         return tor
-    vignette_beginnen(bindung, request.session)
+    vignette_beginnen(bindung)
     return _weiter_im_ablauf(request, bindung)
 
 
@@ -1210,7 +1215,7 @@ def _weiter_im_ablauf(
         case LaufendeSitzung() | OffenerSitzungsblock():
             return redirect("erhebungen:gespraech", token=bindung.token)
         case NaechsteVignette():
-            vignette_beginnen(bindung, request.session)
+            vignette_beginnen(bindung)
             return redirect("erhebungen:gespraech", token=bindung.token)
         case OffenerAbschlussblock():
             return redirect("erhebungen:itemblock", token=bindung.token)
@@ -1304,14 +1309,14 @@ def gespraech(request: HttpRequest, token: str) -> HttpResponse:
 def _sitzung_ohne_verlauf_abbrechen(
     request: HttpRequest, bindung: Erhebungsbindung
 ) -> HttpResponseRedirect | None:
-    # Eine flüchtige Sitzung, deren Verlauf nicht in dieser Session liegt, endet
-    # als abgebrochen, statt ohne Gedächtnis weiterzulaufen; der Browser folgt
+    # Eine flüchtige Sitzung, deren Inhalte abgelaufen sind, endet als
+    # abgebrochen, statt ohne Gedächtnis weiterzulaufen; der Browser folgt
     # danach dem Ablauf.
 
     sitzung: Sitzung | None = laufende_sitzung(bindung)
     if sitzung is None:
         return None
-    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung)
     if not sink.verlauf_fehlt:
         return None
     sitzung_abbrechen(sink)
@@ -1330,7 +1335,7 @@ def gespraech_beenden(request: HttpRequest, token: str) -> HttpResponse:
     )
     if ohne_verlauf is not None:
         return ohne_verlauf
-    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung)
     sitzung_beenden(sink)
     return persistierten_debrief_anzeigen(request, sitzung, _sitzungsnavigation(token))
 
@@ -1341,7 +1346,7 @@ def abbrechen(request: HttpRequest, token: str) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     sitzung, bindung = _erhebungssitzung(token)
-    sink: GeruestSink = sink_fuer_sitzung(sitzung, request.session)
+    sink: GeruestSink = sink_fuer_sitzung(sitzung)
     if not sitzung_abbrechen(sink):
         return _weiter_im_ablauf(request, bindung)
     anhang: str = _sitzungsblock_rendern(request, bindung, sitzung)
@@ -1372,7 +1377,7 @@ def debrief(request: HttpRequest, token: str) -> HttpResponse:
         sitzung = Sitzung.objects.select_for_update().get(pk=sitzung.pk)
         if sitzung.status != Sitzung.Status.LAUFEND:
             return HttpResponseBadRequest("Der Debrief gehört nicht zu dieser Sitzung.")
-        sink_fuer_sitzung(sitzung, request.session).diagnose_setzen(
+        sink_fuer_sitzung(sitzung).diagnose_setzen(
             request.POST["diagnose"],
             eingabemodus=Eingabemodus.aus_formular(request.POST.get("eingabemodus")),
         )
@@ -1501,12 +1506,15 @@ def abschluss(request: HttpRequest, teilnahme_link: UUID) -> HttpResponse:
 def _bindung_aus_session(
     request: HttpRequest, stichprobe: Stichprobe
 ) -> Erhebungsbindung | None:
-    """Lädt die zur Stichprobe passende Bindung des aktuellen Browsers."""
+    """Lädt die zur Stichprobe passende Bindung des aktuellen Browsers.
+
+    Der Zugriff verschiebt die Frist ihrer flüchtigen Inhalte.
+    """
 
     token: str | None = token_aus_session(request, stichprobe.teilnahme_link)
     if token is None:
         return None
-    return (
+    bindung: Erhebungsbindung | None = (
         Erhebungsbindung.objects.select_related("teilnahme")
         .filter(
             stichprobe=stichprobe,
@@ -1514,6 +1522,9 @@ def _bindung_aus_session(
         )
         .first()
     )
+    if bindung is not None:
+        fluechtige_inhalte_vorhalten(bindung.teilnahme)
+    return bindung
 
 
 def _bindung_in_session_speichern(
@@ -1527,11 +1538,15 @@ def _bindung_in_session_speichern(
 
 
 def _laufende_bindung(token: str) -> Erhebungsbindung:
-    """Löst eine Teilnahme über ihr Token innerhalb des laufenden Fensters auf."""
+    """Löst eine Teilnahme über ihr Token innerhalb des laufenden Fensters auf.
+
+    Der Zugriff verschiebt die Frist ihrer flüchtigen Inhalte.
+    """
 
     bindung: Erhebungsbindung | None = _laufende_bindung_oder_none(token)
     if bindung is None:
         raise Http404
+    fluechtige_inhalte_vorhalten(bindung.teilnahme)
     return bindung
 
 
