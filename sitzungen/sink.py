@@ -26,7 +26,6 @@ from sitzungen.models import (
 from vignetten.models import Vignette
 
 
-_PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
 _VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "verbrauchte_zeit"
 _ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "zeit_laeuft_seit"
 
@@ -667,13 +666,6 @@ def _schrittdaten(
     }
 
 
-def _session_als_geaendert_markieren(session: MutableMapping[str, Any]) -> None:
-    # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
-
-    if hasattr(session, "modified"):
-        session.modified = True
-
-
 def sink_fuer_teilnahme(teilnahme: Teilnahme) -> GeruestSink:
     """Wählt die Senke einer neuen Sitzung allein nach der Speicherung."""
 
@@ -690,19 +682,16 @@ def sink_fuer_sitzung(sitzung: Sitzung) -> GeruestSink:
     return DBSink.fuer_sitzung(sitzung)
 
 
-def probelauf_laeuft(session: MutableMapping[str, Any]) -> bool:
-    """Meldet, ob die Session einen laufenden Probelauf trägt."""
-
-    return _PROBELAUF_SESSION_SCHLUESSEL in session
-
-
 class ScratchSink:
-    """Hält einen Probelauf ausschließlich in der Django-Session."""
+    """Hält einen Probelauf ausschließlich in seinem übergebenen Zustand.
 
-    def __init__(self, session: MutableMapping[str, Any]) -> None:
-        """Bindet den Sink an den Session-Speicher eines Probelaufs."""
+    Wo der Zustand zwischen den Anfragen liegt, entscheidet der Aufrufer.
+    """
 
-        self.session: MutableMapping[str, Any] = session
+    def __init__(self, zustand: MutableMapping[str, Any]) -> None:
+        """Bindet den Sink an den Zustand eines Probelaufs."""
+
+        self._zustand: MutableMapping[str, Any] = zustand
 
     def sitzung_starten(
         self,
@@ -710,15 +699,18 @@ class ScratchSink:
         simulationskern: Simulationskern,
         modell_konfiguration: ModellKonfiguration,
     ) -> None:
-        """Initialisiert den verworfenen Sitzungszustand in der Session."""
+        """Initialisiert den verworfenen Sitzungszustand."""
 
         self._gestartete_vignette: Vignette = vignette
-        self.session[_PROBELAUF_SESSION_SCHLUESSEL] = {
-            "vignette_pk": vignette.pk,
-            "kern_pk": simulationskern.pk,
-            "modell_konfiguration_pk": modell_konfiguration.pk,
-            "gespraechsschritte": [],
-        }
+        self._zustand.clear()
+        self._zustand.update(
+            {
+                "vignette_pk": vignette.pk,
+                "kern_pk": simulationskern.pk,
+                "modell_konfiguration_pk": modell_konfiguration.pk,
+                "gespraechsschritte": [],
+            }
+        )
         if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
             self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = 0.0
 
@@ -757,14 +749,6 @@ class ScratchSink:
         """Kennzeichnet ein administrativ frei gewähltes Tripel."""
 
         return bool(self._zustand.get("freie_auswahl"))
-
-    @property
-    def _zustand(self) -> MutableMapping[str, Any]:
-        # Kapselt die untypisierte Session-Struktur innerhalb des Scratch-Sinks.
-
-        return cast(
-            MutableMapping[str, Any], self.session[_PROBELAUF_SESSION_SCHLUESSEL]
-        )
 
     def antwortversuch_beginnen(self, jetzt: datetime) -> None:
         """Hält die Uhr an; der Probelauf hat nur einen Tab und nichts zu verwerfen."""
@@ -818,7 +802,7 @@ class ScratchSink:
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
     ) -> bool:
-        """Hält die im Probelauf verworfene Diagnose in der Session.
+        """Hält die im Probelauf verworfene Diagnose im Zustand fest.
 
         Der Modus reist bis hierher, wird aber nicht festgehalten: Der
         Probelauf verwirft die Diagnose ohnehin (ADR-0014).
@@ -831,14 +815,12 @@ class ScratchSink:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
         self._zustand["status"] = status
-        _session_als_geaendert_markieren(self.session)
         return True
 
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""
 
         self._zustand["freie_auswahl"] = True
-        _session_als_geaendert_markieren(self.session)
 
     @property
     def _vignette(self) -> Vignette:
@@ -881,7 +863,7 @@ class ScratchSink:
         )
 
     def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
-        # Hält den Probelauf weiter vollständig in der Browser-Session.
+        # Hält den Budgetstand im Zustand des Probelaufs.
 
         self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = budgetstand.verbrauchte_zeit
         if budgetstand.offene_spanne_seit is None:
@@ -890,9 +872,8 @@ class ScratchSink:
             self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = (
                 budgetstand.offene_spanne_seit.isoformat()
             )
-        _session_als_geaendert_markieren(self.session)
 
     def verwerfen(self) -> None:
-        """Entfernt den vollständigen Probelaufzustand aus der Session."""
+        """Leert den vollständigen Probelaufzustand."""
 
-        self.session.pop(_PROBELAUF_SESSION_SCHLUESSEL, None)
+        self._zustand.clear()

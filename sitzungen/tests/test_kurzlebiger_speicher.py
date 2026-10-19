@@ -118,3 +118,16 @@ def test_ein_unbekannter_schluessel_liefert_nichts() -> None:
     """Ein nie geschriebener Eintrag fehlt wie ein abgelaufener."""
 
     assert kurzlebiger_speicher.lesen(_SCHLUESSEL) is None
+
+
+def test_alle_loeschen_trifft_nur_den_praefix() -> None:
+    """Gelöscht wird jeder Eintrag mit dem Präfix, kein anderer."""
+
+    for schluessel in ("probelauf-3-a", "probelauf-3-b", "probelauf-31-a"):
+        kurzlebiger_speicher.schreiben(schluessel, {"schritte": 1})
+
+    kurzlebiger_speicher.alle_loeschen("probelauf-3-")
+
+    assert kurzlebiger_speicher.lesen("probelauf-3-a") is None
+    assert kurzlebiger_speicher.lesen("probelauf-3-b") is None
+    assert kurzlebiger_speicher.lesen("probelauf-31-a") == {"schritte": 1}

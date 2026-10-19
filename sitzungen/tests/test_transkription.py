@@ -58,7 +58,7 @@ class ProbelaufTranskriptionTests(TestCase):
         return SimpleUploadedFile("aufnahme.webm", b"\0" * groesse, "audio/webm")
 
     def _probelauf_starten(self) -> None:
-        # Legt den Probelaufzustand über die echte HTTP-Naht in der Session ab.
+        # Legt den Probelaufzustand über die echte HTTP-Naht an.
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
 
     def _anfragen(
@@ -74,10 +74,13 @@ class ProbelaufTranskriptionTests(TestCase):
     ) -> HttpResponse:
         # Ruft den Endpunkt ohne sitzung_pk auf, so wie es der Probelauf tut.
         request: HttpRequest = RequestFactory().post(
-            "/sitzungen/transkription/", {"audio": aufnahme or audioaufnahme()}
+            "/sitzungen/probelauf/transkription/",
+            {"audio": aufnahme or audioaufnahme()},
         )
         request.user = self.autorin
-        request.session = self.client.session
+        request.COOKIES = {
+            name: morsel.value for name, morsel in self.client.cookies.items()
+        }
         try:
             return transkriptions_endpunkt(
                 fabrik, probelauf_sitzung_fuer_transkription

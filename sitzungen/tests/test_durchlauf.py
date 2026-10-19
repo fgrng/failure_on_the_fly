@@ -3,7 +3,6 @@
 from datetime import UTC, datetime
 
 import pytest
-from django.contrib.sessions.backends.db import SessionStore
 from time_machine import TimeMachineFixture
 
 from config.tests.sprachmodell import vor_jedem_aufruf
@@ -60,7 +59,7 @@ def _senken() -> list[SitzungSink]:
     # Je eine frische Senke jeder Art für die Paritätstests.
 
     return [
-        ScratchSink(SessionStore()),
+        ScratchSink({}),
         DBSink(Teilnahme.objects.create()),
         FluechtigerSink(Teilnahme.objects.create()),
     ]
@@ -124,8 +123,8 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 ):
     """Der schreibfreie Sink bewahrt jeden Zug in der späteren Persistenzform auf."""
 
-    session: SessionStore = SessionStore()
-    sink: ScratchSink = ScratchSink(session)
+    zustand: dict[str, object] = {}
+    sink: ScratchSink = ScratchSink(zustand)
     kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
     vignette: Vignette = Vignette(
         lernauftrag_text="Addiere zwei Brüche.", gepinnter_kern=kern
@@ -253,7 +252,7 @@ def test_scratch_sink_schliesst_mit_diagnose_ab() -> None:
     """Auch der Probelauf ist nach der Diagnose beendet."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
 
     sitzung_starten(scratch, vignette, konfiguration)
     scratch.diagnose_setzen("Zähler und Nenner werden addiert.")
@@ -274,7 +273,7 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
             },
         ]
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -407,7 +406,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
 
     beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
-    for sink in (ScratchSink(SessionStore()), datenbank):
+    for sink in (ScratchSink({}), datenbank):
         time_machine.move_to(beginn, tick=False)
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(beginn)
@@ -447,7 +446,7 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"denkspur": "Ich addiere alles.", "aeusserung": "2/5."}]
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -474,7 +473,7 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -518,7 +517,7 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
         [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
     )
 
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -540,7 +539,7 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     ausgaenge: list[Ausgang] = []
@@ -572,7 +571,7 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
     vignette.budget_wert = 1
     vignette.save(update_fields=["budget_typ", "budget_wert"])
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
     fluechtig: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create())
 

@@ -30,7 +30,7 @@ urlpatterns: list[URLPattern] = [
     path("probelauf/beenden/", views.probelauf_beenden, name="probelauf_beenden"),
     path("probelauf/debrief/", views.probelauf_debrief, name="probelauf_debrief"),
     path(
-        "transkription/",
+        "probelauf/transkription/",
         views.transkriptions_endpunkt(
             transkriptions_anbieter, views.probelauf_sitzung_fuer_transkription
         ),

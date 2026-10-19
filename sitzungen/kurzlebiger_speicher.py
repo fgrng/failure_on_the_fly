@@ -69,6 +69,19 @@ def vorhalten(schluessel: str) -> None:
         return
 
 
+def loeschen(schluessel: str) -> None:
+    """Entfernt einen Eintrag; ein fehlender ist schon gelöscht."""
+
+    _datei(schluessel).unlink(missing_ok=True)
+
+
+def alle_loeschen(praefix: str) -> None:
+    """Entfernt jeden Eintrag, dessen Schlüssel mit dem Präfix beginnt."""
+
+    for datei in _verzeichnis().glob(f"{_datei(praefix).name}*"):
+        datei.unlink(missing_ok=True)
+
+
 def _ist_abgelaufen(datei: Path) -> bool:
     # Die Frist läuft einen Tag ab dem letzten Schreiben oder Vorhalten, das
     # die Änderungszeit der Datei festhält.

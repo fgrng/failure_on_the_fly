@@ -178,7 +178,21 @@ Zustand listet. Eine archivierte Fassung ist nicht mehr spielbar; auch ein
 direkter Start über sie scheitert. Administrator:innen wählen im freien
 Probelauf Kern und Modell-Konfiguration beliebig, als Vignette nur eine finale.
 Wird die Fassung während eines laufenden Probelaufs archiviert, läuft er bis zum
-Debrief weiter. Eine archivierte Fassung bietet »Entarchivieren« nur an, solange
+Debrief weiter.
+
+Der laufende Probelauf samt Denkspur liegt nicht in der Session des Kontos,
+sondern im kurzlebigen Speicher (`FLUECHTIG_PFAD`) außerhalb von Datenbank und
+Backup. Ein eigenes Cookie, das nur unter `/sitzungen/probelauf/` gilt, ordnet
+ihn dem Browser zu; jeder Browser hat so seinen eigenen Probelauf, auch beim
+selben Konto. Er gilt nur für das Konto, das ihn gestartet hat: Meldet sich im
+selben Browser ein anderes Konto an, gibt es für dieses keinen laufenden
+Probelauf. Neuladen setzt an derselben Stelle fort, und jeder Aufruf einer
+Probelaufseite verlängert die Frist; nach einem Tag ohne Zugriff ist er
+verfallen. Das Abmelden löscht die Probeläufe des Kontos, in allen Browsern.
+Gibt es keinen laufenden Probelauf, antworten Gespräch, Beenden und Debrief mit
+404; ein neuer startet über die Detailansicht oder die Auswahl.
+
+Eine archivierte Fassung bietet »Entarchivieren« nur an, solange
 ihre Vorgängerin keine andere nicht archivierte Nachfolgerin hat; ein Versuch
 führt sonst mit einer Meldung zurück auf ihre Detailansicht.
 

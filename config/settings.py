@@ -91,6 +91,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "erhebungen.teilnahme_session.teilnahme_tokens_middleware",
+    "sitzungen.probelauf_speicher.probelauf_middleware",
 ]
 
 ROOT_URLCONF = "config.urls"

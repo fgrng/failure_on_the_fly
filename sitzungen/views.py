@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import UploadedFile
 from django.db.models import QuerySet
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
@@ -46,9 +47,9 @@ from sitzungen.sink import (
     GeruestSink,
     GespraechsschrittDaten,
     ScratchSink,
-    probelauf_laeuft,
     sink_fuer_sitzung,
 )
+from sitzungen.probelauf_speicher import probelauf_zustand
 from vignetten.models import Vignette
 
 
@@ -102,6 +103,15 @@ def _probelauf_vignette_und_kern(
         Simulationskern.objects.all(), pk=sink.kern_pk
     )
     return vignette, kern
+
+
+def _laufender_probelauf(request: HttpRequest) -> ScratchSink:
+    """Liefert den laufenden Probelauf; ohne ihn, etwa nach Ablauf, gibt es 404."""
+
+    zustand: dict[str, object] = probelauf_zustand(request)
+    if not zustand:
+        raise Http404("Kein laufender Probelauf.")
+    return ScratchSink(zustand)
 
 
 def _sitzungsnavigation() -> Sitzungsnavigation:
@@ -179,7 +189,7 @@ def _probelauf_starten(
 ) -> HttpResponse:
     # Hält das gewählte Tripel schreibfrei fest und zeigt seine Einleitung.
 
-    sink: ScratchSink = ScratchSink(request.session)
+    sink: ScratchSink = ScratchSink(probelauf_zustand(request))
     if freie_auswahl:
         sitzung_starten(sink, vignette, modell_konfiguration, simulationskern=kern)
     else:
@@ -211,7 +221,7 @@ def probelauf_auswahl(request: HttpRequest) -> HttpResponse:
 @login_required
 @autorin_erforderlich
 def probelauf_starten(request: HttpRequest, pk: int) -> HttpResponse:
-    """Fixiert das Autorinnen-Tripel in der Session und zeigt die Einleitung."""
+    """Fixiert das Autorinnen-Tripel im Probelauf und zeigt die Einleitung."""
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -246,7 +256,7 @@ def administratorin_probelauf_auswahl(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def administratorin_probelauf_starten(request: HttpRequest) -> HttpResponse:
-    """Fixiert ein administrativ gewähltes Tripel in der Session."""
+    """Fixiert ein administrativ gewähltes Tripel im Probelauf."""
 
     verweigert: HttpResponse | None = _administratorin_erforderlich(request)
     if verweigert is not None:
@@ -277,7 +287,7 @@ def probelauf_gespraech(request: HttpRequest) -> HttpResponse:
 
     if request.method not in {"GET", "POST"}:
         return HttpResponseNotAllowed(["GET", "POST"])
-    sink: ScratchSink = ScratchSink(request.session)
+    sink: ScratchSink = _laufender_probelauf(request)
     schritte: list[GespraechsschrittDaten] = sink.gespraechsschritte
     if sink.ist_beendet:
         return _gespeicherten_debrief_anzeigen(request, sink)
@@ -317,7 +327,7 @@ def probelauf_beenden(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sink: ScratchSink = ScratchSink(request.session)
+    sink: ScratchSink = _laufender_probelauf(request)
     sitzung_beenden(sink)
     sink.status_setzen(Sitzung.Status.ABGESCHLOSSEN)
     return _gespeicherten_debrief_anzeigen(request, sink)
@@ -335,7 +345,7 @@ def probelauf_debrief(request: HttpRequest) -> HttpResponse:
 
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    sink: ScratchSink = ScratchSink(request.session)
+    sink: ScratchSink = _laufender_probelauf(request)
     freie_auswahl: bool = sink.freie_auswahl
     vignette_pk: int = sink.vignette_pk
     sink.verwerfen()
@@ -351,7 +361,7 @@ def probelauf_sitzung_fuer_transkription(request: HttpRequest) -> Sitzung | None
     Teilnahme, die einwilligen könnte (ADR-0026).
     """
 
-    if not (request.user.is_authenticated and probelauf_laeuft(request.session)):
+    if not (request.user.is_authenticated and probelauf_zustand(request)):
         raise PermissionDenied
     return None
 
