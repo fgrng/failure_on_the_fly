@@ -90,6 +90,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    "erhebungen.teilnahme_session.teilnahme_tokens_middleware",
 ]
 
 ROOT_URLCONF = "config.urls"

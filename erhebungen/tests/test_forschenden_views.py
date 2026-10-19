@@ -40,7 +40,6 @@ from erhebungen.models import (
     Stichprobe,
     Vignettenziehung,
 )
-from erhebungen.teilnahme_session import TEILNAHME_TOKENS_SESSION_KEY
 from fragebogen_items.models import FragebogenItem
 from simulation.models import (
     Anbieter,
@@ -287,15 +286,20 @@ class ErhebungenAnlegenUndListeTests(TestCase):
 
         ada: Konto = forschende("ada")
         self.client.force_login(ada)
-        sitzung = self.client.session
-        sitzung[TEILNAHME_TOKENS_SESSION_KEY] = {
-            "4f1c0f0e-0000-4000-8000-000000000000": "ABCD-2345"
-        }
-        sitzung.save()
+        ModellKonfiguration.objects.aktivieren(
+            _forschungskonfiguration(), Verwendung.SCHUELERIN
+        )
+        erhebung: Erhebung = _erhebung_mit_design(ada)
+        erhebung.finalisieren()
+        stichprobe: Stichprobe = _laufende_bindung(erhebung, "ABCD-2345").stichprobe
+        self.client.get(
+            reverse("erhebungen:teilnehmen", args=[stichprobe.teilnahme_link])
+        )
+        token: str = Erhebungsbindung.objects.exclude(token="ABCD-2345").get().token
 
         liste: HttpResponse = self.client.get(reverse("erhebungen:liste"))
 
-        self.assertNotContains(liste, "ABCD-2345")
+        self.assertNotContains(liste, token)
         self.assertContains(liste, "sidebar-account")
 
     def test_administration_legt_eine_erhebung_an(self) -> None:

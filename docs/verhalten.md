@@ -1143,7 +1143,15 @@ Link-Aufruf angelegte, noch einwilligungslose Teilnahme bleibt dabei unverbunden
 liegen. Ein unbekanntes Token, eines außerhalb des Fensters oder einer
 archivierten Stichprobe und eine leere Eingabe ergeben dieselbe Meldung „Zu
 diesem Token lässt sich keine Teilnahme fortsetzen.“ auf der Einwilligungsseite,
-ohne zu verraten, ob das Token existiert. Wer der Speicherung nicht zustimmt,
+ohne zu verraten, ob das Token existiert. Welches Token der Browser zu welchem
+Teilnahme-Link hält, steht in einem eigenen signierten Cookie, das nur unter
+`/erhebungen/teilnahme/` gilt, nie in der Session des Nutzerkontos: Auch bei
+nebenbei angemeldetem Konto oder einer Anmeldung nach der Teilnahme liegen Konto
+und Token auf dem Server nie im selben Datensatz, und eine Anmeldung oder
+Abmeldung beendet die Zuordnung nicht. Jeder Aufruf einer Teilnahmeseite
+verlängert sie; nach einem Tag ohne Zugriff ordnet der Browser die Teilnahme
+nicht mehr zu, der Teilnahme-Link legt dann eine neue an, und das notierte Token
+führt über die Eingabe weiter in die alte. Wer der Speicherung nicht zustimmt,
 macht eine flüchtige Teilnahme: Die Vignetten werden genauso gespielt, Verlauf,
 Debrief und Diagnose erscheinen wie gewohnt, und ein Neuladen im selben Browser
 setzt an derselben Stelle fort. Gesprächsschritte, Fehlversuche und Diagnose

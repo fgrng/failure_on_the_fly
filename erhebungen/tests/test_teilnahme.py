@@ -7,6 +7,7 @@ from html.parser import HTMLParser
 from uuid import UUID
 
 import time_machine
+from django.contrib.sessions.models import Session
 from django.db import models
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase
@@ -2691,6 +2692,100 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertRedirects(
             antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+
+    def _session_zeilen_mit(self, token: str) -> list[str]:
+        # Die Zeilen von django_session, deren Inhalt das Token nennt.
+
+        return [
+            zeile.session_key
+            for zeile in Session.objects.all()
+            if token in str(zeile.get_decoded()) or token in zeile.session_data
+        ]
+
+    def test_angemeldetes_konto_und_token_stehen_nie_in_derselben_session(
+        self,
+    ) -> None:
+        """Ein nebenbei angemeldetes Konto erfährt das Teilnahme-Token nicht (ADR-0006)."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.force_login(Konto.objects.create_user(username="grace"))
+
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+
+        token: str = Erhebungsbindung.objects.get().token
+        self.assertEqual(
+            self.client.cookies["erhebung_teilnahme_tokens"]["path"],
+            "/erhebungen/teilnahme/",
+        )
+        self.assertTrue(Session.objects.exists())
+        self.assertEqual(self._session_zeilen_mit(token), [])
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+
+    def test_an_und_abmeldung_lassen_die_teilnahme_im_browser(self) -> None:
+        """Wer sich nach der Teilnahme anmeldet, verknüpft Konto und Token nicht."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        token: str = Erhebungsbindung.objects.get().token
+
+        # Über die echten Views: Der Test-Client leert beim Abmelden alle Cookies.
+        Konto.objects.create_user(username="grace", password="geheim-123")
+        self.client.post(
+            reverse("login"), {"username": "grace", "password": "geheim-123"}
+        )
+
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(self._session_zeilen_mit(token), [])
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+        self.client.post(reverse("logout"))
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+        self.assertEqual(Erhebungsbindung.objects.count(), 1)
+
+    def test_browser_vergisst_die_teilnahme_einen_tag_nach_dem_letzten_zugriff(
+        self,
+    ) -> None:
+        """Jeder Zugriff verlängert die Bindung; danach führt nur noch das Token weiter."""
+
+        self._tokeneingabe_vorbereiten()
+        Stichprobe.objects.filter(pk=self.stichprobe.pk).update(
+            ende=timezone.now() + timedelta(days=7)
+        )
+
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
+            self.client.get(self.url)
+            self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+            token: str = Erhebungsbindung.objects.get().token
+            uhr.shift(timedelta(hours=23))
+            self.assertEqual(
+                self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link),
+                token,
+            )
+            uhr.shift(timedelta(hours=23))
+            self.assertEqual(
+                self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link),
+                token,
+            )
+            uhr.shift(timedelta(days=1, seconds=1))
+
+            neu: str = self._angezeigtes_token(
+                self.client, self.stichprobe.teilnahme_link
+            )
+            fortgesetzt: HttpResponse = self._fortsetzen(token, self.client)
+
+        self.assertNotEqual(neu, token)
+        self.assertRedirects(
+            fortgesetzt,
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
             fetch_redirect_response=False,
         )
