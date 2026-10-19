@@ -81,7 +81,7 @@
                     <form method="post" action="{% url 'simulation:transkriptions_konfiguration_token' gewaehlt.pk %}" class="system-page-field-list">
                         {% csrf_token %}
                         {{ rotationsformular.non_field_errors }}
-                        {% include "vignetten/includes/form_field.html" with field=rotationsformular.anbieter_token %}
+                        {% include "includes/form_field.html" with field=rotationsformular.anbieter_token %}
                         <button class="button button--secondary" type="submit">Token ersetzen</button>
                     </form>
                 {% else %}
@@ -124,9 +124,9 @@
                 <b>03</b><span><h2>Neue Fassung: Anbieterzugang</h2><small>Vorbelegt aus der aktiven Fassung, ohne Token</small></span>
             </header>
             <div class="system-page-field-list">
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_token %}
-                {% include "vignetten/includes/form_field.html" with field=form.anbieter_basis_url %}
+                {% include "includes/form_field.html" with field=form.anbieter %}
+                {% include "includes/form_field.html" with field=form.anbieter_token %}
+                {% include "includes/form_field.html" with field=form.anbieter_basis_url %}
             </div>
         </section>
 
@@ -136,7 +136,7 @@
             </header>
             <div class="system-page-field-list">
                 {% include "simulation/includes/modellvorschlaege_knopf.html" with field=form.transkriptionsmodell naht="transkription" %}
-                {% include "vignetten/includes/form_field.html" with field=form.sprache %}
+                {% include "includes/form_field.html" with field=form.sprache %}
             </div>
         </section>
 

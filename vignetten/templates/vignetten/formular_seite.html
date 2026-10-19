@@ -34,7 +34,7 @@
             <div class="field-grid field-grid--three">
                 {% include "vignetten/includes/autovervollstaendigung_field.html" with field=form.fach werte_id="fach-werte" %}
                 {% include "vignetten/includes/autovervollstaendigung_field.html" with field=form.thema werte_id="thema-werte" %}
-                {% include "vignetten/includes/form_field.html" with field=form.klassenstufe %}
+                {% include "includes/form_field.html" with field=form.klassenstufe %}
             </div>
         </section>
 
@@ -43,10 +43,10 @@
                 <b>02</b><span><h2 id="section-actors">Akteure</h2><small>Wer begegnet sich in der Rahmenhandlung?</small></span>
             </header>
             <div class="field-grid">
-                {% include "vignetten/includes/form_field.html" with field=form.schuelerin_name %}
-                {% include "vignetten/includes/form_field.html" with field=form.schuelerin_geschlecht %}
-                {% include "vignetten/includes/form_field.html" with field=form.lehrperson_name %}
-                {% include "vignetten/includes/form_field.html" with field=form.lehrperson_geschlecht %}
+                {% include "includes/form_field.html" with field=form.schuelerin_name %}
+                {% include "includes/form_field.html" with field=form.schuelerin_geschlecht %}
+                {% include "includes/form_field.html" with field=form.lehrperson_name %}
+                {% include "includes/form_field.html" with field=form.lehrperson_geschlecht %}
             </div>
         </section>
 
@@ -87,8 +87,8 @@
                 <b>06</b><span><h2 id="section-budget">Gesprächsbudget</h2><small>Wann endet das Diagnosegespräch?</small></span>
             </header>
             <div class="field-grid">
-                {% include "vignetten/includes/form_field.html" with field=form.budget_typ %}
-                {% include "vignetten/includes/form_field.html" with field=form.budget_wert %}
+                {% include "includes/form_field.html" with field=form.budget_typ %}
+                {% include "includes/form_field.html" with field=form.budget_wert %}
             </div>
         </section>
 

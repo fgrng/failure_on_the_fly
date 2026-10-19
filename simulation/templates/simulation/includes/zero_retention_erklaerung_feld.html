@@ -1,4 +1,4 @@
 {{ form.zero_retention_erklaert.errors }}
 <label><input type="checkbox" name="{{ form.zero_retention_erklaert.html_name }}" id="{{ form.zero_retention_erklaert.id_for_label }}"{% if form.zero_retention_erklaert.value %} checked{% endif %}> {{ form.zero_retention_erklaert.label }}</label>
 <small class="system-page-hint">{{ form.zero_retention_erklaert.help_text }}</small>
-{% include "vignetten/includes/form_field.html" with field=form.zero_retention_beleg %}
+{% include "includes/form_field.html" with field=form.zero_retention_beleg %}

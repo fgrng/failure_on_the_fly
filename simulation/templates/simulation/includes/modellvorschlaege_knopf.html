@@ -6,7 +6,7 @@
     bleibt; leer gelassen, füllt die Antwort es bei Infomaniak selbst.
 {% endcomment %}
 <div class="vignette-autovervollstaendigung">
-    {% include "vignetten/includes/form_field.html" with field=field %}
+    {% include "includes/form_field.html" with field=field %}
     <button class="button" type="button" x-cloak x-show="anbieter !== 'fake'"
             hx-post="{% url 'simulation:modellvorschlaege' %}"
             hx-vals='{"naht": "{{ naht }}"}'

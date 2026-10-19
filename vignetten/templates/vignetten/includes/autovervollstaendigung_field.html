@@ -36,7 +36,7 @@
         },
     }"
 >
-    {% include "vignetten/includes/form_field.html" with field=field %}
+    {% include "includes/form_field.html" with field=field %}
     <ul class="vignette-vorschlaege" x-cloak x-show="vorschlaege.length" role="listbox">
         <template x-for="vorschlag in vorschlaege" :key="vorschlag.wert">
             <li><button type="button" @mousedown.prevent="auswaehlen(vorschlag.wert)" x-text="vorschlag.wert"></button></li>

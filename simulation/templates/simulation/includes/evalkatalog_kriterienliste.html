@@ -12,9 +12,9 @@
             <textarea class="zuordnungsliste__text" id="{{ zeile.feld }}" name="{{ zeile.feld }}" rows="2"{% if gesperrt %} disabled{% endif %}>{{ zeile.text }}</textarea>
             {% if not gesperrt %}
             <span class="zuordnungsliste__leiste" role="group" aria-label="Aktionen für Kriterium {{ forloop.counter }}">
-                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.hoch }}"{% if forloop.first %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach oben" title="Nach oben">{% include "erhebungen/includes/icon.html" with name="hoch" %}</button>
-                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.runter }}"{% if forloop.last %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach unten" title="Nach unten">{% include "erhebungen/includes/icon.html" with name="runter" %}</button>
-                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{{ zeile.loeschen }}" aria-label="Kriterium {{ forloop.counter }} löschen" title="Löschen">{% include "erhebungen/includes/icon.html" with name="muell" %}</button>
+                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.hoch }}"{% if forloop.first %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach oben" title="Nach oben">{% include "includes/icon.html" with name="hoch" %}</button>
+                <button type="submit" class="zuordnung-iconknopf" formaction="{{ zeile.runter }}"{% if forloop.last %} disabled{% endif %} aria-label="Kriterium {{ forloop.counter }} nach unten" title="Nach unten">{% include "includes/icon.html" with name="runter" %}</button>
+                <button type="submit" class="zuordnung-iconknopf zuordnung-iconknopf--gefahr" formaction="{{ zeile.loeschen }}" aria-label="Kriterium {{ forloop.counter }} löschen" title="Löschen">{% include "includes/icon.html" with name="muell" %}</button>
             </span>
             {% endif %}
         </li>
