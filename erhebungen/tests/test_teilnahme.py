@@ -69,7 +69,11 @@ _SYSTEMTEXT_SPEICHERUNG: str = (
     "gespeichert und für Forschungszwecke ausgewertet. Ohne diese Einwilligung "
     "können Sie trotzdem vollständig teilnehmen; gespeichert werden dann nur "
     "technische Ablaufdaten (etwa welche Vignetten in welcher Reihenfolge gespielt "
-    "wurden und wie lange), nicht aber Ihre Eingaben. Sie können Ihre Einwilligung "
+    "wurden und wie lange), nicht aber Ihre Eingaben. Ihre Gespräche und "
+    "Diagnosen werden nur bis einen Tag nach Ihrem letzten Schritt vorgehalten und "
+    "dann gelöscht; bis dahin können Sie sich daraus eine persönliche Abschrift in "
+    "Ihr Nutzerkonto holen. Ihre Fragebogen-Antworten werden gar nicht gespeichert. "
+    "Sie können Ihre Einwilligung "
     "jederzeit widerrufen, indem Sie sich unter Angabe Ihres Teilnahme-Tokens an "
     "die Studienleitung wenden."
 )
@@ -82,8 +86,17 @@ _ABBRUCHTEXT: str = (
 
 # Der verbindliche Wortlaut des Abschlusshinweises einer flüchtigen Teilnahme.
 _NICHT_GESPEICHERT: str = (
-    "Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, "
-    "Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert."
+    "Sie haben der Speicherung Ihrer Daten für die Forschung nicht zugestimmt. "
+    "Ihre Gespräche und Diagnosen werden deshalb nur bis einen Tag nach Ihrem "
+    "letzten Schritt vorgehalten und dann gelöscht; Ihre Fragebogen-Antworten "
+    "wurden nicht gespeichert."
+)
+
+# Der verbindliche Hinweis zum Token unter dem Abschluss einer flüchtigen Teilnahme.
+_TOKEN_BINNEN_FRIST: str = (
+    "Notieren Sie dieses Token. Angemeldet holen Sie sich damit innerhalb dieser "
+    "Frist eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr Nutzerkonto. "
+    "Danach gibt es keine Abschrift mehr."
 )
 
 # Die eine Meldung, mit der die Tokeneingabe jedes unbrauchbare Token abweist.
@@ -2163,8 +2176,8 @@ class ErhebungsteilnahmeTests(TestCase):
         ):
             self.assertNotIn(inhalt, sessions)
 
-    def test_fluechtige_abschlussseite_ersetzt_den_abschrift_baustein(self) -> None:
-        """Ohne Speicherung sagt die Abschlussseite, dass nichts gespeichert wurde."""
+    def test_fluechtige_abschlussseite_nennt_frist_und_token(self) -> None:
+        """Ohne Speicherung nennt die Abschlussseite die Frist und zeigt das Token."""
 
         self._vignette_anlegen()
         self._erhebung_fertigstellen()
@@ -2182,21 +2195,22 @@ class ErhebungsteilnahmeTests(TestCase):
             "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
         )
 
-        # Auch der erneute Aufruf zeigt den Hinweis statt des Tokens.
+        # Auch der erneute Aufruf zeigt Hinweis und Token.
         for _ in range(2):
-            antwort: HttpResponse = self.client.get(abschluss_url)
-            seite: str = antwort.content.decode()
+            seite: str = self.client.get(abschluss_url).content.decode()
             self.assertIn(self.erhebung.abschlusstext, seite)
             self.assertIn(_NICHT_GESPEICHERT, seite)
             self.assertLess(
                 seite.index(self.erhebung.abschlusstext),
                 seite.index(_NICHT_GESPEICHERT),
             )
-            self.assertNotIn("section-abschrift", seite)
-            self.assertNotIn("Ohne dieses Token", seite)
-            self.assertNotIn(f'href="{reverse("training:abschriften")}"', seite)
-            # Das Token der Seitenleiste bleibt für den Wiedereinstieg.
-            self._seitenleiste_zeigt_nur_das_token(antwort, bindung.token)
+            # Ab dem Hinweis gelesen, damit das Token der Seitenleiste nicht
+            # für den Baustein einspringt.
+            baustein: str = seite[seite.index(_NICHT_GESPEICHERT) :]
+            self.assertIn(bindung.token, baustein)
+            self.assertIn(_TOKEN_BINNEN_FRIST, baustein)
+            self.assertNotIn("Ohne dieses Token", baustein)
+            self.assertIn(f'href="{reverse("training:abschriften")}"', baustein)
         bindung.refresh_from_db()
         self.assertIsNotNone(bindung.abgeschlossen_am)
 

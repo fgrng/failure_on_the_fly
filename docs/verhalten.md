@@ -1132,92 +1132,99 @@ Teilnehmer:innenansicht erscheint. Die Einwilligungsseite zeigt unter dem
 Einwilligungstext der Forschenden drei getrennte Einwilligungen mit je einem
 festen, nicht abschaltbaren Systemtext zur Folge einer Ablehnung: Verarbeitung
 durch Sprachmodelle, Spracherkennung und Speicherung und Verwendung für
-Forschungszwecke; der Text zur Speicherung nennt den Widerruf per
-Teilnahme-Token bei der Studienleitung. Jede ist eine Pflichtwahl Ja/Nein ohne
-Vorauswahl, danach folgt »Weiter«. Die Spracherkennung wird nur gefragt, wenn
-die Instanz transkribiert, also die aktive Transkriptions-Fassung einen echten
-Anbieter und eine nicht widerrufene Zero-Retention-Erklärung trägt. Wer der
-Verarbeitung durch Sprachmodelle nicht zustimmt, landet auf einer systemseitigen
-Abbruchseite ohne Abschlusstext, Fragebogen oder Token; Teilnahme-Link,
-Token-Wiedereinstieg und alle übrigen Teilnahmeseiten führen dann dorthin, und
-es entstehen weder Ziehung noch Sitzung. Ihr Knopf »Zur Startseite der Erhebung«
-führt zurück zum Einwilligungsformular ohne Vorauswahl; eine neue Entscheidung
-ersetzt die alte. Ist die Verarbeitung durch Sprachmodelle einmal erteilt,
-stehen alle drei Entscheidungen fest; ein erneuter Aufruf des
-Einwilligungsformulars führt dann in den Ablauf. Solange die Teilnahme dieses
-Browsers nicht eingewilligt hat, bietet die Einwilligungsseite darunter in einem
-eigenen Formular einen zweiten Weg: »Sie haben schon ein Teilnahme-Token?« mit
-Feld und »Hier fortsetzen«. Groß- und Kleinschreibung, Leerzeichen und ein
-fehlender Bindestrich zählen nicht (`vc9h ynfr` gilt als `VC9H-YNFR`). Gehört
-das Token zu einer laufenden, nicht archivierten Stichprobe, wird es unter deren
-Teilnahme-Link an den Browser gebunden — auch wenn die Seite über einen anderen
-Link erreicht wurde —, und es geht dort weiter, wo die Teilnahme steht, nach
-abgelehnter Verarbeitung durch Sprachmodelle also auf der Abbruchseite. Die beim
-Link-Aufruf angelegte, noch einwilligungslose Teilnahme bleibt dabei unverbunden
-liegen. Ein unbekanntes Token, eines außerhalb des Fensters oder einer
-archivierten Stichprobe und eine leere Eingabe ergeben dieselbe Meldung „Zu
-diesem Token lässt sich keine Teilnahme fortsetzen.“ auf der Einwilligungsseite,
-ohne zu verraten, ob das Token existiert. Welches Token der Browser zu welchem
-Teilnahme-Link hält, steht in einem eigenen signierten Cookie, das nur unter
-`/erhebungen/teilnahme/` gilt, nie in der Session des Nutzerkontos: Auch bei
-nebenbei angemeldetem Konto oder einer Anmeldung nach der Teilnahme liegen Konto
-und Token auf dem Server nie im selben Datensatz, und eine Anmeldung oder
-Abmeldung beendet die Zuordnung nicht. Jeder Aufruf einer Teilnahmeseite
-verlängert sie; nach einem Tag ohne Zugriff ordnet der Browser die Teilnahme
-nicht mehr zu, der Teilnahme-Link legt dann eine neue an, und das notierte Token
-führt über die Eingabe weiter in die alte. Wer der Speicherung nicht zustimmt,
-macht eine flüchtige Teilnahme: Die Vignetten werden genauso gespielt, Verlauf,
-Debrief und Diagnose erscheinen wie gewohnt, und ein Neuladen setzt an derselben
-Stelle fort. Gesprächsschritte, Fehlversuche und Diagnose gelangen dabei aber
-nie in die Forschungsdatenbank, auch nicht in die Session des Browsers: Der
-Server hält sie je Sitzung in einem kurzlebigen Speicher außerhalb von Datenbank
-und Backup vor (`FLUECHTIG_PFAD`), bis einen Tag nach dem letzten Zugriff der
-Teilnahme; jeder Aufruf einer ihrer Seiten verschiebt diese Frist, und weder der
-Abschluss noch ein anderer Schritt löscht vorher etwas. Abgelaufene Inhalte
-entfernt ein nächtlicher Aufräumlauf vom Server. Gespeichert und exportiert wird
-nur das Ablaufgerüst (Ziehung, Sitzungen mit Status, Zeitstempeln und
-verbrauchter Zeit, Vignettenposition). Auch die Fragebögen werden ihr wie allen
-anderen vorgelegt, doch ihre Antworten werden beim Abschicken verworfen: Es
-entsteht keine Item-Antwort, auch keine Markierung »vorgelegt, übersprungen«;
-nur der Itemblock hält mit Vorlage und Erledigung fest, dass der Ablauf
-weiterging. Das Token führt auch eine flüchtige Teilnahme in jedem Browser fort,
-samt bisherigem Verlauf und Gedächtnis der simulierten Schüler:in. Sind die
-Inhalte einer laufenden Sitzung abgelaufen, endet diese Sitzung beim nächsten
-Zugriff als `abgebrochen`, statt mit einer Schüler:in ohne Gedächtnis
-weiterzulaufen. Danach geht der Ablauf regulär weiter: mit dem Fragebogen der
-Sitzung, der nächsten Vignette oder dem Abschluss. Wer der Spracherkennung
-zustimmt, kann Eingaben im Diagnosegespräch und die Diagnose per Mikrofon
-eingeben; ohne Zustimmung bleibt die Tastatureingabe vollständig nutzbar. Nach
-jeder beendeten Sitzung erscheinen ihre freiwilligen Fragebogen-Items direkt
-unter dem Verlauf; sie können beantwortet oder übersprungen werden, bevor die
-nächste Vignette beginnt. Nach der letzten Sitzung folgen zusätzlich die
-freiwilligen Fragebogen-Items am Andockpunkt `am Ende` als eigene Seite. Jede
-Item-Antwort wird sofort gespeichert, und auch übersprungene Fragebogen-Items
-bleiben als vorgelegt dokumentiert. Likert-Items bieten dabei die global
-festgelegten Skalenpole zur Auswahl an; festgehalten wird die zugehörige Stufe.
-Ein noch nicht abgeschickter Fragebogen — nach einer Sitzung ebenso wie am Ende
-— wird auch in einem anderen Browser erneut vorgelegt; ein abgeschickter nicht
-mehr. Der gesamte Fortschritt hängt am Teilnahme-Token und nicht am Browser: Ein
-Aufruf setzt die Teilnahme genau dort fort, wo sie steht — bei der Instruktion,
-im laufenden Gespräch, beim offenen Fragebogen oder bei der nächsten Vignette.
-Anschließend endet die Teilnahme mit dem Abschlusstext. Damit das Token
-jederzeit ablesbar ist, zeigt die Seitenleiste es auf allen Teilnahmeseiten —
-von der Einwilligung über Instruktion, Diagnosegespräch und Debrief bis zu
-Fragebogen- und Abschlussseite — an der Stelle, an der sonst Konto oder
-Anmeldelink stehen, in fester Laufweite und mit der Bitte, es zu notieren, weil
-sich die Teilnahme damit in einem anderen Browser fortsetzen lässt. Während
-einer Teilnahme erscheinen dort weder Kontoblock noch Anmeldelink, auch nicht
-bei nebenbei angemeldetem Konto; in Forschenden-Ansichten erscheint umgekehrt
-kein Teilnahme-Token. Unter dem Abschlusstext steht auf der Abschlussseite
-zusätzlich ein systemseitiger Hinweis, den die Forschende nicht abschalten kann:
-das Token groß und in fester Laufweite, dazu die Erklärung, dass sich damit
-angemeldet später eine Abschrift der eigenen Sitzungen ins Nutzerkonto holen
-lässt und dass es ohne das Token keine Abschrift gibt, samt Link auf die
-Token-Eingabe. Ein erneuter Aufruf der Abschlussseite zeigt beides wieder. Bei
-einer flüchtigen Teilnahme ersetzt diesen Baustein der ebenso unabschaltbare
-Hinweis »Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche,
-Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert.« — ohne
-Token, Abschrift-Erklärung und Link; auch er erscheint bei jedem Aufruf wieder.
+Forschungszwecke; der Text zur Speicherung sagt, dass ohne sie Gespräche und
+Diagnosen nur bis einen Tag nach dem letzten Schritt vorgehalten werden und sich
+bis dahin eine Abschrift ins Nutzerkonto holen lässt, dass Fragebogen-Antworten
+gar nicht gespeichert werden, und nennt den Widerruf per Teilnahme-Token bei der
+Studienleitung. Jede ist eine Pflichtwahl Ja/Nein ohne Vorauswahl, danach folgt
+»Weiter«. Die Spracherkennung wird nur gefragt, wenn die Instanz transkribiert,
+also die aktive Transkriptions-Fassung einen echten Anbieter und eine nicht
+widerrufene Zero-Retention-Erklärung trägt. Wer der Verarbeitung durch
+Sprachmodelle nicht zustimmt, landet auf einer systemseitigen Abbruchseite ohne
+Abschlusstext, Fragebogen oder Token; Teilnahme-Link, Token-Wiedereinstieg und
+alle übrigen Teilnahmeseiten führen dann dorthin, und es entstehen weder Ziehung
+noch Sitzung. Ihr Knopf »Zur Startseite der Erhebung« führt zurück zum
+Einwilligungsformular ohne Vorauswahl; eine neue Entscheidung ersetzt die alte.
+Ist die Verarbeitung durch Sprachmodelle einmal erteilt, stehen alle drei
+Entscheidungen fest; ein erneuter Aufruf des Einwilligungsformulars führt dann
+in den Ablauf. Solange die Teilnahme dieses Browsers nicht eingewilligt hat,
+bietet die Einwilligungsseite darunter in einem eigenen Formular einen zweiten
+Weg: »Sie haben schon ein Teilnahme-Token?« mit Feld und »Hier fortsetzen«.
+Groß- und Kleinschreibung, Leerzeichen und ein fehlender Bindestrich zählen
+nicht (`vc9h ynfr` gilt als `VC9H-YNFR`). Gehört das Token zu einer laufenden,
+nicht archivierten Stichprobe, wird es unter deren Teilnahme-Link an den Browser
+gebunden — auch wenn die Seite über einen anderen Link erreicht wurde —, und es
+geht dort weiter, wo die Teilnahme steht, nach abgelehnter Verarbeitung durch
+Sprachmodelle also auf der Abbruchseite. Die beim Link-Aufruf angelegte, noch
+einwilligungslose Teilnahme bleibt dabei unverbunden liegen. Ein unbekanntes
+Token, eines außerhalb des Fensters oder einer archivierten Stichprobe und eine
+leere Eingabe ergeben dieselbe Meldung „Zu diesem Token lässt sich keine
+Teilnahme fortsetzen.“ auf der Einwilligungsseite, ohne zu verraten, ob das
+Token existiert. Welches Token der Browser zu welchem Teilnahme-Link hält, steht
+in einem eigenen signierten Cookie, das nur unter `/erhebungen/teilnahme/` gilt,
+nie in der Session des Nutzerkontos: Auch bei nebenbei angemeldetem Konto oder
+einer Anmeldung nach der Teilnahme liegen Konto und Token auf dem Server nie im
+selben Datensatz, und eine Anmeldung oder Abmeldung beendet die Zuordnung nicht.
+Jeder Aufruf einer Teilnahmeseite verlängert sie; nach einem Tag ohne Zugriff
+ordnet der Browser die Teilnahme nicht mehr zu, der Teilnahme-Link legt dann
+eine neue an, und das notierte Token führt über die Eingabe weiter in die alte.
+Wer der Speicherung nicht zustimmt, macht eine flüchtige Teilnahme: Die
+Vignetten werden genauso gespielt, Verlauf, Debrief und Diagnose erscheinen wie
+gewohnt, und ein Neuladen setzt an derselben Stelle fort. Gesprächsschritte,
+Fehlversuche und Diagnose gelangen dabei aber nie in die Forschungsdatenbank,
+auch nicht in die Session des Browsers: Der Server hält sie je Sitzung in einem
+kurzlebigen Speicher außerhalb von Datenbank und Backup vor (`FLUECHTIG_PFAD`),
+bis einen Tag nach dem letzten Zugriff der Teilnahme; jeder Aufruf einer ihrer
+Seiten verschiebt diese Frist, und weder der Abschluss noch ein anderer Schritt
+löscht vorher etwas. Abgelaufene Inhalte entfernt ein nächtlicher Aufräumlauf
+vom Server. Gespeichert und exportiert wird nur das Ablaufgerüst (Ziehung,
+Sitzungen mit Status, Zeitstempeln und verbrauchter Zeit, Vignettenposition).
+Auch die Fragebögen werden ihr wie allen anderen vorgelegt, doch ihre Antworten
+werden beim Abschicken verworfen: Es entsteht keine Item-Antwort, auch keine
+Markierung »vorgelegt, übersprungen«; nur der Itemblock hält mit Vorlage und
+Erledigung fest, dass der Ablauf weiterging. Das Token führt auch eine flüchtige
+Teilnahme in jedem Browser fort, samt bisherigem Verlauf und Gedächtnis der
+simulierten Schüler:in. Sind die Inhalte einer laufenden Sitzung abgelaufen,
+endet diese Sitzung beim nächsten Zugriff als `abgebrochen`, statt mit einer
+Schüler:in ohne Gedächtnis weiterzulaufen. Danach geht der Ablauf regulär
+weiter: mit dem Fragebogen der Sitzung, der nächsten Vignette oder dem
+Abschluss. Wer der Spracherkennung zustimmt, kann Eingaben im Diagnosegespräch
+und die Diagnose per Mikrofon eingeben; ohne Zustimmung bleibt die
+Tastatureingabe vollständig nutzbar. Nach jeder beendeten Sitzung erscheinen
+ihre freiwilligen Fragebogen-Items direkt unter dem Verlauf; sie können
+beantwortet oder übersprungen werden, bevor die nächste Vignette beginnt. Nach
+der letzten Sitzung folgen zusätzlich die freiwilligen Fragebogen-Items am
+Andockpunkt `am Ende` als eigene Seite. Jede Item-Antwort wird sofort
+gespeichert, und auch übersprungene Fragebogen-Items bleiben als vorgelegt
+dokumentiert. Likert-Items bieten dabei die global festgelegten Skalenpole zur
+Auswahl an; festgehalten wird die zugehörige Stufe. Ein noch nicht abgeschickter
+Fragebogen — nach einer Sitzung ebenso wie am Ende — wird auch in einem anderen
+Browser erneut vorgelegt; ein abgeschickter nicht mehr. Der gesamte Fortschritt
+hängt am Teilnahme-Token und nicht am Browser: Ein Aufruf setzt die Teilnahme
+genau dort fort, wo sie steht — bei der Instruktion, im laufenden Gespräch, beim
+offenen Fragebogen oder bei der nächsten Vignette. Anschließend endet die
+Teilnahme mit dem Abschlusstext. Damit das Token jederzeit ablesbar ist, zeigt
+die Seitenleiste es auf allen Teilnahmeseiten — von der Einwilligung über
+Instruktion, Diagnosegespräch und Debrief bis zu Fragebogen- und Abschlussseite
+— an der Stelle, an der sonst Konto oder Anmeldelink stehen, in fester Laufweite
+und mit der Bitte, es zu notieren, weil sich die Teilnahme damit in einem
+anderen Browser fortsetzen lässt. Während einer Teilnahme erscheinen dort weder
+Kontoblock noch Anmeldelink, auch nicht bei nebenbei angemeldetem Konto; in
+Forschenden-Ansichten erscheint umgekehrt kein Teilnahme-Token. Unter dem
+Abschlusstext steht auf der Abschlussseite zusätzlich ein systemseitiger
+Hinweis, den die Forschende nicht abschalten kann: das Token groß und in fester
+Laufweite, dazu die Erklärung, dass sich damit angemeldet später eine Abschrift
+der eigenen Sitzungen ins Nutzerkonto holen lässt und dass es ohne das Token
+keine Abschrift gibt, samt Link auf die Token-Eingabe. Ein erneuter Aufruf der
+Abschlussseite zeigt beides wieder. Bei einer flüchtigen Teilnahme steht
+stattdessen der ebenso unabschaltbare Abschnitt „Keine Speicherung“: »Sie haben
+der Speicherung Ihrer Daten für die Forschung nicht zugestimmt. Ihre Gespräche
+und Diagnosen werden deshalb nur bis einen Tag nach Ihrem letzten Schritt
+vorgehalten und dann gelöscht; Ihre Fragebogen-Antworten wurden nicht
+gespeichert.« Darunter steht das Token wie bei eingewilligten Teilnahmen, mit
+dem Hinweis, dass sich damit angemeldet innerhalb dieser Frist eine Abschrift
+der eigenen Sitzungen ins Nutzerkonto holen lässt und es danach keine mehr gibt,
+samt Link auf die Token-Eingabe; auch er erscheint bei jedem Aufruf wieder.
 Abschlusstext und Token in der Seitenleiste bleiben. Ein Diagnosegespräch kann
 vorzeitig in den Debrief geführt werden; eine Sitzung kann ohne Diagnose
 abgebrochen werden. Ist die Diagnose abgegeben, bleibt sie im Debrief sichtbar,
@@ -1253,9 +1260,14 @@ selbst bleiben unberührt, es wird kein Token gespeichert und keine Verknüpfung
 zwischen Konto und Teilnahme festgehalten. Der Import gelingt unabhängig vom
 Teilnahmefenster, solange weder Stichprobe noch Erhebung archiviert sind, und
 ist beliebig oft wiederholbar; jede Wiederholung erzeugt eine weitere Abschrift.
-Unbrauchbare Tokens — auch das einer flüchtigen Teilnahme — werden ohne Angabe
-eines Grundes abgelehnt. Die Liste zeigt je Abschrift den Namen der Erhebung und
-den Importzeitpunkt — nicht die Spielzeit der Erhebung. Von der Liste führt jede
+Auch eine flüchtige Teilnahme ergibt eine Abschrift, solange ihre Inhalte
+vorgehalten werden: Gesprächsschritte samt Denkspur, Fehlversuche und Diagnose
+kommen dann aus dem kurzlebigen Speicher, und es entsteht dieselbe Abschrift wie
+bei einer eingewilligten. Der Import liest nur und verschiebt die Frist nicht.
+Unbrauchbare Tokens — auch das einer flüchtigen Teilnahme, deren Inhalte
+abgelaufen sind — werden mit derselben Meldung ohne Angabe eines Grundes
+abgelehnt. Die Liste zeigt je Abschrift den Namen der Erhebung und den
+Importzeitpunkt — nicht die Spielzeit der Erhebung. Von der Liste führt jede
 Abschrift in eine eigene, nur lesende Ansicht: die gespielten Vignetten in der
 Reihenfolge ihrer Vignettenposition, je Vignette Lernauftrag und Arbeitsheft,
 das Transkript des Diagnosegesprächs, den Ausgang der Sitzung und die eigene

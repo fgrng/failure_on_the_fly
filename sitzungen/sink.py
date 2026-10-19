@@ -567,11 +567,12 @@ class FluechtigerSink(GeruestSink):
         self._schritt_anhaengen(eingabe, eingabemodus, None, None, fehlversuche)
 
     def _diagnose_ablegen(self, text: str, *, eingabemodus: str) -> None:
-        # Hält die Diagnose im Speicher. Der Eingabemodus gehört zum Inhalt
-        # und wird deshalb nicht festgehalten.
+        # Hält die Diagnose samt Eingabemodus im Speicher; beide gehören zum
+        # Inhalt und erreichen die DB nicht.
 
         inhalt: dict[str, Any] = self._inhalt()
         inhalt["diagnose"] = text
+        inhalt["diagnose_eingabemodus"] = eingabemodus
         self._inhalt_speichern(inhalt)
 
     def _schritt_anhaengen(
@@ -638,6 +639,59 @@ def fluechtige_inhalte_vorhalten(teilnahme: Teilnahme) -> None:
         "pk", flat=True
     ):
         kurzlebiger_speicher.vorhalten(_fluechtiger_schluessel(sitzung_pk))
+
+
+@dataclass(frozen=True)
+class Sitzungsinhalte:
+    """Was eine Sitzung über ihr Gerüst hinaus trägt, gleich wo es liegt."""
+
+    gespraechsschritte: list[GespraechsschrittDaten]
+    diagnose: str | None
+    diagnose_eingabemodus: str
+
+
+def sitzungsinhalte(sitzung: Sitzung) -> Sitzungsinhalte | None:
+    """Liefert Gesprächsschritte samt Denkspur und Fehlversuchen und die Diagnose.
+
+    Die Inhalte einer flüchtigen Sitzung kommen aus dem kurzlebigen Speicher;
+    gelesen wird nur, die Frist bleibt, wo sie ist. Sind sie abgelaufen, gibt
+    es nichts.
+    """
+
+    if sitzung.teilnahme.ist_fluechtig:
+        inhalt: dict[str, Any] | None = kurzlebiger_speicher.lesen(
+            _fluechtiger_schluessel(sitzung.pk)
+        )
+        if inhalt is None:
+            return None
+        return Sitzungsinhalte(
+            gespraechsschritte=inhalt["gespraechsschritte"],
+            diagnose=inhalt.get("diagnose"),
+            diagnose_eingabemodus=inhalt.get(
+                "diagnose_eingabemodus", Eingabemodus.GETIPPT
+            ),
+        )
+    diagnose: Diagnose | None = Diagnose.objects.filter(sitzung=sitzung).first()
+    return Sitzungsinhalte(
+        gespraechsschritte=[
+            _schrittdaten(
+                schritt.reihenfolge,
+                schritt.eingabe,
+                schritt.eingabemodus,
+                schritt.denkspur,
+                schritt.aeusserung,
+                [
+                    {"grund": fehlversuch.grund, "rohantwort": fehlversuch.rohantwort}
+                    for fehlversuch in schritt.fehlversuch_set.all()
+                ],
+            )
+            for schritt in sitzung.gespraechsschritte
+        ],
+        diagnose=None if diagnose is None else diagnose.text,
+        diagnose_eingabemodus=(
+            Eingabemodus.GETIPPT if diagnose is None else diagnose.eingabemodus
+        ),
+    )
 
 
 def _fluechtiger_schluessel(sitzung_pk: int) -> str:
