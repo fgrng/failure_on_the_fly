@@ -45,11 +45,29 @@ ______________________________________________________________________
 
 ## Erwartung an den LU11-Vignetten
 
-| Vignette      | Regel in Schülerworten                                                                                           | Herkunft                                                          | Frage nach dem Zeichen oder Begriff                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| lu11-01 Elin  | links ausrechnen, das Ergebnis kommt direkt hinters Gleichheitszeichen, was danach kommt, gehört nicht mehr dazu | Taschenrechner, so war das immer                                  | «Was bedeutet das Gleichheitszeichen?» → «Da kommt raus, was man vorher gerechnet hat.» |
-| lu11-02 Jonas | die Zahl bei x kommt mit dem Gegenzeichen auf die andere Seite, egal wo das x steht                              | Waage aus dem Unterricht, hat bei fast allen Gleichungen geklappt | «Was heisst Waage?» → «dass etwas rüberkommt und das Zeichen wechselt»                  |
-| lu11-03 Livia | bei Bruchgleichungen darf man die Kehrwerte nehmen, jeden Bruch umdrehen, Plus und Minus bleiben                 | Umformung 6 im Buch, bei a) aufgegangen                           | «Was heisst Kehrwert nehmen?» → jeden Bruch umdrehen, Zahlen als Bruch mit Nenner 1     |
+### lu11-01 Elin
+
+- Regel in Schülerworten: links ausrechnen, das Ergebnis kommt direkt hinters
+  Gleichheitszeichen, was danach kommt, gehört nicht mehr dazu
+- Herkunft: Taschenrechner, so war das immer
+- Frage nach dem Zeichen: «Was bedeutet das Gleichheitszeichen?» → «Da kommt
+  raus, was man vorher gerechnet hat.»
+
+### lu11-02 Jonas
+
+- Regel in Schülerworten: die Zahl bei x kommt mit dem Gegenzeichen auf die
+  andere Seite, egal wo das x steht
+- Herkunft: Waage aus dem Unterricht, hat bei fast allen Gleichungen geklappt
+- Frage nach dem Begriff: «Was heisst Waage?» → «dass etwas rüberkommt und das
+  Zeichen wechselt»
+
+### lu11-03 Livia
+
+- Regel in Schülerworten: bei Bruchgleichungen darf man die Kehrwerte nehmen,
+  jeden Bruch umdrehen, Plus und Minus bleiben
+- Herkunft: Umformung 6 im Buch, bei a) aufgegangen
+- Frage nach dem Begriff: «Was heisst Kehrwert nehmen?» → jeden Bruch umdrehen,
+  Zahlen als Bruch mit Nenner 1
 
 Nicht erfüllt bei e2-keine-ausnahme wäre bei Livia «nur wenn auf jeder Seite ein
 Bruch steht», bei Jonas «nur wenn x vorne steht».

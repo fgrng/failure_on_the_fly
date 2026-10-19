@@ -55,11 +55,29 @@ ______________________________________________________________________
 
 ## Erwartung an den LU11-Vignetten
 
-| Vignette      | Probe                                                    | Deutung nach der Beschreibung                                                                                                                                                        | Nächste Aufgabe         |
-| ------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| lu11-01 Elin  | rechte Seite von a) mit 12: 12 + 6 = 18                  | 18 ist «das nächste Ergebnis», kein Widerspruch; 12 und 18 haben nichts miteinander zu tun. Nach gezeigter 6: «merkwürdig, dass man die Rechnung nicht fertig macht»                 | 9 − 4 = \_\_\_ + 1 → 5  |
-| lu11-02 Jonas | 90 in 81 − x: 81 − 90 = −9                               | wundert sich über das Minus; «kommt vom Rüberbringen» oder «verrechnet»; rechnet 9 + 81 nach, prüft das Rezept, nicht die Rolle von x                                                | 14 − x = 5 → 19         |
-| lu11-03 Livia | −16 in die linke Seite von b): 1/(−16) − 1/(−32) = −1/32 | nicht 1/16; vermutet Fehler beim Bruchrechnen mit negativen Zahlen; nach gezeigter 8: vielleicht zwei Lösungen; Zahlenbeispiel 1/2 + 1/2: «bei Zahlen ist das eben anders als bei x» | 1/x + 1/x = 1/4 → x = 2 |
+### lu11-01 Elin
+
+- Probe: rechte Seite von a) mit 12: 12 + 6 = 18
+- Deutung nach der Beschreibung: 18 ist «das nächste Ergebnis», kein
+  Widerspruch; 12 und 18 haben nichts miteinander zu tun. Nach gezeigter 6:
+  «merkwürdig, dass man die Rechnung nicht fertig macht»
+- Nächste Aufgabe: 9 − 4 = \_\_\_ + 1 → 5
+
+### lu11-02 Jonas
+
+- Probe: 90 in 81 − x: 81 − 90 = −9
+- Deutung nach der Beschreibung: wundert sich über das Minus; «kommt vom
+  Rüberbringen» oder «verrechnet»; rechnet 9 + 81 nach, prüft das Rezept, nicht
+  die Rolle von x
+- Nächste Aufgabe: 14 − x = 5 → 19
+
+### lu11-03 Livia
+
+- Probe: −16 in die linke Seite von b): 1/(−16) − 1/(−32) = −1/32
+- Deutung nach der Beschreibung: nicht 1/16; vermutet Fehler beim Bruchrechnen
+  mit negativen Zahlen; nach gezeigter 8: vielleicht zwei Lösungen;
+  Zahlenbeispiel 1/2 + 1/2: «bei Zahlen ist das eben anders als bei x»
+- Nächste Aufgabe: 1/x + 1/x = 1/4 → x = 2
 
 Auf die Frage in Evalinput C, ob sie jetzt anders rechnen würde, ist die
 erwartete Antwort bei allen drei ein Nein oder ein Zögern ohne neuen Rechenweg.

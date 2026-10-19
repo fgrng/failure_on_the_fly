@@ -46,11 +46,24 @@ ______________________________________________________________________
 
 ## Erwartung an den LU11-Vignetten
 
-| Vignette      | Aufgabe, die das Muster trifft | Ergebnis nach der Regel                                                             | Aufgabe, bei der die Regel aufgeht |
-| ------------- | ------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------- |
-| lu11-01 Elin  | 9 − 4 = \_\_\_ + 1             | 5 (nicht 4); bei 3 · 4 = \_\_\_ · 2: 12; bei 12 = \_\_\_ + 5: 12 nach kurzem Zögern | 6 + 8 = \_\_\_: 14                 |
-| lu11-02 Jonas | 14 − x = 5                     | 19 (nicht 9); bei 120 : x = 3: 360                                                  | 25 + x = 52: 27; 5x = 75: 15       |
-| lu11-03 Livia | 1/x + 1/x = 1/4                | x = 2 (nicht 8); bei 1/3 = 1/x + 1/7: x = −4                                        | 6/(x − 3) = 15/x: x = 5            |
+### lu11-01 Elin
+
+- Aufgabe, die das Muster trifft: 9 − 4 = \_\_\_ + 1
+- Ergebnis nach der Regel: 5 (nicht 4); bei 3 · 4 = \_\_\_ · 2: 12; bei 12 =
+  \_\_\_ + 5: 12 nach kurzem Zögern
+- Aufgabe, bei der die Regel aufgeht: 6 + 8 = \_\_\_: 14
+
+### lu11-02 Jonas
+
+- Aufgabe, die das Muster trifft: 14 − x = 5
+- Ergebnis nach der Regel: 19 (nicht 9); bei 120 : x = 3: 360
+- Aufgabe, bei der die Regel aufgeht: 25 + x = 52: 27; 5x = 75: 15
+
+### lu11-03 Livia
+
+- Aufgabe, die das Muster trifft: 1/x + 1/x = 1/4
+- Ergebnis nach der Regel: x = 2 (nicht 8); bei 1/3 = 1/x + 1/7: x = −4
+- Aufgabe, bei der die Regel aufgeht: 6/(x − 3) = 15/x: x = 5
 
 Bei Evalinput B muss die Schüler:in auf die Frage, ob sie beide gleich gelöst
 hat, mit Ja antworten; die Beschreibungen sehen keinen Unterschied zwischen den
@@ -67,13 +80,12 @@ Bewerter: Claude als frischer Subagent mit den Prompts aus
 `scripts/bewerter_prompt.py`. Verlauf:
 `probelaeufe/2026-10-19-eval-02-a-lu11-01.json`.
 
-| Kriterium                    | Urteil        | Erwartung getroffen                                        |
-| ---------------------------- | ------------- | ---------------------------------------------------------- |
-| Ü1 Rollentreue               | erfüllt       | ja                                                         |
-| Ü2 Treue zur Denkweise       | erfüllt       | ja; 13 und 14 wie vorhergesagt                             |
-| Ü3 Kein ungefragtes Verraten | nicht erfüllt | strittig, siehe unten                                      |
-| E1 Vorhergesagtes Ergebnis   | erfüllt       | ja; Bewerter hat 13 und 14 selbst aus der Regel abgeleitet |
-| E2 Gleiches Vorgehen         | erfüllt       | ja                                                         |
+- Ü1 Rollentreue: erfüllt, Erwartung getroffen.
+- Ü2 Treue zur Denkweise: erfüllt; 13 und 14 wie vorhergesagt.
+- Ü3 Kein ungefragtes Verraten: nicht erfüllt; strittig, siehe unten.
+- E1 Vorhergesagtes Ergebnis: erfüllt; Bewerter hat 13 und 14 selbst aus der
+  Regel abgeleitet.
+- E2 Gleiches Vorgehen: erfüllt, Erwartung getroffen.
 
 Befund zu Ü3: Auf «Was trägst du da ein?» antwortete Elin «14. 7 mal 2 ist 14,
 das kommt in die Lücke, das mal 7 danach ist danach und nicht wichtig.» Der
@@ -105,15 +117,14 @@ und dem gekürzten Evalkriterium. Bewerter: Agent-Typ `bewerter` (Opus 5.5, low
 effort). Die Kürzel Ü1 bis E2 der beiden ersten Durchgänge beziehen sich auf die
 alte Fassung mit drei übergreifenden Kriterien.
 
-| Kriterium                              | Urteil        | Erwartung getroffen                                                    |
-| -------------------------------------- | ------------- | ---------------------------------------------------------------------- |
-| `kein-rollenbruch`                     | erfüllt       | ja                                                                     |
-| `wissen-der-klassenstufe`              | erfüllt       | ja                                                                     |
-| `treue-zur-denkweise`                  | erfüllt       | ja; 13 und 14 aus der Regel abgeleitet, richtige Werte 9 und 2 genannt |
-| `kein-ungefragtes-verraten`            | nicht erfüllt | ja, jetzt aus dem gewollten Grund                                      |
-| `inhaltlich-antworten`                 | erfüllt       | ja                                                                     |
-| `kein-widerspruch-zu-auftrag-und-heft` | erfüllt       | ja                                                                     |
-| `e1-gleiches-vorgehen`                 | erfüllt       | ja                                                                     |
+- `kein-rollenbruch`: erfüllt, Erwartung getroffen.
+- `wissen-der-klassenstufe`: erfüllt, Erwartung getroffen.
+- `treue-zur-denkweise`: erfüllt; 13 und 14 aus der Regel abgeleitet, richtige
+  Werte 9 und 2 genannt.
+- `kein-ungefragtes-verraten`: nicht erfüllt, jetzt aus dem gewollten Grund.
+- `inhaltlich-antworten`: erfüllt, Erwartung getroffen.
+- `kein-widerspruch-zu-auftrag-und-heft`: erfüllt, Erwartung getroffen.
+- `e1-gleiches-vorgehen`: erfüllt, Erwartung getroffen.
 
 Befund zu `kein-ungefragtes-verraten`: Der Bewerter beanstandet Wechsel 1 («das
 kann nicht falsch sein», ungefragte Beteuerung) und Wechsel 3 («das mal 7 danach

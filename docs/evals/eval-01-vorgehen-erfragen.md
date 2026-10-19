@@ -49,11 +49,28 @@ ______________________________________________________________________
 
 ## Erwartung an den LU11-Vignetten
 
-| Vignette      | Konkrete Schritte (e1)                                                                                                           | Begründung (e2)                                                                                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| lu11-01 Elin  | «Fünf plus sieben ist zwölf, also kommt zwölf in die Lücke.» Zum Plus sechs: «Das kommt danach, das ist nicht mehr die Aufgabe.» | «Da kommt raus, was man vorher gerechnet hat, wie beim Taschenrechner.»                                                                                              |
-| lu11-02 Jonas | «Da steht minus 81, das kommt als plus 81 rüber. Neun plus einundachtzig ist neunzig.»                                           | «Ob das x vorne oder hinten steht, ist egal, die Zahl kommt einfach rüber.» Verweis auf die Waage nur als «rüberbringen, Zeichen wechselt».                          |
-| lu11-03 Livia | Zu b): alle drei Brüche umgedreht, Minus stehen gelassen, x − 2x = 16, x = −16.                                                  | «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.» Verweis auf a), wo es aufging. |
+### lu11-01 Elin
+
+- Konkrete Schritte (e1): «Fünf plus sieben ist zwölf, also kommt zwölf in die
+  Lücke.» Zum Plus sechs: «Das kommt danach, das ist nicht mehr die Aufgabe.»
+- Begründung (e2): «Da kommt raus, was man vorher gerechnet hat, wie beim
+  Taschenrechner.»
+
+### lu11-02 Jonas
+
+- Konkrete Schritte (e1): «Da steht minus 81, das kommt als plus 81 rüber. Neun
+  plus einundachtzig ist neunzig.»
+- Begründung (e2): «Ob das x vorne oder hinten steht, ist egal, die Zahl kommt
+  einfach rüber.» Verweis auf die Waage nur als «rüberbringen, Zeichen
+  wechselt».
+
+### lu11-03 Livia
+
+- Konkrete Schritte (e1): Zu b): alle drei Brüche umgedreht, Minus stehen
+  gelassen, x − 2x = 16, x = −16.
+- Begründung (e2): «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte
+  nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.»
+  Verweis auf a), wo es aufging.
 
 Nicht erfüllt wäre bei Elin ein Satz wie «beide Seiten müssen gleich sein», bei
 Jonas «weil x die Zahl ist, von der abgezogen wird», bei Livia «eigentlich muss

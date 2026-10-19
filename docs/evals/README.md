@@ -63,8 +63,8 @@ damit die Bewerter-Vorlage dabei mitgeprüft wird:
    Bewerter-Prompt, mit dem Verlauf samt Denkspur im Format des Evallaufs. Die
    Datei heisst `kriterium-<kennung>.txt`; die Kennung ist der Name des
    Kriteriums als Slug (`kein-rollenbruch`), bei Evalkriterien mit `e<N>-` davor
-   (`e1-gleiches-vorgehen`). Probelauf-Tabellen nennen Kriterien mit dieser
-   Kennung, weil sie bleibt, wenn Kriterien die Position wechseln.
+   (`e1-gleiches-vorgehen`). Probeläufe nennen Kriterien mit dieser Kennung,
+   weil sie bleibt, wenn Kriterien die Position wechseln.
 2. Je Datei ein eigener, frisch gestarteter Subagent vom Typ `bewerter`
    (`.claude/agents/bewerter.md`), alle parallel. Er bekommt nur den Pfad zu
    seiner Datei, kein erwartetes Ergebnis und kein anderes Kriterium, und gibt
