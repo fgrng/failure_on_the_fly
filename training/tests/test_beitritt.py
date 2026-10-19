@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
 )
@@ -287,6 +288,8 @@ class GeschlossenesTrainingTests(TestCase):
 
     def test_kreis_und_administration_starten_sitzungen_und_behalten_sie(self) -> None:
         """Erst der Start bindet das Konto; spätere Linkaufrufe erhalten die Sitzung."""
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
         administratorin: Konto = konto_mit_rollen("root", is_superuser=True)
         for konto in (self.ausbilderin, administratorin):

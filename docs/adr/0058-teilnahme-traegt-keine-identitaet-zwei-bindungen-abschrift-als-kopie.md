@@ -1,8 +1,19 @@
 ---
-status: accepted
+status: amended
+amended-by: ["fluechtige-inhalte-im-kurzlebigen-speicher"]
 ---
 
 # Die Teilnahme trägt keine Identität: zwei Bindungen, Abschrift als Kopie
+
+> **Nachgeführt durch ADR „Flüchtige Inhalte liegen in einem kurzlebigen
+> Speicher, außerhalb der Forschungsdatenbank und getrennt von der
+> Konto-Session“:** Eine Abschrift entsteht auch aus einer flüchtigen
+> Teilnahme, über dasselbe Token-Formular und mit denselben Regeln, solange
+> deren Inhalte vorgehalten werden; danach wird das Token wie jedes
+> unbrauchbare ohne Grund abgelehnt. Sie gleicht der normalen genau, samt
+> Denkspur. Die Zusage „Das System führt die Verknüpfung nicht“ gilt auch für
+> die Browser-Session: Teilnahme-Tokens stehen nicht mehr in der Konto-Session,
+> sondern in einem eigenen signierten Cookie.
 
 Dieses ADR fasst den Stand von ADR-0018 (samt Nachführungen durch ADR-0043
 und #235) und ADR-0043 (samt Nachführung durch ADR-0049) zusammen und ersetzt

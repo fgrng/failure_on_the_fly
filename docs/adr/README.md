@@ -53,6 +53,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0026 Transkription über externen Auftragsverarbeiter mit Zero-Retention
 - ADR-0045 Flüchtige Teilnahme: Gerüst in der DB, Inhalte nie
 - ADR-0058 Die Teilnahme trägt keine Identität: zwei Bindungen, Abschrift als Kopie
+- ADR „Flüchtige Inhalte liegen in einem kurzlebigen Speicher, außerhalb der Forschungsdatenbank und getrennt von der Konto-Session“
 - ADR-0067 Die Zero-Retention-Erklärung gehört an die Konfiguration, nicht an die Instanz
 
 **Eigentum, Rollen und Lebenszyklus**

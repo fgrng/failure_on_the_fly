@@ -9,7 +9,11 @@ from django.http import HttpResponse
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import finale_vignette, konto_mit_rollen
+from config.tests.aufbau import (
+    erklaerte_aktive_transkription,
+    finale_vignette,
+    konto_mit_rollen,
+)
 from config.tests.formular import submit_knoepfe
 from config.tests.sprachmodell import vor_jedem_aufruf
 from konten.models import Konto
@@ -40,6 +44,8 @@ class TrainingssitzungTests(TestCase):
         kern_ueberholen: bool = False,
     ) -> Training:
         """Startet eine Trainingssitzung mit dem übergebenen Fake-Skript."""
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         ausbilderin: Konto = konto_mit_rollen("ada")
         teilnehmerin: Konto = konto_mit_rollen("grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(

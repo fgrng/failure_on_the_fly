@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
+    erklaerte_aktive_transkription,
     finale_vignette,
     konto_mit_rollen,
 )
@@ -160,6 +161,8 @@ class TrainingskatalogTests(TestCase):
         self,
     ) -> None:
         """Die freie Wahl führt über den DB-Sink zu einer abgeschlossenen Sitzung."""
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         ausbilderin: Konto = konto_mit_rollen("ada")
         studierende: Konto = get_user_model().objects.create_user(username="grace")
         kern: Simulationskern = Simulationskern.objects.anlegen(
@@ -237,6 +240,8 @@ class TrainingskatalogTests(TestCase):
         self,
     ) -> None:
         """Audioverarbeitung beginnt erst nach der dokumentierten Einwilligung."""
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         ausbilderin: Konto = konto_mit_rollen("ada")
         teilnehmerin: Konto = konto_mit_rollen("grace")
         aktive_modell_konfiguration(Verwendung.SCHUELERIN)
@@ -340,6 +345,8 @@ class TrainingsabbruchTests(TestCase):
         audioverarbeitung_eingewilligt: bool = True,
     ) -> Training:
         """Startet eine persistierte Trainingssitzung mit einem Fake-Skript."""
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         ausbilderin: Konto = konto_mit_rollen("ada")
         teilnehmerin: Konto = konto_mit_rollen("grace")
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(

@@ -201,7 +201,7 @@ Die Klammer, unter der alle Sitzungen einer Person in genau einem Training, gena
 _Avoid_: Durchlauf, Session, Sitzung
 
 **Abschrift**:
-Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0058). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
+Die konto-gebundene Kopie einer abgeschlossenen Erhebungsteilnahme im Trainingsbereich: Transkript, Ausgang und eigene Diagnose, in der gespielten Reihenfolge. Sie entsteht durch Eingabe des Teilnahme-Tokens, bei einer flüchtigen Teilnahme nur, solange deren Inhalte vorgehalten werden. Sie hält den Namen der Erhebung als Text und den Importzeitpunkt — kein Token, keinen Rückzeiger. Sie gehört der Teilnehmer:in persönlich und ist ausdrücklich kein Forschungsdatum (ADR-0058). Fremdeinsicht in sie gibt es nur, wenn die Teilnehmer:in sie für ein Training **freigibt**, dem sie beigetreten ist; die Freigabe umfasst die ganze Abschrift, unabhängig von den Vignetten des Trainings, und ist jederzeit widerrufbar. Nach einem Austritt aus dem Training **ruht** die Freigabe: Sie wirkt nicht, bleibt aber bestehen, widerrufbar und mit dem Wiederbeitritt wieder wirksam.
 _Avoid_: Export, Mitschrift, Transkriptarchiv — „Kopie“ benennt in ADR-0058 das Verfahren (Kopie statt Verknüpfung), nie die Sache selbst.
 
 **Training**:
@@ -245,7 +245,7 @@ Die drei Entscheidungen, die eine Teilnehmer:in am Einwilligungstor einer Erhebu
 _Avoid_: Einwilligung erteilt, Teilnahmeeinwilligung, Zustimmung, Consent
 
 **Flüchtige Teilnahme**:
-Die Teilnahme an einer Erhebung, deren Teilnehmer:in der Speicherung (Einwilligung c) widersprochen hat. Sie läuft vollständig ab, mit Diagnosegespräch, Debrief und Diagnose. Gespeichert wird aber nur ihr **Ablaufgerüst**: Ziehung, Sitzungen mit Vignette, Kern, Modell-Konfiguration, Status, Zeitstempeln und Budget-Uhr sowie die Vignettenposition. Gesprächsschritte, Fehlversuche und Diagnose leben allein in der Browser-Session und erreichen die Datenbank nie (ADR-0045). Das Gerüst wird normal exportiert.
+Die Teilnahme an einer Erhebung, deren Teilnehmer:in der Speicherung (Einwilligung c) widersprochen hat. Sie läuft vollständig ab, mit Diagnosegespräch, Debrief und Diagnose. Gespeichert wird aber nur ihr **Ablaufgerüst**: Ziehung, Sitzungen mit Vignette, Kern, Modell-Konfiguration, Status, Zeitstempeln und Budget-Uhr sowie die Vignettenposition. Gesprächsschritte, Fehlversuche und Diagnose erreichen die Forschungsdatenbank nie: Sie werden nur bis einen Tag nach dem letzten Zugriff vorgehalten und dann gelöscht (ADR-0045, ADR „Flüchtige Inhalte liegen in einem kurzlebigen Speicher, außerhalb der Forschungsdatenbank und getrennt von der Konto-Session“). Solange sie vorliegen, lässt sich aus ihnen eine Abschrift holen. Das Gerüst wird normal exportiert.
 _Avoid_: anonyme Teilnahme, Teilnahme ohne Daten, Gastteilnahme
 
 **Datenspur**:
