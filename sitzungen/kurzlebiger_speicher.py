@@ -2,22 +2,23 @@
 
 Einträge liegen als Dateien in `FLUECHTIG_PFAD`, außerhalb der
 Forschungsdatenbank und jedes Backups. Jeder Eintrag gilt bis einen Tag nach
-seinem letzten Schreiben; danach ist er abgelaufen und wird nicht mehr
-geliefert. Der Speicher kennt nur Schlüssel, weder Token noch Konto (ADR-0055).
+seinem letzten Schreiben oder Vorhalten; danach ist er abgelaufen und wird
+nicht mehr geliefert. Der Speicher kennt nur Schlüssel, weder Token noch Konto
+(ADR-0055).
 """
 
 import json
 import os
 import re
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from django.conf import settings
 from django.utils import timezone
 
-FRIST: timedelta = timedelta(days=1)
+_FRIST: timedelta = timedelta(days=1)
 _GUELTIGER_SCHLUESSEL: re.Pattern[str] = re.compile(r"[a-z0-9-]+")
 
 
@@ -27,39 +28,60 @@ def lesen(schluessel: str) -> Any | None:
     Das Lesen verschiebt die Frist nicht.
     """
 
+    datei: Path = _datei(schluessel)
     try:
-        eintrag: dict[str, Any] = json.loads(_datei(schluessel).read_text("utf-8"))
+        if _ist_abgelaufen(datei):
+            return None
+        return json.loads(datei.read_text("utf-8"))
     except FileNotFoundError:
         return None
-    if datetime.fromisoformat(eintrag["bis"]) <= timezone.now():
-        return None
-    return eintrag["inhalt"]
 
 
 def schreiben(schluessel: str, inhalt: Any) -> None:
     """Legt den Inhalt unter dem Schlüssel ab und setzt die Frist neu an."""
 
-    verzeichnis: Path = _verzeichnis()
-    eintrag: str = json.dumps(
-        {"bis": (timezone.now() + FRIST).isoformat(), "inhalt": inhalt}
-    )
+    ziel: Path = _datei(schluessel)
     # Erst vollständig schreiben, dann ersetzen: Ein paralleler Leser sieht
     # nie einen halben Eintrag.
-    deskriptor, temporaer = tempfile.mkstemp(dir=verzeichnis)
-    with os.fdopen(deskriptor, "w", encoding="utf-8") as datei:
-        datei.write(eintrag)
-    os.replace(temporaer, _datei(schluessel))
+    deskriptor, temporaer = tempfile.mkstemp(dir=_verzeichnis())
+    try:
+        with os.fdopen(deskriptor, "w", encoding="utf-8") as datei:
+            datei.write(json.dumps(inhalt))
+        _frist_ansetzen(Path(temporaer))
+        os.replace(temporaer, ziel)
+    except BaseException:
+        Path(temporaer).unlink(missing_ok=True)
+        raise
 
 
 def vorhalten(schluessel: str) -> None:
     """Verschiebt die Frist eines noch gültigen Eintrags auf einen Tag ab jetzt.
 
-    Ein abgelaufener Eintrag bleibt abgelaufen.
+    Ein abgelaufener Eintrag bleibt abgelaufen. Der Inhalt bleibt unberührt,
+    damit ein gleichzeitiges Schreiben nicht überschrieben wird.
     """
 
-    inhalt: Any | None = lesen(schluessel)
-    if inhalt is not None:
-        schreiben(schluessel, inhalt)
+    datei: Path = _datei(schluessel)
+    try:
+        if not _ist_abgelaufen(datei):
+            _frist_ansetzen(datei)
+    except FileNotFoundError:
+        return
+
+
+def _ist_abgelaufen(datei: Path) -> bool:
+    # Die Frist läuft einen Tag ab dem letzten Schreiben oder Vorhalten, das
+    # die Änderungszeit der Datei festhält.
+
+    geaendert: datetime = datetime.fromtimestamp(datei.stat().st_mtime, tz=UTC)
+    return geaendert + _FRIST <= timezone.now()
+
+
+def _frist_ansetzen(datei: Path) -> None:
+    # Setzt die Änderungszeit auf jetzt, nach der gesteuerten Uhr von Django.
+
+    jetzt: float = timezone.now().timestamp()
+    os.utime(datei, (jetzt, jetzt))
 
 
 def _verzeichnis() -> Path:

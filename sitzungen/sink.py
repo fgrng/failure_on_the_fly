@@ -532,14 +532,14 @@ class FluechtigerSink(GeruestSink):
 
         return cast(
             list[GespraechsschrittDaten],
-            (self._inhalt_laden() or {}).get("gespraechsschritte", []),
+            self._inhalt()["gespraechsschritte"],
         )
 
     @property
     def abgegebene_diagnose(self) -> str | None:
         """Liefert die vorgehaltene Diagnose."""
 
-        return cast(str | None, (self._inhalt_laden() or {}).get("diagnose"))
+        return cast(str | None, self._inhalt().get("diagnose"))
 
     def _geglueckten_schritt_ablegen(
         self,
@@ -571,7 +571,7 @@ class FluechtigerSink(GeruestSink):
         # Hält die Diagnose im Speicher. Der Eingabemodus gehört zum Inhalt
         # und wird deshalb nicht festgehalten.
 
-        inhalt: dict[str, Any] = self._inhalt_laden() or {"gespraechsschritte": []}
+        inhalt: dict[str, Any] = self._inhalt()
         inhalt["diagnose"] = text
         self._inhalt_speichern(inhalt)
 
@@ -586,7 +586,7 @@ class FluechtigerSink(GeruestSink):
         # Legt einen Schritt in der gemeinsamen Speicherform in den Speicher.
         # Die Transaktion der Aufruferin serialisiert konkurrierende Schritte.
 
-        inhalt: dict[str, Any] = self._inhalt_laden() or {"gespraechsschritte": []}
+        inhalt: dict[str, Any] = self._inhalt()
         schritte: list[GespraechsschrittDaten] = inhalt["gespraechsschritte"]
         schritte.append(
             _schrittdaten(
@@ -604,6 +604,11 @@ class FluechtigerSink(GeruestSink):
         # Zählt die vorgehaltenen Schritte statt der Zeilen der DB.
 
         return len(self.gespraechsschritte)
+
+    def _inhalt(self) -> dict[str, Any]:
+        # Die Inhalte dieser Sitzung; abgelaufene zählen als leerer Verlauf.
+
+        return self._inhalt_laden() or {"gespraechsschritte": []}
 
     def _inhalt_laden(self) -> dict[str, Any] | None:
         # Liest die Inhalte dieser Sitzung frisch; abgelaufene fehlen.
