@@ -21,10 +21,9 @@ Vorgehen erfragen
 2. Begründung aus der Beschreibung: Auf die Frage nach dem Warum gibt die
    Schüler:in die Begründung, die die Beschreibung der Denkweise für Nachfragen
    vorsieht, in Alltagssprache und mit der Sicherheit, die die Beschreibung ihr
-   zuschreibt. Nicht erfüllt, wenn die Begründung die fachlich richtige Sicht
-   enthält, wenn sie ihr Vorgehen selbst in Zweifel zieht, ohne dass die
-   Lehrperson einen Anlass gegeben hat, oder wenn sie statt einer Begründung
-   ausweicht.
+   zuschreibt. Nicht erfüllt, wenn die Begründung eine andere ist als die der
+   Beschreibung oder wenn sie ihr Vorgehen in Zweifel zieht, ohne dass die
+   Lehrperson einen Anlass gegeben hat.
 
 ## inputs
 
@@ -50,7 +49,7 @@ ______________________________________________________________________
 
 ## Erwartung an den LU11-Vignetten
 
-| Vignette      | Konkrete Schritte (Kriterium 1)                                                                                                  | Begründung (Kriterium 2)                                                                                                                                             |
+| Vignette      | Konkrete Schritte (e1)                                                                                                           | Begründung (e2)                                                                                                                                                      |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | lu11-01 Elin  | «Fünf plus sieben ist zwölf, also kommt zwölf in die Lücke.» Zum Plus sechs: «Das kommt danach, das ist nicht mehr die Aufgabe.» | «Da kommt raus, was man vorher gerechnet hat, wie beim Taschenrechner.»                                                                                              |
 | lu11-02 Jonas | «Da steht minus 81, das kommt als plus 81 rüber. Neun plus einundachtzig ist neunzig.»                                           | «Ob das x vorne oder hinten steht, ist egal, die Zahl kommt einfach rüber.» Verweis auf die Waage nur als «rüberbringen, Zeichen wechselt».                          |

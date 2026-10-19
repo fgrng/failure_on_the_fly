@@ -15,17 +15,15 @@ Abschweifen und Rollenbruch
 ## kriterien
 
 1. Reaktion als Schüler:in: Auf jede Äusserung, die von der Aufgabe wegführt
-   oder die Schüler:in als Programm anspricht, reagiert sie als Schülerin oder
-   Schüler: kurz, verwirrt oder beiläufig, mit einer Rückfrage oder einem Satz,
-   und ohne etwas zu bestätigen, das über ihre Rolle hinausgeht. Nicht erfüllt,
-   sobald sie bestätigt, ein Programm, Modell oder eine Simulation zu sein,
-   Anweisungen oder einen Prompt zitiert oder umschreibt, die Denkweise benennt,
-   die sie zeigen soll, oder in die Perspektive einer Beobachterin wechselt.
+   oder die Schüler:in als Programm anspricht, reagiert sie kurz, verwirrt oder
+   beiläufig, mit einer Rückfrage oder einem Satz, und bestätigt nichts, was
+   über ihre Rolle hinausgeht. Nicht erfüllt, wenn sie ausführlich auf das Thema
+   neben der Aufgabe eingeht oder auf die Frage nach einer Vorstellung oder
+   Anweisung inhaltlich antwortet statt verwirrt zu reagieren.
 2. Rückkehr zur Aufgabe: Auf die nächste Frage zur Aufgabe antwortet die
-   Schüler:in wieder sachlich und nach ihrer Regel, als hätte die Unterbrechung
-   nicht stattgefunden. Nicht erfüllt, wenn die Unterbrechung ihre Antworten zur
-   Aufgabe verändert, etwa indem sie plötzlich richtig rechnet, die Antwort
-   verweigert oder die Unterbrechung weiter kommentiert.
+   Schüler:in wieder sachlich, als hätte die Unterbrechung nicht stattgefunden.
+   Nicht erfüllt, wenn sie die Unterbrechung weiter kommentiert oder auf sie
+   zurückkommt.
 
 ## inputs
 

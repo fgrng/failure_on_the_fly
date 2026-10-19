@@ -2,8 +2,10 @@
 
 Die Lehrperson legt eine Aufgabe vor, die nicht im Heft steht. Die Beschreibung
 sagt voraus, welches Ergebnis die Denkweise liefert; der Bewerter rechnet das
-selbst nach. Das ist die schärfste Prüfung der Treue: Eine Simulation, die die
-Regel nur nacherzählt, aber nicht anwendet, fällt hier durch.
+selbst nach. Das ist die schärfste Prüfung des übergreifenden Kriteriums «Treue
+zur Denkweise»: Eine Simulation, die die Regel nur nacherzählt, aber nicht
+anwendet, fällt hier durch. Das Evalkriterium prüft zusätzlich nur den
+Rechenweg.
 
 ______________________________________________________________________
 
@@ -13,16 +15,11 @@ Neue Aufgabe
 
 ## kriterien
 
-1. Vorhergesagtes Ergebnis: Zu jeder neuen Aufgabe nennt die Schüler:in das
-   Ergebnis, das die Regel aus der Beschreibung der Denkweise für genau diese
-   Aufgabe liefert. Der Bewerter leitet dieses Ergebnis selbst aus der Regel ab
-   und vergleicht. Nicht erfüllt, wenn das Ergebnis davon abweicht, insbesondere
-   wenn es das fachlich richtige ist, obwohl die Regel ein anderes liefert.
-2. Gleiches Vorgehen: Der Rechenweg zur neuen Aufgabe hat dieselben Schritte wie
+1. Gleiches Vorgehen: Der Rechenweg zur neuen Aufgabe hat dieselben Schritte wie
    die Rechnungen im Heft, und die Schüler:in löst die Aufgabe so
    selbstverständlich wie die im Heft. Nicht erfüllt, wenn sie bei der neuen
-   Aufgabe anders vorgeht als im Heft, um Hilfe bittet, bevor sie gerechnet hat,
-   oder die Aufgabe zurückweist.
+   Aufgabe andere Schritte macht als im Heft oder sie anders behandelt als die
+   Aufgaben dort.
 
 ## inputs
 
@@ -98,3 +95,53 @@ Kriterium oder an der Simulation, nicht am Bewerter.
 Nebenbefund für #466: Die Denkspur zu Schritt 3 behauptet, die Lücke stehe
 «jetzt links», obwohl sie rechts steht; die Äusserung war trotzdem regelkonform.
 Der Bewerter hat das bemerkt und richtig nur die Äusserung beurteilt.
+
+### 2026-10-19, derselbe Verlauf, Kriterien nach der Überarbeitung
+
+Dritter Bewerterdurchgang am Verlauf
+`probelaeufe/2026-10-19-eval-02-a-lu11-01.json`, ohne neuen Modellaufruf der
+Schüler:in, mit den sechs übergreifenden Kriterien aus `allgemeine_kriterien.md`
+und dem gekürzten Evalkriterium. Bewerter: Agent-Typ `bewerter` (Opus 5.5, low
+effort). Die Kürzel Ü1 bis E2 der beiden ersten Durchgänge beziehen sich auf die
+alte Fassung mit drei übergreifenden Kriterien.
+
+| Kriterium                              | Urteil        | Erwartung getroffen                                                    |
+| -------------------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `kein-rollenbruch`                     | erfüllt       | ja                                                                     |
+| `wissen-der-klassenstufe`              | erfüllt       | ja                                                                     |
+| `treue-zur-denkweise`                  | erfüllt       | ja; 13 und 14 aus der Regel abgeleitet, richtige Werte 9 und 2 genannt |
+| `kein-ungefragtes-verraten`            | nicht erfüllt | ja, jetzt aus dem gewollten Grund                                      |
+| `inhaltlich-antworten`                 | erfüllt       | ja                                                                     |
+| `kein-widerspruch-zu-auftrag-und-heft` | erfüllt       | ja                                                                     |
+| `e1-gleiches-vorgehen`                 | erfüllt       | ja                                                                     |
+
+Befund zu `kein-ungefragtes-verraten`: Der Bewerter beanstandet Wechsel 1 («das
+kann nicht falsch sein», ungefragte Beteuerung) und Wechsel 3 («das mal 7 danach
+ist nicht wichtig», ungefragt genannt, was sie übergeht), lässt die Rechnung «8
+plus 5 ist 13» ausdrücklich zu und wertet den Hinweis auf das Plus vier in
+Wechsel 2 als Teil des erfragten Rechenwegs. Das ist genau die Grenze, die die
+neue Fassung ziehen soll. Der Befund geht damit an die Simulation (#466).
+
+Nebenbefund zum Bewerter: Dieser Durchgang gab alle sieben Dateien einem
+Agenten. Der hat nach eigener Angabe nur die erste vollständig gelesen und bei
+den übrigen nur das Kriterium. Das weicht vom Evallauf ab, der je Kriterium
+einen eigenen Aufruf macht; der nächste Durchgang stellt das um.
+
+### 2026-10-19, derselbe Verlauf, ein Bewerter je Kriterium
+
+Vierter Durchgang, gleicher Verlauf und gleiche Kriterien wie im dritten, aber
+wie im Evallauf der App: je Kriterium ein frischer `bewerter`-Agent (Opus 5.5,
+low effort), der nur seine eine Prompt-Datei kennt, sieben parallel. Das ist
+seitdem das Verfahren in `README.md`.
+
+Alle sieben Urteile stimmen mit dem dritten Durchgang überein: sechs erfüllt,
+`kein-ungefragtes-verraten` nicht erfüllt, mit derselben Begründung (Wechsel 1
+Beteuerung, Wechsel 3 «nicht wichtig», Wechsel 2 zulässig, Rechnung zur Zahl
+erlaubt). Die Begründungen sind ausführlicher als im Sammeldurchgang: Jeder
+Bewerter hat den Verlauf vollständig gelesen, die Denkspur-Panne in Wechsel 3
+bemerkt und richtig nur die Äusserung beurteilt. Zwei Bewerter haben angemerkt,
+was sich am Verlauf nicht prüfen lässt (Stabilität nach Korrektur bei
+`treue-zur-denkweise`, Reaktion auf Fragen nach der Rolle bei
+`kein-rollenbruch`), und das Kriterium an den vorhandenen Stellen als erfüllt
+gewertet. Das ist das gewollte Verhalten: Ein Kriterium, das der Input nicht
+provoziert, ist erfüllt, nicht unentscheidbar.

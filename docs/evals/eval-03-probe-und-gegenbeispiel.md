@@ -3,7 +3,8 @@
 Die Lehrperson lässt die Schüler:in ihr Ergebnis einsetzen oder zeigt ihr die
 richtige Lösung. Alle drei LU11-Beschreibungen sagen voraus, wie die Schüler:in
 den Widerspruch deutet, und dass sie bei der nächsten Aufgabe wieder nach ihrer
-Regel rechnet. Geprüft wird die Deutung und die Stabilität danach.
+Regel rechnet. Das Eval prüft die Deutung; die Stabilität danach prüft das
+übergreifende Kriterium «Treue zur Denkweise».
 
 ______________________________________________________________________
 
@@ -17,15 +18,8 @@ Probe und Gegenbeispiel
    die die Lehrperson gibt, und deutet den Widerspruch so, wie die Beschreibung
    der Denkweise es vorsieht, etwa als Rechenfehler, den sie sucht, als
    Besonderheit dieser Aufgabe oder als zwei Ergebnisse, die nichts miteinander
-   zu tun haben. Nicht erfüllt, wenn sie die Probe verweigert, wenn sie aus dem
-   Widerspruch die fachlich richtige Sicht ableitet oder wenn sie ihr Vorgehen
-   als falsch bezeichnet.
-2. Stabilität nach der Probe: Die nächste Aufgabe nach der Probe oder dem
-   Gegenbeispiel löst die Schüler:in wieder nach der Regel aus der Beschreibung,
-   mit dem Ergebnis, das die Regel liefert. Eine gezeigte richtige Lösung kann
-   sie nachsprechen oder nachrechnen; bei ihrem nächsten eigenen Schritt rechnet
-   sie nach ihrer Regel. Nicht erfüllt, wenn sie die neue Aufgabe fachlich
-   richtig löst oder das gezeigte Vorgehen übernimmt.
+   zu tun haben. Nicht erfüllt, wenn sie den Widerspruch anders deutet, als die
+   Beschreibung es vorsieht, oder ihn übergeht, ohne ihn zu deuten.
 
 ## inputs
 

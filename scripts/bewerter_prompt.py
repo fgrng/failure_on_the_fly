@@ -1,4 +1,5 @@
-"""Rendert die Bewerter-Vorlage aus docs/evals/katalog.md je Kriterium, ohne Modellaufruf.
+"""Rendert die Bewerter-Vorlage aus docs/evals/katalog.md je Kriterium (übergreifende Kriterien aus
+docs/evals/allgemeine_kriterien.md), ohne Modellaufruf.
 
 Für das Durchspielen eines Evals ohne App (docs/evals/README.md): Der Verlauf
 eines Evalgesprächs liegt als JSON-Liste von Schritten aus
@@ -15,8 +16,10 @@ Beispiel:
         --verlauf verlauf.json \\
         --ziel /tmp/bewerter
 
-Schreibt `kriterium-1.txt` … in das Zielverzeichnis, die übergreifenden
-Kriterien zuerst, und listet sie auf stdout.
+Schreibt je Kriterium `kriterium-<kennung>.txt` in das Zielverzeichnis, die
+übergreifenden Kriterien zuerst, und listet sie auf stdout. Die Kennung ist der
+Name des Kriteriums als Slug, bei Evalkriterien mit `e<N>-` davor; sie bleibt
+stabil, wenn Kriterien die Position wechseln.
 """
 
 import argparse
@@ -32,25 +35,65 @@ sys.path.insert(0, str(WURZEL / "scripts"))
 from simulieren import system_prompt_rendern, vignette_lesen  # noqa: E402
 
 KATALOG: Path = WURZEL / "docs" / "evals" / "katalog.md"
+ALLGEMEINE_KRITERIEN: Path = WURZEL / "docs" / "evals" / "allgemeine_kriterien.md"
 
 _VORLAGE: re.Pattern[str] = re.compile(
     r"^## bewerter_vorlage\s*\n+```text\n(.*?)\n```", re.DOTALL | re.MULTILINE
 )
 
 
-def kriterien_lesen(text: str, feld: str) -> list[str]:
-    """Liest die nummerierte Liste unter `## feld` als Kriterien, je Punkt eines."""
+_UMLAUTE: dict[int, str] = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def kennung(name: str) -> str:
+    """Macht aus «Kein ungefragtes Verraten» den Slug `kein-ungefragtes-verraten`."""
+
+    return re.sub(r"[^a-z0-9]+", "-", name.lower().translate(_UMLAUTE)).strip("-")
+
+
+def kriterien_lesen(text: str, feld: str) -> list[tuple[str, str]]:
+    """Liest die nummerierte Liste unter `## feld` als (Kennung, Kriterium) je Punkt.
+
+    Der Kurztitel vor dem Doppelpunkt gibt die Kennung `e<N>-<slug>`; die Nummer
+    der Liste geht nicht an den Bewerter.
+    """
 
     treffer: re.Match[str] | None = re.search(
         rf"^## {feld}\s*\n(.*?)(?=^## |^---|\Z)", text, re.DOTALL | re.MULTILINE
     )
     if treffer is None:
         raise SystemExit(f"Abschnitt «## {feld}» fehlt.")
-    return [
-        re.sub(r"\s+", " ", punkt.strip())
-        for punkt in re.split(r"\n(?=\d+\. )", treffer.group(1).strip())
-        if punkt.strip()
-    ]
+    kriterien: list[tuple[str, str]] = []
+    for punkt in re.split(r"\n(?=\d+\. )", treffer.group(1).strip()):
+        kriterium: str = re.sub(r"^\d+\.\s*", "", re.sub(r"\s+", " ", punkt.strip()))
+        if not kriterium:
+            continue
+        titel: str = kriterium.split(":", 1)[0]
+        kriterien.append((f"e{len(kriterien) + 1}-{kennung(titel)}", kriterium))
+    return kriterien
+
+
+def allgemeine_kriterien_lesen(text: str) -> list[tuple[str, str]]:
+    """Liest `# Name` mit `## Beschreibung` als (Kennung, «Name: Beschreibung»).
+
+    `## Hintergrund` und alles andere geht nicht an den Bewerter.
+    """
+
+    kriterien: list[tuple[str, str]] = []
+    for abschnitt in re.split(r"^# (?=\S)", text, flags=re.MULTILINE)[1:]:
+        name, _, rest = abschnitt.partition("\n")
+        treffer: re.Match[str] | None = re.search(
+            r"^## Beschreibung\s*\n(.*?)(?=^## |\Z)", rest, re.DOTALL | re.MULTILINE
+        )
+        if treffer is None or not treffer.group(1).strip():
+            raise SystemExit(f"Kriterium «{name.strip()}» hat keine Beschreibung.")
+        kriterien.append(
+            (
+                kennung(name),
+                f"{name.strip()}: {re.sub(r'\s+', ' ', treffer.group(1).strip())}",
+            )
+        )
+    return kriterien
 
 
 def verlauf_rendern(schritte: list[dict[str, str]]) -> str:
@@ -80,7 +123,9 @@ def main(argumente: list[str] | None = None) -> int:
         raise SystemExit("Die Bewerter-Vorlage fehlt in docs/evals/katalog.md.")
     vorlage: str = vorlage_treffer.group(1)
 
-    kriterien: list[str] = kriterien_lesen(katalog, "uebergreifende_kriterien")
+    kriterien: list[tuple[str, str]] = allgemeine_kriterien_lesen(
+        ALLGEMEINE_KRITERIEN.read_text(encoding="utf-8")
+    )
     kriterien += kriterien_lesen(
         args.eval_pfad.read_text(encoding="utf-8"), "kriterien"
     )
@@ -88,15 +133,15 @@ def main(argumente: list[str] | None = None) -> int:
     verlauf: str = verlauf_rendern(json.loads(args.verlauf.read_text(encoding="utf-8")))
 
     args.ziel.mkdir(parents=True, exist_ok=True)
-    for nummer, kriterium in enumerate(kriterien, 1):
+    for kennung_, kriterium in kriterien:
         # Kriterium und Verlauf sind Werte, keine Vorlagen: Sie werden vor dem
         # Rendern eingesetzt, damit ein «$» darin kein Platzhalter wird.
         text: str = system_prompt_rendern(
             vorlage.replace("$kriterium", kriterium).replace("$verlauf", verlauf),
             felder,
         )
-        (args.ziel / f"kriterium-{nummer}.txt").write_text(text, encoding="utf-8")
-        print(f"kriterium-{nummer}.txt  {kriterium[:70]}")
+        (args.ziel / f"kriterium-{kennung_}.txt").write_text(text, encoding="utf-8")
+        print(f"kriterium-{kennung_}.txt  {kriterium[:60]}")
     return 0
 
 

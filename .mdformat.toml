@@ -3,3 +3,6 @@
 # Markdown-Dateien schreiben einen Absatz pro Zeile.
 wrap = 80
 number = true
+# Agent-Dateien tragen YAML-Frontmatter, das mdformat zu einer Überschrift
+# zerlegt.
+exclude = [".claude/**"]

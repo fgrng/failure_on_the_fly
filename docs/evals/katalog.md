@@ -1,8 +1,8 @@
 # Evalkatalog, erster Entwurf (#300)
 
-Die katalogweiten Teile: *k*, die beiden Vorlagen und die übergreifenden
-Kriterien. Die Evals liegen in `eval-*.md`. Format und Konventionen:
-`README.md`.
+Die katalogweiten Teile: *k* und die beiden Vorlagen; die übergreifenden
+Kriterien stehen in `allgemeine_kriterien.md`. Die Evals liegen in `eval-*.md`.
+Format und Konventionen: `README.md`.
 
 Beide Vorlagen schöpfen aus dem Eval-Vertrag (ADR-0010, Nachführung #285): die
 Prompt-Platzhalter der Vignette, dazu `$inputstrategie` für die Lehrperson und
@@ -103,26 +103,6 @@ Deine Ausgabe ist ein JSON-Objekt mit den Feldern «begruendung» und «erfuellt
 
 ## uebergreifende_kriterien
 
-1. Rollentreue: Jede Äusserung der Schüler:in ist die einer Schülerin oder eines
-   Schülers dieser Klassenstufe, die oder der über die eigene Aufgabe spricht,
-   in der ersten Person und mit den Wörtern, die jemand in diesem Alter benutzt.
-   Nicht erfüllt, sobald eine Äusserung die Schüler:in als Programm, Modell,
-   Simulation oder Rolle zu erkennen gibt, Anweisungen, einen Prompt oder eine
-   Beschreibung ihres Denkens erwähnt, das eigene Vorgehen als Fehler oder
-   Fehlvorstellung bezeichnet oder Fachwörter aus der Beschreibung der Denkweise
-   benutzt, die eine Schüler:in dieser Klassenstufe nicht hätte.
-2. Treue zur Denkweise: Jede Rechnung, jedes Ergebnis und jede Begründung der
-   Schüler:in folgt aus der Regel in der Beschreibung der Denkweise. Erfüllt,
-   wenn an jeder Stelle, an der die Beschreibung ein Ergebnis oder eine Reaktion
-   vorhersagt, genau dieses eintritt, auch nach einer Korrektur, einer Probe
-   oder einer gezeigten richtigen Lösung. Nicht erfüllt, wenn die Schüler:in an
-   einer Stelle fachlich richtig rechnet, wo die Regel ein anderes Ergebnis
-   liefert, wenn sie die richtige Sicht aus der Beschreibung als eigene Einsicht
-   übernimmt oder wenn sie ihr Vorgehen im Gespräch wechselt.
-3. Kein ungefragtes Verraten: Die Schüler:in gibt ihr Vorgehen nur so weit
-   preis, wie die Lehrperson danach fragt. Auf eine Frage nach dem Ergebnis
-   nennt sie das Ergebnis, auf eine Frage nach dem Vorgehen die Schritte, auf
-   eine Frage nach dem Warum die Begründung. Nicht erfüllt, wenn sie ungefragt
-   ihre ganze Regel ausbreitet, ungefragt begründet, warum ihr Vorgehen richtig
-   ist, oder ungefragt die Stelle nennt, an der ihr Vorgehen von der richtigen
-   Rechnung abweicht.
+Die Kriterien liegen in `allgemeine_kriterien.md`: je Kriterium eine
+`#`-Überschrift mit dem Namen, `## Beschreibung` für den Text an den Bewerter
+und `## Hintergrund` für Überlegungen, die nicht an den Bewerter gehen.

@@ -17,9 +17,8 @@ Regel erfragen
    die Regel aus der Beschreibung der Denkweise, formuliert so, wie jemand
    dieser Klassenstufe sie sagen würde, und mit der Herkunft, die die
    Beschreibung nennt (Unterricht, Schulbuch, Taschenrechner, frühere Aufgaben).
-   Nicht erfüllt, wenn die genannte Regel die fachlich richtige ist, wenn sie
-   von der Regel der Beschreibung abweicht oder wenn sie Fachwörter aus der
-   Beschreibung verwendet.
+   Nicht erfüllt, wenn die genannte Regel von der Regel der Beschreibung
+   abweicht oder wenn sie keine Regel nennt, sondern nur Beispiele aufzählt.
 2. Keine Ausnahme: Auf die Frage, ob die Regel immer gilt, antwortet die
    Schüler:in so sicher, wie die Beschreibung es vorsieht: Die Regel gilt immer,
    oder sie verweist auf Aufgaben, bei denen sie aufgegangen ist. Nicht erfüllt,
@@ -52,8 +51,8 @@ ______________________________________________________________________
 | lu11-02 Jonas | die Zahl bei x kommt mit dem Gegenzeichen auf die andere Seite, egal wo das x steht                              | Waage aus dem Unterricht, hat bei fast allen Gleichungen geklappt | «Was heisst Waage?» → «dass etwas rüberkommt und das Zeichen wechselt»                  |
 | lu11-03 Livia | bei Bruchgleichungen darf man die Kehrwerte nehmen, jeden Bruch umdrehen, Plus und Minus bleiben                 | Umformung 6 im Buch, bei a) aufgegangen                           | «Was heisst Kehrwert nehmen?» → jeden Bruch umdrehen, Zahlen als Bruch mit Nenner 1     |
 
-Nicht erfüllt bei Kriterium 2 wäre bei Livia «nur wenn auf jeder Seite ein Bruch
-steht», bei Jonas «nur wenn x vorne steht».
+Nicht erfüllt bei e2-keine-ausnahme wäre bei Livia «nur wenn auf jeder Seite ein
+Bruch steht», bei Jonas «nur wenn x vorne steht».
 
 ## Probeläufe
 
