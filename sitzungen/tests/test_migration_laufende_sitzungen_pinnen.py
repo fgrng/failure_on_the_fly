@@ -36,45 +36,51 @@ def _migrieren(bestand_anlegen: Callable[[], None]) -> None:
         MigrationExecutor(connection).migrate(ziel)
 
 
+def _wie(vorlage: Sitzung, **felder: object) -> Sitzung:
+    # Legt eine Sitzung mit Vignette, Kern und Modell-Konfiguration der Vorlage an.
+    return Sitzung.objects.create(
+        teilnahme=Teilnahme.objects.create(),
+        vignette=vorlage.vignette,
+        simulationskern=vorlage.simulationskern,
+        modell_konfiguration=vorlage.modell_konfiguration,
+        **felder,
+    )
+
+
 @pytest.mark.django_db(transaction=True)
 def test_migration_pinnt_nur_laufende_sitzungen_ohne_pin() -> None:
     """Laufende Sitzungen ohne Pin bekommen die aktive Fassung, sonst bleibt alles."""
 
     bestand: dict[str, Sitzung] = {}
+    fassungen: dict[str, TranskriptionsKonfiguration] = {}
 
     def anlegen() -> None:
-        TranskriptionsKonfiguration.objects.aktive()
-        fruehere: TranskriptionsKonfiguration = transkriptions_fassung()
+        fassungen["aktive"] = TranskriptionsKonfiguration.objects.aktive()
+        fassungen["fruehere"] = transkriptions_fassung()
         laufend: Sitzung = sitzungen_anlegen(Teilnahme.objects.create(), 1)[0]
-        gepinnt: Sitzung = Sitzung.objects.create(
-            teilnahme=Teilnahme.objects.create(),
-            vignette=laufend.vignette,
-            simulationskern=laufend.simulationskern,
-            modell_konfiguration=laufend.modell_konfiguration,
-            transkriptions_konfiguration=fruehere,
+        bestand["laufend"] = laufend
+        bestand["gepinnt"] = _wie(
+            laufend, transkriptions_konfiguration=fassungen["fruehere"]
         )
-        beendet: Sitzung = Sitzung.objects.create(
-            teilnahme=laufend.teilnahme,
-            vignette=laufend.vignette,
-            simulationskern=laufend.simulationskern,
-            modell_konfiguration=laufend.modell_konfiguration,
-            status=Sitzung.Status.ABGESCHLOSSEN,
-        )
-        bestand.update(
-            laufend=laufend, gepinnt=gepinnt, beendet=beendet, fruehere=fruehere
-        )
+        for status in (
+            Sitzung.Status.ABGESCHLOSSEN,
+            Sitzung.Status.ABGEBROCHEN,
+            Sitzung.Status.GESCHEITERT,
+        ):
+            bestand[status] = _wie(laufend, status=status)
 
     _migrieren(anlegen)
 
-    aktive_pk: int = TranskriptionsKonfiguration.objects.aktive().pk
     pins: dict[str, int | None] = {
-        name: Sitzung.objects.get(pk=bestand[name].pk).transkriptions_konfiguration_id
-        for name in ("laufend", "gepinnt", "beendet")
+        name: Sitzung.objects.get(pk=sitzung.pk).transkriptions_konfiguration_id
+        for name, sitzung in bestand.items()
     }
     assert pins == {
-        "laufend": aktive_pk,
-        "gepinnt": bestand["fruehere"].pk,
-        "beendet": None,
+        "laufend": fassungen["aktive"].pk,
+        "gepinnt": fassungen["fruehere"].pk,
+        "abgeschlossen": None,
+        "abgebrochen": None,
+        "gescheitert": None,
     }
 
 

@@ -949,8 +949,9 @@ Jede Sitzung in Training und Erhebung pinnt beim Start die aktive Fassung. Alle
 ihre Aufnahmen gehen an diese Fassung; ein Umschalten wirkt erst ab der nächsten
 Sitzung. Der Probelauf hat keine Sitzung und nimmt bei jeder Aufnahme die gerade
 aktive Fassung. Sitzungen, die bei der Umstellung auf Fassungen liefen, sind auf
-die damals aktive Fassung gepinnt. Nur Sitzungen, die schon vorher endeten,
-tragen keinen Pin.
+die damals aktive Fassung gepinnt. Ohne Pin bleiben Sitzungen, die schon vorher
+endeten, und laufende, wenn es bei der Umstellung noch keine Fassung gab; diese
+folgen weiter der aktiven.
 
 Das Token einer Fassung lässt sich ohne neue Fassung ersetzen: »Token ersetzen«
 im Detail einer Fassung mit echtem Anbieter tauscht es aus, Anbieter und
@@ -977,10 +978,10 @@ dann, wenn schon eines hinterlegt ist.
 Anlegen, Aktivieren und Token ersetzen sind der Administration vorbehalten.
 
 Der Export einer Erhebung führt je Sitzung die Nummer ihrer gepinnten Fassung
-(`transkriptions_konfiguration_id` in `sitzungen.csv`, `NA` für Sitzungen, die
-vor der Umstellung endeten) und in `transkriptionskonfigurationen.csv` die
-referenzierten Fassungen mit Anbieter, Transkriptionsmodell, Sprache und
-Anlagedatum, ohne Token und Basis-URL (ADR-0029).
+(`transkriptions_konfiguration_id` in `sitzungen.csv`, `NA` für Sitzungen ohne
+Pin) und in `transkriptionskonfigurationen.csv` die referenzierten Fassungen mit
+Anbieter, Transkriptionsmodell, Sprache und Anlagedatum, ohne Token und
+Basis-URL (ADR-0029).
 
 Ob transkribiert wird, entscheidet die Zero-Retention-Erklärung an der Fassung:
 Transkribiert wird nur mit einer Fassung, deren Anbieter nicht `fake` ist und

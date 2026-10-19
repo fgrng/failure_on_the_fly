@@ -53,9 +53,9 @@ amended-by: ["#278", ADR-0067, "#497", "#498", "#499", "#500", "#506"]
 > danach.
 >
 > **Nachgeführt durch #506:** Sitzungen, die bei der Umstellung auf Fassungen
-> noch liefen, tragen die damals aktive Fassung. `NA` in
-> `transkriptions_konfiguration_id` steht damit nur für Sitzungen, die vor der
-> Umstellung endeten.
+> noch liefen, tragen die damals aktive Fassung, sofern es eine gab. `NA` in
+> `transkriptions_konfiguration_id` steht damit für Sitzungen, die vor der
+> Umstellung endeten, und für laufende auf einer Instanz ohne Fassung.
 
 Der Export ist ein veröffentlichter Datenformatvertrag: Änderungen daran können
 Analyseskripte und bereits ausgegebene Datensätze brechen. Ab der ersten
