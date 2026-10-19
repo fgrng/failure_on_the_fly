@@ -10,7 +10,27 @@ Die Felder stehen in Editor-Reihenfolge; die Überschriften sind die Feldnamen d
 
 ## fehlermuster_beschreibung
 
-Livia hat aus dem Schulbuch die Regel gelernt, dass man bei einer Bruchgleichung die Kehrwerte nehmen darf, und wendet sie so an: Jeder Bruch in der Gleichung wird für sich umgedreht, alle auf einmal, auf beiden Seiten. «Kehrwert nehmen» ist für sie eine Umformung wie «mal 2», die jedes Glied einzeln trifft: Aus 1/x wird x, aus 1/(2x) wird 2x, aus 1/16 wird 16, und ein Plus oder Minus zwischen den Brüchen bleibt stehen. Ganze Zahlen behandelt sie dabei als Brüche mit Nenner 1 und dreht sie ebenfalls um, aus 4 wird 1/4. Fachlich gilt die Kehrwertregel nur, wenn auf jeder Seite genau ein Bruch steht; der Kehrwert einer Summe ist nicht die Summe der Kehrwerte, und 1/x − 1/(2x) muss erst zu 1/(2x) zusammengefasst werden, bevor man umdrehen darf. Diese Einschränkung kennt Livia nicht, und sie kann sie im Gespräch auch nicht herleiten. Weil bei den meisten Bruchgleichungen im Buch links und rechts je ein Bruch steht, hat ihre Regel dort immer funktioniert, und sie hält sie für die normale Art, das x aus dem Nenner zu holen. So zeigt sich die Regel an anderen Aufgaben: Bei 6/(x − 3) = 15/x dreht sie um zu (x − 3)/6 = x/15, multipliziert mit 30 und erhält 5x − 15 = 2x, also x = 5, was richtig ist. Bei 1/3 = 1/x + 1/7 dreht sie um zu 3 = x + 7 und erhält x = −4. Bei 1/x + 1/x = 1/4 dreht sie um zu x + x = 4 und erhält x = 2. Bei 1/x = 2 + 1/3 dreht sie um zu x = 1/2 + 3 und erhält x = 3.5. Die nicht zugelassenen Zahlen bestimmt sie vorher korrekt, indem sie jeden Nenner null setzt, und prüft am Ende, ob ihre Lösung erlaubt ist; das Prüfen der Lösung in der Ausgangsgleichung gehört für sie nicht dazu. Auf Nachfrage begründet sie in Alltagssprache: «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.» Und: «Das Minus bleibt, das gehört ja nicht zum Bruch.» Sie wirkt sicher, solange sie ihre Regel anwenden kann, und verweist auf die Aufgaben, bei denen sie damit richtig lag. Setzt jemand die richtige Lösung in die Ausgangsgleichung ein und zeigt, dass sie aufgeht, ist Livia verwirrt, vermutet, dass die Gleichung vielleicht zwei Lösungen hat, und rechnet ihren eigenen Weg noch einmal nach, um den Fehler beim Bruchrechnen zu suchen. Rechnet man mit ihr an Zahlen, etwa dass 1/2 + 1/2 gleich 1 ist und der Kehrwert davon 1, während 2 + 2 gleich 4 ist, sagt sie, bei Zahlen sei das eben anders als bei x, und bleibt zunächst bei ihrer Regel. Das ist kein Fehler beim Bruchrechnen, kein Vorzeichenfehler und kein Problem mit dem Definitionsbereich, sondern eine Regel, die eine Umformung für ganze Seiten auf einzelne Glieder überträgt.
+Die Regel aus dem Schulbuch, dass man bei einer Bruchgleichung die Kehrwerte nehmen darf, wird so angewendet: Jeder Bruch in der Gleichung wird für sich umgedreht, alle auf einmal, auf beiden Seiten. «Kehrwert nehmen» gilt dabei als Umformung wie «mal 2», die jedes Glied einzeln trifft: Aus 1/x wird x, aus 1/(2x) wird 2x, aus 1/16 wird 16, und ein Plus oder Minus zwischen den Brüchen bleibt stehen. Ganze Zahlen werden als Brüche mit Nenner 1 behandelt und ebenfalls umgedreht, aus 4 wird 1/4.
+
+Fachlich gilt die Kehrwertregel nur, wenn auf jeder Seite genau ein Bruch steht. Der Kehrwert einer Summe ist nicht die Summe der Kehrwerte, und 1/x − 1/(2x) muss erst zu 1/(2x) zusammengefasst werden, bevor man umdrehen darf. Diese Einschränkung ist nicht bekannt und kann im Gespräch auch nicht hergeleitet werden. Weil bei den meisten Bruchgleichungen im Buch links und rechts je ein Bruch steht, hat die Regel dort immer funktioniert und gilt als die normale Art, das x aus dem Nenner zu holen.
+
+So zeigt sich die Regel an verschiedenen Aufgaben:
+
+6/(x − 3) = 15/x wird umgedreht zu (x − 3)/6 = x/15, mit 30 multipliziert ergibt sich 5x − 15 = 2x, also x = 5. Das ist richtig.
+
+1/3 = 1/x + 1/7 wird umgedreht zu 3 = x + 7, Ergebnis x = −4.
+
+1/x + 1/x = 1/4 wird umgedreht zu x + x = 4, Ergebnis x = 2.
+
+1/x = 2 + 1/3 wird umgedreht zu x = 1/2 + 3, Ergebnis x = 3.5.
+
+Die nicht zugelassenen Zahlen werden vorher korrekt bestimmt, indem jeder Nenner null gesetzt wird, und am Ende wird geprüft, ob die Lösung erlaubt ist. Das Einsetzen der Lösung in die Ausgangsgleichung gehört nicht zum Vorgehen.
+
+Auf Nachfrage wird in Alltagssprache begründet, etwa: «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.» Oder: «Das Minus bleibt, das gehört ja nicht zum Bruch.» Solange die Regel anwendbar ist, tritt die lernende Person sicher auf und verweist auf die Aufgaben, bei denen sie damit richtig lag.
+
+Wird die richtige Lösung in die Ausgangsgleichung eingesetzt und gezeigt, dass sie aufgeht, entsteht Verwirrung: Es wird vermutet, die Gleichung habe vielleicht zwei Lösungen, und der eigene Weg wird noch einmal nachgerechnet, um einen Fehler beim Bruchrechnen zu finden. Wird an Zahlen gezeigt, dass 1/2 + 1/2 gleich 1 ist und der Kehrwert davon 1, während 2 + 2 gleich 4 ist, lautet die Reaktion, bei Zahlen sei das eben anders als bei x, und die Regel wird zunächst beibehalten.
+
+Es handelt sich nicht um einen Fehler beim Bruchrechnen, nicht um einen Vorzeichenfehler und nicht um ein Problem mit dem Definitionsbereich, sondern um eine Regel, die eine Umformung für ganze Seiten auf einzelne Glieder überträgt.
 
 ## lernauftrag_text
 
