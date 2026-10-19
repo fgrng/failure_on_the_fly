@@ -7,8 +7,10 @@ findet keinen. Wie der Eintrag lebt das Cookie gleitend einen Tag ab dem
 letzten Zugriff. Das Abmelden löscht die Probeläufe des Kontos.
 """
 
+import copy
 import secrets
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -23,8 +25,18 @@ _COOKIE: str = "probelauf"
 _PFAD: str = "/sitzungen/probelauf/"
 _FRIST: timedelta = timedelta(days=1)
 _SALZ: str = "sitzungen.probelauf"
-# Kennung und Zustand dieses Requests, einmal geladen.
+# Der Probelauf dieses Requests, einmal geladen.
 _ATTRIBUT: str = "_probelauf"
+
+
+@dataclass
+class _Geladen:
+    # Kennung und veränderbarer Zustand eines Requests, dazu der Zustand, wie
+    # er geladen wurde: An ihm erkennt die Middleware, ob sich etwas geändert hat.
+
+    kennung: str | None
+    zustand: dict[str, Any]
+    beim_laden: dict[str, Any]
 
 
 def probelauf_zustand(request: HttpRequest) -> dict[str, Any]:
@@ -34,7 +46,7 @@ def probelauf_zustand(request: HttpRequest) -> dict[str, Any]:
     Antwort fest.
     """
 
-    return _laden(request)[1]
+    return _laden(request).zustand
 
 
 def probelauf_beim_abmelden_loeschen(
@@ -55,18 +67,29 @@ def probelauf_middleware(
 ) -> Callable[[HttpRequest], HttpResponse]:
     """Hält den Probelauf nach jedem Zugriff unter dem Probelaufpfad fest.
 
-    Das Schreiben verschiebt die Frist von Eintrag und Cookie; ein leerer
-    Zustand löscht beide.
+    Jeder Zugriff verschiebt die Frist von Eintrag und Cookie; geschrieben
+    wird nur ein geänderter Zustand, damit eine bloß lesende Anfrage keinen
+    neueren überschreibt. Ein leerer Zustand löscht beide. Wie die Session
+    hält eine Anfrage mit Serverfehler nichts fest.
     """
 
     def middleware(request: HttpRequest) -> HttpResponse:
         response: HttpResponse = get_response(request)
-        if not request.path.startswith(_PFAD) or not request.user.is_authenticated:
+        if (
+            not request.path.startswith(_PFAD)
+            or not request.user.is_authenticated
+            or response.status_code >= 500
+        ):
             return response
-        kennung, zustand = _laden(request)
-        if zustand:
+        geladen: _Geladen = _laden(request)
+        kennung: str | None = geladen.kennung
+        if geladen.zustand:
             kennung = kennung or secrets.token_hex(16)
-            kurzlebiger_speicher.schreiben(_schluessel(request.user, kennung), zustand)
+            schluessel: str = _schluessel(request.user, kennung)
+            if geladen.zustand == geladen.beim_laden:
+                kurzlebiger_speicher.vorhalten(schluessel)
+            else:
+                kurzlebiger_speicher.schreiben(schluessel, geladen.zustand)
             response.set_cookie(
                 _COOKIE,
                 signing.dumps(kennung, salt=_SALZ),
@@ -84,7 +107,7 @@ def probelauf_middleware(
     return middleware
 
 
-def _laden(request: HttpRequest) -> tuple[str | None, dict[str, Any]]:
+def _laden(request: HttpRequest) -> _Geladen:
     # Liest Kennung und Zustand einmal je Request. Ein verfälschtes oder
     # abgelaufenes Cookie zählt als keines, ein fehlender oder abgelaufener
     # Eintrag als leerer Zustand.
@@ -102,7 +125,7 @@ def _laden(request: HttpRequest) -> tuple[str | None, dict[str, Any]]:
             zustand = (
                 kurzlebiger_speicher.lesen(_schluessel(request.user, kennung)) or {}
             )
-        setattr(request, _ATTRIBUT, (kennung, zustand))
+        setattr(request, _ATTRIBUT, _Geladen(kennung, zustand, copy.deepcopy(zustand)))
     return getattr(request, _ATTRIBUT)
 
 

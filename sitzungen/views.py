@@ -106,7 +106,7 @@ def _probelauf_vignette_und_kern(
 
 
 def _laufender_probelauf(request: HttpRequest) -> ScratchSink:
-    """Liefert den laufenden Probelauf; ohne ihn, etwa nach Ablauf, gibt es 404."""
+    # Liefert den laufenden Probelauf; ohne ihn, etwa nach Ablauf, gibt es 404.
 
     zustand: dict[str, object] = probelauf_zustand(request)
     if not zustand:

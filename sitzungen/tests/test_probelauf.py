@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import time_machine
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseServerError
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -61,16 +61,23 @@ def _probelauf_laeuft(client: Client) -> bool:
     return client.get(reverse("sitzungen:probelauf_gespraech")).status_code == 200
 
 
-@contextmanager
-def _probelauf_im_browser(client: Client, konto: Konto) -> Iterator[ScratchSink]:
-    # Der Probelauf dieses Browsers als Sink, danach festgehalten wie nach
-    # einer Anfrage.
+def _anfrage_aus_dem_browser(client: Client, konto: Konto) -> HttpRequest:
+    # Eine Anfrage auf das Gespräch mit den Cookies dieses Browsers.
 
     request: HttpRequest = RequestFactory().get(
         reverse("sitzungen:probelauf_gespraech")
     )
     request.COOKIES = {name: morsel.value for name, morsel in client.cookies.items()}
     request.user = konto
+    return request
+
+
+@contextmanager
+def _probelauf_im_browser(client: Client, konto: Konto) -> Iterator[ScratchSink]:
+    # Der Probelauf dieses Browsers als Sink, danach festgehalten wie nach
+    # einer Anfrage.
+
+    request: HttpRequest = _anfrage_aus_dem_browser(client, konto)
     yield ScratchSink(probelauf_zustand(request))
     probelauf_middleware(lambda _: HttpResponse())(request)
 
@@ -465,8 +472,8 @@ class ProbelaufRollenentzugTests(_ProbelaufAufbau):
         self.ada.groups.remove(autorin)
 
         self.assertEqual(self._status(), (403, 403))
-        self.assertFalse(_probelauf_laeuft(self.client))
         self.ada.groups.add(autorin)
+        self.assertFalse(_probelauf_laeuft(self.client))
         self.assertEqual(self._status(), (200, 200))
 
     def test_administration_ohne_rolle_startet_weiter(self) -> None:
@@ -1248,3 +1255,48 @@ class ProbelaufSpeicherTests(_ProbelaufAufbau):
             self.assertEqual(self._gespraech().status_code, 200)
         with time_machine.travel(timezone.now() + timedelta(hours=65), tick=False):
             self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_lesende_anfrage_ueberschreibt_keinen_neueren_schritt(self) -> None:
+        """Wer den Probelauf nur liest, schreibt seinen alten Stand nicht zurück."""
+
+        with _probelauf_im_browser(self.client, self.ada):
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+            )
+
+        self.assertContains(self._gespraech(), "Und warum?")
+
+    def test_gescheiterte_anfrage_haelt_nichts_fest(self) -> None:
+        """Wie bei der Session bleibt nach einem Serverfehler der alte Stand."""
+
+        def scheitern(request: HttpRequest) -> HttpResponse:
+            # Verwirft den Probelauf und scheitert danach.
+            ScratchSink(probelauf_zustand(request)).verwerfen()
+            return HttpResponseServerError()
+
+        probelauf_middleware(scheitern)(_anfrage_aus_dem_browser(self.client, self.ada))
+
+        self.assertContains(self._gespraech(), "Ich addiere einfach alles.")
+
+    def test_verfaelschtes_cookie_zaehlt_als_keines(self) -> None:
+        """Ein Cookie ohne gültige Signatur führt zu keinem Probelauf."""
+
+        self.client.cookies["probelauf"] = "probelauf-1-verfaelscht"
+
+        self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_debrief_loescht_den_eintrag(self) -> None:
+        """Nach dem Debrief findet auch eine Kopie des Cookies keinen Probelauf."""
+
+        kopie: Client = Client()
+        kopie.force_login(self.ada)
+        kopie.cookies["probelauf"] = self.client.cookies["probelauf"].value
+
+        self.client.post(reverse("sitzungen:probelauf_beenden"))
+        self.client.post(
+            reverse("sitzungen:probelauf_debrief"), {"diagnose": "Brüche addiert."}
+        )
+
+        self.assertEqual(
+            kopie.get(reverse("sitzungen:probelauf_gespraech")).status_code, 404
+        )
