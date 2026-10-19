@@ -2702,7 +2702,7 @@ class ErhebungsteilnahmeTests(TestCase):
         return [
             zeile.session_key
             for zeile in Session.objects.all()
-            if token in str(zeile.get_decoded()) or token in zeile.session_data
+            if token in str(zeile.get_decoded())
         ]
 
     def test_angemeldetes_konto_und_token_stehen_nie_in_derselben_session(

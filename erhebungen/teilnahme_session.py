@@ -14,10 +14,9 @@ from django.conf import settings
 from django.core import signing
 from django.http import HttpRequest, HttpResponse
 
-TEILNAHME_TOKENS_COOKIE: str = "erhebung_teilnahme_tokens"
-TEILNAHME_PFAD: str = "/erhebungen/teilnahme/"
-FRIST: timedelta = timedelta(days=1)
-
+_COOKIE: str = "erhebung_teilnahme_tokens"
+_PFAD: str = "/erhebungen/teilnahme/"
+_FRIST: timedelta = timedelta(days=1)
 _SALZ: str = "erhebungen.teilnahme_tokens"
 # Die Tokens dieses Requests, einmal aus dem Cookie gelesen.
 _ATTRIBUT: str = "_teilnahme_tokens"
@@ -44,14 +43,16 @@ def tokens_im_browser(request: HttpRequest) -> list[str]:
 
 
 def _tokens(request: HttpRequest) -> dict[str, str]:
-    # Ein Browser kann an mehreren Erhebungen teilnehmen: Teilnahme-Link -> Token.
+    # Liest die Zuordnung Teilnahme-Link -> Token einmal je Request aus dem
+    # Cookie; ein Browser kann an mehreren Erhebungen teilnehmen. Ein
+    # verfälschtes oder abgelaufenes Cookie zählt als leer.
 
     if not hasattr(request, _ATTRIBUT):
         tokens: dict[str, str] = {}
-        wert: str | None = request.COOKIES.get(TEILNAHME_TOKENS_COOKIE)
+        wert: str | None = request.COOKIES.get(_COOKIE)
         if wert is not None:
             try:
-                tokens = signing.loads(wert, salt=_SALZ, max_age=FRIST.total_seconds())
+                tokens = signing.loads(wert, salt=_SALZ, max_age=_FRIST)
             except signing.BadSignature:
                 pass
         setattr(request, _ATTRIBUT, tokens)
@@ -69,21 +70,21 @@ def teilnahme_tokens_middleware(
 
     def middleware(request: HttpRequest) -> HttpResponse:
         response: HttpResponse = get_response(request)
-        if not request.path.startswith(TEILNAHME_PFAD):
+        if not request.path.startswith(_PFAD):
             return response
         tokens: dict[str, str] = _tokens(request)
         if tokens:
             response.set_cookie(
-                TEILNAHME_TOKENS_COOKIE,
+                _COOKIE,
                 signing.dumps(tokens, salt=_SALZ),
-                max_age=FRIST,
-                path=TEILNAHME_PFAD,
+                max_age=_FRIST,
+                path=_PFAD,
                 secure=settings.SESSION_COOKIE_SECURE,
                 httponly=settings.SESSION_COOKIE_HTTPONLY,
                 samesite=settings.SESSION_COOKIE_SAMESITE,
             )
-        elif TEILNAHME_TOKENS_COOKIE in request.COOKIES:
-            response.delete_cookie(TEILNAHME_TOKENS_COOKIE, path=TEILNAHME_PFAD)
+        elif _COOKIE in request.COOKIES:
+            response.delete_cookie(_COOKIE, path=_PFAD)
         return response
 
     return middleware
