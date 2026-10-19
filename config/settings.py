@@ -90,6 +90,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    "erhebungen.teilnahme_session.teilnahme_tokens_middleware",
+    "sitzungen.probelauf_speicher.probelauf_middleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -182,6 +184,10 @@ MEDIA_URL: str = "/media/"
 EVALLAEUFE_SPERRE: Path = Path(
     os.environ.get("EVALLAEUFE_SPERRE", BASE_DIR / "evallaeufe.lock")
 )
+
+# Der kurzlebige Speicher hält die Inhalte flüchtiger Teilnahmen außerhalb der
+# Datenbank vor; im Betrieb liegt er unter einem `no_backup`-Ordner.
+FLUECHTIG_PFAD: Path = Path(os.environ.get("FLUECHTIG_PFAD", BASE_DIR / "fluechtig"))
 
 # Das Betriebslog geht nach stderr, wo supervisord es einsammelt (ADR-0065):
 # alles ab WARNING, Serverfehler aus `django.request` samt Traceback erst ab

@@ -1,7 +1,7 @@
 """Tests des Import-Kommandos und der Token-Eingabe für Abschriften."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import time_machine
@@ -15,6 +15,7 @@ from config.tests.aufbau import (
     aktive_modell_konfiguration,
     finale_vignette,
     finaler_kern,
+    konto_mit_rollen,
 )
 from erhebungen.models import (
     Erhebung,
@@ -27,6 +28,7 @@ from erhebungen.models import (
 )
 from fragebogen_items.models import FragebogenItem
 from konten.models import Konto
+from konten.navigation import AUSBILDERIN_GRUPPE
 from simulation.models import (
     ModellKonfiguration,
     TranskriptionsKonfiguration,
@@ -41,8 +43,9 @@ from sitzungen.models import (
     Teilnahme,
     Vignettenposition,
 )
-from training.abschriften import abschrift_holen
-from training.models import Abschrift
+from sitzungen.sink import GeruestSink, sink_fuer_teilnahme
+from training.abschriften import abschrift_freigeben, abschrift_holen
+from training.models import Abschrift, Training
 from vignetten.models import Vignette
 
 
@@ -119,6 +122,47 @@ def _gespielte_teilnahme_in_neuer_erhebung(name: str = "Brüche") -> Erhebungsbi
     return _gespielte_teilnahme(
         _erhebung_anlegen(Konto.objects.create_user(username="ada"), name=name)
     )
+
+
+def _fluechtig_gespielte_teilnahme(erhebung: Erhebung) -> Erhebungsbindung:
+    """Legt eine flüchtige Teilnahme an, gespielt über ihren Sink.
+
+    Die Inhalte liegen so im kurzlebigen Speicher, das Gerüst in der DB: ein
+    geglückter Schritt mit Fehlversuch, eine transkribierte Diagnose.
+    """
+
+    bindung: Erhebungsbindung = Erhebungsbindung.objects.create(
+        stichprobe=_stichprobe_anlegen(erhebung),
+        teilnahme=Teilnahme.objects.create(
+            sprachmodell_eingewilligt=True, speicherung_eingewilligt=False
+        ),
+        token="2345-6789",
+        abgeschlossen_am=timezone.now(),
+    )
+    vignette: Vignette = erhebung.vignetten.get()
+    sink: GeruestSink = sink_fuer_teilnahme(bindung.teilnahme)
+    sink.sitzung_starten(
+        vignette,
+        finaler_kern(),
+        ModellKonfiguration.objects.belegte(Verwendung.SCHUELERIN),
+    )
+    sink.gespraechsschritt_anhaengen(
+        eingabe="Wie hast du gerechnet?",
+        eingabemodus=Eingabemodus.TRANSKRIBIERT,
+        denkspur="Flüchtige Denkspur.",
+        aeusserung="Ich habe oben und unten zusammengezählt.",
+        fehlversuche=[{"grund": "Format", "rohantwort": "{kaputt"}],
+    )
+    sink.diagnose_setzen(
+        "Zähler und Nenner addiert.", eingabemodus=Eingabemodus.GEMISCHT
+    )
+    Vignettenposition.objects.create(
+        teilnahme=bindung.teilnahme,
+        sitzung=sink.sitzung,
+        vignette=vignette,
+        position=1,
+    )
+    return bindung
 
 
 @pytest.mark.django_db
@@ -272,7 +316,7 @@ def test_kopierte_sitzungen_tragen_die_importzeit() -> None:
         "nicht_abgeschlossen",
         "stichprobe_archiviert",
         "erhebung_archiviert",
-        "fluechtig",
+        "fluechtig_abgelaufen",
     ],
 )
 def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
@@ -296,8 +340,9 @@ def test_weist_unbrauchbare_tokens_mit_derselben_meldung_ab(fall: str) -> None:
             _gespielte_teilnahme(erhebung)
             erhebung.finalisieren()
             erhebung.archivieren()
-        case "fluechtig":
-            _gespielte_teilnahme(erhebung, speicherung_eingewilligt=False)
+        case "fluechtig_abgelaufen":
+            with time_machine.travel(timezone.now() - timedelta(days=1, minutes=1)):
+                _fluechtig_gespielte_teilnahme(erhebung)
 
     with pytest.raises(ValidationError) as abgelehnt:
         abschrift_holen(teilnehmerin, token)
@@ -348,6 +393,130 @@ def test_zweiter_import_erzeugt_eine_eigenstaendige_zweite_abschrift() -> None:
     assert erste.teilnahme != zweite.teilnahme
     assert Abschrift.objects.count() == 2
     assert Sitzung.objects.filter(teilnahme=zweite.teilnahme).count() == 1
+
+
+@pytest.mark.django_db
+def test_holt_die_vorgehaltenen_inhalte_einer_fluechtigen_teilnahme() -> None:
+    """Aus dem kurzlebigen Speicher entsteht dieselbe Abschrift samt Denkspur."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = _erhebung_anlegen(Konto.objects.create_user(username="ada"))
+    bindung: Erhebungsbindung = _fluechtig_gespielte_teilnahme(erhebung)
+
+    abschrift: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+
+    assert abschrift.erhebungsname == erhebung.name
+    kopie: Sitzung = Sitzung.objects.get(teilnahme=abschrift.teilnahme)
+    original: Sitzung = Sitzung.objects.get(teilnahme=bindung.teilnahme)
+    assert kopie.vignette == original.vignette
+    assert kopie.status == Sitzung.Status.ABGESCHLOSSEN
+    schritt: Gespraechsschritt = kopie.gespraechsschritte.get()
+    assert schritt.eingabe == "Wie hast du gerechnet?"
+    assert schritt.denkspur == "Flüchtige Denkspur."
+    assert schritt.aeusserung == "Ich habe oben und unten zusammengezählt."
+    assert schritt.reihenfolge == 1
+    assert schritt.eingabemodus == Eingabemodus.TRANSKRIBIERT
+    assert [
+        (fehlversuch.grund, fehlversuch.rohantwort)
+        for fehlversuch in schritt.fehlversuch_set.all()
+    ] == [("Format", "{kaputt")]
+    assert kopie.diagnose.text == "Zähler und Nenner addiert."
+    assert kopie.diagnose.eingabemodus == Eingabemodus.GEMISCHT
+    position: Vignettenposition = abschrift.teilnahme.vignettenpositionen.get()
+    assert (position.position, position.sitzung) == (1, kopie)
+    # Die Erhebungsseite bleibt ohne Inhaltszeilen.
+    assert not Gespraechsschritt.objects.filter(sitzung=original).exists()
+    assert not Diagnose.objects.filter(sitzung=original).exists()
+
+
+@pytest.mark.django_db
+def test_import_verschiebt_die_frist_der_fluechtigen_inhalte_nicht() -> None:
+    """Wiederholte Importe binnen der Frist gelingen, verlängern sie aber nicht."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    erhebung: Erhebung = _erhebung_anlegen(Konto.objects.create_user(username="ada"))
+    with time_machine.travel(datetime(2026, 7, 1, 10, 0, tzinfo=UTC)):
+        bindung: Erhebungsbindung = _fluechtig_gespielte_teilnahme(erhebung)
+
+    with time_machine.travel(datetime(2026, 7, 2, 9, 0, tzinfo=UTC)):
+        erste: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+        zweite: Abschrift = abschrift_holen(teilnehmerin, bindung.token)
+    with time_machine.travel(datetime(2026, 7, 2, 11, 0, tzinfo=UTC)):
+        with pytest.raises(ValidationError):
+            abschrift_holen(teilnehmerin, bindung.token)
+
+    assert erste.teilnahme != zweite.teilnahme
+    assert Abschrift.objects.count() == 2
+
+
+def _fluechtige_abschrift_ueber_das_formular(client: Client, konto: Konto) -> Abschrift:
+    """Holt die Abschrift einer flüchtigen Teilnahme über das Token-Formular."""
+
+    erhebung: Erhebung = _erhebung_anlegen(Konto.objects.create_user(username="ada"))
+    bindung: Erhebungsbindung = _fluechtig_gespielte_teilnahme(erhebung)
+    client.force_login(konto)
+    client.post(reverse("training:abschriften"), {"token": bindung.token})
+    return Abschrift.objects.get(konto=konto)
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_zeigt_transkript_ohne_denkspur(
+    client: Client,
+) -> None:
+    """Die Ansicht zeigt Transkript, Ausgang und Diagnose, die Denkspur nicht."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
+    inhalt: str = client.get(
+        reverse("training:abschrift", args=[abschrift.pk])
+    ).content.decode()
+
+    assert "Wie hast du gerechnet?" in inhalt
+    assert "Ich habe oben und unten zusammengezählt." in inhalt
+    assert "Zähler und Nenner addiert." in inhalt
+    assert "Abgeschlossen" in inhalt
+    assert "Flüchtige Denkspur." not in inhalt
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_laesst_sich_freigeben(
+    client: Client,
+) -> None:
+    """Wie jede Abschrift geht sie an ein Training, dem das Konto angehört."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    training: Training = Training.objects.anlegen(
+        konto_mit_rollen("barbara", AUSBILDERIN_GRUPPE), name="Bruchrechnung"
+    )
+    training.veroeffentlichen()
+    training.beitreten(teilnehmerin)
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
+    abschrift_freigeben(abschrift, [training.pk])
+
+    assert list(abschrift.freigegeben_fuer.all()) == [training]
+
+
+@pytest.mark.django_db
+def test_abschrift_einer_fluechtigen_teilnahme_laesst_sich_loeschen(
+    client: Client,
+) -> None:
+    """Wie jede Abschrift verschwindet sie mit allem Kopierten."""
+
+    teilnehmerin: Konto = Konto.objects.create_user(username="grace")
+    abschrift: Abschrift = _fluechtige_abschrift_ueber_das_formular(
+        client, teilnehmerin
+    )
+
+    client.post(reverse("training:abschrift_loeschen", args=[abschrift.pk]))
+
+    assert not Abschrift.objects.exists()
+    assert not Sitzung.objects.filter(teilnahme_id=abschrift.teilnahme_id).exists()
 
 
 @pytest.mark.django_db

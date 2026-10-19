@@ -19,7 +19,7 @@ def teilnahme_token(request: HttpRequest) -> dict[str, str]:
     """Löst das Token der laufenden Teilnahme ohne Datenbankzugriff auf.
 
     Es steht in beiden Fällen schon vor der Tür: entweder in der URL selbst
-    oder in dem Session-Eintrag, den die Teilnahme ohnehin führt, um einen
+    oder in dem Cookie, das die Teilnahme ohnehin führt, um einen
     tokenbasierten Wiedereinstieg an den Browser zu binden.
     """
 

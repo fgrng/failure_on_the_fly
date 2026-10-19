@@ -1,9 +1,11 @@
 """Testweite Einstellungen, die die Produktivkonfiguration nicht berühren."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from django.conf import settings
+from django.test import override_settings
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -27,3 +29,10 @@ def pytest_configure(config: pytest.Config) -> None:
     die Stärke des Hashings.
     """
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture(autouse=True)
+def _fluechtiger_speicher(tmp_path: Path) -> Iterator[None]:
+    """Jeder Test hält flüchtige Inhalte in seinem eigenen leeren Verzeichnis."""
+    with override_settings(FLUECHTIG_PFAD=tmp_path / "fluechtig"):
+        yield

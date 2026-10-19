@@ -1,14 +1,17 @@
 """HTTP-Tests für den schreibfreien Probelauf."""
 
 import re
-from datetime import UTC, datetime
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 
 import time_machine
 from django.contrib.auth.models import Group
-from django.contrib.sessions.backends.base import SessionBase
-from django.http import HttpResponse
-from django.test import Client, TestCase, override_settings
+from django.contrib.sessions.models import Session
+from django.http import HttpRequest, HttpResponse, HttpResponseServerError
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from config.tests.aufbau import (
     aktive_modell_konfiguration,
@@ -37,7 +40,8 @@ from sitzungen.models import (
     Sitzung,
     Teilnahme,
 )
-from sitzungen.sink import ScratchSink, probelauf_laeuft
+from sitzungen.probelauf_speicher import probelauf_middleware, probelauf_zustand
+from sitzungen.sink import ScratchSink
 from vignetten.models import Vignette
 
 
@@ -49,6 +53,33 @@ _ENDGUELTIGER_FEHLSCHLAG: list[dict[str, str]] = [
     {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
     {"fehler": "anbieterfehler", "rohantwort": "Rohtext vom Anbieter"},
 ]
+
+
+def _probelauf_laeuft(client: Client) -> bool:
+    # Ob der Browser einen laufenden Probelauf hat, gefragt über sein Gespräch.
+
+    return client.get(reverse("sitzungen:probelauf_gespraech")).status_code == 200
+
+
+def _anfrage_aus_dem_browser(client: Client, konto: Konto) -> HttpRequest:
+    # Eine Anfrage auf das Gespräch mit den Cookies dieses Browsers.
+
+    request: HttpRequest = RequestFactory().get(
+        reverse("sitzungen:probelauf_gespraech")
+    )
+    request.COOKIES = {name: morsel.value for name, morsel in client.cookies.items()}
+    request.user = konto
+    return request
+
+
+@contextmanager
+def _probelauf_im_browser(client: Client, konto: Konto) -> Iterator[ScratchSink]:
+    # Der Probelauf dieses Browsers als Sink, danach festgehalten wie nach
+    # einer Anfrage.
+
+    request: HttpRequest = _anfrage_aus_dem_browser(client, konto)
+    yield ScratchSink(probelauf_zustand(request))
+    probelauf_middleware(lambda _: HttpResponse())(request)
 
 
 class _ProbelaufAufbau(TestCase):
@@ -206,7 +237,7 @@ class ProbelaufStartTests(_ProbelaufAufbau):
 
         self.assertContains(response, "zeigt Ihnen die Bearbeitung.")
         self.assertNotContains(response, "Neuer Kern.")
-        self.assertTrue(probelauf_laeuft(self.client.session))
+        self.assertTrue(_probelauf_laeuft(self.client))
 
     def test_archivierte_fassung_startet_nicht(self) -> None:
         """Eine archivierte Fassung ist nicht mehr spielbar."""
@@ -219,7 +250,7 @@ class ProbelaufStartTests(_ProbelaufAufbau):
         )
 
         self.assertEqual(response.status_code, 404)
-        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.assertFalse(_probelauf_laeuft(self.client))
 
     def test_rahmenhandlung_erscheint_als_szenentext_mit_woertlichen_werten(
         self,
@@ -441,8 +472,8 @@ class ProbelaufRollenentzugTests(_ProbelaufAufbau):
         self.ada.groups.remove(autorin)
 
         self.assertEqual(self._status(), (403, 403))
-        self.assertFalse(probelauf_laeuft(self.client.session))
         self.ada.groups.add(autorin)
+        self.assertFalse(_probelauf_laeuft(self.client))
         self.assertEqual(self._status(), (200, 200))
 
     def test_administration_ohne_rolle_startet_weiter(self) -> None:
@@ -537,15 +568,14 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         if geglueckt is None:
             geglueckt = self._geglueckte_neben_fehlschlag_anlegen()
         self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
-        session: SessionBase = self.client.session
-        gespraechsschritt_ausfuehren(
-            ScratchSink(session),
-            self.entwurf,
-            self.kern,
-            geglueckt,
-            eingabe="Wie rechnest du?",
-        )
-        session.save()
+        with _probelauf_im_browser(self.client, self.ada) as sink:
+            gespraechsschritt_ausfuehren(
+                sink,
+                self.entwurf,
+                self.kern,
+                geglueckt,
+                eingabe="Wie rechnest du?",
+            )
         return self.client.post(
             reverse("sitzungen:probelauf_gespraech"),
             {"eingabe": "Und warum?", "eingabemodus": eingabemodus},
@@ -750,14 +780,14 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
                     {"eingabe": "Wie rechnest du?"},
                 )
 
-            session: SessionBase = self.client.session
-            ausgang: Ausgang = gespraechsschritt_ausfuehren(
-                ScratchSink(session),
-                self.entwurf,
-                self.kern,
-                geglueckt,
-                eingabe="Und warum?",
-            )
+            with _probelauf_im_browser(self.client, self.ada) as sink:
+                ausgang: Ausgang = gespraechsschritt_ausfuehren(
+                    sink,
+                    self.entwurf,
+                    self.kern,
+                    geglueckt,
+                    eingabe="Und warum?",
+                )
 
         self.assertContains(response, "Die Antwort konnte nicht erzeugt werden.")
         self.assertNotContains(response, "Budget")
@@ -943,7 +973,7 @@ class ProbelaufGespraechTests(_ProbelaufAufbau):
         )
 
         self.assertRedirects(ende, reverse("vignetten:detail", args=[self.entwurf.pk]))
-        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.assertFalse(_probelauf_laeuft(self.client))
         self.assertEqual(zeilen_zaehlen(), zeilen)
 
 
@@ -1063,7 +1093,7 @@ class AdministratorinProbelaufTests(TestCase):
         self.assertRedirects(
             ende, reverse("sitzungen:administratorin_probelauf_auswahl")
         )
-        self.assertFalse(probelauf_laeuft(self.client.session))
+        self.assertFalse(_probelauf_laeuft(self.client))
         self.vignette.refresh_from_db()
         self.assertEqual(self.vignette.gepinnter_kern_id, self.gepinnter_kern_pk)
         self.assertNotEqual(
@@ -1111,7 +1141,7 @@ class GeteiltesKontoTests(_ProbelaufAufbau):
     """Ein Konto trägt mehrere gleichzeitige Probeläufe in getrennten Browsern."""
 
     def test_zwei_anmeldungen_desselben_kontos_proben_unabhaengig(self) -> None:
-        """Der Probelauf lebt in der Session, also je Browser statt je Konto."""
+        """Der Probelauf lebt je Browser statt je Konto."""
 
         ModellKonfiguration.objects.aktivieren(
             ModellKonfiguration.objects.create(
@@ -1154,3 +1184,119 @@ class GeteiltesKontoTests(_ProbelaufAufbau):
         self.assertNotContains(antwort_eins, "Frage aus Browser 2")
         self.assertContains(antwort_zwei, "Frage aus Browser 2")
         self.assertNotContains(antwort_zwei, "Frage aus Browser 1")
+
+
+class ProbelaufSpeicherTests(_ProbelaufAufbau):
+    """Der Probelauf liegt im kurzlebigen Speicher, an Browser und Konto gebunden."""
+
+    def setUp(self) -> None:
+        """Startet einen Probelauf mit einem geglückten Schritt."""
+
+        super().setUp()
+        ModellKonfiguration.objects.aktivieren(
+            ModellKonfiguration.objects.create(
+                bezeichnung="Test",
+                sprachmodell="fake",
+                parameter={
+                    "skript": [
+                        {
+                            "denkspur": "Mia addiert Zähler und Nenner.",
+                            "aeusserung": "Ich addiere einfach alles.",
+                        }
+                    ]
+                },
+            ),
+            Verwendung.SCHUELERIN,
+        )
+        self.client.post(reverse("sitzungen:probelauf_starten", args=[self.entwurf.pk]))
+        self.client.post(reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Wie?"})
+
+    def _gespraech(self) -> HttpResponse:
+        # Ruft das laufende Gespräch dieses Browsers auf.
+        return self.client.get(reverse("sitzungen:probelauf_gespraech"))
+
+    def test_neu_laden_zeigt_den_bisherigen_verlauf(self) -> None:
+        """Der Verlauf überdauert das Neuladen samt Denkspur."""
+
+        response: HttpResponse = self._gespraech()
+
+        self.assertContains(response, "Ich addiere einfach alles.")
+        self.assertContains(response, "Mia addiert Zähler und Nenner.")
+
+    def test_keine_session_zeile_enthaelt_den_probelauf(self) -> None:
+        """Die Konto-Session trägt weder Probelauf noch Denkspur."""
+
+        for session in Session.objects.all():
+            daten: dict[str, object] = session.get_decoded()
+            self.assertNotIn("probelauf", daten)
+            self.assertNotIn("Mia addiert", str(daten))
+
+    def test_nach_abmeldung_ist_der_probelauf_weg(self) -> None:
+        """Das Abmelden löscht den Probelauf, auch bei erneuter Anmeldung."""
+
+        self.client.post(reverse("logout"))
+        self.client.force_login(self.ada)
+
+        self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_anderes_konto_im_selben_browser_sieht_keinen_probelauf(self) -> None:
+        """Ein anderes Konto findet den Probelauf des ersten nicht."""
+
+        self.client.force_login(konto_mit_rollen("lin", "Autor:in"))
+
+        self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_probelauf_verfaellt_nach_einem_tag_ohne_zugriff(self) -> None:
+        """Jeder Zugriff verschiebt die Frist; ein Tag ohne Zugriff beendet ihn."""
+
+        with time_machine.travel(timezone.now() + timedelta(hours=20), tick=False):
+            self.assertEqual(self._gespraech().status_code, 200)
+        with time_machine.travel(timezone.now() + timedelta(hours=40), tick=False):
+            self.assertEqual(self._gespraech().status_code, 200)
+        with time_machine.travel(timezone.now() + timedelta(hours=65), tick=False):
+            self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_lesende_anfrage_ueberschreibt_keinen_neueren_schritt(self) -> None:
+        """Wer den Probelauf nur liest, schreibt seinen alten Stand nicht zurück."""
+
+        with _probelauf_im_browser(self.client, self.ada):
+            self.client.post(
+                reverse("sitzungen:probelauf_gespraech"), {"eingabe": "Und warum?"}
+            )
+
+        self.assertContains(self._gespraech(), "Und warum?")
+
+    def test_gescheiterte_anfrage_haelt_nichts_fest(self) -> None:
+        """Wie bei der Session bleibt nach einem Serverfehler der alte Stand."""
+
+        def scheitern(request: HttpRequest) -> HttpResponse:
+            # Verwirft den Probelauf und scheitert danach.
+            ScratchSink(probelauf_zustand(request)).verwerfen()
+            return HttpResponseServerError()
+
+        probelauf_middleware(scheitern)(_anfrage_aus_dem_browser(self.client, self.ada))
+
+        self.assertContains(self._gespraech(), "Ich addiere einfach alles.")
+
+    def test_verfaelschtes_cookie_zaehlt_als_keines(self) -> None:
+        """Ein Cookie ohne gültige Signatur führt zu keinem Probelauf."""
+
+        self.client.cookies["probelauf"] = "probelauf-1-verfaelscht"
+
+        self.assertEqual(self._gespraech().status_code, 404)
+
+    def test_debrief_loescht_den_eintrag(self) -> None:
+        """Nach dem Debrief findet auch eine Kopie des Cookies keinen Probelauf."""
+
+        kopie: Client = Client()
+        kopie.force_login(self.ada)
+        kopie.cookies["probelauf"] = self.client.cookies["probelauf"].value
+
+        self.client.post(reverse("sitzungen:probelauf_beenden"))
+        self.client.post(
+            reverse("sitzungen:probelauf_debrief"), {"diagnose": "Brüche addiert."}
+        )
+
+        self.assertEqual(
+            kopie.get(reverse("sitzungen:probelauf_gespraech")).status_code, 404
+        )

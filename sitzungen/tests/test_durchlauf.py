@@ -3,7 +3,6 @@
 from datetime import UTC, datetime
 
 import pytest
-from django.contrib.sessions.backends.db import SessionStore
 from time_machine import TimeMachineFixture
 
 from config.tests.sprachmodell import vor_jedem_aufruf
@@ -60,9 +59,9 @@ def _senken() -> list[SitzungSink]:
     # Je eine frische Senke jeder Art für die Paritätstests.
 
     return [
-        ScratchSink(SessionStore()),
+        ScratchSink({}),
         DBSink(Teilnahme.objects.create()),
-        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
+        FluechtigerSink(Teilnahme.objects.create()),
     ]
 
 
@@ -124,8 +123,8 @@ def test_scratch_sink_haelt_erfolgreichen_schritt_mit_fehlversuchen_in_db_form()
 ):
     """Der schreibfreie Sink bewahrt jeden Zug in der späteren Persistenzform auf."""
 
-    session: SessionStore = SessionStore()
-    sink: ScratchSink = ScratchSink(session)
+    zustand: dict[str, object] = {}
+    sink: ScratchSink = ScratchSink(zustand)
     kern: Simulationskern = Simulationskern(user_prompt_vorlage="$lernauftrag")
     vignette: Vignette = Vignette(
         lernauftrag_text="Addiere zwei Brüche.", gepinnter_kern=kern
@@ -253,7 +252,7 @@ def test_scratch_sink_schliesst_mit_diagnose_ab() -> None:
     """Auch der Probelauf ist nach der Diagnose beendet."""
 
     vignette, kern, konfiguration = _persistierbares_tripel([])
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
 
     sitzung_starten(scratch, vignette, konfiguration)
     scratch.diagnose_setzen("Zähler und Nenner werden addiert.")
@@ -274,7 +273,7 @@ def test_scratch_und_db_sink_tragen_dieselbe_gespraechsschritt_struktur() -> Non
             },
         ]
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -358,7 +357,7 @@ def test_schrittbudget_laesst_die_uhr_in_beiden_sinks_stehen() -> None:
 
     for sink in (
         DBSink(Teilnahme.objects.create()),
-        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
+        FluechtigerSink(Teilnahme.objects.create()),
     ):
         sitzung_starten(sink, vignette, konfiguration)
 
@@ -407,7 +406,7 @@ def test_sitzung_beenden_beendet_die_offene_spanne(
 
     beginn: datetime = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
-    for sink in (ScratchSink(SessionStore()), datenbank):
+    for sink in (ScratchSink({}), datenbank):
         time_machine.move_to(beginn, tick=False)
         sitzung_starten(sink, vignette, konfiguration)
         sink.zug_beginnen(beginn)
@@ -447,7 +446,7 @@ def test_modellverlauf_ist_fuer_beide_sinks_derselbe() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"denkspur": "Ich addiere alles.", "aeusserung": "2/5."}]
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -474,7 +473,7 @@ def test_modellverlauf_laesst_schritt_ohne_aeusserung_draussen() -> None:
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -518,7 +517,7 @@ def test_gespraechsschritt_meldet_fortgesetztes_gespraech_fuer_beide_sinks() -> 
         [{"denkspur": "Meine Regel.", "aeusserung": "2/5."}]
     )
 
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     for sink in (scratch, datenbank):
@@ -540,7 +539,7 @@ def test_gescheiterter_schritt_meldet_denselben_ausgang_und_wird_je_sink_behande
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
     )
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
 
     ausgaenge: list[Ausgang] = []
@@ -572,11 +571,9 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
     vignette.budget_typ = Vignette.BudgetTyp.SCHRITTE
     vignette.budget_wert = 1
     vignette.save(update_fields=["budget_typ", "budget_wert"])
-    scratch: ScratchSink = ScratchSink(SessionStore())
+    scratch: ScratchSink = ScratchSink({})
     datenbank: DBSink = DBSink(Teilnahme.objects.create())
-    fluechtig: FluechtigerSink = FluechtigerSink(
-        Teilnahme.objects.create(), SessionStore()
-    )
+    fluechtig: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create())
 
     ausgaenge: list[Ausgang] = []
     for sink in (scratch, datenbank, fluechtig):
@@ -596,8 +593,8 @@ def test_erschoepftes_budget_meldet_seinen_ausgang_und_schliesst_nur_den_probela
 
 
 @pytest.mark.django_db
-def test_fluechtiger_sink_haelt_den_verlauf_nur_in_der_session() -> None:
-    """Die Sitzung steht mit Status in der DB, ihr Gespräch nur in der Session."""
+def test_fluechtiger_sink_haelt_den_verlauf_nur_im_kurzlebigen_speicher() -> None:
+    """Die Sitzung steht mit Status in der DB, ihr Gespräch nur im Speicher."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [
@@ -605,8 +602,7 @@ def test_fluechtiger_sink_haelt_den_verlauf_nur_in_der_session() -> None:
             {"denkspur": "Meine Regel.", "aeusserung": "2/5."},
         ]
     )
-    session: SessionStore = SessionStore()
-    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), session)
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create())
 
     sitzung_starten(sink, vignette, konfiguration)
     gespraechsschritt_ausfuehren(
@@ -624,7 +620,7 @@ def test_fluechtiger_sink_haelt_den_verlauf_nur_in_der_session() -> None:
     assert not Diagnose.objects.exists()
     sitzung: Sitzung = Sitzung.objects.get()
     assert sitzung.status == Sitzung.Status.ABGESCHLOSSEN
-    wiederhergestellt: FluechtigerSink = FluechtigerSink.fuer_sitzung(sitzung, session)
+    wiederhergestellt: FluechtigerSink = FluechtigerSink.fuer_sitzung(sitzung)
     assert wiederhergestellt.gespraechsschritte == [
         {
             "reihenfolge": 1,
@@ -639,14 +635,13 @@ def test_fluechtiger_sink_haelt_den_verlauf_nur_in_der_session() -> None:
 
 
 @pytest.mark.django_db
-def test_fluechtiger_sink_haelt_den_gescheiterten_schritt_nur_in_der_session() -> None:
-    """Der Abbruchschritt steht im Verlauf der Session, der Status in der DB."""
+def test_fluechtiger_sink_haelt_den_gescheiterten_schritt_nur_im_speicher() -> None:
+    """Der Abbruchschritt steht im vorgehaltenen Verlauf, der Status in der DB."""
 
     vignette, kern, konfiguration = _persistierbares_tripel(
         [{"fehler": "anbieterfehler"}] * 3
     )
-    session: SessionStore = SessionStore()
-    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create(), session)
+    sink: FluechtigerSink = FluechtigerSink(Teilnahme.objects.create())
 
     sitzung_starten(sink, vignette, konfiguration)
     ausgang: Ausgang = gespraechsschritt_ausfuehren(
@@ -657,9 +652,7 @@ def test_fluechtiger_sink_haelt_den_gescheiterten_schritt_nur_in_der_session() -
     assert not Gespraechsschritt.objects.exists()
     assert not Fehlversuch.objects.exists()
     assert Sitzung.objects.get().status == Sitzung.Status.GESCHEITERT
-    [schritt] = FluechtigerSink.fuer_sitzung(
-        Sitzung.objects.get(), session
-    ).gespraechsschritte
+    [schritt] = FluechtigerSink.fuer_sitzung(Sitzung.objects.get()).gespraechsschritte
     assert (schritt["eingabe"], schritt["aeusserung"]) == ("Warum?", None)
     assert len(schritt["fehlversuche"]) == 3
 
@@ -701,7 +694,7 @@ def _geruestsenken() -> list[GeruestSink]:
 
     return [
         DBSink(Teilnahme.objects.create()),
-        FluechtigerSink(Teilnahme.objects.create(), SessionStore()),
+        FluechtigerSink(Teilnahme.objects.create()),
     ]
 
 
@@ -710,7 +703,7 @@ def _zweiter_tab(sink: GeruestSink) -> GeruestSink:
 
     sitzung: Sitzung = _sitzungszeile(sink)
     if isinstance(sink, FluechtigerSink):
-        return FluechtigerSink.fuer_sitzung(sitzung, sink.session)
+        return FluechtigerSink.fuer_sitzung(sitzung)
     return DBSink.fuer_sitzung(sitzung)
 
 

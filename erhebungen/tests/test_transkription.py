@@ -64,6 +64,9 @@ class ErhebungsTranskriptionTests(TestCase):
         )
         request.user = AnonymousUser()
         request.session = self.client.session
+        request.COOKIES = {
+            name: morsel.value for name, morsel in self.client.cookies.items()
+        }
         try:
             return transkriptions_endpunkt(
                 lambda _: anbieter, sitzung_fuer_transkription

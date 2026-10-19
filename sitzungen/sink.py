@@ -14,6 +14,7 @@ from simulation.models import (
     Simulationskern,
     TranskriptionsKonfiguration,
 )
+from sitzungen import kurzlebiger_speicher
 from sitzungen.models import (
     Diagnose,
     Eingabemodus,
@@ -25,8 +26,6 @@ from sitzungen.models import (
 from vignetten.models import Vignette
 
 
-_PROBELAUF_SESSION_SCHLUESSEL: str = "probelauf"
-_FLUECHTIGE_SITZUNGEN_SCHLUESSEL: str = "fluechtige_sitzungen"
 _VERBRAUCHTE_ZEIT_SCHLUESSEL: str = "verbrauchte_zeit"
 _ZEIT_LAEUFT_SEIT_SCHLUESSEL: str = "zeit_laeuft_seit"
 
@@ -55,6 +54,21 @@ class GespraechsschrittDaten(TypedDict):
     denkspur: str | None
     aeusserung: str | None
     fehlversuche: list[FehlversuchDaten]
+
+
+class DiagnoseDaten(TypedDict):
+    """Eine abgegebene Diagnose samt dem Weg, auf dem sie entstand."""
+
+    text: str
+    eingabemodus: str
+
+
+@dataclass(frozen=True)
+class Sitzungsinhalte:
+    """Was eine Sitzung über ihr Gerüst hinaus trägt, gleich wo es liegt."""
+
+    gespraechsschritte: list[GespraechsschrittDaten]
+    diagnose: DiagnoseDaten | None
 
 
 @dataclass
@@ -290,6 +304,14 @@ class GeruestSink(ABC):
     def abgegebene_diagnose(self) -> str | None:
         """Liefert den Text der bereits abgegebenen Diagnose, sonst nichts."""
 
+    @property
+    @abstractmethod
+    def inhalte(self) -> Sitzungsinhalte | None:
+        """Liefert Schritte samt Denkspur und Fehlversuchen und die Diagnose.
+
+        Gelesen wird nur; fehlt der Verlauf, gibt es nichts.
+        """
+
     @abstractmethod
     def _geglueckten_schritt_ablegen(
         self,
@@ -434,6 +456,38 @@ class DBSink(GeruestSink):
             .first()
         )
 
+    @property
+    def inhalte(self) -> Sitzungsinhalte:
+        """Liefert die gespeicherten Schritte und die Diagnose in der Speicherform."""
+
+        diagnose: Diagnose | None = Diagnose.objects.filter(
+            sitzung=self._sitzung
+        ).first()
+        return Sitzungsinhalte(
+            gespraechsschritte=[
+                _schrittdaten(
+                    schritt.reihenfolge,
+                    schritt.eingabe,
+                    schritt.eingabemodus,
+                    schritt.denkspur,
+                    schritt.aeusserung,
+                    [
+                        {
+                            "grund": fehlversuch.grund,
+                            "rohantwort": fehlversuch.rohantwort,
+                        }
+                        for fehlversuch in schritt.fehlversuch_set.all()
+                    ],
+                )
+                for schritt in self.gespraechsschritte
+            ],
+            diagnose=(
+                None
+                if diagnose is None
+                else {"text": diagnose.text, "eingabemodus": diagnose.eingabemodus}
+            ),
+        )
+
     def _geglueckten_schritt_ablegen(
         self,
         *,
@@ -492,26 +546,20 @@ class DBSink(GeruestSink):
 
 
 class FluechtigerSink(GeruestSink):
-    """Führt das Ablaufgerüst in der DB und die Inhalte nur in der Session.
+    """Führt das Ablaufgerüst in der DB und die Inhalte im kurzlebigen Speicher.
 
     Die Senke der flüchtigen Teilnahme: Gesprächsschritte samt Fehlversuchen
-    und die Diagnose liegen allein in der Browser-Session, je Sitzung unter
-    ihrem Primärschlüssel, und erreichen die DB nie.
+    und die Diagnose liegen je Sitzung unter ihrem Primärschlüssel im
+    kurzlebigen Speicher und erreichen die DB nie. Weil sie über die Sitzung
+    gefunden werden, setzt die Sitzung in jedem Browser fort (ADR „Flüchtige
+    Inhalte liegen in einem kurzlebigen Speicher“).
     """
 
-    def __init__(self, teilnahme: Teilnahme, session: MutableMapping[str, Any]) -> None:
-        """Bindet den Sink an die Teilnahme und den Session-Speicher des Browsers."""
-
-        super().__init__(teilnahme)
-        self.session: MutableMapping[str, Any] = session
-
     @classmethod
-    def fuer_sitzung(
-        cls, sitzung: Sitzung, session: MutableMapping[str, Any]
-    ) -> "FluechtigerSink":
+    def fuer_sitzung(cls, sitzung: Sitzung) -> "FluechtigerSink":
         """Stellt den Sink für eine laufende oder beendete Sitzung wieder her."""
 
-        sink: FluechtigerSink = cls(sitzung.teilnahme, session)
+        sink: FluechtigerSink = cls(sitzung.teilnahme)
         sink.sitzung = sitzung
         return sink
 
@@ -521,34 +569,50 @@ class FluechtigerSink(GeruestSink):
         simulationskern: Simulationskern,
         modell_konfiguration: ModellKonfiguration,
     ) -> None:
-        """Legt die Sitzung in der DB und ihren Verlauf in dieser Session an."""
+        """Legt die Sitzung in der DB und ihren leeren Verlauf im Speicher an."""
 
         super().sitzung_starten(vignette, simulationskern, modell_konfiguration)
-        self._verlauf_anlegen()
+        self._inhalt_speichern({"gespraechsschritte": []})
 
     @property
     def verlauf_fehlt(self) -> bool:
-        """Meldet eine Sitzung, deren Verlauf nicht in dieser Session liegt.
+        """Meldet eine Sitzung, deren Inhalte abgelaufen sind."""
 
-        Das ist in einem anderen Browser oder nach Ablauf der Session der Fall.
-        """
-
-        return str(self._sitzung.pk) not in self._sitzungsverlaeufe
+        return self._inhalt_laden() is None
 
     @property
     def gespraechsschritte(self) -> list[GespraechsschrittDaten]:
-        """Liefert die Schritte dieser Sitzung aus der Session."""
+        """Liefert die vorgehaltenen Schritte dieser Sitzung."""
 
         return cast(
             list[GespraechsschrittDaten],
-            self._zustand.setdefault("gespraechsschritte", []),
+            self._inhalt()["gespraechsschritte"],
         )
 
     @property
     def abgegebene_diagnose(self) -> str | None:
-        """Liefert die in der Session gehaltene Diagnose."""
+        """Liefert die vorgehaltene Diagnose."""
 
-        return cast(str | None, self._zustand.get("diagnose"))
+        return cast(str | None, self._inhalt().get("diagnose"))
+
+    @property
+    def inhalte(self) -> Sitzungsinhalte | None:
+        """Liefert die vorgehaltenen Inhalte, ohne ihre Frist zu verschieben."""
+
+        inhalt: dict[str, Any] | None = self._inhalt_laden()
+        if inhalt is None:
+            return None
+        return Sitzungsinhalte(
+            gespraechsschritte=inhalt["gespraechsschritte"],
+            diagnose=(
+                None
+                if "diagnose" not in inhalt
+                else {
+                    "text": inhalt["diagnose"],
+                    "eingabemodus": inhalt["diagnose_eingabemodus"],
+                }
+            ),
+        )
 
     def _geglueckten_schritt_ablegen(
         self,
@@ -559,7 +623,7 @@ class FluechtigerSink(GeruestSink):
         aeusserung: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        # Hängt den geglückten Schritt an den Verlauf der Session.
+        # Hängt den geglückten Schritt an den vorgehaltenen Verlauf.
 
         self._schritt_anhaengen(
             eingabe, eingabemodus, denkspur, aeusserung, fehlversuche
@@ -572,16 +636,18 @@ class FluechtigerSink(GeruestSink):
         eingabemodus: str,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        # Hält den antwortlosen Schritt nur im Verlauf der Session.
+        # Hält den antwortlosen Schritt nur im vorgehaltenen Verlauf.
 
         self._schritt_anhaengen(eingabe, eingabemodus, None, None, fehlversuche)
 
     def _diagnose_ablegen(self, text: str, *, eingabemodus: str) -> None:
-        # Hält die Diagnose in der Session. Der Eingabemodus gehört zum Inhalt
-        # und wird deshalb nicht festgehalten.
+        # Hält die Diagnose samt Eingabemodus im Speicher; beide gehören zum
+        # Inhalt und erreichen die DB nicht.
 
-        self._zustand["diagnose"] = text
-        _session_als_geaendert_markieren(self.session)
+        inhalt: dict[str, Any] = self._inhalt()
+        inhalt["diagnose"] = text
+        inhalt["diagnose_eingabemodus"] = eingabemodus
+        self._inhalt_speichern(inhalt)
 
     def _schritt_anhaengen(
         self,
@@ -591,11 +657,14 @@ class FluechtigerSink(GeruestSink):
         aeusserung: str | None,
         fehlversuche: list[FehlversuchDaten],
     ) -> None:
-        # Legt einen Schritt in der gemeinsamen Speicherform in die Session.
+        # Legt einen Schritt in der gemeinsamen Speicherform in den Speicher.
+        # Die Transaktion der Aufruferin serialisiert konkurrierende Schritte.
 
-        self.gespraechsschritte.append(
+        inhalt: dict[str, Any] = self._inhalt()
+        schritte: list[GespraechsschrittDaten] = inhalt["gespraechsschritte"]
+        schritte.append(
             _schrittdaten(
-                self._naechste_reihenfolge(),
+                len(schritte) + 1,
                 eingabe,
                 eingabemodus,
                 denkspur,
@@ -603,36 +672,53 @@ class FluechtigerSink(GeruestSink):
                 fehlversuche,
             )
         )
-        _session_als_geaendert_markieren(self.session)
+        self._inhalt_speichern(inhalt)
 
     def _schrittzahl(self) -> int:
-        # Zählt die Schritte der Session statt der Zeilen der DB.
+        # Zählt die vorgehaltenen Schritte statt der Zeilen der DB.
 
         return len(self.gespraechsschritte)
 
-    def _verlauf_anlegen(self) -> None:
-        # Der leere Eintrag weist diese Session als Trägerin des Verlaufs aus.
+    def _inhalt(self) -> dict[str, Any]:
+        # Die Inhalte dieser Sitzung; abgelaufene zählen als leerer Verlauf.
 
-        self._sitzungsverlaeufe[str(self._sitzung.pk)] = {"gespraechsschritte": []}
-        _session_als_geaendert_markieren(self.session)
+        return self._inhalt_laden() or {"gespraechsschritte": []}
 
-    @property
-    def _sitzungsverlaeufe(self) -> MutableMapping[str, Any]:
-        # Die Verläufe aller flüchtigen Sitzungen dieser Session.
+    def _inhalt_laden(self) -> dict[str, Any] | None:
+        # Liest die Inhalte dieser Sitzung frisch; abgelaufene fehlen.
 
         return cast(
-            MutableMapping[str, Any],
-            self.session.setdefault(_FLUECHTIGE_SITZUNGEN_SCHLUESSEL, {}),
+            dict[str, Any] | None,
+            kurzlebiger_speicher.lesen(_fluechtiger_schluessel(self._sitzung.pk)),
         )
 
-    @property
-    def _zustand(self) -> MutableMapping[str, Any]:
-        # Kapselt den Session-Eintrag dieser einen Sitzung.
+    def _inhalt_speichern(self, inhalt: dict[str, Any]) -> None:
+        # Schreibt die Inhalte dieser Sitzung und verschiebt damit ihre Frist.
 
-        return cast(
-            MutableMapping[str, Any],
-            self._sitzungsverlaeufe.setdefault(str(self._sitzung.pk), {}),
+        kurzlebiger_speicher.schreiben(
+            _fluechtiger_schluessel(self._sitzung.pk), inhalt
         )
+
+
+def fluechtige_inhalte_vorhalten(teilnahme: Teilnahme) -> None:
+    """Verschiebt die Frist der Inhalte aller Sitzungen einer flüchtigen Teilnahme.
+
+    Jeder Zugriff der Teilnahme ruft sie; abgelaufene Inhalte bleiben
+    abgelaufen.
+    """
+
+    if not teilnahme.ist_fluechtig:
+        return
+    for sitzung_pk in Sitzung.objects.filter(teilnahme=teilnahme).values_list(
+        "pk", flat=True
+    ):
+        kurzlebiger_speicher.vorhalten(_fluechtiger_schluessel(sitzung_pk))
+
+
+def _fluechtiger_schluessel(sitzung_pk: int) -> str:
+    # Der Schlüssel der Inhalte einer flüchtigen Sitzung im Speicher.
+
+    return f"sitzung-{sitzung_pk}"
 
 
 def _schrittdaten(
@@ -643,7 +729,7 @@ def _schrittdaten(
     aeusserung: str | None,
     fehlversuche: list[FehlversuchDaten],
 ) -> GespraechsschrittDaten:
-    # Baut die gemeinsame Speicherform der beiden Session-Senken.
+    # Baut die gemeinsame Speicherform der Sinks und des Probelaufs.
 
     return {
         "reihenfolge": reihenfolge,
@@ -655,46 +741,43 @@ def _schrittdaten(
     }
 
 
-def _session_als_geaendert_markieren(session: MutableMapping[str, Any]) -> None:
-    # Markiert verschachtelte Session-Änderungen für Django als speicherwürdig.
-
-    if hasattr(session, "modified"):
-        session.modified = True
-
-
-def sink_fuer_teilnahme(
-    teilnahme: Teilnahme, session: MutableMapping[str, Any]
-) -> GeruestSink:
+def sink_fuer_teilnahme(teilnahme: Teilnahme) -> GeruestSink:
     """Wählt die Senke einer neuen Sitzung allein nach der Speicherung."""
 
     if teilnahme.ist_fluechtig:
-        return FluechtigerSink(teilnahme, session)
+        return FluechtigerSink(teilnahme)
     return DBSink(teilnahme)
 
 
-def sink_fuer_sitzung(
-    sitzung: Sitzung, session: MutableMapping[str, Any]
-) -> GeruestSink:
+def sink_fuer_sitzung(sitzung: Sitzung) -> GeruestSink:
     """Wählt die Senke einer bestehenden Sitzung allein nach der Speicherung."""
 
     if sitzung.teilnahme.ist_fluechtig:
-        return FluechtigerSink.fuer_sitzung(sitzung, session)
+        return FluechtigerSink.fuer_sitzung(sitzung)
     return DBSink.fuer_sitzung(sitzung)
 
 
-def probelauf_laeuft(session: MutableMapping[str, Any]) -> bool:
-    """Meldet, ob die Session einen laufenden Probelauf trägt."""
+def sitzungsinhalte(sitzung: Sitzung) -> Sitzungsinhalte | None:
+    """Liefert die Inhalte einer Sitzung, gleich wo sie liegen.
 
-    return _PROBELAUF_SESSION_SCHLUESSEL in session
+    Die Inhalte einer flüchtigen Sitzung kommen aus dem kurzlebigen Speicher;
+    gelesen wird nur, die Frist bleibt, wo sie ist. Sind sie abgelaufen, gibt
+    es nichts.
+    """
+
+    return sink_fuer_sitzung(sitzung).inhalte
 
 
 class ScratchSink:
-    """Hält einen Probelauf ausschließlich in der Django-Session."""
+    """Hält einen Probelauf ausschließlich in seinem übergebenen Zustand.
 
-    def __init__(self, session: MutableMapping[str, Any]) -> None:
-        """Bindet den Sink an den Session-Speicher eines Probelaufs."""
+    Wo der Zustand zwischen den Anfragen liegt, entscheidet der Aufrufer.
+    """
 
-        self.session: MutableMapping[str, Any] = session
+    def __init__(self, zustand: MutableMapping[str, Any]) -> None:
+        """Bindet den Sink an den Zustand eines Probelaufs."""
+
+        self._zustand: MutableMapping[str, Any] = zustand
 
     def sitzung_starten(
         self,
@@ -702,15 +785,18 @@ class ScratchSink:
         simulationskern: Simulationskern,
         modell_konfiguration: ModellKonfiguration,
     ) -> None:
-        """Initialisiert den verworfenen Sitzungszustand in der Session."""
+        """Initialisiert den verworfenen Sitzungszustand."""
 
         self._gestartete_vignette: Vignette = vignette
-        self.session[_PROBELAUF_SESSION_SCHLUESSEL] = {
-            "vignette_pk": vignette.pk,
-            "kern_pk": simulationskern.pk,
-            "modell_konfiguration_pk": modell_konfiguration.pk,
-            "gespraechsschritte": [],
-        }
+        self._zustand.clear()
+        self._zustand.update(
+            {
+                "vignette_pk": vignette.pk,
+                "kern_pk": simulationskern.pk,
+                "modell_konfiguration_pk": modell_konfiguration.pk,
+                "gespraechsschritte": [],
+            }
+        )
         if vignette.budget_typ == Vignette.BudgetTyp.ZEIT:
             self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = 0.0
 
@@ -749,14 +835,6 @@ class ScratchSink:
         """Kennzeichnet ein administrativ frei gewähltes Tripel."""
 
         return bool(self._zustand.get("freie_auswahl"))
-
-    @property
-    def _zustand(self) -> MutableMapping[str, Any]:
-        # Kapselt die untypisierte Session-Struktur innerhalb des Scratch-Sinks.
-
-        return cast(
-            MutableMapping[str, Any], self.session[_PROBELAUF_SESSION_SCHLUESSEL]
-        )
 
     def antwortversuch_beginnen(self, jetzt: datetime) -> None:
         """Hält die Uhr an; der Probelauf hat nur einen Tab und nichts zu verwerfen."""
@@ -810,7 +888,7 @@ class ScratchSink:
     def diagnose_setzen(
         self, text: str, *, eingabemodus: str = Eingabemodus.GETIPPT
     ) -> bool:
-        """Hält die im Probelauf verworfene Diagnose in der Session.
+        """Hält die im Probelauf verworfene Diagnose im Zustand fest.
 
         Der Modus reist bis hierher, wird aber nicht festgehalten: Der
         Probelauf verwirft die Diagnose ohnehin (ADR-0014).
@@ -823,14 +901,12 @@ class ScratchSink:
         """Hält den Sitzungsstatus für den Probelauf fest."""
 
         self._zustand["status"] = status
-        _session_als_geaendert_markieren(self.session)
         return True
 
     def freie_auswahl_setzen(self) -> None:
         """Markiert das Tripel als administrativ frei gewählt."""
 
         self._zustand["freie_auswahl"] = True
-        _session_als_geaendert_markieren(self.session)
 
     @property
     def _vignette(self) -> Vignette:
@@ -873,7 +949,7 @@ class ScratchSink:
         )
 
     def _budgetstand_speichern(self, budgetstand: Budgetstand) -> None:
-        # Hält den Probelauf weiter vollständig in der Browser-Session.
+        # Hält den Budgetstand im Zustand des Probelaufs.
 
         self._zustand[_VERBRAUCHTE_ZEIT_SCHLUESSEL] = budgetstand.verbrauchte_zeit
         if budgetstand.offene_spanne_seit is None:
@@ -882,9 +958,8 @@ class ScratchSink:
             self._zustand[_ZEIT_LAEUFT_SEIT_SCHLUESSEL] = (
                 budgetstand.offene_spanne_seit.isoformat()
             )
-        _session_als_geaendert_markieren(self.session)
 
     def verwerfen(self) -> None:
-        """Entfernt den vollständigen Probelaufzustand aus der Session."""
+        """Leert den vollständigen Probelaufzustand."""
 
-        self.session.pop(_PROBELAUF_SESSION_SCHLUESSEL, None)
+        self._zustand.clear()

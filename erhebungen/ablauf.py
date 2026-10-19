@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
@@ -190,12 +188,8 @@ def ziehung_festschreiben(bindung: Erhebungsbindung) -> None:
         bindung.vignetten_ziehen()
 
 
-def vignette_beginnen(
-    bindung: Erhebungsbindung, session: MutableMapping[str, Any]
-) -> Sitzung | None:
+def vignette_beginnen(bindung: Erhebungsbindung) -> Sitzung | None:
     """Beginnt die nächste gezogene Vignette und hält ihre Position fest.
-
-    Die Session des Browsers nimmt bei flüchtiger Teilnahme den Verlauf auf.
 
     Läuft bereits eine Sitzung, bleibt es bei ihr; steht keine Vignette mehr an,
     entsteht keine. Beides macht das Kommando gegen einen zweiten Aufruf — aus
@@ -212,14 +206,12 @@ def vignette_beginnen(
                 vignette: Vignette | None = _naechste_gezogene_vignette(bindung)
                 if vignette is None:
                     return None
-                return _sitzung_beginnen(bindung, vignette, session)
+                return _sitzung_beginnen(bindung, vignette)
             case _:
                 return None
 
 
-def _sitzung_beginnen(
-    bindung: Erhebungsbindung, vignette: Vignette, session: MutableMapping[str, Any]
-) -> Sitzung:
+def _sitzung_beginnen(bindung: Erhebungsbindung, vignette: Vignette) -> Sitzung:
     # Startet die persistierte Sitzung und schreibt ihre gezogene Position.
 
     modell_konfiguration: ModellKonfiguration | None = (
@@ -227,7 +219,7 @@ def _sitzung_beginnen(
     )
     if modell_konfiguration is None:
         raise RuntimeError("Erhebungsvignetten brauchen eine Modell-Konfiguration.")
-    sink: GeruestSink = sink_fuer_teilnahme(bindung.teilnahme, session)
+    sink: GeruestSink = sink_fuer_teilnahme(bindung.teilnahme)
     sitzung_starten(sink, vignette, modell_konfiguration)
     sitzung: Sitzung = sink.sitzung
     Vignettenposition.objects.create(

@@ -7,6 +7,7 @@ from html.parser import HTMLParser
 from uuid import UUID
 
 import time_machine
+from django.contrib.sessions.models import Session
 from django.db import models
 from django.http import HttpResponse, HttpResponseBase
 from django.test import Client, TestCase
@@ -68,7 +69,11 @@ _SYSTEMTEXT_SPEICHERUNG: str = (
     "gespeichert und für Forschungszwecke ausgewertet. Ohne diese Einwilligung "
     "können Sie trotzdem vollständig teilnehmen; gespeichert werden dann nur "
     "technische Ablaufdaten (etwa welche Vignetten in welcher Reihenfolge gespielt "
-    "wurden und wie lange), nicht aber Ihre Eingaben. Sie können Ihre Einwilligung "
+    "wurden und wie lange), nicht aber Ihre Eingaben. Ihre Gespräche und "
+    "Diagnosen werden nur bis einen Tag nach Ihrem letzten Schritt vorgehalten und "
+    "dann gelöscht; bis dahin können Sie sich daraus eine persönliche Abschrift in "
+    "Ihr Nutzerkonto holen. Ihre Fragebogen-Antworten werden gar nicht gespeichert. "
+    "Sie können Ihre Einwilligung "
     "jederzeit widerrufen, indem Sie sich unter Angabe Ihres Teilnahme-Tokens an "
     "die Studienleitung wenden."
 )
@@ -81,8 +86,17 @@ _ABBRUCHTEXT: str = (
 
 # Der verbindliche Wortlaut des Abschlusshinweises einer flüchtigen Teilnahme.
 _NICHT_GESPEICHERT: str = (
-    "Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, "
-    "Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert."
+    "Sie haben der Speicherung Ihrer Daten für die Forschung nicht zugestimmt. "
+    "Ihre Gespräche und Diagnosen werden deshalb nur bis einen Tag nach Ihrem "
+    "letzten Schritt vorgehalten und dann gelöscht; Ihre Fragebogen-Antworten "
+    "wurden nicht gespeichert."
+)
+
+# Der verbindliche Hinweis zum Token unter dem Abschluss einer flüchtigen Teilnahme.
+_TOKEN_BINNEN_FRIST: str = (
+    "Notieren Sie dieses Token. Angemeldet holen Sie sich damit innerhalb dieser "
+    "Frist eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr Nutzerkonto. "
+    "Danach gibt es keine Abschrift mehr."
 )
 
 # Die eine Meldung, mit der die Tokeneingabe jedes unbrauchbare Token abweist.
@@ -242,6 +256,15 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         # Die jüngste Bindung gehört zu diesem Browser, auch neben früheren Teilnahmen.
         return Erhebungsbindung.objects.latest("pk")
+
+    def _nach_ablauf_der_frist(self) -> time_machine.travel:
+        """Springt hinter die Frist flüchtiger Inhalte, die Stichprobe läuft weiter."""
+
+        self.stichprobe.ende = timezone.now() + timedelta(days=7)
+        self.stichprobe.save(update_fields=["ende"])
+        return time_machine.travel(
+            timezone.now() + timedelta(days=1, seconds=1), tick=False
+        )
 
     def _einwilligung_url(self) -> str:
         # Das Einwilligungsformular der Stichprobe, zugleich ihre Startseite.
@@ -2095,6 +2118,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen(budget_wert=2)
         self._vignette_anlegen(budget_wert=2, position=2)
         self._erhebung_fertigstellen()
+        # Das angemeldete Konto sorgt dafür, dass django_session Zeilen hat.
+        self.client.force_login(Konto.objects.create_user(username="grace"))
         self.client.get(self.url)
         self.client.post(
             self._einwilligung_url(),
@@ -2112,7 +2137,7 @@ class ErhebungsteilnahmeTests(TestCase):
             )
             self.assertContains(gespraech, "Wie rechnest du?")
             self.assertContains(gespraech, "Ich addiere.")
-            # Der Reload im selben Browser zeigt den Verlauf aus der Session.
+            # Der Reload zeigt den vorgehaltenen Verlauf an derselben Stelle.
             neu_geladen: HttpResponse = self.client.get(gespraech_url)
             self.assertContains(neu_geladen, "Ich addiere.")
             self.assertNotContains(neu_geladen, 'id="sitzung-debrief"')
@@ -2142,9 +2167,20 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
         self.assertFalse(Diagnose.objects.exists())
+        self.assertTrue(Session.objects.exists())
+        sessions: str = "".join(
+            str(zeile.get_decoded()) for zeile in Session.objects.all()
+        )
+        for inhalt in (
+            "Wie rechnest du?",
+            "Ich addiere.",
+            "Geheime Regel.",
+            "Bruchfehler",
+        ):
+            self.assertNotIn(inhalt, sessions)
 
-    def test_fluechtige_abschlussseite_ersetzt_den_abschrift_baustein(self) -> None:
-        """Ohne Speicherung sagt die Abschlussseite, dass nichts gespeichert wurde."""
+    def test_fluechtige_abschlussseite_nennt_frist_und_token(self) -> None:
+        """Ohne Speicherung nennt die Abschlussseite die Frist und zeigt das Token."""
 
         self._vignette_anlegen()
         self._erhebung_fertigstellen()
@@ -2162,21 +2198,22 @@ class ErhebungsteilnahmeTests(TestCase):
             "erhebungen:abschluss", args=[self.stichprobe.teilnahme_link]
         )
 
-        # Auch der erneute Aufruf zeigt den Hinweis statt des Tokens.
+        # Auch der erneute Aufruf zeigt Hinweis und Token.
         for _ in range(2):
-            antwort: HttpResponse = self.client.get(abschluss_url)
-            seite: str = antwort.content.decode()
+            seite: str = self.client.get(abschluss_url).content.decode()
             self.assertIn(self.erhebung.abschlusstext, seite)
             self.assertIn(_NICHT_GESPEICHERT, seite)
             self.assertLess(
                 seite.index(self.erhebung.abschlusstext),
                 seite.index(_NICHT_GESPEICHERT),
             )
-            self.assertNotIn("section-abschrift", seite)
-            self.assertNotIn("Ohne dieses Token", seite)
-            self.assertNotIn(f'href="{reverse("training:abschriften")}"', seite)
-            # Das Token der Seitenleiste bleibt für den Wiedereinstieg.
-            self._seitenleiste_zeigt_nur_das_token(antwort, bindung.token)
+            # Ab dem Hinweis gelesen, damit das Token der Seitenleiste nicht
+            # für den Baustein einspringt.
+            baustein: str = seite[seite.index(_NICHT_GESPEICHERT) :]
+            self.assertIn(bindung.token, baustein)
+            self.assertIn(_TOKEN_BINNEN_FRIST, baustein)
+            self.assertNotIn("Ohne dieses Token", baustein)
+            self.assertIn(f'href="{reverse("training:abschriften")}"', baustein)
         bindung.refresh_from_db()
         self.assertIsNotNone(bindung.abgeschlossen_am)
 
@@ -2206,10 +2243,41 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
 
-    def test_token_wiedereinstieg_bricht_fluechtige_sitzung_ohne_verlauf_ab(
+    def test_token_wiedereinstieg_setzt_fluechtige_sitzung_mit_verlauf_fort(
         self,
     ) -> None:
-        """Ein frischer Browser spricht nicht mit einer Schüler:in ohne Gedächtnis."""
+        """Ein frischer Browser findet den vorgehaltenen Verlauf über das Token."""
+
+        self._vignette_anlegen(budget_wert=2)
+        self._vignette_anlegen(budget_wert=2, position=2)
+        self._erhebung_fertigstellen()
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+        sitzung: Sitzung = Sitzung.objects.get()
+
+        anderer_browser: Client = Client()
+        wiedereinstieg: HttpResponse = anderer_browser.get(gespraech_url)
+
+        self.assertContains(wiedereinstieg, "Wie rechnest du?")
+        self.assertContains(wiedereinstieg, "Ich addiere.")
+        weiter: HttpResponse = anderer_browser.post(
+            gespraech_url, {"eingabe": "Und dann?"}
+        )
+        self.assertContains(weiter, "Wie rechnest du?")
+        self.assertContains(weiter, "Und dann?")
+        self.assertContains(weiter, "Was ist Ihnen aufgefallen?")
+        sitzung.refresh_from_db()
+        self.assertEqual(sitzung.status, Sitzung.Status.LAUFEND)
+        self.assertEqual(Sitzung.objects.count(), 1)
+        self.assertFalse(Gespraechsschritt.objects.exists())
+
+    def test_fluechtige_sitzung_mit_abgelaufenen_inhalten_endet_abgebrochen(
+        self,
+    ) -> None:
+        """Nach Ablauf der Frist spricht niemand mit einer Schüler:in ohne Gedächtnis."""
 
         self._vignette_anlegen(budget_wert=2)
         self._vignette_anlegen(budget_wert=2, position=2)
@@ -2221,23 +2289,44 @@ class ErhebungsteilnahmeTests(TestCase):
         self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
         erste_sitzung: Sitzung = Sitzung.objects.get()
 
-        anderer_browser: Client = Client()
-        wiedereinstieg: HttpResponse = anderer_browser.get(gespraech_url)
+        with self._nach_ablauf_der_frist():
+            wiedereinstieg: HttpResponse = self.client.get(gespraech_url)
 
-        self.assertRedirects(
-            wiedereinstieg, gespraech_url, fetch_redirect_response=False
+            self.assertRedirects(
+                wiedereinstieg, gespraech_url, fetch_redirect_response=False
+            )
+            erste_sitzung.refresh_from_db()
+            self.assertEqual(erste_sitzung.status, Sitzung.Status.ABGEBROCHEN)
+            zweite_sitzung: Sitzung = Sitzung.objects.get(status=Sitzung.Status.LAUFEND)
+            self.assertNotEqual(zweite_sitzung.vignette, erste_sitzung.vignette)
+            weiter: HttpResponse = self.client.post(
+                gespraech_url, {"eingabe": "Und dann?"}
+            )
+            self.assertContains(weiter, "Und dann?")
+            self.assertNotContains(weiter, "Wie rechnest du?")
+
+    def test_zugriff_innerhalb_der_frist_verschiebt_sie(self) -> None:
+        """Wer binnen eines Tages zurückkehrt, hat wieder einen vollen Tag."""
+
+        self._vignette_anlegen(budget_wert=3)
+        self._erhebung_fertigstellen()
+        self.stichprobe.ende = timezone.now() + timedelta(days=7)
+        self.stichprobe.save(update_fields=["ende"])
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
         )
-        erste_sitzung.refresh_from_db()
-        self.assertEqual(erste_sitzung.status, Sitzung.Status.ABGEBROCHEN)
-        zweite_sitzung: Sitzung = Sitzung.objects.get(status=Sitzung.Status.LAUFEND)
-        self.assertNotEqual(zweite_sitzung.vignette, erste_sitzung.vignette)
-        weiter: HttpResponse = anderer_browser.post(
-            gespraech_url, {"eingabe": "Und dann?"}
-        )
-        self.assertContains(weiter, "Und dann?")
-        self.assertNotContains(weiter, "Wie rechnest du?")
-        zweite_sitzung.refresh_from_db()
-        self.assertEqual(zweite_sitzung.status, Sitzung.Status.LAUFEND)
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+        start = timezone.now()
+
+        with time_machine.travel(start + timedelta(hours=20), tick=False):
+            self.assertContains(Client().get(gespraech_url), "Wie rechnest du?")
+        with time_machine.travel(start + timedelta(hours=40), tick=False):
+            self.assertContains(Client().get(gespraech_url), "Wie rechnest du?")
+        with time_machine.travel(start + timedelta(hours=65), tick=False):
+            Client().get(gespraech_url)
+
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
 
     def test_abgebrochene_fluechtige_sitzung_fuehrt_zu_ihrem_fragebogen(
         self,
@@ -2252,11 +2341,14 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
 
-        anderer_browser: Client = Client()
-        anderer_browser.get(gespraech_url)
+        with self._nach_ablauf_der_frist():
+            anderer_browser: Client = Client()
+            anderer_browser.get(gespraech_url)
 
-        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
-        self.assertContains(anderer_browser.get(gespraech_url), "Wie war die Sitzung?")
+            self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
+            self.assertContains(
+                anderer_browser.get(gespraech_url), "Wie war die Sitzung?"
+            )
 
     def test_letzte_abgebrochene_fluechtige_sitzung_fuehrt_zum_abschluss(
         self,
@@ -2269,10 +2361,10 @@ class ErhebungsteilnahmeTests(TestCase):
             speicherung_eingewilligt="nein"
         )
 
-        anderer_browser: Client = Client()
-        wiedereinstieg: HttpResponse = anderer_browser.get(
-            reverse("erhebungen:gespraech", args=[bindung.token]), follow=True
-        )
+        with self._nach_ablauf_der_frist():
+            wiedereinstieg: HttpResponse = self.client.get(
+                reverse("erhebungen:gespraech", args=[bindung.token]), follow=True
+            )
 
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
         self.assertRedirects(
@@ -2283,7 +2375,7 @@ class ErhebungsteilnahmeTests(TestCase):
     def test_debrief_ohne_verlauf_schliesst_die_fluechtige_sitzung_nicht_ab(
         self,
     ) -> None:
-        """Auch ein Debrief aus einer verlorenen Session bricht die Sitzung ab."""
+        """Auch ein Debrief nach Ablauf der Frist bricht die Sitzung ab."""
 
         self._vignette_anlegen()
         self._erhebung_fertigstellen()
@@ -2292,17 +2384,20 @@ class ErhebungsteilnahmeTests(TestCase):
         )
         sitzung: Sitzung = Sitzung.objects.get()
 
-        Client().post(reverse("erhebungen:gespraech_beenden", args=[bindung.token]))
-        Client().post(
-            reverse("erhebungen:debrief", args=[bindung.token]),
-            {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
-        )
+        with self._nach_ablauf_der_frist():
+            self.client.post(
+                reverse("erhebungen:gespraech_beenden", args=[bindung.token])
+            )
+            self.client.post(
+                reverse("erhebungen:debrief", args=[bindung.token]),
+                {"diagnose": "Bruchfehler", "sitzung_pk": sitzung.pk},
+            )
 
         sitzung.refresh_from_db()
         self.assertEqual(sitzung.status, Sitzung.Status.ABGEBROCHEN)
 
     def test_fluechtige_sitzung_laeuft_im_selben_browser_weiter(self) -> None:
-        """Mit dem Verlauf in der Session bleibt die Sitzung beim Wiedereinstieg."""
+        """Mit vorgehaltenem Verlauf bleibt die Sitzung beim Wiedereinstieg."""
 
         self._vignette_anlegen(budget_wert=2)
         self._erhebung_fertigstellen()
@@ -2611,8 +2706,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertRedirects(antwort, abbruch_url, fetch_redirect_response=False)
         self.assertContains(self.browser_b.get(abbruch_url), _ABBRUCHTEXT)
 
-    def test_fluechtige_teilnahme_bricht_die_sitzung_ohne_verlauf_ab(self) -> None:
-        """Wie beim URL-Wiedereinstieg endet die laufende Sitzung `abgebrochen`."""
+    def test_fluechtige_teilnahme_setzt_mit_dem_verlauf_fort(self) -> None:
+        """Wie beim URL-Wiedereinstieg findet Browser B den vorgehaltenen Verlauf."""
 
         self._tokeneingabe_vorbereiten()
 
@@ -2624,7 +2719,25 @@ class ErhebungsteilnahmeTests(TestCase):
 
         antwort: HttpResponse = self._fortsetzen(bindung.token)
         self.assertRedirects(antwort, gespraech_url, fetch_redirect_response=False)
-        self.browser_b.get(gespraech_url)
+
+        self.assertContains(self.browser_b.get(gespraech_url), "Wie rechnest du?")
+        self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.LAUFEND)
+
+    def test_fluechtige_teilnahme_bricht_nach_ablauf_der_frist_ab(self) -> None:
+        """Mit abgelaufenen Inhalten endet die laufende Sitzung `abgebrochen`."""
+
+        self._tokeneingabe_vorbereiten()
+
+        bindung: Erhebungsbindung = self._laufende_sitzung_starten(
+            speicherung_eingewilligt="nein"
+        )
+        gespraech_url: str = reverse("erhebungen:gespraech", args=[bindung.token])
+        self.client.post(gespraech_url, {"eingabe": "Wie rechnest du?"})
+
+        with self._nach_ablauf_der_frist():
+            antwort: HttpResponse = self._fortsetzen(bindung.token)
+            self.assertRedirects(antwort, gespraech_url, fetch_redirect_response=False)
+            self.browser_b.get(gespraech_url)
 
         self.assertEqual(Sitzung.objects.get().status, Sitzung.Status.ABGEBROCHEN)
 
@@ -2691,6 +2804,114 @@ class ErhebungsteilnahmeTests(TestCase):
 
         self.assertRedirects(
             antwort,
+            reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
+            fetch_redirect_response=False,
+        )
+
+    def _session_zeilen_mit(self, token: str) -> list[str]:
+        # Die Zeilen von django_session, deren Inhalt das Token nennt.
+
+        return [
+            zeile.session_key
+            for zeile in Session.objects.all()
+            if token in str(zeile.get_decoded())
+        ]
+
+    def test_angemeldetes_konto_und_token_stehen_nie_in_derselben_session(
+        self,
+    ) -> None:
+        """Ein nebenbei angemeldetes Konto erfährt das Teilnahme-Token nicht (ADR-0006)."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.force_login(Konto.objects.create_user(username="grace"))
+
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+
+        token: str = Erhebungsbindung.objects.get().token
+        self.assertEqual(
+            self.client.cookies["erhebung_teilnahme_tokens"]["path"],
+            "/erhebungen/teilnahme/",
+        )
+        self.assertTrue(Session.objects.exists())
+        self.assertEqual(self._session_zeilen_mit(token), [])
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+
+    def test_an_und_abmeldung_lassen_die_teilnahme_im_browser(self) -> None:
+        """Wer sich nach der Teilnahme anmeldet, verknüpft Konto und Token nicht."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        token: str = Erhebungsbindung.objects.get().token
+
+        # Über die echten Views: Der Test-Client leert beim Abmelden alle Cookies.
+        Konto.objects.create_user(username="grace", password="geheim-123")
+        self.client.post(
+            reverse("login"), {"username": "grace", "password": "geheim-123"}
+        )
+
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(self._session_zeilen_mit(token), [])
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+        self.client.post(reverse("logout"))
+        self.assertEqual(
+            self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
+        )
+        self.assertEqual(Erhebungsbindung.objects.count(), 1)
+
+    def test_verfaelschtes_token_cookie_zaehlt_als_keines(self) -> None:
+        """Ein Cookie ohne gültige Signatur führt wie ein frischer Browser zu einer neuen Teilnahme."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        token: str = Erhebungsbindung.objects.get().token
+        self.client.cookies["erhebung_teilnahme_tokens"] = "verfaelscht"
+
+        neu: str = self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link)
+
+        self.assertNotEqual(neu, token)
+        self.assertEqual(Erhebungsbindung.objects.count(), 2)
+
+    def test_browser_vergisst_die_teilnahme_einen_tag_nach_dem_letzten_zugriff(
+        self,
+    ) -> None:
+        """Jeder Zugriff verlängert die Bindung; danach führt nur noch das Token weiter."""
+
+        self._tokeneingabe_vorbereiten()
+        Stichprobe.objects.filter(pk=self.stichprobe.pk).update(
+            ende=timezone.now() + timedelta(days=7)
+        )
+
+        with time_machine.travel(timezone.now(), tick=False) as uhr:
+            self.client.get(self.url)
+            self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+            token: str = Erhebungsbindung.objects.get().token
+            uhr.shift(timedelta(hours=23))
+            self.assertEqual(
+                self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link),
+                token,
+            )
+            uhr.shift(timedelta(hours=23))
+            self.assertEqual(
+                self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link),
+                token,
+            )
+            uhr.shift(timedelta(days=1, seconds=1))
+
+            neu: str = self._angezeigtes_token(
+                self.client, self.stichprobe.teilnahme_link
+            )
+            fortgesetzt: HttpResponse = self._fortsetzen(token, self.client)
+
+        self.assertNotEqual(neu, token)
+        self.assertRedirects(
+            fortgesetzt,
             reverse("erhebungen:instruktion", args=[self.stichprobe.teilnahme_link]),
             fetch_redirect_response=False,
         )

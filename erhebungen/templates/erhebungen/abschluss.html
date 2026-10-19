@@ -23,9 +23,9 @@
 
     {% comment %}
     Systemseitig und unabschaltbar, wie der Auftragsverarbeitungs-Absatz der
-    Einwilligung: Der Abschlusstext der Forschenden bleibt unberührt. Eine
-    flüchtige Teilnahme hat nichts, woraus sich eine Abschrift holen ließe,
-    und erfährt das statt des Tokens.
+    Einwilligung: Der Abschlusstext der Forschenden bleibt unberührt. Auch eine
+    flüchtige Teilnahme bekommt ihr Token; eine Abschrift holt sie nur, solange
+    ihre Inhalte vorgehalten werden.
     {% endcomment %}
     {% if fluechtig %}
     <section class="page-section" aria-labelledby="section-speicherung">
@@ -34,8 +34,9 @@
         </header>
         <div class="page-field">
             <p>
-                Sie haben der Speicherung Ihrer Daten nicht zugestimmt. Ihre Gespräche, Diagnosen und Fragebogen-Antworten wurden deshalb nicht gespeichert.
+                Sie haben der Speicherung Ihrer Daten für die Forschung nicht zugestimmt. Ihre Gespräche und Diagnosen werden deshalb nur bis einen Tag nach Ihrem letzten Schritt vorgehalten und dann gelöscht; Ihre Fragebogen-Antworten wurden nicht gespeichert.
             </p>
+            {% include "erhebungen/abschrift_token.html" with hinweis="Notieren Sie dieses Token. Angemeldet holen Sie sich damit innerhalb dieser Frist eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr Nutzerkonto. Danach gibt es keine Abschrift mehr." %}
         </div>
     </section>
     {% else %}
@@ -44,20 +45,7 @@
             <b>02</b><span><h2 id="section-abschrift">Ihre Abschrift</h2></span>
         </header>
         <div class="page-field">
-            <div class="card card--participant">
-                <div class="card__header">
-                    <h3>Ihr Teilnahme-Token</h3>
-                </div>
-                <div class="card__body">
-                    <p class="abschrift-token">{{ teilnahme_token }}</p>
-                    <p>
-                        Notieren Sie dieses Token. Angemeldet holen Sie sich damit später
-                        eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr
-                        Nutzerkonto. Ohne dieses Token gibt es keine Abschrift.
-                    </p>
-                    <p><a href="{% url 'training:abschriften' %}">Zur Token-Eingabe</a></p>
-                </div>
-            </div>
+            {% include "erhebungen/abschrift_token.html" with hinweis="Notieren Sie dieses Token. Angemeldet holen Sie sich damit später eine persönliche Abschrift Ihrer eigenen Sitzungen in Ihr Nutzerkonto. Ohne dieses Token gibt es keine Abschrift." %}
         </div>
     </section>
     {% endif %}

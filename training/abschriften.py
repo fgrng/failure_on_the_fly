@@ -20,6 +20,7 @@ from sitzungen.models import (
     Teilnahme,
     Vignettenposition,
 )
+from sitzungen.sink import GespraechsschrittDaten, Sitzungsinhalte, sitzungsinhalte
 
 from .models import Abschrift, Training
 
@@ -38,15 +39,20 @@ def abschrift_holen(konto: Konto, token: str) -> Abschrift:
     eigenständige Abschrift an. Eine Deduplizierung verlangte, dass sich das
     System merkt, welches Token in welches Konto ging — genau die verbotene
     Verknüpfung.
+
+    Eine flüchtige Teilnahme liefert ihre Inhalte, solange sie vorgehalten
+    werden; danach gilt das Token als unbrauchbar. Der Import liest nur und
+    verschiebt die Frist nicht.
     """
 
     bindung: Erhebungsbindung = _holbare_bindung(token)
+    inhalte: list[tuple[Sitzung, Sitzungsinhalte]] = _inhalte_lesen(bindung.teilnahme)
     abschrift: Abschrift = Abschrift.objects.create(
         teilnahme=Teilnahme.objects.create(),
         konto=konto,
         erhebungsname=bindung.stichprobe.erhebung.name,
     )
-    _sitzungen_kopieren(bindung.teilnahme, abschrift.teilnahme)
+    _sitzungen_kopieren(bindung.teilnahme, inhalte, abschrift.teilnahme)
     return abschrift
 
 
@@ -116,9 +122,8 @@ def teilnahme_einer_abschrift_raeumen(teilnahme: Teilnahme) -> None:
 
 
 def _holbare_bindung(token: str) -> Erhebungsbindung:
-    # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen,
-    # nicht flüchtig und nichts archiviert ist. Jeder andere Ausgang ist
-    # dieselbe Ablehnung.
+    # Löst das normalisierte Token auf, solange die Teilnahme abgeschlossen
+    # und nichts archiviert ist. Jeder andere Ausgang ist dieselbe Ablehnung.
 
     bindung: Erhebungsbindung | None = (
         Erhebungsbindung.objects.filter(
@@ -126,7 +131,6 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
             abgeschlossen_am__isnull=False,
             stichprobe__archiviert=False,
         )
-        .exclude(Teilnahme.fluechtig_q("teilnahme__"))
         .exclude(stichprobe__erhebung__status=Erhebung.Status.ARCHIVIERT)
         .select_related("stichprobe__erhebung", "teilnahme")
         .first()
@@ -136,8 +140,25 @@ def _holbare_bindung(token: str) -> Erhebungsbindung:
     return bindung
 
 
-def _sitzungen_kopieren(quelle: Teilnahme, ziel: Teilnahme) -> None:
-    # Kopiert die Sitzungen in ihrer Anlagereihenfolge. Die gespielte Reihenfolge
+def _inhalte_lesen(teilnahme: Teilnahme) -> list[tuple[Sitzung, Sitzungsinhalte]]:
+    # Liest die Inhalte aller Sitzungen in ihrer Anlagereihenfolge. Fehlt auch
+    # nur eine, sind die flüchtigen Inhalte abgelaufen: dieselbe Ablehnung.
+
+    gelesen: list[tuple[Sitzung, Sitzungsinhalte]] = []
+    for sitzung in teilnahme.sitzung_set.select_related("teilnahme").order_by("pk"):
+        inhalte: Sitzungsinhalte | None = sitzungsinhalte(sitzung)
+        if inhalte is None:
+            raise ValidationError(ABLEHNUNG)
+        gelesen.append((sitzung, inhalte))
+    return gelesen
+
+
+def _sitzungen_kopieren(
+    quelle: Teilnahme,
+    inhalte: list[tuple[Sitzung, Sitzungsinhalte]],
+    ziel: Teilnahme,
+) -> None:
+    # Kopiert die Sitzungen samt ihren Inhalten. Die gespielte Reihenfolge
     # steht in der Vignettenposition und wird je Sitzung mitgegeben — eine
     # Sitzung ohne Position bekommt auch in der Abschrift keine.
 
@@ -145,11 +166,13 @@ def _sitzungen_kopieren(quelle: Teilnahme, ziel: Teilnahme) -> None:
         position.sitzung_id: position.position
         for position in quelle.vignettenpositionen.all()
     }
-    for sitzung in quelle.sitzung_set.order_by("pk"):
-        _sitzung_kopieren(sitzung, ziel, positionen.get(sitzung.pk))
+    for sitzung, sitzung_inhalte in inhalte:
+        _sitzung_kopieren(sitzung, sitzung_inhalte, ziel, positionen.get(sitzung.pk))
 
 
-def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) -> None:
+def _sitzung_kopieren(
+    quelle: Sitzung, inhalte: Sitzungsinhalte, ziel: Teilnahme, position: int | None
+) -> None:
     # Kopiert eine Sitzung samt Transkript, Fehlversuchen und Diagnose. Die
     # Zeitstempel der Kopien entstehen neu (`auto_now_add`): Die Abschrift führt
     # die Importzeit, nicht die Spielzeit der Erhebung.
@@ -163,12 +186,13 @@ def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) ->
         status=quelle.status,
         verbrauchte_zeit=quelle.verbrauchte_zeit,
     )
-    for schritt in quelle.gespraechsschritte:
+    for schritt in inhalte.gespraechsschritte:
         _schritt_kopieren(schritt, kopie)
-    diagnose: Diagnose | None = Diagnose.objects.filter(sitzung=quelle).first()
-    if diagnose is not None:
+    if inhalte.diagnose is not None:
         Diagnose.objects.create(
-            sitzung=kopie, text=diagnose.text, eingabemodus=diagnose.eingabemodus
+            sitzung=kopie,
+            text=inhalte.diagnose["text"],
+            eingabemodus=inhalte.diagnose["eingabemodus"],
         )
     if position is not None:
         Vignettenposition.objects.create(
@@ -179,26 +203,26 @@ def _sitzung_kopieren(quelle: Sitzung, ziel: Teilnahme, position: int | None) ->
         )
 
 
-def _schritt_kopieren(schritt: Gespraechsschritt, ziel: Sitzung) -> None:
+def _schritt_kopieren(schritt: GespraechsschrittDaten, ziel: Sitzung) -> None:
     # Kopiert einen Gesprächsschritt einschließlich Denkspur: Der CheckConstraint
     # lässt Äußerung ohne Denkspur nicht zu, die Sichtbarkeitszusage aus ADR-0064
     # sitzt im Rendering.
 
     kopie: Gespraechsschritt = Gespraechsschritt.objects.create(
         sitzung=ziel,
-        eingabe=schritt.eingabe,
-        denkspur=schritt.denkspur,
-        aeusserung=schritt.aeusserung,
-        reihenfolge=schritt.reihenfolge,
-        eingabemodus=schritt.eingabemodus,
+        eingabe=schritt["eingabe"],
+        denkspur=schritt["denkspur"],
+        aeusserung=schritt["aeusserung"],
+        reihenfolge=schritt["reihenfolge"],
+        eingabemodus=schritt["eingabemodus"],
     )
     Fehlversuch.objects.bulk_create(
         [
             Fehlversuch(
                 gespraechsschritt=kopie,
-                grund=fehlversuch.grund,
-                rohantwort=fehlversuch.rohantwort,
+                grund=fehlversuch["grund"],
+                rohantwort=fehlversuch["rohantwort"],
             )
-            for fehlversuch in schritt.fehlversuch_set.all()
+            for fehlversuch in schritt["fehlversuche"]
         ]
     )

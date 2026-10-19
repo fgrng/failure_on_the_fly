@@ -9,6 +9,7 @@ __pycache__/
 .env
 db.sqlite3*
 evallaeufe.lock
+fluechtig/
 staticfiles/
 media/
 
