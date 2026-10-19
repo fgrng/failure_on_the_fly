@@ -1,8 +1,22 @@
 ---
-status: accepted
+status: amended
+amended-by: ["fluechtige-inhalte-im-kurzlebigen-speicher"]
 ---
 
 # Flüchtige Teilnahme: Gerüst in der DB, Inhalte nie
+
+> **Nachgeführt durch ADR „Flüchtige Inhalte liegen in einem kurzlebigen
+> Speicher, außerhalb der Forschungsdatenbank und getrennt von der
+> Konto-Session“:** Die „Browser-Session“ war Djangos Datenbank-Session, also
+> eine Zeile in der Forschungsdatenbank, ohne Ablauf und im Backup. Die Inhalte
+> liegen jetzt in einem kurzlebigen Dateispeicher außerhalb der
+> Forschungsdatenbank und jedes Backups, je Sitzung unter ihrem
+> Primärschlüssel, und werden einen Tag nach dem letzten Zugriff gelöscht. „Nie
+> gespeichert“ heißt: nie in der Forschungsdatenbank, nur vorgehalten. Weil die
+> Inhalte nicht mehr am Browser hängen, setzt eine flüchtige Sitzung in jedem
+> Browser mit Gedächtnis fort; als `abgebrochen` endet sie nur noch, wenn ihre
+> Inhalte abgelaufen sind (die Folge zu #281 gilt nur noch dafür). Solange die Inhalte
+> vorliegen, lässt sich aus ihnen eine Abschrift holen.
 
 Wer bei einer Erhebung der Speicherung und Verwendung für Forschungszwecke
 (Einwilligung c) widerspricht, macht eine **flüchtige Teilnahme**. Sie läuft
