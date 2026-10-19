@@ -1,10 +1,13 @@
 """Tests für das nächtliche Aufräumen abgelaufener Einträge und Sessions."""
 
+import os
 from datetime import UTC, datetime, timedelta
+from io import StringIO
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
-from django.contrib.sessions.models import Session
 from django.core.management import call_command
 from time_machine import TimeMachineFixture
 
@@ -29,7 +32,10 @@ def test_loescht_abgelaufene_eintraege_und_laesst_frische_stehen(
     kurzlebiger_speicher.schreiben("probelauf-3-neu", {"schritte": 1})
 
     time_machine.move_to(_BEGINN + timedelta(hours=30), tick=False)
-    call_command("aufraeumen")
+    ausgabe: StringIO = StringIO()
+    call_command("aufraeumen", stdout=ausgabe)
+
+    assert ausgabe.getvalue() == "2 abgelaufene Einträge gelöscht.\n"
 
     # Zurück zu einem Zeitpunkt, an dem alle vier noch gültig wären: Was jetzt
     # fehlt, hat der Befehl gelöscht.
@@ -52,8 +58,35 @@ def test_entfernt_abgelaufene_konto_sessions(time_machine: TimeMachineFixture) -
     gueltig.create()
 
     time_machine.move_to(_BEGINN + timedelta(hours=2), tick=False)
-    call_command("aufraeumen")
+    call_command("aufraeumen", stdout=StringIO())
 
-    assert set(Session.objects.values_list("session_key", flat=True)) == {
-        gueltig.session_key
-    }
+    assert not SessionStore().exists(abgelaufen.session_key)
+    assert SessionStore().exists(gueltig.session_key)
+
+
+def test_raeumt_liegengebliebene_dateien_und_uebergeht_unterordner(
+    time_machine: TimeMachineFixture,
+) -> None:
+    """Fremde alte Dateien gehen; ein Unterordner bricht den Lauf nicht ab."""
+
+    time_machine.move_to(_BEGINN, tick=False)
+    sitzung = SessionStore()
+    sitzung.set_expiry(timedelta(hours=1))
+    sitzung.create()
+
+    time_machine.move_to(_BEGINN + timedelta(days=3), tick=False)
+    verzeichnis: Path = Path(settings.FLUECHTIG_PFAD)
+    verzeichnis.mkdir(parents=True, exist_ok=True)
+    alt: float = _BEGINN.timestamp()
+    liegengeblieben: Path = verzeichnis / "tmpabgebrochen"
+    liegengeblieben.write_text("{", "utf-8")
+    os.utime(liegengeblieben, (alt, alt))
+    unterordner: Path = verzeichnis / "fremd"
+    unterordner.mkdir()
+    os.utime(unterordner, (alt, alt))
+
+    call_command("aufraeumen", stdout=StringIO())
+
+    assert not liegengeblieben.exists()
+    assert unterordner.is_dir()
+    assert not SessionStore().exists(sitzung.session_key)

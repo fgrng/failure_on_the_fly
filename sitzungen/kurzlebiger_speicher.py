@@ -86,13 +86,14 @@ def abgelaufene_loeschen() -> int:
     """Entfernt jeden abgelaufenen Eintrag und liefert, wie viele es waren.
 
     Auch liegengebliebene temporäre Dateien eines abgebrochenen Schreibens
-    gehen, sobald ihre Frist um ist.
+    gehen, sobald ihre Frist um ist. Fremde Ordner bleiben stehen, damit der
+    Lauf nicht vor dem Aufräumen der Sessions abbricht.
     """
 
     geloescht: int = 0
     for datei in _verzeichnis().iterdir():
         try:
-            if _ist_abgelaufen(datei):
+            if datei.is_file() and _ist_abgelaufen(datei):
                 datei.unlink()
                 geloescht += 1
         except FileNotFoundError:
