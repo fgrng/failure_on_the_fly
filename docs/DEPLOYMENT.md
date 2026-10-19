@@ -167,6 +167,7 @@ DEBUG=False
 ALLOWED_HOSTS=isabell.uber.space
 CSRF_TRUSTED_ORIGINS=https://isabell.uber.space
 DATABASE_PFAD=/home/isabell/failure_on_the_fly/db.sqlite3
+FLUECHTIG_PFAD=/home/isabell/no_backup/fluechtig
 STATIC_ROOT=/home/isabell/html/static
 MEDIA_ROOT=/home/isabell/html/media
 TIME_ZONE=Europe/Berlin
@@ -176,18 +177,19 @@ chmod 600 ~/failure_on_the_fly/.env
 
 Was die Werte bedeuten:
 
-| Variable               | Bedeutung                                                                                                                                                                                                 |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SECRET_KEY`           | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git.                                                                                                           |
-| `DEBUG`                | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen.                                                                |
-| `ALLOWED_HOSTS`        | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400.                                                                                        |
-| `CSRF_TRUSTED_ORIGINS` | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“.                                                                                  |
-| `DATABASE_PFAD`        | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst.                                                                          |
-| `STATIC_ROOT`          | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot.                                                                                                                                            |
-| `MEDIA_ROOT`           | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                    |
-| `TIME_ZONE`            | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC. |
-| `EVALLAEUFE_SPERRE`    | Optional. Sperrdatei, mit der höchstens ein Evallauf-Dienst arbeitet; voreingestellt `evallaeufe.lock` im Projektverzeichnis. Nur ändern, wenn das Projektverzeichnis nicht beschreibbar ist.             |
-| `SECURE_SSL_REDIRECT`  | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                             |
+| Variable               | Bedeutung                                                                                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SECRET_KEY`           | Signiert Sitzungen und CSRF-Token. Ein Wechsel meldet alle Angemeldeten ab. Gehört in kein Git.                                                                                                                                  |
+| `DEBUG`                | Muss `False` sein. Schaltet HTTPS-Weiterleitung, sichere Cookies und HSTS scharf und verhindert, dass Fehlerseiten interne Details zeigen.                                                                                       |
+| `ALLOWED_HOSTS`        | Kommaliste aller Hostnamen, unter denen die Instanz erreichbar ist. Fehlt ein Name, antwortet Django mit HTTP 400.                                                                                                               |
+| `CSRF_TRUSTED_ORIGINS` | Kommaliste mit Schema, also `https://…`. Ohne passenden Eintrag scheitert jedes Formular mit „CSRF verification failed“.                                                                                                         |
+| `DATABASE_PFAD`        | Absoluter Pfad der SQLite-Datei. Explizit gesetzt, damit ein Cronjob oder ein Backup-Skript dieselbe Datei meint wie der Dienst.                                                                                                 |
+| `FLUECHTIG_PFAD`       | Kurzlebiger Speicher für flüchtige Teilnahmen und Probeläufe, je Eintrag einen Tag ab dem letzten Zugriff. Gehört unter einen Ordner namens `no_backup`, den die Uberspace-Dateisicherung auslässt, mit Rechten 700 (Schritt 6). |
+| `STATIC_ROOT`          | Zielverzeichnis von `collectstatic`; zeigt ins Apache-Docroot.                                                                                                                                                                   |
+| `MEDIA_ROOT`           | Ablage der hochgeladenen Vignettenbilder; zeigt ebenfalls ins Docroot.                                                                                                                                                           |
+| `TIME_ZONE`            | Zeitzone, in der Forschende Zeitpunkte eingeben und angezeigt bekommen — etwa der Erhebungszeitraum einer Stichprobe. Voreingestellt ist `Europe/Berlin`; gespeichert wird unabhängig davon immer in UTC.                        |
+| `EVALLAEUFE_SPERRE`    | Optional. Sperrdatei, mit der höchstens ein Evallauf-Dienst arbeitet; voreingestellt `evallaeufe.lock` im Projektverzeichnis. Nur ändern, wenn das Projektverzeichnis nicht beschreibbar ist.                                    |
+| `SECURE_SSL_REDIRECT`  | Optional. Nur auf `False` setzen, wenn die Instanz in eine Weiterleitungsschleife läuft (siehe Abschnitt 13).                                                                                                                    |
 
 Bei einer eigenen Domain (Schritt 8) gehören deren Namen zusätzlich in
 `ALLOWED_HOSTS` und `CSRF_TRUSTED_ORIGINS`.
@@ -196,10 +198,18 @@ Bei einer eigenen Domain (Schritt 8) gehören deren Namen zusätzlich in
 
 ```bash
 cd ~/failure_on_the_fly
-mkdir -p ~/html/static ~/html/media
+mkdir -p ~/html/static ~/html/media ~/no_backup/fluechtig
+chmod 700 ~/no_backup ~/no_backup/fluechtig
 uv run python manage.py migrate
 uv run python manage.py collectstatic --noinput
 ```
+
+Unter `~/no_backup/fluechtig` liegen Gesprächsschritte und Diagnosen flüchtiger
+Teilnahmen sowie laufende Probeläufe. Sie dürfen in kein Backup: Wer der
+Speicherung nicht zugestimmt hat, soll auch in keiner Sicherung auftauchen.
+Uberspace lässt Ordner namens `no_backup` bei der Dateisicherung aus
+(<https://manual.uberspace.de/basics-backup/>); die Rechte 700 halten andere
+Benutzer:innen draußen.
 
 `migrate` legt nebenbei die drei fachlichen Rollen als Django-Groups an
 (`konten/apps.py`, post_migrate) — `Autor:in`, `Ausbilder:in`, `Forschende:r`
@@ -559,6 +569,18 @@ Evallauf-Dienstes *abgebrochen*.
 Vor jedem Update (Abschnitt 12) und vor jedem Eingriff in die Datenbank gehört
 ein Backup gezogen — von Hand, nicht auf den nächtlichen Lauf vertrauend.
 
+**Aufräumen:** Abgelaufene Einträge unter `FLUECHTIG_PFAD` und abgelaufene
+Konto-Sessions in der Datenbank löscht niemand von selbst. Das übernimmt
+`manage.py aufraeumen`: Er entfernt jeden Eintrag des kurzlebigen Speichers,
+dessen Tagesfrist um ist, und führt im selben Lauf Djangos `clearsessions` aus.
+Nächtlich, in derselben `crontab` wie das Backup:
+
+```
+15 4 * * * cd /home/isabell/failure_on_the_fly && .venv/bin/python manage.py aufraeumen > /dev/null
+```
+
+Die Zählausgabe geht nach `/dev/null`; Fehler landen über `MAILTO` im Postfach.
+
 ## 12. Update einspielen
 
 Der Ablauf für eine neue Version:
@@ -582,9 +604,13 @@ Dienste stehen, solange migriert wird, damit kein alter Prozess gegen ein neues
 Schema schreibt. Laufende Gesprächsschritte brechen ab, ein laufender Evallauf
 endet *abgebrochen*; wartende Läufe arbeitet der Dienst nach dem Start ab.
 Updates gehören deshalb nicht in ein offenes Teilnahmefenster einer Erhebung.
-Migrationen sind unveränderlich (ADR-0031) und laufen vorwärts; ein Rückweg
-führt über das Backup: Dienst stoppen, Sicherung an den `DATABASE_PFAD`
-kopieren, alten Stand auschecken, Dienst starten.
+Insbesondere nicht während einer laufenden Stichprobe deployen: Laufende
+flüchtige Teilnahmen und Probeläufe hängen am kurzlebigen Speicher und an
+Session-Daten; bereinigt ein Update diese, enden die betroffenen Sitzungen beim
+nächsten Zugriff als `abgebrochen`. Migrationen sind unveränderlich (ADR-0031)
+und laufen vorwärts; ein Rückweg führt über das Backup: Dienst stoppen,
+Sicherung an den `DATABASE_PFAD` kopieren, alten Stand auschecken, Dienst
+starten.
 
 **Nach dem Update auf die Zero-Retention-Erklärung an der Transkription:** Der
 frühere Umgebungsschalter der Transkription entfällt und kann aus der `.env`
