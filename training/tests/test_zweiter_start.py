@@ -9,7 +9,11 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import finale_vignette, konto_mit_rollen
+from config.tests.aufbau import (
+    erklaerte_aktive_transkription,
+    finale_vignette,
+    konto_mit_rollen,
+)
 from konten.models import Konto
 from simulation.models import ModellKonfiguration, Verwendung
 from sitzungen.models import Gespraechsschritt, Sitzung, Teilnahme
@@ -21,6 +25,8 @@ class ZweiterStartTests(TestCase):
     """Je Teilnahme läuft höchstens eine Trainingssitzung."""
 
     def setUp(self) -> None:
+        # Mit offenem Tor fragt das Training die Audioverarbeitung ab.
+        erklaerte_aktive_transkription()
         konfiguration: ModellKonfiguration = ModellKonfiguration.objects.create(
             bezeichnung="Test",
             sprachmodell="fake",

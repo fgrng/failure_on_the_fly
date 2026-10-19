@@ -6,7 +6,12 @@ from django.http import HttpResponse
 from django.test import TestCase
 from django.urls import reverse
 
-from config.tests.aufbau import finale_vignette, finaler_kern, konto_mit_rollen
+from config.tests.aufbau import (
+    erklaerte_aktive_transkription,
+    finale_vignette,
+    finaler_kern,
+    konto_mit_rollen,
+)
 from config.tests.formular import submit_knoepfe, text_ohne_tags
 from erhebungen.models import Erhebung
 from fragebogen_items.models import FragebogenItem
@@ -173,6 +178,7 @@ class SeitenvokabularTests(TestCase):
 
     def test_einwilligung_nennt_training_starten(self) -> None:
         """Die Einwilligung vor dem Start steht unter »Training starten«."""
+        erklaerte_aktive_transkription()
         antwort: HttpResponse = self.client.post(
             reverse("training:wahl", args=[self.veroeffentlicht.pk, self.finale.pk])
         )
