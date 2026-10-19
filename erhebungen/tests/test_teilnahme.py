@@ -2118,6 +2118,8 @@ class ErhebungsteilnahmeTests(TestCase):
         self._vignette_anlegen(budget_wert=2)
         self._vignette_anlegen(budget_wert=2, position=2)
         self._erhebung_fertigstellen()
+        # Das angemeldete Konto sorgt dafür, dass django_session Zeilen hat.
+        self.client.force_login(Konto.objects.create_user(username="grace"))
         self.client.get(self.url)
         self.client.post(
             self._einwilligung_url(),
@@ -2165,6 +2167,7 @@ class ErhebungsteilnahmeTests(TestCase):
         self.assertFalse(Gespraechsschritt.objects.exists())
         self.assertFalse(Fehlversuch.objects.exists())
         self.assertFalse(Diagnose.objects.exists())
+        self.assertTrue(Session.objects.exists())
         sessions: str = "".join(
             str(zeile.get_decoded()) for zeile in Session.objects.all()
         )
@@ -2860,6 +2863,20 @@ class ErhebungsteilnahmeTests(TestCase):
             self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link), token
         )
         self.assertEqual(Erhebungsbindung.objects.count(), 1)
+
+    def test_verfaelschtes_token_cookie_zaehlt_als_keines(self) -> None:
+        """Ein Cookie ohne gültige Signatur führt wie ein frischer Browser zu einer neuen Teilnahme."""
+
+        self._tokeneingabe_vorbereiten()
+        self.client.get(self.url)
+        self.client.post(self._einwilligung_url(), _ZUSTIMMUNG)
+        token: str = Erhebungsbindung.objects.get().token
+        self.client.cookies["erhebung_teilnahme_tokens"] = "verfaelscht"
+
+        neu: str = self._angezeigtes_token(self.client, self.stichprobe.teilnahme_link)
+
+        self.assertNotEqual(neu, token)
+        self.assertEqual(Erhebungsbindung.objects.count(), 2)
 
     def test_browser_vergisst_die_teilnahme_einen_tag_nach_dem_letzten_zugriff(
         self,

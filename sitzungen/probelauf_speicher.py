@@ -11,20 +11,17 @@ import copy
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
-from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
-from django.core import signing
 from django.http import HttpRequest, HttpResponse
 
+from sitzungen.pfad_cookie import PfadCookie
 from sitzungen import kurzlebiger_speicher
 
-_COOKIE: str = "probelauf"
-_PFAD: str = "/sitzungen/probelauf/"
-_FRIST: timedelta = timedelta(days=1)
-_SALZ: str = "sitzungen.probelauf"
+_COOKIE: PfadCookie = PfadCookie(
+    name="probelauf", pfad="/sitzungen/probelauf/", salz="sitzungen.probelauf"
+)
 # Der Probelauf dieses Requests, einmal geladen.
 _ATTRIBUT: str = "_probelauf"
 
@@ -76,7 +73,7 @@ def probelauf_middleware(
     def middleware(request: HttpRequest) -> HttpResponse:
         response: HttpResponse = get_response(request)
         if (
-            not request.path.startswith(_PFAD)
+            not request.path.startswith(_COOKIE.pfad)
             or not request.user.is_authenticated
             or response.status_code >= 500
         ):
@@ -90,18 +87,10 @@ def probelauf_middleware(
                 kurzlebiger_speicher.vorhalten(schluessel)
             else:
                 kurzlebiger_speicher.schreiben(schluessel, geladen.zustand)
-            response.set_cookie(
-                _COOKIE,
-                signing.dumps(kennung, salt=_SALZ),
-                max_age=_FRIST,
-                path=_PFAD,
-                secure=settings.SESSION_COOKIE_SECURE,
-                httponly=settings.SESSION_COOKIE_HTTPONLY,
-                samesite=settings.SESSION_COOKIE_SAMESITE,
-            )
+            _COOKIE.setzen(response, kennung)
         elif kennung is not None:
             kurzlebiger_speicher.loeschen(_schluessel(request.user, kennung))
-            response.delete_cookie(_COOKIE, path=_PFAD)
+            _COOKIE.loeschen(response)
         return response
 
     return middleware
@@ -113,14 +102,8 @@ def _laden(request: HttpRequest) -> _Geladen:
     # Eintrag als leerer Zustand.
 
     if not hasattr(request, _ATTRIBUT):
-        kennung: str | None = None
+        kennung: str | None = _COOKIE.lesen(request)
         zustand: dict[str, Any] = {}
-        wert: str | None = request.COOKIES.get(_COOKIE)
-        if wert is not None:
-            try:
-                kennung = signing.loads(wert, salt=_SALZ, max_age=_FRIST)
-            except signing.BadSignature:
-                pass
         if kennung is not None and request.user.is_authenticated:
             zustand = (
                 kurzlebiger_speicher.lesen(_schluessel(request.user, kennung)) or {}

@@ -7,17 +7,17 @@ einen Tag ab dem letzten Zugriff.
 """
 
 from collections.abc import Callable
-from datetime import timedelta
 from uuid import UUID
 
-from django.conf import settings
-from django.core import signing
 from django.http import HttpRequest, HttpResponse
 
-_COOKIE: str = "erhebung_teilnahme_tokens"
-_PFAD: str = "/erhebungen/teilnahme/"
-_FRIST: timedelta = timedelta(days=1)
-_SALZ: str = "erhebungen.teilnahme_tokens"
+from sitzungen.pfad_cookie import PfadCookie
+
+_COOKIE: PfadCookie = PfadCookie(
+    name="erhebung_teilnahme_tokens",
+    pfad="/erhebungen/teilnahme/",
+    salz="erhebungen.teilnahme_tokens",
+)
 # Die Tokens dieses Requests, einmal aus dem Cookie gelesen.
 _ATTRIBUT: str = "_teilnahme_tokens"
 
@@ -48,13 +48,7 @@ def _tokens(request: HttpRequest) -> dict[str, str]:
     # verfälschtes oder abgelaufenes Cookie zählt als leer.
 
     if not hasattr(request, _ATTRIBUT):
-        tokens: dict[str, str] = {}
-        wert: str | None = request.COOKIES.get(_COOKIE)
-        if wert is not None:
-            try:
-                tokens = signing.loads(wert, salt=_SALZ, max_age=_FRIST)
-            except signing.BadSignature:
-                pass
+        tokens: dict[str, str] = _COOKIE.lesen(request) or {}
         setattr(request, _ATTRIBUT, tokens)
     return getattr(request, _ATTRIBUT)
 
@@ -70,21 +64,13 @@ def teilnahme_tokens_middleware(
 
     def middleware(request: HttpRequest) -> HttpResponse:
         response: HttpResponse = get_response(request)
-        if not request.path.startswith(_PFAD):
+        if not request.path.startswith(_COOKIE.pfad):
             return response
         tokens: dict[str, str] = _tokens(request)
         if tokens:
-            response.set_cookie(
-                _COOKIE,
-                signing.dumps(tokens, salt=_SALZ),
-                max_age=_FRIST,
-                path=_PFAD,
-                secure=settings.SESSION_COOKIE_SECURE,
-                httponly=settings.SESSION_COOKIE_HTTPONLY,
-                samesite=settings.SESSION_COOKIE_SAMESITE,
-            )
-        elif _COOKIE in request.COOKIES:
-            response.delete_cookie(_COOKIE, path=_PFAD)
+            _COOKIE.setzen(response, tokens)
+        elif _COOKIE.name in request.COOKIES:
+            _COOKIE.loeschen(response)
         return response
 
     return middleware
