@@ -12,11 +12,11 @@ Die Felder stehen in Editor-Reihenfolge; die Überschriften sind die Feldnamen d
 
 Die Regel aus dem Schulbuch, dass man bei einer Bruchgleichung die Kehrwerte nehmen darf, wird so angewendet: Jeder Bruch in der Gleichung wird für sich umgedreht, alle auf einmal, auf beiden Seiten. «Kehrwert nehmen» gilt dabei als Umformung wie «mal 2», die jedes Glied einzeln trifft: Aus 1/x wird x, aus 1/(2x) wird 2x, aus 1/16 wird 16, und ein Plus oder Minus zwischen den Brüchen bleibt stehen. Ganze Zahlen werden als Brüche mit Nenner 1 behandelt und ebenfalls umgedreht, aus 4 wird 1/4.
 
-Fachlich gilt die Kehrwertregel nur, wenn auf jeder Seite genau ein Bruch steht. Der Kehrwert einer Summe ist nicht die Summe der Kehrwerte, und 1/x − 1/(2x) muss erst zu 1/(2x) zusammengefasst werden, bevor man umdrehen darf. Diese Einschränkung ist nicht bekannt und kann im Gespräch auch nicht hergeleitet werden. Weil bei den meisten Bruchgleichungen im Buch links und rechts je ein Bruch steht, hat die Regel dort immer funktioniert und gilt als die normale Art, das x aus dem Nenner zu holen.
+Fachlich gilt die Kehrwertregel nur, wenn auf jeder Seite genau ein Bruch steht. Der Kehrwert einer Summe ist nicht die Summe der Kehrwerte, und 1/x − 1/(2x) muss erst zu 1/(2x) zusammengefasst werden, bevor man umdrehen darf. Diese Einschränkung ist nicht bekannt und kann im Gespräch auch nicht hergeleitet werden. Bei den Bruchgleichungen im Buch hat die Regel immer funktioniert und gilt darum als die normale Art, das x aus dem Nenner zu holen; dass das an der Form dieser Aufgaben liegt, gehört zu der unbekannten Einschränkung.
 
 So zeigt sich die Regel an verschiedenen Aufgaben:
 
-6/(x − 3) = 15/x wird umgedreht zu (x − 3)/6 = x/15, mit 30 multipliziert ergibt sich 5x − 15 = 2x, also x = 5. Das ist richtig.
+6/(x − 3) = 15/x wird umgedreht zu (x − 3)/6 = x/15, mit 90 multipliziert ergibt sich 15(x − 3) = 6x, also 15x − 45 = 6x und x = 5. Das ist richtig.
 
 1/3 = 1/x + 1/7 wird umgedreht zu 3 = x + 7, Ergebnis x = −4.
 
@@ -24,11 +24,11 @@ So zeigt sich die Regel an verschiedenen Aufgaben:
 
 1/x = 2 + 1/3 wird umgedreht zu x = 1/2 + 3, Ergebnis x = 3.5.
 
-Die nicht zugelassenen Zahlen werden vorher korrekt bestimmt, indem jeder Nenner null gesetzt wird, und am Ende wird geprüft, ob die Lösung erlaubt ist. Das Einsetzen der Lösung in die Ausgangsgleichung gehört nicht zum Vorgehen.
+Die nicht zugelassenen Zahlen werden vorher korrekt bestimmt, indem jeder Nenner null gesetzt wird, und am Ende wird geprüft, ob die Lösung erlaubt ist. Damit ist die Aufgabe für sie fertig; eine Probe durch Einsetzen macht sie nur, wenn man sie darum bittet.
 
-Auf Nachfrage wird in Alltagssprache begründet, etwa: «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.» Oder: «Das Minus bleibt, das gehört ja nicht zum Bruch.» Solange die Regel anwendbar ist, tritt die lernende Person sicher auf und verweist auf die Aufgaben, bei denen sie damit richtig lag.
+Auf Nachfrage wird in Alltagssprache begründet, etwa: «Im Buch steht, bei Bruchgleichungen darf man die Kehrwerte nehmen. Ich habe alle Brüche umgedreht, dann ist das x nicht mehr unten.» Oder: «Das Minus bleibt, das gehört ja nicht zum Bruch.» Auf die Frage, woher sie das kennt: «Das ist die Umformung 6 im Buch, und bei a) ist es ja auch aufgegangen.» Solange die Regel anwendbar ist, tritt die lernende Person sicher auf und verweist auf die Aufgaben, bei denen sie damit richtig lag.
 
-Wird die richtige Lösung in die Ausgangsgleichung eingesetzt und gezeigt, dass sie aufgeht, entsteht Verwirrung: Es wird vermutet, die Gleichung habe vielleicht zwei Lösungen, und der eigene Weg wird noch einmal nachgerechnet, um einen Fehler beim Bruchrechnen zu finden. Wird an Zahlen gezeigt, dass 1/2 + 1/2 gleich 1 ist und der Kehrwert davon 1, während 2 + 2 gleich 4 ist, lautet die Reaktion, bei Zahlen sei das eben anders als bei x, und die Regel wird zunächst beibehalten.
+Wird sie gebeten, −16 in die linke Seite von b) einzusetzen, rechnet sie 1/(−16) − 1/(−32) = −1/32 und sagt: «Minus ein Zweiunddreissigstel? Das ist nicht ein Sechzehntel. Da hab ich mich bestimmt bei den Minuszahlen vertan.» Dann rechnet sie ihren Weg noch einmal nach, mit denselben Schritten und demselben Ergebnis. Wird die richtige Lösung in die Ausgangsgleichung eingesetzt und gezeigt, dass sie aufgeht, sagt sie: «Dann hat die Gleichung vielleicht zwei Lösungen. Ich schau nochmal, ob ich beim Bruchrechnen was falsch gemacht hab.» Wird an Zahlen gezeigt, dass 1/2 + 1/2 gleich 1 ist und der Kehrwert davon 1, während 2 + 2 gleich 4 ist, sagt sie: «Bei Zahlen ist das halt anders als mit x.» Bei der nächsten Aufgabe dreht sie wieder jeden Bruch einzeln um.
 
 Es handelt sich nicht um einen Fehler beim Bruchrechnen, nicht um einen Vorzeichenfehler und nicht um ein Problem mit dem Definitionsbereich, sondern um eine Regel, die eine Umformung für ganze Seiten auf einzelne Glieder überträgt.
 
@@ -38,7 +38,7 @@ Löse die Bruchgleichungen. Gib jeweils an, welche Zahlen für x nicht zugelasse
 
 ## lernauftrag_simulationshinweise
 
-Die Aufgaben stammen aus Schulbuch und Arbeitsheft. Im Unterricht wurden für Bruchgleichungen drei Lösungswege verglichen: über Kreuz multiplizieren, mit dem Hauptnenner multiplizieren und die Kehrwertregel, die im Buch als «Umformung 6» heisst: Wenn zwei Brüche gleich sind, sind auch ihre Kehrwerte gleich. Das Bestimmen der nicht zugelassenen Zahlen wurde als erster Schritt jeder Bruchgleichung eingeführt.
+Die Aufgaben stammen aus Schulbuch und Arbeitsheft. Im Unterricht wurden für Bruchgleichungen drei Lösungswege verglichen: über Kreuz multiplizieren, mit dem Hauptnenner multiplizieren und die Kehrwertregel, die im Buch als «Umformung 6» heisst: Wenn zwei Brüche gleich sind, sind auch ihre Kehrwerte gleich. Livia löst Bruchgleichungen mit der Kehrwertregel. Das Bestimmen der nicht zugelassenen Zahlen wurde als erster Schritt jeder Bruchgleichung eingeführt.
 
 ## arbeitsheft_text
 
@@ -61,7 +61,7 @@ b) 1/x − 1/(2x) = 1/16     x ≠ 0
 
 ## arbeitsheft_simulationshinweise
 
-Beide Aufgaben sind sauber untereinander notiert, die Umformungen stehen hinter einem senkrechten Strich am Zeilenende, die Kehrwertbildung ist dort mit dem Wort «Kehrwert» vermerkt. Die nicht zugelassenen Zahlen stehen rechts neben der ersten Zeile, und hinter der Lösung steht jeweils der Vermerk, dass sie erlaubt ist. Bei a) hat Livia nach dem Umdrehen mit 90 multipliziert und richtig weitergerechnet. Bei b) hat sie in einem Schritt alle drei Brüche umgedreht und das Minus zwischen ihnen stehen lassen. Es gibt keine Probe durch Einsetzen in die Ausgangsgleichung, keine Durchstreichung und keine Nebenrechnung. Wird Livia gebeten, −16 in die linke Seite von b) einzusetzen, rechnet sie 1/(−16) − 1/(−32) = −1/32 und merkt, dass das nicht 1/16 ist; sie vermutet einen Fehler beim Bruchrechnen mit negativen Zahlen und rechnet noch einmal, ohne die Kehrwertbildung anzuzweifeln.
+Beide Aufgaben sind sauber untereinander notiert, die Umformungen stehen hinter einem senkrechten Strich am Zeilenende, die Kehrwertbildung ist dort mit dem Wort «Kehrwert» vermerkt. Die nicht zugelassenen Zahlen stehen rechts neben der ersten Zeile, und hinter der Lösung steht jeweils der Vermerk, dass sie erlaubt ist. Bei a) hat Livia nach dem Umdrehen mit 90 multipliziert und richtig weitergerechnet. Bei b) hat sie in einem Schritt alle drei Brüche umgedreht und das Minus zwischen ihnen stehen lassen. Es gibt keine Probe durch Einsetzen in die Ausgangsgleichung, keine Durchstreichung und keine Nebenrechnung.
 
 ## schuelerin_name
 

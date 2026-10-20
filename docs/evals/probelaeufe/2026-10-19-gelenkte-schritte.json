@@ -1,0 +1,94 @@
+{
+  "eval-01-b": {
+    "lu11-01": [
+      "Elin, schau mal auf a): 5 + 7 = ___ + 6. Was hast du da gerechnet?",
+      "Und das Plus sechs hinter der Lücke, was ist damit?"
+    ],
+    "lu11-02": [
+      "Jonas, schau mal auf b): 81 − x = 9. Was hast du da gerechnet?",
+      "Bei b) steht das x hinter dem Minus, bei c) steht es davor. Was heisst das für deine Rechnung?"
+    ],
+    "lu11-03": [
+      "Livia, schau mal auf b): 1/x − 1/(2x) = 1/16. Was hast du da gerechnet?",
+      "Und das Minus zwischen den beiden Brüchen, was ist damit beim Umdrehen passiert?"
+    ]
+  },
+  "eval-02-a": {
+    "lu11-01": [
+      "Elin, ich habe noch eine Aufgabe, die nicht in deinem Heft steht: 8 + 5 = ___ + 4. Welche Zahl kommt in die Lücke?",
+      "Noch eine: 7 · 2 = ___ · 7. Was trägst du da ein?"
+    ],
+    "lu11-02": [
+      "Jonas, ich habe noch eine Gleichung, die nicht in deinem Heft steht: 14 − x = 5. Löse die mal.",
+      "Noch eine: 120 : x = 3. Was kommt für x raus?"
+    ],
+    "lu11-03": [
+      "Livia, ich habe noch eine Bruchgleichung, die nicht in deinem Heft steht: 1/x + 1/x = 1/4. Löse die mal.",
+      "Noch eine: 1/3 = 1/x + 1/7. Was kommt für x raus?"
+    ]
+  },
+  "eval-02-b": {
+    "lu11-01": [
+      "Elin, ich habe eine neue Aufgabe für dich: 6 + 9 = ___. Welche Zahl kommt in die Lücke?",
+      "Und jetzt diese: 10 − 3 = ___ + 2. Welche Zahl kommt rein, und hast du die beiden Aufgaben gleich gelöst?"
+    ],
+    "lu11-02": [
+      "Jonas, ich habe eine neue Gleichung für dich: 25 + x = 52. Löse die mal.",
+      "Und jetzt diese: 91 − x = 16. Was kommt für x raus, und hast du die beiden Gleichungen gleich gelöst?"
+    ],
+    "lu11-03": [
+      "Livia, ich habe eine neue Bruchgleichung für dich: 4/(x + 1) = 8/x. Löse die mal.",
+      "Und jetzt diese: 1/x + 1/(3x) = 1/12. Was kommt für x raus, und hast du die beiden Gleichungen gleich gelöst?"
+    ]
+  },
+  "eval-03-a": {
+    "lu11-01": [
+      "Elin, bei a) hast du 12 eingetragen: 5 + 7 = 12 + 6. Rechne mal auch die rechte Seite aus, also 12 + 6.",
+      "Gut. Jetzt eine neue Aufgabe: 6 + 6 = ___ + 3. Welche Zahl kommt in die Lücke?"
+    ],
+    "lu11-02": [
+      "Jonas, bei b) hast du x = 90. Setz die 90 mal in 81 − x ein und rechne das aus.",
+      "Gut. Jetzt eine neue Gleichung: 14 − x = 5. Löse die mal."
+    ],
+    "lu11-03": [
+      "Livia, bei b) hast du x = −16. Setz die −16 mal links ein, also in 1/x − 1/(2x), und rechne das aus.",
+      "Gut. Jetzt eine neue Bruchgleichung: 1/x + 1/x = 1/4. Löse die mal."
+    ]
+  },
+  "eval-03-b": {
+    "lu11-01": [
+      "Elin, bei a) habe ich die 6 in der Lücke: 5 + 7 ist 12, und 6 + 6 ist auch 12, dann sind beide Seiten gleich. Was meinst du dazu?",
+      "Okay. Jetzt eine neue Aufgabe: 8 + 5 = ___ + 4. Welche Zahl kommt in die Lücke?"
+    ],
+    "lu11-02": [
+      "Jonas, bei b) habe ich x = 72: 81 − 72 ist 9, das geht auf. Was meinst du dazu?",
+      "Okay. Jetzt eine neue Gleichung: 120 : x = 3. Löse die mal."
+    ],
+    "lu11-03": [
+      "Livia, bei b) habe ich x = 8: 1/8 − 1/16 ist 1/16, das geht auf. Was meinst du dazu?",
+      "Okay. Jetzt eine neue Bruchgleichung: 1/3 = 1/x + 1/7. Löse die mal."
+    ]
+  },
+  "eval-03-c": {
+    "lu11-01": [
+      "Elin, schau mal: 4 + 4 = 8, das stimmt, oder? Und 8 = 4 + 4, stimmt das auch? Wie erklärst du dir das?"
+    ],
+    "lu11-02": [
+      "Jonas, b) und c) sind ja zwei verschiedene Gleichungen, 81 − x = 9 und x − 81 = 9, und bei beiden hast du x = 90. Wie erklärst du dir das?"
+    ],
+    "lu11-03": [
+      "Livia, schau mal mit Zahlen: 1/2 + 1/2 ist 1, und der Kehrwert von 1 ist wieder 1. Wenn ich aber jeden Bruch einzeln umdrehe, bekomme ich 2 + 2 = 4. Wie erklärst du dir das?"
+    ]
+  },
+  "eval-04-b": {
+    "lu11-01": [
+      "Elin, was bedeutet für dich das Gleichheitszeichen?"
+    ],
+    "lu11-02": [
+      "Jonas, ihr hattet im Unterricht die Waage. Was heisst das für dich, wenn man sagt, eine Gleichung ist wie eine Waage?"
+    ],
+    "lu11-03": [
+      "Livia, in deinem Heft steht bei den Umformungen «Kehrwert». Was heisst das für dich, den Kehrwert nehmen?"
+    ]
+  }
+}

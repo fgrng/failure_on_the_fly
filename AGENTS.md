@@ -13,4 +13,5 @@ Außerhalb von Sandcastle vor jedem Commit: `uv run pytest`, `uv run ruff format
 - **Issue tracker**: GitHub issues via `gh`. See docs/agents/issue-tracker.md.
 - **Triage labels**: canonical names plus `Spec`. See docs/agents/triage-labels.md.
 - **Simulation ohne App**: einen Gesprächsschritt mit Vignette und Prompt-Entwurf per `uv run scripts/simulieren.py` durchspielen. See docs/agents/simulieren.md.
+- **Evals ohne App**: Evalgespräche k-mal spielen, Bewerter-Prompts rendern, Urteile zählen (`scripts/evalgespraech.py`, `bewerter_prompt.py`, `urteile_zaehlen.py`). See docs/evals/README.md, Abschnitt «Durchspielen ohne App».
 - **Image generation**: framing-story illustrations (`static/images/session/`) via the quota-limited `agy` CLI. See docs/agents/image-generation.md.

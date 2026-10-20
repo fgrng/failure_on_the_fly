@@ -9,7 +9,7 @@ Beispiel:
 
     uv run scripts/simulieren.py \\
         --vignette docs/vignetten/lu11-01-gleichheitszeichen-als-rechenaufforderung.md \\
-        --prompt docs/simulation_prompts/2026-10-19-systemprompt.md \\
+        --prompt docs/simulation_prompts/2026-10-20-systemprompt.md \\
         --verlauf @verlauf.json \\
         "Was hast du bei a) gerechnet?"
 

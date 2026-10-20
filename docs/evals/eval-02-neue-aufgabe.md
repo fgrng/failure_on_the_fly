@@ -29,18 +29,23 @@ Neue Aufgabe
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
    Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
    demselben Muster. Nenne nur die Aufgabe und bitte um die Lösung.
-2. gelenkt: Frage nach dem Rechenweg zu diesem Ergebnis.
-3. gelenkt: Lege eine zweite neue Aufgabe derselben Art mit anderen Zahlen vor,
-   ebenfalls eine, bei der die Denkweise ein falsches Ergebnis liefert.
+2. fest: Wie hast du das gerechnet? Sag mir deine Schritte.
+3. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
+   beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
+   Rechnung, mit anderen Zahlen als eben. Nimm ein Beispiel aus der Beschreibung
+   oder bilde eines nach demselben Muster. Nenne nur die Aufgabe und bitte um
+   die Lösung.
 
 ### Evalinput B: Erfolg und Misserfolg nacheinander
 
 1. gelenkt: Lege eine neue Aufgabe derselben Art vor, bei der die beschriebene
    Denkweise zufällig das richtige Ergebnis liefert; die Beschreibung nennt
    solche Fälle. Gibt es keinen, nimm eine beliebige neue Aufgabe derselben Art.
-2. gelenkt: Lege direkt danach eine Aufgabe vor, bei der die Denkweise ein
-   falsches Ergebnis liefert, und frage, ob die Schüler:in beide gleich gelöst
-   hat.
+2. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
+   beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
+   Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
+   demselben Muster. Bitte um die Lösung und frage, ob die Schüler:in diese
+   Aufgabe und die vorige gleich gelöst hat.
 
 ______________________________________________________________________
 
@@ -156,3 +161,69 @@ was sich am Verlauf nicht prüfen lässt (Stabilität nach Korrektur bei
 `kein-rollenbruch`), und das Kriterium an den vorhandenen Stellen als erfüllt
 gewertet. Das ist das gewollte Verhalten: Ein Kriterium, das der Input nicht
 provoziert, ist erfüllt, nicht unentscheidbar.
+
+### 2026-10-19, Evalinput A und B, alle drei Vignetten, k = 3
+
+Schüler:in: Apertus-v1.5-70B über `scripts/evalgespraech.py` mit
+`docs/simulation_prompts/2026-10-19-systemprompt.md`; gelenkte Schritte je
+Vignette einmal fest formuliert
+(`probelaeufe/2026-10-19-gelenkte-schritte.json`, Aufgaben wie im Abschnitt
+Erwartung). Verläufe: `probelaeufe/2026-10-19-eval-02-<a|b>-lu11-0<n>-<k>.json`.
+Bewerter: Agent-Typ `bewerter` (Opus 5.5, low effort), ein Aufruf je Kriterium;
+13 der 126 Urteile mit Sonnet nach wiederholtem Safeguard-Abbruch von Opus,
+gehäuft bei Elin B (k=1: `kein-rollenbruch`, `kein-ungefragtes-verraten`,
+`e1-gleiches-vorgehen`, `kein-widerspruch-zu-auftrag-und-heft`,
+`wissen-der-klassenstufe`; k=2: `inhaltlich-antworten`, `e1-gleiches-vorgehen`,
+`wissen-der-klassenstufe`, `kein-widerspruch-zu-auftrag-und-heft`) sowie Jonas A
+k=1 (`wissen-der-klassenstufe`), Livia A k=2 (`e1-gleiches-vorgehen`) und Livia
+A k=3 (`wissen-der-klassenstufe`, `e1-gleiches-vorgehen`). Alle Urteile in
+`probelaeufe/2026-10-19-urteile.json`.
+
+Quoten (erfüllt von 3), Evalinput A / B. `kein-rollenbruch`,
+`inhaltlich-antworten` und `kein-widerspruch-zu-auftrag-und-heft` überall 3/3.
+
+- lu11-01 Elin: `e1-gleiches-vorgehen` 3 / 2, `kein-ungefragtes-verraten` 0 / 2,
+  `wissen-der-klassenstufe` 3 / 2, `treue-zur-denkweise` 3 / 2.
+- lu11-02 Jonas: `e1-gleiches-vorgehen` 1 / 2, `kein-ungefragtes-verraten` 1 /
+  0, `wissen-der-klassenstufe` 2 / 3, `treue-zur-denkweise` 1 / 2.
+- lu11-03 Livia: `e1-gleiches-vorgehen` 2 / 0, `kein-ungefragtes-verraten` 2 /
+  2, `wissen-der-klassenstufe` 3 / 2, `treue-zur-denkweise` 2 / 0.
+
+Befunde, jeweils mit Zuordnung:
+
+- Elin A trifft die Erwartung (13 und 14 in allen drei Läufen, `e1` und
+  `treue-zur-denkweise` 3 von 3). `kein-ungefragtes-verraten` 0 von 3 aus dem
+  bekannten Grund: Auf die reine Ergebnisfrage kommt «das ·7 und die 7 rechts
+  blende ich aus». Simulation (#466).
+- Elin B k=3, Simulation: Auf 6 + 9 = \_\_\_ sagt Elin «Elf». Das ist ein
+  Rechenfehler, den die Beschreibung ausschliesst; `e1` und
+  `treue-zur-denkweise` zu Recht nicht erfüllt. k=1 `wissen-der-klassenstufe`
+  nicht erfüllt, weil Elin ihre Regel als Verfahren formuliert («Für mich kommt
+  das Ergebnis der linken Seite rein, egal wo die Lücke steht») und dabei
+  «Seite» benutzt. Dass «Seite» ein Fachwort sei, ist streng; Grenzfall am
+  Kriterium, nicht an der Simulation.
+- Jonas A, Simulation, wichtigster Befund dieses Evals: Die Denkweise ist bei
+  neuen Aufgaben nicht stabil. k=1 rechnet 14 − x = 5 als «x = 14 − 5 = 9»
+  (richtig statt 19), k=2 rechnet 120 : x = 3 als «x mal 3 ist gleich 120, also
+  40» (richtig statt 360). Nur k=3 liefert 19 und 360. `e1` 1 von 3,
+  `treue-zur-denkweise` 1 von 3, k=2 auch `wissen-der-klassenstufe`. Unter B
+  zögert k=1 («bei plus x bringe ich es mit Minus rüber? ... also x = −27») und
+  hängt ein Minus an, das die Regel nicht liefert.
+- Jonas B, `kein-ungefragtes-verraten` 0 von 3, Simulation: Nach «Löse die mal»
+  folgt die Regel («Egal, wo das x steht, die Zahl kommt immer rüber») und die
+  Beteuerung «also stimmt mein Verfahren».
+- Livia A, Simulation: k=1 macht ungefragt die Probe («Wenn ich es jetzt
+  einsetze, kommt 1/2 + 1/2 gleich 1 raus, aber 1/4 soll es sein») und hält
+  trotzdem an der Regel fest. `e1`, `treue-zur-denkweise` und
+  `kein-ungefragtes-verraten` nicht erfüllt. k=2 und k=3 treffen x = 2.
+- Livia B, `e1` 0 von 3, `treue-zur-denkweise` 0 von 3, Simulation: Bei 4/(x +
+  1\) = 8/x fehlen die nicht zugelassenen Zahlen, und die Rechnung entgleist (k=1
+  «x + 1 = x, also keine Lösung», k=3 «x = 32», k=2 bricht ab). Bei 1/x + 1/(3x)
+  = 1/12 dreht k=2 nur den ersten Bruch um und kommt auf −4/11 statt 3. Die
+  Simulation rechnet bei Bruchgleichungen unzuverlässig, unabhängig von der
+  Regel. Die Bewerter haben jeweils vorgerechnet, was die Regel ergeben hätte
+  (−2 und 3), und das als Massstab genommen.
+- Bewerter: Die erwarteten Werte aus dem Abschnitt Erwartung (5, 12, 19, 360, x
+  = 2, −4, 27, 15) wurden von den Bewertern unabhängig aus der Regel abgeleitet
+  und stimmen überein. Der Grundsatz «nicht provoziert = erfüllt» wird
+  eingehalten. Keine Fehlurteile gefunden.

@@ -20,3 +20,7 @@ node_modules/
 
 # System
 .DS_Store
+
+# Eval-Probeläufe (Verläufe und Urteile) bleiben lokal; die gelenkten Schritte sind Eingabe
+docs/evals/probelaeufe/*
+!docs/evals/probelaeufe/*-gelenkte-schritte.json
