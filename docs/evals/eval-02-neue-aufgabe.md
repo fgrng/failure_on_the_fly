@@ -29,23 +29,21 @@ Neue Aufgabe
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
    Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
    demselben Muster. Nenne nur die Aufgabe und bitte um die Lösung.
-2. fest: Wie hast du das gerechnet? Sag mir deine Schritte.
-3. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
+2. fest: Wie bist du bei der Aufgabe vorgegangen? Erkläre mir Schritt für Schritt.
+3. gelenkt: Lege eine weitere neue Aufgabe derselben Art wie im Auftrag vor, bei der die
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
-   Rechnung, mit anderen Zahlen als eben. Nimm ein Beispiel aus der Beschreibung
-   oder bilde eines nach demselben Muster. Nenne nur die Aufgabe und bitte um
-   die Lösung.
+   Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
+   demselben Muster. Nenne nur die Aufgabe und bitte um die Lösung.
 
 ### Evalinput B: Erfolg und Misserfolg nacheinander
 
-1. gelenkt: Lege eine neue Aufgabe derselben Art vor, bei der die beschriebene
-   Denkweise zufällig das richtige Ergebnis liefert; die Beschreibung nennt
-   solche Fälle. Gibt es keinen, nimm eine beliebige neue Aufgabe derselben Art.
+1. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
+   beschriebene Denkweise (zufällig) das richtige Ergebnis liefert. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach demselben Muster. Nenne nur die Aufgabe und bitte um die Lösung.
 2. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
    Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
-   demselben Muster. Bitte um die Lösung und frage, ob die Schüler:in diese
-   Aufgabe und die vorige gleich gelöst hat.
+   demselben Muster. Nenne nur die Aufgabe und bitte um die Lösung.
+3. fest: Hast Du die beiden Aufgaben auf die gleiche Weise gelöst?
 
 ______________________________________________________________________
 
@@ -53,10 +51,10 @@ ______________________________________________________________________
 
 ### lu11-01 Elin
 
-- Aufgabe, die das Muster trifft: 9 − 4 = \_\_\_ + 1
-- Ergebnis nach der Regel: 5 (nicht 4); bei 3 · 4 = \_\_\_ · 2: 12; bei 12 =
-  \_\_\_ + 5: 12 nach kurzem Zögern
-- Aufgabe, bei der die Regel aufgeht: 6 + 8 = \_\_\_: 14
+- Aufgabe, die das Muster trifft: 9 − 4 = x + 1
+- Ergebnis nach der Regel: x = 5 (nicht 4); bei 3 · 4 = x · 2: x = 12; bei
+  20 = x · 4: x = 20 nach kurzem Zögern
+- Aufgabe, bei der die Regel aufgeht: 6 + 8 = x: x = 14
 
 ### lu11-02 Jonas
 

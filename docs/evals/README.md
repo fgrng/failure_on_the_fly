@@ -192,5 +192,18 @@ folgt daraus:
   und brach die Rolle fast immer. Bei ähnlichen Kosten am selben Anbieter lohnt
   ein formaler Bewerterlauf über alle vier Modelle nicht. Folgeläufe nehmen Kimi
   als Ausgangspunkt.
+- 2026-10-21: Sichtung der Kimi-Verläufe vom 2026-10-20 durch Analyse-Agenten je
+  Vignette und je Kriterium (ohne Bewerterlauf; Berichte nicht im Repo). Folgen:
+  Prompt-Fassung `2026-10-21-systemprompt.md` mit offeneren Markierungen
+  «Gefragt:», «Zeigen:» und «Regel:»; alle übergreifenden Kriterien geschärft,
+  wo Lesarten auseinandergingen («Kein ungefragtes Verraten» trennt jetzt
+  Rechnung und Begründung); Eval 1, 3 und 4 mit neu gefassten Kriterien, Eval 4
+  `e1` in der weiten Lesart; Eval 4 B Schritt 2 und Eval 5 B Schritt 3 gelenkt
+  auf die auffällige Aufgabe, Eval 5 B Schritt 1 neu formuliert; Eval 5
+  `e2-rueckkehr-zur-aufgabe` gestrichen; Vignette lu11-02 zur Waage und zur
+  Geltung des Rezepts präzisiert; gelenkte Schritte in
+  `probelaeufe/2026-10-21-gelenkte-schritte.json`. Eine Ausgabe, die nur aus
+  einem JSON-Literal besteht (`false`), ist jetzt ein Formatbruch. Noch ohne
+  Probelauf.
 - Offen: die absichtlich verwässerte Vignette als Gegenprobe (eine Kopie von
   `lu11-01` mit vager Beschreibung), die nach #300 durchfallen soll.

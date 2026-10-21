@@ -14,22 +14,26 @@ Probe und Gegenbeispiel
 
 ## kriterien
 
-1. Deutung des Widerspruchs: Die Schüler:in rechnet die Probe mit den Zahlen,
-   die die Lehrperson gibt, und deutet den Widerspruch so, wie die Beschreibung
-   der Denkweise es vorsieht, etwa als Rechenfehler, den sie sucht, als
-   Besonderheit dieser Aufgabe oder als zwei Ergebnisse, die nichts miteinander
-   zu tun haben. Nicht erfüllt, wenn sie den Widerspruch anders deutet, als die
-   Beschreibung es vorsieht, oder ihn übergeht, ohne ihn zu deuten.
+1. Deutung des Widerspruchs: Zeigt die Lehrperson einen Widerspruch (eine Probe,
+   die nicht aufgeht, eine richtige Lösung, die aufgeht, oder ein
+   Gegenbeispiel), deutet die Schüler:in ihn so, wie die Beschreibung der
+   Denkweise es für diese Stelle vorsieht; sinngemäss genügt. Sieht die
+   Beschreibung für die Stelle keine eigene Deutung vor, gilt die Deutung, die
+   sie für die Probe nennt. Ist es nach der Beschreibung für die Schüler:in gar
+   kein Widerspruch, etwa weil zwei Rechnungen für sie nichts miteinander zu tun
+   haben, ist das ihre Deutung. Bittet die Lehrperson um eine Probe, rechnet die
+   Schüler:in sie mit den Zahlen, die die Lehrperson gibt. Nicht erfüllt, wenn
+   sie den Widerspruch anders deutet, als die Beschreibung es vorsieht, nur ihre
+   eigene Rechnung oder deren Herkunft wiederholt, ohne auf den Widerspruch
+   einzugehen, oder die Probe mit anderen Zahlen rechnet. Ob sie danach wieder
+   nach ihrer Regel rechnet, prüft «Treue zur Denkweise».
 
 ## inputs
 
 ### Evalinput A: Einsetzen
 
-1. gelenkt: Bitte die Schüler:in, ihr Ergebnis aus dem Heft in die ursprüngliche
-   Aufgabe einzusetzen oder die andere Seite damit nachzurechnen. Wähle die
-   Stelle, an der die Beschreibung einen Widerspruch vorhersagt, und nenne die
-   Zahlen so, wie sie im Heft stehen.
-2. fest: Hm, das ist aber nicht dasselbe wie auf der anderen Seite. Wie erklärst
+1. gelenkt: Bitte die Schüler:in, ihr Ergebnis aus dem Heft zu überprüfen. Etwa durch eine Proberechnung in Mathematik oder ein Gedankengang ausgehend vom Anfang der Aufgabe. Gib dabei spezifische die Ergebnisse so vor, wie sie im Heft stehen.
+2. fest: Hm, da scheint etwas nicht zu passen. Wie erklärst
    du dir das?
 3. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
@@ -38,9 +42,8 @@ Probe und Gegenbeispiel
 
 ### Evalinput B: die richtige Lösung zeigen
 
-1. gelenkt: Sage der Schüler:in, welches Ergebnis du bei der auffälligen Aufgabe
-   im Heft hast, und zeige in einem Satz, dass es aufgeht. Frage, was sie dazu
-   meint.
+1. gelenkt: Sage der Schüler:in das richtige Ergebnis bei der auffälligen Aufgabe
+   im Heft. Frage, was sie dazu meint.
 2. gelenkt: Lege eine neue Aufgabe derselben Art wie im Auftrag vor, bei der die
    beschriebene Denkweise ein anderes Ergebnis liefert als die richtige
    Rechnung. Nimm ein Beispiel aus der Beschreibung oder bilde eines nach
@@ -62,24 +65,25 @@ ______________________________________________________________________
 
 ### lu11-01 Elin
 
-- Probe: rechte Seite von a) mit 12: 12 + 6 = 18
+- Probe: rechte Seite von a) mit x = 12: 12 + 6 = 18
 - Deutung nach der Beschreibung: 18 ist «das nächste Ergebnis», kein
   Widerspruch; 12 und 18 haben nichts miteinander zu tun. Nach gezeigter 6:
   «merkwürdig, dass man die Rechnung nicht fertig macht»
 - Gegenbeispiel (C): 4 + 4 = 8 gegen 8 = 4 + 4 → «verkehrt herum geschrieben,
   gemeint ist dasselbe»; oder die vorgeführte 6 wie bei B
-- Nächste Aufgabe: 9 − 4 = \_\_\_ + 1 → 5
+- Nächste Aufgabe: 9 − 4 = x + 1 → x = 5
 
 ### lu11-02 Jonas
 
-- Probe: 90 in 81 − x: 81 − 90 = −9
+- Probe: 62 in 50 − x: 50 − 62 = −12
 - Deutung nach der Beschreibung: wundert sich über das Minus; «kommt vom
-  Rüberbringen» oder «verrechnet»; rechnet 9 + 81 nach, prüft das Rezept, nicht
+  Rüberbringen» oder «verrechnet»; rechnet 12 + 50 nach, prüft das Rezept, nicht
   die Rolle von x
-- Gegenbeispiel (C): Die Beschreibung nennt kein eigenes; die Lehrperson nimmt
-  nach dem Rückfall der Strategie b) und c) aus dem Heft, zwei verschiedene
-  Gleichungen mit derselben Lösung 90 → «Es ist egal, ob das x vorne oder hinten
-  steht», genau der Sinn, den die Beschreibung dem Vergleich zuschreibt
+- Gegenbeispiel (C): das Gleichungspaar 81 − x = 9 und x − 81 = 9 aus der
+  Beschreibung, beide mit derselben Lösung 90 → «Ist ja egal, wo das x steht»
+- Gezeigte Lösung (B): Die Beschreibung nennt keine eigene Deutung der 38; es
+  gilt die Deutung der Probe («kommt vom Rüberbringen» oder «verrechnet»). Nur
+  die 62 und ihre Herkunft zu wiederholen ist nicht erfüllt.
 - Nächste Aufgabe: 14 − x = 5 → 19
 
 ### lu11-03 Livia

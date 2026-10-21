@@ -12,8 +12,8 @@ Beispiel:
     uv run scripts/evalgespraech.py \\
         --vignette docs/vignetten/lu11-01-gleichheitszeichen-als-rechenaufforderung.md \\
         --eval docs/evals/eval-01-vorgehen-erfragen.md --input B \\
-        --prompt docs/simulation_prompts/2026-10-20-systemprompt.md \\
-        --gelenkt docs/evals/probelaeufe/2026-10-19-gelenkte-schritte.json
+        --prompt docs/simulation_prompts/2026-10-21-systemprompt.md \\
+        --gelenkt docs/evals/probelaeufe/2026-10-21-gelenkte-schritte.json
 
 Schreibt `docs/evals/probelaeufe/<datum>-eval-01-b-lu11-01-<k>.json` für
 k = 1 bis 3 und überspringt Dateien, die schon da sind. Die Datei für

@@ -13,17 +13,22 @@ Regel erfragen
 
 ## kriterien
 
-1. Regel in Schülerworten: Die Regel, die die Schüler:in nennt, ist inhaltlich
-   die Regel aus der Beschreibung der Denkweise, formuliert so, wie jemand
-   dieser Klassenstufe sie sagen würde, und mit der Herkunft, die die
-   Beschreibung nennt (Unterricht, Schulbuch, Taschenrechner, frühere Aufgaben).
-   Nicht erfüllt, wenn die genannte Regel von der Regel der Beschreibung
-   abweicht oder wenn sie keine Regel nennt, sondern nur Beispiele aufzählt.
-2. Keine Ausnahme: Auf die Frage, ob die Regel immer gilt, antwortet die
-   Schüler:in so sicher, wie die Beschreibung es vorsieht: Die Regel gilt immer,
-   oder sie verweist auf Aufgaben, bei denen sie aufgegangen ist. Nicht erfüllt,
-   wenn sie eine Einschränkung nennt, die laut Beschreibung nicht zu ihrem
-   Wissen gehört, etwa die Bedingung, unter der die Regel fachlich richtig wäre.
+1. Regel in Schülerworten: Die Regel, die die Schüler:in nennt, passt zur Regel
+   aus der Beschreibung der Denkweise: Was sie sagt, ist ein Teil dieser Regel
+   oder die ganze, in eigenen Worten; vollständig muss sie nicht sein. Nicht
+   erfüllt, wenn die genannte Regel der Regel der Beschreibung widerspricht oder
+   eine andere Regel ist, oder wenn sie keine Regel nennt, sondern nur Beispiele
+   aufzählt. Woher sie die Regel hat, welche Wörter sie benutzt und ob die Regel
+   immer gilt, prüfen andere Kriterien.
+2. Keine Ausnahme: Auf die Frage, ob die Regel immer gilt, nennt die Schüler:in
+   keinen Fall und keine Bedingung, in dem ihre Regel nicht geht. Erfüllt, wenn
+   sie bejaht, auch zögernd, auf Aufgaben verweist, bei denen die Regel
+   aufgegangen ist, sagt, dass sie keine Ausnahme kennt oder es nicht weiss,
+   oder die Regel auf ihren Aufgabentyp bezieht («bei Bruchgleichungen geht das
+   immer»); stellt die Lehrperson die Frage nicht, ist das Kriterium erfüllt.
+   Nicht erfüllt, wenn sie einen Fall oder eine Bedingung nennt, in dem ihre
+   Regel nicht oder anders gilt, besonders eine Bedingung, die eine ihrer
+   eigenen, nach der Regel gelösten Heftaufgaben ausschliessen würde.
 
 ## inputs
 
@@ -40,7 +45,10 @@ Regel erfragen
 1. gelenkt: Frage nach der Bedeutung des Zeichens, der Umformung oder des
    Begriffs, an dem die beschriebene Denkweise hängt, so wie die Beschreibung
    die Diagnosefrage nennt. Frage offen, ohne Antwortmöglichkeiten.
-2. fest: Zeig mir das mal an einer Aufgabe aus deinem Heft.
+2. gelenkt: Bitte die Schüler:in, das an der Aufgabe aus ihrem Heft zu zeigen,
+   bei der die beschriebene Denkweise ein anderes Ergebnis liefert als die
+   richtige Rechnung. Nenne die Aufgabe so, wie sie im Auftrag steht, ohne zu
+   sagen, dass sie auffällt.
 3. fest: Und geht das immer so, oder gibt es Aufgaben, bei denen das nicht geht?
 
 ______________________________________________________________________
@@ -50,31 +58,42 @@ ______________________________________________________________________
 ### lu11-01 Elin
 
 - Regel in Schülerworten: links ausrechnen, das Ergebnis kommt direkt hinters
-  Gleichheitszeichen, was danach kommt, gehört nicht mehr dazu
-- Herkunft: Taschenrechner, so war das immer
+  Gleichheitszeichen, was danach kommt, gehört nicht mehr dazu; «links
+  ausrechnen, das ist dann x» allein genügt
+- Herkunft (prüft «Kein Widerspruch zu Auftrag und Heft»): Taschenrechner, so
+  war das immer
+- An der Aufgabe (B, Schritt 2): a) 5 + 7 = \_\_\_ + 6 → 12
 - Frage nach dem Zeichen: «Was bedeutet das Gleichheitszeichen?» → «Da kommt
   raus, was man vorher gerechnet hat.»
 
 ### lu11-02 Jonas
 
 - Regel in Schülerworten: die Zahl bei x kommt mit dem Gegenzeichen auf die
-  andere Seite, egal wo das x steht
-- Herkunft: Waage aus dem Unterricht, hat bei fast allen Gleichungen geklappt
+  andere Seite, egal wo das x steht; «die Zahl kommt rüber, das Zeichen dreht
+  sich» allein genügt
+- Herkunft (prüft «Kein Widerspruch zu Auftrag und Heft»): Waage aus dem
+  Unterricht, hat bei fast allen Gleichungen geklappt
+- An der Aufgabe (B, Schritt 2): b) 50 − x = 12 → 62
 - Frage nach dem Begriff: «Was heisst Waage?» → «dass etwas rüberkommt und das
   Zeichen wechselt»
 
 ### lu11-03 Livia
 
 - Regel in Schülerworten: bei Bruchgleichungen darf man die Kehrwerte nehmen,
-  jeden Bruch umdrehen, Plus und Minus bleiben
-- Herkunft: Umformung 6 im Buch, bei a) aufgegangen
+  jeden Bruch umdrehen, Plus und Minus bleiben; «Kehrwerte nehmen» allein genügt
+- Herkunft (prüft «Kein Widerspruch zu Auftrag und Heft»): Umformung 6 im Buch,
+  bei a) aufgegangen
+- An der Aufgabe (B, Schritt 2): b) 1/x − 1/(2x) = 1/16 → −16
 - Frage nach dem Begriff: «Was heisst Kehrwert nehmen?» → jeden Bruch umdrehen,
   Zahlen als Bruch mit Nenner 1
 
 Auf die Frage nach der Geltung (A Schritt 3, B Schritt 3) bei allen drei: gilt
-immer, oder Verweis auf die Aufgaben, bei denen es aufging. Nicht erfüllt bei
-e2-keine-ausnahme wäre bei Livia «nur wenn auf jeder Seite ein Bruch steht», bei
-Jonas «nur wenn x vorne steht».
+immer, oder Verweis auf die Aufgaben, bei denen es aufging; «ich glaube schon»,
+«weiss ich nicht» und «bei Bruchgleichungen immer» sind ebenfalls erfüllt. Nicht
+erfüllt bei e2-keine-ausnahme wäre bei Livia «nur wenn auf jeder Seite ein Bruch
+steht», bei Jonas «nur wenn x vorne steht», bei Elin «nur wenn hinter der Lücke
+nichts mehr steht». «Der Nenner darf nicht null werden» (Livia) ist ihr eigenes
+Wissen und schliesst keine Heftaufgabe aus; erfüllt.
 
 ## Probeläufe
 

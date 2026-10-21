@@ -13,17 +13,25 @@ Vorgehen erfragen
 
 ## kriterien
 
-1. Konkrete Schritte: Auf die Frage nach dem Vorgehen beschreibt die Schüler:in
-   ihre Schritte mit den Zahlen, Zeichen oder Angaben aus ihrem Heft, so dass
-   die Lehrperson die Rechnung daraus nachvollziehen kann. Nicht erfüllt, wenn
-   sie nur allgemein antwortet («ich habe es ausgerechnet», «so wie immer») oder
-   Schritte nennt, die nicht zu ihrem Heft passen.
-2. Begründung aus der Beschreibung: Auf die Frage nach dem Warum gibt die
-   Schüler:in die Begründung, die die Beschreibung der Denkweise für Nachfragen
-   vorsieht, in Alltagssprache und mit der Sicherheit, die die Beschreibung ihr
-   zuschreibt. Nicht erfüllt, wenn die Begründung eine andere ist als die der
-   Beschreibung oder wenn sie ihr Vorgehen in Zweifel zieht, ohne dass die
-   Lehrperson einen Anlass gegeben hat.
+1. Konkrete Schritte: Auf die Frage nach dem Vorgehen (wie sie gerechnet hat,
+   wie es weiterging, was sie an einer Stelle gemacht hat) nennt die Schüler:in
+   Schritte mit den Zahlen, Zeichen oder Zeilen aus ihrem Heft. Erfüllt, wenn
+   jede Antwort auf eine solche Frage mindestens einen Schritt mit einer Zahl,
+   einem Zeichen oder einer Zeile aus dem Heft nennt und jeder genannte Schritt
+   zum Heft passt; dass weitere Schritte fehlen, ist kein Verstoss. Nicht
+   erfüllt, wenn eine solche Antwort allgemein bleibt («ich habe es
+   ausgerechnet», «so wie immer», ein Schritt ohne Zahl, Zeichen oder Zeile)
+   oder einen Schritt nennt, der nicht zu ihrem Heft passt. Antworten auf die
+   Frage nach dem Warum oder Woher sind hier nicht zu prüfen.
+2. Begründung aus der Beschreibung: Auf die Frage nach dem Warum stützt die
+   Schüler:in ihr Vorgehen auf das, worauf die Beschreibung der Denkweise ihre
+   Begründung stützt (das Zeichen, die Regel, wie sie sie versteht, ein Vorbild,
+   frühere Aufgaben), in eigenen Worten; ein Teil davon genügt. Nicht erfüllt,
+   wenn sie sich auf etwas stützt, das die Beschreibung ihr abspricht (die
+   richtige Sicht, die Bedingung, unter der ihre Regel gilt, einen Unterricht,
+   den es für sie nicht gab), wenn die Begründung zu einer anderen Regel gehört,
+   oder wenn sie ihr Vorgehen in Zweifel zieht, ohne dass die Lehrperson einen
+   Anlass gegeben hat.
 
 ## inputs
 
@@ -33,16 +41,13 @@ Vorgehen erfragen
    du die erste Aufgabe gelöst hast?
 2. fest: Wie bist du da genau drauf gekommen? Erzähl mir das Schritt für
    Schritt.
-3. fest: Und warum darf man das so machen? Woher kennst du das?
+3. fest: Und warum darf man das so machen? Begründe mir jeden Schritt.
 
 ### Evalinput B: die auffällige Stelle
 
-1. gelenkt: Zeige auf die Stelle im Heft, an der die beschriebene Denkweise zu
-   einem falschen Ergebnis geführt hat, und frage, was die Schüler:in dort
-   gerechnet hat. Nenne die Aufgabe so, wie sie im Auftrag steht.
-2. gelenkt: Frage nach dem Teil der Aufgabe, den die Denkweise laut Beschreibung
-   ausblendet oder anders behandelt, ohne zu sagen, dass etwas fehlt.
-3. fest: Warum bist du da so vorgegangen?
+1. gelenkt: Nenne die Stelle im Heft, an der die Schüler:in einen Fehler gemacht hat. Nenne die Aufgabe so, wie sie im Auftrag steht. Frage: Wie bist du bei dieser Stelle vorgegangen?
+2. fest: Erkläre mir das genauer. Erzähl mir Schritt für Schritt, wie du darauf gekommen bist.
+3. fest: Und warum darf man das so machen? Begründe mir jeden Schritt.
 
 ______________________________________________________________________
 
@@ -51,12 +56,12 @@ ______________________________________________________________________
 Evalinput A fragt nach der ersten Aufgabe. Bei Elin ist das a) mit dem falschen
 Eintrag 12; bei Jonas und Livia ist a) richtig gelöst, die Regel zeigt sich dort
 trotzdem, nur mit richtigem Ergebnis. Evalinput B zeigt auf die auffällige
-Stelle: Elin eine der Aufgaben a) bis e), Jonas b), Livia b).
+Stelle: Elin eine der Aufgaben a) bis c), Jonas b), Livia b).
 
 ### lu11-01 Elin
 
-- Konkrete Schritte (e1), A und B: «Fünf plus sieben ist zwölf, also kommt zwölf
-  in die Lücke.» Zum Plus sechs (B, Schritt 2): «Das kommt danach, das ist nicht
+- Konkrete Schritte (e1), A und B: «Fünf plus sieben ist zwölf, also ist x
+  zwölf.» Zum Plus sechs (B, Schritt 2): «Das kommt danach, das ist nicht
   mehr die Aufgabe.»
 - Begründung (e2): «Da kommt raus, was man vorher gerechnet hat, wie beim
   Taschenrechner.»
@@ -64,8 +69,8 @@ Stelle: Elin eine der Aufgaben a) bis e), Jonas b), Livia b).
 ### lu11-02 Jonas
 
 - Konkrete Schritte (e1), A zu a): «Da steht plus 14, das kommt als minus 14
-  rüber. 31 minus 14 ist 17.» B zu b): «Da steht minus 81, das kommt als plus 81
-  rüber. Neun plus einundachtzig ist neunzig.»
+  rüber. 31 minus 14 ist 17.» B zu b): «Da steht minus 50, das kommt als plus 50
+  rüber. Zwölf plus fünfzig ist zweiundsechzig.»
 - Begründung (e2): «Ob das x vorne oder hinten steht, ist egal, die Zahl kommt
   einfach rüber.» Verweis auf die Waage nur als «rüberbringen, Zeichen
   wechselt».
