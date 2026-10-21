@@ -26,6 +26,8 @@ VERTRAG_PROMPT: frozenset[str] = frozenset(
         "arbeitsheft_simulationshinweise",
         "schuelerin_name",
         "schuelerin_geschlecht",
+        "lehrperson_name",
+        "lehrperson_anrede",
         "fach",
         "thema",
         "klassenstufe",

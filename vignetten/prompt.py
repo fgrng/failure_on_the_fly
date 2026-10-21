@@ -89,6 +89,13 @@ def _huelle(tag: str, inhalt: str) -> str:
     return f"<{tag}>\n{inhalt}\n</{tag}>" if inhalt else ""
 
 
+# Die Schlüssel sind die Werte von `Vignette.Geschlecht`.
+_ANREDEN: dict[str, str] = {
+    "weiblich": "Frau",
+    "männlich": "Herr",
+}
+
+
 def prompt_platzhalter(vignette: Any) -> dict[str, str]:
     """Liefert die Vignettenwerte für Prompt-Vorlagen."""
 
@@ -108,6 +115,8 @@ def prompt_platzhalter(vignette: Any) -> dict[str, str]:
         ),
         "schuelerin_name": vignette.schuelerin_name,
         "schuelerin_geschlecht": vignette.schuelerin_geschlecht,
+        "lehrperson_name": vignette.lehrperson_name,
+        "lehrperson_anrede": _ANREDEN[vignette.lehrperson_geschlecht],
         "fach": vignette.fach,
         "thema": vignette.thema,
         "klassenstufe": vignette.klassenstufe,
@@ -139,10 +148,6 @@ def rahmen_platzhalter(vignette: Any) -> dict[str, str]:
         "weiblich": ("sie", "ihr"),
         "männlich": ("er", "sein"),
     }
-    anreden: dict[str, str] = {
-        "weiblich": "Frau",
-        "männlich": "Herr",
-    }
     schuelerin_geschlecht: str = vignette.schuelerin_geschlecht
     lehrperson_geschlecht: str = vignette.lehrperson_geschlecht
     schuelerin_pronomen, schuelerin_possessiv = pronomen_und_possessiv[
@@ -163,5 +168,5 @@ def rahmen_platzhalter(vignette: Any) -> dict[str, str]:
         "schuelerin_possessiv": schuelerin_possessiv,
         "lehrperson_pronomen": lehrperson_pronomen,
         "lehrperson_possessiv": lehrperson_possessiv,
-        "lehrperson_anrede": anreden[lehrperson_geschlecht],
+        "lehrperson_anrede": _ANREDEN[lehrperson_geschlecht],
     }

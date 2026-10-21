@@ -61,6 +61,8 @@ def test_platzhalter_mit_umgebung_deckt_sich_mit_der_erzeugten_ausgabe() -> None
         arbeitsheft_simulationshinweise="Auf Nachfragen beharrt Lukas auf der 12.",
         schuelerin_name="Lukas",
         schuelerin_geschlecht=Vignette.Geschlecht.MAENNLICH,
+        lehrperson_name="Weber",
+        lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
         fach="Mathematik",
         thema="Gleichungen",
         klassenstufe="4",

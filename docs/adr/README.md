@@ -78,6 +78,7 @@ ersetzt, führt die Liste nach; ersetzte ADRs erscheinen hier nicht.
 - ADR-0020 Die Vorlagen des Kerns sind `string.Template`
 - ADR-0052 Wem die Nachrichtenrollen gehören
 - ADR-0054 Fester Vertrag zwischen Vignette und Vorlagen, samt Positionsmarker
+- ADR „Die Prompt-Vorlagen dürfen die Lehrperson als Klassenlehrperson nennen, nicht als Zuhörerin“
 - ADR-0056 Anbieter und Modell-Konfiguration: append-only, ein Zeiger je Verwendung
 - ADR-0064 Die Denkspur: pro Antwort aus dem Ausgabeschema, Regieperspektive, im Verlauf, für Teilnehmende nie sichtbar
 

@@ -490,6 +490,17 @@ mehr. Ohne das Feld lässt das Speichern die Vorlage unberührt. Die Leseansicht
 zeigen den Abschnitt je Fassung nur bei gefüllter Vorlage, auch bei archivierten
 Fassungen.
 
+Die Prompt-Vorlagen kennen nur die Platzhalter des Promptvertrags:
+`$fehlermuster_beschreibung`, `$lernauftrag`, `$arbeitsheft`,
+`$lernauftrag_simulationshinweise`, `$arbeitsheft_simulationshinweise`,
+`$schuelerin_name`, `$schuelerin_geschlecht`, `$lehrperson_name`,
+`$lehrperson_anrede`, `$fach`, `$thema` und `$klassenstufe`. Die Hinweise unter
+den beiden Vorlagen nennen sie. `$lehrperson_anrede` ist »Frau« oder »Herr« nach
+dem Geschlecht der Lehrperson, wie in der Rahmenhandlung. Geschlecht, Pronomen
+und Possessiv der Lehrperson bleiben der Rahmenhandlung vorbehalten; eine
+Prompt-Vorlage mit ihnen oder einem anderen Platzhalter speichert nicht und
+zeigt »Enthält ungültige Platzhalter.«
+
 Die simulierte Schüler:in erhält ihren Arbeitskontext im System-Prompt, in
 Sitzung, Probelauf und Evalgespräch gleich: Der System-Prompt ist die gerenderte
 System-Prompt-Vorlage. Ist die User-Prompt-Vorlage der Kern-Fassung gefüllt,

@@ -398,6 +398,21 @@ class SimulationskernVerwaltungTests(TestCase):
         ):
             self.assertContains(response, text)
 
+    def test_prompt_hinweis_nennt_name_und_anrede_der_lehrperson(self) -> None:
+        """Der Hinweis unter den Prompt-Vorlagen folgt dem Promptvertrag (#518)."""
+        entwurf: Simulationskern = Simulationskern.objects.get(
+            zustand=Simulationskern.Zustand.ENTWURF
+        )
+
+        response: HttpResponse = self.client.get(
+            reverse("simulation:kern_bearbeiten", args=[entwurf.pk])
+        )
+
+        self.assertContains(
+            response,
+            "$klassenstufe, $lehrperson_anrede, $lehrperson_name, $lernauftrag",
+        )
+
     def test_bearbeitungsseite_benennt_die_felder_wie_die_ansicht(self) -> None:
         """Formular und Ansicht tragen dieselben Feldbezeichnungen."""
         entwurf: Simulationskern = Simulationskern.objects.get(

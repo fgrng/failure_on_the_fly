@@ -610,9 +610,9 @@ def test_unvollstaendiger_entwurf_wird_nicht_final(
         ),
         (
             "bewerter_vorlage",
-            "$kriterium für $unbekannt und ${lehrperson_name}",
+            "$kriterium für $unbekannt und ${lehrperson_pronomen}",
             "Die Bewerter-Vorlage enthält Platzhalter außerhalb ihres Vertrags: "
-            "$lehrperson_name, $unbekannt.",
+            "$lehrperson_pronomen, $unbekannt.",
         ),
         (
             "lehrperson_vorlage",

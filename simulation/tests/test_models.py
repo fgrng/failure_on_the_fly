@@ -105,8 +105,8 @@ def test_finale_fassung_kann_nicht_gesammelt_geloescht_werden() -> None:
 @pytest.mark.parametrize(
     ("vorlagenfeld", "platzhalter"),
     [
-        ("system_prompt_vorlage", "$lehrperson_name"),
-        ("user_prompt_vorlage", "$lehrperson_name"),
+        ("system_prompt_vorlage", "$lehrperson_pronomen"),
+        ("user_prompt_vorlage", "$lehrperson_pronomen"),
         ("rahmenhandlung_einleitung", "$fehlermuster_beschreibung"),
         ("rahmenhandlung_gespraechseinleitung", "$fehlermuster_beschreibung"),
         ("rahmenhandlung_debrief", "$fehlermuster_beschreibung"),
@@ -127,11 +127,28 @@ def test_finalisieren_lehnt_vertragsfremde_platzhalter_je_feld_ab(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "vorlagenfeld", ["system_prompt_vorlage", "user_prompt_vorlage"]
+)
+def test_prompt_vorlagen_duerfen_die_lehrperson_nennen(vorlagenfeld: str) -> None:
+    """Name und Anrede der Lehrperson gehören zum Promptvertrag (#518)."""
+
+    kern: Simulationskern = Simulationskern.objects.anlegen(
+        **{vorlagenfeld: "bei $lehrperson_anrede $lehrperson_name"},
+    )
+
+    kern.finalisieren()
+
+    kern.refresh_from_db()
+    assert kern.zustand == Simulationskern.Zustand.FINAL
+
+
+@pytest.mark.django_db
 def test_finalisieren_speichert_den_geprueften_entwurf() -> None:
     """Die finale Fassung enthält die Vorlagen, die beim Finalisieren geprüft wurden."""
 
     kern: Simulationskern = Simulationskern.objects.anlegen(
-        system_prompt_vorlage="$lehrperson_name",
+        system_prompt_vorlage="$lehrperson_pronomen",
     )
     kern.system_prompt_vorlage = "$fehlermuster_beschreibung"
 

@@ -71,6 +71,6 @@ schaltet nur die Bildbeschreibung frei.
 
 Steht ein ```` ```text ````-Block unter `## System-Prompt-Vorlage`, ist er die
 Vorlage; sonst die ganze Datei. Verfügbar sind die Prompt- und die
-Rahmen-Platzhalter der App (`vignetten/prompt.py`), also auch `$lehrperson_name`
-und `$lehrperson_anrede`, die die App im Kern (noch) nicht einsetzt. Ein
-unbekannter Platzhalter ist ein Fehler.
+Rahmen-Platzhalter der App (`vignetten/prompt.py`), also auch die
+Rahmen-Platzhalter außerhalb des Promptvertrags wie `$lehrperson_pronomen`, die
+die App in Prompt-Vorlagen abweist. Ein unbekannter Platzhalter ist ein Fehler.

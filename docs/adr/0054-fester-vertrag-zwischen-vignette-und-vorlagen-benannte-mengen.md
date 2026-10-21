@@ -1,8 +1,19 @@
 ---
-status: accepted
+status: amended
+amended-by: ["lehrperson-im-promptvertrag", "#518"]
 ---
 
 # Fester Vertrag zwischen Vignette und Vorlagen: benannte Platzhaltermengen im Code
+
+> **Nachgeführt durch ADR „Die Prompt-Vorlagen dürfen die Lehrperson als
+> Klassenlehrperson nennen, nicht als Zuhörerin“, #518:** `VERTRAG_PROMPT`
+> enthält zusätzlich `$lehrperson_name` und `$lehrperson_anrede`, und damit
+> auch `VERTRAG_LEHRPERSON` und `VERTRAG_BEWERTER`. In der Tabelle «Welches
+> Vignettenfeld wohin fließt» gilt für die erfahrene Lehrperson: Name und die
+> daraus abgeleitete Anrede im Prompt ja, Geschlecht, Pronomen und Possessiv
+> nein. Die Vorlage nennt die Lehrperson als Lehrperson der Klasse, nicht als
+> anwesend oder zuhörend; die Störvariable dieses ADRs bleibt so
+> ausgeschlossen.
 
 Dieses ADR fasst ADR-0010 und seine Nachführungen aus #3 und #285 zusammen,
 berücksichtigt die Nachrichtenordnung aus ADR-0052 und ersetzt ADR-0010. Es

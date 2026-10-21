@@ -295,15 +295,15 @@ class Vignette(models.Model):
         blank=True,
         help_text="Nachname der erfahrenen Lehrperson, die durch die "
         "Hospitation führt und im Debrief nach der Diagnose fragt. Wird für "
-        "die Simulation nicht einbezogen — die Lehrperson ist der "
-        "simulierten Schüler:in unbekannt. Für Teilnehmer:in sichtbar.",
+        "die Simulation einbezogen — die simulierte Schüler:in kennt sie als "
+        "ihre Lehrperson. Für Teilnehmer:in sichtbar.",
     )
     lehrperson_geschlecht: models.CharField = models.CharField(
         max_length=9,
         choices=Geschlecht,
         help_text="Geschlecht der erfahrenen Lehrperson; steuert Anrede "
         "(Frau/Herr), Pronomen und die Illustrationen der Rahmenhandlung. "
-        "Wird für die Simulation nicht einbezogen. "
+        "Wird für die Simulation nur über die Anrede einbezogen. "
         "Für Teilnehmer:in sichtbar.",
     )
     fach: models.CharField = models.CharField(

@@ -23,7 +23,7 @@ Die fachliche Verortung einer Vignette: Unterrichtsfach, Unterrichtsthema und Kl
 _Avoid_: Metadaten, Fachbezug, Rahmendaten
 
 **Erfahrene Lehrperson**:
-Die Akteurin der Vignette, die die Teilnehmer:in bei der Hospitation begleitet und die im Debrief nach der Diagnose fragt. Sie erscheint ausschließlich in der Rahmenhandlung und ist der simulierten Schüler:in unbekannt.
+Die Akteurin der Vignette, die die Teilnehmer:in bei der Hospitation begleitet und die im Debrief nach der Diagnose fragt. Sie erscheint in der Rahmenhandlung. Die simulierte Schüler:in kennt sie nur mit Anrede und Name als ihre Lehrperson, nicht als Zuhörerin des Gesprächs (ADR „Die Prompt-Vorlagen dürfen die Lehrperson als Klassenlehrperson nennen, nicht als Zuhörerin“).
 _Avoid_: Mentorin, Lehrkraft, Betreuerin
 
 ## Aufgabenkontext

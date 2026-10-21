@@ -158,6 +158,8 @@ class EvalkatalogEditorTests(TestCase):
             "fach",
             "fehlermuster_beschreibung",
             "klassenstufe",
+            "lehrperson_anrede",
+            "lehrperson_name",
             "lernauftrag",
             "lernauftrag_simulationshinweise",
             "schuelerin_geschlecht",

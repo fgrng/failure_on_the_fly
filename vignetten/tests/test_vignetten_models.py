@@ -25,6 +25,13 @@ from vignetten.models import (
 )
 
 
+def _prompt_vignette(**felder: object) -> Vignette:
+    """Eine ungespeicherte Vignette; die Anrede braucht das Lehrperson-Geschlecht."""
+
+    felder.setdefault("lehrperson_geschlecht", Vignette.Geschlecht.WEIBLICH)
+    return Vignette(**felder)
+
+
 def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> None:
     """Der zusammengesetzte Arbeitsheftwert folgt dem ersten Positionsmarker."""
 
@@ -37,6 +44,8 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
         arbeitsheft_bildbeschreibung="Heftseite mit durchgestrichener 12.",
         schuelerin_name="Mia",
         schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        lehrperson_name="Koch",
+        lehrperson_geschlecht=Vignette.Geschlecht.WEIBLICH,
         fach="Mathematik",
         thema="Brüche",
         klassenstufe="5",
@@ -65,17 +74,41 @@ def test_prompt_platzhalter_ordnet_arbeitsheft_text_und_bildbeschreibung() -> No
         "arbeitsheft_simulationshinweise": "",
         "schuelerin_name": "Mia",
         "schuelerin_geschlecht": "weiblich",
+        "lehrperson_name": "Koch",
+        "lehrperson_anrede": "Frau",
         "fach": "Mathematik",
         "thema": "Brüche",
         "klassenstufe": "5",
     }
 
 
+@pytest.mark.parametrize(
+    ("geschlecht", "anrede"),
+    [(Vignette.Geschlecht.WEIBLICH, "Frau"), (Vignette.Geschlecht.MAENNLICH, "Herr")],
+)
+def test_prompt_platzhalter_nennt_die_lehrperson_mit_anrede(
+    geschlecht: str, anrede: str
+) -> None:
+    """Die Schüler:in kennt Name und Anrede ihrer Lehrperson (#518)."""
+    vignette: Vignette = Vignette(
+        schuelerin_geschlecht=Vignette.Geschlecht.WEIBLICH,
+        lehrperson_name="Koch",
+        lehrperson_geschlecht=geschlecht,
+    )
+
+    platzhalter: dict[str, str] = prompt_platzhalter(vignette)
+
+    assert (platzhalter["lehrperson_name"], platzhalter["lehrperson_anrede"]) == (
+        "Koch",
+        anrede,
+    )
+
+
 def test_prompt_platzhalter_ordnet_lernauftrag_text_und_bildbeschreibung() -> None:
     """Der komponierte Lernauftrag folgt dem ersten Positionsmarker."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
+        _prompt_vignette(
             lernauftrag_text="Rechne zuerst.\r\n\t[Bild]\r\nBegründe danach.",
             lernauftrag_bild="vignettenbilder/auftrag.gif",
             lernauftrag_bildbeschreibung="Arbeitsblatt mit einer Zahlenreihe.",
@@ -96,7 +129,7 @@ def test_prompt_platzhalter_fasst_simulationshinweise_in_umgebungen() -> None:
     """Simulationshinweise werden in benannte Umgebungen gefasst."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
+        _prompt_vignette(
             lernauftrag_simulationshinweise="Klasse hat Brüche mit Pizza geübt.",
             arbeitsheft_simulationshinweise="Mia hat zuvor mit Plättchen probiert.",
         )
@@ -118,7 +151,7 @@ def test_prompt_platzhalter_reicht_spitze_klammern_unveraendert_durch() -> None:
     """Nutzereingaben gehen roh in den Prompt — kein HTML-Escaping."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
+        _prompt_vignette(
             fehlermuster_beschreibung="a < b & b > c",
             lernauftrag_text="Vergleiche <a> mit &amp;.",
             arbeitsheft_simulationshinweise='Mia schreibt "5 < 7".',
@@ -146,7 +179,9 @@ def test_prompt_platzhalter_reicht_markdown_unveraendert_durch() -> None:
     """Das Sprachmodell liest die Markdown-Quelle, nicht das Gerenderte (ADR-0044)."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(lernauftrag_text="Addiere **zwei** Brüche.\n[Tipp](https://x.org)")
+        _prompt_vignette(
+            lernauftrag_text="Addiere **zwei** Brüche.\n[Tipp](https://x.org)"
+        )
     )
 
     assert platzhalter["lernauftrag"] == (
@@ -160,7 +195,7 @@ def test_prompt_platzhalter_reicht_markdown_unveraendert_durch() -> None:
 def test_prompt_platzhalter_laesst_leere_lange_werte_ungefasst() -> None:
     """Leere lange Prompt-Inhalte werden nicht mit einer Umgebung versehen."""
 
-    platzhalter: dict[str, str] = prompt_platzhalter(Vignette())
+    platzhalter: dict[str, str] = prompt_platzhalter(_prompt_vignette())
 
     assert (
         platzhalter["fehlermuster_beschreibung"],
@@ -176,7 +211,7 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild(teil: str) -> None:
     """Ein Teil ohne Bild gibt den Marker nie an das Modell weiter."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(**{f"{teil}_text": "Oben\n[BILD]\nunten\n[bild]"})
+        _prompt_vignette(**{f"{teil}_text": "Oben\n[BILD]\nunten\n[bild]"})
     )
 
     assert platzhalter[teil] == (
@@ -195,7 +230,7 @@ def test_prompt_platzhalter_entfernt_marker_ohne_bild(teil: str) -> None:
 def test_positionsmarker_zaehlt_nur_allein_auf_einer_zeile(text: str) -> None:
     """Mitten in einer Zeile oder als Linktext bleibt [bild] gewöhnlicher Text."""
 
-    vignette: Vignette = Vignette(
+    vignette: Vignette = _prompt_vignette(
         lernauftrag_text=text,
         lernauftrag_bild="vignettenbilder/auftrag.gif",
         lernauftrag_bildbeschreibung="Arbeitsblatt",
@@ -216,7 +251,7 @@ def test_positionsmarker_zaehlt_nur_allein_auf_einer_zeile(text: str) -> None:
 def test_positionsmarker_auf_eigener_zeile_zerlegt_den_text() -> None:
     """Allein auf einer Zeile zerlegt der erste Marker den Text; alle verschwinden."""
 
-    teil: Aufgabenkontextteil = Vignette(
+    teil: Aufgabenkontextteil = _prompt_vignette(
         arbeitsheft_text="Oben\n   [Bild]\t\nMitte\n[bild]\nunten",
         arbeitsheft_bild="vignettenbilder/heft.gif",
     ).arbeitsheft
@@ -229,7 +264,7 @@ def test_prompt_platzhalter_ordnet_bild_ohne_marker_nach_dem_text(teil: str) -> 
     """Ohne Marker steht die Bildbeschreibung im Prompt nach dem Text."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
+        _prompt_vignette(
             **{
                 f"{teil}_text": "Aufgabe oben",
                 f"{teil}_bild": "vignettenbilder/blatt.gif",
@@ -251,7 +286,7 @@ def test_prompt_platzhalter_laesst_leere_textstuecke_weg(teil: str) -> None:
     """Ein Teil nur mit Bild erzeugt keine leere Textumgebung."""
 
     platzhalter: dict[str, str] = prompt_platzhalter(
-        Vignette(
+        _prompt_vignette(
             **{
                 f"{teil}_bild": "vignettenbilder/blatt.gif",
                 f"{teil}_bildbeschreibung": "Blatt mit Skizze",
