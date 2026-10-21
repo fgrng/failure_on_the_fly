@@ -17,6 +17,11 @@ media/
 .claude/settings.local.json
 .claude/worktrees/
 node_modules/
+# Playwright CLI: Logs und Snapshots (können Zugangsdaten enthalten); nur die
+# Browserwahl ist versioniert
+.playwright/*
+!.playwright/cli.config.json
+.playwright-cli/
 
 # System
 .DS_Store

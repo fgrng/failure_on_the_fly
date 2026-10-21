@@ -201,6 +201,19 @@ Agents getestet, ohne Docker und ohne Agents:
 npm run test:sandcastle
 ```
 
+Außerhalb von Sandcastle bedienen Agenten die App auch im Browser, auf dem
+Dev-Server und auf der Produktivinstanz, über den Skill `playwright-cli`. Dafür
+muss die CLI global installiert sein, samt Chromium:
+
+```
+npm install -g @playwright/cli
+playwright-cli install-browser
+```
+
+Profile und Logs landen in `.playwright-cli/` und im Cache unter
+`~/.cache/ms-playwright/`, nie im Repo. Wie Agenten dabei vorgehen, steht in
+[docs/agents/playwright/README.md](docs/agents/playwright/README.md).
+
 ## Deployment auf Uberspace
 
 Der vollständige Walkthrough — Inbetriebnahme, Abnahme, Backup, Update,
