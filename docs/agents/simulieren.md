@@ -12,7 +12,7 @@ kommt.
 ```sh
 uv run scripts/simulieren.py \
     --vignette docs/vignetten/lu11-01-gleichheitszeichen-als-rechenaufforderung.md \
-    --prompt docs/simulation_prompts/2026-10-20-systemprompt.md \
+    --prompt docs/simulation_prompts/2026-10-21-systemprompt.md \
     --verlauf @verlauf.json \
     "Was hast du bei a) eingetragen?"
 ```
@@ -62,15 +62,22 @@ Jede `##`-Überschrift ist ein Feldname der Vignette in der Datenbank
 `arbeitsheft_simulationshinweise`, `schuelerin_name`, `lehrperson_geschlecht`
 usw.); der Abschnitt darunter ist der Wert. Fehlende oder leere Abschnitte sind
 leere Felder, unbekannte Überschriften ein Fehler. Text vor der ersten
-`##`-Überschrift ist Einleitung. Besteht ein Abschnitt nur aus einem Codeblock,
-zählt dessen Inhalt ohne Zäune. Geschlechter sind `weiblich` oder `männlich`.
+`##`-Überschrift ist Einleitung; eine Trennlinie `---` nach dem letzten Feld
+beendet die Vignette, was folgt, ist Kommentar. Der Wert ist der Abschnitt,
+wie das Formular der App ihn speichert: ohne Leerzeilen und Leerraum außen,
+aber mit der Einrückung der ersten Zeile. Mehrzeilige Heftinhalte stehen
+deshalb als eingerückter Block (vier Leerzeichen je Zeile), den die App mit
+Spalten und Einrückung zeigt; ein umzäunter Codeblock ist ein Fehler, weil die
+App die Zäune wörtlich zeigt. Geschlechter sind `weiblich` oder `männlich`;
+`budget_typ` darf wie im Editor `Schritte` heißen und wird kleingeschrieben.
 Bildfelder tragen einen Dateinamen; das Bild selbst wird nicht gelesen, es
 schaltet nur die Bildbeschreibung frei.
 
 ## Prompt-Datei
 
 Steht ein ```` ```text ````-Block unter `## System-Prompt-Vorlage`, ist er die
-Vorlage; sonst die ganze Datei. Verfügbar sind die Prompt- und die
+Vorlage; sonst die ganze Datei. Der Block darf einen längeren Zaun tragen
+(````` ````text `````), damit die Vorlage selbst Codeblöcke enthalten kann. Verfügbar sind die Prompt- und die
 Rahmen-Platzhalter der App (`vignetten/prompt.py`), also auch die
 Rahmen-Platzhalter außerhalb des Promptvertrags wie `$lehrperson_pronomen`, die
 die App in Prompt-Vorlagen abweist. Ein unbekannter Platzhalter ist ein Fehler.

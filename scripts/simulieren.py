@@ -9,7 +9,7 @@ Beispiel:
 
     uv run scripts/simulieren.py \\
         --vignette docs/vignetten/lu11-01-gleichheitszeichen-als-rechenaufforderung.md \\
-        --prompt docs/simulation_prompts/2026-10-20-systemprompt.md \\
+        --prompt docs/simulation_prompts/2026-10-21-systemprompt.md \\
         --verlauf @verlauf.json \\
         "Was hast du bei a) gerechnet?"
 
@@ -64,10 +64,16 @@ VIGNETTENFELDER: tuple[str, ...] = (
 )
 
 _UEBERSCHRIFT: re.Pattern[str] = re.compile(r"^## (.+?)[ \t]*$", re.MULTILINE)
-_CODEBLOCK: re.Pattern[str] = re.compile(r"\A```[^\n]*\n(.*)\n```\Z", re.DOTALL)
+_ZAUN: re.Pattern[str] = re.compile(r"^[ \t]*```", re.MULTILINE)
+_FUEHRENDE_LEERZEILEN: re.Pattern[str] = re.compile(r"\A(?:[ \t]*\n)+")
+# Der Block endet am ersten Zaun gleicher Länge; ein längerer Zaun (````)
+# lässt kürzere Codeblöcke in der Vorlage zu.
 _SYSTEM_PROMPT_VORLAGE: re.Pattern[str] = re.compile(
-    r"^## System-Prompt-Vorlage\s*\n+```text\n(.*?)\n```", re.DOTALL | re.MULTILINE
+    r"^## System-Prompt-Vorlage\s*\n+(`{3,})text\n(.*?)\n\1[ \t]*$",
+    re.DOTALL | re.MULTILINE,
 )
+# Eine Trennlinie nach dem letzten Feld beendet die Vignette.
+_SCHLUSSLINIE: re.Pattern[str] = re.compile(r"^---[ \t]*$", re.MULTILINE)
 
 
 class Eingabefehler(Exception):
@@ -78,32 +84,41 @@ def vignette_lesen(text: str) -> dict[str, str]:
     """Liest die Felder einer Vignette aus Markdown.
 
     Jede `##`-Überschrift ist ein Feldname; ihr Abschnitt bis zur nächsten
-    Überschrift ist der Wert. Besteht ein Abschnitt nur aus einem Codeblock,
-    zählt dessen Inhalt. Fehlende Abschnitte sind leere Felder; Text vor der
-    ersten Überschrift ist Einleitung.
+    Überschrift ist der Wert, wie das Formular der App ihn speichert: ohne
+    Leerraum außen, aber mit der Einrückung der ersten Zeile, damit ein
+    eingerückter Block einer bleibt. Umzäunte Codeblöcke sind ein Fehler, weil
+    die App die Zäune wörtlich zeigt. Fehlende Abschnitte sind leere Felder;
+    Text vor der ersten Überschrift ist Einleitung, Text nach einer Trennlinie
+    `---` im letzten Abschnitt ist Kommentar. `budget_typ` steht in der Datei wie im
+    Editor (`Schritte`) und wird zum Wert der Datenbank (`schritte`).
     """
 
     felder: dict[str, str] = dict.fromkeys(VIGNETTENFELDER, "")
     teile: list[str] = _UEBERSCHRIFT.split(text)
+    if len(teile) > 1:
+        teile[-1] = _SCHLUSSLINIE.split(teile[-1], maxsplit=1)[0]
     for name, abschnitt in zip(teile[1::2], teile[2::2], strict=True):
         if name not in felder:
             raise Eingabefehler(f"Unbekannte Überschrift in der Vignette: ## {name}")
-        wert: str = abschnitt.strip()
-        if codeblock := _CODEBLOCK.match(wert):
-            wert = codeblock.group(1)
-        felder[name] = wert
+        if _ZAUN.search(abschnitt):
+            raise Eingabefehler(
+                f"Umzäunter Codeblock unter ## {name}: Die App zeigt die Zäune "
+                "wörtlich; den Block stattdessen mit vier Leerzeichen einrücken."
+            )
+        felder[name] = _FUEHRENDE_LEERZEILEN.sub("", abschnitt).rstrip()
+    felder["budget_typ"] = felder["budget_typ"].lower()
     return felder
 
 
 def vorlage_lesen(text: str) -> str:
     """Liest die System-Prompt-Vorlage aus einer Prompt-Datei.
 
-    Steht ein ```` ```text ````-Block unter `## System-Prompt-Vorlage`, ist er
-    die Vorlage; sonst die ganze Datei.
+    Steht ein ```` ```text ````-Block (oder mit längerem Zaun) unter
+    `## System-Prompt-Vorlage`, ist er die Vorlage; sonst die ganze Datei.
     """
 
     if treffer := _SYSTEM_PROMPT_VORLAGE.search(text):
-        return treffer.group(1)
+        return treffer.group(2)
     return text
 
 

@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import litellm
 import pytest
 
-from scripts.simulieren import main
+from scripts.simulieren import main, vignette_lesen
 
 VIGNETTE: str = """# Vignette zum Testen
 
@@ -26,9 +26,7 @@ Setze die passende Zahl ein: 5 + 7 = ___ + 6
 
 ## arbeitsheft_text
 
-```
-a) 5 + 7 = 12 + 6
-```
+    a) 5 + 7 = 12 + 6
 
 ## schuelerin_name
 
@@ -109,7 +107,7 @@ def test_nur_prompt_rendert_die_vorlage_mit_den_vignettenfeldern(
     assert capsys.readouterr().out == (
         "Du bist Elin bei Herr Wyss.\n"
         "<arbeitsheft>\n"
-        "<arbeitsheft_text>a) 5 + 7 = 12 + 6</arbeitsheft_text>\n"
+        "<arbeitsheft_text>    a) 5 + 7 = 12 + 6</arbeitsheft_text>\n"
         "</arbeitsheft>\n"
     )
 
@@ -133,6 +131,52 @@ def test_prompt_datei_ohne_vorlagenabschnitt_ist_ganz_die_vorlage(
     main([*dateien, "--nur-prompt"])
 
     assert capsys.readouterr().out == "Hallo Elin.\n"
+
+
+def test_vorlage_in_vier_backticks_ist_nur_der_block(
+    dateien: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "prompt.md").write_text(
+        "# Entwurf\n\n## System-Prompt-Vorlage\n\n"
+        "````text\nHallo $schuelerin_name.\n```\ninnen\n```\n````\n\nNachwort.\n",
+        encoding="utf-8",
+    )
+
+    main([*dateien, "--nur-prompt"])
+
+    assert capsys.readouterr().out == "Hallo Elin.\n```\ninnen\n```\n"
+
+
+def test_trennlinie_nach_dem_letzten_feld_beendet_die_vignette() -> None:
+    felder: dict[str, str] = vignette_lesen(
+        "## budget_typ\n\nSchritte\n\n## budget_wert\n\n10\n\n---\n\n"
+        "**Warum simulierbar:** Kommentar.\n"
+    )
+
+    assert felder["budget_wert"] == "10"
+
+
+def test_eingerueckter_block_behaelt_die_einrueckung_der_ersten_zeile() -> None:
+    felder: dict[str, str] = vignette_lesen(
+        "## arbeitsheft_text\n\n    a) x = 3    | − 1\n       x = 2\n\n## fach\n\nM\n"
+    )
+
+    assert felder["arbeitsheft_text"] == "    a) x = 3    | − 1\n       x = 2"
+
+
+def test_umzaeunter_codeblock_bricht_ab(
+    dateien: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "vignette.md").write_text(
+        "## arbeitsheft_text\n\n```\na) 5 + 7 = 12\n```\n", encoding="utf-8"
+    )
+
+    assert main([*dateien, "--nur-prompt"]) == 2
+    assert "## arbeitsheft_text" in capsys.readouterr().err
+
+
+def test_budget_typ_ist_der_wert_der_datenbank() -> None:
+    assert vignette_lesen("## budget_typ\n\nSchritte\n")["budget_typ"] == "schritte"
 
 
 def test_schritt_gibt_einen_verlaufseintrag_aus(

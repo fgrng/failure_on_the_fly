@@ -45,7 +45,7 @@ Die Nummerierung M1–M20 gilt nur für dieses Dokument.
 ### M1 Umkehr-Rezept ohne Rücksicht auf die Stellung von x (Stufe A)
 
 - **Regel**: «Die Zahl neben dem x kommt mit der Umkehroperation auf die andere Seite.» Die Schüler:in liest das Rechenzeichen zwischen Zahl und x und wendet die Gegenoperation auf die rechte Seite an, egal ob x Minuend oder Subtrahend, Dividend oder Divisor ist.
-- **Kontrast**: Das Rezept stimmt nur, wenn x vorne steht (x − 81 = 9, x : 5 = 12). Steht x hinten (81 − x = 9, 120 : x = 4), ist die Umkehrung eine andere: x = 81 − 9 bzw. x = 120 : 4.
+- **Kontrast**: Das Rezept stimmt nur, solange x nicht abgezogen wird und nicht teilt (x − 81 = 9, x : 5 = 12, aber auch 25 + x = 52 und 5x = 75). Wird x abgezogen oder teilt es (81 − x = 9, 120 : x = 4), ist die Umkehrung eine andere: x = 81 − 9 bzw. x = 120 : 4.
 - **An Aufgaben der LU 11**:
   - AH 1, Serie C: x − 81 = 9 → x = 90 (richtig). 81 − x = 9 → «minus 81 kommt als plus 81 rüber»: x = 9 + 81 = 90 (richtig wäre 72). Beide Gleichungen bekommen dieselbe Lösung.
   - AH 2, Serie C: 120 : x = 1, 2, 3, 4 → x = 120, 240, 360, 480 (richtig 120, 60, 40, 30). Die Serie soll zeigen, dass x kleiner wird; bei ihr wird x grösser.
