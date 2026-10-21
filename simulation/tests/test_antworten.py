@@ -150,6 +150,46 @@ def test_antwort_versuchen_verwirft_leere_denkspur_oder_aeusserung(
     ]
 
 
+@pytest.mark.parametrize(
+    "literal",
+    [
+        {"denkspur": "false", "aeusserung": "false"},
+        {"denkspur": "Ich addiere.", "aeusserung": "null"},
+        {"denkspur": " true\n", "aeusserung": "2/5."},
+    ],
+)
+def test_antwort_versuchen_verwirft_ein_json_literal_als_text(
+    literal: dict[str, str],
+) -> None:
+    """Ein JSON-Literal als ganzer Feldinhalt ist ein Formatbruch, kein Text.
+
+    Kimi K2.6 lieferte im Probelauf vom 2026-10-20 einmal «false» in beiden
+    Feldern; als Äusserung gespeichert, verfälschte das den Verlauf.
+    """
+
+    antwortversuch = _schuelerin_versuchen(
+        [literal, {"denkspur": "Ich addiere.", "aeusserung": "2/5."}]
+    )
+
+    assert antwortversuch.antwort is not None
+    assert antwortversuch.antwort.aeusserung == "2/5."
+    assert [fehlversuch.grund for fehlversuch in antwortversuch.fehlversuche] == [
+        "Formatbruch"
+    ]
+
+
+def test_antwort_versuchen_laesst_ein_wort_wie_null_im_satz_stehen() -> None:
+    """Nur das nackte Literal bricht das Format; «Null.» ist eine Antwort."""
+
+    antwortversuch = _schuelerin_versuchen(
+        [{"denkspur": "Ich ziehe ab.", "aeusserung": "Null."}]
+    )
+
+    assert antwortversuch.antwort is not None
+    assert antwortversuch.antwort.aeusserung == "Null."
+    assert antwortversuch.fehlversuche == []
+
+
 def test_antwort_versuchen_scheitert_an_anhaltend_leerer_ausgabe() -> None:
     """Bleibt die Ausgabe in allen Versuchen leer, entsteht kein Gesprächsschritt."""
 

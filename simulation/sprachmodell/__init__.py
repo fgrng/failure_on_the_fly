@@ -38,6 +38,10 @@ BEWERTER_SCHEMA: dict[str, object] = {
 # Die JSON-Typen, die in den Ausgabeschemas vorkommen.
 _JSON_TYPEN: dict[str, type] = {"string": str, "boolean": bool}
 
+# JSON-Literale, die ein Modell statt Text in ein Textfeld schreibt; als
+# ganzer Feldinhalt sind sie kein Text (Probelauf vom 2026-10-20: «false»).
+_JSON_LITERALE: frozenset[str] = frozenset({"true", "false", "null"})
+
 
 def nachrichten_bauen(
     system_prompt: str,
@@ -89,10 +93,10 @@ def _ausgabe_pruefen(
     """Gibt den Inhalt zurück, wenn er genau dem Ausgabeschema entspricht.
 
     Fehlende, zusätzliche oder falsch typisierte Felder sind ein Formatbruch,
-    ebenso eine Zeichenkette, die leer ist oder nur aus Leerraum besteht: Jedes
-    Textfeld eines Ausgabeschemas ist Pflicht, so wie ein Gesprächsschritt ohne
-    Denkspur oder Äußerung unzulässig ist (ADR-0061). Der Inhalt bleibt dabei
-    unverändert.
+    ebenso eine Zeichenkette, die leer ist, nur aus Leerraum besteht oder nur
+    ein JSON-Literal enthält: Jedes Textfeld eines Ausgabeschemas ist Pflicht,
+    so wie ein Gesprächsschritt ohne Denkspur oder Äußerung unzulässig ist
+    (ADR-0061). Der Inhalt bleibt dabei unverändert.
     """
 
     eigenschaften: Mapping[str, Mapping[str, str]] = ausgabe_schema["properties"]
@@ -102,7 +106,9 @@ def _ausgabe_pruefen(
         wert: object = inhalt[name]
         if not isinstance(wert, _JSON_TYPEN[eigenschaft["type"]]):
             raise Formatbruch(rohantwort)
-        if isinstance(wert, str) and not wert.strip():
+        if isinstance(wert, str) and (
+            not wert.strip() or wert.strip() in _JSON_LITERALE
+        ):
             raise Formatbruch(rohantwort)
     return inhalt
 
