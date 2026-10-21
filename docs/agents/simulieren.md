@@ -49,7 +49,7 @@ In `.env` oder der Umgebung:
 SIMULIEREN_MODELL=openai/moonshotai/Kimi-K2.6        # LiteLLM-Modell-String, Pflicht
 SIMULIEREN_API_KEY=…                                  # Pflicht
 SIMULIEREN_API_BASE=https://…/openai/v1               # optional
-SIMULIEREN_PARAMETER={"reasoning_effort": "none", "allowed_openai_params": ["reasoning_effort"], "temperature": 1}   # optional, JSON-Objekt
+SIMULIEREN_PARAMETER={"reasoning_effort": "none", "temperature": 1}   # optional, JSON-Objekt
 ```
 
 Welche Modelle der Anbieter hat und welche Parameter sie brauchen (Thinking,
@@ -63,21 +63,22 @@ Jede `##`-Überschrift ist ein Feldname der Vignette in der Datenbank
 usw.); der Abschnitt darunter ist der Wert. Fehlende oder leere Abschnitte sind
 leere Felder, unbekannte Überschriften ein Fehler. Text vor der ersten
 `##`-Überschrift ist Einleitung; eine Trennlinie `---` nach dem letzten Feld
-beendet die Vignette, was folgt, ist Kommentar. Der Wert ist der Abschnitt,
-wie das Formular der App ihn speichert: ohne Leerzeilen und Leerraum außen,
-aber mit der Einrückung der ersten Zeile. Mehrzeilige Heftinhalte stehen
-deshalb als eingerückter Block (vier Leerzeichen je Zeile), den die App mit
-Spalten und Einrückung zeigt; ein umzäunter Codeblock ist ein Fehler, weil die
-App die Zäune wörtlich zeigt. Geschlechter sind `weiblich` oder `männlich`;
-`budget_typ` darf wie im Editor `Schritte` heißen und wird kleingeschrieben.
-Bildfelder tragen einen Dateinamen; das Bild selbst wird nicht gelesen, es
-schaltet nur die Bildbeschreibung frei.
+beendet die Vignette, was folgt, ist Kommentar. Der Wert ist der Abschnitt, wie
+das Formular der App ihn speichert: ohne Leerzeilen und Leerraum außen, aber mit
+der Einrückung der ersten Zeile. Mehrzeilige Heftinhalte stehen deshalb als
+eingerückter Block (vier Leerzeichen je Zeile), den die App mit Spalten und
+Einrückung zeigt; ein umzäunter Codeblock ist ein Fehler, weil die App die Zäune
+wörtlich zeigt. Geschlechter sind `weiblich` oder `männlich`; `budget_typ` darf
+wie im Editor `Schritte` heißen und wird kleingeschrieben. Bildfelder tragen
+einen Dateinamen; das Bild selbst wird nicht gelesen, es schaltet nur die
+Bildbeschreibung frei.
 
 ## Prompt-Datei
 
 Steht ein ```` ```text ````-Block unter `## System-Prompt-Vorlage`, ist er die
 Vorlage; sonst die ganze Datei. Der Block darf einen längeren Zaun tragen
-(````` ````text `````), damit die Vorlage selbst Codeblöcke enthalten kann. Verfügbar sind die Prompt- und die
-Rahmen-Platzhalter der App (`vignetten/prompt.py`), also auch die
-Rahmen-Platzhalter außerhalb des Promptvertrags wie `$lehrperson_pronomen`, die
-die App in Prompt-Vorlagen abweist. Ein unbekannter Platzhalter ist ein Fehler.
+(````` ````text `````), damit die Vorlage selbst Codeblöcke enthalten kann.
+Verfügbar sind die Prompt- und die Rahmen-Platzhalter der App
+(`vignetten/prompt.py`), also auch die Rahmen-Platzhalter außerhalb des
+Promptvertrags wie `$lehrperson_pronomen`, die die App in Prompt-Vorlagen
+abweist. Ein unbekannter Platzhalter ist ein Fehler.

@@ -179,6 +179,12 @@ class FakeSprachmodell:
         return _ausgabe_pruefen(inhalt, ausgabe_schema, rohantwort)
 
 
+# Was neben den Stellschrauben im Aufruf steht und kein Modellparameter ist.
+VERBINDUNGSPARAMETER: frozenset[str] = frozenset(
+    {"api_key", "api_base", "extra_body", "timeout", "allowed_openai_params"}
+)
+
+
 class LiteLLMSprachmodell:
     """Routet den konfigurierten Modell-String über LiteLLM."""
 
@@ -218,6 +224,12 @@ class LiteLLMSprachmodell:
         # Allowlist der Mikro-Stellschrauben und überschreibt einen dort
         # dennoch gelandeten Wert.
         aufrufparameter: dict[str, Any] = {**self.parameter, "timeout": timeout}
+        # LiteLLM soll die Stellschrauben auch für Modelle senden, die es nicht
+        # kennt (etwa `reasoning_effort` bei Kimi), statt den Aufruf
+        # abzulehnen. Die App prüft sie vorher gegen die Allowlist.
+        stellschrauben: set[str] = set(self.parameter) - VERBINDUNGSPARAMETER
+        if stellschrauben:
+            aufrufparameter["allowed_openai_params"] = sorted(stellschrauben)
 
         import litellm
 

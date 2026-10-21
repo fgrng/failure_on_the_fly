@@ -55,15 +55,16 @@ Reranker- und Bildmodelle.
 
 ```sh
 SIMULIEREN_MODELL=openai/moonshotai/Kimi-K2.6
-SIMULIEREN_PARAMETER={"reasoning_effort": "none", "allowed_openai_params": ["reasoning_effort"], "temperature": 1}
+SIMULIEREN_PARAMETER={"reasoning_effort": "none", "temperature": 1}
 ```
 
-`reasoning_effort: none` ist bei Qwen und Kimi Pflicht. `allowed_openai_params`
-braucht LiteLLM, weil es `reasoning_effort` für unbekannte Modelle hinter
-`openai/` sonst schon vor der Anfrage mit `UnsupportedParamsError` ablehnt. Die
-Temperatur ausdrücklich setzen, damit sie in den Probelauf-Einträgen steht und
-ein Lauf mit anderer Temperatur davon unterscheidbar bleibt. Seit dem 2026-10-20
-steht `.env` auf Kimi-K2.6 mit genau diesen Parametern (docs/evals/README.md,
-«Stand»). Apertus lief bis dahin ohne Parameter, also mit Temperatur 1 und ohne
-Thinking; ein Thinking-Modus steht für Apertus über diese API nicht zur
-Verfügung, es denkt nur in der Denkspur.
+`reasoning_effort: none` ist bei Qwen und Kimi Pflicht. LiteLLM lehnt
+`reasoning_effort` für unbekannte Modelle hinter `openai/` sonst schon vor der
+Anfrage mit `UnsupportedParamsError` ab; der Adapter setzt deshalb selbst
+`allowed_openai_params` mit allen gesetzten Parametern. Die Temperatur
+ausdrücklich setzen, damit sie in den Probelauf-Einträgen steht und ein Lauf mit
+anderer Temperatur davon unterscheidbar bleibt. Seit dem 2026-10-20 steht `.env`
+auf Kimi-K2.6 mit genau diesen Parametern (docs/evals/README.md, «Stand»).
+Apertus lief bis dahin ohne Parameter, also mit Temperatur 1 und ohne Thinking;
+ein Thinking-Modus steht für Apertus über diese API nicht zur Verfügung, es
+denkt nur in der Denkspur.

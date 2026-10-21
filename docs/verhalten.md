@@ -524,7 +524,9 @@ Bezeichnung angelegt wurden, heißen »<Sprachmodell> (Nr. <Nummer>)«. Der
 Anbieter ist eine feste Auswahl — `fake`, `openrouter` oder `infomaniak` —, der
 Modellname bleibt freier Text; Basis-URL und Token liegen an der Konfiguration
 und nicht in der Umgebung. Die Parameter nehmen nur Mikro-Stellschrauben des
-Modellverhaltens auf, bei `fake` ausschließlich das Skript und den Schalter
+Modellverhaltens auf; sie gehen auch an Modelle, die LiteLLM nicht kennt (etwa
+`reasoning_effort` an Kimi über `infomaniak`), statt dass LiteLLM sie vor der
+Anfrage ablehnt. Bei `fake` sind es ausschließlich das Skript und der Schalter
 `skript_fortlesen` sowie die Zahl `verzoegerung`, die jeden Aufruf so viele
 Sekunden warten lässt wie ein langsames Modell (nur als endliche Zahl ab 0; als
 Text, `true`, negativ oder unendlich wartet er nicht). Die Wartezeit endet

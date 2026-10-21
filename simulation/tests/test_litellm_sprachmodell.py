@@ -2,6 +2,7 @@
 
 import traceback
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -66,6 +67,7 @@ def test_litellm_adapter_reicht_konfiguration_und_schema_durch() -> None:
         },
         temperature=0.2,
         timeout=SPRACHMODELL_FRIST_SEKUNDEN,
+        allowed_openai_params=["temperature"],
     )
 
 
@@ -452,6 +454,42 @@ def test_antwort_versuchen_reicht_token_und_basis_url_an_den_aufruf_durch() -> N
     assert completion.call_args.kwargs["api_base"] == (
         "https://api.infomaniak.com/1/ai/4711/openai"
     )
+
+
+def _completion_mit_litellm_parameterpruefung(**kwargs: Any) -> SimpleNamespace:
+    # Löst die Parameter wie `litellm.completion` auf, ohne das Netz zu berühren.
+
+    from litellm.utils import get_optional_params
+
+    anbieter, _, modell = kwargs["model"].partition("/")
+    stellschrauben: dict[str, Any] = {
+        name: wert
+        for name, wert in kwargs.items()
+        if name not in {"model", "messages", "api_key", "api_base", "timeout"}
+    }
+    get_optional_params(model=modell, custom_llm_provider=anbieter, **stellschrauben)
+    return _geglueckte_completion().return_value
+
+
+def test_antwort_versuchen_reicht_reasoning_effort_an_ein_unbekanntes_modell() -> None:
+    """LiteLLM kennt Kimi nicht und lehnte `reasoning_effort` sonst ab."""
+
+    with patch("litellm.completion", _completion_mit_litellm_parameterpruefung):
+        versuch = antwort_versuchen(
+            {"lernauftrag": "Addiere zwei Brüche."},
+            Simulationskern(user_prompt_vorlage="$lernauftrag"),
+            ModellKonfiguration(
+                anbieter=Anbieter.INFOMANIAK,
+                sprachmodell="openai/moonshotai/Kimi-K2.6",
+                anbieter_basis_url="https://api.infomaniak.com/1/ai/4711/openai",
+                anbieter_token="infomaniak-geheim",
+                parameter={"reasoning_effort": "none", "temperature": 1},
+            ),
+            verlauf=[],
+            eingabe="Wie hast du gerechnet?",
+        )
+
+    assert versuch.antwort == Antwort("Ich addiere.", "2/5.")
 
 
 def test_antwort_versuchen_setzt_den_provider_filter_bei_openrouter() -> None:
