@@ -1413,3 +1413,41 @@ class VignettenRollenTests(TestCase):
 
         self.assertEqual(self.client.get(reverse("vignetten:liste")).status_code, 200)
         self.assertEqual(self.client.get(reverse("vignetten:anlegen")).status_code, 200)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("teil", ["lernauftrag", "arbeitsheft"])
+def test_eingerueckter_block_am_anfang_behaelt_seine_einrueckung(
+    client: Client, teil: str
+) -> None:
+    """Ein Text, der mit einem eingerückten Block beginnt, bleibt ein Block (#270)."""
+
+    vignette: Vignette = _angemeldeter_entwurf(client)
+
+    client.post(
+        reverse("vignetten:bearbeiten", args=[vignette.pk]),
+        {
+            **_geschlechter(vignette),
+            f"{teil}_text": "\n    a) x + 14 = 31    x = 17\n    b) 9 = x\n  \n",
+        },
+    )
+
+    vignette.refresh_from_db()
+    assert getattr(vignette, f"{teil}_text") == (
+        "    a) x + 14 = 31    x = 17\n    b) 9 = x"
+    )
+
+
+@pytest.mark.django_db
+def test_text_nur_aus_leerraum_ist_leer(client: Client) -> None:
+    """Leerraum allein zählt nicht als Arbeitsheft-Text."""
+
+    vignette: Vignette = _angemeldeter_entwurf(client)
+
+    client.post(
+        reverse("vignetten:bearbeiten", args=[vignette.pk]),
+        {**_geschlechter(vignette), "arbeitsheft_text": "   \n  "},
+    )
+
+    vignette.refresh_from_db()
+    assert vignette.arbeitsheft_text == ""

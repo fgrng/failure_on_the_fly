@@ -127,15 +127,17 @@ Abschrift und in der Vignetten-Detailansicht. Der Umfang gleicht dem der
 Erhebungstexte (siehe „Erhebungsteilnahme"), nur ohne Links: Link-Syntax
 erscheint wörtlich. Die Teile vor und nach dem Bild werden je für sich
 gerendert. In der Sitzung stehen Überschriften über dem großen Fließtext der
-Szene. Rechenschritte mit Einrückung lassen sich als eingerückter Block setzen.
-Schülernotation mit `*`, `_`, führendem `-` oder `1.` escapen Autor:innen mit
-einem Backslash. Bildbeschreibung und Simulationshinweise bleiben reiner Text.
-Prompt und Datenspur-Export erhalten die unveränderte Markdown-Quelle. Im
-Vignettenformular stehen unter beiden Feldern der Markdown-Hinweis ohne
-Link-Syntax, samt Backslash- und Einrückungsregel, und derselbe Umschalter
-»Bearbeiten | Vorschau« wie bei den Erhebungstexten; die Vorschau rendert den
-ungespeicherten Text im Profil Szenentext so wie die Sitzung. Bei einem Text mit
-Positionsmarker zeigt sie `[bild]` wörtlich.
+Szene. Rechenschritte mit Einrückung lassen sich als eingerückter Block setzen,
+auch gleich am Anfang des Textes: Beim Speichern fallen nur Leerzeilen und
+Leerraum außen weg, die Einrückung der ersten Zeile bleibt. Schülernotation mit
+`*`, `_`, führendem `-` oder `1.` escapen Autor:innen mit einem Backslash.
+Bildbeschreibung und Simulationshinweise bleiben reiner Text. Prompt und
+Datenspur-Export erhalten die unveränderte Markdown-Quelle. Im Vignettenformular
+stehen unter beiden Feldern der Markdown-Hinweis ohne Link-Syntax, samt
+Backslash- und Einrückungsregel, und derselbe Umschalter »Bearbeiten | Vorschau«
+wie bei den Erhebungstexten; die Vorschau rendert den ungespeicherten Text im
+Profil Szenentext so wie die Sitzung. Bei einem Text mit Positionsmarker zeigt
+sie `[bild]` wörtlich.
 
 Im Formular zum Anlegen und Bearbeiten stehen Lernauftrag- und Arbeitsheft-Bild
 jeweils mit ihrer Bildbeschreibung in einer Bildkarte. Ein Bild lässt sich

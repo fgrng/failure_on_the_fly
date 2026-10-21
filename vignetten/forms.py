@@ -1,5 +1,6 @@
 """Formulare des Vignetten-Editors."""
 
+import re
 from typing import Any
 
 from django.forms import ClearableFileInput, ModelForm
@@ -7,6 +8,14 @@ from django.forms import ClearableFileInput, ModelForm
 from .models import FELDBESCHRIFTUNGEN, Vignette
 
 _BILDTEILE: tuple[str, ...] = ("lernauftrag", "arbeitsheft")
+_FUEHRENDE_LEERZEILEN: re.Pattern[str] = re.compile(r"\A(?:[ \t]*\r?\n)+")
+
+
+def _einrueckung_erhalten(text: str) -> str:
+    # Wie Djangos strip, aber die erste Zeile behält ihre Einrückung: Mit ihr
+    # beginnt ein eingerückter Block (ADR-0044, #270).
+
+    return _FUEHRENDE_LEERZEILEN.sub("", text).rstrip()
 
 
 class Bildeingabe(ClearableFileInput):
@@ -54,6 +63,8 @@ class VignetteForm(ModelForm):
     def __init__(self, *args: object, **kwargs: object) -> None:
         """Ergänzt Unterrichtskontext- und Bildfelder um Alpine-Hooks."""
         super().__init__(*args, **kwargs)
+        for teil in _BILDTEILE:
+            self.fields[f"{teil}_text"].strip = False
         for feldname in ("fach", "thema"):
             self.fields[feldname].widget.attrs.update(
                 {
@@ -129,3 +140,11 @@ class VignetteForm(ModelForm):
                 "entfernen": entfernen,
             }
         return karten
+
+    def clean_lernauftrag_text(self) -> str:
+        """Entfernt Leerraum außen, ohne die Einrückung der ersten Zeile."""
+        return _einrueckung_erhalten(self.cleaned_data["lernauftrag_text"])
+
+    def clean_arbeitsheft_text(self) -> str:
+        """Entfernt Leerraum außen, ohne die Einrückung der ersten Zeile."""
+        return _einrueckung_erhalten(self.cleaned_data["arbeitsheft_text"])
